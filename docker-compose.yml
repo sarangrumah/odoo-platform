@@ -1,0 +1,193 @@
+# ============================================================
+# Odoo 19 Platform — base compose
+# Services: postgres, redis, odoo, ai-gateway
+# Always run with at least one override (dev/prod) — this base
+# alone has no host port binding for postgres/redis (security default).
+# ============================================================
+
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+x-security-baseline: &security-baseline
+  security_opt:
+    - no-new-privileges:true
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-postgres
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-odoo} -d ${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-redis
+    <<: [*restart-policy, *default-logging, *security-baseline]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "${REDIS_PASSWORD}"
+      - --maxmemory
+      - 1gb
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+
+  odoo:
+    build:
+      context: ./odoo
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # DB
+      HOST: postgres
+      PORT: 5432
+      USER: ${POSTGRES_USER:-odoo}
+      PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Odoo
+      ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD}
+      WORKERS: ${WORKERS:-0}
+      MAX_CRON_THREADS: ${MAX_CRON_THREADS:-2}
+      LIST_DB: ${LIST_DB:-False}
+      WITHOUT_DEMO: ${WITHOUT_DEMO:-all}
+      LIMIT_TIME_CPU: ${LIMIT_TIME_CPU:-600}
+      LIMIT_TIME_REAL: ${LIMIT_TIME_REAL:-1200}
+      LIMIT_MEMORY_SOFT: ${LIMIT_MEMORY_SOFT:-2147483648}
+      LIMIT_MEMORY_HARD: ${LIMIT_MEMORY_HARD:-2684354560}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PROXY_MODE: ${PROXY_MODE:-True}
+      DBFILTER: ${DBFILTER:-^.*$$}
+      SERVER_WIDE_MODULES: ${SERVER_WIDE_MODULES:-base,web}
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # AI gateway
+      AI_GATEWAY_URL: http://ai-gateway:8080
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
+      # Coretax
+      CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY}
+    volumes:
+      - ./addons:/mnt/extra-addons:ro
+      - ./data/odoo-filestore:/var/lib/odoo
+    ports:
+      - "${ODOO_HTTP_PORT:-18069}:8069"
+      - "${ODOO_LONGPOLL_PORT:-18072}:8072"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/custom-healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+
+  ai-gateway:
+    build:
+      context: ./ai-gateway
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-ai-gateway:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-ai-gateway
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=128m,mode=1777
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+      AI_MODEL_DEFAULT: ${AI_MODEL_DEFAULT:-claude-sonnet-4-6}
+      AI_MODEL_QUALITY: ${AI_MODEL_QUALITY:-claude-opus-4-7}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL_DEFAULT: ${OPENAI_MODEL_DEFAULT:-gpt-4o}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL_DEFAULT: ${OLLAMA_MODEL_DEFAULT:-llama3.2}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${AI_GATEWAY_PORT:-18080}:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+networks:
+  odoo-net:
+    driver: bridge
+    name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-net

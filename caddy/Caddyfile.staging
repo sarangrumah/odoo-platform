@@ -1,0 +1,39 @@
+# ============================================================
+# Caddyfile.staging — variant pointing to Let's Encrypt STAGING.
+# Use during cutover testing to avoid hitting LE prod rate limits
+# (50 certs / domain / week, 5 duplicates / week).
+#
+# To activate, override the bind-mount in docker-compose.tls-acme.yml:
+#   volumes:
+#     - ./caddy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
+# ============================================================
+
+{
+	email {$ACME_EMAIL}
+	acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+	admin 0.0.0.0:2019
+}
+
+{$DOMAIN:localhost.localdomain} {
+	encode zstd gzip
+
+	tls {$ACME_EMAIL}
+
+	reverse_proxy nginx:80 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			read_timeout 720s
+			write_timeout 720s
+			dial_timeout 10s
+		}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}

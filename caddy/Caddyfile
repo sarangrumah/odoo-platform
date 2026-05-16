@@ -1,0 +1,59 @@
+# ============================================================
+# Caddyfile — TLS terminator in front of nginx
+# Env-driven:
+#   {$DOMAIN}      site name (default: localhost.localdomain)
+#   {$ACME_EMAIL}  contact for LE (empty => local internal CA)
+#   {$ACME_CA_DIR} ACME directory URL (empty => LE production)
+#
+# Caddy listens on 80 + 443 and proxies cleartext to the internal
+# `nginx:80` service, which still enforces rate-limit/WAF rules.
+# ============================================================
+
+{
+	# Email is required for real ACME issuance; harmless when empty.
+	email {$ACME_EMAIL}
+
+	# Optional custom ACME CA directory (e.g. Buypass, ZeroSSL).
+	# Leave empty for Let's Encrypt production (Caddy's default).
+	# acme_ca {$ACME_CA_DIR}
+
+	# Admin API bound to localhost inside the container — used by healthcheck.
+	admin 0.0.0.0:2019
+}
+
+{$DOMAIN:localhost.localdomain} {
+	encode zstd gzip
+
+	# TLS mode:
+	#   * Default below = Caddy's internal CA (self-signed). Safe everywhere,
+	#     works without a public DNS name. Browser will show "not trusted"
+	#     unless you import the local root from /data/caddy/pki/.
+	#   * For real Let's Encrypt certs on an internet-reachable host,
+	#     comment `tls internal` and uncomment `tls {$ACME_EMAIL}` below,
+	#     then ensure DOMAIN + ACME_EMAIL are set in .env.
+	#   * For LE staging during cutover, swap this file for Caddyfile.staging
+	#     (see docs/runbooks/tls-renewal.md).
+	tls internal
+	# tls {$ACME_EMAIL}
+
+	# Forward all traffic to internal nginx (which still does rate-limit,
+	# block /web/database/manager, longpolling, etc.).
+	reverse_proxy nginx:80 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			read_timeout 720s
+			write_timeout 720s
+			dial_timeout 10s
+		}
+	}
+
+	# Caddy-level access log (JSON) shipped to stdout for Loki/Promtail.
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}

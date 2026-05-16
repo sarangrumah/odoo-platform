@@ -1,0 +1,145 @@
+# ============================================================
+# Prod override: nginx reverse proxy, multi-worker Odoo,
+# read-only rootfs, no DB ports exposed, scheduled backup.
+# Use:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================
+
+services:
+
+  postgres:
+    # No host port (internal only)
+    deploy:
+      resources:
+        limits:
+          memory: 8g
+
+  redis:
+    # No host port
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  odoo:
+    # Don't expose 8069/8072 to host directly — nginx fronts them
+    ports: []
+    expose:
+      - "8069"
+      - "8072"
+    environment:
+      WORKERS: ${WORKERS:-4}
+      MAX_CRON_THREADS: ${MAX_CRON_THREADS:-2}
+      LIST_DB: "False"
+      WITHOUT_DEMO: all
+      LOG_LEVEL: info
+      PROXY_MODE: "True"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=512m,mode=1777
+    volumes:
+      - ./addons:/mnt/extra-addons:ro
+      - ./data/odoo-filestore:/var/lib/odoo
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          memory: ${ODOO_MEM_LIMIT:-6g}
+          cpus: "${ODOO_CPU_LIMIT:-4}"
+          pids: 256
+
+  ai-gateway:
+    ports: []
+    expose:
+      - "8080"
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          pids: 256
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-nginx
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE, DAC_OVERRIDE]
+    depends_on:
+      odoo:
+        condition: service_healthy
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./data/nginx-cache:/var/cache/nginx
+    ports:
+      - "${NGINX_HTTP_PORT:-18000}:80"
+      - "${NGINX_HTTPS_PORT:-18443}:443"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [odoo-net]
+
+  # Local backup (kept as fallback / fast restore)
+  pg-backup-local:
+    image: prodrigestivill/postgres-backup-local:16
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-pgbackup-local
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: postgres:postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_EXTRA_OPTS: "-Z9 --schema=public --blobs"
+      SCHEDULE: ${SCHEDULE:-@daily}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_KEEP_WEEKS: 8
+      BACKUP_KEEP_MONTHS: 6
+      HEALTHCHECK_PORT: 8080
+    volumes:
+      - ./data/backups:/backups
+    networks: [odoo-net]
+
+  # S3 / S3-compatible offsite backup. Disabled automatically when S3_BUCKET
+  # is empty (sidecar will error out fast; remove the service if not desired).
+  pg-backup-s3:
+    image: eeshugerman/postgres-backup-s3:16
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-pgbackup-s3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # DB
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # S3 (leave S3_ENDPOINT empty for AWS; set for R2/MinIO/Wasabi/etc.)
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_PREFIX: ${S3_PREFIX:-odoo19-platform/postgres}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      # Schedule & retention
+      SCHEDULE: ${SCHEDULE:-@daily}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+      # Encrypt the dump at rest with gpg (optional — uncomment if you set a passphrase)
+      # PASSPHRASE: ${BACKUP_GPG_PASSPHRASE}
+    networks: [odoo-net]

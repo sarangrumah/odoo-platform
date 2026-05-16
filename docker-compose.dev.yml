@@ -1,0 +1,71 @@
+# ============================================================
+# Dev override: hot reload, mailpit (SMTP catcher), pgadmin,
+# expose postgres/redis to host (toggle via EXPOSE_DB / EXPOSE_REDIS).
+# Use:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================
+
+services:
+
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-15432}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-16379}:6379"
+
+  odoo:
+    environment:
+      WORKERS: 0
+      MAX_CRON_THREADS: 1
+      LIST_DB: "True"
+      WITHOUT_DEMO: ""
+      LOG_LEVEL: debug
+      DBFILTER: "^.*$$"
+    volumes:
+      # Re-mount addons RW so editor can write back live
+      - ./addons:/mnt/extra-addons:rw
+      - ./data/odoo-filestore:/var/lib/odoo
+    command: ["odoo", "--dev=reload,qweb,werkzeug,xml"]
+
+  ai-gateway:
+    environment:
+      LOG_LEVEL: debug
+    # Mount source RW for hot reload
+    volumes:
+      - ./ai-gateway/app:/app/app:rw
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+    # Override read_only since uvicorn --reload writes pyc
+    read_only: false
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-mailpit
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    ports:
+      - "${MAILPIT_UI_PORT:-18025}:8025"
+      - "${MAILPIT_SMTP_PORT:-11025}:1025"
+    networks: [odoo-net]
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-pgadmin
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@platform.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - ./data/pgadmin:/var/lib/pgadmin
+    ports:
+      - "${PGADMIN_PORT:-15050}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [odoo-net]

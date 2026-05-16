@@ -1,0 +1,37 @@
+{
+  "title": "Capacity & Upgrade Suggestions",
+  "uid": "capacity-prediction",
+  "tags": ["platform", "predictor"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {"from": "now-30d", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Days to saturation (per component)",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 0},
+      "targets": [{"expr": "custom_predictor_saturation_eta_days", "legendFormat": "{{component}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "d", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 7}, {"color": "green", "value": 30}]}}},
+      "datasource": {"type": "prometheus", "uid": "prometheus"}
+    },
+    {
+      "id": 2,
+      "title": "Latest upgrade recommendations (from predictor JSON)",
+      "type": "table",
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 6},
+      "targets": [{
+        "refId": "A",
+        "fields": [
+          {"jsonPath": "$.recommend_upgrade[*].component", "name": "Component"},
+          {"jsonPath": "$.recommend_upgrade[*].urgency", "name": "Urgency"},
+          {"jsonPath": "$.recommend_upgrade[*].rationale", "name": "Rationale"}
+        ],
+        "method": "GET",
+        "urlPath": "/latest.json"
+      }],
+      "datasource": {"type": "marcusolsson-json-datasource", "uid": "predictor"}
+    }
+  ]
+}

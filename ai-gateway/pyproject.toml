@@ -1,0 +1,36 @@
+[project]
+name = "ai-gateway"
+version = "0.1.0"
+description = "Multi-provider AI gateway for Odoo 19 Platform"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.115.4",
+  "uvicorn[standard]==0.32.0",
+  "pydantic==2.9.2",
+  "pydantic-settings==2.6.0",
+  "httpx[http2]==0.27.2",
+  "anthropic==0.39.0",
+  "openai==1.54.0",
+  "redis==5.1.1",
+  "structlog==24.4.0",
+  "prometheus-client==0.21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.3.3",
+  "pytest-asyncio==0.24.0",
+  "ruff==0.7.2",
+  "mypy==1.13.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "TCH", "ASYNC"]
+ignore = ["S101"]  # allow assert in tests
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

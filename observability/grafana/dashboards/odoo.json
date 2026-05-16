@@ -1,0 +1,44 @@
+{
+  "title": "Odoo Service",
+  "uid": "odoo-service",
+  "tags": ["platform", "odoo"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP up",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "targets": [{"expr": "odoo_http_up", "refId": "A"}],
+      "datasource": {"type": "prometheus", "uid": "prometheus"}
+    },
+    {
+      "id": 2,
+      "title": "Longpoll up",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "targets": [{"expr": "odoo_longpoll_up", "refId": "A"}],
+      "datasource": {"type": "prometheus", "uid": "prometheus"}
+    },
+    {
+      "id": 3,
+      "title": "HTTP latency (avg)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 16, "x": 8, "y": 0},
+      "targets": [{"expr": "rate(odoo_http_request_duration_seconds_sum[5m]) / rate(odoo_http_request_duration_seconds_count[5m])", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "datasource": {"type": "prometheus", "uid": "prometheus"}
+    },
+    {
+      "id": 4,
+      "title": "Recent error logs (Loki)",
+      "type": "logs",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 8},
+      "targets": [{"expr": "{service=\"odoo\", level=~\"ERROR|CRITICAL\"}", "refId": "A"}],
+      "datasource": {"type": "loki", "uid": "loki"}
+    }
+  ]
+}

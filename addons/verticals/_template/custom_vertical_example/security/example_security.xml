@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!--
+            User group for Custom Vertical (Example).
+
+            Sits under the shared Custom Platform module category so it
+            appears together with custom_core and other vertical groups
+            in the user-form group selector.
+        -->
+        <record id="group_user" model="res.groups">
+            <field name="name">Custom Vertical Example / User</field>
+            <field name="privilege_id" ref="custom_core.res_groups_privilege_custom_platform"/>
+            <field name="comment">Baseline access to Custom Vertical (Example) features.</field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!--
+            Extend the standard partner form with a "Vertical" tab
+            holding the new `x_custom_vertical_example_tag` field.
+            Using xpath against the existing notebook keeps the
+            extension idempotent.
+        -->
+        <record id="view_partner_form_vertical_example" model="ir.ui.view">
+            <field name="name">res.partner.form.custom.vertical.example</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//notebook" position="inside">
+                    <page string="Vertical" name="vertical_example">
+                        <group>
+                            <field name="x_custom_vertical_example_tag"/>
+                        </group>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+
+        <!--
+            Optional: also expose the field on the partner list view
+            so it is searchable from the top-level action above.
+            Odoo 19 uses <list> rather than <tree>.
+        -->
+        <record id="view_partner_list_vertical_example" model="ir.ui.view">
+            <field name="name">res.partner.list.custom.vertical.example</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//list" position="inside">
+                    <field name="x_custom_vertical_example_tag" optional="show"/>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

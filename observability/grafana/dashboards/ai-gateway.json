@@ -1,0 +1,36 @@
+{
+  "title": "AI Gateway",
+  "uid": "ai-gateway",
+  "tags": ["platform", "ai"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request rate (per route)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{"expr": "sum by (handler) (rate(http_requests_total[5m]))", "legendFormat": "{{handler}}", "refId": "A"}],
+      "datasource": {"type": "prometheus", "uid": "prometheus"}
+    },
+    {
+      "id": 2,
+      "title": "Predictor saturation ETA (days)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{"expr": "custom_predictor_saturation_eta_days", "legendFormat": "{{component}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "d"}},
+      "datasource": {"type": "prometheus", "uid": "prometheus"}
+    },
+    {
+      "id": 3,
+      "title": "Upgrade advice count by urgency",
+      "type": "barchart",
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 8},
+      "targets": [{"expr": "custom_predictor_advice_count", "legendFormat": "{{urgency}}", "refId": "A"}],
+      "datasource": {"type": "prometheus", "uid": "prometheus"}
+    }
+  ]
+}

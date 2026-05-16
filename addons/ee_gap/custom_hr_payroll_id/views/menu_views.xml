@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_payroll_id_root"
+              name="Payroll ID"
+              parent="hr.menu_hr_root"
+              sequence="60"
+              groups="custom_hr_payroll_id.group_user"/>
+
+    <menuitem id="menu_payroll_id_payslips"
+              name="Payslips"
+              parent="menu_payroll_id_root"
+              action="action_hr_payslip"
+              sequence="10"/>
+
+    <menuitem id="menu_payroll_id_config"
+              name="Configuration"
+              parent="menu_payroll_id_root"
+              sequence="90"
+              groups="custom_hr_payroll_id.group_manager"/>
+
+    <menuitem id="menu_payroll_id_config_main"
+              name="Payroll Config"
+              parent="menu_payroll_id_config"
+              action="action_hr_payroll_config"
+              sequence="10"/>
+
+    <!-- Also expose under Custom root -->
+    <menuitem id="menu_payroll_id_in_custom"
+              name="Payroll ID"
+              parent="custom_core.menu_custom_root"
+              action="action_hr_payslip"
+              sequence="50"
+              groups="custom_hr_payroll_id.group_user"/>
+</odoo>

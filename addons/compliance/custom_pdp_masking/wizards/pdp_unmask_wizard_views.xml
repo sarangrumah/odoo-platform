@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pdp_unmask_wizard_form" model="ir.ui.view">
+        <field name="name">pdp.unmask.wizard.form</field>
+        <field name="model">pdp.unmask.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Unmask PII">
+                <group>
+                    <field name="model_name" readonly="1"/>
+                    <field name="res_ids_csv" readonly="1"/>
+                    <field name="reason"/>
+                </group>
+                <footer>
+                    <button name="action_unmask" type="object" string="Unmask (audited)" class="btn-primary"/>
+                    <button special="cancel" string="Cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pdp_unmask_wizard" model="ir.actions.act_window">
+        <field name="name">Unmask PII</field>
+        <field name="res_model">pdp.unmask.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -1,0 +1,33 @@
+# ============================================================
+# Local LLM override: Ollama for self-hosted models.
+# Optional. Pull a model once Ollama is up:
+#   docker compose exec ollama ollama pull llama3.2
+# Use:  docker compose -f docker-compose.yml \
+#                      -f docker-compose.dev.yml \
+#                      -f docker-compose.local-llm.yml up -d
+# Set AI_PROVIDER=ollama in .env to route gateway traffic here.
+# ============================================================
+
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-ollama
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./data/ollama:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 16g

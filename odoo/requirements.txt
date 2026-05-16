@@ -1,0 +1,15 @@
+# Additional Python deps for the Odoo 19 image
+# Pinned to known-good versions (May 2026)
+
+httpx[http2]==0.27.2          # AI gateway client
+redis==5.1.1                  # session cache + queue_job (vendored later)
+cryptography==43.0.3          # Fernet for sertel + ir.config_parameter
+pyjwt==2.9.0                  # JWT for AI gateway auth (alt to HMAC)
+xmlschema==3.4.1              # Coretax XSD validation
+signxml==4.0.0                # Sertel XAdES signing (DJP requirement)
+phonenumbers==8.13.50         # E.164 normalization for PII fields
+qrcode==7.4.2                 # 2FA + receipt QR
+pyotp==2.9.0                  # TOTP for 2FA admin
+pypdf==5.1.0                  # PDF utilities for Documents/Sign modules
+python-dateutil==2.9.0
+prometheus-client==0.21.0     # Optional: Odoo can expose /metrics later

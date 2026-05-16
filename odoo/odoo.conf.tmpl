@@ -1,0 +1,54 @@
+[options]
+; ============================================================
+; Odoo 19 Platform — config template
+; Rendered by entrypoint.sh via `envsubst`. Literal $ must be $$.
+; ============================================================
+
+; ----- Database -----
+db_host = ${HOST}
+db_port = ${PORT}
+db_user = ${USER}
+db_password = ${PASSWORD}
+db_template = template0
+list_db = ${LIST_DB}
+dbfilter = ${DBFILTER}
+
+; ----- Master / admin -----
+admin_passwd = ${ODOO_ADMIN_PASSWD}
+
+; ----- Addons -----
+addons_path = /usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons/_vendor,/mnt/extra-addons/core,/mnt/extra-addons/compliance,/mnt/extra-addons/ee_gap,/mnt/extra-addons/verticals
+
+; ----- Server-wide modules -----
+server_wide_modules = ${SERVER_WIDE_MODULES}
+
+; ----- HTTP / proxy -----
+proxy_mode = ${PROXY_MODE}
+http_interface = 0.0.0.0
+http_port = 8069
+gevent_port = 8072
+
+; ----- Workers -----
+workers = ${WORKERS}
+max_cron_threads = ${MAX_CRON_THREADS}
+limit_time_cpu = ${LIMIT_TIME_CPU}
+limit_time_real = ${LIMIT_TIME_REAL}
+limit_memory_soft = ${LIMIT_MEMORY_SOFT}
+limit_memory_hard = ${LIMIT_MEMORY_HARD}
+limit_request = 8192
+
+; ----- Data dir -----
+data_dir = /var/lib/odoo
+
+; ----- Demo data -----
+without_demo = ${WITHOUT_DEMO}
+
+; ----- Logging -----
+log_level = ${LOG_LEVEL}
+log_handler = :INFO,werkzeug:WARNING,odoo.modules.loading:WARNING,odoo.addons.base:INFO
+logfile = None
+
+; ----- Security / misc -----
+csv_internal_sep = ,
+reportgz = False
+unaccent = True

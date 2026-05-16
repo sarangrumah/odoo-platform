@@ -1,0 +1,85 @@
+rules:
+  - id: odoo-sql-injection-fstring
+    languages: [python]
+    severity: ERROR
+    message: >
+      cr.execute() called with an f-string or `.format()` — SQL injection risk.
+      Use parameterized queries: `cr.execute("... %s ...", (value,))`.
+    patterns:
+      - pattern-either:
+          - pattern: $CR.execute(f"...")
+          - pattern: $CR.execute("...".format(...))
+          - pattern: |
+              $Q = f"..."
+              $CR.execute($Q)
+      - metavariable-pattern:
+          metavariable: $CR
+          patterns:
+            - pattern-regex: '^(cr|self\.env\.cr|self\.cr)$'
+
+  - id: odoo-sql-injection-percent-format
+    languages: [python]
+    severity: ERROR
+    message: >
+      cr.execute() called with `%` string formatting — SQL injection risk.
+    pattern: |
+      $CR.execute("..." % ...)
+
+  - id: odoo-sudo-without-comment
+    languages: [python]
+    severity: WARNING
+    message: >
+      .sudo() bypasses access rights. Add an inline comment with rationale,
+      or refactor to use a security group.
+    patterns:
+      - pattern: $X.sudo()
+      - pattern-not-inside: |
+          # ...
+          $X.sudo()
+
+  - id: odoo-eval-builtin
+    languages: [python]
+    severity: ERROR
+    message: >
+      Use of `eval()` is forbidden. Use `safe_eval` from `odoo.tools` if you must.
+    pattern: eval(...)
+
+  - id: odoo-os-popen
+    languages: [python]
+    severity: ERROR
+    message: >
+      `os.popen` / `os.system` are forbidden. Use `subprocess.run` with shell=False.
+    pattern-either:
+      - pattern: os.popen(...)
+      - pattern: os.system(...)
+
+  - id: odoo-print-statement
+    languages: [python]
+    severity: WARNING
+    message: >
+      `print()` in addon code — use `_logger` instead.
+    pattern: print(...)
+    paths:
+      include:
+        - "addons/**/*.py"
+
+  - id: weak-hash-md5-sha1
+    languages: [python]
+    severity: WARNING
+    message: >
+      MD5 / SHA1 are not collision-resistant. Use SHA-256 or stronger for security
+      sensitive hashes (allowed for caching keys / etags).
+    pattern-either:
+      - pattern: hashlib.md5(...)
+      - pattern: hashlib.sha1(...)
+
+  - id: odoo-missing-access-csv
+    languages: [generic]
+    severity: WARNING
+    message: >
+      A new model is defined but there is no matching `ir.model.access.csv` entry.
+      Manual review required — Semgrep cannot confirm membership reliably.
+    paths:
+      include:
+        - "addons/**/models/**/*.py"
+    pattern-regex: '^\s*_name\s*=\s*[''"][a-z][a-z0-9_.]+[''"]'

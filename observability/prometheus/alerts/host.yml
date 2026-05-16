@@ -1,0 +1,71 @@
+groups:
+  - name: host-alerts
+    rules:
+      - alert: HostHighCPU
+        expr: instance:cpu_usage:percent > 90
+        for: 15m
+        labels:
+          severity: warning
+          component: cpu
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU > 90% for 15m (current {{ $value | printf \"%.1f\" }}%)"
+
+      - alert: HostHighMemory
+        expr: instance:memory_used:percent > 90
+        for: 15m
+        labels:
+          severity: warning
+          component: memory
+        annotations:
+          summary: "High memory on {{ $labels.instance }}"
+          description: "Memory > 90% for 15m (current {{ $value | printf \"%.1f\" }}%)"
+
+      - alert: HostLowDisk
+        expr: instance:disk_used:percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: disk
+        annotations:
+          summary: "Low disk on {{ $labels.instance }}"
+          description: "Disk usage > 85% (current {{ $value | printf \"%.1f\" }}%)"
+
+      - alert: HostCriticalDisk
+        expr: instance:disk_used:percent > 95
+        for: 1m
+        labels:
+          severity: critical
+          component: disk
+        annotations:
+          summary: "Critical disk on {{ $labels.instance }}"
+          description: "Disk > 95% — service degradation imminent"
+
+      - alert: HostOOMKill
+        expr: increase(node_vmstat_oom_kill[5m]) > 0
+        labels:
+          severity: critical
+          component: memory
+        annotations:
+          summary: "OOM kill on {{ $labels.instance }}"
+          description: "{{ $value }} OOM kill(s) in last 5m"
+
+  - name: capacity-alerts
+    rules:
+      - alert: CapacitySaturationWarn
+        expr: custom_predictor_saturation_eta_days < 14
+        labels:
+          severity: warning
+          component: "{{ $labels.component }}"
+        annotations:
+          summary: "{{ $labels.component }} will saturate in {{ $value | printf \"%.1f\" }}d"
+          description: "Predictor forecasts saturation < 14d. Plan upgrade."
+
+      - alert: CapacitySaturationCritical
+        expr: custom_predictor_saturation_eta_days < 7
+        labels:
+          severity: critical
+          component: "{{ $labels.component }}"
+        annotations:
+          summary: "{{ $labels.component }} will saturate in {{ $value | printf \"%.1f\" }}d (CRITICAL)"
+          description: "Predictor forecasts saturation < 7d. Upgrade now."

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_pdp_unmask_wizard"
+              name="Unmask PII"
+              parent="custom_pdp_core.menu_pdp_config"
+              action="action_pdp_unmask_wizard"
+              sequence="40"
+              groups="group_view_pii,custom_pdp_core.group_dpo"/>
+</odoo>

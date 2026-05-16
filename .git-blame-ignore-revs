@@ -1,0 +1,8 @@
+# Revisions listed here are excluded from `git blame` output.
+# Use this for bulk reformatting / mass-rename commits so blame still points
+# to the actual author of each line of business logic.
+#
+# Enable locally:  git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Add one SHA per line. Example:
+# 123abc456def...   # mass ruff format pass (no logic change)

@@ -1,0 +1,62 @@
+# ----- Secrets & local config -----
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+!nginx/certs/.gitkeep
+nginx/certs/*
+!nginx/certs/.gitkeep
+age.key
+age.txt
+.secrets.dec.yaml
+
+# ----- Runtime data (bind volumes) -----
+data/
+!data/.gitkeep
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+.coverage
+htmlcov/
+
+# ----- Node / frontend tooling (if needed for assets) -----
+node_modules/
+
+# ----- Editors -----
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ----- Build / dist -----
+dist/
+build/
+*.tgz
+*.tar.gz
+
+# ----- Logs -----
+*.log
+logs/
+
+# ----- Trivy / scan artifacts -----
+trivy-results.*
+sbom-*.json
+sbom-*.xml
+
+# ----- Coretax sertel (encrypted at rest, but never commit) -----
+addons/compliance/custom_coretax/data/sertel/*.p12
+addons/compliance/custom_coretax/data/sertel/*.pfx

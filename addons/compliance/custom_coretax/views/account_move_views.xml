@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_move_form_inherit_coretax" model="ir.ui.view">
+        <field name="name">account.move.form.inherit.coretax</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Coretax" name="coretax"
+                      groups="custom_coretax.group_user">
+                    <group>
+                        <group string="DJP Submission">
+                            <field name="x_custom_coretax_status"/>
+                            <field name="x_custom_coretax_status_code"/>
+                            <field name="x_custom_coretax_submission_uuid"/>
+                        </group>
+                        <group string="NSFP">
+                            <field name="x_custom_nsfp"
+                                   invisible="x_custom_coretax_status == 'draft'"
+                                   placeholder="17 digits — assigned by DJP after approval"/>
+                            <field name="x_custom_coretax_response_attach_id"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- NOTE: A list-view inheritance for account.move was intentionally
+         omitted because the canonical list xmlid varies between Odoo
+         CE editions (account.view_invoice_tree vs account.view_out_invoice_tree).
+         Operators can extend the list locally if desired. -->
+
+</odoo>

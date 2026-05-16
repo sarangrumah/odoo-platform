@@ -1,0 +1,7 @@
+# Trivy ignore list — justify EVERY entry
+# Format: <CVE-ID>
+# Each entry MUST have a comment line above explaining justification + expiry.
+
+# Example:
+# # justification: false positive — affects only debian buster, we run bookworm. expires 2026-12-31
+# CVE-2024-99999

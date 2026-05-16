@@ -1,0 +1,21 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Shell scripts must always be LF
+*.sh text eol=lf
+entrypoint.sh text eol=lf
+healthcheck.sh text eol=lf
+
+# Windows-specific
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.p12 binary
+*.pfx binary
+*.pdf binary

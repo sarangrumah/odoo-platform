@@ -1,0 +1,11 @@
+# SOPS configuration — encrypt .env-like files with age key
+# Generate a key:  age-keygen -o ~/.config/sops/age/keys.txt
+# Then set SOPS_AGE_RECIPIENT to the public part for `make encrypt-env`.
+
+creation_rules:
+  - path_regex: \.secrets\.enc\.yaml$
+    # Encrypt any field whose name contains a sensitivity hint — case-insensitive.
+    # Public-by-design fields (ports, paths, public model names, log levels) stay readable.
+    encrypted_regex: '(?i)(password|passwd|secret|key|token|api[_-]?key|credential|sertel|private|ANTHROPIC_API_KEY|OPENAI_API_KEY|GATEWAY_SHARED_SECRET|CORETAX_SERTEL|S3_(ACCESS|SECRET))'
+    age: >-
+      age1wdh3mpmewqdzp73hr7ypk429n0ut3ex6c9qxlj26u9lfg6vyvp7qj524f4

@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_payroll_config_user,hr.payroll.config user,model_hr_payroll_config,custom_hr_payroll_id.group_user,1,0,0,0
+access_payroll_config_manager,hr.payroll.config manager,model_hr_payroll_config,custom_hr_payroll_id.group_manager,1,1,1,1
+access_payslip_user,hr.payslip user,model_hr_payslip,custom_hr_payroll_id.group_user,1,0,0,0
+access_payslip_manager,hr.payslip manager,model_hr_payslip,custom_hr_payroll_id.group_manager,1,1,1,1
+access_payslip_line_user,hr.payslip.line user,model_hr_payslip_line,custom_hr_payroll_id.group_user,1,0,0,0
+access_payslip_line_manager,hr.payslip.line manager,model_hr_payslip_line,custom_hr_payroll_id.group_manager,1,1,1,1

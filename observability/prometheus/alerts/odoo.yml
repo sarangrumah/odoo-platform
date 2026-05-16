@@ -1,0 +1,30 @@
+groups:
+  - name: odoo-alerts
+    rules:
+      - alert: OdooHTTPDown
+        expr: odoo_http_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: odoo
+        annotations:
+          summary: "Odoo HTTP not responding"
+          description: "odoo-exporter cannot reach Odoo HTTP for 2m"
+
+      - alert: OdooLongpollingDown
+        expr: odoo_longpoll_up == 0
+        for: 2m
+        labels:
+          severity: warning
+          component: odoo
+        annotations:
+          summary: "Odoo longpolling not responding"
+
+      - alert: OdooHighLatency
+        expr: histogram_quantile(0.95, sum by (le) (rate(odoo_http_request_duration_seconds_bucket[5m]))) > 3
+        for: 10m
+        labels:
+          severity: warning
+          component: odoo
+        annotations:
+          summary: "Odoo p95 latency > 3s for 10m"
