@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_rental_root" name="Rental" sequence="56"
+              groups="custom_rental.group_rental_user"/>
+    <menuitem id="menu_rental_orders" name="Orders" parent="menu_rental_root"
+              action="action_rental_order" sequence="10"/>
+    <menuitem id="menu_rental_assets" name="Assets" parent="menu_rental_root"
+              action="action_rental_asset" sequence="20"
+              groups="custom_rental.group_rental_manager"/>
+</odoo>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_studio_root" name="Studio" sequence="75"
+              groups="custom_studio_lite.group_studio_admin"/>
+    <menuitem id="menu_studio_fields" name="Custom Fields" parent="menu_studio_root"
+              action="action_studio_field" sequence="10"/>
+</odoo>

@@ -1,25 +1,26 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Studio Lite",
-    "summary": "Low-code customization: field builder, view editor, report designer",
+    "summary": "Declarative custom-field + view-extension manager (lightweight Studio replacement)",
     "description": """
-Custom Studio Lite is a CE-targeted reimplementation of a subset of Odoo Studio (EE),
-documented at https://www.odoo.com/documentation/19.0/applications/studio.html.
-
-IMPLEMENTATION STATUS: SCAFFOLD - manifest only, no models/views yet.
-Reference spec:
-- Low-code custom field builder UI (ir.model.fields wrapper)
-- View inheritance editor with visual XPath assistance
-- Custom report designer (QWeb template authoring)
-- App creation wizard (model + menu + security boilerplate)
+Lightweight 'Studio': admins declare custom fields + view inserts via
+DB records (rather than editing source). The manager pre-creates
+``ir.model.fields`` rows (prefixed ``x_studio_``) and ``ir.ui.view``
+inheritances on save. Useful for vertical-specific quick tweaks
+without forking a module.
 """,
     "author": "Custom Platform",
-    "category": "Tools/Customization",
+    "category": "Productivity/Studio",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "web"],
-    "data": [],
+    "depends": ["custom_core", "custom_pdp_audit", "base"],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "views/studio_custom_field_views.xml",
+        "views/menu_views.xml",
+    ],
     "installable": True,
-    "application": False,
+    "application": True,
     "auto_install": False,
 }

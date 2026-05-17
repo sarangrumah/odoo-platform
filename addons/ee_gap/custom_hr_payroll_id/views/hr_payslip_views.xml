@@ -76,6 +76,18 @@
                     <group>
                         <field name="take_home_pay" class="oe_subtotal_footer"/>
                     </group>
+                    <group string="Calculation Audit" invisible="state == 'draft'">
+                        <group>
+                            <field name="calc_method_used" readonly="1"/>
+                            <field name="ter_category_used" readonly="1"
+                                   invisible="calc_method_used != 'ter'"/>
+                            <field name="ter_rate_used" readonly="1"
+                                   invisible="calc_method_used != 'ter'"/>
+                        </group>
+                        <group>
+                            <field name="bupot_id" readonly="1"/>
+                        </group>
+                    </group>
                     <notebook>
                         <page string="Lines">
                             <field name="line_ids">

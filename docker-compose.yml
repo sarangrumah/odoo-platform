@@ -35,9 +35,18 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      # Consumed by 05-rotate-orchestrator-password.sh on first boot only.
+      PG_ORCHESTRATOR_PASSWORD: ${PG_ORCHESTRATOR_PASSWORD}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    command:
+      - "postgres"
+      - "-c"
+      - "hba_file=/etc/postgresql/pg_hba.conf"
+      - "-c"
+      - "password_encryption=scram-sha-256"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-odoo} -d ${POSTGRES_DB:-postgres}"]
       interval: 10s
@@ -181,6 +190,102 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  minio:
+    image: minio/minio:RELEASE.2024-10-29T16-01-48Z
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-minio
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS:-platform-backups}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:${MINIO_CONSOLE_PORT:-19001}
+    command:
+      - "server"
+      - "/data"
+      - "--console-address"
+      - ":9001"
+    volumes:
+      - ./data/minio:/data
+    ports:
+      - "${MINIO_API_PORT:-19000}:9000"
+      - "${MINIO_CONSOLE_PORT:-19001}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  tenant-orchestrator:
+    build:
+      context: ./tenant-orchestrator
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-tenant-orchestrator:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-tenant-orchestrator
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=512m,mode=1777
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      odoo:
+        condition: service_healthy
+    environment:
+      # --- Postgres master + roles ---
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_MASTER_DB: ${POSTGRES_DB:-postgres}
+      PG_SUPER_USER: ${POSTGRES_USER:-odoo}
+      PG_SUPER_PASSWORD: ${POSTGRES_PASSWORD}
+      PG_ORCHESTRATOR_USER: tenant_orchestrator
+      PG_ORCHESTRATOR_PASSWORD: ${PG_ORCHESTRATOR_PASSWORD}
+      PG_TENANT_OWNER_ROLE: ${POSTGRES_USER:-odoo}
+      # --- Cryptography ---
+      MASTER_WRAPPING_KEY: ${MASTER_WRAPPING_KEY}
+      # --- API auth ---
+      ORCHESTRATOR_SHARED_SECRET: ${ORCHESTRATOR_SHARED_SECRET}
+      # --- MinIO / S3 ---
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${MINIO_DEFAULT_BUCKETS:-platform-backups}
+      S3_USE_SSL: "false"
+      # --- Odoo ---
+      ODOO_HOST: odoo
+      ODOO_PORT: 8069
+      ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD}
+      # --- Operational ---
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENABLE_BACKUP_SCHEDULER: ${ENABLE_BACKUP_SCHEDULER:-true}
+    ports:
+      - "${TENANT_ORCHESTRATOR_PORT:-18091}:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks: [odoo-net]
     deploy:
       resources:

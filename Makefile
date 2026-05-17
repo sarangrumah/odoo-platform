@@ -11,12 +11,20 @@ COMPOSE_PROD := $(COMPOSE_BASE) -f docker-compose.prod.yml
 COMPOSE_OBS  := -f docker-compose.observability.yml
 COMPOSE_LLM  := -f docker-compose.local-llm.yml
 COMPOSE_TLS  := -f docker-compose.tls-acme.yml
+COMPOSE_MT   := -f docker-compose.multitenant.yml
 
 SERVICE ?= odoo
 MODULE  ?= custom_core
 DB      ?= odoo_dev
 FILE    ?=
 IMAGE   ?=
+SLUG    ?=
+NAME    ?=
+PLAN    ?= standard
+EMAIL   ?=
+KIND    ?= manual
+S3_KEY  ?=
+TARGET_DB ?=
 
 # ----- Help -----
 .PHONY: help
@@ -45,8 +53,11 @@ up-llm: ## Start with local Ollama (profile local-llm)
 up-tls: ## Start with Caddy ACME (set DOMAIN+ACME_EMAIL in .env first)
 	$(COMPOSE_PROD) $(COMPOSE_TLS) up -d --build
 
+up-multitenant: ## Start multi-tenant stack (Caddy wildcard + orchestrator + MinIO)
+	$(COMPOSE_BASE) $(COMPOSE_MT) $(COMPOSE_OBS) up -d --build
+
 down: ## Stop all (keep volumes)
-	$(COMPOSE_DEV) $(COMPOSE_OBS) $(COMPOSE_LLM) $(COMPOSE_TLS) -f docker-compose.prod.yml down
+	$(COMPOSE_DEV) $(COMPOSE_OBS) $(COMPOSE_LLM) $(COMPOSE_TLS) $(COMPOSE_MT) -f docker-compose.prod.yml down
 
 stop: ## Stop services
 	$(COMPOSE_DEV) stop
@@ -153,3 +164,105 @@ verify-audit-chain: ## Verify PDP audit log hash chain integrity
 
 test-gateway: ## Run AI gateway tests
 	$(COMPOSE_DEV) exec ai-gateway pytest -v
+
+test-orchestrator: ## Run tenant-orchestrator tests
+	$(COMPOSE_BASE) exec tenant-orchestrator python -m pytest -v
+
+# ============================================================
+# Multi-tenant operations (P0)
+# ============================================================
+.PHONY: tenant-list tenant-provision tenant-suspend tenant-resume tenant-archive \
+        tenant-backup tenant-list-backups tenant-restore tenant-verify-chain \
+        init-master-admin rotate-orchestrator-pwd
+
+tenant-list: ## List all tenants
+	./scripts/orchestrator-call.sh GET /v1/tenants | python3 -m json.tool
+
+tenant-provision: ## Provision tenant: make tenant-provision SLUG=acme NAME="Acme Corp" [PLAN=standard] [EMAIL=...]
+	@test -n "$(SLUG)" || (echo "SLUG= required" && exit 1)
+	@test -n "$(NAME)" || (echo "NAME= required" && exit 1)
+	./scripts/tenant-provision.sh "$(SLUG)" "$(NAME)" "$(PLAN)" "$(EMAIL)"
+
+tenant-suspend: ## Suspend tenant: make tenant-suspend SLUG=acme
+	@test -n "$(SLUG)" || (echo "SLUG= required" && exit 1)
+	./scripts/orchestrator-call.sh POST /v1/tenants/$(SLUG)/suspend '{}' | python3 -m json.tool
+
+tenant-resume: ## Resume tenant: make tenant-resume SLUG=acme
+	@test -n "$(SLUG)" || (echo "SLUG= required" && exit 1)
+	./scripts/orchestrator-call.sh POST /v1/tenants/$(SLUG)/resume '{}' | python3 -m json.tool
+
+tenant-archive: ## Archive tenant (30d purge window): make tenant-archive SLUG=acme
+	@test -n "$(SLUG)" || (echo "SLUG= required" && exit 1)
+	./scripts/orchestrator-call.sh DELETE /v1/tenants/$(SLUG) '{"retention_days":30}' | python3 -m json.tool
+
+tenant-backup: ## Manual backup: make tenant-backup SLUG=acme [KIND=manual]
+	@test -n "$(SLUG)" || (echo "SLUG= required" && exit 1)
+	./scripts/tenant-backup.sh "$(SLUG)" "$(KIND)"
+
+tenant-list-backups: ## List a tenant's backups: make tenant-list-backups SLUG=acme
+	@test -n "$(SLUG)" || (echo "SLUG= required" && exit 1)
+	./scripts/tenant-list-backups.sh "$(SLUG)"
+
+tenant-restore: ## Restore a backup to staging: make tenant-restore SLUG=acme S3_KEY=acme/2026/05/17/... [TARGET_DB=acme_staging]
+	@test -n "$(SLUG)" || (echo "SLUG= required" && exit 1)
+	@test -n "$(S3_KEY)" || (echo "S3_KEY= required" && exit 1)
+	./scripts/tenant-restore.sh "$(SLUG)" "$(S3_KEY)" "$(TARGET_DB)"
+
+tenant-verify-chain: ## Verify tenant_registry.action_log hash chain
+	./scripts/verify-tenant-chain.sh && echo "✓ Chain intact" || echo "✗ Chain has breaks"
+
+init-master-admin: ## Bootstrap master_admin DB (run once after first `make up-multitenant`)
+	$(COMPOSE_BASE) exec odoo odoo -d master_admin --without-demo=all --stop-after-init -i custom_super_admin
+
+rotate-orchestrator-pwd: ## Rotate tenant_orchestrator role password to current env value
+	@test -n "$$PG_ORCHESTRATOR_PASSWORD" || (echo "Set PG_ORCHESTRATOR_PASSWORD in .env" && exit 1)
+	$(COMPOSE_BASE) exec -T postgres psql -U $${POSTGRES_USER:-odoo} -d $${POSTGRES_DB:-postgres} \
+	  -c "ALTER ROLE tenant_orchestrator WITH LOGIN PASSWORD '$$PG_ORCHESTRATOR_PASSWORD';"
+	@echo "✓ Password rotated. Restart orchestrator: docker compose restart tenant-orchestrator"
+
+# ============================================================
+# P4 — Production hardening (load, chaos, compliance)
+# ============================================================
+.PHONY: load-smoke load-mixed load-provisioning \
+        chaos-postgres chaos-redis chaos-ai-gateway chaos-orchestrator \
+        chaos-fill-disk chaos-pajakku \
+        compliance-verify capacity-tune dr-drill-snapshot
+
+load-smoke: ## k6 read-only smoke (5 VUs / 30s)
+	k6 run --vus 5 --duration 30s tests/load/k6/read_only.js
+
+load-mixed: ## k6 full mixed scenario (500 VUs / 30 min, 60/30/10 read/write/report)
+	k6 run tests/load/k6/mixed_scenario.js
+
+load-provisioning: ## k6 parallel tenant provisioning (10 VUs)
+	k6 run tests/load/k6/provisioning.js
+
+chaos-postgres: ## Drill: kill postgres, verify Odoo reconnect + no data loss
+	./scripts/chaos/kill-postgres.sh
+
+chaos-redis: ## Drill: kill redis, verify ai-gateway rate-limit fails open
+	./scripts/chaos/kill-redis.sh
+
+chaos-ai-gateway: ## Drill: kill ai-gateway, verify Odoo degrades gracefully
+	./scripts/chaos/kill-ai-gateway.sh
+
+chaos-orchestrator: ## Drill: kill tenant-orchestrator, verify tenants stay up
+	./scripts/chaos/kill-orchestrator.sh
+
+chaos-fill-disk: ## Drill: fill disk briefly, verify era-predictor alert
+	./scripts/chaos/fill-disk.sh
+
+chaos-pajakku: ## Drill: block Pajakku network, verify circuit breaker opens
+	./scripts/chaos/kill-pajakku-network.sh
+
+compliance-verify: ## Run all SOC2-style automated checks; report at docs/compliance/_last_verify.json
+	./scripts/compliance/verify_all.sh
+
+capacity-tune: ## Snapshot capacity prediction accuracy; weekly cron helper
+	./scripts/capacity/tune_predictor.sh
+
+dr-drill-snapshot: ## Take a forensic snapshot before running a DR drill
+	@mkdir -p data/forensic
+	$(COMPOSE_BASE) exec -T postgres pg_dumpall -U $${POSTGRES_USER:-odoo} | gzip > \
+	  data/forensic/dumpall-$$(date +%Y%m%dT%H%M%SZ).sql.gz
+	@echo "Snapshot saved. Run drills, then compare via 'gunzip -c data/forensic/<latest>.sql.gz | head'"

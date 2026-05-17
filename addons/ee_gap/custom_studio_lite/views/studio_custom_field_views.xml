@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_studio_field_list" model="ir.ui.view">
+        <field name="name">studio.custom.field.list</field>
+        <field name="model">studio.custom.field</field>
+        <field name="arch" type="xml">
+            <list decoration-success="state == 'applied'"
+                  decoration-danger="state == 'error'">
+                <field name="name"/>
+                <field name="technical_name"/>
+                <field name="model_id"/>
+                <field name="field_type"/>
+                <field name="required"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_studio_field_form" model="ir.ui.view">
+        <field name="name">studio.custom.field.form</field>
+        <field name="model">studio.custom.field</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_apply" string="Apply" type="object" class="btn-primary"
+                            invisible="state == 'applied'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="model_id" options="{'no_create': True}"/>
+                            <field name="technical_name" placeholder="x_studio_..."/>
+                            <field name="field_type"/>
+                        </group>
+                        <group>
+                            <field name="required"/>
+                            <field name="readonly"/>
+                            <field name="ir_model_fields_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <separator string="Selection values (key|label per line)"
+                               invisible="field_type != 'selection'"/>
+                    <field name="selection_values"
+                           invisible="field_type != 'selection'"
+                           placeholder="draft|Draft&#10;done|Done"/>
+                    <separator string="Help text"/>
+                    <field name="help_text"/>
+                    <separator string="Last error" invisible="not last_error"/>
+                    <field name="last_error" readonly="1" invisible="not last_error"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_studio_field" model="ir.actions.act_window">
+        <field name="name">Custom Fields</field>
+        <field name="res_model">studio.custom.field</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

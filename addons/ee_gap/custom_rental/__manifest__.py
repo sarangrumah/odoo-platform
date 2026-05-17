@@ -1,25 +1,24 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Rental",
-    "summary": "Product rental: pricing tiers, pickup/return scheduling, late fees",
+    "summary": "Asset/equipment rental lifecycle: pickup → return with availability check",
     "description": """
-Custom Rental is a CE-targeted reimplementation of capabilities documented at
-https://www.odoo.com/documentation/19.0/applications/sales/rental.html.
-
-IMPLEMENTATION STATUS: SCAFFOLD - manifest only, no models/views yet.
-Reference spec:
-- Rental product configuration (rentable flag, availability windows)
-- Period-based pricing (hour / day / week / month tiers)
-- Pickup and return scheduling with calendar
-- Late-fee automation on overdue returns
-- Integration with delivery (stock pickings for handover)
+Track rental of assets. Each rental.order has pickup_dt and return_dt;
+overlap rejected on the same asset. Daily fee + late penalty computed.
 """,
     "author": "Custom Platform",
     "category": "Sales/Rental",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "sale_management", "stock"],
-    "data": [],
+    "depends": ["custom_core", "custom_pdp_audit", "mail", "product", "account"],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "data/ir_sequence_data.xml",
+        "views/rental_asset_views.xml",
+        "views/rental_order_views.xml",
+        "views/menu_views.xml",
+    ],
     "installable": True,
     "application": True,
     "auto_install": False,

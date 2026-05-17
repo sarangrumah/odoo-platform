@@ -1,2 +1,3 @@
-# -*- coding: utf-8 -*-
-# Custom Accounting Full - scaffold placeholder. No models registered yet.
+from . import models
+from . import wizards
+from . import reports

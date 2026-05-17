@@ -1,26 +1,35 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Field Service",
-    "summary": "Technician dispatch, on-site tasks, materials, signature and routing",
+    "summary": "Technician dispatch, on-site work orders, materials, signature capture",
     "description": """
-Custom Field Service is a CE-targeted reimplementation of capabilities documented at
-https://www.odoo.com/documentation/19.0/applications/services/field_service.html.
-
-IMPLEMENTATION STATUS: SCAFFOLD - manifest only, no models/views yet.
-Reference spec:
-- Technician dispatch board (calendar / map view)
-- On-site task checklists per service type
-- Material consumption logging tied to stock moves
-- Signature capture on completion
-- Time tracking with billable / non-billable distinction
-- Route optimization between scheduled stops
+Lightweight field-service module. Work orders linked to a customer
++ site, assigned to a technician, tracked through scheduled → in
+progress → completed with materials consumed and a captured customer
+signature. Audited via pdp.audit_log.
 """,
     "author": "Custom Platform",
     "category": "Services/Field Service",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "project", "hr", "stock"],
-    "data": [],
+    "depends": [
+        "custom_core",
+        "custom_pdp_core",
+        "custom_pdp_audit",
+        "mail",
+        "stock",
+        "product",
+    ],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "data/ir_sequence_data.xml",
+        "views/fsm_site_views.xml",
+        "views/fsm_skill_views.xml",
+        "views/fsm_technician_views.xml",
+        "views/fsm_work_order_views.xml",
+        "views/menu_views.xml",
+    ],
     "installable": True,
     "application": True,
     "auto_install": False,

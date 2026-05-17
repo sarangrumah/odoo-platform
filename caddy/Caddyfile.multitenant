@@ -1,0 +1,156 @@
+# ============================================================
+# Caddyfile.multitenant — wildcard TLS for *.platform.localhost
+# ============================================================
+# Used by `docker-compose.multitenant.yml`. Each tenant gets a
+# subdomain (e.g. `acme.platform.localhost`) that Odoo's dbfilter
+# resolves to a per-tenant database via `%d` substitution.
+#
+# Hosts file entries required on the presenter machine:
+#   127.0.0.1   platform.localhost
+#   127.0.0.1   admin.platform.localhost
+#   127.0.0.1   acme.platform.localhost
+#   127.0.0.1   <slug>.platform.localhost  (per provisioned tenant)
+#
+# Caddy mints a local CA on first boot; trust the root cert from
+# `data/caddy/data/caddy/pki/authorities/local/root.crt` once.
+# ============================================================
+
+{
+	email {$ACME_EMAIL}
+	admin 0.0.0.0:2019
+
+	# Internal CA settings — overridable for production via ACME by swapping
+	# this file out for Caddyfile (single-domain ACME) or a custom variant.
+	pki {
+		ca local {
+			name "Platform Local CA"
+			# Roots expire in 10y by default — fine for demo / dev.
+		}
+	}
+}
+
+# ----- Super-admin portal -----
+# Lives at https://admin.platform.localhost — maps to Odoo DB `master_admin`.
+admin.platform.localhost {
+	encode zstd gzip
+	tls internal
+
+	reverse_proxy nginx:80 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Tenant-Slug "master_admin"
+		transport http {
+			read_timeout 720s
+			write_timeout 720s
+			dial_timeout 10s
+		}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+# ----- Tenant subdomains: *.platform.localhost -----
+# Catches every other subdomain. Odoo's `dbfilter=^%d$` will look up the
+# database whose name equals the first label.
+*.platform.localhost {
+	encode zstd gzip
+	tls internal
+
+	# Extract the tenant slug (first label) for downstream auditing / logging.
+	@hassub {
+		header_regexp Host hostprefix "^(?P<slug>[a-z0-9_]{2,63})\.platform\.localhost(:\d+)?$"
+	}
+
+	reverse_proxy nginx:80 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Tenant-Slug {http.regexp.hostprefix.slug}
+		transport http {
+			read_timeout 720s
+			write_timeout 720s
+			dial_timeout 10s
+		}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+		# Add tenant_slug to every log line for Loki indexing
+	}
+}
+
+# ----- Orchestrator API (ops-only, HMAC-protected) -----
+# Exposes tenant-orchestrator on a separate hostname so it's clearly
+# distinct from the tenant UI traffic. Still TLS-terminated by Caddy.
+orchestrator.platform.localhost {
+	encode zstd gzip
+	tls internal
+
+	reverse_proxy tenant-orchestrator:8080 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			read_timeout 60s
+			write_timeout 60s
+			dial_timeout 5s
+		}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+# ----- MinIO console (ops-only) -----
+minio.platform.localhost {
+	encode zstd gzip
+	tls internal
+
+	reverse_proxy minio:9001 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			read_timeout 120s
+		}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+# ----- Grafana (ops-only) -----
+grafana.platform.localhost {
+	encode zstd gzip
+	tls internal
+
+	reverse_proxy grafana:3000 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}

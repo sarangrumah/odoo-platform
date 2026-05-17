@@ -82,6 +82,29 @@ class HrPayslip(models.Model):
 
     line_ids = fields.One2many("hr.payslip.line", "payslip_id", string="Lines")
 
+    # Calculation method used at compute time (cached for audit + reporting).
+    calc_method_used = fields.Selection(
+        [
+            ("ter", "TER (PP 58/2023)"),
+            ("annualised", "Legacy annualised"),
+            ("annual_recon", "Annual Recon (December)"),
+        ],
+        readonly=True,
+    )
+    ter_category_used = fields.Selection(
+        [("A", "A"), ("B", "B"), ("C", "C")],
+        readonly=True,
+    )
+    ter_rate_used = fields.Float(string="TER Rate (%) used", digits=(6, 4), readonly=True)
+
+    # Coretax bridge — one Bupot PPh 21 per payslip (materialised on approve)
+    bupot_id = fields.Many2one(
+        "custom.coretax.bukti.potong",
+        string="Bupot PPh 21",
+        readonly=True,
+        copy=False,
+    )
+
     state = fields.Selection(
         [
             ("draft", "Draft"),
@@ -147,19 +170,33 @@ class HrPayslip(models.Model):
         bpjs_jkm = gross_total_month * (config.bpjs_jkm_company_pct / 100.0)
 
         # ---------- PPh 21 ----------
+        method_used = "annualised"
+        ter_cat = False
+        ter_rate = 0.0
+
         if self.is_thr:
-            # THR: separate calc. Annual taxable = regular annual + THR.
-            # Simplified: tax on THR alone using progressive brackets on annual basis.
+            # THR: tax on THR alone using progressive brackets on annual basis.
             # For MVP, treat THR as a one-month gross (gross_month is the THR amount).
-            annual_with_thr = gross_total_month  # already the THR amount
-            taxable = annual_with_thr  # treat THR as taxable bonus
             ptkp = config.get_ptkp(self.employee_id.x_custom_ptkp_status or "TK/0")
-            taxable_year = max(0.0, taxable - ptkp)
+            taxable_year = max(0.0, gross_total_month - ptkp)
             pph_year = _compute_pph21(taxable_year)
             pph_month = pph_year
+            method_used = "annual_recon"
+        elif (
+            config.calc_method == "ter"
+            and self.employee_id.x_custom_employment_type == "pegawai_tetap"
+            and int(self.period_month or 0) != 12
+        ):
+            # TER (PP 58/2023): flat monthly bracket per Kategori A/B/C.
+            # Year-end (December) always falls through to annualised reconciliation.
+            ter_cat = self.employee_id.x_custom_ter_category or "A"
+            ter_table = self.env["hr.payroll.ter.bracket"].sudo()
+            rate_fraction = ter_table.get_rate(ter_cat, gross_total_month)
+            ter_rate = rate_fraction * 100.0
+            pph_month = gross_total_month * rate_fraction
+            method_used = "ter"
         else:
-            # Regular monthly: annualize, subtract biaya jabatan + JHT_emp + JP_emp,
-            # subtract PTKP, apply progressive brackets, /12.
+            # Annualised fallback (December reconciliation OR config.calc_method='annualised').
             annual_gross = gross_total_month * 12
             biaya_jabatan_year = min(
                 annual_gross * (config.biaya_jabatan_pct / 100.0),
@@ -172,6 +209,7 @@ class HrPayslip(models.Model):
             taxable_year = max(0.0, net_year - ptkp)
             pph_year = _compute_pph21(taxable_year)
             pph_month = pph_year / 12.0
+            method_used = "annualised" if int(self.period_month or 0) != 12 else "annual_recon"
 
         # ---------- Take-home ----------
         deductions = bpjs_kes_emp + bpjs_jht_emp + bpjs_jp_emp + pph_month
@@ -189,6 +227,9 @@ class HrPayslip(models.Model):
             "bpjs_jkm": bpjs_jkm,
             "pph21": pph_month,
             "take_home_pay": thp,
+            "calc_method_used": method_used,
+            "ter_category_used": ter_cat,
+            "ter_rate_used": ter_rate,
             "state": "computed",
         })
 
@@ -221,7 +262,46 @@ class HrPayslip(models.Model):
     def action_approve(self):
         self.write({"state": "approved"})
         for r in self:
+            r._materialise_bupot_pph21()
             r._pdp_audit("approve")
+
+    def _materialise_bupot_pph21(self):
+        """Create a draft Bupot PPh 21 for this payslip if PPh > 0.
+
+        Idempotent: skips if ``bupot_id`` already set.
+        """
+        self.ensure_one()
+        if self.bupot_id or not self.pph21 or self.pph21 <= 0:
+            return
+        Bupot = self.env["custom.coretax.bukti.potong"].sudo()
+        partner = self.employee_id.user_partner_id or self.employee_id.address_home_id
+        if not partner:
+            # Fall back to employee resource_id name; create a minimal partner so
+            # the Bupot has a counterparty reference. Operator can later replace.
+            partner = self.env["res.partner"].sudo().create({
+                "name": self.employee_id.name,
+                "is_company": False,
+            })
+        try:
+            self.bupot_id = Bupot.create({
+                "no_bupot": f"DRAFT-PPH21-{self.period_year}{self.period_month:0>2}-{self.employee_id.id}",
+                "partner_id": partner.id,
+                "jenis_pph": "pph_21",
+                "tarif": self.ter_rate_used or 0.0,
+                "dpp": self.gross_salary + (self.tunjangan_jabatan or 0) + (self.tunjangan_lain or 0),
+                "pph_terpotong": self.pph21,
+                "currency_id": self.currency_id.id,
+                "tanggal_bupot": fields.Date.context_today(self),
+                "period_year": self.period_year,
+                "period_month": int(self.period_month or 0),
+                "source": "outgoing",
+                "state": "draft",
+            }).id
+        except Exception as e:
+            _logger.warning("Failed to create Bupot PPh 21 for payslip %s: %s", self.name, e)
+            self.message_post(
+                body=_("Failed to auto-create Bupot PPh 21: %s") % e
+            )
 
     def action_pay(self):
         self.write({"state": "paid"})

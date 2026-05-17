@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="module_category_accounting_full" model="ir.module.category">
+            <field name="name">Accounting / Group Reporting</field>
+            <field name="description">Multi-company accounting + consolidation</field>
+            <field name="sequence">80</field>
+        </record>
+
+        <!-- Group Reporting Viewer: can run consolidated reports -->
+        <record id="group_consolidation_viewer" model="res.groups">
+            <field name="name">Consolidation Viewer</field>
+            <field name="category_id" ref="module_category_accounting_full"/>
+        </record>
+
+        <!-- Group Reporting Admin: design perimeters + intercompany rules -->
+        <record id="group_consolidation_admin" model="res.groups">
+            <field name="name">Consolidation Admin</field>
+            <field name="category_id" ref="module_category_accounting_full"/>
+            <field name="implied_ids" eval="[Command.link(ref('group_consolidation_viewer'))]"/>
+        </record>
+
+    </data>
+</odoo>

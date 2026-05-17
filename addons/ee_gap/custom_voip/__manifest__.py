@@ -1,25 +1,26 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom VoIP",
-    "summary": "SIP softphone (WebRTC), click-to-call, call logging and transcription",
+    "summary": "Click-to-call + call logging with multiple SIP/PBX provider adapters",
     "description": """
-Custom VoIP is a CE-targeted reimplementation of capabilities documented at
-https://www.odoo.com/documentation/19.0/applications/productivity/voip.html.
-
-IMPLEMENTATION STATUS: SCAFFOLD - manifest only, no models/views yet.
-Reference spec:
-- SIP softphone via WebRTC in the Odoo web client
-- Click-to-call from contact / lead / ticket records
-- Call log linking back to source record with mail.thread
-- Transcription of recorded calls via custom_ai_bridge
+Lightweight VoIP integration. voip.provider abstraction (Asterisk AMI /
+webhook stub), captures inbound/outbound voip.call records linked to
+res.partner, click-to-call button on partner form.
 """,
     "author": "Custom Platform",
-    "category": "Productivity/Telephony",
+    "category": "Productivity/VoIP",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "crm", "mail"],
-    "data": [],
+    "depends": ["custom_core", "custom_pdp_audit", "mail"],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "views/voip_provider_views.xml",
+        "views/voip_call_views.xml",
+        "views/res_partner_views.xml",
+        "views/menu_views.xml",
+    ],
     "installable": True,
-    "application": False,
+    "application": True,
     "auto_install": False,
 }

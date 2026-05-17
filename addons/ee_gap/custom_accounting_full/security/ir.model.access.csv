@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ic_rule_admin,intercompany rule admin,model_account_intercompany_rule,group_consolidation_admin,1,1,1,1
+access_ic_rule_acc_mgr,intercompany rule mgr,model_account_intercompany_rule,account.group_account_manager,1,0,0,0
+access_ic_mapping_admin,ic account mapping admin,model_account_intercompany_account_mapping,group_consolidation_admin,1,1,1,1
+access_consol_admin,consolidation config admin,model_account_consolidation_config,group_consolidation_admin,1,1,1,1
+access_consol_viewer,consolidation config viewer,model_account_consolidation_config,group_consolidation_viewer,1,0,0,0
+access_consol_wiz,consolidation wizard,model_account_consolidation_report_wizard,group_consolidation_viewer,1,1,1,1

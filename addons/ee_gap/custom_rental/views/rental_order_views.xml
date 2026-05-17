@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_rental_order_list" model="ir.ui.view">
+        <field name="name">rental.order.list</field>
+        <field name="model">rental.order</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="asset_id"/>
+                <field name="pickup_dt"/>
+                <field name="return_dt_expected"/>
+                <field name="total_due"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_rental_order_form" model="ir.ui.view">
+        <field name="name">rental.order.form</field>
+        <field name="model">rental.order</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_confirm" string="Confirm" type="object" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_pickup" string="Mark Picked-up" type="object"
+                            invisible="state != 'confirmed'"/>
+                    <button name="action_return" string="Mark Returned" type="object"
+                            class="btn-success" invisible="state != 'picked_up'"/>
+                    <button name="action_cancel" string="Cancel" type="object"
+                            invisible="state in ('returned','cancelled')"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="asset_id"/>
+                            <field name="daily_rate"/>
+                            <field name="deposit_amount"/>
+                        </group>
+                        <group>
+                            <field name="pickup_dt"/>
+                            <field name="return_dt_expected"/>
+                            <field name="return_dt_actual" readonly="1"/>
+                            <field name="days_planned" readonly="1"/>
+                            <field name="days_actual" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Settlement">
+                        <field name="rental_fee" readonly="1"/>
+                        <field name="late_penalty" readonly="1"/>
+                        <field name="total_due" readonly="1" class="oe_subtotal_footer"/>
+                    </group>
+                    <separator string="Notes"/>
+                    <field name="notes"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_rental_order" model="ir.actions.act_window">
+        <field name="name">Rental Orders</field>
+        <field name="res_model">rental.order</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

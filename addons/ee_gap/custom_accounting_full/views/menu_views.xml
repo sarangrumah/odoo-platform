@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_accounting_full_root"
+              name="Group Reporting"
+              parent="account.menu_finance"
+              sequence="50"
+              groups="custom_accounting_full.group_consolidation_viewer"/>
+
+    <menuitem id="menu_consol_wizard"
+              name="Run Consolidation Report"
+              parent="menu_accounting_full_root"
+              action="action_consolidation_report_wizard"
+              sequence="10"/>
+
+    <menuitem id="menu_consol_config"
+              name="Perimeters"
+              parent="menu_accounting_full_root"
+              action="action_consol_config"
+              sequence="20"
+              groups="custom_accounting_full.group_consolidation_admin"/>
+
+    <menuitem id="menu_ic_rule"
+              name="Intercompany Rules"
+              parent="menu_accounting_full_root"
+              action="action_ic_rule"
+              sequence="30"
+              groups="custom_accounting_full.group_consolidation_admin"/>
+
+</odoo>

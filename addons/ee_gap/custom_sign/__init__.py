@@ -1,2 +1,3 @@
 # -*- coding: utf-8 -*-
-# Custom Sign - scaffold placeholder. No models registered yet.
+from . import models
+from . import controllers

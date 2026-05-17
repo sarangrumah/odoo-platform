@@ -1,0 +1,67 @@
+# ============================================================
+# Multi-tenant overlay
+# ----------------------------------------------------------------
+# Adds Caddy front-end with wildcard TLS for *.platform.localhost.
+# Each tenant gets a subdomain; Odoo's dbfilter routes to the
+# correct per-tenant DB via %d substitution.
+#
+# Use with:
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.multitenant.yml \
+#     up -d
+# (or: make up-multitenant)
+#
+# Required env:
+#   DOMAIN=platform.localhost
+#   PG_ORCHESTRATOR_PASSWORD=...
+#   MASTER_WRAPPING_KEY=...   (44-char Fernet key)
+#   ORCHESTRATOR_SHARED_SECRET=...
+#   MINIO_ROOT_PASSWORD=...
+# ============================================================
+
+services:
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-caddy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE, DAC_OVERRIDE]
+    depends_on:
+      odoo:
+        condition: service_healthy
+      tenant-orchestrator:
+        condition: service_healthy
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./caddy/Caddyfile.multitenant:/etc/caddy/Caddyfile:ro
+      - ./data/caddy/data:/data
+      - ./data/caddy/config:/config
+    ports:
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks: [odoo-net]
+
+  # Odoo dbfilter is the linchpin of tenant isolation: this overlay forces
+  # the per-host DB filter on top of whatever dev/prod set.
+  odoo:
+    environment:
+      DBFILTER: "^%d$$"
+      # Trust Caddy's X-Forwarded headers; Caddy is the public-facing TLS terminator.
+      PROXY_MODE: "True"
+      LIST_DB: "False"     # multitenant: never list DBs publicly

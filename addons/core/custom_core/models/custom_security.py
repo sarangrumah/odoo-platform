@@ -23,6 +23,24 @@ class CustomSecurity(models.AbstractModel):
         return secret
 
     @api.model
+    def _orchestrator_secret(self) -> str:
+        secret = os.environ.get("ORCHESTRATOR_SHARED_SECRET", "")
+        if not secret or "changeme" in secret:
+            raise RuntimeError("ORCHESTRATOR_SHARED_SECRET not properly set in env")
+        return secret
+
+    @api.model
+    def sign_for(self, secret_key: str, body: bytes) -> tuple[str, int]:
+        """Generic signer. ``secret_key`` is the env var name."""
+        secret = os.environ.get(secret_key, "")
+        if not secret or "changeme" in secret:
+            raise RuntimeError(f"{secret_key} not properly set in env")
+        ts = int(time.time())
+        msg = str(ts).encode() + b"." + body
+        sig = hmac.new(secret.encode(), msg, hashlib.sha256).hexdigest()
+        return f"t={ts},v1={sig}", ts
+
+    @api.model
     def sign_payload(self, body: bytes) -> tuple[str, int]:
         """Return (header_value, timestamp) for X-Custom-Signature.
 

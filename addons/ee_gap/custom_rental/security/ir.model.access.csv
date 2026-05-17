@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_rental_asset_user,rental.asset user,model_rental_asset,group_rental_user,1,0,0,0
+access_rental_asset_mgr,rental.asset mgr,model_rental_asset,group_rental_manager,1,1,1,1
+access_rental_order_user,rental.order user,model_rental_order,group_rental_user,1,1,1,0
+access_rental_order_mgr,rental.order mgr,model_rental_order,group_rental_manager,1,1,1,1

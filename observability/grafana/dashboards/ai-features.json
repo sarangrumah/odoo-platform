@@ -1,0 +1,114 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Anomaly findings — last 24h",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "postgres", "uid": "platform-pg"},
+      "targets": [{
+        "rawSql": "SELECT severity, COUNT(*) AS n FROM ai_anomaly_finding WHERE create_date > now() - interval '24 hours' GROUP BY severity ORDER BY severity",
+        "format": "table"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 5}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "NLQ questions — last 7d",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "postgres", "uid": "platform-pg"},
+      "targets": [{
+        "rawSql": "SELECT COUNT(*) FROM ai_nlq_message WHERE role = 'user' AND create_date > now() - interval '7 days'",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat",
+      "title": "AI gateway requests/min (avg 5m)",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "platform-prom"},
+      "targets": [{
+        "expr": "rate(http_requests_total{job=\"ai-gateway\"}[5m]) * 60",
+        "legendFormat": "{{path}}"
+      }]
+    },
+    {
+      "type": "stat",
+      "title": "Cache hit ratio",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "platform-prom"},
+      "targets": [{
+        "expr": "sum(rate(anthropic_cache_read_tokens_total[15m])) / sum(rate(anthropic_input_tokens_total[15m]))",
+        "legendFormat": "cache-hit"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0.3},
+              {"color": "green", "value": 0.6}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Open critical anomalies",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 4},
+      "datasource": {"type": "postgres", "uid": "platform-pg"},
+      "targets": [{
+        "rawSql": "SELECT create_date AS \"When\", res_model AS \"Model\", res_id AS \"Record\", metric AS \"Metric\", latest_value AS \"Value\", score AS \"Score\", rationale AS \"Why\" FROM ai_anomaly_finding WHERE state = 'new' AND severity = 'critical' ORDER BY create_date DESC LIMIT 25",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI gateway p95 latency by endpoint",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "datasource": {"type": "prometheus", "uid": "platform-prom"},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"ai-gateway\"}[5m])) by (le, path))",
+        "legendFormat": "{{path}}"
+      }],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Anomaly findings rate (per hour, last 7d)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "datasource": {"type": "postgres", "uid": "platform-pg"},
+      "targets": [{
+        "rawSql": "SELECT date_trunc('hour', create_date) AS time, severity AS metric, COUNT(*) AS value FROM ai_anomaly_finding WHERE create_date > now() - interval '7 days' GROUP BY 1, 2 ORDER BY 1",
+        "format": "time_series"
+      }]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["ai", "platform"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "title": "AI Features",
+  "uid": "ai-features",
+  "version": 1
+}

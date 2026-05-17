@@ -1,25 +1,25 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom HR Referral",
-    "summary": "Employee referral program with points, leaderboard and rewards",
+    "summary": "Employee referral program with candidate tracking + reward ledger",
     "description": """
-Custom HR Referral is a CE-targeted reimplementation of capabilities documented at
-https://www.odoo.com/documentation/19.0/applications/human_resources/referrals.html.
-
-IMPLEMENTATION STATUS: SCAFFOLD - manifest only, no models/views yet.
-Reference spec:
-- Referral campaigns linked to recruitment jobs
-- Point reward accounting per referral stage (applied / hired / retained)
-- Employee leaderboard with gamification
-- Share-to-social plumbing (LinkedIn / WhatsApp / email)
-- Redemption catalog with reward fulfillment workflow
+Employees submit candidate referrals against open positions; HR tracks
+the candidate through screening → interviewed → offered → hired. Reward
+is credited when state hits 'hired' (configurable per position).
 """,
     "author": "Custom Platform",
-    "category": "Human Resources",
+    "category": "Human Resources/Recruitment",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "hr", "hr_recruitment"],
-    "data": [],
+    "depends": ["custom_core", "custom_pdp_audit", "hr", "mail"],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "views/referral_position_views.xml",
+        "views/referral_candidate_views.xml",
+        "views/referral_reward_views.xml",
+        "views/menu_views.xml",
+    ],
     "installable": True,
     "application": True,
     "auto_install": False,

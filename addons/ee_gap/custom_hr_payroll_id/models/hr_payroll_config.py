@@ -15,6 +15,21 @@ class HrPayrollConfig(models.Model):
 
     name = fields.Char(default="Default", required=True)
     active = fields.Boolean(default=True)
+    company_id = fields.Many2one(
+        "res.company", default=lambda self: self.env.company, ondelete="cascade",
+    )
+
+    # ---- Calculation method ----
+    calc_method = fields.Selection(
+        [
+            ("ter", "TER per PP 58/2023 (default since Jan 2024)"),
+            ("annualised", "Legacy annualised (pre-2024)"),
+        ],
+        default="ter",
+        required=True,
+        help="TER applies a flat monthly bracket per Kategori A/B/C (mapped from PTKP). "
+             "December always reconciles via annual progressive regardless of method.",
+    )
 
     # PTKP per PMK 101/2016 (still current as of 2024)
     ptkp_tk0 = fields.Float(string="PTKP TK/0", default=54_000_000)
@@ -50,7 +65,8 @@ class HrPayrollConfig(models.Model):
 
     @api.model
     def get_default(self):
-        rec = self.search([("active", "=", True)], limit=1)
+        rec = self.search([("active", "=", True),
+                           ("company_id", "in", (False, self.env.company.id))], limit=1)
         if not rec:
             rec = self.create({"name": "Default"})
         return rec

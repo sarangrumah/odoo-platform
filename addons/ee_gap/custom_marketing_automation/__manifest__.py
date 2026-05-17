@@ -1,25 +1,27 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Marketing Automation",
-    "summary": "Drip campaigns, lead scoring, A/B testing and triggered workflows",
+    "summary": "Multi-step email campaigns + drip sequences + audience segmentation",
     "description": """
-Custom Marketing Automation is a CE-targeted reimplementation of capabilities documented at
-https://www.odoo.com/documentation/19.0/applications/marketing/marketing_automation.html.
-
-IMPLEMENTATION STATUS: SCAFFOLD - manifest only, no models/views yet.
-Reference spec:
-- Drip email campaigns with delay / condition activities
-- Lead scoring rules based on behavior and demographics
-- A/B testing for email subject and content variants
-- Triggered workflows on record events (server actions)
-- Segmentation builder with saved audience filters
+Lightweight marketing automation. Define audience segments via a domain
+on res.partner, build multi-step campaigns (email → wait → email →
+condition → email), and let a scheduler tick through participant flows.
+Respects custom_pdp_consent (no email without valid 'marketing' consent).
 """,
     "author": "Custom Platform",
-    "category": "Marketing",
+    "category": "Marketing/Marketing Automation",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "mass_mailing"],
-    "data": [],
+    "depends": ["custom_core", "custom_pdp_audit", "custom_pdp_consent", "mail"],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "data/ir_cron_data.xml",
+        "views/marketing_segment_views.xml",
+        "views/marketing_campaign_views.xml",
+        "views/marketing_participant_views.xml",
+        "views/menu_views.xml",
+    ],
     "installable": True,
     "application": True,
     "auto_install": False,

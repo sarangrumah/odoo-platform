@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="module_category_studio_lite" model="ir.module.category">
+            <field name="name">Studio Lite</field>
+            <field name="sequence">109</field>
+        </record>
+        <record id="group_studio_admin" model="res.groups">
+            <field name="name">Studio Admin</field>
+            <field name="category_id" ref="module_category_studio_lite"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_system'))]"/>
+        </record>
+    </data>
+</odoo>
