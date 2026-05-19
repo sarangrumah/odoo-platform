@@ -43,10 +43,10 @@ class PdpRetentionPolicy(models.Model):
     records_eligible_count = fields.Integer(compute="_compute_eligible", store=False)
     display_name = fields.Char(compute="_compute_display_name", store=True)
 
-    _sql_constraints = [
-        ("policy_unique", "unique(model_id, classification_id)",
-         "Only one policy per model+classification."),
-    ]
+    _policy_unique = models.Constraint(
+        'unique(model_id, classification_id)',
+        'Only one policy per model+classification.',
+    )
 
     @api.depends("model_id", "classification_id")
     def _compute_display_name(self):

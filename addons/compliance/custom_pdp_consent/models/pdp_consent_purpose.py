@@ -18,6 +18,7 @@ class PdpConsentPurpose(models.Model):
     )
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code)", "Consent purpose code must be unique."),
-    ]
+    _code_uniq = models.Constraint(
+        'unique(code)',
+        'Consent purpose code must be unique.',
+    )

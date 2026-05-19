@@ -38,13 +38,15 @@ under `data/xsd/` post-install.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Custom Platform/Compliance/Coretax",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "account"],
     "data": [
         "security/coretax_security.xml",
         "security/ir.model.access.csv",
         "data/coretax_data.xml",
+        "data/pmk131_taxes.xml",
+        "data/pmk131_fiscal_positions.xml",
         # wizard actions first — referenced by config form + menu items
         "wizards/coretax_export_wizard_views.xml",
         "wizards/coretax_import_wizard_views.xml",

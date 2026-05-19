@@ -39,11 +39,10 @@ class PdpConsent(models.Model):
         store=True,
     )
 
-    _sql_constraints = [
-        ("partner_purpose_unique_active",
-         "EXCLUDE (partner_id WITH =, purpose_id WITH =) WHERE (withdrawn_at IS NULL)",
-         "Active consent already exists for this partner and purpose."),
-    ]
+    _partner_purpose_unique_active = models.Constraint(
+        'EXCLUDE (partner_id WITH =, purpose_id WITH =) WHERE (withdrawn_at IS NULL)',
+        'Active consent already exists for this partner and purpose.',
+    )
 
     @api.depends("given_at", "purpose_id.requires_renewal_days")
     def _compute_expires_at(self):

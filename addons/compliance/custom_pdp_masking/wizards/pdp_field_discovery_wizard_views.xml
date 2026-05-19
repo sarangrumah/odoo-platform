@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_pdp_field_discovery_wizard_form" model="ir.ui.view">
+        <field name="name">custom.pdp.field.discovery.wizard.form</field>
+        <field name="model">custom.pdp.field.discovery.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Discover Candidate PII Fields">
+                <header>
+                    <button name="action_scan" type="object"
+                            string="Scan Models" class="btn-primary"/>
+                    <button name="action_create_selected" type="object"
+                            string="Add Selected to Registry"
+                            class="btn-secondary"/>
+                </header>
+                <group invisible="not report">
+                    <field name="report" readonly="1" nolabel="1"/>
+                </group>
+                <field name="suggestion_ids">
+                    <list editable="bottom">
+                        <field name="selected"/>
+                        <field name="model_name" readonly="1"/>
+                        <field name="field_name" readonly="1"/>
+                        <field name="pii_category"/>
+                        <field name="mask_pattern"/>
+                    </list>
+                </field>
+                <footer>
+                    <button special="cancel" string="Close"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pdp_field_discovery_wizard" model="ir.actions.act_window">
+        <field name="name">Discover PII Fields</field>
+        <field name="res_model">custom.pdp.field.discovery.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

@@ -30,9 +30,10 @@ class PdpClassification(models.Model):
     color = fields.Integer(default=0)
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code)", "Classification code must be unique."),
-    ]
+    _code_uniq = models.Constraint(
+        'unique(code)',
+        'Classification code must be unique.',
+    )
 
     @api.constrains("code")
     def _check_code(self):

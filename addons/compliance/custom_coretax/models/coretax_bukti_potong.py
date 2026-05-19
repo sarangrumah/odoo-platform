@@ -84,11 +84,10 @@ class CoretaxBuktiPotong(models.Model):
 
     notes = fields.Text(string="Notes")
 
-    _sql_constraints = [
-        ("no_bupot_unique_per_source",
-         "unique(no_bupot, source)",
-         "Bukti Potong number must be unique per source (issued/received)."),
-    ]
+    _no_bupot_unique_per_source = models.Constraint(
+        'unique(no_bupot, source)',
+        'Bukti Potong number must be unique per source (issued/received).',
+    )
 
     @api.constrains("period_month")
     def _check_period_month(self):

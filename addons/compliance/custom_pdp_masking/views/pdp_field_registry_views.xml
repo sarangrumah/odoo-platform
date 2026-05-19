@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_pdp_field_registry_form" model="ir.ui.view">
+        <field name="name">custom.pdp.field.registry.form</field>
+        <field name="model">custom.pdp.field.registry</field>
+        <field name="arch" type="xml">
+            <form string="PII Field Registry">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="model_id"/>
+                            <field name="field_name"/>
+                            <field name="pii_category"/>
+                        </group>
+                        <group>
+                            <field name="mask_pattern"/>
+                            <field name="active"/>
+                            <field name="note"/>
+                        </group>
+                    </group>
+                    <group string="Bypass Groups">
+                        <field name="mask_groups" nolabel="1" widget="many2many_tags"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pdp_field_registry_list" model="ir.ui.view">
+        <field name="name">custom.pdp.field.registry.list</field>
+        <field name="model">custom.pdp.field.registry</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="model_name"/>
+                <field name="field_name"/>
+                <field name="pii_category"/>
+                <field name="mask_pattern"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pdp_field_registry_search" model="ir.ui.view">
+        <field name="name">custom.pdp.field.registry.search</field>
+        <field name="model">custom.pdp.field.registry</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="model_name"/>
+                <field name="field_name"/>
+                <field name="pii_category"/>
+                <group expand="0" string="Group By">
+                    <filter name="g_model" string="Model" context="{'group_by': 'model_name'}"/>
+                    <filter name="g_cat" string="Category" context="{'group_by': 'pii_category'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pdp_field_registry" model="ir.actions.act_window">
+        <field name="name">PII Field Registry</field>
+        <field name="res_model">custom.pdp.field.registry</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

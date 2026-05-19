@@ -12,7 +12,7 @@ _logger = logging.getLogger(__name__)
 
 class PdpDsarController(http.Controller):
 
-    @http.route(["/dsar/request"], type="json", auth="public",
+    @http.route(["/dsar/request"], type="jsonrpc", auth="public",
                 methods=["POST"], csrf=False, sitemap=False)
     def dsar_request(self, **kw):
         payload = kw or {}

@@ -31,6 +31,14 @@ class CoretaxConfig(models.Model):
 
     name = fields.Char(string="Display Name", required=True, default="Coretax Configuration")
     active = fields.Boolean(default=True, index=True)
+    company_id = fields.Many2one(
+        "res.company",
+        string="Company",
+        default=lambda self: self.env.company,
+        index=True,
+        help="Company that owns this Coretax configuration. Each company has its own "
+             "NPWP, sertel, and adapter credentials.",
+    )
 
     # ----- Taxpayer identity -----
     npwp = fields.Char(string="NPWP", size=16, required=True,
@@ -67,9 +75,10 @@ class CoretaxConfig(models.Model):
              "stored on this record.",
     )
 
-    _sql_constraints = [
-        ("npwp_unique", "unique(npwp)", "NPWP must be unique across Coretax configurations."),
-    ]
+    _npwp_unique = models.Constraint(
+        'unique(npwp)',
+        'NPWP must be unique across Coretax configurations.',
+    )
 
     @api.constrains("npwp")
     def _check_npwp(self):
