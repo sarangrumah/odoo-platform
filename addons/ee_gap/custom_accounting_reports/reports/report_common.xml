@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Dispatcher: routes to the right per-report template based on
+             report_code returned by custom_report_dispatch. -->
+        <template id="report_dispatch">
+            <t t-call="web.html_container">
+                <t t-call="web.internal_layout">
+                    <div class="page">
+                        <t t-if="report_code == 'general_ledger'">
+                            <t t-call="custom_accounting_reports.report_general_ledger"/>
+                        </t>
+                        <t t-elif="report_code == 'trial_balance'">
+                            <t t-call="custom_accounting_reports.report_trial_balance"/>
+                        </t>
+                        <t t-elif="report_code == 'balance_sheet'">
+                            <t t-call="custom_accounting_reports.report_balance_sheet"/>
+                        </t>
+                        <t t-elif="report_code == 'profit_loss'">
+                            <t t-call="custom_accounting_reports.report_profit_loss"/>
+                        </t>
+                        <t t-elif="report_code == 'cash_flow'">
+                            <t t-call="custom_accounting_reports.report_cash_flow"/>
+                        </t>
+                        <t t-elif="report_code == 'aged_receivable'">
+                            <t t-call="custom_accounting_reports.report_aged_receivable"/>
+                        </t>
+                        <t t-elif="report_code == 'aged_payable'">
+                            <t t-call="custom_accounting_reports.report_aged_payable"/>
+                        </t>
+                        <t t-elif="report_code == 'partner_ledger'">
+                            <t t-call="custom_accounting_reports.report_partner_ledger"/>
+                        </t>
+                        <t t-elif="report_code == 'tax'">
+                            <t t-call="custom_accounting_reports.report_tax"/>
+                        </t>
+                        <t t-elif="report_code == 'day_book'">
+                            <t t-call="custom_accounting_reports.report_day_book"/>
+                        </t>
+                        <t t-elif="report_code == 'cash_book'">
+                            <t t-call="custom_accounting_reports.report_cash_book"/>
+                        </t>
+                        <t t-elif="report_code == 'bank_book'">
+                            <t t-call="custom_accounting_reports.report_bank_book"/>
+                        </t>
+                        <t t-elif="report_code == 'journal_audit'">
+                            <t t-call="custom_accounting_reports.report_journal_audit"/>
+                        </t>
+                        <t t-elif="report_code == 'financial'">
+                            <t t-call="custom_accounting_reports.report_financial"/>
+                        </t>
+                        <t t-else="">
+                            <p>Unknown report: <t t-esc="report_code"/></p>
+                        </t>
+                    </div>
+                </t>
+            </t>
+        </template>
+
+        <template id="report_header">
+            <div class="mb-3">
+                <h2 class="mb-1" t-esc="report_title"/>
+                <div class="text-muted">
+                    <span>Company:</span>
+                    <strong t-esc="company_names"/>
+                    <span class="ms-3">Period:</span>
+                    <strong t-esc="date_from_str"/> &#8594;
+                    <strong t-esc="date_to_str"/>
+                </div>
+            </div>
+        </template>
+
+        <template id="report_footer_signature">
+            <div class="row mt-5 pt-4 small">
+                <div class="col-4 text-center">
+                    <div class="border-top pt-1">Prepared by</div>
+                </div>
+                <div class="col-4 text-center">
+                    <div class="border-top pt-1">Reviewed by</div>
+                </div>
+                <div class="col-4 text-center">
+                    <div class="border-top pt-1">Approved by</div>
+                </div>
+            </div>
+        </template>
+    </data>
+</odoo>

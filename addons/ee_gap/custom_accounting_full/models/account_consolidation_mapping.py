@@ -29,13 +29,10 @@ class IntercompanyAccountMapping(models.Model):
     )
     note = fields.Char()
 
-    _sql_constraints = [
-        (
-            "uniq_source_per_rule",
-            "unique (rule_id, source_account_id)",
-            "Source account already mapped in this rule.",
-        ),
-    ]
+    _uniq_source_per_rule = models.Constraint(
+        'unique (rule_id, source_account_id)',
+        'Source account already mapped in this rule.',
+    )
 
     @api.constrains("rule_id", "source_account_id", "target_account_id")
     def _check_company_alignment(self):

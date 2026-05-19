@@ -33,7 +33,7 @@ class TestAnalyticBranch(AccountingFullCommon):
         child = Analytic.create({
             "name": "JKT Dept Finance",
             "plan_id": plan.id,
-            "parent_id": root.id,
+            "x_custom_parent_id": root.id,
         })
         self.assertEqual(child.x_custom_branch_root_id, root)
 

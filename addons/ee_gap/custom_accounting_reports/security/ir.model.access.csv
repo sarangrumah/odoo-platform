@@ -1,0 +1,13 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_custom_report_financial_user,custom.report.financial user,model_custom_report_financial,group_report_user,1,0,0,0
+access_custom_report_financial_admin,custom.report.financial admin,model_custom_report_financial,group_report_admin,1,1,1,1
+access_gl_wizard_user,gl wizard user,model_custom_report_general_ledger_wizard,group_report_user,1,1,1,1
+access_tb_wizard_user,tb wizard user,model_custom_report_trial_balance_wizard,group_report_user,1,1,1,1
+access_bs_wizard_user,bs wizard user,model_custom_report_balance_sheet_wizard,group_report_user,1,1,1,1
+access_pl_wizard_user,pl wizard user,model_custom_report_profit_loss_wizard,group_report_user,1,1,1,1
+access_cf_wizard_user,cf wizard user,model_custom_report_cash_flow_wizard,group_report_user,1,1,1,1
+access_ar_wizard_user,ar wizard user,model_custom_report_aged_receivable_wizard,group_report_user,1,1,1,1
+access_ap_wizard_user,ap wizard user,model_custom_report_aged_payable_wizard,group_report_user,1,1,1,1
+access_pl2_wizard_user,partner ledger wizard user,model_custom_report_partner_ledger_wizard,group_report_user,1,1,1,1
+access_tax_wizard_user,tax wizard user,model_custom_report_tax_wizard,group_report_user,1,1,1,1
+access_db_wizard_user,day book wizard user,model_custom_report_day_book_wizard,group_report_user,1,1,1,1

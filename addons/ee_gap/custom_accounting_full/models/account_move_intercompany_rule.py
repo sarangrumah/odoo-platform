@@ -66,13 +66,10 @@ class IntercompanyRule(models.Model):
         copy=True,
     )
 
-    _sql_constraints = [
-        (
-            "unique_pair_direction",
-            "unique (company_from_id, company_to_id, direction)",
-            "An intercompany rule for this company pair + direction already exists.",
-        ),
-    ]
+    _unique_pair_direction = models.Constraint(
+        'unique (company_from_id, company_to_id, direction)',
+        'An intercompany rule for this company pair + direction already exists.',
+    )
 
     @api.constrains("company_from_id", "company_to_id")
     def _check_distinct_companies(self):

@@ -19,6 +19,13 @@ class AccountAnalyticAccount(models.Model):
         help="When True, this analytic account is the root for a legal branch and "
              "all child analytic accounts are considered part of that branch's books.",
     )
+    x_custom_parent_id = fields.Many2one(
+        "account.analytic.account",
+        string="Parent Analytic Account",
+        index=True,
+        help="Parent analytic account for branch hierarchy. Replaces the native "
+             "parent_id that was removed in Odoo 19 (hierarchy now lives on plan).",
+    )
     x_custom_branch_root_id = fields.Many2one(
         "account.analytic.account",
         string="Branch Root",
@@ -27,12 +34,12 @@ class AccountAnalyticAccount(models.Model):
         recursive=True,
     )
 
-    @api.depends("parent_id", "parent_id.x_custom_branch_root_id", "x_custom_is_branch_root")
+    @api.depends("x_custom_parent_id", "x_custom_parent_id.x_custom_branch_root_id", "x_custom_is_branch_root")
     def _compute_branch_root(self):
         for rec in self:
             if rec.x_custom_is_branch_root:
                 rec.x_custom_branch_root_id = rec
-            elif rec.parent_id:
-                rec.x_custom_branch_root_id = rec.parent_id.x_custom_branch_root_id
+            elif rec.x_custom_parent_id:
+                rec.x_custom_branch_root_id = rec.x_custom_parent_id.x_custom_branch_root_id
             else:
                 rec.x_custom_branch_root_id = False

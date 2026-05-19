@@ -10,6 +10,7 @@
                 <group string="Branch (kantor cabang)" name="branch_info">
                     <field name="x_custom_branch_code"/>
                     <field name="x_custom_is_branch_root"/>
+                    <field name="x_custom_parent_id"/>
                     <field name="x_custom_branch_root_id" readonly="1"/>
                 </group>
             </xpath>
