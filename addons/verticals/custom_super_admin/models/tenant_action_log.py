@@ -38,9 +38,10 @@ class TenantActionLog(models.Model):
     prev_hash_hex = fields.Char(string="Prev Hash")
     hash_hex = fields.Char(string="Hash")
 
-    _sql_constraints = [
-        ("master_id_uniq", "unique(master_id)", "Master log id must be unique in mirror."),
-    ]
+    _master_id_uniq = models.Constraint(
+        'unique(master_id)',
+        'Master log id must be unique in mirror.',
+    )
 
     @api.model
     def _cron_sync(self) -> None:

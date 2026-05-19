@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="module_category_to_engine" model="ir.module.category">
+            <field name="name">Transfer Orders</field>
+            <field name="sequence">27</field>
+        </record>
+
+        <record id="group_to_operator" model="res.groups">
+            <field name="name">TO / Operator</field>
+            <field name="category_id" ref="module_category_to_engine"/>
+            <field name="implied_ids" eval="[(4, ref('stock.group_stock_user'))]"/>
+        </record>
+
+        <record id="group_to_supervisor" model="res.groups">
+            <field name="name">TO / Supervisor</field>
+            <field name="category_id" ref="module_category_to_engine"/>
+            <field name="implied_ids" eval="[(4, ref('group_to_operator'))]"/>
+        </record>
+
+        <record id="group_to_admin" model="res.groups">
+            <field name="name">TO / Administrator</field>
+            <field name="category_id" ref="module_category_to_engine"/>
+            <field name="implied_ids" eval="[(4, ref('group_to_supervisor')), (4, ref('stock.group_stock_manager'))]"/>
+            <field name="users" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+    </data>
+</odoo>

@@ -164,7 +164,7 @@
                 <filter name="suspended" string="Suspended" domain="[('state','=','suspended')]"/>
                 <filter name="archived" string="Archived" domain="[('state','=','archived')]"/>
                 <filter name="failed" string="Failed" domain="[('state','=','failed')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="by_state" string="State" context="{'group_by': 'state'}"/>
                     <filter name="by_plan" string="Plan" context="{'group_by': 'plan_tier'}"/>
                     <filter name="by_csm" string="CSM" context="{'group_by': 'csm_user_id'}"/>

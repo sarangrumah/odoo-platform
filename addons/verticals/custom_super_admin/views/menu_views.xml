@@ -43,7 +43,7 @@
               name="Settings"
               parent="menu_super_admin_root"
               sequence="100"
-              action="base.action_general_configuration"
+              action="base.res_config_setting_act_window"
               groups="custom_super_admin.group_super_admin"/>
 
 </odoo>

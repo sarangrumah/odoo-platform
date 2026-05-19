@@ -12,14 +12,12 @@
         <!-- Group: Super Admin (write) -->
         <record id="group_super_admin" model="res.groups">
             <field name="name">Super Admin</field>
-            <field name="category_id" ref="module_category_super_admin"/>
             <field name="comment">Full lifecycle control: provision, suspend, archive, restore tenants.</field>
         </record>
 
         <!-- Group: CSM (read + trigger backup only) -->
         <record id="group_csm" model="res.groups">
             <field name="name">Customer Success Manager</field>
-            <field name="category_id" ref="module_category_super_admin"/>
             <field name="implied_ids" eval="[]"/>
             <field name="comment">Read tenant info, see backups/action-log, trigger on-demand backups.</field>
         </record>

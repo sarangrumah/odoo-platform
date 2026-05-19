@@ -64,9 +64,10 @@ class TenantRegistry(models.Model):
         help="Last error returned by the orchestrator for an action on this tenant"
     )
 
-    _sql_constraints = [
-        ("slug_uniq", "unique(slug)", "Tenant slug must be unique."),
-    ]
+    _slug_uniq = models.Constraint(
+        'unique(slug)',
+        'Tenant slug must be unique.',
+    )
 
     # --------------------------------------------------------------
     # Cron + sync

@@ -37,9 +37,10 @@ class TenantBackup(models.Model):
     error = fields.Text()
     expires_at = fields.Datetime()
 
-    _sql_constraints = [
-        ("master_id_uniq", "unique(master_id)", "Master backup id must be unique in mirror."),
-    ]
+    _master_id_uniq = models.Constraint(
+        'unique(master_id)',
+        'Master backup id must be unique in mirror.',
+    )
 
     @api.depends("size_bytes")
     def _compute_size_human(self):

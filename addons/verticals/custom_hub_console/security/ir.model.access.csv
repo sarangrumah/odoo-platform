@@ -1,0 +1,16 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_catalog_viewer,catalog.viewer,model_custom_hub_module_catalog,group_hub_viewer,1,0,0,0
+access_catalog_csm,catalog.csm,model_custom_hub_module_catalog,group_hub_csm,1,0,0,0
+access_catalog_admin,catalog.admin,model_custom_hub_module_catalog,group_hub_admin,1,1,1,1
+access_deployment_viewer,deployment.viewer,model_custom_hub_module_deployment,group_hub_viewer,1,0,0,0
+access_deployment_csm,deployment.csm,model_custom_hub_module_deployment,group_hub_csm,1,1,1,0
+access_deployment_admin,deployment.admin,model_custom_hub_module_deployment,group_hub_admin,1,1,1,1
+access_audit_viewer,audit.viewer,model_custom_hub_audit_event,group_hub_viewer,1,0,0,0
+access_audit_csm,audit.csm,model_custom_hub_audit_event,group_hub_csm,1,0,1,0
+access_audit_admin,audit.admin,model_custom_hub_audit_event,group_hub_admin,1,0,1,0
+access_ai_usage_viewer,ai.usage.viewer,model_custom_hub_ai_usage,group_hub_viewer,1,0,0,0
+access_ai_usage_csm,ai.usage.csm,model_custom_hub_ai_usage,group_hub_csm,1,0,0,0
+access_ai_usage_admin,ai.usage.admin,model_custom_hub_ai_usage,group_hub_admin,1,1,1,1
+access_deploy_wiz_csm,deploy.wiz.csm,model_custom_hub_deploy_module_wizard,group_hub_csm,1,1,1,1
+access_deploy_wiz_admin,deploy.wiz.admin,model_custom_hub_deploy_module_wizard,group_hub_admin,1,1,1,1
+access_rescan_wiz_admin,rescan.wiz.admin,model_custom_hub_rescan_catalog_wizard,group_hub_admin,1,1,1,1

@@ -30,7 +30,7 @@
                 <field name="action"/>
                 <field name="actor"/>
                 <filter name="failures" string="Failures only" domain="[('outcome','=','failure')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="by_tenant" string="Tenant" context="{'group_by': 'tenant_slug'}"/>
                     <filter name="by_action" string="Action" context="{'group_by': 'action'}"/>
                     <filter name="by_outcome" string="Outcome" context="{'group_by': 'outcome'}"/>
