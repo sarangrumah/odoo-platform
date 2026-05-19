@@ -22,4 +22,7 @@ class RentalAsset(models.Model):
     active = fields.Boolean(default=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
 
-    _sql_constraints = [("code_uniq", "unique(code)", "Asset code must be unique.")]
+    _code_uniq = models.Constraint(
+        'unique(code)',
+        'Asset code must be unique.',
+    )

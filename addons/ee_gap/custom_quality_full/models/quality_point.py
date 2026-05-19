@@ -38,3 +38,8 @@ class QualityPoint(models.Model):
     measure_uom_id = fields.Many2one("uom.uom")
     active = fields.Boolean(default=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
+    default_test_id = fields.Many2one(
+        "custom.quality.test", string="Default Test Template",
+        help="When provided, new quality.check records seeded from this "
+             "point will copy the test's inspection lines.",
+    )

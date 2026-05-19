@@ -35,6 +35,14 @@ class QualityAlert(models.Model):
     resolved_at = fields.Datetime(readonly=True)
     closed_at = fields.Datetime(readonly=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
+    capa_ids = fields.One2many(
+        "custom.quality.capa", "alert_id", string="CAPA Actions",
+    )
+    capa_count = fields.Integer(compute="_compute_capa_count")
+
+    def _compute_capa_count(self):
+        for rec in self:
+            rec.capa_count = len(rec.capa_ids)
 
     def _pdp_audit_classification(self):
         return "internal"

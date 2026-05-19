@@ -25,6 +25,35 @@ class QualityCheck(models.Model):
     performed_at = fields.Datetime(readonly=True)
     alert_id = fields.Many2one("quality.alert", readonly=True, copy=False)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
+    inspection_line_ids = fields.One2many(
+        "custom.quality.inspection.line", "check_id", string="Inspection Lines",
+    )
+    signature_ids = fields.One2many(
+        "custom.quality.signature", "check_id", string="Signatures",
+    )
+    overall_result = fields.Selection([
+        ("pass", "Pass"), ("fail", "Fail"), ("na", "N/A"),
+    ], compute="_compute_overall_result", store=True)
+
+    @api.depends("inspection_line_ids.pass_fail", "inspection_line_ids.is_required")
+    def _compute_overall_result(self):
+        for rec in self:
+            required = rec.inspection_line_ids.filtered("is_required")
+            if not required:
+                rec.overall_result = "na"
+            elif any(l.pass_fail == "fail" for l in required):
+                rec.overall_result = "fail"
+            else:
+                rec.overall_result = "pass"
+
+    def action_apply_test_template(self, test_id=None):
+        """Seed inspection lines from a custom.quality.test template."""
+        self.ensure_one()
+        test_id = test_id or (self.point_id and self.point_id.default_test_id.id)
+        if not test_id:
+            raise UserError(_("No test template provided."))
+        self.env["custom.quality.test"].browse(test_id).apply_to_check(self)
+        return True
 
     def _pdp_audit_classification(self):
         return "internal"

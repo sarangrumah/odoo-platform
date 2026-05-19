@@ -45,12 +45,25 @@
                             <field name="severity"/>
                             <field name="resolved_at" readonly="1"/>
                             <field name="closed_at" readonly="1"/>
+                            <field name="capa_count"/>
                         </group>
                     </group>
                     <notebook>
                         <page string="Description"><field name="description"/></page>
                         <page string="Root Cause"><field name="root_cause"/></page>
                         <page string="Corrective Action"><field name="corrective_action"/></page>
+                        <page string="CAPA Tracker">
+                            <field name="capa_ids" context="{'default_alert_id': id}">
+                                <list editable="bottom">
+                                    <field name="name" readonly="1"/>
+                                    <field name="action_type"/>
+                                    <field name="description"/>
+                                    <field name="responsible_id"/>
+                                    <field name="deadline"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
                     </notebook>
                 </sheet>
                 <chatter/>
