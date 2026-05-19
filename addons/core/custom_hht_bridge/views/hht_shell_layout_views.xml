@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- License: LGPL-3 -->
+<odoo>
+    <template id="hht_shell_layout" name="HHT PWA Shell">
+        <html lang="en">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport"
+                      content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+                <meta name="theme-color" content="#1f2937"/>
+                <title>Hub HHT</title>
+                <link rel="manifest" href="/hht/manifest.webmanifest"/>
+                <link rel="icon" sizes="192x192"
+                      href="/custom_hht_bridge/static/src/pwa/icon-192.png"/>
+                <t t-call-assets="custom_hht_bridge.pwa_assets" t-css="true" t-js="false"/>
+                <t t-call-assets="custom_hht_bridge.pwa_assets" t-css="false" t-js="true"/>
+                <script type="text/javascript">
+                    if ('serviceWorker' in navigator) {
+                        window.addEventListener('load', function () {
+                            navigator.serviceWorker.register('/hht/sw.js', { scope: '/hht/' })
+                                .catch(function (e) { console.warn('SW register failed', e); });
+                        });
+                    }
+                </script>
+            </head>
+            <body>
+                <div id="hht-app"
+                     data-public-component="custom_hht_bridge.HhtShell"/>
+            </body>
+        </html>
+    </template>
+</odoo>
