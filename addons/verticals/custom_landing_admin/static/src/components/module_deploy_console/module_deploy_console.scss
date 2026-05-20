@@ -1,0 +1,14 @@
+.o_landing_modules {
+    padding: 1rem;
+    height: 100%;
+    overflow: auto;
+
+    .o_landing_modules_header h3 {
+        margin: 0 0 0.75rem 0;
+    }
+
+    .o_landing_chip.maturity-production { background: #d1fae5; color: #065f46; }
+    .o_landing_chip.maturity-beta { background: #fef3c7; color: #92400e; }
+    .o_landing_chip.maturity-alpha { background: #e0e7ff; color: #3730a3; }
+    .o_landing_chip.maturity-deprecated { background: #fee2e2; color: #991b1b; }
+}

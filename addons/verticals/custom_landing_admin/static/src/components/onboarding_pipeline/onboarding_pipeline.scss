@@ -1,0 +1,103 @@
+.o_landing_pipeline {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+
+    .o_landing_pipeline_toolbar {
+        display: flex;
+        gap: 1rem;
+        padding: 0.75rem 1rem;
+        background: var(--landing-surface, #fff);
+        border-bottom: 1px solid var(--landing-border, #e6e8eb);
+        align-items: center;
+    }
+
+    .o_landing_search {
+        display: flex;
+        gap: 0.25rem;
+        input {
+            min-width: 220px;
+        }
+    }
+
+    .o_landing_filters {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        label { font-size: 0.85em; color: #6b7280; }
+        input { width: 140px; }
+    }
+
+    .o_landing_kanban {
+        flex: 1;
+        display: flex;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        overflow-x: auto;
+        background: var(--landing-bg, #f4f6f8);
+    }
+
+    .o_landing_col {
+        flex: 0 0 280px;
+        background: var(--landing-surface, #fff);
+        border: 1px solid var(--landing-border, #e6e8eb);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        max-height: 100%;
+    }
+
+    .o_landing_col_header {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0.75rem;
+        font-weight: 600;
+        border-bottom: 1px solid var(--landing-border, #e6e8eb);
+    }
+
+    .o_landing_col_count {
+        background: var(--landing-bg, #f4f6f8);
+        border-radius: 999px;
+        padding: 0 0.5rem;
+        font-size: 0.8em;
+        color: #6b7280;
+    }
+
+    .o_landing_col_body {
+        padding: 0.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .o_landing_card {
+        background: #fff;
+        border: 1px solid var(--landing-border, #e6e8eb);
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.5rem;
+        cursor: grab;
+        transition: box-shadow 0.1s ease;
+        &:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        &:active { cursor: grabbing; }
+
+        .o_landing_card_title { font-weight: 600; }
+        .o_landing_card_sub {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 0.85em;
+            color: #6b7280;
+            margin: 0.25rem 0;
+        }
+        .o_landing_chip {
+            background: var(--landing-bg, #f4f6f8);
+            border-radius: 999px;
+            padding: 0 0.4rem;
+        }
+        .o_landing_card_foot {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8em;
+            color: #9ca3af;
+        }
+    }
+}
