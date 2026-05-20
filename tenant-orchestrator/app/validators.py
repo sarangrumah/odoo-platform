@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import re
+from typing import Literal, Optional
+
+from pydantic import BaseModel, Field
 
 SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{1,62}$")
 DB_NAME_RE = SLUG_RE  # we use the slug as the db name 1:1
@@ -19,3 +22,50 @@ def assert_valid_slug(slug: str) -> None:
             f"Invalid slug '{slug}': must match {SLUG_RE.pattern} "
             "(lowercase, start with letter, alphanumeric + underscore, length 2-63)"
         )
+
+
+# ---------------------------------------------------------------------------
+# VPS lifecycle request schemas
+# ---------------------------------------------------------------------------
+
+
+class _VPSBase(BaseModel):
+    """Common SSH target fields used by every /v1/vps/* call."""
+
+    vps_id: int = Field(ge=1)
+    hostname: str = Field(min_length=1, max_length=255)
+    public_ip: Optional[str] = None
+    ssh_user: str = Field(default="root", min_length=1, max_length=64)
+    ssh_port: int = Field(default=22, ge=1, le=65535)
+    ssh_credential_ref: str = Field(
+        min_length=4,
+        description="Pointer to credential vault — e.g. vault://, env://, file://. NEVER raw key.",
+    )
+
+
+class VPSRegisterRequest(_VPSBase):
+    """POST /v1/vps/register — just probes SSH reachability."""
+
+
+class BootstrapRequest(_VPSBase):
+    """POST /v1/vps/{id}/bootstrap — runs harden_os + install_docker + install_caddy."""
+
+    tenant_slug: Optional[str] = None
+
+
+class DeployStackRequest(_VPSBase):
+    """POST /v1/vps/{id}/deploy-stack — generate docker-compose + up -d."""
+
+    env_type: Literal["dev", "staging", "prod"] = "dev"
+    tenant_slug: str = Field(min_length=2, max_length=63, pattern=r"^[a-z][a-z0-9_]{1,62}$")
+    db_name: str = Field(min_length=2, max_length=63, pattern=r"^[a-z][a-z0-9_]{1,62}$")
+    pg_password: Optional[str] = None
+    workers: Optional[int] = Field(default=2, ge=1, le=32)
+
+
+class SyncAddonsRequest(_VPSBase):
+    """POST /v1/vps/{id}/sync-addons — rsync addons + restart + -u all."""
+
+    env_type: Literal["dev", "staging", "prod"] = "dev"
+    tenant_slug: str = Field(min_length=2, max_length=63, pattern=r"^[a-z][a-z0-9_]{1,62}$")
+    db_name: str = Field(min_length=2, max_length=63, pattern=r"^[a-z][a-z0-9_]{1,62}$")
