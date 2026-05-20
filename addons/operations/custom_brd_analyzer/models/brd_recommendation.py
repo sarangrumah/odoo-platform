@@ -79,6 +79,76 @@ class BrdRecommendation(models.Model):
     assigned_user_id = fields.Many2one("res.users", string="Assignee")
     project_task_id = fields.Many2one("project.task", string="Backlog Task", ondelete="set null", copy=False)
 
+    # ------------------------------------------------------------------
+    # Cross-vertical impact analysis (Track B)
+    # ------------------------------------------------------------------
+    affects_existing_module_ids = fields.Many2many(
+        comodel_name="custom.hub.module.catalog",
+        relation="brd_recommendation_hub_catalog_rel",
+        column1="recommendation_id",
+        column2="catalog_id",
+        string="Affects Existing Hub Modules",
+        help="Hub catalog modules this recommendation would extend, patch or affect.",
+    )
+    cross_vertical_impact_json = fields.Text(
+        string="Cross-Vertical Impact (JSON)",
+        help='JSON map of {"module_name": ["vertical_a", "vertical_b"]} describing '
+             "which verticals consume each affected module.",
+    )
+    breaking_change = fields.Boolean(
+        default=False,
+        help="True if this recommendation would break backward compatibility of "
+             "an existing hub module API/schema.",
+    )
+    compat_strategy = fields.Selection(
+        [
+            ("extend", "Extend via _inherit"),
+            ("abstract_base", "Refactor to abstract base"),
+            ("feature_flag", "Feature flag"),
+            ("fork_warning", "Fork warning - high risk"),
+        ],
+        string="Compatibility Strategy",
+        help="Strategy to keep existing verticals running while shipping the change.",
+    )
+    impact_severity = fields.Selection(
+        [
+            ("low", "Low"),
+            ("medium", "Medium"),
+            ("high", "High"),
+            ("critical", "Critical"),
+        ],
+        compute="_compute_impact_severity",
+        store=True,
+        help="Computed from breaking_change flag plus the number of verticals affected.",
+    )
+
+    @api.depends("breaking_change", "cross_vertical_impact_json", "affects_existing_module_ids")
+    def _compute_impact_severity(self):
+        import json as _json
+        for rec in self:
+            verticals: set[str] = set()
+            raw = rec.cross_vertical_impact_json
+            if raw:
+                try:
+                    data = _json.loads(raw)
+                    if isinstance(data, dict):
+                        for vs in data.values():
+                            if isinstance(vs, list):
+                                verticals.update(str(v) for v in vs)
+                except (ValueError, TypeError):
+                    pass
+            v_count = len(verticals)
+            if rec.breaking_change and v_count >= 3:
+                rec.impact_severity = "critical"
+            elif rec.breaking_change and v_count >= 1:
+                rec.impact_severity = "high"
+            elif v_count >= 3:
+                rec.impact_severity = "high"
+            elif v_count >= 1 or rec.affects_existing_module_ids:
+                rec.impact_severity = "medium"
+            else:
+                rec.impact_severity = "low"
+
     _sql_constraints = [
         (
             "name_doc_uniq",

@@ -12,6 +12,8 @@
                     <field name="name"/>
                     <field name="severity"/>
                     <field name="estimated_md"/>
+                    <field name="breaking_change" widget="boolean_toggle"/>
+                    <field name="impact_severity" decoration-danger="impact_severity == 'critical'" decoration-warning="impact_severity == 'high'" decoration-info="impact_severity == 'medium'" decoration-muted="impact_severity == 'low'" widget="badge"/>
                     <field name="state"/>
                     <field name="project_task_id"/>
                 </list>
@@ -59,6 +61,24 @@
                             </page>
                             <page string="Related BRD Sections">
                                 <field name="related_section_ids" widget="many2many_tags"/>
+                            </page>
+                            <page string="Cross-Vertical Impact">
+                                <group>
+                                    <group>
+                                        <field name="breaking_change"/>
+                                        <field name="compat_strategy"/>
+                                        <field name="impact_severity" widget="badge" decoration-danger="impact_severity == 'critical'" decoration-warning="impact_severity == 'high'" decoration-info="impact_severity == 'medium'" decoration-muted="impact_severity == 'low'"/>
+                                    </group>
+                                </group>
+                                <separator string="Affected Hub Modules"/>
+                                <field name="affects_existing_module_ids" widget="many2many_tags"/>
+                                <separator string="Cross-Vertical Impact Map (JSON)"/>
+                                <div class="text-muted">
+                                    Map of <code>{"module_name": ["vertical_a", "vertical_b"]}</code> showing
+                                    which verticals consume each affected module. Used to score
+                                    blast-radius and select a compatibility strategy.
+                                </div>
+                                <field name="cross_vertical_impact_json" readonly="1" widget="text"/>
                             </page>
                         </notebook>
                     </sheet>

@@ -74,6 +74,32 @@ class BrdDocument(models.Model):
     contact_email = fields.Char()
     language = fields.Selection([("id", "Bahasa Indonesia"), ("en", "English")], default="en")
 
+    # ------------------------------------------------------------------
+    # Onboarding lifecycle hooks (Track B)
+    # ------------------------------------------------------------------
+    # Forward reference: ``onboarding.journey`` lives in a sibling module that
+    # depends on us. We declare the comodel by string only; ondelete='set null'
+    # means a missing target is harmless.
+    journey_id = fields.Many2one(
+        comodel_name="onboarding.journey",
+        string="Onboarding Journey",
+        ondelete="set null",
+        index=True,
+        help="Optional link to an onboarding journey record. Forward-reference "
+             "to the future ``custom_onboarding_journey`` module.",
+    )
+    vertical_target = fields.Char(
+        string="Vertical Target",
+        help="Free-form code of the target vertical (e.g. retail, fnb, "
+             "healthcare). Kept as Char to avoid coupling to a fixed enum.",
+    )
+    company_profile_json = fields.Text(
+        string="Company Profile (JSON)",
+        help='JSON: {"name": "...", "logo_url": "...", "npwp": "...", '
+             '"bank": {...}}. Captured during BRD intake for downstream tenant '
+             "provisioning.",
+    )
+
     state = fields.Selection(
         [
             ("draft", "Draft"),
