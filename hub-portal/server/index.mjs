@@ -80,7 +80,7 @@ app.post('/api/intake/submit', async (req, res) => {
 
 app.get('/api/intake/status/:token', async (req, res) => {
   try {
-    const r = await callOrch('GET', `/v1/intake/status/${encodeURIComponent(req.params.token)}`);
+    const r = await callOrch('GET', `/v1/intake/${encodeURIComponent(req.params.token)}/status`);
     res.status(r.status).type('application/json').send(r.body);
   } catch (e) {
     res.status(500).json({ detail: String(e?.message || e) });
@@ -91,9 +91,20 @@ app.get('/api/intake/status/:token', async (req, res) => {
 // VPS (orchestrator passthrough)
 // ---------------------------------------------------------------------------
 app.get('/api/vps', async (_req, res) => {
+  // VPS inventory lives in Odoo (tenant.vps); orchestrator only handles lifecycle.
   try {
-    const r = await callOrch('GET', '/v1/vps');
-    res.status(r.status).type('application/json').send(r.body);
+    const r = await odooCall('tenant.vps', 'search_read', [[]], {
+      fields: ['id', 'name', 'public_ip', 'state', 'provider', 'region',
+               'cpu_cores', 'ram_mb', 'disk_gb', 'last_health_check_at',
+               'prometheus_target_url', 'grafana_dashboard_uid'],
+      limit: 500,
+      order: 'name',
+    });
+    const text = await r.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { return res.status(r.status).type('application/json').send(text); }
+    if (parsed?.error) return res.status(500).json({ detail: parsed.error?.data?.message || 'Odoo error', error: parsed.error });
+    res.status(r.status).json(parsed.result ?? []);
   } catch (e) {
     res.status(500).json({ detail: String(e?.message || e) });
   }
@@ -101,8 +112,13 @@ app.get('/api/vps', async (_req, res) => {
 
 app.get('/api/vps/:id', async (req, res) => {
   try {
-    const r = await callOrch('GET', `/v1/vps/${req.params.id}`);
-    res.status(r.status).type('application/json').send(r.body);
+    const r = await odooCall('tenant.vps', 'read', [[Number(req.params.id)]], {});
+    const text = await r.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { return res.status(r.status).type('application/json').send(text); }
+    if (parsed?.error) return res.status(500).json({ detail: parsed.error?.data?.message || 'Odoo error', error: parsed.error });
+    const recs = parsed.result || [];
+    res.status(r.status).json(recs[0] || null);
   } catch (e) {
     res.status(500).json({ detail: String(e?.message || e) });
   }

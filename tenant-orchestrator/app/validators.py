@@ -99,24 +99,15 @@ class EnforceRetentionRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-VERTICAL_TARGETS = Literal[
-    "residensia",
-    "ppob",
-    "arkaim",
-    "jds",
-    "telco",
-    "komdigi",
-    "other",
-]
-
-
 class IntakeSubmitRequest(BaseModel):
-    """Body for POST /v1/intake/submit (from Next.js landing-public)."""
+    """Body for POST /v1/intake/submit (from hub-portal IntakeWizard)."""
 
     company_name: str = Field(min_length=2, max_length=200)
     contact_email: str = Field(min_length=3, max_length=200)
     contact_phone: str = Field(min_length=6, max_length=32)
-    vertical_target: VERTICAL_TARGETS
+    # Vertical code controlled by the UI dropdown (tokens.js). Kept as Char on the
+    # Odoo side, so accept any short string here rather than coupling to an enum.
+    vertical_target: str = Field(min_length=2, max_length=40)
     modules_wishlist: list[str] = Field(default_factory=list, max_length=50)
     business_process_narrative: str = Field(min_length=50, max_length=20000)
     company_logo_base64: Optional[str] = Field(default=None, max_length=2_000_000)

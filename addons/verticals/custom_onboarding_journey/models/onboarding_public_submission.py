@@ -67,6 +67,31 @@ class OnboardingPublicSubmission(models.Model):
         ),
     ]
 
+    # ------------------------------------------------------------------ API
+    @api.model
+    def create_from_payload(self, payload):
+        """Create a submission from a JSON payload (called by orchestrator /v1/intake).
+
+        Returns ``{token, status_url, id}`` so the public landing can
+        immediately show the customer a status link.
+        """
+        import hashlib
+        if not isinstance(payload, dict):
+            raise UserError(_("payload must be a dict"))
+        if not payload.get("company_name"):
+            raise UserError(_("company_name is required"))
+        source_ip = payload.pop("source_ip", None)
+        ip_hash = hashlib.sha256(source_ip.encode("utf-8")).hexdigest()[:32] if source_ip else False
+        rec = self.sudo().create({
+            "raw_payload_json": json.dumps(payload),
+            "source_ip_hash": ip_hash,
+        })
+        return {
+            "id": rec.id,
+            "token": rec.public_token,
+            "status_url": f"/onboarding/public/status/{rec.public_token}",
+        }
+
     @api.depends("raw_payload_json", "submitted_at")
     def _compute_name(self):
         for rec in self:

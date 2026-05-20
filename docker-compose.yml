@@ -275,6 +275,11 @@ services:
       ODOO_HOST: odoo
       ODOO_PORT: 8069
       ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD}
+      # --- Odoo Mgmt (for intake/journey bridge from /v1/intake/*) ---
+      ODOO_MGMT_URL: http://odoo-mgmt:8069
+      ODOO_MGMT_DB: ${ORCHESTRATOR_ODOO_MGMT_DB:-landing_demo}
+      ODOO_MGMT_USER: ${ORCHESTRATOR_ODOO_MGMT_USER:-admin}
+      ODOO_MGMT_PASSWORD: ${ORCHESTRATOR_ODOO_MGMT_PASSWORD:-admin}
       # --- Operational ---
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENABLE_BACKUP_SCHEDULER: ${ENABLE_BACKUP_SCHEDULER:-true}
@@ -291,6 +296,47 @@ services:
       resources:
         limits:
           memory: 1g
+
+  hub-portal:
+    build:
+      context: ./hub-portal
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-hub-portal:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-hub-portal
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=64m,mode=1777
+    depends_on:
+      tenant-orchestrator:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      ORCHESTRATOR_URL: http://tenant-orchestrator:8080
+      ORCHESTRATOR_BASE_URL: http://tenant-orchestrator:8080
+      ORCHESTRATOR_SHARED_SECRET: ${ORCHESTRATOR_SHARED_SECRET}
+      HUB_PORTAL_ACTOR: hub-portal
+      ODOO_BASE_URL: http://odoo-mgmt:8069
+      ODOO_DB: ${HUB_PORTAL_ODOO_DB:-landing_demo}
+      ODOO_LOGIN: ${HUB_PORTAL_ODOO_LOGIN:-admin}
+      ODOO_PASSWORD: ${HUB_PORTAL_ODOO_PASSWORD:-admin}
+      NODE_ENV: production
+    ports:
+      - "${HUB_PORTAL_PORT:-18000}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
 networks:
   odoo-net:
