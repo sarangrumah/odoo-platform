@@ -45,6 +45,14 @@ class VPSTarget:
 def resolve_ssh_key(ref: str) -> str:
     """Resolve a credential ref to a PEM private key body.
 
+    Supported schemes:
+      * ``env://VAR_NAME``        — read PEM body from env var
+      * ``file:///abs/path``      — read PEM body from local file
+      * ``vault://path/to/key``   — read from HashiCorp Vault if
+        ``VAULT_ADDR`` is configured; otherwise raises
+        ``SSHCredentialError`` with a friendly hint so callers can
+        skip the action gracefully in dev/UAT.
+
     NEVER log the returned material.
     """
     if not ref:
@@ -65,9 +73,59 @@ def resolve_ssh_key(ref: str) -> str:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
     if ref.startswith("vault://"):
-        # TODO: implement HashiCorp Vault lookup
-        raise SSHCredentialError(f"vault:// refs not yet implemented ({ref})")
+        return _resolve_vault_ref(ref)
     raise SSHCredentialError(f"unsupported credential scheme: {ref.split('://', 1)[0]}")
+
+
+def _resolve_vault_ref(ref: str) -> str:
+    """Resolve ``vault://path/to/secret#field`` against HashiCorp Vault.
+
+    Requires ``VAULT_ADDR`` and ``VAULT_TOKEN`` env vars. If ``VAULT_ADDR``
+    is not configured we raise ``SSHCredentialError`` with a friendly hint;
+    the router-level handler then converts that to a 200 "skipped" response
+    so dev/UAT does not get a 502 stack-trace.
+    """
+    vault_addr = os.environ.get("VAULT_ADDR")
+    if not vault_addr:
+        log.warning(
+            "vault.skip: VAULT_ADDR not configured, skipping vault:// resolution "
+            "for ref=%s",
+            ref,
+        )
+        raise SSHCredentialError(
+            "vault:// credential resolver not configured (VAULT_ADDR unset) — "
+            "set up Vault or use file:// / env:// refs for dev"
+        )
+    vault_token = os.environ.get("VAULT_TOKEN")
+    if not vault_token:
+        raise SSHCredentialError(
+            "VAULT_TOKEN not set — cannot authenticate to Vault"
+        )
+    try:
+        import urllib.request  # local import: avoid runtime cost when unused
+    except ImportError as e:  # pragma: no cover
+        raise SSHCredentialError(f"urllib unavailable: {e}") from e
+
+    body = ref[len("vault://"):]
+    # Allow optional ``#field`` suffix to pick a specific key from the secret.
+    field = "private_key"
+    if "#" in body:
+        body, field = body.split("#", 1)
+    url = f"{vault_addr.rstrip('/')}/v1/{body.lstrip('/')}"
+    req = urllib.request.Request(url, headers={"X-Vault-Token": vault_token})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+            import json as _json
+            payload = _json.loads(resp.read().decode("utf-8"))
+    except Exception as e:  # noqa: BLE001
+        raise SSHCredentialError(f"vault lookup failed: {e}") from e
+    data = (payload.get("data") or {}).get("data") or payload.get("data") or {}
+    val = data.get(field)
+    if not val:
+        raise SSHCredentialError(
+            f"vault secret at {body} has no '{field}' key"
+        )
+    return val
 
 
 class RemoteDockerExecutor:

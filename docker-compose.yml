@@ -283,6 +283,16 @@ services:
       # --- Operational ---
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENABLE_BACKUP_SCHEDULER: ${ENABLE_BACKUP_SCHEDULER:-true}
+      # --- Demo / UAT friendliness ---
+      # When true, SSH-dependent VPS actions return a stub success response
+      # instead of attempting a real connection. Leave false in prod.
+      PLATFORM_DEMO_MODE: ${PLATFORM_DEMO_MODE:-false}
+      # --- Optional integrations (blank = degrade gracefully) ---
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
+      # --- Vault (vault:// ssh credential refs); blank disables resolver ---
+      VAULT_ADDR: ${VAULT_ADDR:-}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
     ports:
       - "${TENANT_ORCHESTRATOR_PORT:-18091}:8080"
     healthcheck:

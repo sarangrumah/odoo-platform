@@ -17,13 +17,38 @@ from pathlib import Path
 from typing import Iterator, Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..provisioner_ssh import (
     RemoteDockerExecutor,
     SSHCredentialError,
     VPSTarget,
 )
+
+
+def _demo_mode() -> bool:
+    """``PLATFORM_DEMO_MODE=true`` short-circuits SSH-dependent actions to
+    a friendly stub response so a fresh UAT install never returns 502."""
+    return os.environ.get("PLATFORM_DEMO_MODE", "false").lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _credential_skip_response(detail: str) -> JSONResponse:
+    """Return 200 + body explaining that the action was skipped because
+    the SSH credential could not be resolved (typical in dev / UAT)."""
+    return JSONResponse(
+        status_code=200,
+        content={
+            "ok": False,
+            "skipped": True,
+            "reason": (
+                "ssh credential could not be resolved (dev mode) — "
+                "configure vault:// or use file:// ref. "
+                f"detail: {detail}"
+            ),
+        },
+    )
 from ..validators import (
     BootstrapRequest,
     DeployStackRequest,
@@ -92,11 +117,23 @@ def register_vps(body: VPSRegisterRequest, request: Request) -> dict:
     """
     actor = getattr(request.state, "actor", "system")
     target = _target_from(body)
+    if _demo_mode():
+        log.info("vps.register.demo_mode host=%s", target.hostname)
+        return {
+            "ok": True,
+            "vps_id": body.vps_id,
+            "hostname": target.hostname,
+            "state": "registered",
+            "skipped": True,
+            "reason": "PLATFORM_DEMO_MODE=true — SSH check stubbed",
+        }
     try:
         with RemoteDockerExecutor(target) as ex:
             hc = ex.healthcheck()
     except SSHCredentialError as e:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"credential error: {e}") from e
+        # Friendly: return 200 + skipped so UAT does not see a 400 wall.
+        log.info("vps.register.credential_skip host=%s err=%s", target.hostname, e)
+        return _credential_skip_response(str(e))
     except Exception as e:  # noqa: BLE001
         log.warning("vps.register.ssh_failed host=%s err=%s", target.hostname, e)
         raise HTTPException(
@@ -213,11 +250,25 @@ def health(
         ssh_port=ssh_port,
         ssh_credential_ref=ssh_credential_ref,
     )
+    if _demo_mode():
+        return {
+            "ok": True,
+            "output": "demo-mode stub: 0 containers running, uname=Linux demo 6.0",
+            "skipped": True,
+        }
     try:
         with RemoteDockerExecutor(target) as ex:
             return ex.healthcheck()
     except SSHCredentialError as e:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+        log.info("vps.health.credential_skip host=%s err=%s", target.hostname, e)
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": (
+                "ssh credential could not be resolved — configure vault:// or "
+                f"use file:// ref. detail: {e}"
+            ),
+        }
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": str(e)}
 
@@ -236,11 +287,20 @@ for d in /opt/odoo/*/; do
 done
 echo "[decommission] DONE"
 """
+    if _demo_mode():
+        return {
+            "ok": True,
+            "vps_id": vps_id,
+            "exit_code": 0,
+            "log": "demo-mode stub: decommission skipped",
+            "skipped": True,
+        }
     try:
         with RemoteDockerExecutor(target) as ex:
             lines = list(ex.run_script("decommission.sh", script))
     except SSHCredentialError as e:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+        log.info("vps.decommission.credential_skip vps_id=%s err=%s", vps_id, e)
+        return _credential_skip_response(str(e))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
     rc_line = next((l for l in lines if l.startswith("__EXIT__")), "__EXIT__ -1")
