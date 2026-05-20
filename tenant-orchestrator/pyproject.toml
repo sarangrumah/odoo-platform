@@ -17,6 +17,7 @@ dependencies = [
   "prometheus-client==0.21.0",
   "croniter==3.0.4",
   "apscheduler==3.10.4",
+  "paramiko==3.5.0",
 ]
 
 [project.optional-dependencies]
