@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!--
+        Lightweight shell template — intentionally NOT inheriting
+        ``web.layout`` so we get full control over the chrome (no Odoo
+        top-bar, no app launcher, no left menu). We do, however, load
+        the standard backend asset bundle so OWL + services are
+        available.
+    -->
+    <template id="app_root" name="Landing Admin Shell">
+        <!DOCTYPE html>
+        <html t-att-data-uid="uid" lang="en">
+            <head>
+                <meta charset="utf-8"/>
+                <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+                <meta name="viewport"
+                      content="width=device-width,initial-scale=1"/>
+                <title>Platform Landing Admin</title>
+                <link rel="icon" type="image/x-icon"
+                      href="/web/static/img/favicon.ico"/>
+                <t t-call-assets="web.assets_common" t-css="true"/>
+                <t t-call-assets="web.assets_backend" t-css="true"/>
+            </head>
+            <body class="o_landing_admin_body">
+                <script type="text/javascript">
+                    // Expose the server-rendered context to OWL.
+                    window.__landing_admin__ = {
+                        subpath: "<t t-esc="subpath"/>",
+                        user: {
+                            id: <t t-esc="uid"/>,
+                            name: "<t t-esc="user_name"/>",
+                            login: "<t t-esc="user_login"/>"
+                        }
+                    };
+                </script>
+                <div id="landing_admin_root"
+                     class="o_landing_admin_root">
+                    <div class="o_landing_admin_boot">
+                        <i class="fa fa-spinner fa-spin"/>
+                        Loading Landing Admin…
+                    </div>
+                </div>
+                <t t-call-assets="web.assets_common" t-js="true"/>
+                <t t-call-assets="web.assets_backend" t-js="true"/>
+            </body>
+        </html>
+    </template>
+</odoo>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_landing_admin.BrdUpload">
+        <div class="o_landing_brd_upload">
+            <div class="o_landing_dropzone"
+                 t-att-class="state.dragging ? 'is-dragging' : ''"
+                 t-on-dragenter="onDragEnter"
+                 t-on-dragleave="onDragLeave"
+                 t-on-dragover="onDragOver"
+                 t-on-drop="onDrop"
+                 t-on-click="onPick">
+                <i class="fa fa-cloud-upload fa-2x"/>
+                <div>Drop BRD files here, or click to browse</div>
+                <input type="file" multiple="multiple"
+                       style="display:none"
+                       t-ref="fileInput"
+                       t-on-change="onFileChange"/>
+            </div>
+
+            <div t-if="state.uploading" class="o_landing_upload_status">
+                <i class="fa fa-spinner fa-spin"/> Uploading…
+            </div>
+
+            <div t-if="state.error" class="alert alert-danger">
+                <t t-esc="state.error"/>
+            </div>
+
+            <ul t-if="state.uploads.length" class="o_landing_upload_list">
+                <t t-foreach="state.uploads" t-as="u" t-key="u.id">
+                    <li>
+                        <span class="o_landing_upload_name" t-esc="u.name"/>
+                        <span class="o_landing_chip" t-esc="u.state"/>
+                    </li>
+                </t>
+            </ul>
+        </div>
+    </t>
+</templates>

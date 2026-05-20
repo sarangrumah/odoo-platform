@@ -1,0 +1,37 @@
+.o_landing_brd_upload {
+    .o_landing_dropzone {
+        border: 2px dashed var(--landing-border, #d1d5db);
+        border-radius: 8px;
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        background: #fff;
+        color: #6b7280;
+        transition: border-color 0.15s ease, background 0.15s ease;
+
+        &.is-dragging,
+        &:hover {
+            border-color: var(--landing-primary, #2563eb);
+            background: #eef2ff;
+            color: var(--landing-primary, #2563eb);
+        }
+    }
+
+    .o_landing_upload_status {
+        margin-top: 0.5rem;
+        color: #6b7280;
+    }
+
+    .o_landing_upload_list {
+        margin-top: 0.75rem;
+        list-style: none;
+        padding: 0;
+        li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.4rem 0.6rem;
+            border-bottom: 1px solid var(--landing-border, #e6e8eb);
+        }
+    }
+}
