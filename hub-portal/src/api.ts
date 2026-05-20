@@ -114,6 +114,20 @@ export interface JourneyFilters {
   offset?: number;
 }
 
+// Public-intake inbox: submissions that haven't been promoted yet.
+export const listPublicSubmissions = (status: string = 'submitted') =>
+  jsonrpc<any[]>('onboarding.public.submission', 'search_read', [[['status', '=', status]]], {
+    fields: ['id', 'name', 'status', 'public_token', 'submitted_at', 'raw_payload_json', 'journey_id'],
+    limit: 200,
+    order: 'submitted_at desc',
+  });
+
+export const promoteSubmission = (id: number) =>
+  jsonrpc<any>('onboarding.public.submission', 'action_promote_to_journey', [[id]], {});
+
+export const rejectSubmission = (id: number) =>
+  jsonrpc<boolean>('onboarding.public.submission', 'action_reject', [[id]], {});
+
 export const listJourneys = (filters: JourneyFilters = {}) => {
   const domain: any[] = [];
   if (filters.stage) domain.push(['stage', '=', filters.stage]);

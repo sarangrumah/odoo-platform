@@ -113,23 +113,84 @@ class OnboardingPublicSubmission(models.Model):
         except Exception as exc:
             raise UserError(_("Cannot parse submission payload: %s") % exc) from exc
 
-        partner_name = data.get("partner_name") or data.get("company_name") or _("Unknown")
-        partner_email = data.get("partner_email")
+        partner_name = (
+            data.get("partner_name")
+            or data.get("company_name")
+            or _("Unknown")
+        )
+        partner_email = data.get("partner_email") or data.get("contact_email")
+        partner_phone = data.get("contact_phone")
         Partner = self.env["res.partner"].sudo()
         partner = False
         if partner_email:
             partner = Partner.search([("email", "=", partner_email)], limit=1)
         if not partner:
-            partner = Partner.create({"name": partner_name, "email": partner_email or False})
+            partner_vals = {"name": partner_name, "is_company": True}
+            if partner_email:
+                partner_vals["email"] = partner_email
+            if partner_phone:
+                partner_vals["phone"] = partner_phone
+            partner = Partner.create(partner_vals)
 
-        journey = self.env["onboarding.journey"].sudo().create(
-            {
-                "name": _("Onboarding - %s") % partner_name,
-                "partner_id": partner.id,
-                "stage": "intake",
-                "company_profile_json": self.raw_payload_json,
-            }
-        )
+        # Best-effort initial stage based on what the intake provided.
+        has_brd = bool(data.get("brd_file_base64s"))
+        initial_stage = "brd_uploaded" if has_brd else "intake"
+
+        journey_vals = {
+            "name": _("Onboarding - %s") % partner_name,
+            "partner_id": partner.id,
+            "stage": initial_stage,
+            "company_profile_json": self.raw_payload_json,
+        }
+        if "vertical_target" in self.env["onboarding.journey"]._fields and data.get("vertical_target"):
+            journey_vals["vertical_target"] = data["vertical_target"]
+
+        journey = self.env["onboarding.journey"].sudo().create(journey_vals)
+
+        # Extract any uploaded BRD files into ir.attachment + brd.document so
+        # the AI analyzer has something to chew on.
+        brd_files = data.get("brd_file_base64s") or []
+        brd_filenames = data.get("brd_filenames") or []
+        BrdDocument = self.env["brd.document"].sudo()
+        Attachment = self.env["ir.attachment"].sudo()
+        for idx, b64 in enumerate(brd_files):
+            if not b64:
+                continue
+            try:
+                # b64 might be a data URL ("data:application/...;base64,XXX")
+                if isinstance(b64, str) and "," in b64 and b64.startswith("data:"):
+                    b64 = b64.split(",", 1)[1]
+                fname = (brd_filenames[idx] if idx < len(brd_filenames) else None) or f"BRD-{partner_name}-{idx + 1}.docx"
+                att = Attachment.create({
+                    "name": fname,
+                    "datas": b64,
+                    "res_model": "brd.document",
+                    "res_id": 0,
+                })
+                doc_vals = {
+                    "name": fname.rsplit(".", 1)[0],
+                    "document_attachment_id": att.id,
+                    "document_filename": fname,
+                    "vertical_target_id": False,
+                    "state": "draft",
+                }
+                if "journey_id" in BrdDocument._fields:
+                    doc_vals["journey_id"] = journey.id
+                if data.get("vertical_target") and "vertical_target" in BrdDocument._fields:
+                    doc_vals["vertical_target"] = data["vertical_target"]
+                if "company_profile_json" in BrdDocument._fields:
+                    doc_vals["company_profile_json"] = json.dumps({
+                        k: data.get(k) for k in (
+                            "company_name", "contact_email", "contact_phone",
+                            "npwp", "bank_name", "bank_account",
+                        )
+                    })
+                doc = BrdDocument.create(doc_vals)
+                # Re-point attachment to the created BRD record so the Documents app picks it up.
+                att.write({"res_id": doc.id})
+            except Exception as e:
+                _logger.warning("Failed to materialize BRD attachment #%d from submission %s: %s", idx, self.id, e)
+
         self.write({"status": "promoted", "journey_id": journey.id})
         return self._open_journey()
 

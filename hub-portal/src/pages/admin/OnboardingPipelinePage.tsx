@@ -1,10 +1,13 @@
 import { DragEvent, useEffect, useMemo, useState } from 'react';
-import { Plus, Search, Workflow } from 'lucide-react';
+import { Inbox, Plus, Search, Workflow, X } from 'lucide-react';
 import { Badge, Button, Card, Input, Select } from '../../components/ui';
 import EmptyState from '../../components/EmptyState';
 import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, radii, spacing, stageColors, verticals } from '../../tokens';
-import { listJourneys, updateJourneyStage } from '../../api';
+import {
+  listJourneys, updateJourneyStage,
+  listPublicSubmissions, promoteSubmission, rejectSubmission,
+} from '../../api';
 
 const STAGES: { key: string; label: string }[] = [
   { key: 'intake', label: 'Intake' },
@@ -38,6 +41,8 @@ interface Props {
 
 export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: Props) {
   const [journeys, setJourneys] = useState<Journey[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [busyId, setBusyId] = useState<number | null>(null);
   const [filterBa, setFilterBa] = useState('');
   const [filterVertical, setFilterVertical] = useState('');
   const [search, setSearch] = useState('');
@@ -45,10 +50,11 @@ export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: P
   const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    listJourneys()
-      .then((rows) => {
-        if (Array.isArray(rows)) setJourneys(rows as any);
+  function refresh() {
+    Promise.all([listJourneys(), listPublicSubmissions('submitted')])
+      .then(([j, s]) => {
+        if (Array.isArray(j)) setJourneys(j as any);
+        if (Array.isArray(s)) setSubmissions(s);
         setLoaded(true);
       })
       .catch((err: any) => {
@@ -58,7 +64,41 @@ export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: P
         setApiError({ message: msg, configRequired });
         setLoaded(true);
       });
+  }
+
+  useEffect(() => {
+    refresh();
   }, []);
+
+  async function onPromote(id: number) {
+    setBusyId(id);
+    try {
+      const res = await promoteSubmission(id);
+      refresh();
+      // action_promote_to_journey returns an ir.actions.act_window with res_id
+      const jid = res?.res_id;
+      if (jid) setTimeout(() => onOpenJourney(jid), 200);
+    } catch (e: any) {
+      alert('Promote failed: ' + (e?.detail || e?.message || e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onReject(id: number) {
+    if (!confirm('Reject this submission? It will be hidden from the inbox.')) return;
+    setBusyId(id);
+    try {
+      await rejectSubmission(id);
+      refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function parsePayload(raw: string) {
+    try { return JSON.parse(raw || '{}'); } catch { return {}; }
+  }
 
   const filtered = useMemo(() => {
     return journeys.filter((j) => {
@@ -98,6 +138,60 @@ export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: P
           hint={apiError.message}
         />
       )}
+      {submissions.length > 0 && (
+        <Card style={{ marginBottom: spacing.md, padding: spacing.md, background: '#FEF6E6', border: `1px solid #F5D78E` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: spacing.sm }}>
+            <Inbox size={16} color="#92400E" />
+            <strong style={{ color: '#92400E', fontSize: 13 }}>
+              Public Inbox — {submissions.length} new intake submission{submissions.length === 1 ? '' : 's'} awaiting promotion
+            </strong>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {submissions.map((s) => {
+              const p = parsePayload(s.raw_payload_json);
+              const fileCount = (p.brd_file_base64s || []).length;
+              const moduleCount = (p.modules_wishlist || []).length;
+              return (
+                <div key={s.id} style={{
+                  background: '#fff', borderRadius: radii.md, padding: spacing.sm,
+                  border: `1px solid ${colors.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>
+                      {p.company_name || 'Untitled submission'}
+                    </div>
+                    <div style={{ fontSize: 11, color: colors.muted, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <span>Vertical: <strong>{p.vertical_target || '—'}</strong></span>
+                      <span>{p.contact_email || '—'}</span>
+                      <span>{moduleCount} module{moduleCount === 1 ? '' : 's'} requested</span>
+                      <span>{fileCount} BRD file{fileCount === 1 ? '' : 's'}</span>
+                      <span>{new Date(s.submitted_at).toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => onReject(s.id)}
+                      disabled={busyId === s.id}
+                      style={{ color: colors.muted }}
+                    >
+                      <X size={12} /> Reject
+                    </Button>
+                    <Button
+                      onClick={() => onPromote(s.id)}
+                      disabled={busyId === s.id}
+                    >
+                      {busyId === s.id ? 'Promoting…' : 'Promote to Journey →'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       <Card style={{ marginBottom: spacing.md, display: 'flex', gap: spacing.sm, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 220px' }}>
           <Search size={14} color={colors.textMuted} />
