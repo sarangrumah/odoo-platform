@@ -92,3 +92,51 @@ class EnforceRetentionRequest(BaseModel):
 
     tenant_slug: str = Field(min_length=2, max_length=63, pattern=SLUG_RE.pattern)
     retention_days: int = Field(default=30, ge=1, le=3650)
+
+
+# ---------------------------------------------------------------------------
+# Public intake (Next.js landing-public → orchestrator → odoo-mgmt)
+# ---------------------------------------------------------------------------
+
+
+VERTICAL_TARGETS = Literal[
+    "residensia",
+    "ppob",
+    "arkaim",
+    "jds",
+    "telco",
+    "komdigi",
+    "other",
+]
+
+
+class IntakeSubmitRequest(BaseModel):
+    """Body for POST /v1/intake/submit (from Next.js landing-public)."""
+
+    company_name: str = Field(min_length=2, max_length=200)
+    contact_email: str = Field(min_length=3, max_length=200)
+    contact_phone: str = Field(min_length=6, max_length=32)
+    vertical_target: VERTICAL_TARGETS
+    modules_wishlist: list[str] = Field(default_factory=list, max_length=50)
+    business_process_narrative: str = Field(min_length=50, max_length=20000)
+    company_logo_base64: Optional[str] = Field(default=None, max_length=2_000_000)
+    npwp: Optional[str] = Field(default=None, max_length=32)
+    bank_name: Optional[str] = Field(default=None, max_length=100)
+    bank_account: Optional[str] = Field(default=None, max_length=64)
+    turnstile_token: str = Field(min_length=1, max_length=4096)
+    brd_file_base64s: Optional[list[str]] = Field(default=None, max_length=5)
+    source_ip: Optional[str] = Field(default=None, max_length=64)
+
+
+class IntakeSubmitResponse(BaseModel):
+    token: str
+    status_url: str
+
+
+class IntakeStatusResponse(BaseModel):
+    token: str
+    stage: str
+    status: str
+    target_go_live: Optional[str] = None
+    progress_pct: Optional[float] = None
+    journey_id: Optional[int] = None
