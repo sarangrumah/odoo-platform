@@ -25,7 +25,19 @@ import { Badge, Button, Card, Tabs } from '../../components/ui';
 import EmptyState from '../../components/EmptyState';
 import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, radii, spacing } from '../../tokens';
-import { getJourney, listRecommendations } from '../../api';
+import { getJourney, listRecommendations, listBrdDocuments, runBrdExtract, runBrdAnalyze } from '../../api';
+
+function partnerName(j: any): string {
+  return Array.isArray(j?.partner_id) ? j.partner_id[1] : (j?.name || '—');
+}
+function baName(j: any): string {
+  return Array.isArray(j?.ba_id) ? j.ba_id[1] : '—';
+}
+function readJsonField(raw: any): any {
+  if (!raw) return {};
+  if (typeof raw !== 'string') return raw;
+  try { return JSON.parse(raw); } catch { return {}; }
+}
 
 interface Props {
   journeyId: number;
@@ -43,34 +55,49 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
   const [tab, setTab] = useState('overview');
   const [journey, setJourney] = useState<any>(null);
   const [recs, setRecs] = useState<any[]>([]);
+  const [brds, setBrds] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
+  const [busyBrd, setBusyBrd] = useState<number | null>(null);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  function refresh() {
     if (journeyId == null) {
       setLoaded(true);
       return;
     }
-    let cancelled = false;
     const detectConfig = (msg: string) =>
       /turnstile|api key|webhook secret|vault|prometheus|ANTHROPIC|requires config/i.test(msg);
     Promise.all([
       getJourney(journeyId).catch((e: any) => {
         const msg = e?.detail || e?.message || String(e);
-        if (!cancelled) setApiError({ message: msg, configRequired: detectConfig(msg) });
+        setApiError({ message: msg, configRequired: detectConfig(msg) });
         return null;
       }),
-      listRecommendations(journeyId).catch(() => null),
-    ]).then(([j, r]) => {
-      if (cancelled) return;
+      listRecommendations(journeyId).catch(() => []),
+      listBrdDocuments(journeyId).catch(() => []),
+    ]).then(([j, r, b]) => {
       if (Array.isArray(j) && j[0]) setJourney(j[0]);
       if (Array.isArray(r)) setRecs(r);
+      if (Array.isArray(b)) setBrds(b);
       setLoaded(true);
     });
-    return () => {
-      cancelled = true;
-    };
-  }, [journeyId]);
+  }
+
+  useEffect(() => { refresh(); }, [journeyId]);
+
+  async function doExtract(id: number) {
+    setBusyBrd(id); setActionMsg(null);
+    try { await runBrdExtract(id); setActionMsg('Extract completed.'); refresh(); }
+    catch (e: any) { setActionMsg('Extract failed: ' + (e?.detail || e?.message || e)); }
+    finally { setBusyBrd(null); }
+  }
+  async function doAnalyze(id: number) {
+    setBusyBrd(id); setActionMsg(null);
+    try { await runBrdAnalyze(id); setActionMsg('AI analysis dispatched. Reload tab in a moment.'); refresh(); }
+    catch (e: any) { setActionMsg('Analyze failed: ' + (e?.detail || e?.message || e)); }
+    finally { setBusyBrd(null); }
+  }
 
   const severityCounts = useMemo(() => {
     const acc: Record<string, number> = {};
@@ -122,13 +149,16 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
           <div style={{ fontSize: 11, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>
             {journey.name}
           </div>
-          <h2 style={{ margin: '4px 0 12px', fontSize: 18 }}>{journey.partner_name}</h2>
+          <h2 style={{ margin: '4px 0 12px', fontSize: 18 }}>{partnerName(journey)}</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-            <Row k="Vertical" v={<Badge tone="info">{journey.vertical_target}</Badge>} />
+            {(() => {
+              const cp = readJsonField(journey.company_profile_json);
+              return <Row k="Vertical" v={<Badge tone="info">{cp.vertical_target || '—'}</Badge>} />;
+            })()}
             <Row k="Stage" v={<Badge tone="warning">{journey.stage}</Badge>} />
-            <Row k="Mandays" v={journey.mandays_estimate} />
-            <Row k="BA" v={Array.isArray(journey.ba_user_id) ? journey.ba_user_id[1] : '—'} />
-            <Row k="Target go-live" v={journey.target_go_live} />
+            <Row k="Mandays" v={journey.mandays_estimate || 0} />
+            <Row k="BA" v={baName(journey)} />
+            <Row k="Target go-live" v={journey.target_go_live || '—'} />
           </div>
         </Card>
         <Card style={{ marginTop: spacing.md }}>
@@ -167,48 +197,128 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
         />
 
         {tab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.md }}>
+          recs.length === 0 ? (
             <Card>
-              <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>Mandays by category</div>
-              <div style={{ height: 220 }}>
-                <ResponsiveContainer>
-                  <BarChart data={mandaysByCategory}>
-                    <CartesianGrid stroke={colors.border} strokeDasharray="3 3" />
-                    <XAxis dataKey="category" stroke={colors.textDim} fontSize={11} />
-                    <YAxis stroke={colors.textDim} fontSize={11} />
-                    <Tooltip contentStyle={{ background: colors.surfaceMuted, border: `1px solid ${colors.border}` }} />
-                    <Bar dataKey="md" fill={colors.accent} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Overview</h3>
+              <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 16 }}>
+                {brds.length === 0
+                  ? 'No BRD documents attached yet. Upload a BRD via the intake wizard, or attach one in the BRD Analysis tab below.'
+                  : `${brds.length} BRD document${brds.length === 1 ? '' : 's'} attached. Open the BRD Analysis tab to extract sections and run AI analysis — recommendations will then appear here.`}
+              </p>
+              {(() => {
+                const cp = readJsonField(journey.company_profile_json);
+                if (Object.keys(cp).length === 0) return null;
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
+                    <Row k="Company" v={cp.company_name || '—'} />
+                    <Row k="Email" v={cp.contact_email || '—'} />
+                    <Row k="Phone" v={cp.contact_phone || '—'} />
+                    <Row k="NPWP" v={cp.npwp || '—'} />
+                    <Row k="Bank" v={cp.bank_name ? `${cp.bank_name} · ${cp.bank_account || '—'}` : '—'} />
+                    <Row k="Modules requested" v={(cp.modules_wishlist || []).length} />
+                  </div>
+                );
+              })()}
             </Card>
-            <Card>
-              <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>Severity distribution</div>
-              <div style={{ height: 220 }}>
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie data={severityCounts} dataKey="value" nameKey="name" outerRadius={80} label>
-                      {severityCounts.map((s, i) => (
-                        <Cell key={i} fill={s.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: colors.surfaceMuted, border: `1px solid ${colors.border}` }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.md }}>
+              <Card>
+                <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>Mandays by severity</div>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={mandaysByCategory}>
+                      <CartesianGrid stroke={colors.border} strokeDasharray="3 3" />
+                      <XAxis dataKey="category" stroke={colors.textDim} fontSize={11} />
+                      <YAxis stroke={colors.textDim} fontSize={11} />
+                      <Tooltip contentStyle={{ background: colors.surfaceMuted, border: `1px solid ${colors.border}` }} />
+                      <Bar dataKey="md" fill={colors.accent} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+              <Card>
+                <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>Severity distribution</div>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={severityCounts} dataKey="value" nameKey="name" outerRadius={80} label>
+                        {severityCounts.map((s, i) => (
+                          <Cell key={i} fill={s.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ background: colors.surfaceMuted, border: `1px solid ${colors.border}` }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            </div>
+          )
         )}
 
         {tab === 'brd' && (
-          <Card>
-            <h3 style={{ marginTop: 0 }}>BRD Analysis</h3>
-            <p style={{ color: colors.textMuted, fontSize: 13 }}>
-              Last analyzer run: 2026-05-18. {recs.length} recommendations generated.
-              <br />
-              TODO: render parsed sections and analyzer transcript.
-            </p>
-          </Card>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+            {actionMsg && (
+              <div style={{
+                padding: 12, borderRadius: radii.md,
+                background: actionMsg.startsWith('Extract failed') || actionMsg.startsWith('Analyze failed') ? '#FEE2E2' : '#D1FAE5',
+                color: actionMsg.startsWith('Extract failed') || actionMsg.startsWith('Analyze failed') ? '#991B1B' : '#065F46',
+                fontSize: 13,
+              }}>
+                {actionMsg}
+              </div>
+            )}
+            {brds.length === 0 ? (
+              <Card>
+                <h3 style={{ marginTop: 0 }}>BRD Analysis</h3>
+                <p style={{ color: colors.textMuted, fontSize: 13 }}>
+                  No BRD documents attached to this journey yet. Upload BRD files via the intake wizard (and they'll auto-attach on Promote to Journey), or add them via Odoo's BRD Analyzer menu.
+                </p>
+              </Card>
+            ) : brds.map((b) => (
+              <Card key={b.id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{b.name || b.document_filename || `BRD #${b.id}`}</div>
+                    <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>
+                      {b.reference && <span style={{ marginRight: 12 }}>Ref: <code>{b.reference}</code></span>}
+                      {b.document_filename && <span style={{ marginRight: 12 }}>File: {b.document_filename}</span>}
+                      {b.document_mime && <span>{b.document_mime}</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Badge tone={b.state === 'analyzed' || b.state === 'approved' ? 'success' : b.state === 'extracted' || b.state === 'reviewed' ? 'info' : 'warning'}>
+                        {b.state || 'draft'}
+                      </Badge>
+                      {b.overall_fit_pct != null && b.overall_fit_pct > 0 && (
+                        <Badge tone={b.overall_fit_pct >= 70 ? 'success' : b.overall_fit_pct >= 40 ? 'warning' : 'danger'}>
+                          fit: {b.overall_fit_pct}%
+                        </Badge>
+                      )}
+                      {b.severity_summary && <Badge>{b.severity_summary}</Badge>}
+                      {b.business_domain && <Badge>{b.business_domain}</Badge>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch' }}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={busyBrd === b.id}
+                      onClick={() => doExtract(b.id)}
+                    >
+                      {busyBrd === b.id ? '…' : '1. Extract'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={busyBrd === b.id || b.state === 'draft'}
+                      onClick={() => doAnalyze(b.id)}
+                      title={b.state === 'draft' ? 'Run Extract first' : 'Run AI analysis'}
+                    >
+                      {busyBrd === b.id ? '…' : '2. Run AI Analyze'}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         )}
 
         {tab === 'recs' && (

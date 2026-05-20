@@ -162,6 +162,24 @@ export const updateJourneyStage = (id: number, stage: string) =>
   jsonrpc<boolean>('onboarding.journey', 'write', [[id], { stage }]);
 
 // brd.recommendation lives on a brd.document; filter via journey -> document chain.
+// BRD documents linked to a journey (after Promote, the docx upload(s) land here).
+export const listBrdDocuments = (journeyId: number) =>
+  jsonrpc<any[]>('brd.document', 'search_read', [[['journey_id', '=', journeyId]]], {
+    fields: ['id', 'name', 'reference', 'document_filename', 'document_mime',
+             'state', 'overall_fit_pct', 'severity_summary',
+             'business_domain', 'language', 'create_date'],
+    limit: 50,
+    order: 'create_date desc',
+  });
+
+// Trigger the extractor (PyMuPDF / python-docx) — parses sections + sets state=extracted.
+export const runBrdExtract = (id: number) =>
+  jsonrpc<boolean>('brd.document', 'action_extract', [[id]], {});
+
+// Trigger AI analyzer (via custom_ai_bridge → Anthropic) — populates recommendations, sets state=analyzed.
+export const runBrdAnalyze = (id: number) =>
+  jsonrpc<boolean>('brd.document', 'action_analyze', [[id]], {});
+
 export const listRecommendations = (journeyId: number) =>
   jsonrpc<any[]>(
     'brd.recommendation',
