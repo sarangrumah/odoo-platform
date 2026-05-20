@@ -18,6 +18,12 @@
 
 import express from 'express';
 import { createHmac } from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DIST_DIR = path.resolve(__dirname, '..', 'dist');
 
 const ORCH_BASE = (process.env.ORCHESTRATOR_BASE_URL || 'http://orchestrator:8000').replace(/\/+$/, '');
 const ORCH_SECRET = process.env.ORCHESTRATOR_SHARED_SECRET || '';
@@ -228,6 +234,12 @@ app.post('/api/auth/logout', (_req, res) => res.json({ ok: true }));
 app.get('/api/auth/me', (_req, res) => res.json({ email: ODOO_LOGIN || 'unknown' }));
 
 // ---------------------------------------------------------------------------
+// Static SPA + healthcheck. All non-/api routes fall through to index.html.
+// ---------------------------------------------------------------------------
+app.get('/healthz', (_req, res) => res.json({ ok: true }));
+app.use(express.static(DIST_DIR, { index: false, maxAge: '1h' }));
+app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(DIST_DIR, 'index.html')));
+
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`[hub-portal] proxy listening on :${PORT} -> orchestrator=${ORCH_BASE} odoo=${ODOO_BASE}`);

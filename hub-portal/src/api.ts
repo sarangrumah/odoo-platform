@@ -243,7 +243,9 @@ export const replicateBackup = (backupId: number, target: string) =>
 // ---------------------------------------------------------------------------
 // Tenants / Users / Monitoring / Costs / Audit (existing pages)
 // ---------------------------------------------------------------------------
+export const health = () => http<any>('GET', '/api/health');
 export const listTenants = () => http<any[]>('GET', '/api/tenants');
+export const getTenant = (slug: string) => http<any>('GET', `/api/tenants/${slug}`);
 export const listUsers = () => http<any[]>('GET', '/api/users');
 export const getMetrics = () => http<any>('GET', '/api/monitoring/metrics');
 export const getCosts = () => http<any>('GET', '/api/costs');
@@ -251,7 +253,24 @@ export const listAudit = (limit = 100) =>
   http<any[]>('GET', `/api/audit?limit=${limit}`);
 export const listDocuments = () => http<any[]>('GET', '/api/documents');
 
-export default {
+// Back-compat shortcuts used by user's existing .jsx pages.
+const monitoring = () => http<any>('GET', '/api/monitoring');
+const costs = () => http<any>('GET', '/api/costs');
+const users = () => http<any[]>('GET', '/api/users');
+const audit = () => http<any[]>('GET', '/api/audit');
+const documents = () => http<any[]>('GET', '/api/documents');
+
+export const api = {
+  // legacy aliases (jsx pages)
+  health,
+  listTenants,
+  getTenant,
+  monitoring,
+  costs,
+  users,
+  audit,
+  documents,
+  // new (tsx pages)
   auth,
   submitIntake,
   getIntakeStatus,
@@ -271,10 +290,11 @@ export default {
   createDevCycle,
   listDevCyclePrs,
   replicateBackup,
-  listTenants,
   listUsers,
   getMetrics,
   getCosts,
   listAudit,
   listDocuments,
 };
+
+export default api;
