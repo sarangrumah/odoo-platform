@@ -237,17 +237,79 @@ app.post('/api/odoo/jsonrpc', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Auth stubs (browser hits these from Login.tsx).
-// Wire to real SSO / Odoo session as Track I matures.
+// Auth (browser hits these from Login). Forwarded to Odoo /web/session/*.
+// Cookie issued by Odoo is propagated to the browser so subsequent
+// /api/odoo/jsonrpc calls (and any direct Odoo calls) reuse the same session.
 // ---------------------------------------------------------------------------
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ detail: 'missing creds' });
-  // TODO: forward to Odoo /web/session/authenticate or external IdP
-  return res.json({ ok: true, email });
+  if (!email || !password) return res.status(400).json({ detail: 'email + password required' });
+  try {
+    const r = await fetch(`${ODOO_BASE}/web/session/authenticate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        params: { db: ODOO_DB, login: email, password },
+      }),
+    });
+    const body = await r.json();
+    if (body.error || !body?.result?.uid) {
+      return res.status(401).json({ detail: 'Invalid credentials' });
+    }
+    // Forward Odoo's session cookie(s) so the browser stores them on our
+    // origin. Node's fetch may merge multiple Set-Cookie headers into one
+    // comma-separated string; pass through as-is for simplicity.
+    const setCookie = r.headers.get('set-cookie');
+    if (setCookie) {
+      res.setHeader('Set-Cookie', setCookie);
+    }
+    return res.json({
+      ok: true,
+      uid: body.result.uid,
+      name: body.result.name,
+      login: body.result.username || email,
+    });
+  } catch (e) {
+    return res.status(502).json({ detail: 'Auth gateway error: ' + String(e?.message || e) });
+  }
 });
-app.post('/api/auth/logout', (_req, res) => res.json({ ok: true }));
-app.get('/api/auth/me', (_req, res) => res.json({ email: ODOO_LOGIN || 'unknown' }));
+
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    const cookie = req.headers.cookie || '';
+    const r = await fetch(`${ODOO_BASE}/web/session/get_session_info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ jsonrpc: '2.0', params: {} }),
+    });
+    const body = await r.json();
+    const info = body?.result || {};
+    if (!info.uid) return res.status(401).json({ detail: 'not authenticated' });
+    return res.json({
+      uid: info.uid,
+      name: info.name,
+      login: info.username || info.login,
+    });
+  } catch (e) {
+    return res.status(502).json({ detail: String(e?.message || e) });
+  }
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const cookie = req.headers.cookie || '';
+    await fetch(`${ODOO_BASE}/web/session/destroy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ jsonrpc: '2.0', params: {} }),
+    });
+    res.setHeader('Set-Cookie', 'session_id=; Path=/; HttpOnly; Max-Age=0');
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(502).json({ detail: String(e?.message || e) });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Static SPA + healthcheck. All non-/api routes fall through to index.html.

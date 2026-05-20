@@ -53,13 +53,23 @@ async function jsonrpc<T = any>(
 }
 
 // ---------------------------------------------------------------------------
-// Auth (existing endpoints used by Login.tsx)
+// Auth — proxied to Odoo /web/session/* via server/index.mjs.
 // ---------------------------------------------------------------------------
+export interface AuthUser {
+  uid: number;
+  name: string;
+  login: string;
+}
+
+export interface LoginResponse extends AuthUser {
+  ok: true;
+}
+
 export const auth = {
   login: (email: string, password: string) =>
-    http('POST', '/api/auth/login', { email, password }),
-  logout: () => http('POST', '/api/auth/logout'),
-  me: () => http('GET', '/api/auth/me'),
+    http<LoginResponse>('POST', '/api/auth/login', { email, password }),
+  logout: () => http<{ ok: true }>('POST', '/api/auth/logout'),
+  me: () => http<AuthUser>('GET', '/api/auth/me'),
 };
 
 // ---------------------------------------------------------------------------

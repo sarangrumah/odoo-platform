@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import api from '../api.ts';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity, Layers, FileText, Users, DollarSign, History, BarChart3,
@@ -39,6 +40,30 @@ export function AdminShell({ onLogout }) {
   const [active, setActive] = useState('dashboard');
   const [activeJourneyId, setActiveJourneyId] = useState(null);
   const [showIntake, setShowIntake] = useState(false);
+  const [me, setMe] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.auth
+      .me()
+      .then((u) => { if (!cancelled) setMe(u); })
+      .catch(() => { /* not logged in; parent handles redirect */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleLogout = async () => {
+    try { await api.auth.logout(); } catch { /* ignore */ }
+    if (typeof onLogout === 'function') onLogout();
+  };
+
+  const displayName = me?.name || 'Loading...';
+  const initials = (me?.name || '?')
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   const openJourney = (id) => {
     setActiveJourneyId(id);
@@ -104,14 +129,14 @@ export function AdminShell({ onLogout }) {
               color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 12, fontWeight: 700,
-            }}>AM</div>
+            }}>{initials}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Ade Maryadi</div>
-              <div style={{ fontSize: 10, color: tokens.muted }}>Platform Admin</div>
+              <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
+              <div style={{ fontSize: 10, color: tokens.muted }}>{me?.login || 'Platform Admin'}</div>
             </div>
           </div>
           <button
-            onClick={onLogout}
+            onClick={handleLogout}
             style={{
               width: '100%', background: 'transparent',
               color: tokens.muted, border: `1px solid ${tokens.borderDark}`,
