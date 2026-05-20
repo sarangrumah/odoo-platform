@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
 from .config import get_settings
 from .db import close_all
 from .routers import backups as backups_router
+from .routers import intake as intake_router
 from .routers import tenants as tenants_router
 from .routers import vps as vps_router
 from .security import HMACMiddleware
@@ -53,11 +56,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        o.strip()
+        for o in os.getenv("LANDING_PUBLIC_ORIGIN", "http://localhost:3000").split(",")
+        if o.strip()
+    ],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 app.add_middleware(HMACMiddleware)
 app.include_router(tenants_router.router)
 app.include_router(backups_router.router)
 app.include_router(backups_router.admin_router)
 app.include_router(vps_router.router)
+app.include_router(intake_router.router)
 
 
 @app.get("/health", tags=["meta"])
