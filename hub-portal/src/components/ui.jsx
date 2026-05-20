@@ -117,27 +117,23 @@ export const Button = ({ children, onClick, variant = 'primary', size = 'md', ty
   );
 };
 
-export const Input = ({ value, onChange, placeholder, type = 'text', style, ...rest }) => (
+// Transparent passthrough — onChange receives the native event so callers
+// can write `(e) => setX(e.target.value)` (standard React DOM style).
+export const Input = ({ style, ...rest }) => (
   <input
-    type={type}
-    value={value ?? ''}
-    onChange={(e) => onChange && onChange(e.target.value)}
-    placeholder={placeholder}
+    {...rest}
     style={{
       background: '#fff', border: `1px solid ${tokens.border}`,
       borderRadius: 6, padding: '8px 12px', fontSize: 13,
       fontFamily: 'inherit', outline: 'none', width: '100%', ...style,
     }}
-    {...rest}
   />
 );
 
-export const Textarea = ({ value, onChange, placeholder, rows = 4, style }) => (
+export const Textarea = ({ style, rows = 4, ...rest }) => (
   <textarea
-    value={value ?? ''}
-    onChange={(e) => onChange && onChange(e.target.value)}
-    placeholder={placeholder}
     rows={rows}
+    {...rest}
     style={{
       background: '#fff', border: `1px solid ${tokens.border}`,
       borderRadius: 6, padding: '8px 12px', fontSize: 13,
@@ -146,10 +142,11 @@ export const Textarea = ({ value, onChange, placeholder, rows = 4, style }) => (
   />
 );
 
-export const Select = ({ value, onChange, options = [], placeholder, style }) => (
+// Renders children (<option> elements) as standard <select>. Also supports
+// an optional `options` array prop for callers that prefer the data form.
+export const Select = ({ options, placeholder, style, children, ...rest }) => (
   <select
-    value={value ?? ''}
-    onChange={(e) => onChange && onChange(e.target.value)}
+    {...rest}
     style={{
       background: '#fff', border: `1px solid ${tokens.border}`,
       borderRadius: 6, padding: '8px 12px', fontSize: 13,
@@ -157,7 +154,8 @@ export const Select = ({ value, onChange, options = [], placeholder, style }) =>
     }}
   >
     {placeholder && <option value="">{placeholder}</option>}
-    {options.map((opt) => {
+    {children}
+    {options && options.map((opt) => {
       const v = typeof opt === 'object' ? opt.value : opt;
       const l = typeof opt === 'object' ? opt.label : opt;
       return <option key={v} value={v}>{l}</option>;
