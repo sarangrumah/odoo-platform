@@ -278,7 +278,7 @@ services:
       # --- Odoo Mgmt (for intake/journey bridge from /v1/intake/*) ---
       ODOO_MGMT_URL: http://odoo-mgmt:8069
       ODOO_MGMT_DB: ${ORCHESTRATOR_ODOO_MGMT_DB:-landing_demo}
-      ODOO_MGMT_USER: ${ORCHESTRATOR_ODOO_MGMT_USER:-admin}
+      ODOO_MGMT_USER: ${ORCHESTRATOR_ODOO_MGMT_USER:-am.ademaryadi@gmail.com}
       ODOO_MGMT_PASSWORD: ${ORCHESTRATOR_ODOO_MGMT_PASSWORD:-admin}
       # --- Operational ---
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -331,7 +331,7 @@ services:
       HUB_PORTAL_ACTOR: hub-portal
       ODOO_BASE_URL: http://odoo-mgmt:8069
       ODOO_DB: ${HUB_PORTAL_ODOO_DB:-landing_demo}
-      ODOO_LOGIN: ${HUB_PORTAL_ODOO_LOGIN:-admin}
+      ODOO_LOGIN: ${HUB_PORTAL_ODOO_LOGIN:-am.ademaryadi@gmail.com}
       ODOO_PASSWORD: ${HUB_PORTAL_ODOO_PASSWORD:-admin}
       NODE_ENV: production
     ports:

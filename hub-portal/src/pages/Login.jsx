@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api.ts';
 
-export function Login({ onLogin }) {
+export function Login({ onLogin, onBack }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -108,8 +108,24 @@ export function Login({ onLogin }) {
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
 
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={loading}
+            style={{
+              padding: '8px 14px', borderRadius: 6,
+              background: 'transparent', color: '#8b96b0',
+              border: '1px solid #1f2a44', cursor: 'pointer',
+              fontSize: 12, fontFamily: 'inherit',
+            }}
+          >
+            ← Back to homepage
+          </button>
+        )}
+
         <div style={{ fontSize: 11, color: '#6b7794', textAlign: 'center' }}>
-          Default dev: admin / admin
+          Default dev: am.ademaryadi@gmail.com / admin
         </div>
       </form>
     </div>
