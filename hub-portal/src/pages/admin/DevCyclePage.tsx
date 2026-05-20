@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Code2 } from 'lucide-react';
 import { Badge, Card, Modal, Section, Table } from '../../components/ui';
+import EmptyState from '../../components/EmptyState';
+import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, radii, spacing } from '../../tokens';
 import { listDevCyclePrs, listDevCycles } from '../../api';
 
@@ -13,37 +16,49 @@ const STATES = [
   { key: 'done', label: 'Done' },
 ];
 
-const MOCK = [
-  { id: 1, name: 'DC-001 Add PDP masking to residensia', state: 'in_dev', assignee_id: [3, 'Dimas Dev'], estimate_md: 3, pr_count: 2, open_pr_count: 1, merged_pr_count: 1, ci_status: 'passing' },
-  { id: 2, name: 'DC-002 Coretax bupot vendor export', state: 'code_review', assignee_id: [4, 'Lina Dev'], estimate_md: 5, pr_count: 1, open_pr_count: 1, merged_pr_count: 0, ci_status: 'passing' },
-  { id: 3, name: 'DC-003 HHT scan UI refresh', state: 'qa', assignee_id: [3, 'Dimas Dev'], estimate_md: 2, pr_count: 3, open_pr_count: 0, merged_pr_count: 3, ci_status: 'failing' },
-  { id: 4, name: 'DC-004 Recurring invoice template', state: 'backlog', assignee_id: false, estimate_md: 8, pr_count: 0, open_pr_count: 0, merged_pr_count: 0, ci_status: '—' },
-  { id: 5, name: 'DC-005 BRD analyzer prompt v2', state: 'deployed', assignee_id: [5, 'Aulia Dev'], estimate_md: 4, pr_count: 2, open_pr_count: 0, merged_pr_count: 2, ci_status: 'passing' },
-];
-
 export default function DevCyclePage() {
-  const [cycles, setCycles] = useState<any[]>(MOCK);
+  const [cycles, setCycles] = useState<any[]>([]);
   const [open, setOpen] = useState<any | null>(null);
   const [prs, setPrs] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
 
   useEffect(() => {
-    listDevCycles().then((r) => Array.isArray(r) && r.length && setCycles(r)).catch(() => {});
+    listDevCycles()
+      .then((r) => {
+        if (Array.isArray(r)) setCycles(r);
+        setLoaded(true);
+      })
+      .catch((err: any) => {
+        const msg = err?.detail || err?.message || String(err);
+        const configRequired =
+          /turnstile|api key|webhook secret|vault|prometheus|ANTHROPIC|requires config/i.test(msg);
+        setApiError({ message: msg, configRequired });
+        setLoaded(true);
+      });
   }, []);
 
   useEffect(() => {
     if (!open) return;
     listDevCyclePrs(open.id)
       .then((r) => setPrs(Array.isArray(r) ? r : []))
-      .catch(() =>
-        setPrs([
-          { id: 1, name: 'PR #142 add masking rules', url: '#', state: 'merged', ci_status: 'passing', merged_at: '2026-05-19' },
-          { id: 2, name: 'PR #143 refactor handler', url: '#', state: 'open', ci_status: 'passing' },
-        ]),
-      );
+      .catch(() => setPrs([]));
   }, [open]);
+
+  const showEmpty = loaded && cycles.length === 0;
 
   return (
     <Section title="Dev Cycles" description="Tasks → PR → CI → deploy lifecycle">
+      {apiError?.configRequired && (
+        <ConfigRequiredBanner feature="Dev cycles" hint={apiError.message} />
+      )}
+      {showEmpty ? (
+        <EmptyState
+          icon={<Code2 size={48} />}
+          title="No dev cycles yet"
+          description="Create a dev cycle from a BRD recommendation, or wait for GitHub/GitLab webhook events."
+        />
+      ) : (
       <div style={{ display: 'flex', gap: spacing.md, overflowX: 'auto', paddingBottom: spacing.md }}>
         {STATES.map((s) => {
           const items = cycles.filter((c) => c.state === s.key);
@@ -97,6 +112,7 @@ export default function DevCyclePage() {
           );
         })}
       </div>
+      )}
 
       <Modal open={!!open} onClose={() => setOpen(null)} title={open ? open.name : ''} width={760}>
         {open && (

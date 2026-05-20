@@ -1,4 +1,4 @@
-import { ChangeEvent, DragEvent, useState } from 'react';
+import { ChangeEvent, DragEvent, useEffect, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Plus, Trash2, Upload, X } from 'lucide-react';
 import { Badge, Button, Card, Input, Modal, Select, Textarea, Toast } from './ui';
 import { colors, radii, spacing, verticals, VerticalValue } from '../tokens';
@@ -39,6 +39,39 @@ export default function IntakeWizard({ open, onClose, onSuccess }: Props) {
 
   // Step 5
   const [brdFiles, setBrdFiles] = useState<{ name: string; data: string }[]>([]);
+
+  // Turnstile — graceful fallback when site key not configured or widget fails to load.
+  const TURNSTILE_SITE_KEY =
+    (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_TURNSTILE_SITE_KEY) || '';
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const [turnstileReady, setTurnstileReady] = useState<boolean>(!TURNSTILE_SITE_KEY);
+
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) {
+      // Dev mode: no site key configured, allow submission with placeholder token.
+      setTurnstileToken('dev-mode-no-turnstile');
+      setTurnstileReady(true);
+      return;
+    }
+    // Attempt to load Turnstile script; on failure, fall back to dev token.
+    const existing = document.querySelector('script[data-turnstile]');
+    if (existing) {
+      setTurnstileReady(true);
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    s.async = true;
+    s.defer = true;
+    s.setAttribute('data-turnstile', '1');
+    s.onerror = () => {
+      // Widget failed to load → degrade gracefully.
+      setTurnstileToken('dev-mode-no-turnstile');
+      setTurnstileReady(true);
+    };
+    s.onload = () => setTurnstileReady(true);
+    document.head.appendChild(s);
+  }, [TURNSTILE_SITE_KEY]);
 
   function reset() {
     setStep(0);
@@ -139,6 +172,8 @@ export default function IntakeWizard({ open, onClose, onSuccess }: Props) {
       business_process_narrative: narrative,
       brd_file_base64s: brdFiles.map((f) => f.data),
       source: 'internal_ba',
+      // @ts-expect-error — turnstile_token accepted optionally by server
+      turnstile_token: turnstileToken || 'dev-mode-no-turnstile',
     };
     try {
       const resp = await submitIntake(payload);
@@ -348,9 +383,16 @@ export default function IntakeWizard({ open, onClose, onSuccess }: Props) {
               Next <ChevronRight size={14} />
             </Button>
           ) : (
-            <Button onClick={submit} disabled={submitting}>
-              <Check size={14} /> {submitting ? 'Submitting…' : 'Submit intake'}
-            </Button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {!TURNSTILE_SITE_KEY && (
+                <span style={{ fontSize: 11, color: colors.textMuted }}>
+                  Turnstile not configured (dev mode)
+                </span>
+              )}
+              <Button onClick={submit} disabled={submitting || !turnstileReady}>
+                <Check size={14} /> {submitting ? 'Submitting…' : 'Submit intake'}
+              </Button>
+            </div>
           )}
         </div>
       </Modal>

@@ -1,33 +1,37 @@
 import { useEffect, useState } from 'react';
-import { Rocket, Search } from 'lucide-react';
+import { Package, Rocket, Search } from 'lucide-react';
 import { Badge, Button, Card, Input, Modal, Section, Select, Table } from '../../components/ui';
+import EmptyState from '../../components/EmptyState';
+import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, spacing } from '../../tokens';
 import { createDeployment, listDeployments, listModuleCatalog } from '../../api';
 
-const MOCK_CATALOG = [
-  { id: 1, name: 'Custom Accounting Recurring', technical_name: 'custom_accounting_recurring', category: 'finance', version: '1.2.0', is_canary_enabled: true },
-  { id: 2, name: 'Custom PDP Masking', technical_name: 'custom_pdp_masking', category: 'compliance', version: '0.9.3' },
-  { id: 3, name: 'Custom Bupot Unifikasi', technical_name: 'custom_coretax_bupot', category: 'tax', version: '1.0.1', is_canary_enabled: true },
-  { id: 4, name: 'Custom HHT Bridge', technical_name: 'custom_hht_bridge', category: 'ops', version: '0.4.0' },
-];
-
-const MOCK_DEPLOYMENTS = [
-  { id: 1, name: 'D-001', module_id: [1, 'custom_accounting_recurring'], tenant_id: [1, 'Erajaya A'], env: 'prod', state: 'deployed', canary_phase: 'full', deployed_at: '2026-05-18 10:32' },
-  { id: 2, name: 'D-002', module_id: [3, 'custom_coretax_bupot'], tenant_id: [2, 'JDS Pratama'], env: 'staging', state: 'running', canary_phase: '10%', deployed_at: '2026-05-20 08:14' },
-];
-
 export default function ModuleDeployPage() {
-  const [catalog, setCatalog] = useState<any[]>(MOCK_CATALOG);
-  const [deployments, setDeployments] = useState<any[]>(MOCK_DEPLOYMENTS);
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [deployments, setDeployments] = useState<any[]>([]);
   const [q, setQ] = useState('');
   const [openMod, setOpenMod] = useState<any | null>(null);
   const [tenant, setTenant] = useState('1');
   const [env, setEnv] = useState('staging');
   const [canary, setCanary] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
 
   useEffect(() => {
-    listModuleCatalog().then((r) => Array.isArray(r) && r.length && setCatalog(r)).catch(() => {});
-    listDeployments().then((r) => Array.isArray(r) && r.length && setDeployments(r)).catch(() => {});
+    const detectConfig = (msg: string) =>
+      /turnstile|api key|webhook secret|vault|prometheus|ANTHROPIC|requires config/i.test(msg);
+    Promise.all([
+      listModuleCatalog().catch((e: any) => {
+        const msg = e?.detail || e?.message || String(e);
+        setApiError({ message: msg, configRequired: detectConfig(msg) });
+        return null;
+      }),
+      listDeployments().catch(() => null),
+    ]).then(([c, d]) => {
+      if (Array.isArray(c)) setCatalog(c);
+      if (Array.isArray(d)) setDeployments(d);
+      setLoaded(true);
+    });
   }, []);
 
   async function deploy() {
@@ -47,9 +51,22 @@ export default function ModuleDeployPage() {
     (m) => m.name.toLowerCase().includes(q.toLowerCase()) || m.technical_name.toLowerCase().includes(q.toLowerCase()),
   );
 
+  const showCatalogEmpty = loaded && catalog.length === 0;
+
   return (
     <div>
+      {apiError?.configRequired && (
+        <ConfigRequiredBanner feature="Module deploy" hint={apiError.message} />
+      )}
       <Section title="Module Catalog" description="Custom modules available for deployment">
+        {showCatalogEmpty ? (
+          <EmptyState
+            icon={<Package size={48} />}
+            title="No modules in catalog"
+            description="The Hub module catalog is empty. Wait for the next catalog sync or run 'Rescan Catalog' from Hub Console."
+          />
+        ) : (
+        <>
         <Card style={{ marginBottom: spacing.md, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Search size={14} color={colors.textMuted} />
           <Input placeholder="Search module…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -77,6 +94,8 @@ export default function ModuleDeployPage() {
           ]}
           rows={filtered}
         />
+        </>
+        )}
       </Section>
 
       <Section title="Deployment history">

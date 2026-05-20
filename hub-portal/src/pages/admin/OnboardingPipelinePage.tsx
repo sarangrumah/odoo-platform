@@ -1,6 +1,8 @@
 import { DragEvent, useEffect, useMemo, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Workflow } from 'lucide-react';
 import { Badge, Button, Card, Input, Select } from '../../components/ui';
+import EmptyState from '../../components/EmptyState';
+import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, radii, spacing, stageColors, verticals } from '../../tokens';
 import { listJourneys, updateJourneyStage } from '../../api';
 
@@ -29,32 +31,33 @@ interface Journey {
   progress_pct?: number;
 }
 
-const MOCK: Journey[] = [
-  { id: 1, name: 'J-2026-001', partner_name: 'Erajaya Tower B', vertical_target: 'residensia', stage: 'brd_analyzed', mandays_estimate: 42, ba_user_id: [3, 'Andi BA'], target_go_live: '2026-08-15' },
-  { id: 2, name: 'J-2026-002', partner_name: 'Telkom Pulsa Plus', vertical_target: 'ppob', stage: 'intake', mandays_estimate: 18, ba_user_id: [3, 'Andi BA'], target_go_live: '2026-07-10' },
-  { id: 3, name: 'J-2026-003', partner_name: 'Arkaim Logistics', vertical_target: 'arkaim', stage: 'vps_assigned', mandays_estimate: 56, ba_user_id: [4, 'Rini BA'], target_go_live: '2026-09-01' },
-  { id: 4, name: 'J-2026-004', partner_name: 'JDS Pratama', vertical_target: 'jds', stage: 'uat', mandays_estimate: 30, ba_user_id: [4, 'Rini BA'], target_go_live: '2026-06-01' },
-  { id: 5, name: 'J-2026-005', partner_name: 'Komdigi Pilot', vertical_target: 'komdigi', stage: 'provisioning', mandays_estimate: 22, ba_user_id: [3, 'Andi BA'], target_go_live: '2026-07-25' },
-];
-
 interface Props {
   onOpenJourney: (id: number) => void;
   onNewIntake: () => void;
 }
 
 export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: Props) {
-  const [journeys, setJourneys] = useState<Journey[]>(MOCK);
+  const [journeys, setJourneys] = useState<Journey[]>([]);
   const [filterBa, setFilterBa] = useState('');
   const [filterVertical, setFilterVertical] = useState('');
   const [search, setSearch] = useState('');
   const [dragId, setDragId] = useState<number | null>(null);
+  const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     listJourneys()
       .then((rows) => {
-        if (Array.isArray(rows) && rows.length) setJourneys(rows as any);
+        if (Array.isArray(rows)) setJourneys(rows as any);
+        setLoaded(true);
       })
-      .catch(() => {/* keep mock */});
+      .catch((err: any) => {
+        const msg = err?.detail || err?.message || String(err);
+        const configRequired =
+          /turnstile|api key|webhook secret|vault|prometheus|ANTHROPIC|requires config/i.test(msg);
+        setApiError({ message: msg, configRequired });
+        setLoaded(true);
+      });
   }, []);
 
   const filtered = useMemo(() => {
@@ -85,8 +88,16 @@ export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: P
     e.dataTransfer.effectAllowed = 'move';
   }
 
+  const showEmptyState = loaded && journeys.length === 0;
+
   return (
     <div>
+      {apiError?.configRequired && (
+        <ConfigRequiredBanner
+          feature="Onboarding pipeline"
+          hint={apiError.message}
+        />
+      )}
       <Card style={{ marginBottom: spacing.md, display: 'flex', gap: spacing.sm, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 220px' }}>
           <Search size={14} color={colors.textMuted} />
@@ -106,6 +117,18 @@ export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: P
         </Button>
       </Card>
 
+      {showEmptyState ? (
+        <EmptyState
+          icon={<Workflow size={48} />}
+          title="No onboarding journeys yet"
+          description="Submit your first BRD intake to start tracking a customer onboarding lifecycle."
+          action={
+            <Button onClick={onNewIntake}>
+              <Plus size={14} /> New Intake
+            </Button>
+          }
+        />
+      ) : (
       <div
         style={{
           display: 'flex',
@@ -175,6 +198,7 @@ export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: P
           );
         })}
       </div>
+      )}
     </div>
   );
 }
