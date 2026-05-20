@@ -14,6 +14,7 @@ from .config import get_settings
 from .db import close_all
 from .routers import backups as backups_router
 from .routers import tenants as tenants_router
+from .routers import vps as vps_router
 from .security import HMACMiddleware
 
 
@@ -55,6 +56,8 @@ app = FastAPI(
 app.add_middleware(HMACMiddleware)
 app.include_router(tenants_router.router)
 app.include_router(backups_router.router)
+app.include_router(backups_router.admin_router)
+app.include_router(vps_router.router)
 
 
 @app.get("/health", tags=["meta"])
