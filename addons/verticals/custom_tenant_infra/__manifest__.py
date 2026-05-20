@@ -43,6 +43,9 @@ reference (``vault://...``). Credentials are NEVER stored in Odoo.
         # data (seed templates last so views/actions exist)
         "data/bootstrap_templates_data.xml",
     ],
+    "demo": [
+        "data/demo_data.xml",
+    ],
     "installable": True,
     "application": False,
     "auto_install": False,

@@ -61,6 +61,9 @@ shows a user-friendly install hint.
         "views/menu_views.xml",
         "reports/brd_report_templates.xml",
     ],
+    "demo": [
+        "data/demo_data.xml",
+    ],
     "assets": {
         "web.assets_backend": [
             "custom_brd_analyzer/static/src/js/brd_report/brd_report.js",

@@ -47,6 +47,9 @@ by Cloudflare Turnstile and a per-IP rate limit.
         "wizards/go_no_go_wizard_views.xml",
         "views/menu_views.xml",
     ],
+    "demo": [
+        "data/demo_data.xml",
+    ],
     "installable": True,
     "application": True,
     "auto_install": False,

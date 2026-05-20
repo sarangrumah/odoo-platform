@@ -67,7 +67,19 @@ class DevCycleWebhook(http.Controller):
         sig_header = request.httprequest.headers.get("X-Hub-Signature-256", "")
         if not secret:
             _logger.warning("dev_cycle: GitHub webhook secret not configured")
-            return _json_response({"status": "error", "reason": "secret_not_configured"}, status=503)
+            # Return 200 so GitHub does not flag the webhook as failing + retry
+            # storm. UAT-friendly hint tells the operator what to configure.
+            return _json_response(
+                {
+                    "ok": False,
+                    "ignored": True,
+                    "reason": (
+                        "github webhook secret not configured — set "
+                        "dev_cycle.github_webhook_secret in Settings"
+                    ),
+                },
+                status=200,
+            )
         if not sig_header.startswith("sha256="):
             return _json_response({"status": "error", "reason": "missing_signature"}, status=401)
         expected = "sha256=" + hmac.new(
@@ -198,7 +210,18 @@ class DevCycleWebhook(http.Controller):
         token = request.httprequest.headers.get("X-Gitlab-Token", "")
         if not secret:
             _logger.warning("dev_cycle: GitLab webhook secret not configured")
-            return _json_response({"status": "error", "reason": "secret_not_configured"}, status=503)
+            # 200 with explanatory body — see github_webhook for rationale.
+            return _json_response(
+                {
+                    "ok": False,
+                    "ignored": True,
+                    "reason": (
+                        "gitlab webhook secret not configured — set "
+                        "dev_cycle.gitlab_webhook_secret in Settings"
+                    ),
+                },
+                status=200,
+            )
         if not hmac.compare_digest(secret, token):
             return _json_response({"status": "error", "reason": "bad_token"}, status=401)
 

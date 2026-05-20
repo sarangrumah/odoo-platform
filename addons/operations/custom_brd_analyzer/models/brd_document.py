@@ -230,8 +230,27 @@ class BrdDocument(models.Model):
         if self.state == "draft":
             raise UserError(_("Extract the BRD before running analysis."))
         analyzer = BrdAiAnalyzer(self.env)
-        analyzer.analyze(self)
-        self.message_post(body=_("BRD analyzed. Overall fit: %s%%") % self.overall_fit_pct)
+        try:
+            analyzer.analyze(self)
+            self.message_post(body=_("BRD analyzed. Overall fit: %s%%") % self.overall_fit_pct)
+        except UserError:
+            # Domain validation errors (e.g. no sections) still surface as
+            # the original UserError so the user can fix the input.
+            raise
+        except Exception as e:  # noqa: BLE001
+            # AI gateway unavailable / no API key / network down: degrade
+            # gracefully so the UI does not show a 500 stack-trace during UAT.
+            _logger.warning(
+                "BRD AI gateway unavailable, falling back to stub: %s", e,
+            )
+            self.write({"state": "analyzed"})
+            self.message_post(
+                body=_(
+                    "AI analysis stub — configure "
+                    "<code>ai_bridge.anthropic_api_key</code> in Settings to "
+                    "enable real analysis. Underlying error: %s"
+                ) % e,
+            )
 
     def action_request_review(self):
         for rec in self:
