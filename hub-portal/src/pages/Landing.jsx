@@ -159,7 +159,7 @@ export function LandingPage({ onEnterApp }) {
             }}
           >
             {[
-              { k: '6', l: 'Business verticals', s: 'under unified governance' },
+              { k: 'Odoo 19', l: 'Community Edition', s: 'with EE-gap custom modules' },
               { k: '99.5%', l: 'SLA target', s: 'aggregate uptime' },
               { k: 'HMAC', l: 'API trust', s: 'orchestrator + AI gateway' },
               { k: 'UU PDP', l: 'Compliant', s: 'No. 27/2022 ready' },
@@ -413,46 +413,84 @@ export function LandingPage({ onEnterApp }) {
         </div>
       </section>
 
-      {/* VERTICALS */}
+      {/* PILOT PROJECTS */}
       <section id="verticals" style={{ padding: '120px 0', background: tokens.surfaceAlt }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px' }}>
           <div style={{ marginBottom: 64 }}>
-            <div style={{ fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: tokens.brand, fontWeight: 600, marginBottom: 16 }}>— Verticals under management</div>
+            <div style={{ fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: tokens.brand, fontWeight: 600, marginBottom: 16 }}>— Pilot projects on the platform</div>
             <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: 56, fontWeight: 500, letterSpacing: -1.5, lineHeight: 1, margin: 0, maxWidth: 800 }}>
-              Six business <em style={{ color: tokens.brand, fontWeight: 600 }}>verticals.</em> One operational layer.
+              First customers, real <em style={{ color: tokens.brand, fontWeight: 600 }}>workloads.</em>
             </h2>
+            <p style={{ color: tokens.muted, fontSize: 16, lineHeight: 1.6, margin: '20px 0 0', maxWidth: 720 }}>
+              We onboard pilots end-to-end through the platform itself — intake form,
+              BRD AI analysis, GAP report, mandays estimate, go/no-go approval, VPS
+              provisioning, module deployment, and ops monitoring all in one loop.
+            </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            {verticalDefs.map((v, i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
+            {[
+              {
+                code: 'ARKA-AIM',
+                name: 'Arka & Aim',
+                tagline: 'Distribution + retail consolidation pilot',
+                stage: 'BRD Analysis',
+                modules: ['custom_accounting_full', 'custom_pos_id', 'custom_wms_putaway', 'custom_coretax'],
+                eta: 'Q3 2026',
+                color: tokens.brand,
+              },
+              {
+                code: 'DEMO-RETAIL',
+                name: 'PT Demo Retail',
+                tagline: 'Reference workload (seed data)',
+                stage: 'BRD Analyzed',
+                modules: ['custom_retail_pos_offline', 'custom_retail_loyalty_points', 'custom_retail_outlet_dashboard'],
+                eta: 'Q4 2026',
+                color: tokens.accent,
+              },
+            ].map((p, i) => (
               <motion.div
-                key={v.id}
+                key={p.code}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.06 }}
+                transition={{ duration: 0.5, delay: i * 0.08 }}
                 whileHover={{ y: -4 }}
-                style={{ background: '#fff', borderRadius: 16, padding: 28, border: `1px solid ${tokens.border}`, transition: 'box-shadow 0.3s' }}
+                style={{ background: '#fff', borderRadius: 16, padding: 32, border: `1px solid ${tokens.border}` }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-                  <div style={{
-                    width: 48, height: 48, borderRadius: 12,
-                    background: `${v.color}15`, border: `1px solid ${v.color}30`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 24,
-                  }}>{v.icon}</div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <div>
+                    <div style={{
+                      display: 'inline-block', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase',
+                      color: p.color, fontWeight: 700,
+                      padding: '3px 8px', borderRadius: 4, background: `${p.color}12`, marginBottom: 12,
+                    }}>{p.code}</div>
+                    <h3 style={{ fontFamily: 'Fraunces, serif', fontSize: 28, fontWeight: 600, margin: 0, letterSpacing: -0.5 }}>{p.name}</h3>
+                    <p style={{ fontSize: 14, color: tokens.muted, margin: '6px 0 0' }}>{p.tagline}</p>
+                  </div>
+                  <Pill tone={p.stage === 'BRD Analyzed' ? 'ok' : 'info'}>{p.stage}</Pill>
                 </div>
-                <h3 style={{ fontFamily: 'Fraunces, serif', fontSize: 22, fontWeight: 600, margin: '0 0 6px', letterSpacing: -0.5 }}>{v.name}</h3>
-                <p style={{ fontSize: 13, color: tokens.muted, margin: '0 0 20px' }}>{v.tagline}</p>
+
+                <div style={{ marginTop: 24, padding: '20px 0', borderTop: `1px solid ${tokens.border}` }}>
+                  <div style={{ fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: tokens.muted, fontWeight: 600, marginBottom: 10 }}>Modules in scope</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {p.modules.map((mod) => (
+                      <code key={mod} style={{
+                        fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
+                        color: tokens.muted, background: tokens.surfaceAlt,
+                        padding: '3px 8px', borderRadius: 4, border: `1px solid ${tokens.border}`,
+                      }}>{mod}</code>
+                    ))}
+                  </div>
+                </div>
+
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   paddingTop: 16, borderTop: `1px solid ${tokens.border}`,
                   fontSize: 12, color: tokens.muted,
                 }}>
-                  <span>Status</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: tokens.ok, fontWeight: 600 }}>
-                    <StatusDot status="healthy" /> Operational
-                  </span>
+                  <span>Target go-live</span>
+                  <span style={{ color: tokens.ink, fontWeight: 600 }}>{p.eta}</span>
                 </div>
               </motion.div>
             ))}
