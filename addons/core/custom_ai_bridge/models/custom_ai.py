@@ -102,7 +102,11 @@ class CustomAI(models.AbstractModel):
         url = f"{_gateway_url()}{path}"
         tenant = self.env.cr.dbname
         try:
-            with httpx.Client(timeout=httpx.Timeout(60.0)) as c:
+            # 5-minute read timeout: Opus 4.7 with 16k output tokens can take
+            # 2-3 minutes per batch. Connect/write stay short to surface real
+            # network failures quickly.
+            timeout = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=10.0)
+            with httpx.Client(timeout=timeout) as c:
                 r = c.post(
                     url,
                     content=raw,
