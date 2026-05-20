@@ -352,19 +352,23 @@ class BrdAiAnalyzer:
         if isinstance(result, str):
             return result
         if isinstance(result, dict):
-            # 1) Anthropic-shaped
             content = result.get("content")
+            # 1) custom_ai_bridge gateway: ChatResponse.content is a pre-joined
+            #    string of all text blocks. This is the common path for us.
+            if isinstance(content, str):
+                return content
+            # 2) Raw Anthropic SDK response: content is list[{type,text}].
             if isinstance(content, list):
                 parts = [c.get("text", "") for c in content if isinstance(c, dict)]
                 if parts:
                     return "".join(parts)
-            # 2) OpenAI-shaped
+            # 3) OpenAI-shaped
             choices = result.get("choices")
             if isinstance(choices, list) and choices:
                 msg = choices[0].get("message") or {}
                 if isinstance(msg, dict) and msg.get("content"):
                     return str(msg["content"])
-            # 3) Custom gateway wrapped
+            # 4) Other custom gateway shapes
             if "text" in result:
                 return str(result["text"])
             if "output" in result:
