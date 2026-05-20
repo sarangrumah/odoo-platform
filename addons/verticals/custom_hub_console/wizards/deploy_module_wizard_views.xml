@@ -17,9 +17,7 @@
                     </group>
                     <group string="Canary Rollout">
                         <field name="enable_canary"/>
-                        <field name="target_environment_id"
-                               options="{'no_create': True}"
-                               invisible="not enable_canary"/>
+                        <!-- target_environment_id injected by custom_tenant_infra -->
                     </group>
                     <group>
                         <field name="note" placeholder="Optional notes / change ticket reference"/>

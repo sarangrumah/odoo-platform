@@ -75,7 +75,7 @@
                             <group>
                                 <field name="vertical_target_id"/>
                                 <field name="vertical_target"/>
-                                <field name="journey_id" readonly="1" placeholder="(awaiting onboarding journey module)"/>
+                                <!-- journey_id is injected by custom_onboarding_journey -->
                                 <field name="contact_person"/>
                                 <field name="contact_email"/>
                                 <field name="owner_user_id"/>

@@ -38,7 +38,6 @@ auto-transitioned to ``deployed``.
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
-        "data/ir_config_parameter_data.xml",
         "views/dev_cycle_views.xml",
         "views/dev_cycle_pr_views.xml",
         "views/dev_cycle_deployment_views.xml",

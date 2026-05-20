@@ -38,6 +38,7 @@ reference (``vault://...``). Credentials are NEVER stored in Odoo.
         "views/tenant_vps_views.xml",
         "views/tenant_environment_views.xml",
         "views/tenant_vps_bootstrap_template_views.xml",
+        "views/hub_deployment_inherit_views.xml",
         "views/menu_views.xml",
         # data (seed templates last so views/actions exist)
         "data/bootstrap_templates_data.xml",

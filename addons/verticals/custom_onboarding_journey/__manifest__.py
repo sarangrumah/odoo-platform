@@ -37,10 +37,11 @@ by Cloudflare Turnstile and a per-IP rate limit.
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
-        "data/project_template_data.xml",
         "views/onboarding_journey_views.xml",
         "views/onboarding_stage_transition_views.xml",
         "views/onboarding_public_submission_views.xml",
+        "views/brd_document_inherit_views.xml",
+        "views/brd_recommendation_inherit_views.xml",
         "wizards/intake_wizard_views.xml",
         "wizards/brd_upload_wizard_views.xml",
         "wizards/go_no_go_wizard_views.xml",

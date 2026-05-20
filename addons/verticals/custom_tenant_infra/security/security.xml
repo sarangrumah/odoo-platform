@@ -4,13 +4,11 @@
 
         <record id="group_tenant_infra_user" model="res.groups">
             <field name="name">Tenant Infra User</field>
-            <field name="category_id" ref="custom_super_admin.module_category_super_admin"/>
             <field name="comment">Read-only access to VPS fleet + environments.</field>
         </record>
 
         <record id="group_tenant_infra_manager" model="res.groups">
             <field name="name">Tenant Infra Manager</field>
-            <field name="category_id" ref="custom_super_admin.module_category_super_admin"/>
             <field name="implied_ids" eval="[Command.link(ref('group_tenant_infra_user'))]"/>
             <field name="comment">Full lifecycle control of VPS + environments + bootstrap templates.</field>
         </record>

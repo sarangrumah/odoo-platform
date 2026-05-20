@@ -8,7 +8,7 @@
                 <field name="requested_at"/>
                 <field name="catalog_id"/>
                 <field name="tenant_id"/>
-                <field name="environment_id" optional="show"/>
+                <!-- environment_id injected by custom_tenant_infra -->
                 <field name="deploy_mode"/>
                 <field name="state"
                        decoration-success="state == 'installed'"
@@ -77,7 +77,7 @@
                         <page string="Canary &amp; Rollback" name="page_canary">
                             <group>
                                 <group string="Target">
-                                    <field name="environment_id"/>
+                                    <!-- environment_id injected by custom_tenant_infra -->
                                     <field name="canary_phase"/>
                                 </group>
                                 <group string="Health">
@@ -136,12 +136,12 @@
                         domain="[('state', '=', 'failed')]"/>
                 <filter string="Installed" name="f_installed"
                         domain="[('state', '=', 'installed')]"/>
-                <group expand="0" string="Group By">
+                
                     <filter string="State" name="g_state"
                             context="{'group_by': 'state'}"/>
                     <filter string="Tenant" name="g_tenant"
                             context="{'group_by': 'tenant_id'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

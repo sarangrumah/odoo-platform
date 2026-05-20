@@ -8,7 +8,6 @@
         available.
     -->
     <template id="app_root" name="Landing Admin Shell">
-        <!DOCTYPE html>
         <html t-att-data-uid="uid" lang="en">
             <head>
                 <meta charset="utf-8"/>

@@ -1,23 +1,27 @@
 # -*- coding: utf-8 -*-
-"""Tighten the ``journey_id`` field on ``brd.document``.
+"""Declare the ``journey_id`` field on ``brd.document``.
 
-Track B already declared the forward-reference field. Now that the comodel
-exists we don't need to touch the field at all — the O2M ``brd_document_ids``
-on the journey side uses ``journey_id`` as its inverse name, which works as-is.
-
-This stub exists so that any future extension (e.g. propagating
-``journey_id`` on copy, or adding domain restrictions) has a natural home
-without editing the brd_analyzer module.
+The field lives here (not in custom_brd_analyzer) because Odoo refuses to
+set up a Many2one whose comodel is missing at load time. brd_analyzer is
+loaded before custom_onboarding_journey in the module graph, so declaring
+``journey_id`` upstream would fail with ``unknown comodel_name
+'onboarding.journey'``. Declaring it via ``_inherit`` here keeps the
+forward reference valid.
 """
 
-from odoo import models
+from odoo import fields, models
 
 
 class BrdDocumentJourneyLink(models.Model):
     _inherit = "brd.document"
 
-    # No field redeclaration needed; inverse from onboarding.journey.brd_document_ids
-    # already binds correctly because the M2O exists with the proper comodel.
+    journey_id = fields.Many2one(
+        comodel_name="onboarding.journey",
+        string="Onboarding Journey",
+        ondelete="set null",
+        index=True,
+        help="Onboarding journey this BRD belongs to.",
+    )
 
     def write(self, vals):
         # If a BRD is bound to a journey, transition the journey when the BRD

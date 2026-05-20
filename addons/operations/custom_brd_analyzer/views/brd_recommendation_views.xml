@@ -70,8 +70,7 @@
                                         <field name="impact_severity" widget="badge" decoration-danger="impact_severity == 'critical'" decoration-warning="impact_severity == 'high'" decoration-info="impact_severity == 'medium'" decoration-muted="impact_severity == 'low'"/>
                                     </group>
                                 </group>
-                                <separator string="Affected Hub Modules"/>
-                                <field name="affects_existing_module_ids" widget="many2many_tags"/>
+                                <!-- affects_existing_module_ids injected by custom_onboarding_journey -->
                                 <separator string="Cross-Vertical Impact Map (JSON)"/>
                                 <div class="text-muted">
                                     Map of <code>{"module_name": ["vertical_a", "vertical_b"]}</code> showing

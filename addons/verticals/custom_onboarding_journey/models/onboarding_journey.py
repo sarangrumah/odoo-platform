@@ -127,13 +127,7 @@ class OnboardingJourney(models.Model):
         ondelete="set null",
         copy=False,
     )
-    dev_cycle_id = fields.Many2one(
-        "dev.cycle",
-        string="Dev Cycle",
-        ondelete="set null",
-        copy=False,
-        help="Forward reference to ``custom_dev_cycle``; may be unresolved at install time.",
-    )
+    # dev_cycle_id (M2O dev.cycle) is injected by custom_dev_cycle.
     project_id = fields.Many2one(
         "project.project",
         string="Onboarding Project",

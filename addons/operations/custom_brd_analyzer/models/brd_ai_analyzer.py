@@ -488,12 +488,13 @@ class BrdAiAnalyzer:
                     "estimated_md": int(rec.get("estimated_md") or 0),
                     "severity": rec.get("severity") or "should_have",
                     "justification": rec.get("justification") or "",
-                    "affects_existing_module_ids": [(6, 0, affects_ids)],
                     "cross_vertical_impact_json": cross_json,
                     "breaking_change": bool(rec.get("breaking_change")),
                     "compat_strategy": compat,
                 }
             )
+            if "affects_existing_module_ids" in Recommendation._fields:
+                new_rec.write({"affects_existing_module_ids": [(6, 0, affects_ids)]})
             name_to_rec[new_rec.name] = (new_rec, rec.get("depends_on_proposed") or [])
 
         # Second pass: sibling links.

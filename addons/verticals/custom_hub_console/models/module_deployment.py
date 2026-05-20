@@ -25,6 +25,7 @@ _logger = logging.getLogger(__name__)
 
 class CustomHubModuleDeployment(models.Model):
     _name = "custom.hub.module.deployment"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _description = "Hub Module Deployment (per-tenant operation log)"
     _order = "requested_at desc, id desc"
 
@@ -78,13 +79,10 @@ class CustomHubModuleDeployment(models.Model):
     # ------------------------------------------------------------------
     # Track C: canary & rollback
     # ------------------------------------------------------------------
-    environment_id = fields.Many2one(
-        comodel_name="tenant.environment",
-        string="Target Environment",
-        ondelete="set null",
-        help="Optional staging/prod environment row from tenant_infra. "
-             "When unset the deployment targets the tenant default.",
-    )
+    # ``environment_id`` (M2O to tenant.environment) is declared in
+    # ``custom_tenant_infra/models/hub_module_deployment_extension.py``
+    # since hub_console can't depend on tenant_infra (tenant_infra
+    # depends on hub_console).
     dep_graph_resolved_json = fields.Text(
         string="Resolved Dependency Graph",
         help="JSON: {'order': [...], 'missing': [...]} produced by "

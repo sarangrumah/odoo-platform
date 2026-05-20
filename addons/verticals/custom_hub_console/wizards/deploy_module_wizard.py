@@ -61,13 +61,8 @@ class CustomHubDeployModuleWizard(models.TransientModel):
         help="Run the safe sequence: resolve deps, pre-backup, deploy to "
              "canary env, healthcheck, then full rollout (or rollback).",
     )
-    target_environment_id = fields.Many2one(
-        comodel_name="tenant.environment",
-        string="Canary Environment",
-        ondelete="set null",
-        help="Optional explicit staging environment to target. If empty "
-             "the deployment auto-picks a staging env for each tenant.",
-    )
+    # target_environment_id (M2O to tenant.environment) injected by
+    # custom_tenant_infra. See hub_module_deployment_extension.py.
 
     def action_confirm(self):
         self.ensure_one()
@@ -87,8 +82,9 @@ class CustomHubDeployModuleWizard(models.TransientModel):
                 "deploy_mode": self.deploy_mode,
                 "state": "pending",
             }
-            if self.target_environment_id:
-                vals["environment_id"] = self.target_environment_id.id
+            tgt_env = self["target_environment_id"] if "target_environment_id" in self._fields else False
+            if tgt_env:
+                vals["environment_id"] = tgt_env.id
             row = Deployment.create(vals)
             rows |= row
 

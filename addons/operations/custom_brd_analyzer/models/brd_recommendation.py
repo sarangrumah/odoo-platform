@@ -82,14 +82,9 @@ class BrdRecommendation(models.Model):
     # ------------------------------------------------------------------
     # Cross-vertical impact analysis (Track B)
     # ------------------------------------------------------------------
-    affects_existing_module_ids = fields.Many2many(
-        comodel_name="custom.hub.module.catalog",
-        relation="brd_recommendation_hub_catalog_rel",
-        column1="recommendation_id",
-        column2="catalog_id",
-        string="Affects Existing Hub Modules",
-        help="Hub catalog modules this recommendation would extend, patch or affect.",
-    )
+    # ``affects_existing_module_ids`` (M2M to custom.hub.module.catalog) is
+    # declared in ``custom_onboarding_journey/models/brd_recommendation_extension.py``
+    # to avoid a circular dependency (hub_console depends on brd_analyzer).
     cross_vertical_impact_json = fields.Text(
         string="Cross-Vertical Impact (JSON)",
         help='JSON map of {"module_name": ["vertical_a", "vertical_b"]} describing '
@@ -122,9 +117,10 @@ class BrdRecommendation(models.Model):
         help="Computed from breaking_change flag plus the number of verticals affected.",
     )
 
-    @api.depends("breaking_change", "cross_vertical_impact_json", "affects_existing_module_ids")
+    @api.depends("breaking_change", "cross_vertical_impact_json")
     def _compute_impact_severity(self):
         import json as _json
+        has_m2m = "affects_existing_module_ids" in self._fields
         for rec in self:
             verticals: set[str] = set()
             raw = rec.cross_vertical_impact_json
@@ -138,13 +134,14 @@ class BrdRecommendation(models.Model):
                 except (ValueError, TypeError):
                     pass
             v_count = len(verticals)
+            affects_any = has_m2m and bool(rec.affects_existing_module_ids)
             if rec.breaking_change and v_count >= 3:
                 rec.impact_severity = "critical"
             elif rec.breaking_change and v_count >= 1:
                 rec.impact_severity = "high"
             elif v_count >= 3:
                 rec.impact_severity = "high"
-            elif v_count >= 1 or rec.affects_existing_module_ids:
+            elif v_count >= 1 or affects_any:
                 rec.impact_severity = "medium"
             else:
                 rec.impact_severity = "low"

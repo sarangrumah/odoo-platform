@@ -50,7 +50,7 @@ class BrdDocument(models.Model):
     document_filename = fields.Char(string="Filename")
 
     vertical_target_id = fields.Many2one(
-        "custom_super_admin.tenant",
+        "tenant.registry",
         string="Target Vertical / Tenant",
         ondelete="set null",
     )
@@ -77,17 +77,9 @@ class BrdDocument(models.Model):
     # ------------------------------------------------------------------
     # Onboarding lifecycle hooks (Track B)
     # ------------------------------------------------------------------
-    # Forward reference: ``onboarding.journey`` lives in a sibling module that
-    # depends on us. We declare the comodel by string only; ondelete='set null'
-    # means a missing target is harmless.
-    journey_id = fields.Many2one(
-        comodel_name="onboarding.journey",
-        string="Onboarding Journey",
-        ondelete="set null",
-        index=True,
-        help="Optional link to an onboarding journey record. Forward-reference "
-             "to the future ``custom_onboarding_journey`` module.",
-    )
+    # ``journey_id`` is declared in ``custom_onboarding_journey`` via _inherit
+    # to avoid an unresolved comodel at brd_analyzer load time (Odoo refuses
+    # to set up a Many2one whose comodel is not yet in the registry).
     vertical_target = fields.Char(
         string="Vertical Target",
         help="Free-form code of the target vertical (e.g. retail, fnb, "
