@@ -67,6 +67,59 @@ app.use(express.json({ limit: '20mb' }));
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'hub-portal-proxy' }));
 
 // ---------------------------------------------------------------------------
+// Legacy endpoints used by user's WIP jsx pages (DashboardPage / TenantsPage /
+// UsersPage / MonitoringPage / CostsPage / AuditPage / DocumentsPage). Most
+// proxy to Odoo via JSON-RPC; the ones without a backend yet return demo data.
+// ---------------------------------------------------------------------------
+async function odooSearchRead(req, res, model, fields, options = {}) {
+  try {
+    const r = await odooCall(model, 'search_read', [options.domain || []], { fields, limit: options.limit || 200, order: options.order });
+    const text = await r.text();
+    const parsed = JSON.parse(text);
+    if (parsed?.error) return res.status(500).json({ detail: parsed.error?.data?.message || 'Odoo error' });
+    res.json(parsed.result ?? []);
+  } catch (e) {
+    res.status(500).json({ detail: String(e?.message || e) });
+  }
+}
+
+app.get('/api/tenants', (req, res) => odooSearchRead(req, res, 'tenant.registry',
+  ['id', 'slug', 'db_name', 'state', 'plan_tier', 'create_date'], { order: 'create_date desc' }));
+
+app.get('/api/users', (req, res) => odooSearchRead(req, res, 'res.users',
+  ['id', 'name', 'login', 'active'], { domain: [['active', '=', true]], limit: 100 }));
+
+app.get('/api/audit', (req, res) => odooSearchRead(req, res, 'mail.message',
+  ['id', 'date', 'author_id', 'subject', 'body', 'model', 'res_id'], { limit: Number(req.query.limit) || 100, order: 'date desc' }));
+
+app.get('/api/documents', (req, res) => odooSearchRead(req, res, 'ir.attachment',
+  ['id', 'name', 'res_model', 'create_date', 'file_size'], { limit: 100, order: 'create_date desc' }));
+
+app.get('/api/costs', (_req, res) => res.json({
+  demo: true,
+  monthly_total_idr: 18_400_000,
+  breakdown: [
+    { name: 'Infrastructure (VPS, MinIO, Postgres)', amount_idr: 8_200_000 },
+    { name: 'AI Gateway (Anthropic)', amount_idr: 5_100_000 },
+    { name: 'Monitoring (Prometheus, Grafana, Loki)', amount_idr: 2_400_000 },
+    { name: 'Backup storage', amount_idr: 1_300_000 },
+    { name: 'Pajakku ASPP', amount_idr: 1_400_000 },
+  ],
+}));
+
+app.get('/api/monitoring', (_req, res) => res.json({
+  demo: true,
+  services: [
+    { name: 'odoo-mgmt', status: 'healthy', uptime_pct: 99.8 },
+    { name: 'tenant-orchestrator', status: 'healthy', uptime_pct: 99.9 },
+    { name: 'ai-gateway', status: 'healthy', uptime_pct: 99.6 },
+    { name: 'postgres', status: 'healthy', uptime_pct: 100 },
+    { name: 'redis', status: 'healthy', uptime_pct: 100 },
+    { name: 'minio', status: 'healthy', uptime_pct: 99.9 },
+  ],
+}));
+
+// ---------------------------------------------------------------------------
 // Intake (orchestrator passthrough)
 // ---------------------------------------------------------------------------
 app.post('/api/intake/submit', async (req, res) => {

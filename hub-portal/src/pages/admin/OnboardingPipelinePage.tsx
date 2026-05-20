@@ -25,13 +25,21 @@ const STAGES: { key: string; label: string }[] = [
 interface Journey {
   id: number;
   name: string;
-  partner_name: string;
-  vertical_target: string;
+  partner_id?: [number, string] | false;
+  vertical_target?: string;
   stage: string;
   mandays_estimate?: number;
-  ba_user_id?: [number, string] | false;
+  ba_id?: [number, string] | false;
   target_go_live?: string;
   progress_pct?: number;
+  public_status_token?: string;
+}
+
+function partnerName(j: Journey): string {
+  return Array.isArray(j.partner_id) ? j.partner_id[1] : (j.name || '—');
+}
+function baName(j: Journey): string {
+  return Array.isArray(j.ba_id) ? j.ba_id[1] : '—';
 }
 
 interface Props {
@@ -104,10 +112,13 @@ export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: P
     return journeys.filter((j) => {
       if (filterVertical && j.vertical_target !== filterVertical) return false;
       if (filterBa) {
-        const ba = Array.isArray(j.ba_user_id) ? j.ba_user_id[1] : '';
+        const ba = baName(j);
         if (!ba.toLowerCase().includes(filterBa.toLowerCase())) return false;
       }
-      if (search && !j.partner_name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search) {
+        const haystack = `${partnerName(j)} ${j.name || ''}`.toLowerCase();
+        if (!haystack.includes(search.toLowerCase())) return false;
+      }
       return true;
     });
   }, [journeys, filterBa, filterVertical, search]);
@@ -271,14 +282,14 @@ export default function OnboardingPipelinePage({ onOpenJourney, onNewIntake }: P
                     fontSize: 12,
                   }}
                 >
-                  <div style={{ fontWeight: 600, marginBottom: 2 }}>{j.partner_name}</div>
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>{partnerName(j)}</div>
                   <div style={{ color: colors.textMuted, marginBottom: 6 }}>{j.name}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                    <Badge tone="info">{j.vertical_target}</Badge>
-                    {j.mandays_estimate != null && <Badge>{j.mandays_estimate} md</Badge>}
+                    {j.vertical_target && <Badge tone="info">{j.vertical_target}</Badge>}
+                    {j.mandays_estimate != null && j.mandays_estimate > 0 && <Badge>{j.mandays_estimate} md</Badge>}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, color: colors.textDim, fontSize: 11 }}>
-                    <span>BA: {Array.isArray(j.ba_user_id) ? j.ba_user_id[1] : '—'}</span>
+                    <span>BA: {baName(j)}</span>
                     <span>{j.target_go_live || ''}</span>
                   </div>
                 </div>

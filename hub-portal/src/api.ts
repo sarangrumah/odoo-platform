@@ -131,21 +131,24 @@ export const rejectSubmission = (id: number) =>
 export const listJourneys = (filters: JourneyFilters = {}) => {
   const domain: any[] = [];
   if (filters.stage) domain.push(['stage', '=', filters.stage]);
-  if (filters.ba_user_id) domain.push(['ba_user_id', '=', filters.ba_user_id]);
+  if (filters.ba_user_id) domain.push(['ba_id', '=', filters.ba_user_id]);
   if (filters.vertical) domain.push(['vertical_target', '=', filters.vertical]);
-  if (filters.search) domain.push(['partner_name', 'ilike', filters.search]);
+  if (filters.search) {
+    // Search both journey name and the linked partner's name.
+    domain.push('|', ['name', 'ilike', filters.search], ['partner_id.name', 'ilike', filters.search]);
+  }
   return jsonrpc<any[]>('onboarding.journey', 'search_read', [domain], {
     fields: [
       'id',
       'name',
-      'partner_name',
+      'partner_id',
       'vertical_target',
       'stage',
       'mandays_estimate',
-      'ba_user_id',
+      'ba_id',
       'target_go_live',
       'progress_pct',
-      'token',
+      'public_status_token',
     ],
     limit: filters.limit ?? 200,
     offset: filters.offset ?? 0,
