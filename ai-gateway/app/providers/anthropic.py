@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from anthropic import AsyncAnthropic, BadRequestError
+import asyncio
+
+from anthropic import AsyncAnthropic, APIStatusError, BadRequestError, InternalServerError
 
 from ..config import get_settings
 from .base import ChatRequest, ChatResponse, LLMProvider
@@ -76,19 +78,43 @@ class AnthropicProvider(LLMProvider):
         if tool_param is not None:
             kwargs["tools"] = tool_param
 
-        try:
-            resp = await self._client.messages.create(**kwargs)
-        except BadRequestError as e:
-            # Future-proof: if Anthropic deprecates `temperature` for more models,
-            # retry once without it instead of 500-ing.
-            msg = str(getattr(e, "message", e)).lower()
-            if "temperature" in msg and "deprecated" in msg and "temperature" in kwargs:
-                log.warning("anthropic: temperature deprecated for model=%s, retrying without it", model)
-                _NO_TEMPERATURE_MODELS.add(model)  # remember for the rest of this process
-                kwargs.pop("temperature", None)
+        # Retry on Anthropic 529 (Overloaded) / 502 / 503 with exponential
+        # back-off. The SDK auto-retries some of these but caps quickly; we
+        # add a slightly more patient outer loop because BRD analysis is not
+        # latency-sensitive and a transient overload should not bubble up as
+        # a hard 500 to the user.
+        last_exc: Exception | None = None
+        for attempt in range(4):  # total wait ≤ 1+3+7+15 = 26s
+            try:
                 resp = await self._client.messages.create(**kwargs)
-            else:
+                break
+            except BadRequestError as e:
+                # Future-proof: if Anthropic deprecates `temperature` for more
+                # models, retry once without it instead of 500-ing.
+                msg = str(getattr(e, "message", e)).lower()
+                if "temperature" in msg and "deprecated" in msg and "temperature" in kwargs:
+                    log.warning("anthropic: temperature deprecated for model=%s, retrying without it", model)
+                    _NO_TEMPERATURE_MODELS.add(model)
+                    kwargs.pop("temperature", None)
+                    continue
                 raise
+            except (InternalServerError, APIStatusError) as e:
+                # Status 529 = overloaded; 502/503/504 = transient infra.
+                status = getattr(e, "status_code", None) or getattr(getattr(e, "response", None), "status_code", None)
+                if status in (502, 503, 504, 529) and attempt < 3:
+                    wait = 1 + (attempt * attempt) * 2 + attempt  # 1, 3, 7, 15
+                    log.warning("anthropic: status=%s overloaded, retry %d/3 after %ds",
+                                status, attempt + 1, wait)
+                    last_exc = e
+                    await asyncio.sleep(wait)
+                    continue
+                raise
+        else:
+            # Exhausted retries — surface a clearer message than the SDK default.
+            raise RuntimeError(
+                f"Anthropic API overloaded after 4 attempts (last: {last_exc}). "
+                "This is a transient upstream issue at Anthropic; please retry in a minute."
+            ) from last_exc
 
         text_parts = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
         usage = resp.usage
