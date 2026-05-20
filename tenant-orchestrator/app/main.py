@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import logging
-import os
 from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
@@ -56,16 +54,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        o.strip()
-        for o in os.getenv("LANDING_PUBLIC_ORIGIN", "http://localhost:3000").split(",")
-        if o.strip()
-    ],
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"],
-)
 app.add_middleware(HMACMiddleware)
 app.include_router(tenants_router.router)
 app.include_router(backups_router.router)
