@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, BadRequestError
 
 from ..config import get_settings
 from .base import ChatRequest, ChatResponse, LLMProvider
+
+log = logging.getLogger(__name__)
+
+# Newer reasoning-class models (Opus 4.7+, Sonnet 4.7+, …) no longer accept the
+# `temperature` sampling parameter. Hardcode the known list so we don't even
+# send it on the first attempt, AND keep a runtime fallback in case Anthropic
+# deprecates it for more models later.
+_NO_TEMPERATURE_MODELS = {
+    "claude-opus-4-7",
+    "claude-opus-4-7[1m]",
+}
+
+
+def _supports_temperature(model: str) -> bool:
+    return model not in _NO_TEMPERATURE_MODELS
 
 
 class AnthropicProvider(LLMProvider):
@@ -52,14 +68,27 @@ class AnthropicProvider(LLMProvider):
             "model": model,
             "messages": messages,
             "max_tokens": req.max_tokens,
-            "temperature": req.temperature,
         }
+        if _supports_temperature(model):
+            kwargs["temperature"] = req.temperature
         if system_param is not None:
             kwargs["system"] = system_param
         if tool_param is not None:
             kwargs["tools"] = tool_param
 
-        resp = await self._client.messages.create(**kwargs)
+        try:
+            resp = await self._client.messages.create(**kwargs)
+        except BadRequestError as e:
+            # Future-proof: if Anthropic deprecates `temperature` for more models,
+            # retry once without it instead of 500-ing.
+            msg = str(getattr(e, "message", e)).lower()
+            if "temperature" in msg and "deprecated" in msg and "temperature" in kwargs:
+                log.warning("anthropic: temperature deprecated for model=%s, retrying without it", model)
+                _NO_TEMPERATURE_MODELS.add(model)  # remember for the rest of this process
+                kwargs.pop("temperature", None)
+                resp = await self._client.messages.create(**kwargs)
+            else:
+                raise
 
         text_parts = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
         usage = resp.usage
