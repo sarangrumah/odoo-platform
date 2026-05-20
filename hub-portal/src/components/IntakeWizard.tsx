@@ -1,7 +1,9 @@
 import { ChangeEvent, DragEvent, useEffect, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Plus, Trash2, Upload, X } from 'lucide-react';
 import { Badge, Button, Card, Input, Modal, Select, Textarea, Toast } from './ui';
-import { colors, radii, spacing, verticals, VerticalValue } from '../tokens';
+import { colors, radii, spacing, verticals, moduleCatalog } from '../tokens';
+
+type VerticalValue = string;
 import { IntakePayload, submitIntake } from '../api';
 
 interface Props {
@@ -28,7 +30,7 @@ export default function IntakeWizard({ open, onClose, onSuccess }: Props) {
   const [logo, setLogo] = useState<string | null>(null);
 
   // Step 2
-  const [vertical, setVertical] = useState<VerticalValue>('residensia');
+  const [vertical, setVertical] = useState<VerticalValue>('drone_services');
 
   // Step 3
   const [wishlist, setWishlist] = useState<string[]>([]);
@@ -284,29 +286,49 @@ export default function IntakeWizard({ open, onClose, onSuccess }: Props) {
         )}
 
         {step === 2 && (
-          <Field label="Modules wishlist *">
-            <div style={{ display: 'flex', gap: 6 }}>
-              <Input
-                value={wishDraft}
-                onChange={(e) => setWishDraft(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addWish())}
-                placeholder="e.g. invoice_recurring, hht_scan, pdp_masking"
-              />
-              <Button variant="secondary" onClick={addWish}>
-                <Plus size={14} /> Add
-              </Button>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: spacing.sm }}>
-              {wishlist.map((w, i) => (
-                <Badge key={i} tone="info" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  {w}
-                  <button
-                    onClick={() => setWishlist(wishlist.filter((_, j) => j !== i))}
-                    style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}
-                  >
-                    <X size={10} />
-                  </button>
-                </Badge>
+          <Field label="Select modules of interest *">
+            <p style={{ color: colors.textMuted, fontSize: 12, margin: '0 0 12px' }}>
+              Tick the modules the customer wants in scope. You can adjust later — the AI BRD analyzer
+              will also recommend modules based on the uploaded document. Selected: <strong>{wishlist.length}</strong>
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 380, overflowY: 'auto', paddingRight: 8 }}>
+              {moduleCatalog.map((g: any) => (
+                <div key={g.group}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+                    letterSpacing: 1, color: colors.muted, marginBottom: 6,
+                    paddingBottom: 4, borderBottom: `1px solid ${colors.border}`,
+                  }}>{g.group}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                    {g.items.map((m: any) => {
+                      const checked = wishlist.includes(m.code);
+                      return (
+                        <label key={m.code} style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 8,
+                          padding: '6px 8px', borderRadius: 4, cursor: 'pointer',
+                          background: checked ? `${colors.brand}10` : 'transparent',
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) setWishlist([...wishlist, m.code]);
+                              else setWishlist(wishlist.filter((c) => c !== m.code));
+                            }}
+                            style={{ marginTop: 3 }}
+                          />
+                          <span style={{ fontSize: 12, color: colors.ink, lineHeight: 1.4 }}>
+                            {m.label}
+                            <code style={{
+                              display: 'block', fontSize: 10, color: colors.muted,
+                              fontFamily: 'JetBrains Mono, monospace', marginTop: 2,
+                            }}>{m.code}</code>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
           </Field>
