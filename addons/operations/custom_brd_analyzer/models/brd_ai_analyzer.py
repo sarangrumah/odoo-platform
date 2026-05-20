@@ -166,7 +166,8 @@ DEFAULT_JSON_SCHEMA = {
 
 
 # Section count above which we batch.
-_SECTION_BATCH_SIZE = 25
+_SECTION_BATCH_SIZE = 10
+_AI_MAX_TOKENS = 16000  # Opus 4.7 supports up to 32k; 16k fits ~12 full section objects.
 
 
 class BrdAiAnalyzer:
@@ -203,6 +204,23 @@ class BrdAiAnalyzer:
         scored = 0
         fit_total = 0
         raw_responses: list[str] = []  # for diagnostics
+
+        def _flush_diag(extra_note: str = "") -> None:
+            """Save raw responses to the document even when parsing fails so
+            the BA can inspect what the model returned."""
+            raw_dump = "\n\n--- BATCH ---\n\n".join(raw_responses)
+            if extra_note:
+                raw_dump = f"[NOTE] {extra_note}\n\n{raw_dump}"
+            if len(raw_dump) > 60000:
+                raw_dump = raw_dump[:60000] + "\n…(truncated)"
+            try:
+                brd_doc.sudo().write({
+                    "last_ai_raw": raw_dump or False,
+                    "last_ai_at": fields.Datetime.now(),
+                })
+            except Exception:  # noqa: BLE001
+                pass
+
         for batch in self._chunk(sections, _SECTION_BATCH_SIZE):
             section_blob = [
                 {"section_id": s.id, "title": s.title or "", "content": (s.content or "")[:3000]}
@@ -235,12 +253,31 @@ class BrdAiAnalyzer:
                 )
             response_text = self._call_ai(system_prompt=system_prompt, user_message=user_msg, catalog_json=catalog_json)
             raw_responses.append(response_text or "")
+            _flush_diag()  # save after every batch so partial progress is visible
             _logger.info(
                 "brd_ai_analyzer: batch response_text length=%d preview=%s",
                 len(response_text or ""),
                 (response_text or "")[:500].replace("\n", " "),
             )
-            parsed = self._parse_json_strict(response_text, system_prompt=system_prompt, user_message=user_msg, catalog_json=catalog_json)
+            try:
+                parsed = self._parse_json_strict(
+                    response_text,
+                    system_prompt=system_prompt,
+                    user_message=user_msg,
+                    catalog_json=catalog_json,
+                )
+            except UserError:
+                # Both strict-parse attempts failed; try tolerant salvage on
+                # truncated output (Anthropic hit max_tokens mid-stream).
+                parsed = self._tolerant_parse(response_text) or {}
+                if not parsed:
+                    _flush_diag("Parse failed; raw response above is the unparsed AI output.")
+                    raise
+                _logger.warning(
+                    "brd_ai_analyzer: salvaged %d sections / %d recs from truncated response",
+                    len(parsed.get("sections") or []),
+                    len(parsed.get("recommendations") or []),
+                )
             batch_secs = parsed.get("sections") or []
             batch_recs = parsed.get("recommendations") or []
             _logger.info(
@@ -340,7 +377,7 @@ class BrdAiAnalyzer:
             messages=[{"role": "user", "content": user_message}],
             system=cached_system,
             quality="high",
-            max_tokens=4096,
+            max_tokens=_AI_MAX_TOKENS,
             temperature=0.2,
         )
         # custom_ai_bridge gateway returns provider-shaped JSON; tolerate a few
@@ -391,6 +428,96 @@ class BrdAiAnalyzer:
         if parsed is None:
             raise UserError("AI returned malformed JSON twice; check the logs for the raw response.")
         return parsed
+
+    @staticmethod
+    def _tolerant_parse(raw: str) -> dict | None:
+        """Salvage `sections`/`recommendations` from a truncated AI response.
+
+        When Anthropic hits ``max_tokens`` mid-stream, the raw string is no
+        longer valid JSON (missing closing braces / unterminated string).
+        We scan for the ``"sections": [`` array, walk balanced braces until
+        the array breaks, and return whatever complete objects we got. Same
+        for ``"recommendations"``. Better than 0 records.
+        """
+        if not raw:
+            return None
+        # Find a top-level opening brace.
+        i = raw.find("{")
+        if i == -1:
+            return None
+
+        def _extract_array(text: str, key: str) -> list[dict]:
+            label = f'"{key}"'
+            k = text.find(label)
+            if k == -1:
+                return []
+            br = text.find("[", k)
+            if br == -1:
+                return []
+            items: list[dict] = []
+            pos = br + 1
+            length = len(text)
+            while pos < length:
+                # Skip whitespace and commas
+                while pos < length and text[pos] in " \t\r\n,":
+                    pos += 1
+                if pos >= length or text[pos] == "]":
+                    break
+                if text[pos] != "{":
+                    # Unexpected — bail
+                    break
+                # Walk balanced braces with string-awareness.
+                depth = 0
+                start = pos
+                in_str = False
+                escape = False
+                while pos < length:
+                    ch = text[pos]
+                    if in_str:
+                        if escape:
+                            escape = False
+                        elif ch == "\\":
+                            escape = True
+                        elif ch == '"':
+                            in_str = False
+                    else:
+                        if ch == '"':
+                            in_str = True
+                        elif ch == "{":
+                            depth += 1
+                        elif ch == "}":
+                            depth -= 1
+                            if depth == 0:
+                                pos += 1
+                                break
+                    pos += 1
+                if depth != 0:
+                    # Last object was truncated; stop.
+                    break
+                snippet = text[start:pos]
+                try:
+                    items.append(json.loads(snippet))
+                except json.JSONDecodeError:
+                    break
+            return items
+
+        sections = _extract_array(raw, "sections")
+        recommendations = _extract_array(raw, "recommendations")
+        if not sections and not recommendations:
+            return None
+        # Recover overall_fit_pct if obviously present near the top.
+        fit = 0
+        m = re.search(r'"overall_fit_pct"\s*:\s*(\d+)', raw[:2000])
+        if m:
+            try:
+                fit = int(m.group(1))
+            except ValueError:
+                pass
+        return {
+            "overall_fit_pct": fit,
+            "sections": sections,
+            "recommendations": recommendations,
+        }
 
     @staticmethod
     def _try_parse(raw: str) -> dict | None:
