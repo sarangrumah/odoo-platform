@@ -47,9 +47,10 @@ export default function ModuleDeployPage() {
     setOpenMod(null);
   }
 
-  const filtered = catalog.filter(
-    (m) => m.name.toLowerCase().includes(q.toLowerCase()) || m.technical_name.toLowerCase().includes(q.toLowerCase()),
-  );
+  const filtered = catalog.filter((m) => {
+    const haystack = `${m.module_name || ''} ${m.summary || ''}`.toLowerCase();
+    return haystack.includes(q.toLowerCase());
+  });
 
   const showCatalogEmpty = loaded && catalog.length === 0;
 
@@ -73,15 +74,15 @@ export default function ModuleDeployPage() {
         </Card>
         <Table
           columns={[
-            { key: 'name', label: 'Name' },
-            { key: 'technical_name', label: 'Technical name' },
-            { key: 'category', label: 'Category', render: (r) => <Badge tone="info">{r.category}</Badge> },
-            { key: 'version', label: 'Version' },
+            { key: 'module_name', label: 'Module name' },
+            { key: 'category', label: 'Category', render: (r) => <Badge tone="info">{r.category || '—'}</Badge> },
             {
-              key: 'canary',
-              label: 'Canary',
-              render: (r) => (r.is_canary_enabled ? <Badge tone="warning">enabled</Badge> : <Badge>disabled</Badge>),
+              key: 'maturity',
+              label: 'Maturity',
+              render: (r) => <Badge tone={r.maturity === 'production' ? 'success' : r.maturity === 'partial' ? 'warning' : undefined}>{r.maturity || '—'}</Badge>,
             },
+            { key: 'version', label: 'Version' },
+            { key: 'deployment_count', label: 'Deployed' },
             {
               key: 'actions',
               label: '',
@@ -101,27 +102,26 @@ export default function ModuleDeployPage() {
       <Section title="Deployment history">
         <Table
           columns={[
-            { key: 'name', label: 'Ref' },
-            { key: 'module_id', label: 'Module', render: (r) => Array.isArray(r.module_id) ? r.module_id[1] : r.module_id },
-            { key: 'tenant_id', label: 'Tenant', render: (r) => Array.isArray(r.tenant_id) ? r.tenant_id[1] : r.tenant_id },
-            { key: 'env', label: 'Env' },
+            { key: 'catalog_id', label: 'Module', render: (r) => Array.isArray(r.catalog_id) ? r.catalog_id[1] : r.catalog_id || '—' },
+            { key: 'tenant_id', label: 'Tenant', render: (r) => Array.isArray(r.tenant_id) ? r.tenant_id[1] : r.tenant_id || '—' },
+            { key: 'deploy_mode', label: 'Mode' },
             {
               key: 'state',
               label: 'State',
-              render: (r) => <Badge tone={r.state === 'deployed' ? 'success' : 'warning'}>{r.state}</Badge>,
+              render: (r) => <Badge tone={r.state === 'installed' ? 'success' : r.state === 'failed' ? 'danger' : 'warning'}>{r.state}</Badge>,
             },
             {
               key: 'canary_phase',
               label: 'Canary',
-              render: (r) => <Badge tone={r.canary_phase === 'full' ? 'success' : 'warning'}>{r.canary_phase}</Badge>,
+              render: (r) => <Badge tone={r.canary_phase === 'full' ? 'success' : r.canary_phase === 'rolled_back' ? 'danger' : 'warning'}>{r.canary_phase || 'none'}</Badge>,
             },
-            { key: 'deployed_at', label: 'Deployed at' },
+            { key: 'requested_at', label: 'Requested at' },
           ]}
           rows={deployments}
         />
       </Section>
 
-      <Modal open={!!openMod} onClose={() => setOpenMod(null)} title={openMod ? `Deploy: ${openMod.name}` : ''}>
+      <Modal open={!!openMod} onClose={() => setOpenMod(null)} title={openMod ? `Deploy: ${openMod.module_name}` : ''}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
           <label style={{ fontSize: 12, color: colors.textMuted }}>
             Tenant

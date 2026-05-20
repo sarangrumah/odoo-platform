@@ -132,7 +132,6 @@ export const listJourneys = (filters: JourneyFilters = {}) => {
   const domain: any[] = [];
   if (filters.stage) domain.push(['stage', '=', filters.stage]);
   if (filters.ba_user_id) domain.push(['ba_id', '=', filters.ba_user_id]);
-  if (filters.vertical) domain.push(['vertical_target', '=', filters.vertical]);
   if (filters.search) {
     // Search both journey name and the linked partner's name.
     domain.push('|', ['name', 'ilike', filters.search], ['partner_id.name', 'ilike', filters.search]);
@@ -142,13 +141,13 @@ export const listJourneys = (filters: JourneyFilters = {}) => {
       'id',
       'name',
       'partner_id',
-      'vertical_target',
       'stage',
       'mandays_estimate',
       'ba_id',
       'target_go_live',
       'progress_pct',
       'public_status_token',
+      'company_profile_json',
     ],
     limit: filters.limit ?? 200,
     offset: filters.offset ?? 0,
@@ -162,21 +161,25 @@ export const getJourney = (id: number) =>
 export const updateJourneyStage = (id: number, stage: string) =>
   jsonrpc<boolean>('onboarding.journey', 'write', [[id], { stage }]);
 
+// brd.recommendation lives on a brd.document; filter via journey -> document chain.
 export const listRecommendations = (journeyId: number) =>
   jsonrpc<any[]>(
     'brd.recommendation',
     'search_read',
-    [[['journey_id', '=', journeyId]]],
+    [[['document_id.journey_id', '=', journeyId]]],
     {
       fields: [
         'id',
         'name',
+        'scope',
         'severity',
-        'category',
-        'rationale',
+        'estimated_md',
+        'state',
+        'justification',
+        'breaking_change',
+        'compat_strategy',
+        'impact_severity',
         'cross_vertical_impact_json',
-        'estimate_md',
-        'status',
       ],
       limit: 200,
     },
@@ -199,28 +202,33 @@ export const deployStack = (vpsId: number, env: string) =>
 // ---------------------------------------------------------------------------
 export const listModuleCatalog = () =>
   jsonrpc<any[]>('custom.hub.module.catalog', 'search_read', [[]], {
-    fields: ['id', 'name', 'technical_name', 'category', 'version', 'description', 'is_canary_enabled'],
+    fields: ['id', 'module_name', 'category', 'maturity', 'version', 'summary',
+             'models_own_count', 'models_inherit_count', 'deployment_count', 'last_scanned'],
     limit: 500,
+    order: 'category, module_name',
   });
 
-export const listDeployments = (filters: { tenant_id?: number; module_id?: number } = {}) => {
+export const listDeployments = (filters: { tenant_id?: number; catalog_id?: number } = {}) => {
   const domain: any[] = [];
   if (filters.tenant_id) domain.push(['tenant_id', '=', filters.tenant_id]);
-  if (filters.module_id) domain.push(['module_id', '=', filters.module_id]);
+  if (filters.catalog_id) domain.push(['catalog_id', '=', filters.catalog_id]);
   return jsonrpc<any[]>('custom.hub.module.deployment', 'search_read', [domain], {
     fields: [
       'id',
-      'name',
-      'module_id',
+      'catalog_id',
       'tenant_id',
-      'env',
+      'deploy_mode',
       'state',
       'canary_phase',
-      'deployed_at',
-      'rollback_to',
+      'requested_at',
+      'started_at',
+      'completed_at',
+      'rollback_snapshot_id',
+      'healthcheck_passed',
+      'error_message',
     ],
     limit: 200,
-    order: 'deployed_at desc',
+    order: 'requested_at desc',
   });
 };
 
@@ -239,16 +247,21 @@ export const listDevCycles = (filters: { state?: string; assignee_id?: number } 
       'id',
       'name',
       'state',
+      'env_progress',
       'assignee_id',
       'estimate_md',
-      'pr_count',
-      'open_pr_count',
-      'merged_pr_count',
-      'ci_status',
+      'actual_md',
+      'branch_name',
+      'repo_url',
       'journey_id',
+      'brd_recommendation_id',
+      'module_target_id',
+      'pr_count',
+      'deployment_count',
+      'created_at',
     ],
     limit: 300,
-    order: 'priority desc, write_date desc',
+    order: 'write_date desc',
   });
 };
 
@@ -257,8 +270,10 @@ export const createDevCycle = (payload: any) =>
 
 export const listDevCyclePrs = (cycleId: number) =>
   jsonrpc<any[]>('dev.cycle.pr', 'search_read', [[['cycle_id', '=', cycleId]]], {
-    fields: ['id', 'name', 'url', 'state', 'ci_status', 'merged_at'],
+    fields: ['id', 'provider', 'pr_number', 'pr_url', 'state', 'ci_status',
+             'reviewers', 'merged_at', 'merged_by', 'last_synced_at'],
     limit: 100,
+    order: 'last_synced_at desc',
   });
 
 // ---------------------------------------------------------------------------

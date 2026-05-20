@@ -97,14 +97,13 @@ export default function DevCyclePage() {
                 >
                   <div style={{ fontWeight: 600, marginBottom: 6 }}>{c.name}</div>
                   <div style={{ color: colors.textMuted, marginBottom: 6 }}>
-                    {Array.isArray(c.assignee_id) ? c.assignee_id[1] : 'Unassigned'} · {c.estimate_md}md
+                    {Array.isArray(c.assignee_id) ? c.assignee_id[1] : 'Unassigned'}
+                    {c.estimate_md != null && c.estimate_md > 0 ? ` · ${c.estimate_md}md` : ''}
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {c.open_pr_count > 0 && <Badge tone="warning">open {c.open_pr_count}</Badge>}
-                    {c.merged_pr_count > 0 && <Badge tone="success">merged {c.merged_pr_count}</Badge>}
-                    <Badge tone={c.ci_status === 'failing' ? 'danger' : c.ci_status === 'passing' ? 'success' : 'info'}>
-                      CI: {c.ci_status}
-                    </Badge>
+                    {c.env_progress && <Badge tone="info">env: {c.env_progress}</Badge>}
+                    {c.pr_count > 0 && <Badge>PRs: {c.pr_count}</Badge>}
+                    {c.deployment_count > 0 && <Badge tone="success">deploys: {c.deployment_count}</Badge>}
                   </div>
                 </div>
               ))}
@@ -119,15 +118,21 @@ export default function DevCyclePage() {
           <div>
             <Card style={{ marginBottom: spacing.md }}>
               <div style={{ fontSize: 13 }}>
-                State: <Badge>{open.state}</Badge> · Estimate: {open.estimate_md}md
+                State: <Badge>{open.state}</Badge>
+                {open.estimate_md != null && open.estimate_md > 0 && ` · Estimate: ${open.estimate_md}md`}
+                {open.branch_name && ` · Branch: `}{open.branch_name && <code style={{ fontSize: 11 }}>{open.branch_name}</code>}
               </div>
             </Card>
             <h4 style={{ margin: '0 0 8px' }}>Pull requests</h4>
             <Table
               columns={[
-                { key: 'name', label: 'PR' },
+                {
+                  key: 'pr_url',
+                  label: 'PR',
+                  render: (r) => r.pr_url ? <a href={r.pr_url} target="_blank" rel="noreferrer">{r.provider} #{r.pr_number}</a> : `${r.provider || ''} #${r.pr_number || ''}`,
+                },
                 { key: 'state', label: 'State', render: (r) => <Badge tone={r.state === 'merged' ? 'success' : 'warning'}>{r.state}</Badge> },
-                { key: 'ci_status', label: 'CI', render: (r) => <Badge tone={r.ci_status === 'passing' ? 'success' : 'danger'}>{r.ci_status}</Badge> },
+                { key: 'ci_status', label: 'CI', render: (r) => <Badge tone={r.ci_status === 'success' ? 'success' : r.ci_status === 'failure' || r.ci_status === 'error' ? 'danger' : 'info'}>{r.ci_status || '—'}</Badge> },
                 { key: 'merged_at', label: 'Merged at' },
               ]}
               rows={prs}

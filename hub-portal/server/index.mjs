@@ -65,6 +65,7 @@ const app = express();
 app.use(express.json({ limit: '20mb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'hub-portal-proxy' }));
+app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'hub-portal-proxy' }));
 
 // ---------------------------------------------------------------------------
 // Legacy endpoints used by user's WIP jsx pages (DashboardPage / TenantsPage /

@@ -80,7 +80,10 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
 
   const mandaysByCategory = useMemo(() => {
     const acc: Record<string, number> = {};
-    recs.forEach((r) => (acc[r.category] = (acc[r.category] || 0) + (r.estimate_md || 0)));
+    recs.forEach((r) => {
+      const k = r.severity || 'unknown';
+      acc[k] = (acc[k] || 0) + (r.estimated_md || 0);
+    });
     return Object.entries(acc).map(([k, v]) => ({ category: k, md: v }));
   }, [recs]);
 
@@ -214,16 +217,21 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
               <Card key={r.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                   <div>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
-                      <Badge tone={r.severity === 'critical' || r.severity === 'high' ? 'danger' : r.severity === 'medium' ? 'warning' : 'info'}>
-                        {r.severity}
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                      <Badge tone={r.severity === 'must_have' ? 'danger' : r.severity === 'should_have' ? 'warning' : 'info'}>
+                        {r.severity || 'n/a'}
                       </Badge>
-                      <Badge>{r.category}</Badge>
-                      {r.estimate_md != null && <Badge>{r.estimate_md} md</Badge>}
+                      {r.compat_strategy && <Badge>{r.compat_strategy}</Badge>}
+                      {r.estimated_md != null && r.estimated_md > 0 && <Badge>{r.estimated_md} md</Badge>}
+                      {r.breaking_change && <Badge tone="danger">breaking</Badge>}
+                      {r.impact_severity && <Badge tone={r.impact_severity === 'critical' || r.impact_severity === 'high' ? 'danger' : 'warning'}>impact: {r.impact_severity}</Badge>}
                     </div>
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>{r.name}</div>
-                    {r.rationale && (
-                      <div style={{ fontSize: 12, color: colors.textMuted }}>{r.rationale}</div>
+                    {r.scope && (
+                      <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 4 }}>{r.scope}</div>
+                    )}
+                    {r.justification && (
+                      <div style={{ fontSize: 12, color: colors.textMuted, fontStyle: 'italic' }}>{r.justification}</div>
                     )}
                     {r.cross_vertical_impact_json && (
                       <pre
@@ -243,7 +251,7 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
                       </pre>
                     )}
                   </div>
-                  <Badge tone={r.status === 'accepted' ? 'success' : 'warning'}>{r.status || 'open'}</Badge>
+                  <Badge tone={r.state === 'approved' ? 'success' : r.state === 'rejected' ? 'danger' : 'warning'}>{r.state || 'draft'}</Badge>
                 </div>
               </Card>
             ))}
