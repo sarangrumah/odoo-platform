@@ -99,12 +99,26 @@ class AnthropicProvider(LLMProvider):
                     continue
                 raise
             except (InternalServerError, APIStatusError) as e:
-                # Status 529 = overloaded; 502/503/504 = transient infra.
-                status = getattr(e, "status_code", None) or getattr(getattr(e, "response", None), "status_code", None)
-                if status in (502, 503, 504, 529) and attempt < 3:
+                # The SDK's class attribute `status_code` is the family default
+                # (e.g. 500 for InternalServerError). We need the *real* HTTP
+                # status from the underlying response, which is where 529
+                # ("overloaded") lives.
+                resp_obj = getattr(e, "response", None)
+                real_status = getattr(resp_obj, "status_code", None)
+                class_status = getattr(e, "status_code", None)
+                msg = str(getattr(e, "message", e)).lower()
+                is_transient = (
+                    real_status in (500, 502, 503, 504, 529)
+                    or class_status in (500, 502, 503, 504, 529)
+                    or "overloaded" in msg
+                    or "timeout" in msg
+                )
+                if is_transient and attempt < 3:
                     wait = 1 + (attempt * attempt) * 2 + attempt  # 1, 3, 7, 15
-                    log.warning("anthropic: status=%s overloaded, retry %d/3 after %ds",
-                                status, attempt + 1, wait)
+                    log.warning(
+                        "anthropic: transient error (status=%s, msg=%r), retry %d/3 after %ds",
+                        real_status or class_status, msg[:120], attempt + 1, wait,
+                    )
                     last_exc = e
                     await asyncio.sleep(wait)
                     continue
