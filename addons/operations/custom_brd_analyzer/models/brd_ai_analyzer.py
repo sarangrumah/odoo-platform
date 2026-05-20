@@ -316,10 +316,12 @@ class BrdAiAnalyzer:
             f"<!-- cache_control: ephemeral -->\n"
             f"=== CAPABILITY CATALOG (CACHED) ===\n{catalog_json}\n"
         )
+        # ai-gateway accepts quality ∈ {"fast","high"}. BRD analysis benefits
+        # from the quality model (claude-opus-4-7) — fewer JSON parse retries.
         result = self.env["custom.ai"].sudo()._chat(
             messages=[{"role": "user", "content": user_message}],
             system=cached_system,
-            quality="balanced",
+            quality="high",
             max_tokens=4096,
             temperature=0.2,
         )
