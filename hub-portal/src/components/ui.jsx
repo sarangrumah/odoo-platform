@@ -244,8 +244,10 @@ export const Tabs = ({ tabs = [], active, onChange, children }) => (
       marginBottom: 16,
     }}>
       {tabs.map((t) => {
-        const id = typeof t === 'object' ? t.id : t;
+        // Accept both {id, label} and {key, label, icon} shapes.
+        const id = typeof t === 'object' ? (t.id ?? t.key) : t;
         const label = typeof t === 'object' ? t.label : t;
+        const icon = typeof t === 'object' ? t.icon : null;
         const isActive = active === id;
         return (
           <button key={id} onClick={() => onChange && onChange(id)} style={{
@@ -253,7 +255,8 @@ export const Tabs = ({ tabs = [], active, onChange, children }) => (
             padding: '10px 14px', fontSize: 12, fontWeight: isActive ? 600 : 500,
             color: isActive ? tokens.ink : tokens.muted,
             fontFamily: 'inherit', cursor: 'pointer', marginBottom: -1,
-          }}>{label}</button>
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}>{icon}{label}</button>
         );
       })}
     </div>
