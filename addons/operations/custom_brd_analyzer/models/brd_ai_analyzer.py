@@ -61,7 +61,18 @@ After processing every section you must also propose a *minimal* set of new
   - the existing modules they will *impact* (extend / patch),
   - an estimated_md (man-days, integer 1..120),
   - the severity it inherits from the worst section it addresses,
-  - a justification paragraph.
+  - a justification paragraph,
+  - **cross-vertical impact analysis** (REQUIRED): for every recommendation
+    you MUST include
+      * ``affects_existing_modules``: list of hub catalog module_name strings
+        the proposal would extend or patch (subset of catalog),
+      * ``cross_vertical_impact``: object keyed by module_name; each value is
+        the list of verticals that already consume that module (use the
+        ``deployed_in_verticals`` field of the catalog entry),
+      * ``breaking_change``: boolean — true if the change would break the
+        public API/schema for *any* of those verticals,
+      * ``compat_strategy``: one of ``extend`` / ``abstract_base`` /
+        ``feature_flag`` / ``fork_warning``.
 
 OUTPUT MUST BE STRICT JSON matching the schema injected below. Do NOT wrap
 the JSON in markdown code fences. Do NOT add commentary. If you are unsure
@@ -78,6 +89,9 @@ Language: {language}
 
 === AVAILABLE HUB MODULE CATALOG (JSON) ===
 {catalog_json}
+
+=== HUB MODULE CROSS-VERTICAL DEPLOYMENT (JSON) ===
+{cross_vertical_json}
 
 === EXPECTED RESPONSE SCHEMA ===
 {schema_json}
@@ -133,6 +147,16 @@ DEFAULT_JSON_SCHEMA = {
                     "severity": {"type": "string", "enum": ["must_have", "should_have", "nice_to_have"]},
                     "justification": {"type": "string"},
                     "related_section_ids": {"type": "array", "items": {"type": "integer"}},
+                    "affects_existing_modules": {"type": "array", "items": {"type": "string"}},
+                    "cross_vertical_impact": {
+                        "type": "object",
+                        "additionalProperties": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "breaking_change": {"type": "boolean"},
+                    "compat_strategy": {
+                        "type": "string",
+                        "enum": ["extend", "abstract_base", "feature_flag", "fork_warning"],
+                    },
                 },
             },
         },
@@ -171,6 +195,8 @@ class BrdAiAnalyzer:
         schema = self._load_schema(Param)
         catalog = self.env["custom.module.capability.entry"].sudo()._build_prompt_catalog()
         catalog_json = json.dumps(catalog, ensure_ascii=False)
+        cross_vertical = self._build_cross_vertical_context()
+        cross_vertical_json = json.dumps(cross_vertical, ensure_ascii=False)
 
         merged: dict[str, Any] = {"sections": [], "recommendations": [], "overall_fit_pct": 0}
         scored = 0
@@ -180,14 +206,31 @@ class BrdAiAnalyzer:
                 {"section_id": s.id, "title": s.title or "", "content": (s.content or "")[:3000]}
                 for s in batch
             ]
-            user_msg = user_template.format(
-                brd_name=brd_doc.name or "BRD",
-                business_domain=brd_doc.business_domain or "other",
-                language=brd_doc.language or "en",
-                sections_json=json.dumps(section_blob, ensure_ascii=False),
-                catalog_json=catalog_json,
-                schema_json=json.dumps(schema),
-            )
+            try:
+                user_msg = user_template.format(
+                    brd_name=brd_doc.name or "BRD",
+                    business_domain=brd_doc.business_domain or "other",
+                    language=brd_doc.language or "en",
+                    sections_json=json.dumps(section_blob, ensure_ascii=False),
+                    catalog_json=catalog_json,
+                    cross_vertical_json=cross_vertical_json,
+                    schema_json=json.dumps(schema),
+                )
+            except KeyError:
+                # Backward-compat: a previously-overridden template in
+                # ir.config_parameter may not know the new placeholder.
+                user_msg = user_template.format(
+                    brd_name=brd_doc.name or "BRD",
+                    business_domain=brd_doc.business_domain or "other",
+                    language=brd_doc.language or "en",
+                    sections_json=json.dumps(section_blob, ensure_ascii=False),
+                    catalog_json=catalog_json,
+                    schema_json=json.dumps(schema),
+                )
+                user_msg += (
+                    "\n\n=== HUB MODULE CROSS-VERTICAL DEPLOYMENT (JSON) ===\n"
+                    + cross_vertical_json
+                )
             response_text = self._call_ai(system_prompt=system_prompt, user_message=user_msg, catalog_json=catalog_json)
             parsed = self._parse_json_strict(response_text, system_prompt=system_prompt, user_message=user_msg, catalog_json=catalog_json)
             merged["sections"].extend(parsed.get("sections") or [])
@@ -201,6 +244,64 @@ class BrdAiAnalyzer:
 
         self._persist(brd_doc, merged)
         return merged
+
+    # ------------------------------------------------------------------
+    # Cross-vertical context builder
+    # ------------------------------------------------------------------
+
+    def _build_cross_vertical_context(self) -> list[dict]:
+        """Return a serializable view of the hub catalog with capability tags,
+        maturity and per-module list of verticals it is deployed in.
+
+        Format::
+
+            [
+                {"module_name": "custom_coretax",
+                 "category": "compliance",
+                 "maturity": "production",
+                 "tags": ["tax", "indonesia"],
+                 "deployed_in_verticals": ["retail", "fnb"]},
+                ...
+            ]
+
+        Graceful degradation:
+        * If ``custom.hub.module.catalog`` is not installed, returns ``[]``.
+        * If ``custom.hub.module.deployment`` is missing, leaves the verticals
+          list empty.
+        """
+        Catalog = self.env.get("custom.hub.module.catalog")
+        if Catalog is None:
+            return []
+        Catalog = Catalog.sudo()
+        Deployment = self.env.get("custom.hub.module.deployment")
+        deployments_by_catalog: dict[int, list[str]] = {}
+        if Deployment is not None:
+            for dep in Deployment.sudo().search([]):
+                cat = getattr(dep, "catalog_id", False)
+                if not cat:
+                    continue
+                vertical = (
+                    getattr(dep, "vertical_code", False)
+                    or getattr(dep, "tenant_code", False)
+                    or getattr(getattr(dep, "tenant_id", False), "code", False)
+                    or getattr(getattr(dep, "vertical_id", False), "code", False)
+                    or getattr(dep, "name", False)
+                )
+                if vertical:
+                    deployments_by_catalog.setdefault(cat.id, []).append(str(vertical))
+
+        rows: list[dict] = []
+        for entry in Catalog.search([]):
+            rows.append(
+                {
+                    "module_name": entry.module_name,
+                    "category": entry.category or "",
+                    "maturity": entry.maturity or "",
+                    "tags": entry.capability_tag_ids.mapped("technical_code") or entry.capability_tag_ids.mapped("name"),
+                    "deployed_in_verticals": sorted(set(deployments_by_catalog.get(entry.id, []))),
+                }
+            )
+        return rows
 
     # ------------------------------------------------------------------
     # AI gateway call
@@ -312,6 +413,9 @@ class BrdAiAnalyzer:
         Entry = self.env["custom.module.capability.entry"].sudo()
         Tag = self.env["custom.module.capability.tag"].sudo()
         Section = self.env["brd.document.section"].sudo()
+        Catalog = self.env.get("custom.hub.module.catalog")
+        if Catalog is not None:
+            Catalog = Catalog.sudo()
 
         # Wipe previous run to keep idempotency.
         brd_doc.analysis_ids.unlink()
@@ -353,6 +457,24 @@ class BrdAiAnalyzer:
             related = Section.browse([int(x) for x in (rec.get("related_section_ids") or []) if x]).filtered(
                 lambda s, brd=brd_doc: s.document_id.id == brd.id
             )
+            affects_names = rec.get("affects_existing_modules") or []
+            affects_ids: list[int] = []
+            if Catalog is not None and affects_names:
+                affects_ids = Catalog.search(
+                    [("module_name", "in", list(affects_names))]
+                ).ids
+            cross_map = rec.get("cross_vertical_impact")
+            cross_json = ""
+            if isinstance(cross_map, dict):
+                # Coerce values to list[str] for predictable storage.
+                clean = {
+                    str(k): [str(x) for x in (v if isinstance(v, list) else [])]
+                    for k, v in cross_map.items()
+                }
+                cross_json = json.dumps(clean, ensure_ascii=False)
+            compat = rec.get("compat_strategy")
+            if compat not in ("extend", "abstract_base", "feature_flag", "fork_warning"):
+                compat = False
             new_rec = Recommendation.create(
                 {
                     "document_id": brd_doc.id,
@@ -366,6 +488,10 @@ class BrdAiAnalyzer:
                     "estimated_md": int(rec.get("estimated_md") or 0),
                     "severity": rec.get("severity") or "should_have",
                     "justification": rec.get("justification") or "",
+                    "affects_existing_module_ids": [(6, 0, affects_ids)],
+                    "cross_vertical_impact_json": cross_json,
+                    "breaking_change": bool(rec.get("breaking_change")),
+                    "compat_strategy": compat,
                 }
             )
             name_to_rec[new_rec.name] = (new_rec, rec.get("depends_on_proposed") or [])
