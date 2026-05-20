@@ -19,3 +19,33 @@ def assert_valid_slug(slug: str) -> None:
             f"Invalid slug '{slug}': must match {SLUG_RE.pattern} "
             "(lowercase, start with letter, alphanumeric + underscore, length 2-63)"
         )
+
+
+# ---------------------------------------------------------------------------
+# Pydantic models reused across routers (Track D)
+# ---------------------------------------------------------------------------
+
+try:
+    from typing import Literal, Optional
+
+    from pydantic import BaseModel, Field
+
+    class ReplicateRequest(BaseModel):
+        """Body for POST /v1/backups/{backup_id}/replicate."""
+
+        target_tenant_slug: str = Field(min_length=2, max_length=63, pattern=SLUG_RE.pattern)
+        target_env: Literal["prod", "staging", "dev"] = "staging"
+        target_db: Optional[str] = Field(
+            default=None,
+            description="Override target DB name. Defaults to '<slug>_<env>'.",
+        )
+
+    class EnforceRetentionRequest(BaseModel):
+        """Body for POST /v1/backups/enforce-retention."""
+
+        tenant_slug: str = Field(min_length=2, max_length=63, pattern=SLUG_RE.pattern)
+        retention_days: int = Field(default=30, ge=1, le=3650)
+
+except ImportError:  # pragma: no cover — pydantic only required server-side
+    ReplicateRequest = None  # type: ignore[assignment]
+    EnforceRetentionRequest = None  # type: ignore[assignment]

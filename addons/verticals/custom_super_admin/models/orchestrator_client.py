@@ -122,3 +122,31 @@ class OrchestratorClient(models.AbstractModel):
             f"/v1/tenants/{slug}/backups/restore",
             body={"s3_key": s3_key, "target_db": target_db},
         )  # type: ignore[return-value]
+
+    @api.model
+    def replicate_backup(
+        self,
+        backup_id: int,
+        target_tenant_slug: str,
+        target_env: str = "staging",
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/v1/backups/{backup_id}/replicate",
+            body={
+                "target_tenant_slug": target_tenant_slug,
+                "target_env": target_env,
+            },
+        )  # type: ignore[return-value]
+
+    @api.model
+    def enforce_backup_retention(self, slug: str, retention_days: int) -> dict:
+        return self._request(
+            "POST",
+            "/v1/backups/enforce-retention",
+            body={"tenant_slug": slug, "retention_days": retention_days},
+        )  # type: ignore[return-value]
+
+    @api.model
+    def get_backup(self, backup_id: int) -> dict:
+        return self._request("GET", f"/v1/backups/{backup_id}")  # type: ignore[return-value]
