@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Server, Play, Trash2, RefreshCw, Cloud } from 'lucide-react';
 import { Badge, Button, Card, Modal, Section, Table, Tabs } from '../../components/ui';
+import EmptyState from '../../components/EmptyState';
+import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, spacing } from '../../tokens';
 import { bootstrapVps, deployStack, listVps } from '../../api';
 
@@ -14,23 +16,28 @@ interface Vps {
   grafana_dashboard_url?: string;
 }
 
-const MOCK: Vps[] = [
-  { id: 1, name: 'erajaya-prod-01', host: '10.20.30.41', state: 'live', region: 'jkt-1', envs: ['prod'], grafana_dashboard_url: 'https://grafana.local/d/erajaya' },
-  { id: 2, name: 'jds-staging', host: '10.20.30.42', state: 'bootstrapping', region: 'jkt-1', envs: ['staging'] },
-  { id: 3, name: 'arkaim-prod-01', host: '10.20.30.43', state: 'registered', region: 'sgp-1', envs: [] },
-];
-
 export default function VpsConsolePage() {
-  const [rows, setRows] = useState<Vps[]>(MOCK);
+  const [rows, setRows] = useState<Vps[]>([]);
   const [open, setOpen] = useState<Vps | null>(null);
   const [tab, setTab] = useState('info');
   const [log, setLog] = useState<string[]>(['[boot] waiting…']);
+  const [loaded, setLoaded] = useState(false);
+  const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
     listVps()
-      .then((r) => Array.isArray(r) && r.length && setRows(r as any))
-      .catch(() => {/* keep mock */});
+      .then((r) => {
+        if (Array.isArray(r)) setRows(r as any);
+        setLoaded(true);
+      })
+      .catch((err: any) => {
+        const msg = err?.detail || err?.message || String(err);
+        const configRequired =
+          /turnstile|api key|webhook secret|vault|prometheus|ANTHROPIC|requires config/i.test(msg);
+        setApiError({ message: msg, configRequired });
+        setLoaded(true);
+      });
   }, []);
 
   // Bootstrap log polling — placeholder.
@@ -44,6 +51,8 @@ export default function VpsConsolePage() {
     };
   }, [open, tab]);
 
+  const showEmpty = loaded && rows.length === 0;
+
   return (
     <Section
       title="VPS Console"
@@ -54,6 +63,21 @@ export default function VpsConsolePage() {
         </Button>
       }
     >
+      {apiError?.configRequired && (
+        <ConfigRequiredBanner feature="VPS console" hint={apiError.message} />
+      )}
+      {showEmpty ? (
+        <EmptyState
+          icon={<Server size={48} />}
+          title="No VPS registered"
+          description="Register the first VPS to start managing tenant infrastructure deployment."
+          action={
+            <Button>
+              <Server size={14} /> Register VPS
+            </Button>
+          }
+        />
+      ) : (
       <Table
         columns={[
           { key: 'name', label: 'Name' },
@@ -89,6 +113,7 @@ export default function VpsConsolePage() {
         ]}
         rows={rows}
       />
+      )}
 
       <Modal open={!!open} onClose={() => setOpen(null)} title={open ? `VPS: ${open.name}` : ''} width={900}>
         {open && (

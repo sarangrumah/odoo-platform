@@ -22,6 +22,8 @@ import {
   Cell,
 } from 'recharts';
 import { Badge, Button, Card, Tabs } from '../../components/ui';
+import EmptyState from '../../components/EmptyState';
+import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, radii, spacing } from '../../tokens';
 import { getJourney, listRecommendations } from '../../api';
 
@@ -39,35 +41,35 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
   const [tab, setTab] = useState('overview');
-  const [journey, setJourney] = useState<any>({
-    id: journeyId,
-    name: `J-2026-${String(journeyId).padStart(3, '0')}`,
-    partner_name: 'Erajaya Tower B',
-    vertical_target: 'residensia',
-    stage: 'brd_analyzed',
-    mandays_estimate: 42,
-    target_go_live: '2026-08-15',
-    ba_user_id: [3, 'Andi BA'],
-    notes: 'Initial intake from Yulianto (CEO). 5 towers, 1200 units total.',
-  });
-  const [recs, setRecs] = useState<any[]>([
-    { id: 1, name: 'Enable PDP masking on contact module', severity: 'critical', category: 'compliance', estimate_md: 3, status: 'open', rationale: 'PII exposure in default residential contact form.' },
-    { id: 2, name: 'Adopt custom_accounting_recurring for monthly IPL', severity: 'high', category: 'finance', estimate_md: 5, status: 'open', rationale: 'CE accounting lacks recurring template; needed for IPL invoicing.' },
-    { id: 3, name: 'Add Bupot Unifikasi to vendor payouts', severity: 'medium', category: 'tax', estimate_md: 4, status: 'open', rationale: 'PPh23 withholding required for security contractor.' },
-    { id: 4, name: 'Extend HHT scan for asset audit', severity: 'low', category: 'ops', estimate_md: 2, status: 'open' },
-  ]);
+  const [journey, setJourney] = useState<any>(null);
+  const [recs, setRecs] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
 
   useEffect(() => {
-    getJourney(journeyId)
-      .then((rows) => {
-        if (Array.isArray(rows) && rows[0]) setJourney(rows[0]);
-      })
-      .catch(() => {/* keep mock */});
-    listRecommendations(journeyId)
-      .then((rows) => {
-        if (Array.isArray(rows) && rows.length) setRecs(rows);
-      })
-      .catch(() => {/* keep mock */});
+    if (journeyId == null) {
+      setLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    const detectConfig = (msg: string) =>
+      /turnstile|api key|webhook secret|vault|prometheus|ANTHROPIC|requires config/i.test(msg);
+    Promise.all([
+      getJourney(journeyId).catch((e: any) => {
+        const msg = e?.detail || e?.message || String(e);
+        if (!cancelled) setApiError({ message: msg, configRequired: detectConfig(msg) });
+        return null;
+      }),
+      listRecommendations(journeyId).catch(() => null),
+    ]).then(([j, r]) => {
+      if (cancelled) return;
+      if (Array.isArray(j) && j[0]) setJourney(j[0]);
+      if (Array.isArray(r)) setRecs(r);
+      setLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [journeyId]);
 
   const severityCounts = useMemo(() => {
@@ -81,6 +83,30 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
     recs.forEach((r) => (acc[r.category] = (acc[r.category] || 0) + (r.estimate_md || 0)));
     return Object.entries(acc).map(([k, v]) => ({ category: k, md: v }));
   }, [recs]);
+
+  if (!loaded || journey === null) {
+    if (!loaded) {
+      return (
+        <div style={{ padding: spacing.lg, color: colors.textMuted, fontSize: 13 }}>Loading…</div>
+      );
+    }
+    return (
+      <div>
+        {apiError?.configRequired && (
+          <ConfigRequiredBanner feature="Journey workspace" hint={apiError.message} />
+        )}
+        <EmptyState
+          title="No journey selected"
+          description="Pick a journey from the onboarding pipeline to view its workspace."
+          action={
+            <Button onClick={onBack}>
+              <ArrowLeft size={14} /> Back to Pipeline
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', gap: spacing.lg, minHeight: '100%' }}>
