@@ -15,6 +15,12 @@
                         <field name="tenant_ids" widget="many2many_tags"
                                options="{'no_create': True}"/>
                     </group>
+                    <group string="Canary Rollout">
+                        <field name="enable_canary"/>
+                        <field name="target_environment_id"
+                               options="{'no_create': True}"
+                               invisible="not enable_canary"/>
+                    </group>
                     <group>
                         <field name="note" placeholder="Optional notes / change ticket reference"/>
                         <field name="confirmed"/>
