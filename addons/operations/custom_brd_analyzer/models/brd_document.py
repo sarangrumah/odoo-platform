@@ -127,6 +127,18 @@ class BrdDocument(models.Model):
         "res.users", default=lambda self: self.env.user, tracking=True, string="Owner"
     )
 
+    # Diagnostics — last raw AI response (truncated) + counts. Surfaced to UI
+    # so BAs can see why an analyze yielded 0 recommendations.
+    last_ai_raw = fields.Text(
+        string="Last AI Raw Response",
+        readonly=True,
+        copy=False,
+        help="Truncated raw response from the last AI analyze call. For diagnostics.",
+    )
+    last_ai_at = fields.Datetime(string="Last AI Run", readonly=True, copy=False)
+    last_ai_section_count = fields.Integer(string="Sections Analyzed (last run)", readonly=True, copy=False)
+    last_ai_recommendation_count = fields.Integer(string="Recommendations (last run)", readonly=True, copy=False)
+
     # ------------------------------------------------------------------
     # Computes
     # ------------------------------------------------------------------

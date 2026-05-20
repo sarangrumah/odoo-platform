@@ -21,7 +21,7 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { Badge, Button, Card, Tabs } from '../../components/ui';
+import { Badge, Button, Card, Spinner, Tabs } from '../../components/ui';
 import EmptyState from '../../components/EmptyState';
 import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, radii, spacing } from '../../tokens';
@@ -87,16 +87,35 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
   useEffect(() => { refresh(); }, [journeyId]);
 
   async function doExtract(id: number) {
-    setBusyBrd(id); setActionMsg(null);
-    try { await runBrdExtract(id); setActionMsg('Extract completed.'); refresh(); }
+    setBusyBrd(id); setActionMsg('Extract running…');
+    try { await runBrdExtract(id); setActionMsg('Extract completed. State now extracted.'); refresh(); }
     catch (e: any) { setActionMsg('Extract failed: ' + (e?.detail || e?.message || e)); }
     finally { setBusyBrd(null); }
   }
   async function doAnalyze(id: number) {
-    setBusyBrd(id); setActionMsg(null);
-    try { await runBrdAnalyze(id); setActionMsg('AI analysis dispatched. Reload tab in a moment.'); refresh(); }
-    catch (e: any) { setActionMsg('Analyze failed: ' + (e?.detail || e?.message || e)); }
-    finally { setBusyBrd(null); }
+    setBusyBrd(id); setActionMsg('AI analysis running — typically 30–90 seconds. Do not navigate away.');
+    try {
+      await runBrdAnalyze(id);
+      // Pull fresh BRD state so counts + diagnostic land in the UI.
+      const fresh = await listBrdDocuments(journeyId!);
+      const me = (fresh || []).find((x: any) => x.id === id);
+      if (me && me.state === 'analyzed') {
+        const secs = me.last_ai_section_count || 0;
+        const recs = me.last_ai_recommendation_count || 0;
+        setActionMsg(
+          recs > 0
+            ? `AI analysis complete: ${secs} sections analyzed, ${recs} recommendations created. Open the Recommendations tab.`
+            : `AI ran but returned ${secs} sections / ${recs} recommendations. See the diagnostic dump on the BRD card below.`,
+        );
+      } else {
+        setActionMsg('AI analysis dispatched.');
+      }
+      refresh();
+    } catch (e: any) {
+      setActionMsg('Analyze failed: ' + (e?.detail || e?.message || e));
+    } finally {
+      setBusyBrd(null);
+    }
   }
 
   const severityCounts = useMemo(() => {
@@ -295,16 +314,27 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
                       )}
                       {b.severity_summary && <Badge>{b.severity_summary}</Badge>}
                       {b.business_domain && <Badge>{b.business_domain}</Badge>}
+                      {b.last_ai_at && (
+                        <Badge tone="info">
+                          last run: {new Date(b.last_ai_at).toLocaleString()} ·
+                          {' '}{b.last_ai_section_count || 0} secs ·
+                          {' '}{b.last_ai_recommendation_count || 0} recs
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch', minWidth: 170 }}>
                     <Button
                       variant="secondary"
                       size="sm"
                       disabled={busyBrd === b.id}
                       onClick={() => doExtract(b.id)}
                     >
-                      {busyBrd === b.id ? '…' : '1. Extract'}
+                      {busyBrd === b.id ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <Spinner size={10} /> Extracting…
+                        </span>
+                      ) : '1. Extract'}
                     </Button>
                     <Button
                       size="sm"
@@ -312,10 +342,33 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
                       onClick={() => doAnalyze(b.id)}
                       title={b.state === 'draft' ? 'Run Extract first' : 'Run AI analysis'}
                     >
-                      {busyBrd === b.id ? '…' : '2. Run AI Analyze'}
+                      {busyBrd === b.id ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <Spinner size={10} /> AI analyzing…
+                        </span>
+                      ) : '2. Run AI Analyze'}
                     </Button>
                   </div>
                 </div>
+
+                {/* Diagnostic dump: visible after Analyze runs. Lets BA see exactly
+                    what came back from the model when recommendations = 0. */}
+                {b.last_ai_raw && (
+                  <details style={{ marginTop: 12 }}>
+                    <summary style={{ cursor: 'pointer', fontSize: 12, color: colors.textMuted }}>
+                      Raw AI response (last run · click to expand · for diagnosis)
+                    </summary>
+                    <pre style={{
+                      background: '#0b1220', color: '#e6edf7',
+                      padding: 12, borderRadius: 6, marginTop: 8,
+                      fontSize: 11, lineHeight: 1.4, maxHeight: 360,
+                      overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    }}>
+                      {String(b.last_ai_raw).slice(0, 12000)}
+                      {String(b.last_ai_raw).length > 12000 ? '\n…(truncated, full text in Odoo brd.document.last_ai_raw)' : ''}
+                    </pre>
+                  </details>
+                )}
               </Card>
             ))}
           </div>

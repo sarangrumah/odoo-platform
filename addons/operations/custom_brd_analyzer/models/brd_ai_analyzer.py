@@ -25,6 +25,7 @@ import logging
 import re
 from typing import Any
 
+from odoo import fields
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -201,6 +202,7 @@ class BrdAiAnalyzer:
         merged: dict[str, Any] = {"sections": [], "recommendations": [], "overall_fit_pct": 0}
         scored = 0
         fit_total = 0
+        raw_responses: list[str] = []  # for diagnostics
         for batch in self._chunk(sections, _SECTION_BATCH_SIZE):
             section_blob = [
                 {"section_id": s.id, "title": s.title or "", "content": (s.content or "")[:3000]}
@@ -232,15 +234,31 @@ class BrdAiAnalyzer:
                     + cross_vertical_json
                 )
             response_text = self._call_ai(system_prompt=system_prompt, user_message=user_msg, catalog_json=catalog_json)
+            raw_responses.append(response_text or "")
+            _logger.info(
+                "brd_ai_analyzer: batch response_text length=%d preview=%s",
+                len(response_text or ""),
+                (response_text or "")[:500].replace("\n", " "),
+            )
             parsed = self._parse_json_strict(response_text, system_prompt=system_prompt, user_message=user_msg, catalog_json=catalog_json)
-            merged["sections"].extend(parsed.get("sections") or [])
-            merged["recommendations"].extend(parsed.get("recommendations") or [])
+            batch_secs = parsed.get("sections") or []
+            batch_recs = parsed.get("recommendations") or []
+            _logger.info(
+                "brd_ai_analyzer: parsed batch -> %d sections, %d recommendations",
+                len(batch_secs), len(batch_recs),
+            )
+            merged["sections"].extend(batch_secs)
+            merged["recommendations"].extend(batch_recs)
             if parsed.get("overall_fit_pct") is not None:
                 fit_total += int(parsed["overall_fit_pct"])
                 scored += 1
 
         if scored:
             merged["overall_fit_pct"] = int(fit_total / scored)
+
+        # Stash diagnostics on the document so the UI can surface them even
+        # when AI returns empty arrays.
+        merged["_raw_responses"] = raw_responses
 
         self._persist(brd_doc, merged)
         return merged
@@ -505,4 +523,15 @@ class BrdAiAnalyzer:
             if sibs:
                 rec_rec.write({"depends_on_proposed_ids": [(6, 0, sibs)]})
 
-        brd_doc.write({"state": "analyzed"})
+        # Persist diagnostic fields (truncated raw for UI surfacing).
+        raw_responses = parsed.get("_raw_responses") or []
+        raw_dump = "\n\n--- BATCH ---\n\n".join(raw_responses)
+        if len(raw_dump) > 60000:
+            raw_dump = raw_dump[:60000] + "\n…(truncated)"
+        brd_doc.write({
+            "state": "analyzed",
+            "last_ai_raw": raw_dump or False,
+            "last_ai_at": fields.Datetime.now(),
+            "last_ai_section_count": len(parsed.get("sections") or []),
+            "last_ai_recommendation_count": len(parsed.get("recommendations") or []),
+        })

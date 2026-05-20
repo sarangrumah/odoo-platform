@@ -167,7 +167,8 @@ export const listBrdDocuments = (journeyId: number) =>
   jsonrpc<any[]>('brd.document', 'search_read', [[['journey_id', '=', journeyId]]], {
     fields: ['id', 'name', 'reference', 'document_filename', 'document_mime',
              'state', 'overall_fit_pct', 'severity_summary',
-             'business_domain', 'language', 'create_date'],
+             'business_domain', 'language', 'create_date',
+             'last_ai_raw', 'last_ai_at', 'last_ai_section_count', 'last_ai_recommendation_count'],
     limit: 50,
     order: 'create_date desc',
   });
