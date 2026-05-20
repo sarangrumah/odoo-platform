@@ -315,8 +315,22 @@ app.post('/api/auth/logout', async (req, res) => {
 // Static SPA + healthcheck. All non-/api routes fall through to index.html.
 // ---------------------------------------------------------------------------
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
-app.use(express.static(DIST_DIR, { index: false, maxAge: '1h' }));
-app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(DIST_DIR, 'index.html')));
+// Hashed asset bundles get long cache; everything else (incl. index.html via
+// SPA fallback) must NOT be cached so a fresh deploy lands without Ctrl+F5.
+app.use(express.static(DIST_DIR, {
+  index: false,
+  setHeaders(res, filePath) {
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  },
+}));
+app.get(/^(?!\/api\/).*/, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(DIST_DIR, 'index.html'));
+});
 
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
