@@ -26,6 +26,7 @@ _logger = logging.getLogger(__name__)
 class TenantRegistry(models.Model):
     _name = "tenant.registry"
     _description = "Tenant Registry (mirror of master DB tenant_registry.tenants)"
+    _inherit = ["mail.thread"]
     _order = "state, slug"
 
     slug = fields.Char(required=True, index=True, copy=False)
@@ -62,6 +63,25 @@ class TenantRegistry(models.Model):
     notes = fields.Text()
     sync_error = fields.Text(
         help="Last error returned by the orchestrator for an action on this tenant"
+    )
+
+    # Backup scheduling / replication (Track D)
+    backup_schedule = fields.Char(
+        default="0 2 * * *",
+        help="Standard 5-field cron expression for scheduled backups (UTC). "
+             "Default: daily at 02:00 UTC.",
+    )
+    backup_retention_days = fields.Integer(
+        default=30,
+        help="How many days to retain backups before they are eligible for pruning.",
+    )
+    pitr_enabled = fields.Boolean(
+        default=False,
+        help="Point-in-time-recovery toggle (uses WAL archiving when enabled).",
+    )
+    last_scheduled_backup_at = fields.Datetime(
+        readonly=True,
+        help="Timestamp of the most recent backup triggered by the scheduler.",
     )
 
     _slug_uniq = models.Constraint(
@@ -194,6 +214,20 @@ class TenantRegistry(models.Model):
             "view_mode": "form",
             "target": "new",
             "context": {"default_tenant_id": self.id, "default_slug": self.slug},
+        }
+
+    def action_open_replicate_wizard(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Replicate to Staging"),
+            "res_model": "tenant.replicate.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_source_tenant_id": self.id,
+                "default_target_tenant_id": self.id,
+            },
         }
 
     def action_open_grafana(self):

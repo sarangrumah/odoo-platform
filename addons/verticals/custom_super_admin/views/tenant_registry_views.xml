@@ -92,6 +92,10 @@
                             string="Restore..."
                             type="object"
                             invisible="state == 'archived'"/>
+                    <button name="action_open_replicate_wizard"
+                            string="Replicate to Staging"
+                            type="object"
+                            invisible="state not in ('active', 'suspended')"/>
                     <button name="action_open_grafana"
                             string="Grafana ↗"
                             type="object"
@@ -139,6 +143,21 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Backup &amp; Replication">
+                            <group>
+                                <group string="Schedule">
+                                    <field name="backup_schedule"
+                                           placeholder="0 2 * * *"
+                                           help="5-field cron expression (UTC)."/>
+                                    <field name="backup_retention_days"/>
+                                    <field name="pitr_enabled"/>
+                                </group>
+                                <group string="Status">
+                                    <field name="last_backup_at" readonly="1"/>
+                                    <field name="last_scheduled_backup_at" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
                         <page string="Notes">
                             <field name="notes" placeholder="Operational notes about this tenant..."/>
                         </page>

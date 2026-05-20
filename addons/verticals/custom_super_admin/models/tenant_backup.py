@@ -4,12 +4,19 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
+
+try:
+    from croniter import croniter  # type: ignore
+    _HAS_CRONITER = True
+except ImportError:  # pragma: no cover
+    croniter = None  # type: ignore
+    _HAS_CRONITER = False
 
 
 class TenantBackup(models.Model):
@@ -105,6 +112,126 @@ class TenantBackup(models.Model):
             return datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
         except ValueError:
             return False
+
+    # ------------------------------------------------------------------
+    # Scheduled backups (Track D)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _cron_scheduled_backup(self) -> None:
+        """Iterate active tenants and trigger backups whose cron is due.
+
+        Runs every 15 minutes via ir.cron. For each active tenant with a
+        ``backup_schedule`` cron expression, evaluate against
+        ``last_scheduled_backup_at`` and trigger the orchestrator if due.
+        """
+        now = fields.Datetime.now()
+        tenants = self.env["tenant.registry"].sudo().search([
+            ("state", "=", "active"),
+            ("backup_schedule", "!=", False),
+        ])
+        client = self.env["custom.super.admin.orchestrator.client"].sudo()
+        for tenant in tenants:
+            schedule = (tenant.backup_schedule or "").strip()
+            if not schedule:
+                continue
+            base = tenant.last_scheduled_backup_at or (now - timedelta(days=1))
+            try:
+                due = self._cron_is_due(schedule, base, now)
+            except Exception as e:  # bad cron expression — log on tenant and skip
+                _logger.warning(
+                    "tenant.backup.cron_parse_failed slug=%s expr=%r err=%s",
+                    tenant.slug, schedule, e,
+                )
+                tenant.message_post(
+                    body=_("Invalid backup_schedule cron expression %r: %s") % (schedule, e),
+                )
+                continue
+            if not due:
+                continue
+            try:
+                result = client.run_backup(tenant.slug, kind="daily")
+                tenant.sudo().write({"last_scheduled_backup_at": now})
+                self._cron_sync_for(tenant.slug)
+                _logger.info(
+                    "tenant.backup.scheduled.ok slug=%s key=%s",
+                    tenant.slug, (result or {}).get("s3_key"),
+                )
+            except Exception as e:
+                _logger.exception("tenant.backup.scheduled.failed slug=%s", tenant.slug)
+                try:
+                    tenant.message_post(
+                        body=_("Scheduled backup failed: %s") % e,
+                    )
+                except Exception:  # noqa: BLE001 — never let logging break the loop
+                    pass
+
+    @api.model
+    def _cron_enforce_retention(self) -> None:
+        """Ask the orchestrator to prune backups older than retention_days per tenant."""
+        tenants = self.env["tenant.registry"].sudo().search([
+            ("state", "in", ("active", "suspended")),
+            ("backup_retention_days", ">", 0),
+        ])
+        client = self.env["custom.super.admin.orchestrator.client"].sudo()
+        for tenant in tenants:
+            try:
+                client.enforce_backup_retention(tenant.slug, tenant.backup_retention_days)
+                self._cron_sync_for(tenant.slug)
+            except Exception as e:
+                _logger.warning(
+                    "tenant.backup.retention.failed slug=%s err=%s", tenant.slug, e,
+                )
+                try:
+                    tenant.message_post(
+                        body=_("Retention enforcement failed: %s") % e,
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+
+    @staticmethod
+    def _cron_is_due(expr: str, base: datetime, now: datetime) -> bool:
+        """Return True if a cron expression fires between ``base`` (exclusive) and ``now`` (inclusive)."""
+        if _HAS_CRONITER:
+            it = croniter(expr, base)
+            nxt = it.get_next(datetime)
+            return nxt <= now
+        # Minimal fallback for "min hour dom mon dow" with '*' or single integer fields.
+        parts = expr.split()
+        if len(parts) != 5:
+            raise ValueError(f"Unsupported cron expression: {expr!r}")
+        minute, hour, dom, mon, dow = parts
+
+        def _match(field: str, value: int) -> bool:
+            if field == "*":
+                return True
+            if field.startswith("*/"):
+                try:
+                    step = int(field[2:])
+                    return step > 0 and value % step == 0
+                except ValueError:
+                    return False
+            try:
+                return int(field) == value
+            except ValueError:
+                return False
+
+        # Walk minute by minute from base+1min to now (cap iterations for safety).
+        cur = base.replace(second=0, microsecond=0) + timedelta(minutes=1)
+        ceiling = now.replace(second=0, microsecond=0)
+        steps = 0
+        while cur <= ceiling and steps < 24 * 60 * 31:  # at most ~1 month of minutes
+            if (
+                _match(minute, cur.minute)
+                and _match(hour, cur.hour)
+                and _match(dom, cur.day)
+                and _match(mon, cur.month)
+                and _match(dow, cur.weekday() + 1 if cur.weekday() < 6 else 0)
+            ):
+                return True
+            cur += timedelta(minutes=1)
+            steps += 1
+        return False
 
     # ------------------------------------------------------------------
     # Restore action
