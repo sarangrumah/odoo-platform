@@ -35,6 +35,7 @@ auto-transitioned to ``deployed``.
         "custom_brd_analyzer",
         "custom_onboarding_journey",
     ],
+    "capability_tags": ["audit-trail", "approval-workflow", "multi-tenant"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

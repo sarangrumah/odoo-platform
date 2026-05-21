@@ -9,7 +9,7 @@ from odoo.exceptions import UserError
 
 class CustomWitholdingApplication(models.Model):
     _name = "custom.witholding.application"
-    _inherit = ["pdp.audited.mixin"]
+    _inherit = ["pdp.audited.mixin", "mail.thread", "mail.activity.mixin"]
     _description = "PPh Witholding Application Log"
     _order = "create_date desc, id desc"
 

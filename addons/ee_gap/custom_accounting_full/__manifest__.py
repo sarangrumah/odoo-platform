@@ -55,6 +55,7 @@ elimination journal entry is written to ``pdp.audit_log`` via the
         "purchase",
         "mail",
     ],
+    "capability_tags": ["accounting", "intercompany", "consolidation", "audit-trail", "approval-workflow"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

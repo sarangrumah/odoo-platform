@@ -65,8 +65,12 @@ class FakturPenggantiWizard(models.TransientModel):
 
     @staticmethod
     def _extract_kode_status(move) -> int | None:
-        """Pull kode status from existing NSFP (positions 3-4) or return 0."""
-        nsfp = getattr(move, "nsfp", None)
+        """Pull kode status from explicit stamp (replacement chain) falling back to NSFP positions 3-4."""
+        # If the source move is itself a pengganti, its previous kode_status was already stamped.
+        stamped = getattr(move, "x_custom_coretax_kode_status", None)
+        if stamped and stamped.isdigit():
+            return int(stamped)
+        nsfp = getattr(move, "x_custom_nsfp", None)
         if not nsfp:
             return 0
         cleaned = nsfp.replace("-", "").replace(".", "").strip()
@@ -105,16 +109,17 @@ class FakturPenggantiWizard(models.TransientModel):
             "x_custom_coretax_replaced_by_id": copy.id,
         })
         # Best-effort: clear source NSFP since DJP voids it on pengganti approval
-        if hasattr(src, "nsfp"):
-            src.write({"nsfp": False})
-        if hasattr(src, "coretax_status"):
-            src.write({"coretax_status": "rejected_djp"})  # logical 'replaced' bucket
+        if hasattr(src, "x_custom_nsfp"):
+            src.write({"x_custom_nsfp": False})
+        if hasattr(src, "x_custom_coretax_status"):
+            src.write({"x_custom_coretax_status": "rejected"})  # logical 'replaced' bucket
 
-        # Audit
+        # Audit (action constrained to pdp.audit_log allowed values + varchar(16))
         try:
             src._pdp_audit_write(
-                "faktur_pengganti_issued", src.id,
+                "custom", src.id,
                 {
+                    "kind": "faktur_pengganti_issued",
                     "new_move_id": copy.id,
                     "kode_status_new": f"{current_kode + 1:02d}",
                     "reason": self.reason,

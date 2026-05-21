@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Top-level app menu (custom_core root is the safe anchor) -->
+    <menuitem id="menu_ecommerce_id_root"
+              name="eCommerce ID"
+              sequence="60"
+              groups="custom_ecommerce.group_user"/>
+
+    <menuitem id="menu_ecommerce_id_couriers"
+              name="Couriers ID"
+              parent="menu_ecommerce_id_root"
+              action="action_custom_ecommerce_courier"
+              sequence="10"/>
+
+    <!-- Also mount under Custom root for unified navigation -->
+    <menuitem id="menu_ecommerce_id_in_custom"
+              name="Couriers ID"
+              parent="custom_core.menu_custom_root"
+              action="action_custom_ecommerce_courier"
+              sequence="60"
+              groups="custom_ecommerce.group_manager"/>
+</odoo>

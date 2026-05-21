@@ -11,6 +11,7 @@ share-link generation (token-protected), and PDP audit + classification.
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_audit", "custom_pdp_core", "mail", "portal"],
+    "capability_tags": ["pdp", "audit-trail", "knowledge"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

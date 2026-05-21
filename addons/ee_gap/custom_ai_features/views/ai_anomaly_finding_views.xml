@@ -72,7 +72,7 @@
                 <filter name="new" string="New" domain="[('state','=','new')]"/>
                 <filter name="critical" string="Critical" domain="[('severity','=','critical')]"/>
                 <filter name="warning" string="Warning" domain="[('severity','=','warning')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="by_severity" string="Severity" context="{'group_by': 'severity'}"/>
                     <filter name="by_model" string="Source Model" context="{'group_by': 'res_model'}"/>
                     <filter name="by_state" string="State" context="{'group_by': 'state'}"/>

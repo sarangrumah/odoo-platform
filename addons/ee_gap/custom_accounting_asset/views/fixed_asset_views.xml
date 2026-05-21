@@ -163,14 +163,14 @@
                         domain="[('state','=','running')]"/>
                 <filter name="state_disposed" string="Disposed"
                         domain="[('state','=','disposed')]"/>
-                <group expand="0" string="Group By">
+                
                     <filter name="group_group" string="Group"
                             context="{'group_by':'group_id'}"/>
                     <filter name="group_location" string="Location"
                             context="{'group_by':'location_id'}"/>
                     <filter name="group_state" string="State"
                             context="{'group_by':'state'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

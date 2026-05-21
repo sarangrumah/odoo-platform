@@ -11,21 +11,18 @@
         <!-- User: can submit approval requests, sees own pending approvals -->
         <record id="group_approval_user" model="res.groups">
             <field name="name">Approval User</field>
-            <field name="category_id" ref="module_category_approval"/>
             <field name="comment">May submit approval requests against records they own.</field>
         </record>
 
         <!-- Manager: can approve / reject / cancel, manage own delegations -->
         <record id="group_approval_manager" model="res.groups">
             <field name="name">Approval Manager</field>
-            <field name="category_id" ref="module_category_approval"/>
             <field name="implied_ids" eval="[Command.link(ref('group_approval_user'))]"/>
         </record>
 
         <!-- Admin: design matrices, see all delegations + OOO -->
         <record id="group_approval_admin" model="res.groups">
             <field name="name">Approval Admin</field>
-            <field name="category_id" ref="module_category_approval"/>
             <field name="implied_ids" eval="[Command.link(ref('group_approval_manager'))]"/>
         </record>
 

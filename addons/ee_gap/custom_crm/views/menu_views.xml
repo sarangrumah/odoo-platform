@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Mount under Custom root only (CRM already has its own top-level app menu) -->
+    <menuitem id="menu_crm_leads_in_custom"
+              name="CRM Leads"
+              parent="custom_core.menu_custom_root"
+              action="crm.crm_lead_all_leads"
+              sequence="45"
+              groups="custom_crm.group_user"/>
+
+    <menuitem id="menu_crm_lead_mining"
+              name="Lead Mining"
+              parent="custom_core.menu_custom_root"
+              action="action_custom_crm_lead_mining_request"
+              sequence="46"
+              groups="custom_crm.group_user"/>
+
+    <menuitem id="menu_crm_web_form_tokens"
+              name="Web-Form Tokens"
+              parent="custom_core.menu_custom_root"
+              action="action_custom_crm_web_form_token"
+              sequence="47"
+              groups="custom_crm.group_manager"/>
+
+    <!-- Also surface inside the CRM app for sales managers who live there -->
+    <menuitem id="menu_crm_lead_mining_in_crm"
+              name="Lead Mining"
+              parent="crm.crm_menu_root"
+              action="action_custom_crm_lead_mining_request"
+              sequence="100"
+              groups="custom_crm.group_user"/>
+</odoo>

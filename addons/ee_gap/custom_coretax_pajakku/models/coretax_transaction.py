@@ -117,11 +117,11 @@ class CoretaxTransaction(models.Model):
             vals["response_pdf"] = base64.b64encode(response_pdf)
             vals["response_pdf_filename"] = f"{self.external_uuid}-approval.pdf"
         self.write(vals)
-        # Push NSFP back to the source document
-        if self.account_move_id and hasattr(self.account_move_id, "nsfp"):
-            self.account_move_id.sudo().write({"nsfp": nsfp})
-            if hasattr(self.account_move_id, "coretax_status"):
-                self.account_move_id.sudo().write({"coretax_status": "approved"})
+        # Push NSFP back to the source document (custom_coretax extends account.move with x_custom_nsfp / x_custom_coretax_status)
+        if self.account_move_id and hasattr(self.account_move_id, "x_custom_nsfp"):
+            self.account_move_id.sudo().write({"x_custom_nsfp": nsfp})
+            if hasattr(self.account_move_id, "x_custom_coretax_status"):
+                self.account_move_id.sudo().write({"x_custom_coretax_status": "approved"})
         if self.bukti_potong_id and hasattr(self.bukti_potong_id, "no_bupot"):
             self.bukti_potong_id.sudo().write({"no_bupot": nsfp})
         self._pdp_audit_write("coretax_pajakku_approved", self.id,

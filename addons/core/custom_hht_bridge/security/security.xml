@@ -1,24 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- License: LGPL-3 -->
 <odoo noupdate="0">
-
-    <record id="module_category_hht" model="ir.module.category">
-        <field name="name">Handheld Terminal</field>
-        <field name="description">Access management for HHT bridge / PWA shell.</field>
-        <field name="sequence">25</field>
-    </record>
-
     <record id="group_hht_operator" model="res.groups">
         <field name="name">HHT Operator</field>
-        <field name="category_id" ref="module_category_hht"/>
         <field name="comment">Can use the PWA, view scan events of own device.</field>
     </record>
 
     <record id="group_hht_admin" model="res.groups">
         <field name="name">HHT Administrator</field>
-        <field name="category_id" ref="module_category_hht"/>
         <field name="implied_ids" eval="[(4, ref('group_hht_operator'))]"/>
-        <field name="users" eval="[(4, ref('base.user_admin'))]"/>
+        <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
         <field name="comment">Full control of devices, secrets, and global scan events.</field>
     </record>
 

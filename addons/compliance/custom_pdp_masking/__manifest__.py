@@ -16,6 +16,7 @@
         "custom_coretax_bupot",
         "custom_pph_witholding",
     ],
+    "capability_tags": ["pdp", "compliance", "audit-trail", "masking"],
     "data": [
         "security/pdp_security.xml",
         "security/ir.model.access.csv",

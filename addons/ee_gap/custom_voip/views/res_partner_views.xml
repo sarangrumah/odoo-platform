@@ -13,7 +13,7 @@
             </xpath>
             <xpath expr="//field[@name='phone']" position="after">
                 <button name="action_voip_call" type="object" string="📞 Call"
-                        class="btn-link" invisible="not phone and not mobile"/>
+                        class="btn-link" invisible="not phone"/>
             </xpath>
         </field>
     </record>

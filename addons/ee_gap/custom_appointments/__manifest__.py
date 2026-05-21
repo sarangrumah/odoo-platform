@@ -20,6 +20,7 @@ Each booking becomes a calendar.event on the assigned resource.
         "portal",
         "website",
     ],
+    "capability_tags": ["appointment-booking", "calendar", "pdp", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_account_list" model="ir.ui.view">
+        <field name="name">whatsapp.account.list</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <list string="WhatsApp Accounts">
+                <field name="name"/>
+                <field name="provider"/>
+                <field name="phone_number_id"/>
+                <field name="business_account_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="sandbox_mode" widget="boolean_toggle"/>
+                <field name="is_active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_account_form" model="ir.ui.view">
+        <field name="name">whatsapp.account.form</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp Account">
+                <header>
+                    <button name="action_test_connection" type="object"
+                            string="Test Connection" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="e.g. Main Sales Number"/></h1>
+                    </div>
+                    <group>
+                        <group string="Provider">
+                            <field name="provider"/>
+                            <field name="is_active"/>
+                            <field name="sandbox_mode"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Credentials">
+                            <field name="phone_number_id"/>
+                            <field name="business_account_id"/>
+                            <field name="access_token" groups="custom_whatsapp.group_manager"/>
+                            <field name="webhook_verify_token" groups="custom_whatsapp.group_manager"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_account_search" model="ir.ui.view">
+        <field name="name">whatsapp.account.search</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <search string="WhatsApp Accounts">
+                <field name="name"/>
+                <field name="phone_number_id"/>
+                <field name="business_account_id"/>
+                <filter name="active" string="Active" domain="[('is_active','=',True)]"/>
+                <filter name="sandbox" string="Sandbox" domain="[('sandbox_mode','=',True)]"/>
+                <separator/>
+                <filter name="group_provider" string="Provider" context="{'group_by':'provider'}"/>
+                <filter name="group_company" string="Company" context="{'group_by':'company_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_account" model="ir.actions.act_window">
+        <field name="name">WhatsApp Accounts</field>
+        <field name="res_model">whatsapp.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_whatsapp_account_search"/>
+    </record>
+</odoo>

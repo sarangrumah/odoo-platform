@@ -40,14 +40,17 @@ class ResPartnerCreditLimit(models.Model):
     # Spec-aligned aliases (related fields)
     credit_limit_check_method = fields.Selection(
         related="custom_credit_limit_check_method", readonly=False, store=True,
+        string="Credit Check Method (Spec)",
     )
     outstanding_amount = fields.Monetary(
         compute="_compute_custom_credit_metrics",
         currency_field="currency_id",
+        string="Outstanding (Spec)",
     )
     available_credit = fields.Monetary(
         compute="_compute_custom_credit_metrics",
         currency_field="currency_id",
+        string="Available Credit (Spec)",
     )
 
     @api.depends("custom_credit_limit")
@@ -96,8 +99,8 @@ class CreditCheckLog(models.Model):
     )
     note = fields.Text()
     # Spec-aligned aliases
-    checked_by_id = fields.Many2one(related="checked_by", store=False)
-    reason = fields.Text(related="note", readonly=False)
+    checked_by_id = fields.Many2one(related="checked_by", store=False, string="Checked By (Spec)")
+    reason = fields.Text(related="note", readonly=False, string="Note (Spec)")
 
     def _pdp_audit_classification(self):
         return "financial"

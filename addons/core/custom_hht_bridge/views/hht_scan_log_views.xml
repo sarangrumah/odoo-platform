@@ -46,7 +46,7 @@
                     </group>
                     <group string="Diagnostics">
                         <field name="error_message"/>
-                        <field name="payload" widget="ace" options="{'mode': 'json'}"/>
+                        <field name="payload" widget="ace" options="{'mode': 'javascript'}"/>
                     </group>
                 </sheet>
             </form>
@@ -65,11 +65,11 @@
                 <filter string="Errors" name="f_err" domain="[('result', '=', 'error')]"/>
                 <filter string="Today" name="f_today"
                         domain="[('scanned_at', '&gt;=', (context_today()).strftime('%Y-%m-%d'))]"/>
-                <group expand="0" string="Group By">
+                
                     <filter string="Device" name="g_device" context="{'group_by': 'device_id'}"/>
                     <filter string="Action" name="g_action" context="{'group_by': 'action'}"/>
                     <filter string="Date" name="g_date" context="{'group_by': 'scanned_at:day'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

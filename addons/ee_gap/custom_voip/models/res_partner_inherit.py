@@ -18,7 +18,7 @@ class ResPartner(models.Model):
 
     def action_voip_call(self):
         self.ensure_one()
-        target_number = self.phone or self.mobile
+        target_number = self.phone
         if not target_number:
             return False
         return self.env["voip.call"].log_outbound(

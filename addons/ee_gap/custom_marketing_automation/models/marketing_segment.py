@@ -13,6 +13,7 @@ class MarketingSegment(models.Model):
     name = fields.Char(required=True)
     model_id = fields.Many2one(
         "ir.model", required=True,
+        ondelete="cascade",
         domain="[('model', 'in', ('res.partner',))]",
         default=lambda s: s.env.ref("base.model_res_partner").id,
     )

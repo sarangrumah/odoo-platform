@@ -123,12 +123,12 @@
                         domain="[('category', '=', 'operations')]"/>
                 <filter string="Vertical" name="cat_vertical"
                         domain="[('category', '=', 'vertical')]"/>
-                <group expand="0" string="Group By">
+                
                     <filter string="Category" name="g_cat"
                             context="{'group_by': 'category'}"/>
                     <filter string="Maturity" name="g_mat"
                             context="{'group_by': 'maturity'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

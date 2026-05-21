@@ -25,4 +25,7 @@ class DocumentWorkspace(models.Model):
     active = fields.Boolean(default=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
 
-    _sql_constraints = [("code_uniq", "unique(code)", "Workspace code must be unique.")]
+    _code_uniq = models.Constraint(
+        'unique(code)',
+        'Workspace code must be unique.',
+    )

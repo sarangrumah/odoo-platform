@@ -19,6 +19,7 @@ Provides:
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_audit"],
+    "capability_tags": ["audit-trail", "multi-tenant", "approval-workflow"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

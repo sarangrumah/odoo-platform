@@ -22,7 +22,7 @@
                 <field name="metric"/>
                 <filter name="last_hour" string="Last hour"
                         domain="[('recorded_at','&gt;=', (datetime.datetime.utcnow() - datetime.timedelta(hours=1)).isoformat())]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="by_device" string="Device" context="{'group_by': 'device_id'}"/>
                     <filter name="by_metric" string="Metric" context="{'group_by': 'metric'}"/>
                 </group>

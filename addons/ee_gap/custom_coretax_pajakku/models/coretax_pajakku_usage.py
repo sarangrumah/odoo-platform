@@ -24,10 +24,10 @@ class CoretaxPajakkuUsage(models.Model):
 
     last_updated_at = fields.Datetime(default=fields.Datetime.now)
 
-    _sql_constraints = [
-        ("uniq_company_period", "unique(company_id, period)",
-         "One usage row per company per month."),
-    ]
+    _uniq_company_period = models.Constraint(
+        'unique(company_id, period)',
+        'One usage row per company per month.',
+    )
 
     # --------------------------------------------------------------
 

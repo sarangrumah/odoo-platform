@@ -54,7 +54,7 @@
                         </group>
                     </group>
                     <group string="Payload">
-                        <field name="payload" widget="ace" options="{'mode': 'json'}"/>
+                        <field name="payload" widget="ace" options="{'mode': 'javascript'}"/>
                     </group>
                 </sheet>
             </form>
@@ -72,10 +72,10 @@
                 <filter string="Queued" name="f_q" domain="[('state', '=', 'queued')]"/>
                 <filter string="Failed" name="f_f" domain="[('state', '=', 'failed')]"/>
                 <filter string="Applied" name="f_a" domain="[('state', '=', 'applied')]"/>
-                <group expand="0" string="Group By">
+                
                     <filter string="Device" name="g_dev" context="{'group_by': 'device_id'}"/>
                     <filter string="State" name="g_state" context="{'group_by': 'state'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

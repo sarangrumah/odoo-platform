@@ -13,6 +13,7 @@ SIGNER_STATES = [
 
 class SignRequestSigner(models.Model):
     _name = "sign.request.signer"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _description = "Sign Request Signer"
     _order = "request_id, sequence"
 

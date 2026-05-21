@@ -79,11 +79,11 @@ class TestCycleCount(TransactionCase):
         line.action_count(qty=18.0)
         # Strip supervisor group from current user
         sup_group = self.env.ref("custom_wms_cycle_count.group_cycle_count_supervisor")
-        self.env.user.groups_id = [(3, sup_group.id)]
+        self.env.user.group_ids = [(3, sup_group.id)]
         with self.assertRaises(UserError):
             line.action_approve()
         # Grant and retry
-        self.env.user.groups_id = [(4, sup_group.id)]
+        self.env.user.group_ids = [(4, sup_group.id)]
         line.action_approve()
         self.assertEqual(line.status, "approved")
 

@@ -28,13 +28,11 @@
                 <field name="revision"/>
                 <field name="state"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_card oe_kanban_global_click">
-                            <strong><field name="title"/></strong>
-                            <div><field name="product_tmpl_id"/></div>
-                            <div class="text-muted">Rev: <field name="revision"/></div>
-                            <span class="badge text-bg-info"><field name="state"/></span>
-                        </div>
+                    <t t-name="card">
+                        <strong><field name="title"/></strong>
+                        <div><field name="product_tmpl_id"/></div>
+                        <div class="text-muted">Rev: <field name="revision"/></div>
+                        <span class="badge text-bg-info"><field name="state"/></span>
                     </t>
                 </templates>
             </kanban>

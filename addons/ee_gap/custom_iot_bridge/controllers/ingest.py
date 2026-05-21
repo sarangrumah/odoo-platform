@@ -11,7 +11,7 @@ _logger = logging.getLogger(__name__)
 
 class IotIngestController(http.Controller):
 
-    @http.route("/iot/ingest", type="json", auth="public", methods=["POST"], csrf=False)
+    @http.route("/iot/ingest", type="jsonrpc", auth="public", methods=["POST"], csrf=False)
     def ingest(self):
         """Webhook for devices to POST a single reading.
 

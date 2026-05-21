@@ -9,6 +9,7 @@
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_core", "custom_pdp_audit"],
+    "capability_tags": ["pdp", "compliance", "audit-trail", "retention"],
     "data": [
         "security/pdp_security.xml",
         "security/ir.model.access.csv",

@@ -20,7 +20,7 @@ from odoo.exceptions import UserError
 
 class CustomBupotUnifikasi(models.Model):
     _name = "custom.bupot.unifikasi"
-    _inherit = ["pdp.audited.mixin"]
+    _inherit = ["pdp.audited.mixin", "mail.thread", "mail.activity.mixin"]
     _description = "Bukti Potong PPh Unifikasi (Coretax) — Period"
     _order = "year desc, month desc, id desc"
 

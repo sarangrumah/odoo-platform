@@ -35,11 +35,11 @@ export class HealthDashboard extends Component {
     async _loadTiles() {
         try {
             // Latest snapshot per tenant: read_group on tenant_id with max(snapshot_at).
-            const groups = await this.orm.readGroup(
+            const groups = await this.orm.formattedReadGroup(
                 "custom.ops.tenant.health",
                 [],
-                ["tenant_id", "snapshot_at:max"],
                 ["tenant_id"],
+                ["snapshot_at:max"],
                 { orderby: "tenant_id" },
             );
             const tiles = [];

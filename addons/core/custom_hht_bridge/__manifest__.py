@@ -32,17 +32,18 @@ Provides:
         "mail",
         "web",
     ],
+    "capability_tags": ["hht", "barcode-scan", "wms", "audit-trail", "multi-tenant"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/ir_config_parameter_data.xml",
         "data/cron.xml",
-        "views/menu_views.xml",
         "views/hht_device_views.xml",
         "views/hht_scan_log_views.xml",
         "views/hht_sync_queue_views.xml",
         "views/hht_shell_layout_views.xml",
         "wizards/regenerate_secret_wizard_views.xml",
+        "views/menu_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

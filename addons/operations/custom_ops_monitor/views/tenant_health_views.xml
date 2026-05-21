@@ -72,12 +72,12 @@
                 <filter name="green" string="Green" domain="[('status','=','green')]"/>
                 <filter name="yellow" string="Yellow" domain="[('status','=','yellow')]"/>
                 <filter name="red" string="Red" domain="[('status','=','red')]"/>
-                <group expand="0" string="Group By">
+                
                     <filter name="g_tenant" string="Tenant"
                             context="{'group_by':'tenant_id'}"/>
                     <filter name="g_status" string="Status"
                             context="{'group_by':'status'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

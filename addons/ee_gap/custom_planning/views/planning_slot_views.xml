@@ -26,18 +26,16 @@
                 <field name="end_dt"/>
                 <field name="state"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_card oe_kanban_global_click">
-                            <strong>
-                                <t t-if="record.employee_id.raw_value">
-                                    <field name="employee_id"/>
-                                </t>
-                                <t t-else="">OPEN</t>
-                            </strong>
-                            <div><field name="start_dt"/></div>
-                            <div class="text-muted">→ <field name="end_dt"/></div>
-                            <span class="badge text-bg-info"><field name="state"/></span>
-                        </div>
+                    <t t-name="card">
+                        <strong>
+                            <t t-if="record.employee_id.raw_value">
+                                <field name="employee_id"/>
+                            </t>
+                            <t t-else="">OPEN</t>
+                        </strong>
+                        <div><field name="start_dt"/></div>
+                        <div class="text-muted">→ <field name="end_dt"/></div>
+                        <span class="badge text-bg-info"><field name="state"/></span>
                     </t>
                 </templates>
             </kanban>

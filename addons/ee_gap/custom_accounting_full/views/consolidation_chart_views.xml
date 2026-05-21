@@ -69,7 +69,7 @@
                             </field>
                         </page>
                         <page string="Notes">
-                            <field name="note"/>
+                            <field name="notes"/>
                         </page>
                     </notebook>
                 </sheet>

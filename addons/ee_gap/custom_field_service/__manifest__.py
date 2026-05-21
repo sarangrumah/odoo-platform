@@ -20,6 +20,7 @@ signature. Audited via pdp.audit_log.
         "stock",
         "product",
     ],
+    "capability_tags": ["field-service", "audit-trail", "pdp"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

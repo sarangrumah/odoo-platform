@@ -31,6 +31,7 @@ Closes the EE 'account_asset' gap for Odoo CE. Provides:
         "custom_accounting_full",
         "account",
     ],
+    "capability_tags": ["accounting", "fixed-assets", "depreciation", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

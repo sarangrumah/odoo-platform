@@ -4,6 +4,7 @@ from odoo import fields, models
 
 class ReferralPosition(models.Model):
     _name = "referral.position"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _description = "Open Position (Referral)"
     _order = "create_date desc"
 

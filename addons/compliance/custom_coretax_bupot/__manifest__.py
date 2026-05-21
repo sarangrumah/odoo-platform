@@ -21,7 +21,8 @@ Per-period header (``custom.bupot.unifikasi``) and per-cut line
     "category": "Custom Platform/Compliance/Coretax",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "custom_pdp_audit", "custom_coretax", "account"],
+    "depends": ["custom_core", "custom_pdp_audit", "custom_coretax", "account", "mail"],
+    "capability_tags": ["indonesian-tax", "coretax", "withholding", "audit-trail"],
     "data": [
         "security/bupot_security.xml",
         "security/ir.model.access.csv",

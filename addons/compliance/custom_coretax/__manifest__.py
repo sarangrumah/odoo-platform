@@ -40,13 +40,18 @@ under `data/xsd/` post-install.
     "category": "Custom Platform/Compliance/Coretax",
     "version": "19.0.0.2.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "account"],
+    "depends": ["custom_core", "account", "mail"],
+    "capability_tags": ["indonesian-tax", "coretax", "withholding", "accounting", "audit-trail"],
     "data": [
         "security/coretax_security.xml",
         "security/ir.model.access.csv",
         "data/coretax_data.xml",
-        "data/pmk131_taxes.xml",
-        "data/pmk131_fiscal_positions.xml",
+        # PMK131 tax + fiscal position seeds — gated to demo because they
+        # require a fully initialised PSAK chart. Manually load via
+        # `odoo-bin -d <db> -i custom_coretax --without-demo=False` after
+        # custom_accounting_full has provisioned account types.
+        # "data/pmk131_taxes.xml",
+        # "data/pmk131_fiscal_positions.xml",
         # wizard actions first — referenced by config form + menu items
         "wizards/coretax_export_wizard_views.xml",
         "wizards/coretax_import_wizard_views.xml",

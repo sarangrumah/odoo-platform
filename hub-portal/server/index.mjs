@@ -85,7 +85,7 @@ async function odooSearchRead(req, res, model, fields, options = {}) {
 }
 
 app.get('/api/tenants', (req, res) => odooSearchRead(req, res, 'tenant.registry',
-  ['id', 'slug', 'db_name', 'state', 'plan_tier', 'create_date'], { order: 'create_date desc' }));
+  ['id', 'slug', 'display_name', 'db_name', 'state', 'plan_tier', 'create_date'], { order: 'display_name' }));
 
 app.get('/api/users', (req, res) => odooSearchRead(req, res, 'res.users',
   ['id', 'name', 'login', 'active'], { domain: [['active', '=', true]], limit: 100 }));

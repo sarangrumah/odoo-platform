@@ -24,10 +24,10 @@ class SocialAccount(models.Model):
     active = fields.Boolean(default=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
 
-    _sql_constraints = [
-        ("uniq_platform_handle", "unique(platform, handle)",
-         "Account already registered for this platform."),
-    ]
+    _uniq_platform_handle = models.Constraint(
+        'unique(platform, handle)',
+        'Account already registered for this platform.',
+    )
 
     def _ir_config_key(self):
         self.ensure_one()

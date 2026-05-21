@@ -12,13 +12,16 @@ container restart loop.
 
 from __future__ import annotations
 
+import os
 import secrets
 import string
+import subprocess
 from typing import Any
 
 import httpx
 import structlog
 
+from . import dbops
 from .config import get_settings
 
 log = structlog.get_logger()
@@ -38,6 +41,9 @@ class OdooAdminClient:
         self.base_url = base_url or f"http://{s.odoo_host}:{s.odoo_port}"
         self.master_pwd = s.odoo_admin_passwd
         self._client = httpx.Client(base_url=self.base_url, timeout=180.0, follow_redirects=False)
+        # Container name for CLI provisioning. Default matches docker-compose.multitenant.yml.
+        self._mgmt_container = os.environ.get("ODOO_MGMT_CONTAINER", "odoo19-platform-odoo-mgmt")
+        self._tenant_owner = s.pg_tenant_owner_role
 
     def close(self) -> None:
         self._client.close()
@@ -55,28 +61,49 @@ class OdooAdminClient:
         country_code: str | None = "ID",
         login: str = "admin",
         demo: bool = False,
+        init_modules: list[str] | None = None,
     ) -> None:
-        """POST /web/database/create — form-encoded (Odoo expects multipart/form).
+        """Create a tenant database and initialise it deterministically.
 
-        Odoo returns a 303 redirect to /web on success.
+        Two-phase to avoid the unreliability of Odoo 19's ``/web/database/create``
+        HTTP endpoint (which returns 200 even when ``-i base`` fails inside):
+
+          1. ``CREATE DATABASE`` via psycopg as superuser (atomic, fast).
+          2. ``odoo -d <db> --init=<modules> --stop-after-init --without-demo``
+             executed inside the ``odoo-mgmt`` container via ``docker exec``.
+             Surface failures by exit code instead of HTML.
+
+        ``init_modules`` defaults to ``['base']`` — caller is expected to install
+        the platform's custom module set via ``install_modules()`` afterwards.
         """
-        data = {
-            "master_pwd": self.master_pwd,
-            "name": db_name,
-            "login": login,
-            "password": admin_password,
-            "phone": "",
-            "lang": lang,
-            "country_code": country_code or "",
-            "demo": "1" if demo else "",
-        }
-        r = self._client.post("/web/database/create", data=data)
-        if r.status_code in (200, 303):
-            log.info("odoo.db.created", db=db_name)
-            return
-        raise RuntimeError(
-            f"Odoo create_database({db_name}) failed: HTTP {r.status_code} — {r.text[:200]}"
+        mods = init_modules or ["base"]
+        # 1. Direct psycopg CREATE DATABASE
+        if not dbops.db_exists(db_name):
+            dbops.create_database(db_name=db_name, owner_role=self._tenant_owner)
+            log.info("odoo.db.created", db=db_name, mode="psycopg")
+
+        # 2. Init base + custom modules via CLI
+        cmd = [
+            "docker", "exec", self._mgmt_container,
+            "odoo", "-d", db_name,
+            "--init", ",".join(mods),
+            "--stop-after-init",
+            "--without-demo",
+        ]
+        log.info("odoo.db.init.cli", db=db_name, modules=mods)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=1800,
         )
+        if result.returncode != 0:
+            tail = (result.stderr or "")[-1500:]
+            raise RuntimeError(
+                f"Odoo init({db_name}) CLI failed (exit {result.returncode}): {tail}"
+            )
+        # The admin user (login=admin) password defaults to 'admin' after a -i base.
+        # Reset it to the orchestrator-supplied value so subsequent JSON-RPC works.
+        # We do this with a one-shot psql update through dbops.
+        dbops.set_admin_password(db_name=db_name, login=login, password=admin_password)
+        log.info("odoo.db.init.done", db=db_name)
 
     def drop_database(self, db_name: str) -> None:
         data = {"master_pwd": self.master_pwd, "name": db_name}
@@ -96,9 +123,15 @@ class OdooAdminClient:
     # -----------------------------------------------------------------
 
     def _rpc(self, db: str, model: str, method: str, args: list[Any], login: str, password: str) -> Any:
+        # The orchestrator targets the private ``odoo-mgmt`` service which runs
+        # with DBFILTER=^.*$ and LIST_DB=True. ``X-Odoo-Database`` is still set
+        # as belt-and-braces: it gives Odoo 19's dispatcher an unambiguous DB
+        # signal even if the host header is ever changed by a proxy.
+        headers = {"X-Odoo-Database": db}
         # 1. Authenticate
         auth = self._client.post(
             "/jsonrpc",
+            headers=headers,
             json={
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -117,6 +150,7 @@ class OdooAdminClient:
         # 2. Call
         r = self._client.post(
             "/jsonrpc",
+            headers=headers,
             json={
                 "jsonrpc": "2.0",
                 "method": "call",

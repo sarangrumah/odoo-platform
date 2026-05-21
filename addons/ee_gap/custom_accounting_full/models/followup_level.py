@@ -97,6 +97,15 @@ class FollowupStatByPartner(models.Model):
 
     def init(self):
         from odoo import tools
+        # Skip view creation if the back-ref column on res_partner is not
+        # yet materialised (happens on first install of this module, when
+        # the SQL view init may run before the inherited field is created).
+        self.env.cr.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='res_partner' AND column_name='custom_followup_level_id'
+        """)
+        if not self.env.cr.fetchone():
+            return
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute(f"""
             CREATE OR REPLACE VIEW {self._table} AS (

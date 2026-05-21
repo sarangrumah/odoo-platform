@@ -6,7 +6,7 @@
             <field name="name">brd.document.list</field>
             <field name="model">brd.document</field>
             <field name="arch" type="xml">
-                <list decoration-info="state == 'analyzed'" decoration-success="state == 'approved'" decoration-warning="state == 'reviewed'" decoration-muted="state == 'draft'">
+                <list decoration-info="state == 'analyzed'" decoration-success="state == 'approved'" decoration-warning="state in ('reviewed','analyzing')" decoration-muted="state == 'draft'">
                     <field name="reference"/>
                     <field name="name"/>
                     <field name="business_domain"/>
@@ -50,13 +50,14 @@
                 <form>
                     <header>
                         <button name="action_extract" type="object" string="Extract" class="btn-primary" invisible="state != 'draft'"/>
-                        <button name="action_analyze" type="object" string="Run AI Analysis" class="btn-primary" invisible="state not in ('extracted','analyzed')"/>
+                        <button name="action_analyze_async" type="object" string="Run AI Analysis" class="btn-primary" invisible="state not in ('extracted','analyzed')"/>
+                        <button name="action_analyze" type="object" string="Run AI Analysis (sync)" invisible="state not in ('extracted','analyzed')" groups="custom_brd_analyzer.group_brd_admin"/>
                         <button name="action_request_review" type="object" string="Request Review" invisible="state != 'analyzed'"/>
                         <button name="action_approve" type="object" string="Approve" class="btn-success" invisible="state != 'reviewed'" groups="custom_brd_analyzer.group_brd_admin"/>
                         <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state == 'draft'"/>
                         <button name="action_open_report" type="object" string="Open Report"/>
                         <button name="action_generate_share_token" type="object" string="Generate Share Link"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,extracted,analyzed,reviewed,approved"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,extracted,analyzing,analyzed,reviewed,approved"/>
                     </header>
                     <sheet>
                         <div class="oe_title">
@@ -112,6 +113,7 @@
                                     <list editable="bottom">
                                         <field name="sequence" widget="handle"/>
                                         <field name="name"/>
+                                        <field name="recommendation_type" widget="badge" decoration-danger="recommendation_type == 'new'" decoration-warning="recommendation_type == 'extend'" decoration-success="recommendation_type == 'reuse'"/>
                                         <field name="severity"/>
                                         <field name="estimated_md"/>
                                         <field name="depends_on_module_ids" widget="many2many_tags"/>

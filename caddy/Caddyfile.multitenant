@@ -29,6 +29,27 @@
 	}
 }
 
+# ----- Hub portal (Erajaya Odoo Hub landing + admin console) -----
+# Lives at https://hub.platform.localhost — serves the SPA and proxies
+# /api/* through to the tenant-orchestrator with HMAC signing.
+hub.platform.localhost {
+	encode zstd gzip
+	tls internal
+
+	reverse_proxy hub-portal:8080 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
 # ----- Super-admin portal -----
 # Lives at https://admin.platform.localhost — maps to Odoo DB `master_admin`.
 admin.platform.localhost {

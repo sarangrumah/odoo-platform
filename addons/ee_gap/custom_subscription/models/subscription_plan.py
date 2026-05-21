@@ -32,9 +32,10 @@ class SubscriptionPlan(models.Model):
     )
     trial_days = fields.Integer(default=0)
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code)", "Plan code must be unique."),
-    ]
+    _code_uniq = models.Constraint(
+        'unique(code)',
+        'Plan code must be unique.',
+    )
 
     @api.constrains("recurring_count")
     def _check_recurring_count(self):

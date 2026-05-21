@@ -33,10 +33,10 @@ class Appraisal(models.Model):
     submitted_at_manager = fields.Datetime(readonly=True)
     closed_at = fields.Datetime(readonly=True)
 
-    _sql_constraints = [
-        ("uniq_cycle_employee", "unique(cycle_id, employee_id)",
-         "Employee already has an appraisal for this cycle."),
-    ]
+    _uniq_cycle_employee = models.Constraint(
+        'unique(cycle_id, employee_id)',
+        'Employee already has an appraisal for this cycle.',
+    )
 
     def _pdp_audit_classification(self):
         return "sensitive_pii"  # performance ratings are sensitive HR data

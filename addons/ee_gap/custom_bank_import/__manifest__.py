@@ -35,6 +35,7 @@ deduplication and PDP audit-log integration.
         "custom_adapter_framework",
         "account",
     ],
+    "capability_tags": ["bank-import", "accounting", "audit-trail", "h2h-api"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

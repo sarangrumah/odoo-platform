@@ -15,10 +15,10 @@ class DocumentVersion(models.Model):
     uploaded_by_id = fields.Many2one("res.users", default=lambda s: s.env.user, required=True)
     uploaded_at = fields.Datetime(default=fields.Datetime.now, required=True)
 
-    _sql_constraints = [
-        ("uniq_document_version", "unique(document_id, version)",
-         "Version number must be unique per document."),
-    ]
+    _uniq_document_version = models.Constraint(
+        'unique(document_id, version)',
+        'Version number must be unique per document.',
+    )
 
     def write(self, vals):
         if self.env.context.get("document_version_internal"):

@@ -47,6 +47,7 @@ Integration points shipped: ``account.move`` (post gate), ``purchase.order``
         "sale",
         "portal",
     ],
+    "capability_tags": ["approval-workflow", "audit-trail", "delegation", "sla-escalation"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

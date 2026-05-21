@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- NPS Summaries under the standard Surveys menu -->
+    <menuitem id="menu_custom_survey_nps_summary"
+              name="NPS Summaries"
+              parent="survey.menu_surveys"
+              action="action_custom_survey_nps_summary"
+              sequence="50"
+              groups="custom_survey.group_user"/>
+
+    <!-- Also mount under Custom root -->
+    <menuitem id="menu_custom_survey_in_custom"
+              name="NPS Summaries"
+              parent="custom_core.menu_custom_root"
+              action="action_custom_survey_nps_summary"
+              sequence="55"
+              groups="custom_survey.group_user"/>
+</odoo>

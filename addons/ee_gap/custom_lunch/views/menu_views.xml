@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Mount the CE Lunch action under the Custom root for unified navigation -->
+    <menuitem id="menu_lunch_in_custom"
+              name="Lunch (ID)"
+              parent="custom_core.menu_custom_root"
+              action="lunch.lunch_product_action_order"
+              sequence="60"
+              groups="custom_lunch.group_user"/>
+</odoo>

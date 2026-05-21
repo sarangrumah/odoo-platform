@@ -7,11 +7,9 @@
         </record>
         <record id="group_planning_user" model="res.groups">
             <field name="name">Planning User</field>
-            <field name="category_id" ref="module_category_planning"/>
         </record>
         <record id="group_planning_manager" model="res.groups">
             <field name="name">Planning Manager</field>
-            <field name="category_id" ref="module_category_planning"/>
             <field name="implied_ids" eval="[Command.link(ref('group_planning_user'))]"/>
         </record>
     </data>

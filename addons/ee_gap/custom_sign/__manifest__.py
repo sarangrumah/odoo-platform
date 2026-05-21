@@ -12,6 +12,7 @@ document and submit a typed/drawn signature.
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_audit", "mail", "portal", "website"],
+    "capability_tags": ["approval-workflow", "audit-trail", "pdp"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

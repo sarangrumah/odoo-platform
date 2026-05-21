@@ -117,6 +117,35 @@ class BrdRecommendation(models.Model):
         help="Computed from breaking_change flag plus the number of verticals affected.",
     )
 
+    recommendation_type = fields.Selection(
+        [
+            ("new", "NEW MODULE"),
+            ("extend", "EXTEND"),
+            ("reuse", "REUSE"),
+        ],
+        compute="_compute_recommendation_type",
+        store=True,
+        help=(
+            "Classification derived from dependency fields:\n"
+            " - NEW MODULE: no existing module covers this; build custom_<x> from scratch\n"
+            " - EXTEND: existing module(s) impacted or depended on; add via _inherit / feature flag\n"
+            " - REUSE: existing module covers it; recommendation is configuration/data only"
+        ),
+    )
+
+    @api.depends("depends_on_module_ids", "impact_module_ids", "depends_on_proposed_ids")
+    def _compute_recommendation_type(self):
+        for rec in self:
+            has_impact = bool(rec.impact_module_ids)
+            has_existing_dep = bool(rec.depends_on_module_ids)
+            has_proposed_dep = bool(rec.depends_on_proposed_ids)
+            if has_impact:
+                rec.recommendation_type = "extend"
+            elif has_existing_dep and not has_proposed_dep:
+                rec.recommendation_type = "reuse"
+            else:
+                rec.recommendation_type = "new"
+
     @api.depends("breaking_change", "cross_vertical_impact_json")
     def _compute_impact_severity(self):
         import json as _json

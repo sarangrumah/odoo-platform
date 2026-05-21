@@ -30,6 +30,7 @@ reference (``vault://...``). Credentials are NEVER stored in Odoo.
         "custom_ops_monitor",
         "custom_hub_console",
     ],
+    "capability_tags": ["multi-tenant", "audit-trail"],
     "data": [
         # security
         "security/security.xml",

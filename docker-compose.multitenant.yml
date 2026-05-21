@@ -65,3 +65,97 @@ services:
       # Trust Caddy's X-Forwarded headers; Caddy is the public-facing TLS terminator.
       PROXY_MODE: "True"
       LIST_DB: "False"     # multitenant: never list DBs publicly
+
+  # Private management Odoo instance used ONLY by the tenant-orchestrator to
+  # provision/drop/upgrade per-tenant databases. Shares postgres + redis with
+  # the public ``odoo`` service (so DBs created here are immediately visible
+  # to public traffic) but has LIST_DB=True and DBFILTER=^.*$ to expose the
+  # database manager + per-DB JSON-RPC. No host port is published — reachable
+  # only via the odoo-net bridge from the orchestrator container.
+  odoo-mgmt:
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo-mgmt
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      HOST: postgres
+      PORT: 5432
+      USER: ${POSTGRES_USER:-odoo}
+      PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
+      CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY:-}
+      WORKERS: "0"
+      MAX_CRON_THREADS: "1"
+      # Management instance MUST expose the database manager + accept any DB.
+      LIST_DB: "True"
+      DBFILTER: "^.*$$"
+      PROXY_MODE: "False"
+      WITHOUT_DEMO: ${WITHOUT_DEMO:-all}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ./addons:/mnt/extra-addons:ro
+      # IMPORTANT: must point at the same filestore volume as the public `odoo`
+      # service. mgmt and public share Postgres, so ir.attachment rows reference
+      # files in this directory — split mounts produce 404s on assets and the
+      # "CSS error, using old style" fallback in the browser.
+      - ./data/odoo-filestore:/var/lib/odoo
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8069/web/database/selector', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    # ADMIN-ONLY port published on loopback. Database manager + cross-tenant
+    # JSON-RPC live here. Production hardening: leave as 127.0.0.1 binding so
+    # the manager is never publicly reachable. The default 18079 is overrideable
+    # via ODOO_MGMT_PORT in .env.
+    ports:
+      - "127.0.0.1:${ODOO_MGMT_PORT:-18079}:8069"
+    networks: [odoo-net]
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Re-point the orchestrator at the private management Odoo.
+  #
+  # Docker socket is mounted read-only so the orchestrator can `docker exec`
+  # the ``odoo`` CLI inside the ``odoo-mgmt`` container to initialise newly
+  # provisioned tenant databases. /web/database/create cannot be relied on
+  # because it returns HTTP 200 even when the underlying ``-i base`` step
+  # fails — the CLI surfaces those errors deterministically.
+  #
+  # SECURITY: docker socket access is root-equivalent on the host. Acceptable
+  # for the orchestrator (which already has CREATEDB on postgres and writes
+  # encrypted secrets) but the orchestrator MUST stay on an isolated network
+  # and not be publicly reachable. Hardening path is a sidecar in odoo-mgmt
+  # exposing an HMAC-authenticated /init endpoint — tracked separately.
+  tenant-orchestrator:
+    # Override base read_only so docker socket reads work
+    read_only: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      odoo-mgmt:
+        condition: service_healthy
+    environment:
+      ODOO_HOST: odoo-mgmt
+      ODOO_MGMT_CONTAINER: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo-mgmt
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro

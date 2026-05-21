@@ -65,3 +65,9 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-commit]
+      - id: module-knowledge-drift
+        name: warn when a custom_* module source changes without MODULE_KNOWLEDGE.md update
+        entry: python scripts/check_knowledge_drift.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]

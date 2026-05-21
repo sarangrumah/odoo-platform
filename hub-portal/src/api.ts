@@ -178,8 +178,16 @@ export const runBrdExtract = (id: number) =>
   jsonrpc<boolean>('brd.document', 'action_extract', [[id]], {});
 
 // Trigger AI analyzer (via custom_ai_bridge → Anthropic) — populates recommendations, sets state=analyzed.
+// Synchronous variant: blocks until the analyzer completes. With Opus + deep-dive
+// this can exceed proxy/worker timeouts. Use ``runBrdAnalyzeAsync`` instead.
 export const runBrdAnalyze = (id: number) =>
   jsonrpc<boolean>('brd.document', 'action_analyze', [[id]], {});
+
+// Async variant: dispatches the analyze to the queue_job worker and returns
+// immediately. UI should poll ``state`` via listBrdDocuments to detect
+// transition from 'analyzing' → 'analyzed'.
+export const runBrdAnalyzeAsync = (id: number) =>
+  jsonrpc<boolean>('brd.document', 'action_analyze_async', [[id]], {});
 
 export const listRecommendations = (journeyId: number) =>
   jsonrpc<any[]>(
@@ -199,10 +207,50 @@ export const listRecommendations = (journeyId: number) =>
         'compat_strategy',
         'impact_severity',
         'cross_vertical_impact_json',
+        'recommendation_type',
+        'depends_on_module_ids',
+        'depends_on_proposed_ids',
+        'impact_module_ids',
       ],
       limit: 200,
     },
   );
+
+// Capability entries — used as picker for "Reject & save as lesson".
+export const listCapabilityEntries = () =>
+  jsonrpc<any[]>('custom.module.capability.entry', 'search_read', [[]], {
+    fields: ['id', 'module_name', 'maturity', 'category'],
+    limit: 500,
+    order: 'module_name',
+  });
+
+// Convert a wrongly-proposed recommendation into a brd.lesson.
+// Mirrors what brd.reject.as.lesson.wizard.action_save_lesson does on the Odoo
+// side, but executed as two plain JSON-RPC calls from the browser so the analyst
+// does not have to leave hub-portal to use the Odoo wizard form.
+export async function rejectRecommendationAsLesson(
+  recId: number,
+  payload: {
+    name: string;
+    section_pattern: string;
+    rejected_proposals: string[];
+    correct_module_ids: number[];
+    reason: string;
+    severity: 'blocker' | 'hint';
+  },
+): Promise<number> {
+  const lessonId = await jsonrpc<number>('brd.lesson', 'create', [{
+    name: payload.name,
+    section_pattern: payload.section_pattern,
+    rejected_proposals: payload.rejected_proposals,
+    correct_modules: [[6, 0, payload.correct_module_ids]],
+    reason: payload.reason,
+    severity: payload.severity,
+    source_recommendation_id: recId,
+  }]);
+  await jsonrpc<boolean>('brd.recommendation', 'write', [[recId], { state: 'canceled' }]);
+  return lessonId;
+}
 
 // ---------------------------------------------------------------------------
 // VPS (Track E, orchestrator + Odoo)

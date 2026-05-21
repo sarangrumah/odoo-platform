@@ -13,6 +13,7 @@ archived (not deleted) for audit + traceability.
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_audit", "mrp", "mail"],
+    "capability_tags": ["plm", "manufacturing", "approval-workflow", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

@@ -53,9 +53,9 @@
                 <field name="name"/>
                 <field name="trigger"/>
                 <filter name="active" string="Active" domain="[('active','=',True)]"/>
-                <group expand="0" string="Group By">
+                
                     <filter name="grp_trigger" string="Trigger" context="{'group_by':'trigger'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

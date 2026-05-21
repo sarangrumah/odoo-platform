@@ -20,6 +20,7 @@ transfers and includes a barcoded pick slip QWeb report.
         "barcodes",
         "mail",
     ],
+    "capability_tags": ["wms", "barcode-scan", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

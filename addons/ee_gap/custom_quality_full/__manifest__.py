@@ -19,6 +19,7 @@ quality.check / quality.alert (NCR) skeleton, this version adds:
     "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_audit", "mrp", "stock", "mail"],
+    "capability_tags": ["quality", "manufacturing", "audit-trail", "approval-workflow"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

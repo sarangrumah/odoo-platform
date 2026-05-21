@@ -20,6 +20,7 @@ Depends on `custom_core` for HMAC helper and encrypted config storage.
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["custom_core"],
+    "capability_tags": ["ai", "multi-tenant"],
     "external_dependencies": {"python": ["httpx"]},
     "data": [
         "security/custom_ai_security.xml",

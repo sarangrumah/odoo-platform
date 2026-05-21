@@ -21,6 +21,7 @@ Provides:
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["base", "web", "mail"],
+    "capability_tags": ["multi-tenant", "audit-trail"],
     "data": [
         "security/custom_security.xml",
         "security/ir.model.access.csv",

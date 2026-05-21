@@ -34,6 +34,7 @@ by Cloudflare Turnstile and a per-IP rate limit.
         "mail",
         "portal",
     ],
+    "capability_tags": ["multi-tenant", "approval-workflow", "audit-trail", "crm"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

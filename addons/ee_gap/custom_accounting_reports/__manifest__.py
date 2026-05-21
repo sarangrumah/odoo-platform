@@ -34,6 +34,7 @@ render to QWeb PDF or HTML. PSAK-aligned default tree shipped under
         "custom_accounting_full",
         "account",
     ],
+    "capability_tags": ["accounting", "financial-reports", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

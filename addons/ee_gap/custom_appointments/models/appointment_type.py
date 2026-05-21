@@ -30,6 +30,7 @@ class AppointmentType(models.Model):
         string="Available Resources",
     )
 
-    _sql_constraints = [
-        ("slug_uniq", "unique(slug)", "Appointment slug must be unique."),
-    ]
+    _slug_uniq = models.Constraint(
+        'unique(slug)',
+        'Appointment slug must be unique.',
+    )

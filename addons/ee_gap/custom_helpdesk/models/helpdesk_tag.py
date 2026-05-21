@@ -11,6 +11,7 @@ class HelpdeskTag(models.Model):
     color = fields.Integer(default=0)
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ("name_uniq", "unique(name)", "Tag name must be unique."),
-    ]
+    _name_uniq = models.Constraint(
+        'unique(name)',
+        'Tag name must be unique.',
+    )

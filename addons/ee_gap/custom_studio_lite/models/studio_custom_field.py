@@ -47,10 +47,10 @@ class StudioCustomField(models.Model):
     )
     last_error = fields.Text(readonly=True)
 
-    _sql_constraints = [
-        ("uniq_model_field", "unique(model_id, technical_name)",
-         "Field name already exists on this model."),
-    ]
+    _uniq_model_field = models.Constraint(
+        'unique(model_id, technical_name)',
+        'Field name already exists on this model.',
+    )
 
     def _pdp_audit_classification(self):
         return "internal"

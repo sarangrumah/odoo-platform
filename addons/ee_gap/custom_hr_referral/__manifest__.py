@@ -12,6 +12,7 @@ is credited when state hits 'hired' (configurable per position).
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_audit", "hr", "mail"],
+    "capability_tags": ["recruitment", "audit-trail", "pdp"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

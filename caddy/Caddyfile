@@ -36,8 +36,18 @@
 	tls internal
 	# tls {$ACME_EMAIL}
 
-	# Forward all traffic to internal nginx (which still does rate-limit,
-	# block /web/database/manager, longpolling, etc.).
+	# Erajaya Odoo Hub portal (landing + admin console) is mounted at /portal/*.
+	# The portal is a thin SPA + BFF; the BFF in turn signs HMAC calls to the
+	# tenant-orchestrator on the internal network.
+	handle_path /portal/* {
+		reverse_proxy hub-portal:8080
+	}
+	handle /portal {
+		redir /portal/ 308
+	}
+
+	# Forward all remaining traffic to internal nginx (which still does
+	# rate-limit, blocks /web/database/manager, longpolling, etc.).
 	reverse_proxy nginx:80 {
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}

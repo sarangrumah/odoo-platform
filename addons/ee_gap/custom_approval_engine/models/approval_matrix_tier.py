@@ -42,7 +42,7 @@ class ApprovalMatrixTier(models.Model):
     approver_group_id = fields.Many2one("res.groups", string="Approver Group")
     approver_domain = fields.Char(
         string="Approver Domain",
-        help="Odoo domain on res.users (e.g. [('groups_id','in',[ref('account.group_account_manager')])]).",
+        help="Odoo domain on res.users (e.g. [('group_ids','in',[ref('account.group_account_manager')])]).",
     )
 
     require_all = fields.Boolean(

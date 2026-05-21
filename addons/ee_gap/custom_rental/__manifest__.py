@@ -28,6 +28,7 @@ core rental.asset / rental.order skeleton with:
         "stock",
         "account",
     ],
+    "capability_tags": ["rental", "audit-trail", "pdp"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

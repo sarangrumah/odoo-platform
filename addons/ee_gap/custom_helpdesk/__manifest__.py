@@ -24,6 +24,7 @@ Phase 2E MVP:
         "mail",
         "project",
     ],
+    "capability_tags": ["helpdesk", "ai", "audit-trail", "pdp"],
     "data": [
         "security/custom_helpdesk_security.xml",
         "security/ir.model.access.csv",

@@ -14,3 +14,6 @@ access_ai_usage_admin,ai.usage.admin,model_custom_hub_ai_usage,group_hub_admin,1
 access_deploy_wiz_csm,deploy.wiz.csm,model_custom_hub_deploy_module_wizard,group_hub_csm,1,1,1,1
 access_deploy_wiz_admin,deploy.wiz.admin,model_custom_hub_deploy_module_wizard,group_hub_admin,1,1,1,1
 access_rescan_wiz_admin,rescan.wiz.admin,model_custom_hub_rescan_catalog_wizard,group_hub_admin,1,1,1,1
+access_tenant_registry_hub_viewer,tenant.registry hub viewer,custom_super_admin.model_tenant_registry,group_hub_viewer,1,0,0,0
+access_tenant_registry_hub_csm,tenant.registry hub csm,custom_super_admin.model_tenant_registry,group_hub_csm,1,1,0,0
+access_tenant_registry_hub_admin,tenant.registry hub admin,custom_super_admin.model_tenant_registry,group_hub_admin,1,1,1,0

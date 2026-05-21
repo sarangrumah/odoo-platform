@@ -98,3 +98,25 @@ def apply_roles(db_name: str, roles_sql_path: str) -> None:
         body = f.read()
     with superuser_connection(db=db_name) as conn, conn.cursor() as cur:
         cur.execute(body)
+
+
+def set_admin_password(db_name: str, login: str, password: str) -> None:
+    """Reset the Odoo admin user's password inside a freshly initialised tenant DB.
+
+    Odoo's ``-i base`` creates the admin user with password 'admin'. The
+    orchestrator generates a strong per-tenant password and must persist it
+    back into ``res.users``. Odoo 19 only accepts ``pbkdf2_sha512`` (and
+    ``plaintext``, deprecated) — bcrypt was removed from the CryptContext.
+    Hash with passlib's ``pbkdf2_sha512`` to produce a value Odoo will verify.
+
+    psycopg parameter binding protects against injection.
+    """
+    from passlib.hash import pbkdf2_sha512
+    hashed = pbkdf2_sha512.hash(password)
+    with superuser_connection(db=db_name) as conn, conn.cursor() as cur:
+        cur.execute(
+            "UPDATE res_users SET password = %s WHERE login = %s",
+            (hashed, login),
+        )
+        if cur.rowcount == 0:
+            raise LookupError(f"No res.users row with login={login!r} in db={db_name!r}")

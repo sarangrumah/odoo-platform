@@ -1,0 +1,54 @@
+name: Module Knowledge Drift Check
+
+on:
+  pull_request:
+    paths:
+      - 'addons/**/models/**'
+      - 'addons/**/controllers/**'
+      - 'addons/**/wizards/**'
+      - 'addons/**/wizard/**'
+      - 'addons/**/__manifest__.py'
+      - 'addons/**/MODULE_KNOWLEDGE.md'
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so we can diff against base
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Drift check
+        run: |
+          python scripts/check_knowledge_drift.py \
+            --diff "origin/${{ github.base_ref }}...HEAD"
+
+      - name: Comment on PR if drift
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              '⚠ **MODULE_KNOWLEDGE.md drift detected**',
+              '',
+              'One or more `custom_*` modules in this PR have source changes but no corresponding update to their `MODULE_KNOWLEDGE.md`.',
+              '',
+              'Pick one of:',
+              '1. Edit the knowledge file to reflect your changes and commit it.',
+              '2. Regenerate it: `python scripts/generate_module_knowledge.py --module <name> --force`',
+              '3. Add `[knowledge-deferred]` to a commit message or to this PR description if drift is intentional.',
+              '',
+              'See the Action log above for the list of affected modules.'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

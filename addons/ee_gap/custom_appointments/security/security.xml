@@ -7,11 +7,9 @@
         </record>
         <record id="group_appointment_user" model="res.groups">
             <field name="name">Appointments User</field>
-            <field name="category_id" ref="module_category_appointments"/>
         </record>
         <record id="group_appointment_manager" model="res.groups">
             <field name="name">Appointments Manager</field>
-            <field name="category_id" ref="module_category_appointments"/>
             <field name="implied_ids" eval="[Command.link(ref('group_appointment_user'))]"/>
         </record>
     </data>

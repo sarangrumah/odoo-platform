@@ -4,6 +4,7 @@ from odoo import fields, models
 
 class RentalAsset(models.Model):
     _name = "rental.asset"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _description = "Rental Asset"
     _order = "name"
 

@@ -26,8 +26,8 @@ class MatchLineResult(models.Model):
     unit_price_bill = fields.Float()
     price_variance_pct = fields.Float()
     # Spec-aligned aliases
-    ordered_price = fields.Float(related="unit_price_po", store=False)
-    billed_price = fields.Float(related="unit_price_bill", store=False)
+    ordered_price = fields.Float(related="unit_price_po", store=False, string="Unit Price PO (Spec)")
+    billed_price = fields.Float(related="unit_price_bill", store=False, string="Unit Price Bill (Spec)")
     computed_at = fields.Datetime(related="result_id.computed_at", store=False)
 
     status = fields.Selection(

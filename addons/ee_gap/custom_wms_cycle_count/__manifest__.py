@@ -22,6 +22,7 @@ sessions from due plans.
         "product",
         "mail",
     ],
+    "capability_tags": ["wms", "barcode-scan", "approval-workflow", "audit-trail", "hht"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

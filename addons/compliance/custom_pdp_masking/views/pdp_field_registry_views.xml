@@ -52,10 +52,10 @@
                 <field name="model_name"/>
                 <field name="field_name"/>
                 <field name="pii_category"/>
-                <group expand="0" string="Group By">
+                
                     <filter name="g_model" string="Model" context="{'group_by': 'model_name'}"/>
                     <filter name="g_cat" string="Category" context="{'group_by': 'pii_category'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

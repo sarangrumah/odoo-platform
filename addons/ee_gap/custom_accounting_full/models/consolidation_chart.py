@@ -15,12 +15,14 @@ from odoo.exceptions import ValidationError
 
 class CustomConsolidationChart(models.Model):
     _name = "custom.consolidation.chart"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _description = "Consolidation Chart (Group COA)"
     _order = "code, name"
     _check_company_auto = True
 
     name = fields.Char(required=True, translate=True)
     code = fields.Char(required=True)
+    active = fields.Boolean(default=True)
     currency_id = fields.Many2one(
         "res.currency",
         required=True,

@@ -135,7 +135,7 @@ export default function DevCyclePage() {
                 { key: 'ci_status', label: 'CI', render: (r) => <Badge tone={r.ci_status === 'success' ? 'success' : r.ci_status === 'failure' || r.ci_status === 'error' ? 'danger' : 'info'}>{r.ci_status || '—'}</Badge> },
                 { key: 'merged_at', label: 'Merged at' },
               ]}
-              rows={prs}
+              data={prs}
             />
             <h4 style={{ margin: '16px 0 8px' }}>Webhook log</h4>
             <div

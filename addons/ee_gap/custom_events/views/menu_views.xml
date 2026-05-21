@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Mount under Custom root so the extension surfaces alongside other custom apps. -->
+    <menuitem id="menu_events_ext_in_custom"
+              name="Events"
+              parent="custom_core.menu_custom_root"
+              action="event.action_event_view"
+              sequence="60"
+              groups="custom_events.group_user"/>
+</odoo>

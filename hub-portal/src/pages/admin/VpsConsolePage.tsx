@@ -111,7 +111,7 @@ export default function VpsConsolePage() {
             ),
           },
         ]}
-        rows={rows}
+        data={rows}
       />
       )}
 
@@ -158,7 +158,7 @@ export default function VpsConsolePage() {
                   { key: 'compose', label: 'Compose profile' },
                   { key: 'state', label: 'State', render: (r) => <Badge tone="success">{r.state}</Badge> },
                 ]}
-                rows={(open.envs || []).map((e) => ({ id: e, env: e, compose: `${e}.yml`, state: 'running' }))}
+                data={(open.envs || []).map((e) => ({ id: e, env: e, compose: `${e}.yml`, state: 'running' }))}
               />
             )}
 

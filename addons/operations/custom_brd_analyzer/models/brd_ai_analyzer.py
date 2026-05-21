@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import time
 from typing import Any
 
 from odoo import fields
@@ -109,6 +111,18 @@ Language: {language}
 === AVAILABLE HUB MODULE CATALOG (JSON) ===
 {catalog_json}
 
+=== CAPABILITY COVERAGE MAP (per tag → modules + score 0-5) ===
+{gap_matrix_json}
+
+(Use this map to AVOID proposing new modules whose capability tag is already
+covered. A tag with score >= 3 means at least one production module covers it;
+score >= 4 means there is also a knowledge file documenting it. When you see
+a section asking for capability X and X has covered modules in the map, MAP
+the section to those modules — do NOT recommend a new custom_X.)
+
+=== PRIOR LESSONS LEARNED (from human analyst corrections) ===
+{lessons_block}
+
 === HUB MODULE CROSS-VERTICAL DEPLOYMENT (JSON) ===
 {cross_vertical_json}
 
@@ -187,6 +201,57 @@ DEFAULT_JSON_SCHEMA = {
 _SECTION_BATCH_SIZE = 10
 _AI_MAX_TOKENS = 16000  # Opus 4.7 supports up to 32k; 16k fits ~12 full section objects.
 
+# ---- Deep-dive (Jalur B) tuning --------------------------------------------
+# Second pass: for each section flagged partial/missing/unclear, fetch real
+# source code of candidate modules and re-ask the model. Keeps per-document
+# cost AND wall-time bounded — pass 2 cannot run forever, otherwise the
+# synchronous HTTP request that triggered analyze() will hit upstream timeout
+# (gunicorn worker, reverse proxy, undici fetch).
+_DEEP_DIVE_MAX_CALLS = 5  # was 20 — kept small so total wall-time stays bounded.
+_DEEP_DIVE_CANDIDATES_PER_SECTION = 3
+_DEEP_DIVE_MAX_BYTES_PER_MODULE = 50_000
+_DEEP_DIVE_MAX_TOKENS = 4000
+# Wall-time budget for the entire deep-dive phase, in seconds. When exceeded,
+# remaining sections are skipped. Keeps the synchronous code path responsive
+# even when the user opts NOT to dispatch via queue_job.
+_DEEP_DIVE_TIME_BUDGET_S = 120
+# Default quality for deep-dive — source-code verification is well within
+# Haiku's reach and is ~5-10× faster + cheaper than Opus.
+_DEEP_DIVE_QUALITY = "fast"
+
+DEEP_DIVE_SYSTEM_PROMPT = """You are a senior Odoo engineer verifying a *first-pass* gap analysis
+against the ACTUAL SOURCE CODE of candidate hub modules.
+
+You will receive:
+  (a) ONE BRD section (id, title, content).
+  (b) The first-pass verdict (fit_score, gap_status, notes).
+  (c) Python source excerpts (truncated) from 1-3 candidate hub modules
+      that the first pass mapped (or that match the section's capability
+      tags).
+
+Your job is to OVERRIDE the first-pass verdict ONLY IF the source clearly
+shows the capability is covered (or clearly more covered than the first
+pass thought). Be conservative: if the source is ambiguous, keep the
+first-pass verdict.
+
+For every confirmed coverage, cite ``module_name:filename`` and the model
+or method that supplies the capability.
+
+You may also recommend that PROPOSED recommendations be dropped if the
+deep dive shows the capability is already in the source. Use the
+``drop_recommendation_names`` array for that — match by the snake_case
+name from the first pass.
+
+OUTPUT STRICT JSON, no markdown, no prose. Schema:
+{
+  "section_id": <int>,
+  "fit_score": <int 0-100>,
+  "gap_status": "covered" | "partial" | "missing" | "unclear",
+  "notes": "<short reasoning with module_name:filename citations>",
+  "drop_recommendation_names": ["custom_xxx", ...]
+}
+"""
+
 
 class BrdAiAnalyzer:
     """Stateless analyzer; takes an env + a ``brd.document`` recordset of len 1."""
@@ -213,10 +278,14 @@ class BrdAiAnalyzer:
         system_prompt = Param.get_param("custom_brd_analyzer.system_prompt") or DEFAULT_SYSTEM_PROMPT
         user_template = Param.get_param("custom_brd_analyzer.user_prompt_template") or DEFAULT_USER_PROMPT_TEMPLATE
         schema = self._load_schema(Param)
-        catalog = self.env["custom.module.capability.entry"].sudo()._build_prompt_catalog()
+        Entry = self.env["custom.module.capability.entry"].sudo()
+        catalog = Entry._build_prompt_catalog()
         catalog_json = json.dumps(catalog, ensure_ascii=False)
+        gap_matrix = Entry._build_gap_matrix()
+        gap_matrix_json = json.dumps(gap_matrix, ensure_ascii=False)
         cross_vertical = self._build_cross_vertical_context()
         cross_vertical_json = json.dumps(cross_vertical, ensure_ascii=False)
+        lessons_block = self._build_lessons_block(sections)
 
         merged: dict[str, Any] = {"sections": [], "recommendations": [], "overall_fit_pct": 0}
         scored = 0
@@ -251,24 +320,41 @@ class BrdAiAnalyzer:
                     language=brd_doc.language or "en",
                     sections_json=json.dumps(section_blob, ensure_ascii=False),
                     catalog_json=catalog_json,
+                    gap_matrix_json=gap_matrix_json,
+                    lessons_block=lessons_block,
                     cross_vertical_json=cross_vertical_json,
                     schema_json=json.dumps(schema),
                 )
             except KeyError:
-                # Backward-compat: a previously-overridden template in
-                # ir.config_parameter may not know the new placeholder.
-                user_msg = user_template.format(
-                    brd_name=brd_doc.name or "BRD",
-                    business_domain=brd_doc.business_domain or "other",
-                    language=brd_doc.language or "en",
-                    sections_json=json.dumps(section_blob, ensure_ascii=False),
-                    catalog_json=catalog_json,
-                    schema_json=json.dumps(schema),
-                )
-                user_msg += (
-                    "\n\n=== HUB MODULE CROSS-VERTICAL DEPLOYMENT (JSON) ===\n"
-                    + cross_vertical_json
-                )
+                # Backward-compat: previously-overridden template in
+                # ir.config_parameter may lack newer placeholders. Build a
+                # best-effort message with whatever placeholders the template
+                # has, then append the missing blocks at the end.
+                base_kwargs = {
+                    "brd_name": brd_doc.name or "BRD",
+                    "business_domain": brd_doc.business_domain or "other",
+                    "language": brd_doc.language or "en",
+                    "sections_json": json.dumps(section_blob, ensure_ascii=False),
+                    "catalog_json": catalog_json,
+                    "schema_json": json.dumps(schema),
+                }
+                # Try with each optional placeholder; drop the ones the
+                # template doesn't use.
+                for opt_key, opt_val in (
+                    ("gap_matrix_json", gap_matrix_json),
+                    ("lessons_block", lessons_block),
+                    ("cross_vertical_json", cross_vertical_json),
+                ):
+                    if "{" + opt_key + "}" in user_template:
+                        base_kwargs[opt_key] = opt_val
+                user_msg = user_template.format(**base_kwargs)
+                # Append any missing optional blocks so the model still gets them.
+                if "gap_matrix_json" not in base_kwargs:
+                    user_msg += "\n\n=== CAPABILITY COVERAGE MAP ===\n" + gap_matrix_json
+                if "lessons_block" not in base_kwargs:
+                    user_msg += "\n\n=== PRIOR LESSONS LEARNED ===\n" + lessons_block
+                if "cross_vertical_json" not in base_kwargs:
+                    user_msg += "\n\n=== HUB MODULE CROSS-VERTICAL DEPLOYMENT (JSON) ===\n" + cross_vertical_json
             response_text = self._call_ai(system_prompt=system_prompt, user_message=user_msg, catalog_json=catalog_json)
             raw_responses.append(response_text or "")
             _flush_diag()  # save after every batch so partial progress is visible
@@ -310,6 +396,24 @@ class BrdAiAnalyzer:
 
         if scored:
             merged["overall_fit_pct"] = int(fit_total / scored)
+
+        # ----- Pass 2: deep-dive on partial/missing/unclear sections --------
+        deep_enabled = Param.get_param(
+            "custom_brd_analyzer.deep_dive_enabled", default="1"
+        )
+        if str(deep_enabled).strip() not in ("0", "false", "False", ""):
+            try:
+                self._deep_dive(brd_doc, merged, raw_responses)
+                # Re-compute overall fit after deep-dive adjustments.
+                fits = [
+                    int(s.get("fit_score") or 0)
+                    for s in (merged.get("sections") or [])
+                    if s.get("fit_score") is not None
+                ]
+                if fits:
+                    merged["overall_fit_pct"] = int(sum(fits) / len(fits))
+            except Exception as exc:  # pragma: no cover - never block pass-1 result
+                _logger.exception("brd_ai_analyzer: deep-dive failed (non-fatal): %s", exc)
 
         # Stash diagnostics on the document so the UI can surface them even
         # when AI returns empty arrays.
@@ -375,6 +479,286 @@ class BrdAiAnalyzer:
                 }
             )
         return rows
+
+    # ------------------------------------------------------------------
+    # Lessons learned — humans correct the LLM; capture & inject those
+    # corrections into future runs so we don't repeat the same mistakes.
+    # ------------------------------------------------------------------
+
+    def _build_lessons_block(self, sections) -> str:
+        """Render active brd.lesson records as a bullet list. Blocker lessons
+        are always included; hint lessons only when a keyword in their
+        section_pattern overlaps any BRD section content (lowercased
+        substring match). Capped at 20 entries by length desc.
+        """
+        Lesson = self.env.get("brd.lesson")
+        if Lesson is None:
+            return "(none)"
+        lessons = Lesson.sudo().search([("active", "=", True)])
+        if not lessons:
+            return "(none — analyzer has no prior corrections recorded)"
+        # Lower-cased concatenation of all sections for cheap keyword match.
+        haystack = " ".join((s.content or "") for s in sections).lower()
+        picked: list = []
+        for L in lessons:
+            if L.severity == "blocker":
+                picked.append(L)
+                continue
+            pattern = (L.section_pattern or "").lower()
+            # Hit if any 4+ char token from the pattern shows up in haystack.
+            tokens = [t.strip(",.:;()[]\"'") for t in pattern.split() if len(t) >= 4]
+            if any(t in haystack for t in tokens):
+                picked.append(L)
+        if not picked:
+            return "(no lessons match the current BRD section keywords)"
+        picked.sort(key=lambda L: len(L.reason or ""), reverse=True)
+        picked = picked[:20]
+        lines: list[str] = []
+        for L in picked:
+            tag = "[BLOCKER]" if L.severity == "blocker" else "[HINT]"
+            rejected = ", ".join(L.rejected_proposals or []) or "—"
+            correct = ", ".join(L.correct_modules.mapped("module_name")) or "—"
+            lines.append(
+                f"- {tag} {L.name}\n"
+                f"    Pattern: {(L.section_pattern or '').strip()[:200]}\n"
+                f"    Reject: {rejected}\n"
+                f"    Use instead: {correct}\n"
+                f"    Reason: {(L.reason or '').strip()[:400]}"
+            )
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Deep-dive pass (reads real source of candidate modules)
+    # ------------------------------------------------------------------
+
+    def _deep_dive(self, brd_doc, merged: dict, raw_responses: list[str]) -> None:
+        """Pass 2: re-evaluate sections flagged partial/missing/unclear using
+        actual Python source of candidate hub modules.
+
+        Mutates ``merged`` in place:
+        * Updates section.gap_status / fit_score / notes when the source
+          shows the capability is more covered than pass-1 thought.
+        * Drops recommendations whose name appears in the model's
+          ``drop_recommendation_names`` for any reviewed section.
+        """
+        Param = self.env["ir.config_parameter"].sudo()
+        max_calls = int(Param.get_param("custom_brd_analyzer.deep_dive_max_calls", default=_DEEP_DIVE_MAX_CALLS) or _DEEP_DIVE_MAX_CALLS)
+        time_budget = float(
+            Param.get_param("custom_brd_analyzer.deep_dive_time_budget_s", default=_DEEP_DIVE_TIME_BUDGET_S)
+            or _DEEP_DIVE_TIME_BUDGET_S
+        )
+        deep_quality = Param.get_param(
+            "custom_brd_analyzer.deep_dive_quality", default=_DEEP_DIVE_QUALITY
+        ) or _DEEP_DIVE_QUALITY
+        started_at = time.monotonic()
+
+        sections = merged.get("sections") or []
+        todo = [s for s in sections if s.get("gap_status") in ("partial", "missing", "unclear")]
+        if not todo:
+            return
+
+        Entry = self.env["custom.module.capability.entry"].sudo()
+        # Index catalog entries by module_name once.
+        all_entries = Entry.search([])
+        entries_by_name = {e.module_name: e for e in all_entries}
+        # Tag-based fallback index: tech_code -> list[module_name]
+        tag_index: dict[str, list[str]] = {}
+        for e in all_entries:
+            for code in e.capability_tag_ids.mapped("technical_code"):
+                tag_index.setdefault(code, []).append(e.module_name)
+
+        # Build a fast lookup from BRD section_id -> the actual record so we
+        # can read title/content (the model only gets the trimmed batch view).
+        Section = self.env["brd.document.section"].sudo()
+        record_by_id: dict[int, Any] = {
+            s.id: s for s in Section.search([("document_id", "=", brd_doc.id)])
+        }
+
+        # Track which recommendations to drop (set of names).
+        drop_names: set[str] = set()
+        calls = 0
+        deep_raw: list[str] = []
+
+        for sec in todo:
+            if calls >= max_calls:
+                _logger.info("brd_ai_analyzer: deep-dive cap reached (%d), stopping", max_calls)
+                break
+            elapsed = time.monotonic() - started_at
+            if elapsed >= time_budget:
+                _logger.info(
+                    "brd_ai_analyzer: deep-dive time budget exhausted "
+                    "(elapsed=%.1fs, budget=%.1fs, done=%d/%d)",
+                    elapsed, time_budget, calls, len(todo),
+                )
+                break
+            sec_id = int(sec.get("section_id") or 0)
+            sec_record = record_by_id.get(sec_id)
+            if sec_record is None:
+                continue
+
+            # Pick candidates: pass-1 mapped names first, fall back to tag match.
+            cand_names: list[str] = list(sec.get("mapped_module_names") or [])
+            if len(cand_names) < _DEEP_DIVE_CANDIDATES_PER_SECTION:
+                for tag in (sec.get("capabilities_mentioned") or []):
+                    for name in tag_index.get(tag, []):
+                        if name not in cand_names:
+                            cand_names.append(name)
+                        if len(cand_names) >= _DEEP_DIVE_CANDIDATES_PER_SECTION:
+                            break
+                    if len(cand_names) >= _DEEP_DIVE_CANDIDATES_PER_SECTION:
+                        break
+            cand_names = cand_names[:_DEEP_DIVE_CANDIDATES_PER_SECTION]
+            if not cand_names:
+                continue
+
+            excerpts = self._gather_source_excerpts(cand_names, entries_by_name)
+            if not excerpts:
+                continue
+
+            user_msg = self._build_deep_dive_user_msg(
+                brd_doc=brd_doc,
+                section_record=sec_record,
+                pass1_verdict={
+                    "fit_score": sec.get("fit_score"),
+                    "gap_status": sec.get("gap_status"),
+                    "notes": sec.get("notes"),
+                    "mapped_module_names": sec.get("mapped_module_names") or [],
+                },
+                excerpts=excerpts,
+            )
+            try:
+                raw = self._call_ai_deep_dive(user_message=user_msg, quality=deep_quality)
+            except Exception as exc:  # pragma: no cover
+                _logger.warning("brd_ai_analyzer: deep-dive call failed for sec %s: %s", sec_id, exc)
+                continue
+            deep_raw.append(raw or "")
+            parsed = self._try_parse(raw or "")
+            calls += 1
+            if not parsed:
+                _logger.info("brd_ai_analyzer: deep-dive returned unparseable JSON for sec %s", sec_id)
+                continue
+
+            # Apply override conservatively — only accept if gap_status is one
+            # of the allowed values and section_id matches.
+            new_status = parsed.get("gap_status")
+            if new_status in ("covered", "partial", "missing", "unclear"):
+                sec["gap_status"] = new_status
+            if "fit_score" in parsed:
+                try:
+                    sec["fit_score"] = max(0, min(100, int(parsed.get("fit_score") or 0)))
+                except (TypeError, ValueError):
+                    pass
+            if parsed.get("notes"):
+                # Prepend pass-2 note so the BA can see both verdicts.
+                pass1_note = sec.get("notes") or ""
+                sec["notes"] = f"[deep-dive] {parsed['notes']}\n[pass-1] {pass1_note}".strip()
+
+            for n in parsed.get("drop_recommendation_names") or []:
+                if isinstance(n, str):
+                    drop_names.add(n)
+
+        # Drop recommendations the deep-dive confirmed are no longer needed.
+        if drop_names:
+            before = len(merged.get("recommendations") or [])
+            merged["recommendations"] = [
+                r for r in (merged.get("recommendations") or [])
+                if (r.get("name") or "") not in drop_names
+            ]
+            _logger.info(
+                "brd_ai_analyzer: deep-dive dropped %d/%d recommendation(s): %s",
+                before - len(merged["recommendations"]), before, sorted(drop_names),
+            )
+
+        if deep_raw:
+            raw_responses.append("\n--- DEEP-DIVE BATCH ---\n" + "\n\n--- DD ---\n\n".join(deep_raw))
+
+    def _gather_source_excerpts(self, module_names: list[str], entries_by_name: dict) -> list[dict]:
+        """Read up to ``_DEEP_DIVE_MAX_BYTES_PER_MODULE`` of source per module,
+        prioritising ``models/*.py`` then ``wizards/*.py``. Returns a list of
+        ``{module, files: [{path, content}]}`` dicts.
+        """
+        out: list[dict] = []
+        for name in module_names:
+            entry = entries_by_name.get(name)
+            if entry is None:
+                continue
+            base = entry.module_path
+            if not base or not os.path.isdir(base):
+                continue
+            file_entries: list[dict] = []
+            budget = _DEEP_DIVE_MAX_BYTES_PER_MODULE
+            for sub in ("models", "wizards", "wizard"):
+                folder = os.path.join(base, sub)
+                if not os.path.isdir(folder):
+                    continue
+                for root, _dirs, files in os.walk(folder):
+                    for fn in sorted(files):
+                        if not fn.endswith(".py") or fn == "__init__.py":
+                            continue
+                        if budget <= 0:
+                            break
+                        full = os.path.join(root, fn)
+                        try:
+                            with open(full, "r", encoding="utf-8", errors="ignore") as fh:
+                                src = fh.read(budget + 1)
+                        except OSError:
+                            continue
+                        truncated = len(src) > budget
+                        if truncated:
+                            src = src[:budget] + "\n# ...(truncated)\n"
+                        budget -= len(src)
+                        # Relative path for citation clarity.
+                        rel = os.path.relpath(full, base).replace(os.sep, "/")
+                        file_entries.append({"path": rel, "content": src})
+                    if budget <= 0:
+                        break
+                if budget <= 0:
+                    break
+            if file_entries:
+                out.append({"module": name, "files": file_entries})
+        return out
+
+    @staticmethod
+    def _build_deep_dive_user_msg(*, brd_doc, section_record, pass1_verdict: dict, excerpts: list[dict]) -> str:
+        # Render excerpts as fenced blocks the model can scan quickly.
+        blocks: list[str] = []
+        for mod in excerpts:
+            blocks.append(f"=== MODULE {mod['module']} ===")
+            for f in mod.get("files") or []:
+                blocks.append(f"--- {mod['module']}/{f['path']} ---")
+                blocks.append(f["content"])
+        excerpts_blob = "\n".join(blocks)
+        return (
+            f"BRD: {brd_doc.name or 'BRD'}\n"
+            f"Business domain: {brd_doc.business_domain or 'other'}\n"
+            f"Language: {brd_doc.language or 'en'}\n\n"
+            f"=== BRD SECTION ===\n"
+            f"id: {section_record.id}\n"
+            f"title: {section_record.title or ''}\n"
+            f"content:\n{(section_record.content or '')[:4000]}\n\n"
+            f"=== PASS-1 VERDICT (TO VERIFY OR OVERRIDE) ===\n"
+            f"{json.dumps(pass1_verdict, ensure_ascii=False, indent=2)}\n\n"
+            f"=== CANDIDATE MODULE SOURCE (TRUNCATED) ===\n"
+            f"{excerpts_blob}\n\n"
+            f"Return STRICT JSON per the deep-dive schema. Cite "
+            f"module_name:filename when claiming coverage. If unsure, keep "
+            f"pass-1 verdict."
+        )
+
+    def _call_ai_deep_dive(self, *, user_message: str, quality: str = _DEEP_DIVE_QUALITY) -> str:
+        # Deep-dive system prompt is fixed across all calls in this run → cache.
+        cached_system = (
+            f"{DEEP_DIVE_SYSTEM_PROMPT}\n\n"
+            f"<!-- cache_control: ephemeral -->\n"
+        )
+        result = self.env["custom.ai"].sudo()._chat(
+            messages=[{"role": "user", "content": user_message}],
+            system=cached_system,
+            quality=quality if quality in ("fast", "high") else _DEEP_DIVE_QUALITY,
+            max_tokens=_DEEP_DIVE_MAX_TOKENS,
+            temperature=0.2,
+        )
+        return self._unwrap_text(result)
 
     # ------------------------------------------------------------------
     # AI gateway call

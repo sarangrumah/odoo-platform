@@ -166,7 +166,7 @@ class CustomPdpFieldRegistry(models.Model):
         if not group_ids:
             return False
         user = self.env.user
-        user_groups = set(user.groups_id.ids)
+        user_groups = set(user.all_group_ids.ids)
         return bool(user_groups.intersection(group_ids))
 
     @api.model

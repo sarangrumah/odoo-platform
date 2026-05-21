@@ -57,6 +57,7 @@ What this module does NOT do
         "custom_pdp_audit",
         "custom_coretax",
     ],
+    "capability_tags": ["indonesian-tax", "coretax", "audit-trail", "multi-tenant", "withholding"],
     "external_dependencies": {"python": ["requests"]},
     "data": [
         "security/security.xml",

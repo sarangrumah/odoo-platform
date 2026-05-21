@@ -11,4 +11,7 @@ class DocumentTag(models.Model):
     color = fields.Integer()
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [("name_uniq", "unique(name)", "Tag name must be unique.")]
+    _name_uniq = models.Constraint(
+        'unique(name)',
+        'Tag name must be unique.',
+    )

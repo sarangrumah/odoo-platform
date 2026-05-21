@@ -27,6 +27,7 @@ EE-equivalent feature set:
         "barcodes_gs1_nomenclature",
         "stock",
     ],
+    "capability_tags": ["barcode-scan", "wms", "hht", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

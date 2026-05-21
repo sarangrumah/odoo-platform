@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Mount Forum Moderation under the Custom root menu -->
+    <menuitem id="menu_custom_forum_root"
+              name="Forum Moderation"
+              parent="custom_core.menu_custom_root"
+              sequence="50"
+              groups="custom_forum.group_user"/>
+
+    <menuitem id="menu_custom_forum_posts"
+              name="Posts"
+              parent="menu_custom_forum_root"
+              action="website_forum.forum_post_action"
+              sequence="10"
+              groups="custom_forum.group_user"/>
+
+    <menuitem id="menu_custom_forum_post_reasons"
+              name="Closing Reasons"
+              parent="menu_custom_forum_root"
+              action="website_forum.forum_post_reason_action"
+              sequence="20"
+              groups="custom_forum.group_manager"/>
+</odoo>

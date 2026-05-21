@@ -34,25 +34,23 @@
                 <field name="last_backup_at"/>
                 <field name="contact_email"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_card oe_kanban_global_click">
-                            <div class="o_kanban_record_top">
-                                <div class="o_kanban_record_headings">
-                                    <strong><field name="display_name"/></strong>
-                                    <small class="text-muted">
-                                        <field name="slug"/>
-                                    </small>
-                                </div>
-                                <div>
-                                    <span class="badge text-bg-info">
-                                        <field name="plan_tier"/>
-                                    </span>
-                                </div>
+                    <t t-name="card">
+                        <div class="o_kanban_record_top">
+                            <div class="o_kanban_record_headings">
+                                <strong><field name="display_name"/></strong>
+                                <small class="text-muted">
+                                    <field name="slug"/>
+                                </small>
                             </div>
-                            <div class="o_kanban_record_body">
-                                <div>📧 <field name="contact_email"/></div>
-                                <div>💾 Last backup: <field name="last_backup_at"/></div>
+                            <div>
+                                <span class="badge text-bg-info">
+                                    <field name="plan_tier"/>
+                                </span>
                             </div>
+                        </div>
+                        <div class="o_kanban_record_body">
+                            <div>📧 <field name="contact_email"/></div>
+                            <div>💾 Last backup: <field name="last_backup_at"/></div>
                         </div>
                     </t>
                 </templates>

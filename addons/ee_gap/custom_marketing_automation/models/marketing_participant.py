@@ -24,10 +24,10 @@ class MarketingParticipant(models.Model):
     next_action_at = fields.Datetime(default=fields.Datetime.now)
     completed_at = fields.Datetime(readonly=True)
 
-    _sql_constraints = [
-        ("unique_campaign_partner", "unique(campaign_id, partner_id)",
-         "Partner already in this campaign."),
-    ]
+    _unique_campaign_partner = models.Constraint(
+        'unique(campaign_id, partner_id)',
+        'Partner already in this campaign.',
+    )
 
     def _pdp_audit_classification(self):
         return "pii"

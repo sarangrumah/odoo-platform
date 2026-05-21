@@ -96,6 +96,7 @@ class BrdDocument(models.Model):
         [
             ("draft", "Draft"),
             ("extracted", "Extracted"),
+            ("analyzing", "Analyzing"),
             ("analyzed", "Analyzed"),
             ("reviewed", "Reviewed"),
             ("approved", "Approved"),
@@ -113,9 +114,26 @@ class BrdDocument(models.Model):
     overall_fit_pct = fields.Integer(
         compute="_compute_overall_fit",
         store=True,
-        help="Weighted average fit score across analyzed sections (0-100).",
+        help=(
+            "Weighted average fit_score across all analyzed sections (0-100).\n"
+            "Formula: sum(weight x fit_score) / sum(weight), where weight is "
+            "gap_severity rank (must_have=3, should_have=2, nice_to_have=1).\n"
+            "Per-section fit_score is set by the AI: how confident it is that "
+            "the mapped hub modules cover the requirement of that section."
+        ),
     )
-    severity_summary = fields.Char(compute="_compute_severity_summary", store=True)
+    severity_summary = fields.Char(
+        compute="_compute_severity_summary",
+        store=True,
+        help=(
+            "Count of analyzed sections per gap_status:\n"
+            " - covered: existing hub module fully covers requirement\n"
+            " - partial: existing module covers some, needs extension\n"
+            " - missing: no module covers it, new custom_<x> needed\n"
+            " - unclear: AI not confident (often signals thin knowledge file)\n"
+            "See the Analysis tab for the row-level breakdown."
+        ),
+    )
 
     token_uuid = fields.Char(
         copy=False,
@@ -233,8 +251,44 @@ class BrdDocument(models.Model):
         self.message_post(body=_("BRD extracted: %s sections.") % len(self.section_ids))
 
     def action_analyze(self):
+        """Synchronous analyze. Kept for tests and as a fallback when
+        queue_job's worker is not running. UI should prefer
+        ``action_analyze_async`` which returns immediately and dispatches
+        the heavy work to the queue."""
         for rec in self:
             rec._do_analyze()
+        return True
+
+    def action_analyze_async(self):
+        """Schedule the analyze on the queue_job worker so the HTTP request
+        that triggered it returns immediately. The frontend should poll
+        ``state`` to detect completion.
+
+        Falls back to synchronous execution if queue_job is not installed
+        (e.g. test setup) — the caller still gets a deterministic outcome.
+        """
+        for rec in self:
+            if rec.state == "draft":
+                raise UserError(_("Extract the BRD before running analysis."))
+            rec.write({
+                "state": "analyzing",
+                "last_ai_at": fields.Datetime.now(),
+                "last_ai_raw": False,
+                "last_ai_section_count": 0,
+                "last_ai_recommendation_count": 0,
+            })
+            rec.message_post(body=_("BRD analyze dispatched to background worker."))
+            # queue_job exposes ``with_delay`` on every recordset when the
+            # module is installed. Detect by attribute presence so we don't
+            # hard-depend on it at import time.
+            if hasattr(rec, "with_delay"):
+                rec.with_delay(description="BRD AI analyze")._do_analyze()
+            else:
+                _logger.warning(
+                    "brd.document.action_analyze_async: queue_job not available, "
+                    "running synchronously. State will block the HTTP call."
+                )
+                rec._do_analyze()
         return True
 
     def _do_analyze(self):

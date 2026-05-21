@@ -28,6 +28,7 @@ Indonesian payroll engine — self-contained, does not require Odoo EE
         "hr",
         "mail",
     ],
+    "capability_tags": ["indonesian-payroll", "payroll", "indonesian-tax", "withholding", "coretax", "audit-trail"],
     "data": [
         "security/custom_hr_payroll_id_security.xml",
         "security/ir.model.access.csv",

@@ -20,11 +20,12 @@
         <field name="model">hr.payroll.ter.bracket</field>
         <field name="arch" type="xml">
             <search>
+                <field name="category"/>
                 <filter name="cat_a" string="Kategori A" domain="[('category','=','A')]"/>
                 <filter name="cat_b" string="Kategori B" domain="[('category','=','B')]"/>
                 <filter name="cat_c" string="Kategori C" domain="[('category','=','C')]"/>
-                <group expand="0" string="Group By">
-                    <filter name="by_cat" string="Category" context="{'group_by': 'category'}"/>
+                <group>
+                    <filter name="by_cat" string="Category" domain="[]" context="{'group_by': 'category'}"/>
                 </group>
             </search>
         </field>

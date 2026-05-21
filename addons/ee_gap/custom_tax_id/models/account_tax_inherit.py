@@ -17,6 +17,7 @@ via an overridden ``_compute_amount``.
 from __future__ import annotations
 
 from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 DPP_CATEGORY_SELECTION = [
@@ -62,18 +63,32 @@ class AccountTax(models.Model):
     )
 
     # ------------------------------------------------------------------
-    # Override the per-line tax computation to apply the DPP factor.
-    # Odoo's ``_compute_amount`` returns the tax amount for a single line.
-    # We multiply ``base_amount`` by the factor before delegating to super.
+    # Apply the DPP factor by adjusting raw_base before Odoo's tax engine
+    # computes the amount. Odoo 19 refactored the tax pipeline to call
+    # ``_eval_tax_amount_price_excluded`` / ``_eval_tax_amount_price_included``
+    # / ``_eval_tax_amount_fixed_amount`` instead of the legacy
+    # ``_compute_amount`` hook used in 16/17.
     # ------------------------------------------------------------------
 
-    def _compute_amount(self, base_amount, price_unit, quantity=1.0, product=None,
-                       partner=None, fixed_multiplicator=1):
+    def _dpp_adjust(self, raw_base):
+        """Multiply ``raw_base`` by the DPP factor when nilai_lain is active."""
         if self.x_custom_dpp_method == "nilai_lain" and self.x_custom_dpp_factor:
-            base_amount = base_amount * self.x_custom_dpp_factor
-        return super()._compute_amount(
-            base_amount, price_unit, quantity=quantity, product=product,
-            partner=partner, fixed_multiplicator=fixed_multiplicator,
+            return raw_base * self.x_custom_dpp_factor
+        return raw_base
+
+    def _eval_tax_amount_price_excluded(self, batch, raw_base, evaluation_context):
+        return super()._eval_tax_amount_price_excluded(
+            batch, self._dpp_adjust(raw_base), evaluation_context,
+        )
+
+    def _eval_tax_amount_price_included(self, batch, raw_base, evaluation_context):
+        return super()._eval_tax_amount_price_included(
+            batch, self._dpp_adjust(raw_base), evaluation_context,
+        )
+
+    def _eval_tax_amount_fixed_amount(self, batch, raw_base, evaluation_context):
+        return super()._eval_tax_amount_fixed_amount(
+            batch, self._dpp_adjust(raw_base), evaluation_context,
         )
 
     @api.constrains("x_custom_dpp_method", "x_custom_dpp_factor")
@@ -81,6 +96,6 @@ class AccountTax(models.Model):
         for rec in self:
             if rec.x_custom_dpp_method == "nilai_lain":
                 if not rec.x_custom_dpp_factor or rec.x_custom_dpp_factor <= 0:
-                    raise models.ValidationError(
+                    raise ValidationError(
                         _("DPP Nilai Lain requires a positive ``dpp_factor`` (e.g. 11/12).")
                     )

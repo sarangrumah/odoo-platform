@@ -27,13 +27,11 @@
                 <field name="scheduled_start"/>
                 <field name="state"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_card oe_kanban_global_click">
-                            <strong><field name="name"/></strong>
-                            <div><field name="site_id"/></div>
-                            <div class="text-muted">👷 <field name="technician_id"/></div>
-                            <div class="text-muted">🗓 <field name="scheduled_start"/></div>
-                        </div>
+                    <t t-name="card">
+                        <strong><field name="name"/></strong>
+                        <div><field name="site_id"/></div>
+                        <div class="text-muted">👷 <field name="technician_id"/></div>
+                        <div class="text-muted">🗓 <field name="scheduled_start"/></div>
                     </t>
                 </templates>
             </kanban>

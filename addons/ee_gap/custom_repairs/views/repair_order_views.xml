@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Form view inherit -->
+    <record id="view_repair_order_form_inherit_custom_repairs" model="ir.ui.view">
+        <field name="name">repair.order.form.inherit.custom_repairs</field>
+        <field name="model">repair.order</field>
+        <field name="inherit_id" ref="repair.view_repair_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Warranty &amp; SLA">
+                    <group>
+                        <field name="x_warranty_status"/>
+                        <field name="x_warranty_until"
+                               invisible="x_warranty_status == 'na'"/>
+                        <field name="x_customer_notified"/>
+                    </group>
+                    <group>
+                        <field name="x_promised_completion_date"/>
+                        <field name="x_actual_completion_date"/>
+                        <field name="x_sla_status" widget="badge"/>
+                    </group>
+                </group>
+                <group string="Customer Complaint (ID)">
+                    <field name="x_id_complaint" nolabel="1"
+                           placeholder="Keluhan pelanggan dalam Bahasa Indonesia..."/>
+                </group>
+            </xpath>
+            <xpath expr="//header" position="inside">
+                <button name="action_send_status_whatsapp"
+                        type="object"
+                        string="Send WhatsApp Update"
+                        icon="fa-whatsapp"
+                        groups="custom_repairs.group_user"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- List view inherit -->
+    <record id="view_repair_order_list_inherit_custom_repairs" model="ir.ui.view">
+        <field name="name">repair.order.list.inherit.custom_repairs</field>
+        <field name="model">repair.order</field>
+        <field name="inherit_id" ref="repair.view_repair_order_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <field name="x_warranty_status" optional="show"/>
+                <field name="x_promised_completion_date" optional="show"/>
+                <field name="x_sla_status" widget="badge" optional="show"/>
+                <field name="x_customer_notified" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Standalone action filtered for SLA tracking -->
+    <record id="action_repair_order_custom" model="ir.actions.act_window">
+        <field name="name">Repair Orders (SLA)</field>
+        <field name="res_model">repair.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+    </record>
+</odoo>

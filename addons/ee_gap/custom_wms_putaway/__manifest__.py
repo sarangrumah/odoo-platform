@@ -27,6 +27,7 @@ Generic by design — no warehouse-vertical assumptions.
         "stock",
         "product",
     ],
+    "capability_tags": ["wms", "barcode-scan", "hht", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

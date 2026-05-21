@@ -92,10 +92,10 @@
                 <filter name="active" string="Active" domain="[('active', '=', True)]"/>
                 <filter name="due" string="Due Today"
                         domain="[('next_date', '&lt;=', context_today().strftime('%Y-%m-%d'))]"/>
-                <group string="Group By">
+                
                     <filter name="group_period" string="Period" context="{'group_by': 'period'}"/>
                     <filter name="group_journal" string="Journal" context="{'group_by': 'journal_id'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

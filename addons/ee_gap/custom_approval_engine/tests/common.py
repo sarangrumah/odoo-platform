@@ -45,7 +45,7 @@ class ApprovalTestCommon(TransactionCase):
             "login": login,
             "name": name,
             "email": f"{login}@example.com",
-            "groups_id": [(6, 0, groups)],
+            "group_ids": [(6, 0, groups)],
         })
 
     def _make_matrix(self, name: str, model_xmlid: str = "purchase.model_purchase_order",

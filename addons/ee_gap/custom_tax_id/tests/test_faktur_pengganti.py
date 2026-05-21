@@ -28,8 +28,8 @@ class TestFakturPengganti(TaxIdCommon):
     def _post_with_nsfp(self, move, nsfp: str = "00012620000000001"):
         move.action_post()
         # Simulate Coretax handing back an NSFP after approval
-        if hasattr(move, "nsfp"):
-            move.write({"nsfp": nsfp})
+        if hasattr(move, "x_custom_nsfp"):
+            move.write({"x_custom_nsfp": nsfp})
         return move
 
     def test_first_pengganti_increments_kode_status(self):
@@ -69,11 +69,11 @@ class TestFakturPengganti(TaxIdCommon):
 
     def test_source_nsfp_cleared_after_pengganti(self):
         src = self._post_with_nsfp(self._make_sales_invoice())
-        original_nsfp = src.nsfp
+        original_nsfp = src.x_custom_nsfp
         self.assertTrue(original_nsfp)
         self.env["tax.faktur.pengganti.wizard"].create({
             "source_move_id": src.id,
             "reason": "test",
         }).action_create_replacement()
         # NSFP cleared because DJP voids it once pengganti is approved
-        self.assertFalse(src.nsfp)
+        self.assertFalse(src.x_custom_nsfp)

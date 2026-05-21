@@ -28,7 +28,7 @@ class AccountAnalyticAccount(models.Model):
     )
     x_custom_branch_root_id = fields.Many2one(
         "account.analytic.account",
-        string="Branch Root",
+        string="Branch Root (Computed)",
         compute="_compute_branch_root",
         store=True,
         recursive=True,

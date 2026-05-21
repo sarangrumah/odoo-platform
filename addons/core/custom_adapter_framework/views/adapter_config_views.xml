@@ -72,10 +72,10 @@
                 <filter name="filter_active" string="Active" domain="[('status','=','active')]"/>
                 <filter name="filter_circuit_open" string="Circuit Open" domain="[('status','=','circuit_open')]"/>
                 <filter name="filter_disabled" string="Disabled" domain="[('status','=','disabled')]"/>
-                <group expand="0" string="Group By">
+                
                     <filter name="group_status" string="Status" context="{'group_by': 'status'}"/>
                     <filter name="group_type" string="Type" context="{'group_by': 'adapter_type'}"/>
-                </group>
+                
             </search>
         </field>
     </record>

@@ -14,6 +14,7 @@ from odoo.exceptions import ValidationError
 
 class CoretaxBuktiPotong(models.Model):
     _name = "custom.coretax.bukti.potong"
+    _inherit = ["mail.thread", "mail.activity.mixin"]
     _description = "Custom Coretax — Bukti Potong (PPh)"
     _order = "tanggal_bupot desc, id desc"
     _rec_name = "no_bupot"

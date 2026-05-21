@@ -34,6 +34,7 @@ ops team has a single pane of glass:
         "mail",
         "web",
     ],
+    "capability_tags": ["multi-tenant", "anomaly-detection", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

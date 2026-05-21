@@ -20,6 +20,7 @@ Custom Subscriptions — Phase 2E MVP:
         "sale_management",
         "account",
     ],
+    "capability_tags": ["subscription", "recurring", "ai", "accounting"],
     "data": [
         "security/custom_subscription_security.xml",
         "security/ir.model.access.csv",

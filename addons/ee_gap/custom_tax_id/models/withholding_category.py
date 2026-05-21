@@ -35,6 +35,7 @@ class WithholdingCategory(models.Model):
     )
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code)", "Withholding category code must be unique."),
-    ]
+    _code_uniq = models.Constraint(
+        'unique(code)',
+        'Withholding category code must be unique.',
+    )

@@ -117,13 +117,10 @@ class HrPayslip(models.Model):
         tracking=True,
     )
 
-    _sql_constraints = [
-        (
-            "uniq_employee_period",
-            "unique(employee_id, period_year, period_month, is_thr)",
-            "Only one payslip per employee per period (regular vs THR are distinct).",
-        ),
-    ]
+    _uniq_employee_period = models.Constraint(
+        'unique(employee_id, period_year, period_month, is_thr)',
+        'Only one payslip per employee per period (regular vs THR are distinct).',
+    )
 
     @api.depends("employee_id", "period_year", "period_month", "is_thr")
     def _compute_name(self):
@@ -274,7 +271,7 @@ class HrPayslip(models.Model):
         if self.bupot_id or not self.pph21 or self.pph21 <= 0:
             return
         Bupot = self.env["custom.coretax.bukti.potong"].sudo()
-        partner = self.employee_id.user_partner_id or self.employee_id.address_home_id
+        partner = self.employee_id.user_partner_id or self.employee_id.work_contact_id
         if not partner:
             # Fall back to employee resource_id name; create a minimal partner so
             # the Bupot has a counterparty reference. Operator can later replace.

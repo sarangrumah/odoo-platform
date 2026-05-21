@@ -1,20 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        <record id="module_category_bank_import" model="ir.module.category">
-            <field name="name">Bank Import</field>
-            <field name="sequence">25</field>
-        </record>
-
         <record id="group_bank_import_user" model="res.groups">
             <field name="name">Bank Import User</field>
-            <field name="category_id" ref="module_category_bank_import"/>
             <field name="comment">Can run CSV imports and view logs.</field>
         </record>
 
         <record id="group_bank_import_admin" model="res.groups">
             <field name="name">Bank Import Admin</field>
-            <field name="category_id" ref="module_category_bank_import"/>
             <field name="implied_ids" eval="[Command.link(ref('group_bank_import_user'))]"/>
             <field name="comment">Manage templates and H2H credentials.</field>
         </record>

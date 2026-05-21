@@ -34,6 +34,7 @@ the ORM otherwise — the source of truth is the master DB registry.
     "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "mail"],
+    "capability_tags": ["multi-tenant", "audit-trail", "approval-workflow"],
     "external_dependencies": {"python": ["httpx", "croniter"]},
     "data": [
         "security/security.xml",

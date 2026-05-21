@@ -7,11 +7,9 @@
         </record>
         <record id="group_doc_user" model="res.groups">
             <field name="name">Documents User</field>
-            <field name="category_id" ref="module_category_documents"/>
         </record>
         <record id="group_doc_admin" model="res.groups">
             <field name="name">Documents Admin</field>
-            <field name="category_id" ref="module_category_documents"/>
             <field name="implied_ids" eval="[Command.link(ref('group_doc_user'))]"/>
         </record>
     </data>

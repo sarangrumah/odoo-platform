@@ -37,22 +37,20 @@
                 <field name="overdue"/>
                 <field name="state"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="oe_kanban_card oe_kanban_global_click #{record.overdue.raw_value ? 'border-danger' : ''}">
-                            <div class="o_kanban_record_top">
-                                <strong><field name="res_name"/></strong>
-                            </div>
-                            <div>
-                                <field name="matrix_id"/>
-                            </div>
-                            <div class="text-muted">
-                                Tier: <field name="current_tier_id"/>
-                            </div>
-                            <div class="text-muted">
-                                Due: <field name="due_at"/>
-                            </div>
-                            <div>By <field name="requested_by_id"/></div>
+                    <t t-name="card" t-attf-class="#{record.overdue.raw_value ? 'border-danger' : ''}">
+                        <div class="o_kanban_record_top">
+                            <strong><field name="res_name"/></strong>
                         </div>
+                        <div>
+                            <field name="matrix_id"/>
+                        </div>
+                        <div class="text-muted">
+                            Tier: <field name="current_tier_id"/>
+                        </div>
+                        <div class="text-muted">
+                            Due: <field name="due_at"/>
+                        </div>
+                        <div>By <field name="requested_by_id"/></div>
                     </t>
                 </templates>
             </kanban>
@@ -139,7 +137,7 @@
                 <filter name="overdue" string="Overdue" domain="[('overdue','=',True)]"/>
                 <filter name="approved" string="Approved" domain="[('state','=','approved')]"/>
                 <filter name="rejected" string="Rejected" domain="[('state','=','rejected')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="by_state" string="State" context="{'group_by': 'state'}"/>
                     <filter name="by_matrix" string="Matrix" context="{'group_by': 'matrix_id'}"/>
                     <filter name="by_model" string="Model" context="{'group_by': 'res_model'}"/>

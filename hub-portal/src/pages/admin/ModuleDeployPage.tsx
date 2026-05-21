@@ -1,21 +1,34 @@
-import { useEffect, useState } from 'react';
-import { Package, Rocket, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Package, Rocket, Search } from 'lucide-react';
 import { Badge, Button, Card, Input, Modal, Section, Select, Table } from '../../components/ui';
 import EmptyState from '../../components/EmptyState';
 import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, spacing } from '../../tokens';
-import { createDeployment, listDeployments, listModuleCatalog } from '../../api';
+import { createDeployment, listDeployments, listModuleCatalog, listTenants } from '../../api';
+
+const PAGE_SIZE = 20;
+const CATEGORIES = ['core', 'compliance', 'ee_gap', 'operations', 'vertical'];
+const MATURITIES = ['scaffold', 'partial', 'production'];
 
 export default function ModuleDeployPage() {
   const [catalog, setCatalog] = useState<any[]>([]);
   const [deployments, setDeployments] = useState<any[]>([]);
+  const [tenants, setTenants] = useState<any[]>([]);
   const [q, setQ] = useState('');
+  const [fCategory, setFCategory] = useState('');
+  const [fMaturity, setFMaturity] = useState('');
+  const [page, setPage] = useState(1);
   const [openMod, setOpenMod] = useState<any | null>(null);
-  const [tenant, setTenant] = useState('1');
-  const [env, setEnv] = useState('staging');
+  const [tenantId, setTenantId] = useState('');
+  const [deployMode, setDeployMode] = useState<'install' | 'upgrade' | 'uninstall'>('install');
   const [canary, setCanary] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
+
+  const refreshDeployments = () =>
+    listDeployments().then((d) => Array.isArray(d) && setDeployments(d)).catch(() => null);
 
   useEffect(() => {
     const detectConfig = (msg: string) =>
@@ -27,30 +40,56 @@ export default function ModuleDeployPage() {
         return null;
       }),
       listDeployments().catch(() => null),
-    ]).then(([c, d]) => {
+      listTenants().catch(() => null),
+    ]).then(([c, d, t]) => {
       if (Array.isArray(c)) setCatalog(c);
       if (Array.isArray(d)) setDeployments(d);
+      if (Array.isArray(t)) {
+        setTenants(t);
+        if (t.length > 0) setTenantId(String(t[0].id));
+      }
       setLoaded(true);
     });
   }, []);
 
   async function deploy() {
-    if (!openMod) return;
+    if (!openMod || !tenantId) return;
+    setSubmitting(true);
+    setSubmitError(null);
     try {
       await createDeployment({
-        module_id: openMod.id,
-        tenant_id: Number(tenant),
-        env,
-        canary_phase: canary ? '10%' : 'full',
+        catalog_id: openMod.id,
+        tenant_id: Number(tenantId),
+        deploy_mode: deployMode,
+        canary_phase: canary ? 'canary' : 'full',
       });
-    } catch {/* TODO surface error */}
-    setOpenMod(null);
+      await refreshDeployments();
+      setOpenMod(null);
+    } catch (e: any) {
+      setSubmitError(e?.detail || e?.message || String(e));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  const filtered = catalog.filter((m) => {
-    const haystack = `${m.module_name || ''} ${m.summary || ''}`.toLowerCase();
-    return haystack.includes(q.toLowerCase());
-  });
+  const filtered = useMemo(() => {
+    const needle = q.toLowerCase();
+    return catalog.filter((m) => {
+      if (fCategory && m.category !== fCategory) return false;
+      if (fMaturity && m.maturity !== fMaturity) return false;
+      if (!needle) return true;
+      const haystack = `${m.module_name || ''} ${m.summary || ''}`.toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [catalog, q, fCategory, fMaturity]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, fCategory, fMaturity]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const showCatalogEmpty = loaded && catalog.length === 0;
 
@@ -68,9 +107,19 @@ export default function ModuleDeployPage() {
           />
         ) : (
         <>
-        <Card style={{ marginBottom: spacing.md, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Search size={14} color={colors.textMuted} />
-          <Input placeholder="Search module…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Card style={{ marginBottom: spacing.md, display: 'flex', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 240px', minWidth: 240 }}>
+            <Search size={14} color={colors.textMuted} />
+            <Input placeholder="Search module…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <Select value={fCategory} onChange={(e) => setFCategory(e.target.value)} style={{ minWidth: 160 }}>
+            <option value="">All categories</option>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </Select>
+          <Select value={fMaturity} onChange={(e) => setFMaturity(e.target.value)} style={{ minWidth: 160 }}>
+            <option value="">All maturities</option>
+            {MATURITIES.map((m) => <option key={m} value={m}>{m}</option>)}
+          </Select>
         </Card>
         <Table
           columns={[
@@ -87,14 +136,33 @@ export default function ModuleDeployPage() {
               key: 'actions',
               label: '',
               render: (r) => (
-                <Button size="sm" onClick={() => setOpenMod(r)}>
+                <Button size="sm" onClick={() => { setOpenMod(r); setSubmitError(null); }}>
                   <Rocket size={12} /> Deploy
                 </Button>
               ),
             },
           ]}
-          rows={filtered}
+          data={pageRows}
         />
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginTop: spacing.sm, fontSize: 12, color: colors.textMuted,
+        }}>
+          <span>
+            {filtered.length === 0
+              ? '0 modules'
+              : `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+            <Button size="sm" variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}>
+              <ChevronLeft size={14} /> Prev
+            </Button>
+            <span>Page {safePage} / {totalPages}</span>
+            <Button size="sm" variant="ghost" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}>
+              Next <ChevronRight size={14} />
+            </Button>
+          </div>
+        </div>
         </>
         )}
       </Section>
@@ -117,7 +185,7 @@ export default function ModuleDeployPage() {
             },
             { key: 'requested_at', label: 'Requested at' },
           ]}
-          rows={deployments}
+          data={deployments}
         />
       </Section>
 
@@ -125,29 +193,38 @@ export default function ModuleDeployPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
           <label style={{ fontSize: 12, color: colors.textMuted }}>
             Tenant
-            <Select value={tenant} onChange={(e) => setTenant(e.target.value)} style={{ marginTop: 4 }}>
-              <option value="1">Erajaya Tower A</option>
-              <option value="2">JDS Pratama</option>
-              <option value="3">Telkom Pulsa</option>
+            <Select value={tenantId} onChange={(e) => setTenantId(e.target.value)} style={{ marginTop: 4 }} disabled={tenants.length === 0}>
+              {tenants.length === 0 && <option value="">No tenants registered</option>}
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.display_name || t.slug} ({t.slug})
+                </option>
+              ))}
             </Select>
           </label>
           <label style={{ fontSize: 12, color: colors.textMuted }}>
-            Environment
-            <Select value={env} onChange={(e) => setEnv(e.target.value)} style={{ marginTop: 4 }}>
-              <option value="staging">staging</option>
-              <option value="prod">prod</option>
+            Mode
+            <Select value={deployMode} onChange={(e) => setDeployMode(e.target.value as any)} style={{ marginTop: 4 }}>
+              <option value="install">install</option>
+              <option value="upgrade">upgrade</option>
+              <option value="uninstall">uninstall</option>
             </Select>
           </label>
           <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={canary} onChange={(e) => setCanary(e.target.checked)} />
             Canary rollout (10% → 50% → 100%)
           </label>
+          {submitError && (
+            <div style={{ fontSize: 12, color: '#b91c1c', padding: '8px 12px', background: '#fef2f2', borderRadius: 6 }}>
+              {submitError}
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: spacing.sm }}>
-            <Button variant="ghost" onClick={() => setOpenMod(null)}>
+            <Button variant="ghost" onClick={() => setOpenMod(null)} disabled={submitting}>
               Cancel
             </Button>
-            <Button onClick={deploy}>
-              <Rocket size={14} /> Deploy
+            <Button onClick={deploy} disabled={submitting || !tenantId}>
+              <Rocket size={14} /> {submitting ? 'Deploying…' : 'Deploy'}
             </Button>
           </div>
         </div>

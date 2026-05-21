@@ -29,6 +29,7 @@ run would fall after it. Generated moves are audited through
         "custom_accounting_full",
         "account",
     ],
+    "capability_tags": ["accounting", "recurring", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

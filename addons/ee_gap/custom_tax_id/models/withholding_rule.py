@@ -45,9 +45,9 @@ class WithholdingRule(models.Model):
     account_id = fields.Many2one(
         "account.account",
         string="Account Hutang Pajak",
-        required=True,
         domain="[('company_ids','in',company_id),('account_type','=','liability_current')]",
-        help="Liability account credited when withholding is recognised.",
+        help="Liability account credited when withholding is recognised. "
+             "Required before the rule can be activated.",
     )
 
     # ---- Filters that narrow the resolution ----
@@ -81,6 +81,15 @@ class WithholdingRule(models.Model):
                 raise ValidationError(_("Tarif must be between 0 and 100 percent."))
             if rec.tarif_no_npwp and (rec.tarif_no_npwp < 0 or rec.tarif_no_npwp > 100):
                 raise ValidationError(_("Tarif without NPWP must be between 0 and 100 percent."))
+
+    @api.constrains("active", "account_id")
+    def _check_account_when_active(self):
+        for rec in self:
+            if rec.active and not rec.account_id:
+                raise ValidationError(_(
+                    "Rule '%s' cannot be activated without an Account Hutang Pajak. "
+                    "Set the liability account before activating.", rec.name,
+                ))
 
     # ------------------------------------------------------------------
 

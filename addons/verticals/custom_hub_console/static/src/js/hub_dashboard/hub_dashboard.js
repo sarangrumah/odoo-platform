@@ -13,7 +13,7 @@ import { useService } from "@web/core/utils/hooks";
  */
 export class HubDashboard extends Component {
     static template = "custom_hub_console.HubDashboard";
-    static props = {};
+    static props = ["*"];
 
     setup() {
         this.orm = useService("orm");
@@ -44,9 +44,10 @@ export class HubDashboard extends Component {
         }
     }
 
-    async _safeReadGroup(model, domain, fields, groupby) {
+    async _safeReadGroup(model, domain, groupby, aggregates) {
         try {
-            return await this.orm.readGroup(model, domain, fields, groupby);
+            return await this.orm.formattedReadGroup(
+                model, domain, groupby, aggregates);
         } catch (e) {
             return null;
         }
@@ -78,8 +79,8 @@ export class HubDashboard extends Component {
         const aiGroups = await this._safeReadGroup(
             "custom.hub.ai.usage",
             [["date", ">=", since]],
+            [],
             ["cost_usd:sum"],
-            []
         );
         this.state.aiCost7d = aiGroups && aiGroups.length
             ? (aiGroups[0].cost_usd || 0).toFixed(2)

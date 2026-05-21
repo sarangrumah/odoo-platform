@@ -13,6 +13,7 @@ implementation. Default 'manual' adapter logs but doesn't push.
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_audit", "mail"],
+    "capability_tags": ["marketing", "social-media", "pdp", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

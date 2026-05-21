@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   FileText,
@@ -25,7 +25,7 @@ import { Badge, Button, Card, Spinner, Tabs } from '../../components/ui';
 import EmptyState from '../../components/EmptyState';
 import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, radii, spacing } from '../../tokens';
-import { getJourney, listRecommendations, listBrdDocuments, runBrdExtract, runBrdAnalyze } from '../../api';
+import { getJourney, listRecommendations, listBrdDocuments, runBrdExtract, runBrdAnalyze, runBrdAnalyzeAsync, listCapabilityEntries, rejectRecommendationAsLesson } from '../../api';
 
 function partnerName(j: any): string {
   return Array.isArray(j?.partner_id) ? j.partner_id[1] : (j?.name || '—');
@@ -51,6 +51,23 @@ const SEVERITY_COLORS: Record<string, string> = {
   low: colors.textMuted,
 };
 
+const TYPE_TONE: Record<string, 'danger' | 'warning' | 'success' | 'info'> = {
+  new: 'danger',
+  extend: 'warning',
+  reuse: 'success',
+};
+const TYPE_LABEL: Record<string, string> = {
+  new: 'NEW MODULE',
+  extend: 'EXTEND',
+  reuse: 'REUSE',
+};
+
+// Render a many2one tuple [id, label] OR an array of such tuples.
+function m2oLabel(v: any): string {
+  if (Array.isArray(v) && v.length === 2 && typeof v[1] === 'string') return v[1];
+  return String(v);
+}
+
 export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
   const [tab, setTab] = useState('overview');
   const [journey, setJourney] = useState<any>(null);
@@ -60,6 +77,8 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
   const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
   const [busyBrd, setBusyBrd] = useState<number | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<any | null>(null);
+  const [capabilityEntries, setCapabilityEntries] = useState<any[]>([]);
 
   function refresh() {
     if (journeyId == null) {
@@ -86,6 +105,13 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
 
   useEffect(() => { refresh(); }, [journeyId]);
 
+  function openReject(rec: any) {
+    setRejectTarget(rec);
+    if (capabilityEntries.length === 0) {
+      listCapabilityEntries().then((rows) => setCapabilityEntries(rows || [])).catch(() => {});
+    }
+  }
+
   async function doExtract(id: number) {
     setBusyBrd(id); setActionMsg('Extract running…');
     try { await runBrdExtract(id); setActionMsg('Extract completed. State now extracted.'); refresh(); }
@@ -93,22 +119,36 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
     finally { setBusyBrd(null); }
   }
   async function doAnalyze(id: number) {
-    setBusyBrd(id); setActionMsg('AI analysis running — typically 30–90 seconds. Do not navigate away.');
+    setBusyBrd(id);
+    setActionMsg('AI analysis dispatched — polling for completion (up to ~10 min).');
     try {
-      await runBrdAnalyze(id);
-      // Pull fresh BRD state so counts + diagnostic land in the UI.
-      const fresh = await listBrdDocuments(journeyId!);
-      const me = (fresh || []).find((x: any) => x.id === id);
-      if (me && me.state === 'analyzed') {
-        const secs = me.last_ai_section_count || 0;
-        const recs = me.last_ai_recommendation_count || 0;
+      await runBrdAnalyzeAsync(id);
+      // Poll state every 5s for up to 10 min. queue_job worker flips state
+      // 'analyzing' → 'analyzed' (or back to 'extracted' on hard failure).
+      const deadline = Date.now() + 10 * 60 * 1000;
+      let final: any = null;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 5000));
+        const fresh = await listBrdDocuments(journeyId!);
+        const me = (fresh || []).find((x: any) => x.id === id);
+        if (!me) continue;
+        if (me.state === 'analyzed' || me.state === 'extracted') {
+          final = me;
+          break;
+        }
+      }
+      if (final && final.state === 'analyzed') {
+        const secs = final.last_ai_section_count || 0;
+        const recs = final.last_ai_recommendation_count || 0;
         setActionMsg(
           recs > 0
             ? `AI analysis complete: ${secs} sections analyzed, ${recs} recommendations created. Open the Recommendations tab.`
             : `AI ran but returned ${secs} sections / ${recs} recommendations. See the diagnostic dump on the BRD card below.`,
         );
+      } else if (final && final.state === 'extracted') {
+        setActionMsg('AI analysis failed on the worker — BRD reverted to extracted. Check the queue_job log.');
       } else {
-        setActionMsg('AI analysis dispatched.');
+        setActionMsg('AI analysis still running on the worker. Refresh the page later to see results.');
       }
       refresh();
     } catch (e: any) {
@@ -117,6 +157,10 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
       setBusyBrd(null);
     }
   }
+
+  // Kept for power users / debugging: synchronous variant retained but unused
+  // by default. Reference via window for ad-hoc invocation if needed.
+  void runBrdAnalyze;
 
   const severityCounts = useMemo(() => {
     const acc: Record<string, number> = {};
@@ -183,15 +227,27 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
         <Card style={{ marginTop: spacing.md }}>
           <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 8 }}>SMART LINKS</div>
           {[
-            { i: FileText, label: 'BRD document' },
-            { i: Lightbulb, label: 'Recommendations' },
-            { i: Server, label: 'VPS' },
-            { i: Package, label: 'Tenant DB' },
-            { i: Code2, label: 'Dev tasks' },
+            { i: FileText, label: 'BRD document', tab: 'brd' },
+            { i: Lightbulb, label: 'Recommendations', tab: 'recs' },
+            { i: Server, label: 'VPS', tab: 'vps' },
+            { i: Package, label: 'Tenant DB', tab: 'modules' },
+            { i: Code2, label: 'Dev tasks', tab: 'dev' },
           ].map((l) => {
             const Icon = l.i;
+            const active = tab === l.tab;
             return (
-              <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 12, color: colors.textMuted, cursor: 'pointer' }}>
+              <div
+                key={l.label}
+                onClick={() => setTab(l.tab)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 8px', margin: '2px -8px',
+                  borderRadius: radii.sm, fontSize: 12,
+                  color: active ? colors.text : colors.textMuted,
+                  background: active ? colors.surfaceMuted : 'transparent',
+                  cursor: 'pointer',
+                }}
+              >
                 <Icon size={14} /> {l.label}
               </div>
             );
@@ -376,11 +432,57 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
 
         {tab === 'recs' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+            {/* Summary header: type counts, BRD fit & coverage. Tells the analyst
+                at a glance how many recs are NEW vs reuse, and how much of the
+                BRD is already covered by hub modules. */}
+            {recs.length > 0 && (
+              <Card>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+                  <div style={{ fontSize: 12, color: colors.textMuted }}>Total: <b style={{ color: colors.text }}>{recs.length}</b></div>
+                  {(['new', 'extend', 'reuse'] as const).map((t) => {
+                    const n = recs.filter((r) => r.recommendation_type === t).length;
+                    if (n === 0) return null;
+                    return (
+                      <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                        <Badge tone={TYPE_TONE[t]}>{TYPE_LABEL[t]}</Badge>
+                        <b style={{ color: colors.text }}>{n}</b>
+                      </div>
+                    );
+                  })}
+                  {brds.map((b) => {
+                    if (b.overall_fit_pct == null && !b.severity_summary) return null;
+                    return (
+                      <div key={b.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: colors.textMuted }}>
+                        <span>BRD #{b.id}:</span>
+                        {b.overall_fit_pct != null && (
+                          <Badge
+                            tone={b.overall_fit_pct >= 70 ? 'success' : b.overall_fit_pct >= 40 ? 'warning' : 'danger'}
+                            title="Weighted average of per-section fit_score (must_have=3, should_have=2, nice_to_have=1)."
+                          >
+                            fit: {b.overall_fit_pct}%
+                          </Badge>
+                        )}
+                        {b.severity_summary && (
+                          <Badge title="Per-section gap_status: covered | partial | missing | unclear.">
+                            {b.severity_summary}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
             {recs.map((r) => (
               <Card key={r.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                      {r.recommendation_type && (
+                        <Badge tone={TYPE_TONE[r.recommendation_type] || 'info'}>
+                          {TYPE_LABEL[r.recommendation_type] || r.recommendation_type}
+                        </Badge>
+                      )}
                       <Badge tone={r.severity === 'must_have' ? 'danger' : r.severity === 'should_have' ? 'warning' : 'info'}>
                         {r.severity || 'n/a'}
                       </Badge>
@@ -395,6 +497,30 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
                     )}
                     {r.justification && (
                       <div style={{ fontSize: 12, color: colors.textMuted, fontStyle: 'italic' }}>{r.justification}</div>
+                    )}
+                    {(Array.isArray(r.depends_on_module_ids) && r.depends_on_module_ids.length > 0) && (
+                      <div style={{ marginTop: 8, fontSize: 11, color: colors.textMuted }}>
+                        <span style={{ marginRight: 6 }}>Depends on existing:</span>
+                        {r.depends_on_module_ids.map((m: any) => (
+                          <Badge key={Array.isArray(m) ? m[0] : m} tone="success">{m2oLabel(m)}</Badge>
+                        ))}
+                      </div>
+                    )}
+                    {(Array.isArray(r.impact_module_ids) && r.impact_module_ids.length > 0) && (
+                      <div style={{ marginTop: 4, fontSize: 11, color: colors.textMuted }}>
+                        <span style={{ marginRight: 6 }}>Impacts:</span>
+                        {r.impact_module_ids.map((m: any) => (
+                          <Badge key={Array.isArray(m) ? m[0] : m} tone="warning">{m2oLabel(m)}</Badge>
+                        ))}
+                      </div>
+                    )}
+                    {(Array.isArray(r.depends_on_proposed_ids) && r.depends_on_proposed_ids.length > 0) && (
+                      <div style={{ marginTop: 4, fontSize: 11, color: colors.textMuted }}>
+                        <span style={{ marginRight: 6 }}>Depends on proposed:</span>
+                        {r.depends_on_proposed_ids.map((m: any) => (
+                          <Badge key={Array.isArray(m) ? m[0] : m}>{m2oLabel(m)}</Badge>
+                        ))}
+                      </div>
                     )}
                     {r.cross_vertical_impact_json && (
                       <pre
@@ -414,11 +540,36 @@ export default function JourneyWorkspacePage({ journeyId, onBack }: Props) {
                       </pre>
                     )}
                   </div>
-                  <Badge tone={r.state === 'approved' ? 'success' : r.state === 'rejected' ? 'danger' : 'warning'}>{r.state || 'draft'}</Badge>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', minWidth: 140 }}>
+                    <Badge tone={r.state === 'approved' ? 'success' : r.state === 'canceled' ? 'danger' : 'warning'}>{r.state || 'draft'}</Badge>
+                    {r.state !== 'canceled' && r.state !== 'built' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openReject(r)}
+                        title="Mark this recommendation as wrong and save the correction as a lesson the AI will read on future runs."
+                      >
+                        Reject &amp; save as lesson
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </Card>
             ))}
           </div>
+        )}
+
+        {rejectTarget && (
+          <RejectAsLessonModal
+            recommendation={rejectTarget}
+            capabilityEntries={capabilityEntries}
+            onClose={() => setRejectTarget(null)}
+            onSaved={() => {
+              setRejectTarget(null);
+              setActionMsg(`Lesson saved. Recommendation "${rejectTarget.name}" canceled.`);
+              refresh();
+            }}
+          />
         )}
 
         {tab === 'vps' && (
@@ -467,5 +618,183 @@ function Row({ k, v }: { k: string; v: any }) {
       <span style={{ color: colors.textDim }}>{k}</span>
       <span>{v}</span>
     </div>
+  );
+}
+
+interface RejectModalProps {
+  recommendation: any;
+  capabilityEntries: any[];
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function RejectAsLessonModal({ recommendation, capabilityEntries, onClose, onSaved }: RejectModalProps) {
+  const [name, setName] = useState(`Reject ${recommendation.name}`);
+  const [reason, setReason] = useState(
+    `Rejected manually by analyst — the LLM proposed ${recommendation.name} but existing hub modules already cover this capability.`,
+  );
+  const [severity, setSeverity] = useState<'blocker' | 'hint'>('hint');
+  const [filter, setFilter] = useState('');
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const sectionPattern = (recommendation.scope || recommendation.justification || recommendation.name || '').slice(0, 500);
+
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return capabilityEntries.slice(0, 100);
+    return capabilityEntries.filter((e) => (e.module_name || '').toLowerCase().includes(q)).slice(0, 100);
+  }, [filter, capabilityEntries]);
+
+  function toggle(id: number) {
+    const next = new Set(picked);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setPicked(next);
+  }
+
+  async function save() {
+    setErr(null);
+    if (picked.size === 0) {
+      setErr('Pick at least one existing module that already covers the capability.');
+      return;
+    }
+    if (!reason.trim()) {
+      setErr('Reason is required — this becomes the rationale shown to the AI on future runs.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await rejectRecommendationAsLesson(recommendation.id, {
+        name,
+        section_pattern: sectionPattern,
+        rejected_proposals: [recommendation.name],
+        correct_module_ids: Array.from(picked),
+        reason,
+        severity,
+      });
+      onSaved();
+    } catch (e: any) {
+      setErr(e?.detail || e?.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 560, maxHeight: '85vh', overflow: 'auto',
+          background: colors.surface, borderRadius: radii.md,
+          border: `1px solid ${colors.border}`, padding: spacing.lg,
+        }}
+      >
+        <h3 style={{ marginTop: 0, marginBottom: 4 }}>Reject &amp; save as lesson</h3>
+        <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
+          Cancels <code>{recommendation.name}</code> and writes a <code>brd.lesson</code> so future AI runs map this section to the correct existing modules.
+        </div>
+
+        <Label>Lesson name</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} />
+
+        <Label>Severity</Label>
+        <select
+          value={severity}
+          onChange={(e) => setSeverity(e.target.value as 'blocker' | 'hint')}
+          style={{ width: '100%', padding: 8, fontSize: 13, borderRadius: radii.sm, border: `1px solid ${colors.border}`, marginBottom: 10 }}
+        >
+          <option value="hint">Hint (injected only when section keywords match)</option>
+          <option value="blocker">Blocker (always injected into AI prompt)</option>
+        </select>
+
+        <Label>Use instead (existing modules that already cover this)</Label>
+        <Input placeholder="Filter modules…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <div style={{
+          maxHeight: 200, overflow: 'auto', marginTop: 6, marginBottom: 10,
+          border: `1px solid ${colors.border}`, borderRadius: radii.sm,
+        }}>
+          {capabilityEntries.length === 0 ? (
+            <div style={{ padding: 12, fontSize: 12, color: colors.textMuted }}>Loading modules…</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: 12, fontSize: 12, color: colors.textMuted }}>No matches.</div>
+          ) : filtered.map((e) => (
+            <div
+              key={e.id}
+              onClick={() => toggle(e.id)}
+              style={{
+                padding: '6px 10px', fontSize: 12, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: picked.has(e.id) ? colors.surfaceMuted : 'transparent',
+              }}
+            >
+              <input type="checkbox" readOnly checked={picked.has(e.id)} />
+              <span style={{ flex: 1 }}>{e.module_name}</span>
+              {e.maturity && <Badge>{e.maturity}</Badge>}
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 10 }}>
+          {picked.size} selected
+        </div>
+
+        <Label>Reason</Label>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={4}
+          style={{ width: '100%', padding: 8, fontSize: 13, borderRadius: radii.sm, border: `1px solid ${colors.border}`, marginBottom: 10, fontFamily: 'inherit' }}
+        />
+
+        <details style={{ marginBottom: 10 }}>
+          <summary style={{ fontSize: 12, color: colors.textMuted, cursor: 'pointer' }}>
+            Section keywords (auto-extracted)
+          </summary>
+          <pre style={{
+            background: colors.bg, padding: 8, borderRadius: radii.sm,
+            fontSize: 11, marginTop: 6, maxHeight: 100, overflow: 'auto',
+            whiteSpace: 'pre-wrap',
+          }}>{sectionPattern}</pre>
+        </details>
+
+        {err && (
+          <div style={{ padding: 8, background: '#FEE2E2', color: '#991B1B', borderRadius: radii.sm, fontSize: 12, marginBottom: 10 }}>
+            {err}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save lesson & cancel rec'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Label({ children }: { children: any }) {
+  return <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, marginTop: 4 }}>{children}</div>;
+}
+
+function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      style={{
+        width: '100%', padding: 8, fontSize: 13,
+        borderRadius: radii.sm, border: `1px solid ${colors.border}`,
+        marginBottom: 8,
+        ...(props.style || {}),
+      }}
+    />
   );
 }

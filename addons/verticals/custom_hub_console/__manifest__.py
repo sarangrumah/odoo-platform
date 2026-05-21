@@ -39,6 +39,7 @@ tenant containing only ``custom_core`` + ``custom_super_admin`` +
         "custom_ops_monitor",
         "mail",
     ],
+    "capability_tags": ["multi-tenant", "audit-trail", "approval-workflow", "ai"],
     "data": [
         # security first
         "security/security.xml",

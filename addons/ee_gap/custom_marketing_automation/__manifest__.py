@@ -13,6 +13,7 @@ Respects custom_pdp_consent (no email without valid 'marketing' consent).
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_audit", "custom_pdp_consent", "mail"],
+    "capability_tags": ["marketing", "pdp", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

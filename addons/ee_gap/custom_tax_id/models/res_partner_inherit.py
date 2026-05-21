@@ -22,7 +22,7 @@ class ResPartner(models.Model):
         help="Nomor Pokok Wajib Pajak. 15-digit legacy or 16-digit (NIK-based, post-2024).",
     )
     x_custom_nik = fields.Char(
-        string="NIK",
+        string="NIK (Custom)",
         help="Nomor Induk Kependudukan (16-digit). For individual partners (orang pribadi).",
     )
     x_custom_npwp_status = fields.Selection(

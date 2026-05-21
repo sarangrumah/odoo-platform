@@ -82,3 +82,14 @@ def _post_install_link_menus(env):
         "[hub_console] post-install: %s optional menus linked, %s hidden",
         linked, hidden,
     )
+
+    # Seed module catalog so the Hub Admin "Module Deployments" page is
+    # not empty on first login. Scanner is idempotent and never deletes.
+    try:
+        out = env["custom.hub.module.catalog"].sudo()._action_scan_all()
+        _logger.info(
+            "[hub_console] post-install catalog seed: created=%s updated=%s total=%s",
+            out.get("created"), out.get("updated"), out.get("total"),
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        _logger.warning("[hub_console] post-install catalog seed failed: %s", exc)

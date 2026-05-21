@@ -67,6 +67,7 @@ Every withholding line creation + Faktur Pengganti relink writes to
         "purchase",
         "product",
     ],
+    "capability_tags": ["indonesian-tax", "withholding", "coretax", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

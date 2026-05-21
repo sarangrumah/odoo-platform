@@ -7,4 +7,5 @@ from . import brd_document
 from . import brd_document_section
 from . import brd_analysis
 from . import brd_recommendation
+from . import brd_lesson
 from . import project_task
