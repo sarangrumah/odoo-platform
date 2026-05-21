@@ -112,11 +112,13 @@ services:
       - ./data/backups:/backups
     networks: [odoo-net]
 
-  # S3 / S3-compatible offsite backup. Disabled automatically when S3_BUCKET
-  # is empty (sidecar will error out fast; remove the service if not desired).
+  # S3 / S3-compatible offsite backup.
+  # Opt-in via profile: `docker compose --profile s3-backup up -d`.
+  # Skip this service entirely on demo/VPS hosts where S3 isn't configured yet.
   pg-backup-s3:
     image: eeshugerman/postgres-backup-s3:16
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-pgbackup-s3
+    profiles: ["s3-backup"]
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
