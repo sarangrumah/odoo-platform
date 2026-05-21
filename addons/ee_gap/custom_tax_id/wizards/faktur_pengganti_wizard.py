@@ -74,9 +74,13 @@ class FakturPenggantiWizard(models.TransientModel):
         if not nsfp:
             return 0
         cleaned = nsfp.replace("-", "").replace(".", "").strip()
-        if len(cleaned) < 4 or not cleaned[2:4].isdigit():
+        # NSFP layout (Coretax): SS (kode status, 2 digits with leading zero)
+        # + KK (kode transaksi, 2) + YY (year, 2) + N... (sequence).
+        # The first two digits encode the status: "00" → original, "01"..."09"
+        # → 1st..9th pengganti.
+        if len(cleaned) < 2 or not cleaned[:2].isdigit():
             return 0
-        return int(cleaned[2:4])
+        return int(cleaned[:2])
 
     def action_create_replacement(self):
         self.ensure_one()
@@ -112,7 +116,7 @@ class FakturPenggantiWizard(models.TransientModel):
         if hasattr(src, "x_custom_nsfp"):
             src.write({"x_custom_nsfp": False})
         if hasattr(src, "x_custom_coretax_status"):
-            src.write({"x_custom_coretax_status": "rejected"})  # logical 'replaced' bucket
+            src.write({"x_custom_coretax_status": "rejected_djp"})  # logical 'replaced' bucket
 
         # Audit (action constrained to pdp.audit_log allowed values + varchar(16))
         try:

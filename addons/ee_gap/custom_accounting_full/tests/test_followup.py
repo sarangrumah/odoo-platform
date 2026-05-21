@@ -36,14 +36,14 @@ class TestFollowupCron(TransactionCase):
             "company_id": self.company.id,
         })
         self.rec_account = self.env["account.account"].create({
-            "code": "FLW-RCV",
+            "code": "FLWRCV",
             "name": "Followup Receivable",
             "account_type": "asset_receivable",
             "reconcile": True,
             "company_ids": [(6, 0, [self.company.id])],
         })
         self.inc_account = self.env["account.account"].create({
-            "code": "FLW-INC",
+            "code": "FLWINC",
             "name": "Followup Income",
             "account_type": "income",
             "company_ids": [(6, 0, [self.company.id])],

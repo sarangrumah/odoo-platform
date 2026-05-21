@@ -34,18 +34,18 @@ class TestConsolidationChart(AccountingFullCommon):
             "chart_id": self.chart.id,
             "code": "4000",
             "name": "Group Revenue",
-            "account_category": "revenue",
+            "account_category": "income",
         })
         self.assertEqual(len(self.chart.account_ids), 2)
         self.assertEqual(a.account_category, "asset")
-        self.assertEqual(b.account_category, "revenue")
+        self.assertEqual(b.account_category, "income")
 
     def test_create_mapping(self):
         target = self.env["custom.consolidation.chart.account"].create({
             "chart_id": self.chart.id,
             "code": "4000",
             "name": "Revenue",
-            "account_category": "revenue",
+            "account_category": "income",
         })
         mapping = self.env["custom.consolidation.mapping"].create({
             "chart_id": self.chart.id,

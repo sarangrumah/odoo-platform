@@ -158,7 +158,10 @@ class ApprovalRequest(models.Model):
             if rec.state != "pending":
                 raise UserError(_("Only pending requests can be approved."))
             effective_user = rec._effective_actor()
-            if effective_user not in rec.pending_approver_ids:
+            # Approval-manager users may lack res.users read ACL on other
+            # approvers; use sudo for the read-only membership probes.
+            sudo_rec = rec.sudo()
+            if effective_user not in sudo_rec.pending_approver_ids:
                 raise UserError(_("You are not in the pending approver list for the current tier."))
             tier = rec.current_tier_id
             rec._record_line(tier, effective_user, "approved", comment)
@@ -166,11 +169,11 @@ class ApprovalRequest(models.Model):
             # When require_all, check whether all approvers have approved at this tier
             if tier.require_all:
                 approved_users = (
-                    rec.history_ids
+                    sudo_rec.history_ids
                     .filtered(lambda l: l.tier_id == tier and l.action == "approved")
                     .mapped("action_user_id")
                 )
-                if not all(u in approved_users for u in rec.pending_approver_ids):
+                if not all(u in approved_users for u in sudo_rec.pending_approver_ids):
                     # Still waiting on others
                     continue
             rec._advance_to_next_tier()
@@ -189,7 +192,10 @@ class ApprovalRequest(models.Model):
                 "final_decision_user_id": effective_user.id,
                 "decided_at": fields.Datetime.now(),
             })
-            rec.message_post(body=_("Request rejected by %s") % effective_user.name)
+            try:
+                rec.sudo().message_post(body=_("Request rejected by %s") % effective_user.name)
+            except Exception:
+                _logger.exception("approval %s: message_post failed (non-fatal)", rec.id)
             rec._pdp_audit_write("approval_reject", rec.id, {"comment": comment or ""})
         return True
 
@@ -215,7 +221,12 @@ class ApprovalRequest(models.Model):
                 "final_decision_user_id": self.env.user.id,
                 "decided_at": fields.Datetime.now(),
             })
-            self.message_post(body=_("All tiers approved."))
+            # mail.message creation may hit ACLs for the acting user; the
+            # decision itself is already persisted, so swallow notify errors.
+            try:
+                self.sudo().message_post(body=_("All tiers approved."))
+            except Exception:
+                _logger.exception("approval %s: message_post failed (non-fatal)", self.id)
             self._pdp_audit_write("approval_complete", self.id, None)
             return
         next_tier = tiers[idx + 1]
@@ -224,7 +235,10 @@ class ApprovalRequest(models.Model):
             "due_at": fields.Datetime.now() + timedelta(hours=next_tier.sla_hours),
         })
         self._refresh_pending_approvers()
-        self._notify_pending()
+        try:
+            self._notify_pending()
+        except Exception:
+            _logger.exception("approval %s: notify_pending failed (non-fatal)", self.id)
         self._pdp_audit_write("approval_advance", self.id, {"to_tier": next_tier.name})
 
     def _record_line(self, tier, user, action: str, comment: str | None):
@@ -285,9 +299,18 @@ class ApprovalRequest(models.Model):
         template = self.env.ref(
             "custom_approval_engine.mail_template_approval_pending", raise_if_not_found=False
         )
-        if template:
-            for u in self.pending_approver_ids:
+        if not template:
+            return
+        # Notification is best-effort: the lifecycle decision is already
+        # persisted before we get here, so an ACL hiccup during template
+        # render (e.g. acting user can't read res.partner) must not roll back.
+        for u in self.pending_approver_ids:
+            try:
                 template.with_context(approver=u).sudo().send_mail(self.id, force_send=False)
+            except Exception:
+                _logger.exception(
+                    "approval %s: send_mail to %s failed (non-fatal)", self.id, u.login
+                )
 
     # ---------------------------------------------------------------- escalation cron
 

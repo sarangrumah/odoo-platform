@@ -39,7 +39,9 @@ class TestDppNilaiLain(TaxIdCommon):
         ppn = sum(t["amount"] for t in result["taxes"])
         # 12% × (11/12 × 1,200,000) = 12% × 1,100,000 = 132,000
         # = 11% × 1,200,000 = 132,000
-        self.assertAlmostEqual(ppn, 132_000, places=2)
+        # Float rounding of 11/12 introduces a ~0.05 residue; use absolute
+        # delta (1 rupiah = the natural unit) instead of decimal places.
+        self.assertAlmostEqual(ppn, 132_000, delta=1.0)
 
     def test_paket_wisata_factor_0_1(self):
         tax = self._make_ppn(11.0, dpp_method="nilai_lain", dpp_factor=0.10,

@@ -32,13 +32,13 @@ class TestFiscalYearClose(TransactionCase):
             "company_id": self.company.id,
         })
         self.acc_d = self.env["account.account"].create({
-            "code": "FYT-DR",
+            "code": "FYTDR",
             "name": "FY Debit",
             "account_type": "expense",
             "company_ids": [(6, 0, [self.company.id])],
         })
         self.acc_c = self.env["account.account"].create({
-            "code": "FYT-CR",
+            "code": "FYTCR",
             "name": "FY Credit",
             "account_type": "liability_current",
             "company_ids": [(6, 0, [self.company.id])],

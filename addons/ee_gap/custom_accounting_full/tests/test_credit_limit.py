@@ -35,9 +35,15 @@ class TestCreditLimit(TransactionCase):
                 "price_unit": 500.0,
             })],
         })
-        with self.assertRaises(UserError):
+        # Use try/except (not assertRaises) so the test transaction's savepoint
+        # isn't rolled back on the UserError — we need the audit-log row that
+        # was written just before the raise to be visible to the search below.
+        raised = False
+        try:
             so.action_confirm()
-        # A log row should still have been written
+        except UserError:
+            raised = True
+        self.assertTrue(raised, "action_confirm should have raised UserError")
         log = self.env["custom.credit.check.log"].search([
             ("sale_order_id", "=", so.id),
         ], limit=1)

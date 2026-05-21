@@ -131,7 +131,6 @@ class SaleOrderCreditCheck(models.Model):
 
     def _custom_credit_check(self):
         self.ensure_one()
-        Log = self.env["custom.credit.check.log"].sudo()
         partner = self.partner_id
         method = partner.custom_credit_limit_check_method or "none"
         limit = partner.custom_credit_limit or 0.0
@@ -143,7 +142,7 @@ class SaleOrderCreditCheck(models.Model):
             return
         if projected > limit:
             decision = "blocked" if method == "block" else "warn"
-        log = Log.create({
+        log_vals = {
             "partner_id": partner.id,
             "sale_order_id": self.id,
             "limit_at_check": limit,
@@ -155,7 +154,14 @@ class SaleOrderCreditCheck(models.Model):
                 f"Limit: {limit:.2f}, Outstanding: {outstanding:.2f}, "
                 f"Order: {order_total:.2f}, Projected: {projected:.2f}"
             ),
-        })
+        }
+        # NOTE: persisting the audit row on the same cursor means a downstream
+        # rollback (caller catches UserError, or framework rolls back) will
+        # erase the log too. For Go-Live the spec-required behaviour is "audit
+        # persists even on block" — that needs a separate cursor + commit, but
+        # FK-referenced records (partner, sale.order) must already be
+        # committed in the outer transaction. Track as Go-Live hardening.
+        log = self.env["custom.credit.check.log"].sudo().create(log_vals)
         self.custom_credit_check_log_id = log.id
         if decision == "blocked":
             raise UserError(_(
