@@ -283,7 +283,7 @@ class HrPayslip(models.Model):
             self.bupot_id = Bupot.create({
                 "no_bupot": f"DRAFT-PPH21-{self.period_year}{self.period_month:0>2}-{self.employee_id.id}",
                 "partner_id": partner.id,
-                "jenis_pph": "pph_21",
+                "jenis_pph": "21",
                 "tarif": self.ter_rate_used or 0.0,
                 "dpp": self.gross_salary + (self.tunjangan_jabatan or 0) + (self.tunjangan_lain or 0),
                 "pph_terpotong": self.pph21,
@@ -291,7 +291,7 @@ class HrPayslip(models.Model):
                 "tanggal_bupot": fields.Date.context_today(self),
                 "period_year": self.period_year,
                 "period_month": int(self.period_month or 0),
-                "source": "outgoing",
+                "source": "issued",
                 "state": "draft",
             }).id
         except Exception as e:

@@ -81,7 +81,7 @@ class TestPayslipCompute(PayrollIDCommon):
         slip.action_approve()
         self.assertTrue(slip.bupot_id)
         self.assertEqual(slip.bupot_id.state, "draft")
-        self.assertEqual(slip.bupot_id.jenis_pph, "pph_21")
+        self.assertEqual(slip.bupot_id.jenis_pph, "21")
         self.assertAlmostEqual(slip.bupot_id.pph_terpotong, slip.pph21, places=0)
 
     def test_approve_skips_bupot_when_pph_zero(self):

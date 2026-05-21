@@ -17,26 +17,11 @@ class PdpAuditLog(models.Model):
     tenant_db = fields.Char(readonly=True)
     model_name = fields.Char(readonly=True, index=True)
     res_id = fields.Integer(readonly=True)
-    action = fields.Selection(
-        [
-            ("create", "Create"),
-            ("read", "Read"),
-            ("write", "Write"),
-            ("unlink", "Unlink"),
-            ("export", "Export"),
-            ("login", "Login"),
-            ("logout", "Logout"),
-            ("dsar", "DSAR"),
-            ("unmask", "Unmask"),
-            ("consent_grant", "Consent Grant"),
-            ("consent_withdraw", "Consent Withdraw"),
-            ("sertel_access", "Sertel Access"),
-            ("xml_export", "XML Export"),
-            ("xml_import", "XML Import"),
-            ("custom", "Custom"),
-        ],
-        readonly=True,
-    )
+    # Free-form domain action code (lowercase snake_case, enforced at DB level).
+    # Kept as Char (not Selection) so domain-specific actions added by individual
+    # modules (e.g. 'approval_submit', 'fsm_wo_complete') render without a
+    # closed-enum migration.
+    action = fields.Char(readonly=True, index=True)
     field_changes = fields.Json(readonly=True)
     classification = fields.Char(readonly=True, index=True)
     ip_address = fields.Char(readonly=True)

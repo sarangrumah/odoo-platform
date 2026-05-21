@@ -293,8 +293,16 @@ class ApprovalRequest(models.Model):
 
     @api.model
     def _cron_check_escalations(self):
-        """Called by ``ir.cron`` every 15 minutes."""
-        overdue = self.sudo().search([("state", "=", "pending"), ("overdue", "=", True)])
+        """Called by ``ir.cron`` every 15 minutes.
+
+        Use a Python-side filter rather than the SQL `_search_overdue` so the
+        comparison reads the ORM cache. This matters for in-transaction
+        callers (tests, manual triggers) where due_at writes may not have
+        been flushed yet — the SQL search would otherwise miss them.
+        """
+        now = fields.Datetime.now()
+        candidates = self.sudo().search([("state", "=", "pending")])
+        overdue = candidates.filtered(lambda r: r.due_at and r.due_at < now)
         for rec in overdue:
             try:
                 rec._handle_overdue()

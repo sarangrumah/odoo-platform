@@ -59,7 +59,9 @@ class WithholdingLine(models.Model):
                 bupot = Bupot.create({
                     "no_bupot": f"DRAFT-{line.move_id.name or line.move_id.id}-{line.id}",
                     "partner_id": partner.id,
-                    "jenis_pph": line.pph_kind,
+                    # withholding_category.pph_kind uses "pph_23" style; bupot.jenis_pph
+                    # expects the bare code ("23", "4_2"). Strip the prefix on write.
+                    "jenis_pph": (line.pph_kind or "").removeprefix("pph_"),
                     "tarif": line.tarif,
                     "dpp": line.base_amount,
                     "pph_terpotong": line.tax_amount,
@@ -67,7 +69,7 @@ class WithholdingLine(models.Model):
                     "tanggal_bupot": line.move_id.invoice_date or fields.Date.context_today(self),
                     "period_year": (line.move_id.invoice_date or fields.Date.context_today(self)).year,
                     "period_month": (line.move_id.invoice_date or fields.Date.context_today(self)).month,
-                    "source": "outgoing",  # we are the cutter
+                    "source": "issued",  # we are the cutter
                     "account_move_id": line.move_id.id,
                     "state": "draft",
                 })

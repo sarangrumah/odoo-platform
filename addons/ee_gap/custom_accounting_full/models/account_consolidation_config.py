@@ -116,11 +116,15 @@ class ConsolidationConfig(models.Model):
             c = companies_map[g["company_id"][0]]
             debit = g.get("debit", 0.0) or 0.0
             credit = g.get("credit", 0.0) or 0.0
+            # Odoo 19: account.code is a compute that reads code_store via
+            # env.company.root_id; rebind the account to the row's company to
+            # get the per-company code instead of False.
+            account_code = a.with_company(c).code
             rows.append({
                 "company_id": c.id,
                 "company_name": c.name,
                 "account_id": a.id,
-                "account_code": a.code,
+                "account_code": account_code,
                 "account_name": a.name,
                 "account_type": a.account_type,
                 "debit": debit,
@@ -154,12 +158,18 @@ class ConsolidationConfig(models.Model):
         rows = self._compute_balances(date_from, date_to)
         elims = self._compute_eliminations(rows)
 
-        # Pivot: per account, per company column, plus an elimination column,
-        # plus a consolidated total.
-        by_account: dict[int, dict[str, Any]] = {}
+        # Pivot: group rows by account *code* (not id) so that companies' parallel
+        # charts merge into a single consolidated line. Each company has its own
+        # account.account record, but they share a code (e.g. "11100" exists in
+        # both A and B) — consolidation is keyed on that shared code.
+        by_account: dict[Any, dict[str, Any]] = {}
         company_ids = self.perimeter_company_ids().ids
+        # Map elimination account_id -> code so we can apply the elim against the
+        # pivoted (code-keyed) bucket too.
+        elim_account_codes: dict[int, Any] = {}
         for r in rows:
-            acc = by_account.setdefault(r["account_id"], {
+            key = r["account_code"] or f"_aid_{r['account_id']}"
+            acc = by_account.setdefault(key, {
                 "account_id": r["account_id"],
                 "account_code": r["account_code"],
                 "account_name": r["account_name"],
@@ -169,9 +179,12 @@ class ConsolidationConfig(models.Model):
                 "consolidated": 0.0,
             })
             acc["by_company"][r["company_id"]] += r["balance"]
+            if r["account_id"] in {*self.elimination_account_ids.ids}:
+                elim_account_codes[r["account_id"]] = key
         for acc_id, delta in elims.items():
-            if acc_id in by_account:
-                by_account[acc_id]["elimination"] = delta
+            key = elim_account_codes.get(acc_id)
+            if key and key in by_account:
+                by_account[key]["elimination"] += delta
         for acc in by_account.values():
             acc["consolidated"] = sum(acc["by_company"].values()) + acc["elimination"]
 

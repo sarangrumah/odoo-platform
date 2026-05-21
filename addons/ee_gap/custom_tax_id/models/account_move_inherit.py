@@ -52,7 +52,9 @@ class AccountMove(models.Model):
         Line = self.env["account.move.withholding.line"].sudo()
         partner = self.partner_id.commercial_partner_id
         for ml in self.invoice_line_ids:
-            if ml.display_type:  # skip section / note / line_section etc.
+            # Odoo 19 sets display_type='product' for ordinary invoice product lines
+            # (previously False). Skip only true presentational lines.
+            if ml.display_type and ml.display_type != "product":
                 continue
             rule = Rule._resolve_for_line(ml)
             if not rule:

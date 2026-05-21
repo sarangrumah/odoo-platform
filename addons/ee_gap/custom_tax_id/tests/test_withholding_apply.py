@@ -33,7 +33,7 @@ class TestWithholdingApply(TaxIdCommon):
         wh = bill.x_custom_withholding_line_ids[0]
         self.assertTrue(wh.bupot_id)
         self.assertEqual(wh.bupot_id.state, "draft")
-        self.assertEqual(wh.bupot_id.jenis_pph, "pph_23")
+        self.assertEqual(wh.bupot_id.jenis_pph, "23")
         self.assertEqual(wh.bupot_id.tarif, 2.0)
         self.assertEqual(wh.bupot_id.pph_terpotong, 20_000)
         self.assertEqual(wh.bupot_id.partner_id, self.vendor_npwp)

@@ -23,8 +23,12 @@ class ResPartnerCreditLimit(models.Model):
             ("warning", "Warning Only"),
             ("block", "Block Confirmation"),
         ],
-        default="warning", required=True,
+        default="warning",
         string="Credit Check Method",
+        help="Behaviour when a sale.order exceeds the credit limit. "
+             "Defaults to 'warning'. Left nullable so partners created via "
+             "indirect chains (res.users -> hr.employee -> partner) don't "
+             "trip the NOT NULL constraint before the ORM default fires.",
     )
     custom_outstanding_amount = fields.Monetary(
         compute="_compute_custom_credit_metrics",
