@@ -23,6 +23,7 @@ Convention notes:
     "depends": [
         "custom_core",
         "custom_pdp_audit",
+        "custom_quality_full",
         "repair",
         "custom_whatsapp",
         "mail",
