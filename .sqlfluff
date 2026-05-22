@@ -1,0 +1,45 @@
+# Sqlfluff config — applied by the sqlfluff-lint pre-commit hook
+# (see .pre-commit-config.yaml: files = ^postgres/init/.*\.sql$).
+#
+# The SQL files in postgres/init/ use a deliberate "aligned-column"
+# style — column types/constraints line up vertically using multiple
+# spaces — which is significantly more readable for DDL than the
+# single-space style sqlfluff defaults assume:
+#
+#     id                BIGSERIAL PRIMARY KEY,
+#     slug              VARCHAR(63)  NOT NULL UNIQUE
+#                       CHECK (slug ~ '^[a-z][a-z0-9_]{1,62}$'),
+#     display_name      VARCHAR(128) NOT NULL,
+#
+# Without tuning, sqlfluff flags ~300 false positives on this style:
+#  - LT01 (layout.spacing)  — every multi-space between identifier and type
+#  - LT02 (layout.indent)   — 2-space indent vs sqlfluff's default 4
+#  - LT05 (layout.long_lines) — GRANT statements & function signatures > 80
+#
+# This config accepts the codebase's style while leaving every other
+# sqlfluff rule active to catch real DDL issues.
+
+[sqlfluff]
+dialect = postgres
+# Disabled rules — all stylistic preferences that conflict with the
+# codebase's deliberate conventions:
+#   LT01  spacing       — aligned-column DDL style (multi-space)
+#   LT02  indent        — 2-space indent vs sqlfluff default 4
+#   LT05  long lines    — GRANT statements / function signatures > 80
+#   LT09  select fmt    — VIEW definitions use compact multi-target SELECTs
+#   ST06  column order  — sqlfluff's "wildcards then simple before agg" ordering
+#                          doesn't match view-projection ordering by column meaning
+#   CP02  ident case    — false-positives on Postgres keywords (e.g. USING GIN)
+#   CP05  type case     — built-ins are uppercase; user-defined types
+#                          (e.g. tenant_registry.tenant_state) follow snake_case
+#                          per Postgres schema-qualified-name convention
+#
+# All other sqlfluff rules (RF, AM, ST [other than ST06], CV, structural)
+# stay enforced.
+exclude_rules = LT01, LT02, LT05, LT09, ST06, CP02, CP05
+
+[sqlfluff:indentation]
+# Tracked for the rules that still run (e.g. some CP/ST rules look at
+# indent context). Matches the existing 2-space indent in postgres/init/.
+indent_unit = space
+tab_space_size = 2
