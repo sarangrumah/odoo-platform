@@ -91,7 +91,7 @@ class CustomReportFinancial(models.Model):
     active = fields.Boolean(default=True)
 
     @api.constrains("parent_id")
-    def _check_recursion(self):
+    def _check_node_recursion(self):
         if not self._check_recursion():
             raise ValidationError(_(
                 "A financial report node cannot be its own ancestor."
