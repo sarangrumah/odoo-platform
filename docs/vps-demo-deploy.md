@@ -111,9 +111,10 @@ profile-gated, jadi nggak akan boot tanpa `--profile s3-backup`.
 # Buat folder data (di-bind mount oleh compose)
 mkdir -p data/{backups,odoo-filestore,nginx-cache,caddy/data,caddy/config}
 
-# Odoo container jalan sebagai uid 101 (user 'odoo' di base image).
-# Bind-mount filestore harus owned by uid 101 atau Odoo gagal write sessions/.
-chown -R 101:101 data/odoo-filestore
+# Bind-mount ownership: container user IDs di image base masing-masing tidak
+# match host root. Set ownership sebelum boot supaya container nggak crash.
+chown -R 101:101 data/odoo-filestore    # uid 101 = 'odoo' di odoo:19.0
+chown -R 999:999 data/backups           # uid 999 = 'postgres' di pgbackup-local
 
 # Start prod + TLS (Caddy ACME di depan nginx)
 make up-tls
