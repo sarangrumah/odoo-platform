@@ -29,7 +29,7 @@ services:
     environment:
       WORKERS: ${WORKERS:-4}
       MAX_CRON_THREADS: ${MAX_CRON_THREADS:-2}
-      LIST_DB: "False"
+      LIST_DB: ${LIST_DB:-False}
       WITHOUT_DEMO: all
       LOG_LEVEL: info
       PROXY_MODE: "True"

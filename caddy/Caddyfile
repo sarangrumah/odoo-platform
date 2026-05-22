@@ -10,8 +10,10 @@
 # ============================================================
 
 {
-	# Email is required for real ACME issuance; harmless when empty.
-	email {$ACME_EMAIL}
+	# Email used only for real ACME issuance (Let's Encrypt). With `tls internal`
+	# below it is ignored, but Caddyfile still requires a valid token, so fall
+	# back to a placeholder when ACME_EMAIL is empty.
+	email {$ACME_EMAIL:admin@localhost}
 
 	# Optional custom ACME CA directory (e.g. Buypass, ZeroSSL).
 	# Leave empty for Let's Encrypt production (Caddy's default).
@@ -19,6 +21,11 @@
 
 	# Admin API bound to localhost inside the container — used by healthcheck.
 	admin 0.0.0.0:2019
+
+	# Fall back to this site name when the client sends no SNI (clients
+	# connecting to a bare IP per RFC 6066 don't include SNI, which would
+	# otherwise cause Caddy to abort the handshake).
+	default_sni {$DOMAIN:localhost.localdomain}
 }
 
 {$DOMAIN:localhost.localdomain} {
@@ -39,6 +46,18 @@
 	# Erajaya Odoo Hub portal (landing + admin console) is mounted at /portal/*.
 	# The portal is a thin SPA + BFF; the BFF in turn signs HMAC calls to the
 	# tenant-orchestrator on the internal network.
+	#
+	# The SPA's index.html references absolute paths (`/assets/...`) and its
+	# XHRs call absolute `/api/...`. Neither prefix is used by Odoo, so we
+	# route them straight to hub-portal without stripping. The `/portal/*`
+	# entry serves index.html for the SPA boot; client-side routing then
+	# keeps the URL under /portal/.
+	handle /assets/* {
+		reverse_proxy hub-portal:8080
+	}
+	handle /api/* {
+		reverse_proxy hub-portal:8080
+	}
 	handle_path /portal/* {
 		reverse_proxy hub-portal:8080
 	}
@@ -46,17 +65,19 @@
 		redir /portal/ 308
 	}
 
-	# Forward all remaining traffic to internal nginx (which still does
-	# rate-limit, blocks /web/database/manager, longpolling, etc.).
-	reverse_proxy nginx:80 {
+	# Forward all remaining traffic to internal nginx, which still enforces
+	# rate-limit, blocks /web/database/manager, terminates HTTPS again for
+	# its full Odoo server-block (the port-80 block is a pure HTTP→HTTPS
+	# redirect and would loop forever behind Caddy). The inner hop is a
+	# self-signed cert on the docker network — verification is skipped.
+	reverse_proxy https://nginx:443 {
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
 		transport http {
 			read_timeout 720s
 			write_timeout 720s
 			dial_timeout 10s
+			tls_insecure_skip_verify
 		}
 	}
 

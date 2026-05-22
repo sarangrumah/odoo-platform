@@ -329,7 +329,10 @@ services:
       ORCHESTRATOR_BASE_URL: http://tenant-orchestrator:8080
       ORCHESTRATOR_SHARED_SECRET: ${ORCHESTRATOR_SHARED_SECRET}
       HUB_PORTAL_ACTOR: hub-portal
-      ODOO_BASE_URL: http://odoo-mgmt:8069
+      # Default targets odoo-mgmt (only present with the multitenant overlay).
+      # In single-tenant deployments without that overlay, override to
+      # http://odoo:8069 via HUB_PORTAL_ODOO_BASE_URL in .env.
+      ODOO_BASE_URL: ${HUB_PORTAL_ODOO_BASE_URL:-http://odoo-mgmt:8069}
       ODOO_DB: ${HUB_PORTAL_ODOO_DB:-landing_demo}
       ODOO_LOGIN: ${HUB_PORTAL_ODOO_LOGIN:-am.ademaryadi@gmail.com}
       ODOO_PASSWORD: ${HUB_PORTAL_ODOO_PASSWORD:-admin}
