@@ -38,10 +38,15 @@ RUN find / -xdev -perm -4000 -type f -exec chmod u-s {} + 2>/dev/null || true \
  && find / -xdev -perm -2000 -type f -exec chmod g-s {} + 2>/dev/null || true
 
 # Templates & scripts
+# Template lives in /usr/local/share so it survives a tmpfs mount of /etc/odoo
+# under prod's read_only rootfs. The legacy /etc/odoo copy stays as a fallback
+# for the dev compose where /etc/odoo isn't shadowed.
+COPY odoo.conf.tmpl /usr/local/share/odoo.conf.tmpl
 COPY odoo.conf.tmpl /etc/odoo/odoo.conf.tmpl
 COPY entrypoint.sh /usr/local/bin/custom-entrypoint.sh
 COPY healthcheck.sh /usr/local/bin/custom-healthcheck.sh
 RUN chmod 0755 /usr/local/bin/custom-entrypoint.sh /usr/local/bin/custom-healthcheck.sh \
+ && chmod 0644 /usr/local/share/odoo.conf.tmpl \
  && chown odoo:odoo /etc/odoo/odoo.conf.tmpl
 
 USER odoo

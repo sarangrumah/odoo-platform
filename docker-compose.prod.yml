@@ -36,6 +36,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,size=512m,mode=1777
+      # entrypoint renders odoo.conf from odoo.conf.tmpl into /etc/odoo/odoo.conf
+      # at boot — needs to be writable under read_only rootfs.
+      - /etc/odoo:rw,size=16m,mode=0755,uid=101,gid=101
     volumes:
       - ./addons:/mnt/extra-addons:ro
       - ./data/odoo-filestore:/var/lib/odoo

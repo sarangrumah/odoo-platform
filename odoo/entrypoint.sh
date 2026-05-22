@@ -8,7 +8,11 @@
 # ============================================================
 set -euo pipefail
 
-CONFIG_TMPL="/etc/odoo/odoo.conf.tmpl"
+# Template lives in the read-only image at /usr/local/share/ so it stays
+# accessible when /etc/odoo is mounted as a writable tmpfs in prod compose.
+# Fallback to /etc/odoo for backward-compat with older images.
+CONFIG_TMPL="/usr/local/share/odoo.conf.tmpl"
+[ -r "$CONFIG_TMPL" ] || CONFIG_TMPL="/etc/odoo/odoo.conf.tmpl"
 CONFIG_OUT="/etc/odoo/odoo.conf"
 
 log() { echo "[entrypoint] $*" >&2; }
