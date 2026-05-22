@@ -65,11 +65,11 @@
                 <filter string="Errors" name="f_err" domain="[('result', '=', 'error')]"/>
                 <filter string="Today" name="f_today"
                         domain="[('scanned_at', '&gt;=', (context_today()).strftime('%Y-%m-%d'))]"/>
-                
+
                     <filter string="Device" name="g_device" context="{'group_by': 'device_id'}"/>
                     <filter string="Action" name="g_action" context="{'group_by': 'action'}"/>
                     <filter string="Date" name="g_date" context="{'group_by': 'scanned_at:day'}"/>
-                
+
             </search>
         </field>
     </record>

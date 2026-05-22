@@ -136,12 +136,12 @@
                         domain="[('state', '=', 'failed')]"/>
                 <filter string="Installed" name="f_installed"
                         domain="[('state', '=', 'installed')]"/>
-                
+
                     <filter string="State" name="g_state"
                             context="{'group_by': 'state'}"/>
                     <filter string="Tenant" name="g_tenant"
                             context="{'group_by': 'tenant_id'}"/>
-                
+
             </search>
         </field>
     </record>
