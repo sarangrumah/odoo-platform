@@ -169,13 +169,19 @@ class WhatsappAccount(models.Model):
         while attempt < _MAX_RETRIES:
             attempt += 1
             try:
+                # CodeQL py/clear-text-logging-sensitive-data: the URL is the
+                # WABA Graph endpoint (e.g. /v19.0/<phone_id>/messages). The
+                # bearer token lives in the Authorization header (see
+                # _get_headers above), never in the URL. Log the URL with no
+                # query string just to be doubly defensive.
+                url_for_log = url.split("?", 1)[0]
                 _logger.info(
                     "[whatsapp http] req=%s account=%s attempt=%s %s %s",
                     request_id,
                     self.name,
                     attempt,
                     method,
-                    url,
+                    url_for_log,  # lgtm[py/clear-text-logging-sensitive-data]
                 )
                 resp = requests.request(
                     method,

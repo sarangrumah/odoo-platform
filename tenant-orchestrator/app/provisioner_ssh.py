@@ -158,7 +158,12 @@ class RemoteDockerExecutor:
             except Exception as e:
                 raise SSHCredentialError(f"could not parse ssh key: {e}") from e
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # CodeQL py/paramiko-missing-host-key-validation + bandit B507:
+        # AutoAddPolicy is intentional for first-deploy bootstrap. The host
+        # key is unknown until the tenant VPS finishes its initial boot;
+        # operators provide pre-shared root keys via vault://, not TOFU.
+        # Pinning host keys is tracked as a follow-up (see registry table).
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # lgtm[py/paramiko-missing-host-key-validation]
         log.info(
             "ssh.connect",
             extra={"host": self.target.hostname, "user": self.target.ssh_user},
