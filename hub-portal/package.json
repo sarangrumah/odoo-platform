@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "express": "^4.19.2",
+    "express": "^4.22.2",
     "framer-motion": "^11.3.0",
     "lucide-react": "^0.451.0",
     "react": "^18.3.1",
