@@ -41,9 +41,8 @@ def _compute_dedup_hash(email, phone):
         return False
     raw = ("%s|%s" % (e, p)).encode("utf-8")
     # Hash used as a dedup/lookup key, not security — bandit B324
-    return hashlib.sha1(  # nosemgrep: weak-hash-md5-sha1
-        raw, usedforsecurity=False
-    ).hexdigest()
+    # nosemgrep: weak-hash-md5-sha1 (semgrep rule explicitly allows caching keys)
+    return hashlib.sha1(raw, usedforsecurity=False).hexdigest()
 
 
 class HrApplicant(models.Model):
