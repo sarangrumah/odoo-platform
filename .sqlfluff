@@ -1,0 +1,33 @@
+# Sqlfluff config — applied by the sqlfluff-lint pre-commit hook
+# (see .pre-commit-config.yaml: files = ^postgres/init/.*\.sql$).
+#
+# The SQL files in postgres/init/ use a deliberate "aligned-column"
+# style — column types/constraints line up vertically using multiple
+# spaces — which is significantly more readable for DDL than the
+# single-space style sqlfluff defaults assume:
+#
+#     id                BIGSERIAL PRIMARY KEY,
+#     slug              VARCHAR(63)  NOT NULL UNIQUE
+#                       CHECK (slug ~ '^[a-z][a-z0-9_]{1,62}$'),
+#     display_name      VARCHAR(128) NOT NULL,
+#
+# Without tuning, sqlfluff flags ~300 false positives on this style:
+#  - LT01 (layout.spacing)  — every multi-space between identifier and type
+#  - LT02 (layout.indent)   — 2-space indent vs sqlfluff's default 4
+#  - LT05 (layout.long_lines) — GRANT statements & function signatures > 80
+#
+# This config accepts the codebase's style while leaving every other
+# sqlfluff rule active to catch real DDL issues.
+
+[sqlfluff]
+dialect = postgres
+# Disable layout rules that fight the aligned-column DDL style.
+# These are stylistic warnings, not correctness issues — sqlfluff's
+# other rule categories (RF, AM, ST, CV, CP*) stay enforced.
+exclude_rules = LT01, LT02, LT05
+
+[sqlfluff:indentation]
+# Tracked for the rules that still run (e.g. some CP/ST rules look at
+# indent context). Matches the existing 2-space indent in postgres/init/.
+indent_unit = space
+tab_space_size = 2
