@@ -27,7 +27,7 @@ RUN apt-get update \
 COPY pyproject.toml /app/pyproject.toml
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir --target=/app/site-packages \
-      "fastapi==0.115.4" \
+      "fastapi==0.136.1" \
       "uvicorn[standard]==0.32.0" \
       "pydantic==2.9.2" \
       "pydantic-settings==2.6.0" \
