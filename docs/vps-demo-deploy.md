@@ -116,8 +116,28 @@ mkdir -p data/{backups,odoo-filestore,nginx-cache,caddy/data,caddy/config}
 chown -R 100:101 data/odoo-filestore    # odoo:19.0 image: uid 100, gid 101
 chown -R 999:999 data/backups           # uid 999 = 'postgres' di pgbackup-local
 
+# nginx (di belakang Caddy) tetap perlu cert file present, meski Caddy yang
+# handle TLS publik. Generate self-signed agar nginx boot — Caddy ACME yang
+# bicara ke internet, nginx cuma backend HTTPS.
+mkdir -p nginx/certs
+openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+  -keyout nginx/certs/server.key -out nginx/certs/server.crt \
+  -subj "/CN=localhost"
+chmod 644 nginx/certs/server.crt && chmod 600 nginx/certs/server.key
+
 # Start prod + TLS (Caddy ACME di depan nginx)
 make up-tls
+
+# First-boot init: pgvector tidak ada di image standar postgres, init script
+# 01-extensions.sql akan skip extension itu tapi schema 04-tenant-registry
+# bisa skip juga. Apply manual + sync password orchestrator dari .env.
+PW=$(grep ^POSTGRES_PASSWORD .env | cut -d= -f2)
+TOPW=$(grep ^PG_ORCHESTRATOR_PASSWORD .env | cut -d= -f2)
+docker exec -i -e PGPASSWORD="$PW" odoo19-platform-postgres \
+  psql -U odoo -d postgres < postgres/init/04-tenant-registry-schema.sql
+docker exec -e PGPASSWORD="$PW" odoo19-platform-postgres \
+  psql -U odoo -d postgres -c "ALTER ROLE tenant_orchestrator PASSWORD '$TOPW';"
+docker restart odoo19-platform-tenant-orchestrator
 
 # Cek health
 docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls-acme.yml ps
