@@ -13,7 +13,7 @@ RUN apt-get update \
 FROM base AS builder
 COPY pyproject.toml /app/pyproject.toml
 RUN pip install --no-cache-dir --target=/app/site-packages \
-      "fastapi==0.115.4" \
+      "fastapi==0.136.1" \
       "uvicorn[standard]==0.32.0" \
       "httpx[http2]==0.27.2" \
       "apscheduler==3.10.4" \
