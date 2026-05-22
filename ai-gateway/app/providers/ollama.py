@@ -18,7 +18,12 @@ class OllamaProvider(LLMProvider):
 
     async def chat(self, req: ChatRequest) -> ChatResponse:
         s = get_settings()
-        model = req.model or s.ollama_model_default
+        if req.model:
+            model = req.model
+        elif req.quality == "high":
+            model = s.ollama_model_quality
+        else:
+            model = s.ollama_model_default
         messages = []
         if req.system:
             messages.append({"role": "system", "content": req.system})

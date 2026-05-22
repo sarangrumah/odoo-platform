@@ -23,7 +23,8 @@ class Settings(BaseSettings):
 
     # Ollama
     ollama_base_url: str = "http://ollama:11434"
-    ollama_model_default: str = "llama3.2"
+    ollama_model_default: str = "llama3.2:3b"
+    ollama_model_quality: str = "qwen2.5:7b"
 
     # Redis (rate limit + cache)
     redis_url: str = "redis://redis:6379/0"
