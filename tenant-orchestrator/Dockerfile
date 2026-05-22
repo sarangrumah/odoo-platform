@@ -6,6 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# Enable pipefail so a failed step in `curl ... | tar ...` (line 21 below)
+# aborts the build instead of silently producing a half-extracted docker CLI.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # postgresql-client: pg_dump / pg_restore / psql for backup/restore ops.
 # docker-cli (static): the orchestrator invokes ``docker exec odoo-mgmt odoo -d <db> --init=...``
 #   to bootstrap freshly-provisioned tenant databases. The /web/database/create

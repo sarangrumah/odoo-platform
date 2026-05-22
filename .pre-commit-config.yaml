@@ -27,6 +27,9 @@ repos:
       - id: check-case-conflict
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
+        # Templates are rendered at deploy time; only the rendered output
+        # needs an exec bit, not the template itself.
+        exclude: \.template$
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.21.2
