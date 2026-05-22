@@ -21,10 +21,22 @@
 
 [sqlfluff]
 dialect = postgres
-# Disable layout rules that fight the aligned-column DDL style.
-# These are stylistic warnings, not correctness issues — sqlfluff's
-# other rule categories (RF, AM, ST, CV, CP*) stay enforced.
-exclude_rules = LT01, LT02, LT05
+# Disabled rules — all stylistic preferences that conflict with the
+# codebase's deliberate conventions:
+#   LT01  spacing       — aligned-column DDL style (multi-space)
+#   LT02  indent        — 2-space indent vs sqlfluff default 4
+#   LT05  long lines    — GRANT statements / function signatures > 80
+#   LT09  select fmt    — VIEW definitions use compact multi-target SELECTs
+#   ST06  column order  — sqlfluff's "wildcards then simple before agg" ordering
+#                          doesn't match view-projection ordering by column meaning
+#   CP02  ident case    — false-positives on Postgres keywords (e.g. USING GIN)
+#   CP05  type case     — built-ins are uppercase; user-defined types
+#                          (e.g. tenant_registry.tenant_state) follow snake_case
+#                          per Postgres schema-qualified-name convention
+#
+# All other sqlfluff rules (RF, AM, ST [other than ST06], CV, structural)
+# stay enforced.
+exclude_rules = LT01, LT02, LT05, LT09, ST06, CP02, CP05
 
 [sqlfluff:indentation]
 # Tracked for the rules that still run (e.g. some CP/ST rules look at
