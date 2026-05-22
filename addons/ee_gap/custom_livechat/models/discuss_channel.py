@@ -192,7 +192,9 @@ class DiscussChannel(models.Model):
         except Exception:
             blob = str(payload)
         # Hash used only as a cache/dedup key, not security — bandit B324
-        return hashlib.sha1(blob.encode("utf-8"), usedforsecurity=False).hexdigest()
+        return hashlib.sha1(  # nosemgrep: weak-hash-md5-sha1
+            blob.encode("utf-8"), usedforsecurity=False
+        ).hexdigest()
 
     def action_ai_suggest_reply(self):
         self.ensure_one()
