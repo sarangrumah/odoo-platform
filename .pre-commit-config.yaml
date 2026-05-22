@@ -2,6 +2,15 @@
 default_install_hook_types: [pre-commit, commit-msg]
 fail_fast: false
 
+# Vendored upstream code (OCA modules, third-party static libs) is owned by
+# its source repos — we don't reformat it here. Applies to every hook below.
+exclude: |
+  (?x)^(
+    addons/_vendor/.*|
+    .*/static/lib/.*|
+    .*\.min\.(js|css)
+  )$
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
