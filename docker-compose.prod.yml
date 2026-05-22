@@ -38,7 +38,9 @@ services:
       - /tmp:rw,size=512m,mode=1777
       # entrypoint renders odoo.conf from odoo.conf.tmpl into /etc/odoo/odoo.conf
       # at boot — needs to be writable under read_only rootfs.
-      - /etc/odoo:rw,size=16m,mode=0755,uid=101,gid=101
+      # mode=1777 (world-writable + sticky) — uid/gid mount options aren't
+      # always honored by docker tmpfs, so use sticky-world instead.
+      - /etc/odoo:rw,size=16m,mode=1777
     volumes:
       - ./addons:/mnt/extra-addons:ro
       - ./data/odoo-filestore:/var/lib/odoo
