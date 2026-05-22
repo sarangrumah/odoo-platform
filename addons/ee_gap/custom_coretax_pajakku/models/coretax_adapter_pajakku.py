@@ -34,8 +34,8 @@ _TOKEN_CACHE: dict[str, dict[str, Any]] = {}
 
 # Circuit breaker state: {company_id: {"fail_streak": int, "open_until": float}}
 _CB_STATE: dict[int, dict[str, float]] = {}
-_CB_THRESHOLD = 10           # consecutive failures before opening
-_CB_OPEN_SECONDS = 3600      # circuit stays open for 1 hour
+_CB_THRESHOLD = 10  # consecutive failures before opening
+_CB_OPEN_SECONDS = 3600  # circuit stays open for 1 hour
 
 # Retry policy
 _MAX_RETRIES = 3
@@ -79,6 +79,7 @@ def _circuit_record_failure(company_id: int) -> bool:
 
 class CoretaxAdapterBaseExtend(models.AbstractModel):
     """Register 'pajakku' in the dispatcher mapping."""
+
     _inherit = "custom.coretax.adapter.base"
 
     @api.model
@@ -96,26 +97,40 @@ class CoretaxAdapterPajakku(models.AbstractModel):
     # -------- Public API (overrides) --------
 
     @api.model
-    def submit_xml(self, xml_bytes: bytes, *, config=None, transaction_type: str | None = None,
-                   source_record=None) -> dict:
+    def submit_xml(
+        self, xml_bytes: bytes, *, config=None, transaction_type: str | None = None, source_record=None
+    ) -> dict:
         config = config or self._resolve_config()
         self._guard_enabled(config)
         if _circuit_open(config.company_id.id):
-            raise UserError(_(
-                "Pajakku circuit breaker is OPEN for company '%s'. Will auto-reset in "
-                "~1 hour, or fix the underlying error and retry manually."
-            ) % config.company_id.name)
+            raise UserError(
+                _(
+                    "Pajakku circuit breaker is OPEN for company '%s'. Will auto-reset in "
+                    "~1 hour, or fix the underlying error and retry manually."
+                )
+                % config.company_id.name
+            )
 
         # Materialise a transaction row up front so we have something to update on failure
-        tx = self.env["custom.coretax.transaction"].sudo().create({
-            "company_id": config.company_id.id,
-            "config_id": config.id,
-            "transaction_type": transaction_type or "efaktur_keluaran",
-            "account_move_id": source_record.id if source_record and source_record._name == "account.move" else False,
-            "bukti_potong_id": source_record.id if source_record and source_record._name == "custom.coretax.bukti.potong" else False,
-            "payload": base64.b64encode(xml_bytes),
-            "payload_filename": "submit.xml",
-        })
+        tx = (
+            self.env["custom.coretax.transaction"]
+            .sudo()
+            .create(
+                {
+                    "company_id": config.company_id.id,
+                    "config_id": config.id,
+                    "transaction_type": transaction_type or "efaktur_keluaran",
+                    "account_move_id": source_record.id
+                    if source_record and source_record._name == "account.move"
+                    else False,
+                    "bukti_potong_id": source_record.id
+                    if source_record and source_record._name == "custom.coretax.bukti.potong"
+                    else False,
+                    "payload": base64.b64encode(xml_bytes),
+                    "payload_filename": "submit.xml",
+                }
+            )
+        )
         tx.mark_submitting()
 
         try:
@@ -132,8 +147,7 @@ class CoretaxAdapterPajakku(models.AbstractModel):
                 raise RuntimeError(f"Pajakku response missing submission UUID: {body!r}")
             tx.mark_submitted(uuid, response_xml=response.content)
             _circuit_record_success(config.company_id.id)
-            self._bump_usage(config, "faktur_submits" if "efaktur" in (transaction_type or "")
-                                                       else "bupot_submits")
+            self._bump_usage(config, "faktur_submits" if "efaktur" in (transaction_type or "") else "bupot_submits")
             return {
                 "submission_uuid": uuid,
                 "status": "submitted",
@@ -158,14 +172,20 @@ class CoretaxAdapterPajakku(models.AbstractModel):
             status = body.get("status")
             if status == "approved":
                 nsfp = body.get("nsfp") or body.get("nomor_faktur")
-                tx = self.env["custom.coretax.transaction"].sudo().search(
-                    [("external_uuid", "=", submission_uuid)], limit=1)
+                tx = (
+                    self.env["custom.coretax.transaction"]
+                    .sudo()
+                    .search([("external_uuid", "=", submission_uuid)], limit=1)
+                )
                 if tx and nsfp:
                     tx.mark_approved(nsfp, response_pdf=None)
                 return nsfp
             if status == "rejected":
-                tx = self.env["custom.coretax.transaction"].sudo().search(
-                    [("external_uuid", "=", submission_uuid)], limit=1)
+                tx = (
+                    self.env["custom.coretax.transaction"]
+                    .sudo()
+                    .search([("external_uuid", "=", submission_uuid)], limit=1)
+                )
                 if tx:
                     tx.mark_rejected(body.get("code", "REJECT"), body.get("message", ""))
                 return None
@@ -179,7 +199,8 @@ class CoretaxAdapterPajakku(models.AbstractModel):
         config = config or self._resolve_config()
         self._guard_enabled(config)
         response = self._http_get(
-            config, path=f"/api/v1/efaktur/{submission_uuid}/response",
+            config,
+            path=f"/api/v1/efaktur/{submission_uuid}/response",
             stream=True,
         )
         return response.content
@@ -204,9 +225,13 @@ class CoretaxAdapterPajakku(models.AbstractModel):
     # -------- Internal: HTTP machinery --------
 
     def _resolve_config(self):
-        config = self.env["custom.coretax.config"].sudo().search(
-            [("active", "=", True), ("company_id", "in", (False, self.env.company.id))],
-            limit=1,
+        config = (
+            self.env["custom.coretax.config"]
+            .sudo()
+            .search(
+                [("active", "=", True), ("company_id", "in", (False, self.env.company.id))],
+                limit=1,
+            )
         )
         if not config:
             raise UserError(_("No active Coretax config for this company."))
@@ -214,24 +239,22 @@ class CoretaxAdapterPajakku(models.AbstractModel):
 
     def _guard_enabled(self, config):
         if not getattr(config, "pajakku_enabled", False):
-            raise UserError(_(
-                "Pajakku adapter is disabled for company '%s'. "
-                "Enable in Coretax Config or switch adapter_type to manual."
-            ) % config.company_id.name)
+            raise UserError(
+                _(
+                    "Pajakku adapter is disabled for company '%s'. "
+                    "Enable in Coretax Config or switch adapter_type to manual."
+                )
+                % config.company_id.name
+            )
         if not (config.pajakku_client_id and config.pajakku_client_secret_set):
-            raise UserError(_(
-                "Pajakku credentials missing. Open Coretax Config → Pajakku tab to set "
-                "client_id and client_secret."
-            ))
+            raise UserError(
+                _("Pajakku credentials missing. Open Coretax Config → Pajakku tab to set client_id and client_secret.")
+            )
 
     def _base_url(self, config) -> str:
         if config.pajakku_api_url:
             return config.pajakku_api_url.rstrip("/")
-        return (
-            "https://sandbox-api.pajakku.com"
-            if config.pajakku_sandbox_mode
-            else "https://api.pajakku.com"
-        )
+        return "https://sandbox-api.pajakku.com" if config.pajakku_sandbox_mode else "https://api.pajakku.com"
 
     def _endpoint_for_submit(self, transaction_type: str | None) -> str:
         ttype = transaction_type or ""
@@ -336,7 +359,8 @@ class CoretaxAdapterPajakku(models.AbstractModel):
                     "<b>Pajakku circuit breaker OPENED</b> after %s consecutive failures. "
                     "Submissions will be refused for ~1 hour. Investigate Pajakku status, "
                     "credentials, or last_error on recent transactions."
-                ) % _CB_THRESHOLD,
+                )
+                % _CB_THRESHOLD,
                 subtype_xmlid="mail.mt_note",
             )
         except Exception:

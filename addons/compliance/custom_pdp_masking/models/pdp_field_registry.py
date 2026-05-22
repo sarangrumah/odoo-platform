@@ -88,14 +88,20 @@ class CustomPdpFieldRegistry(models.Model):
         ondelete="cascade",
     )
     model_name = fields.Char(
-        related="model_id.model", store=True, index=True,
+        related="model_id.model",
+        store=True,
+        index=True,
     )
     field_name = fields.Char(required=True, index=True)
     pii_category = fields.Selection(
-        selection=PII_CATEGORIES, required=True, default="other",
+        selection=PII_CATEGORIES,
+        required=True,
+        default="other",
     )
     mask_pattern = fields.Selection(
-        selection=MASK_PATTERNS, required=True, default="redacted",
+        selection=MASK_PATTERNS,
+        required=True,
+        default="redacted",
     )
     mask_groups = fields.Many2many(
         "res.groups",
@@ -125,12 +131,9 @@ class CustomPdpFieldRegistry(models.Model):
         for rec in self:
             if not rec.model_id:
                 continue
-            if not Fields.search_count(
-                [("model", "=", rec.model_id.model), ("name", "=", rec.field_name)]
-            ):
+            if not Fields.search_count([("model", "=", rec.model_id.model), ("name", "=", rec.field_name)]):
                 raise ValidationError(
-                    _("Field %(f)s does not exist on model %(m)s.")
-                    % {"f": rec.field_name, "m": rec.model_id.model}
+                    _("Field %(f)s does not exist on model %(m)s.") % {"f": rec.field_name, "m": rec.model_id.model}
                 )
 
     # ---------- public API used by mixin / ORM override ----------
@@ -146,9 +149,7 @@ class CustomPdpFieldRegistry(models.Model):
             cache = {}
         if model_name in cache:
             return cache[model_name]
-        recs = self.sudo().search(
-            [("active", "=", True), ("model_name", "=", model_name)]
-        )
+        recs = self.sudo().search([("active", "=", True), ("model_name", "=", model_name)])
         out = [
             {
                 "field": r.field_name,
@@ -183,9 +184,7 @@ class CustomPdpFieldRegistry(models.Model):
         model that isn't loaded in the current registry.
         """
         IrModel = self.env["ir.model"].sudo()
-        view_group = self.env.ref(
-            "custom_pdp_masking.group_view_pii", raise_if_not_found=False
-        )
+        view_group = self.env.ref("custom_pdp_masking.group_view_pii", raise_if_not_found=False)
         groups_cmd = [(4, view_group.id)] if view_group else []
         seeds = [
             # (model, field, category, pattern)
@@ -209,13 +208,9 @@ class CustomPdpFieldRegistry(models.Model):
             if not mrec:
                 continue
             # Verify the field actually exists.
-            if not self.env["ir.model.fields"].sudo().search_count(
-                [("model", "=", model), ("name", "=", field)]
-            ):
+            if not self.env["ir.model.fields"].sudo().search_count([("model", "=", model), ("name", "=", field)]):
                 continue
-            if self.search_count(
-                [("model_name", "=", model), ("field_name", "=", field)]
-            ):
+            if self.search_count([("model_name", "=", model), ("field_name", "=", field)]):
                 continue
             try:
                 self.create(

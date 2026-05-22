@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Unit tests for the GS1 Application-Identifier parser on scan.session."""
+
 from odoo.tests.common import TransactionCase
 
 

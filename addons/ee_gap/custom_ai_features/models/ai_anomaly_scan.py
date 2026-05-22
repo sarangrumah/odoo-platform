@@ -5,9 +5,8 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Any
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -50,7 +49,8 @@ class AiAnomalyScan(models.Model):
     finished_at = fields.Datetime(readonly=True)
     state = fields.Selection(
         [("running", "Running"), ("done", "Done"), ("error", "Error")],
-        default="running", required=True,
+        default="running",
+        required=True,
     )
     finding_ids = fields.One2many("ai.anomaly.finding", "scan_id")
     finding_count = fields.Integer(compute="_compute_finding_count")
@@ -96,7 +96,7 @@ class AiAnomalyScan(models.Model):
 
         latest = records[0]
         history_values = []
-        for r in records[1: cfg["min_history"] + 50]:
+        for r in records[1 : cfg["min_history"] + 50]:
             try:
                 history_values.append(float(r[cfg["metric"]]))
             except Exception:
@@ -122,22 +122,23 @@ class AiAnomalyScan(models.Model):
                 },
             )
         except Exception as e:
-            _logger.warning("AI anomaly check failed for %s/%s: %s",
-                            cfg["model"], latest.id, e)
+            _logger.warning("AI anomaly check failed for %s/%s: %s", cfg["model"], latest.id, e)
             return
 
         # Only create a finding when AI flags it as an anomaly with non-trivial confidence
         if not result.get("is_anomaly") or result.get("score", 0) < 0.5:
             return
 
-        Finding.create({
-            "scan_id": self.id,
-            "res_model": cfg["model"],
-            "res_id": latest.id,
-            "metric": cfg["metric"],
-            "latest_value": latest_val,
-            "severity": result.get("severity", "info"),
-            "score": result.get("score", 0.0),
-            "rationale": result.get("rationale", ""),
-            "suggested_action": result.get("suggested_action", ""),
-        })
+        Finding.create(
+            {
+                "scan_id": self.id,
+                "res_model": cfg["model"],
+                "res_id": latest.id,
+                "metric": cfg["metric"],
+                "latest_value": latest_val,
+                "severity": result.get("severity", "info"),
+                "score": result.get("score", 0.0),
+                "rationale": result.get("rationale", ""),
+                "suggested_action": result.get("suggested_action", ""),
+            }
+        )

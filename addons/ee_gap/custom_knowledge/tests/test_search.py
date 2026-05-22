@@ -4,7 +4,6 @@ from odoo.tests import TransactionCase, tagged
 
 @tagged("post_install", "-at_install")
 class TestKnowledgeSearch(TransactionCase):
-
     def setUp(self):
         super().setUp()
         Article = self.env["knowledge.article"]

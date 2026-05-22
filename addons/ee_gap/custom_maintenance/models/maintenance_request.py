@@ -122,23 +122,16 @@ class MaintenanceRequest(models.Model):
     def _compute_sla(self):
         Sla = self.env["custom.maintenance.team.sla"]
         for rec in self:
-            rec.x_sla_id = Sla._find_for(
-                rec.maintenance_team_id.id, rec.priority or "2"
-            )
+            rec.x_sla_id = Sla._find_for(rec.maintenance_team_id.id, rec.priority or "2")
 
-    @api.depends("x_sla_id", "x_sla_id.response_hours",
-                 "x_sla_id.resolve_hours", "create_date", "request_date")
+    @api.depends("x_sla_id", "x_sla_id.response_hours", "x_sla_id.resolve_hours", "create_date", "request_date")
     def _compute_sla_deadlines(self):
         for rec in self:
             base = rec.create_date or rec.request_date
             if rec.x_sla_id and base:
                 base_dt = fields.Datetime.to_datetime(base)
-                rec.x_sla_response_deadline = base_dt + timedelta(
-                    hours=rec.x_sla_id.response_hours
-                )
-                rec.x_sla_resolve_deadline = base_dt + timedelta(
-                    hours=rec.x_sla_id.resolve_hours
-                )
+                rec.x_sla_response_deadline = base_dt + timedelta(hours=rec.x_sla_id.response_hours)
+                rec.x_sla_resolve_deadline = base_dt + timedelta(hours=rec.x_sla_id.resolve_hours)
             else:
                 rec.x_sla_response_deadline = False
                 rec.x_sla_resolve_deadline = False
@@ -191,20 +184,14 @@ class MaintenanceRequest(models.Model):
         Move = self.env.get("stock.move")
         Location = self.env.get("stock.location")
         if Move is None or Location is None:
-            _logger.info(
-                "custom_maintenance: stock module not installed; skipping moves."
-            )
+            _logger.info("custom_maintenance: stock module not installed; skipping moves.")
             return
-        src = Location.sudo().search(
-            [("usage", "=", "internal")], limit=1
+        src = Location.sudo().search([("usage", "=", "internal")], limit=1)
+        dst = Location.sudo().search([("usage", "=", "production")], limit=1) or Location.sudo().search(
+            [("usage", "=", "inventory")], limit=1
         )
-        dst = Location.sudo().search(
-            [("usage", "=", "production")], limit=1
-        ) or Location.sudo().search([("usage", "=", "inventory")], limit=1)
         if not src or not dst:
-            _logger.info(
-                "custom_maintenance: missing source/dest stock locations; skipping."
-            )
+            _logger.info("custom_maintenance: missing source/dest stock locations; skipping.")
             return
         for product in self.x_spare_part_ids:
             Move.sudo().create(
@@ -224,23 +211,18 @@ class MaintenanceRequest(models.Model):
     @api.model
     def cron_check_sla_breach(self):
         """Recompute SLA status and notify managers on newly-breached requests."""
-        open_reqs = self.search(
-            [("stage_id.done", "=", False), ("x_sla_resolve_deadline", "!=", False)]
-        )
+        open_reqs = self.search([("stage_id.done", "=", False), ("x_sla_resolve_deadline", "!=", False)])
         if not open_reqs:
             return True
         open_reqs._compute_sla_status()
-        breached = open_reqs.filtered(
-            lambda r: r.x_sla_status == "breach" and not r.x_sla_breach_notified
-        )
+        breached = open_reqs.filtered(lambda r: r.x_sla_status == "breach" and not r.x_sla_breach_notified)
         for rec in breached:
             try:
                 rec.message_post(
                     body=_(
-                        "<b>SLA Breach</b><br/>"
-                        "This maintenance request has passed its SLA resolution "
-                        "deadline (%s)."
-                    ) % rec.x_sla_resolve_deadline,
+                        "<b>SLA Breach</b><br/>This maintenance request has passed its SLA resolution deadline (%s)."
+                    )
+                    % rec.x_sla_resolve_deadline,
                     subtype_xmlid="mail.mt_comment",
                 )
                 # Notify team manager via mail if available
@@ -253,7 +235,8 @@ class MaintenanceRequest(models.Model):
                                 "<p>Request <b>%(name)s</b> for equipment "
                                 "<b>%(eq)s</b> has breached its SLA "
                                 "resolution deadline (%(dl)s).</p>"
-                            ) % {
+                            )
+                            % {
                                 "name": rec.name,
                                 "eq": rec.equipment_id.display_name or "",
                                 "dl": rec.x_sla_resolve_deadline,

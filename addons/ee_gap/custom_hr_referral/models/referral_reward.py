@@ -14,7 +14,8 @@ class ReferralReward(models.Model):
     currency_id = fields.Many2one("res.currency", default=lambda s: s.env.company.currency_id)
     state = fields.Selection(
         [("pending", "Pending"), ("approved", "Approved"), ("paid", "Paid")],
-        default="pending", required=True,
+        default="pending",
+        required=True,
     )
     approved_at = fields.Datetime(readonly=True)
     paid_at = fields.Datetime(readonly=True)
@@ -26,11 +27,9 @@ class ReferralReward(models.Model):
     def action_approve(self):
         for rec in self:
             rec.write({"state": "approved", "approved_at": fields.Datetime.now()})
-            rec._pdp_audit_write("referral_reward_approve", rec.id,
-                                 {"amount": float(rec.amount)})
+            rec._pdp_audit_write("referral_reward_approve", rec.id, {"amount": float(rec.amount)})
 
     def action_pay(self):
         for rec in self:
             rec.write({"state": "paid", "paid_at": fields.Datetime.now()})
-            rec._pdp_audit_write("referral_reward_pay", rec.id,
-                                 {"amount": float(rec.amount)})
+            rec._pdp_audit_write("referral_reward_pay", rec.id, {"amount": float(rec.amount)})

@@ -11,15 +11,12 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import json
 import logging
 import os
 import re
-from datetime import datetime
 from pathlib import Path
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
 from odoo.modules import get_modules, get_module_path
 
 _logger = logging.getLogger(__name__)
@@ -125,9 +122,9 @@ class CustomModuleCapabilityEntry(models.Model):
     )
     knowledge_md = fields.Text(
         help="Full contents of MODULE_KNOWLEDGE.md at module root. "
-             "Curated knowledge file (purpose, business flow, key models, "
-             "integration points, gotchas) for the BRD analyzer LLM to "
-             "consume. Edit-by-developer; generated baseline lives in git.",
+        "Curated knowledge file (purpose, business flow, key models, "
+        "integration points, gotchas) for the BRD analyzer LLM to "
+        "consume. Edit-by-developer; generated baseline lives in git.",
     )
     knowledge_status = fields.Selection(
         [
@@ -139,29 +136,28 @@ class CustomModuleCapabilityEntry(models.Model):
         default="missing",
         index=True,
         help="Lifecycle marker. 'drift' is set when the source hash no longer "
-             "matches the hash recorded when MODULE_KNOWLEDGE.md was last "
-             "generated/edited — the knowledge file may be stale.",
+        "matches the hash recorded when MODULE_KNOWLEDGE.md was last "
+        "generated/edited — the knowledge file may be stale.",
     )
     declared_tags = fields.Json(
         default=list,
         help="Tags declared by the developer in __manifest__.py via the "
-             "'capability_tags' key. Authoritative — overrides keyword "
-             "inference when present.",
+        "'capability_tags' key. Authoritative — overrides keyword "
+        "inference when present.",
     )
     source_hash = fields.Char(
         index=True,
-        help="SHA-256 digest of (manifest + models/ + controllers/) at the "
-             "last scrape. Pillar of drift detection.",
+        help="SHA-256 digest of (manifest + models/ + controllers/) at the last scrape. Pillar of drift detection.",
     )
     knowledge_md_hash = fields.Char(
         help="SHA-256 of MODULE_KNOWLEDGE.md content at last scrape. Used to "
-             "detect when the knowledge file itself was edited, which resets "
-             "last_knowledge_source_hash.",
+        "detect when the knowledge file itself was edited, which resets "
+        "last_knowledge_source_hash.",
     )
     last_knowledge_source_hash = fields.Char(
         help="The source_hash recorded at the moment MODULE_KNOWLEDGE.md was "
-             "last written (or last manually marked clean). Drift = "
-             "source_hash != last_knowledge_source_hash.",
+        "last written (or last manually marked clean). Drift = "
+        "source_hash != last_knowledge_source_hash.",
     )
     views_count = fields.Integer(default=0)
     reports_count = fields.Integer(default=0)
@@ -213,9 +209,7 @@ class CustomModuleCapabilityEntry(models.Model):
         """
         Tag = self.env["custom.module.capability.tag"]
         # Make sure we know the full tag vocabulary up-front to avoid N queries.
-        tag_cache: dict[str, int] = {
-            t.technical_code: t.id for t in Tag.sudo().search([])
-        }
+        tag_cache: dict[str, int] = {t.technical_code: t.id for t in Tag.sudo().search([])}
 
         written = 0
         for mod_name in get_modules():
@@ -322,9 +316,7 @@ class CustomModuleCapabilityEntry(models.Model):
     _RE_PUBLIC_METHOD = re.compile(r"^\s{4}def\s+([a-z][\w]*)\s*\(", re.MULTILINE)
 
     @classmethod
-    def _scrape_models(
-        cls, path: str
-    ) -> tuple[list[str], list[str], list[dict], list[str], list[str]]:
+    def _scrape_models(cls, path: str) -> tuple[list[str], list[str], list[dict], list[str], list[str]]:
         """Walk models/ and wizards/ to harvest model names, inherited models,
         field declarations, public methods, and transient/wizard model names.
 
@@ -365,10 +357,9 @@ class CustomModuleCapabilityEntry(models.Model):
                     wizards.update(n for n in file_names if ".wizard" in n)
                     # Field harvest — primary "owner" model is the first _name
                     # or first _inherit found in the file. Cheap, good enough.
-                    owner = (
-                        (file_names[0] if file_names else None)
-                        or (cls._RE_INHERIT_SINGLE.findall(src) or [None])[0]
-                    )
+                    owner = (file_names[0] if file_names else None) or (cls._RE_INHERIT_SINGLE.findall(src) or [None])[
+                        0
+                    ]
                     for fname, ftype in cls._RE_FIELD.findall(src):
                         if len(fields_acc) >= 50:
                             break
@@ -499,12 +490,7 @@ class CustomModuleCapabilityEntry(models.Model):
     def _count_files(folder: str, ext: str) -> int:
         if not os.path.isdir(folder):
             return 0
-        return sum(
-            1
-            for root, _dirs, files in os.walk(folder)
-            for fn in files
-            if fn.endswith(ext)
-        )
+        return sum(1 for root, _dirs, files in os.walk(folder) for fn in files if fn.endswith(ext))
 
     @staticmethod
     def _scrape_security_groups(path: str) -> list[str]:
@@ -577,8 +563,8 @@ class CustomModuleCapabilityEntry(models.Model):
         found_codes: set[str] = set(c for c in declared if c)
         if not declared:
             # Fallback inference only when no declared tags exist.
-            models_blob = " ".join(payload.get("models_own") or []) + " " + " ".join(
-                payload.get("models_inherit") or []
+            models_blob = (
+                " ".join(payload.get("models_own") or []) + " " + " ".join(payload.get("models_inherit") or [])
             )
             haystack = " ".join(
                 [
@@ -628,8 +614,7 @@ class CustomModuleCapabilityEntry(models.Model):
             _logger.info("custom_brd_analyzer: drift cron — no drift detected")
             return
         names = drifted.mapped("module_name")
-        _logger.info("custom_brd_analyzer: drift cron — %d module(s) drift: %s",
-                     len(names), ", ".join(names[:10]))
+        _logger.info("custom_brd_analyzer: drift cron — %d module(s) drift: %s", len(names), ", ".join(names[:10]))
         # Try posting mail.activity to brd admin group users.
         try:
             group = self.env.ref("custom_brd_analyzer.group_brd_admin", raise_if_not_found=False)
@@ -649,14 +634,16 @@ class CustomModuleCapabilityEntry(models.Model):
         ) % (len(names), "\n- ".join(names))
         for user in admin_users:
             try:
-                Activity.create({
-                    "summary": "BRD Analyzer: %d module(s) knowledge drift" % len(names),
-                    "note": body,
-                    "user_id": user.id,
-                    "res_model_id": self.env["ir.model"]._get_id(self._name),
-                    "res_id": drifted[0].id,
-                    "activity_type_id": ActivityType.id if ActivityType else False,
-                })
+                Activity.create(
+                    {
+                        "summary": "BRD Analyzer: %d module(s) knowledge drift" % len(names),
+                        "note": body,
+                        "user_id": user.id,
+                        "res_model_id": self.env["ir.model"]._get_id(self._name),
+                        "res_id": drifted[0].id,
+                        "activity_type_id": ActivityType.id if ActivityType else False,
+                    }
+                )
             except Exception:  # pragma: no cover
                 _logger.exception("drift notify: activity post failed for user %s", user.id)
 
@@ -685,7 +672,9 @@ class CustomModuleCapabilityEntry(models.Model):
                 Param.set_param(key, current)
                 _logger.info(
                     "custom_brd_analyzer: auto-rescan on upgrade (%s → %s) wrote %s entries",
-                    last or "-", current, count,
+                    last or "-",
+                    current,
+                    count,
                 )
             except Exception:  # pragma: no cover
                 _logger.exception("custom_brd_analyzer: auto-rescan on upgrade failed")
@@ -697,6 +686,7 @@ class CustomModuleCapabilityEntry(models.Model):
         try:
             with self.pool.cursor() as cr:
                 from odoo import api as _api, SUPERUSER_ID as _SU
+
                 env = _api.Environment(cr, _SU, {})
                 env["custom.module.capability.entry"]._maybe_rescan_on_upgrade()
         except Exception:  # pragma: no cover
@@ -727,11 +717,13 @@ class CustomModuleCapabilityEntry(models.Model):
             score = mat_score + kn_score
             tag_codes = e.capability_tag_ids.mapped("technical_code")
             for code in tag_codes:
-                matrix.setdefault(code, []).append({
-                    "module": e.module_name,
-                    "score": score,
-                    "knowledge_status": ks,
-                })
+                matrix.setdefault(code, []).append(
+                    {
+                        "module": e.module_name,
+                        "score": score,
+                        "knowledge_status": ks,
+                    }
+                )
         for code in matrix:
             matrix[code].sort(key=lambda r: r["score"], reverse=True)
         return matrix
@@ -749,7 +741,7 @@ class CustomModuleCapabilityEntry(models.Model):
             # Pluck top-N fields (variety beats quantity — prefer first per model).
             fields_payload = []
             seen_models: set[str] = set()
-            for row in (e.fields_summary or []):
+            for row in e.fields_summary or []:
                 if not isinstance(row, dict):
                     continue
                 fields_payload.append(
@@ -766,7 +758,7 @@ class CustomModuleCapabilityEntry(models.Model):
             # it is the single best signal for the LLM. Auto-scraped fields
             # remain as fallback for modules where knowledge_md is still
             # draft or missing.
-            knowledge = (e.knowledge_md or "")
+            knowledge = e.knowledge_md or ""
             knowledge_cap = 4000 if e.knowledge_status == "reviewed" else 2500
             out.append(
                 {

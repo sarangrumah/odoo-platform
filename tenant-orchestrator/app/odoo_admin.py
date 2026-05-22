@@ -84,21 +84,27 @@ class OdooAdminClient:
 
         # 2. Init base + custom modules via CLI
         cmd = [
-            "docker", "exec", self._mgmt_container,
-            "odoo", "-d", db_name,
-            "--init", ",".join(mods),
+            "docker",
+            "exec",
+            self._mgmt_container,
+            "odoo",
+            "-d",
+            db_name,
+            "--init",
+            ",".join(mods),
             "--stop-after-init",
             "--without-demo",
         ]
         log.info("odoo.db.init.cli", db=db_name, modules=mods)
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=1800,
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=1800,
         )
         if result.returncode != 0:
             tail = (result.stderr or "")[-1500:]
-            raise RuntimeError(
-                f"Odoo init({db_name}) CLI failed (exit {result.returncode}): {tail}"
-            )
+            raise RuntimeError(f"Odoo init({db_name}) CLI failed (exit {result.returncode}): {tail}")
         # The admin user (login=admin) password defaults to 'admin' after a -i base.
         # Reset it to the orchestrator-supplied value so subsequent JSON-RPC works.
         # We do this with a one-shot psql update through dbops.

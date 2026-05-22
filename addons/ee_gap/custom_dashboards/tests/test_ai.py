@@ -6,20 +6,23 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install")
 class TestDashboardAskAI(TransactionCase):
-
     def setUp(self):
         super().setUp()
-        self.dashboard = self.env["custom.dashboard"].create({
-            "name": "AI Dashboard",
-            "description": "Test dashboard for AI",
-        })
-        self.env["custom.dashboard.tile"].create({
-            "dashboard_id": self.dashboard.id,
-            "name": "Users",
-            "tile_type": "count",
-            "model_name": "res.users",
-            "domain": "[]",
-        })
+        self.dashboard = self.env["custom.dashboard"].create(
+            {
+                "name": "AI Dashboard",
+                "description": "Test dashboard for AI",
+            }
+        )
+        self.env["custom.dashboard.tile"].create(
+            {
+                "dashboard_id": self.dashboard.id,
+                "name": "Users",
+                "tile_type": "count",
+                "model_name": "res.users",
+                "domain": "[]",
+            }
+        )
 
     def test_ask_ai_empty_question(self):
         action = self.dashboard.action_ask_ai("")

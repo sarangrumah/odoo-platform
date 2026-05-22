@@ -72,20 +72,24 @@ class TestCoretaxRoundtrip(TransactionCase):
         # but tests should not depend on data load order).
         cls.config = cls.Config.search([("active", "=", True)], limit=1)
         if not cls.config:
-            cls.config = cls.Config.create({
-                "name": "Test Coretax Config",
-                "active": True,
-                "npwp": "0123456789012345",
-                "taxpayer_name": "PT Test Coretax",
-                "kpp_code": "001",
-                "adapter_type": "manual",
-            })
+            cls.config = cls.Config.create(
+                {
+                    "name": "Test Coretax Config",
+                    "active": True,
+                    "npwp": "0123456789012345",
+                    "taxpayer_name": "PT Test Coretax",
+                    "kpp_code": "001",
+                    "adapter_type": "manual",
+                }
+            )
 
         # Counterparty with a 16-digit NIK-format NPWP (post-2024).
-        cls.partner = cls.Partner.create({
-            "name": "PT Roundtrip Counterparty",
-            "vat": "9988776655443322",
-        })
+        cls.partner = cls.Partner.create(
+            {
+                "name": "PT Roundtrip Counterparty",
+                "vat": "9988776655443322",
+            }
+        )
 
         # Seed an out_invoice in the current year with PPN.
         company = cls.env.company
@@ -95,41 +99,51 @@ class TestCoretaxRoundtrip(TransactionCase):
 
         product = cls.env["product.product"].search([], limit=1)
         if not product:
-            product = cls.env["product.product"].create({
-                "name": "Roundtrip Test Product",
-                "type": "service",
-                "list_price": 1_000_000.0,
-            })
+            product = cls.env["product.product"].create(
+                {
+                    "name": "Roundtrip Test Product",
+                    "type": "service",
+                    "list_price": 1_000_000.0,
+                }
+            )
 
         # Use whichever 11% sale tax is available, fall back to creating one.
         ppn = cls.env["account.tax"].search(
-            [("type_tax_use", "=", "sale"),
-             ("amount", "=", 11.0),
-             ("company_id", "=", company.id)],
+            [("type_tax_use", "=", "sale"), ("amount", "=", 11.0), ("company_id", "=", company.id)],
             limit=1,
         )
         if not ppn:
-            ppn = cls.env["account.tax"].create({
-                "name": "PPN 11% (test)",
-                "type_tax_use": "sale",
-                "amount": 11.0,
-                "amount_type": "percent",
-                "company_id": company.id,
-            })
+            ppn = cls.env["account.tax"].create(
+                {
+                    "name": "PPN 11% (test)",
+                    "type_tax_use": "sale",
+                    "amount": 11.0,
+                    "amount_type": "percent",
+                    "company_id": company.id,
+                }
+            )
 
-        cls.invoice = cls.Move.create({
-            "move_type": "out_invoice",
-            "partner_id": cls.partner.id,
-            "invoice_date": date(date.today().year, max(1, date.today().month), 1),
-            "currency_id": idr.id,
-            "invoice_line_ids": [(0, 0, {
-                "product_id": product.id,
-                "name": "Roundtrip line",
-                "quantity": 1,
-                "price_unit": 1_000_000.0,
-                "tax_ids": [(6, 0, [ppn.id])],
-            })],
-        })
+        cls.invoice = cls.Move.create(
+            {
+                "move_type": "out_invoice",
+                "partner_id": cls.partner.id,
+                "invoice_date": date(date.today().year, max(1, date.today().month), 1),
+                "currency_id": idr.id,
+                "invoice_line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": product.id,
+                            "name": "Roundtrip line",
+                            "quantity": 1,
+                            "price_unit": 1_000_000.0,
+                            "tax_ids": [(6, 0, [ppn.id])],
+                        },
+                    )
+                ],
+            }
+        )
         cls.invoice.action_post()
 
     # ------------------------------------------------------------------
@@ -140,19 +154,20 @@ class TestCoretaxRoundtrip(TransactionCase):
             self.skipTest("lxml not installed")
 
         today = date.today()
-        wiz = self.ExportWizard.create({
-            "config_id": self.config.id,
-            "document_type": "efaktur_keluaran",
-            "period_year_from": today.year,
-            "period_month_from": 1,
-            "period_year_to": today.year,
-            "period_month_to": 12,
-        })
+        wiz = self.ExportWizard.create(
+            {
+                "config_id": self.config.id,
+                "document_type": "efaktur_keluaran",
+                "period_year_from": today.year,
+                "period_month_from": 1,
+                "period_year_to": today.year,
+                "period_month_to": 12,
+            }
+        )
         wiz.action_generate_xml()
 
         self.assertTrue(wiz.xml_file, "Export wizard did not produce an XML payload.")
-        self.assertGreaterEqual(wiz.record_count, 1,
-                                "Export should pick up the seeded invoice.")
+        self.assertGreaterEqual(wiz.record_count, 1, "Export should pick up the seeded invoice.")
 
         xml_bytes = base64.b64decode(wiz.xml_file)
 
@@ -171,9 +186,7 @@ class TestCoretaxRoundtrip(TransactionCase):
             with open(xsd_path, "rb") as fh:
                 xsd_bytes = fh.read()
             if _PLACEHOLDER_TOKEN in xsd_bytes:
-                _logger.warning(
-                    "efaktur_keluaran.xsd is a placeholder — skipping strict validation"
-                )
+                _logger.warning("efaktur_keluaran.xsd is a placeholder — skipping strict validation")
             else:
                 schema = xmlschema.XMLSchema(xsd_path)
                 # ``validate`` raises on failure; we want a hard assertion.
@@ -182,12 +195,14 @@ class TestCoretaxRoundtrip(TransactionCase):
         # (c) round-trip: re-import as faktur_masukan. The export schema
         #     and the inbound NSFP-update path share the <Faktur> shape,
         #     so this exercises tag fidelity end-to-end.
-        imp = self.ImportWizard.create({
-            "document_type": "faktur_masukan",
-            "xml_filename": wiz.xml_filename,
-            "xml_file": wiz.xml_file,
-            "source": "received",
-        })
+        imp = self.ImportWizard.create(
+            {
+                "document_type": "faktur_masukan",
+                "xml_filename": wiz.xml_filename,
+                "xml_file": wiz.xml_file,
+                "source": "received",
+            }
+        )
         imp.action_import()
 
         # Either the exported invoice is matched by name and updated, OR
@@ -198,8 +213,7 @@ class TestCoretaxRoundtrip(TransactionCase):
         unmatched_logged = "no matching invoice" in log.lower()
         self.assertTrue(
             matched or unmatched_logged,
-            "Re-import produced neither a match nor a clear unmatched-row log; "
-            "log was: %r" % log,
+            "Re-import produced neither a match nor a clear unmatched-row log; log was: %r" % log,
         )
 
     # ------------------------------------------------------------------
@@ -237,21 +251,24 @@ class TestCoretaxRoundtrip(TransactionCase):
         before = cr.fetchone()[0]
 
         today = date.today()
-        wiz = self.ExportWizard.create({
-            "config_id": self.config.id,
-            "document_type": "efaktur_keluaran",
-            "period_year_from": today.year,
-            "period_month_from": 1,
-            "period_year_to": today.year,
-            "period_month_to": 12,
-        })
+        wiz = self.ExportWizard.create(
+            {
+                "config_id": self.config.id,
+                "document_type": "efaktur_keluaran",
+                "period_year_from": today.year,
+                "period_month_from": 1,
+                "period_year_to": today.year,
+                "period_month_to": 12,
+            }
+        )
         wiz.action_generate_xml()
 
         cr.execute("SELECT count(*) FROM pdp.audit_log WHERE action = 'xml_export'")
         after = cr.fetchone()[0]
 
         self.assertEqual(
-            after - before, 1,
+            after - before,
+            1,
             "Expected exactly one new pdp.audit_log row with action='xml_export' "
             "after running the export wizard (got delta=%d)." % (after - before),
         )

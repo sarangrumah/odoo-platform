@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Lunch supplier extensions (Indonesia EE)."""
+
 from urllib.parse import quote
 
 from odoo import _, api, fields, models
@@ -89,7 +90,8 @@ class LunchSupplier(models.Model):
         if not self.x_partner_app_url:
             label = _VENDOR_LABELS.get(self.x_id_vendor_type, _("vendor app"))
             raise UserError(
-                _("No %(label)s merchant ID configured for supplier %(name)s.") % {
+                _("No %(label)s merchant ID configured for supplier %(name)s.")
+                % {
                     "label": label,
                     "name": self.name,
                 }

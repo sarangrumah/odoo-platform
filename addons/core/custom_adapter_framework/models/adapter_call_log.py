@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from odoo import api, fields, models
+from odoo import fields, models
 from odoo.exceptions import UserError
 
 
@@ -12,7 +12,10 @@ class CustomAdapterCallLog(models.Model):
     _rec_name = "endpoint"
 
     config_id = fields.Many2one(
-        "custom.adapter.config", required=True, ondelete="restrict", index=True,
+        "custom.adapter.config",
+        required=True,
+        ondelete="restrict",
+        index=True,
     )
     endpoint = fields.Char(required=True, index=True)
     request_hash = fields.Char(string="SHA-256(body)", index=True)

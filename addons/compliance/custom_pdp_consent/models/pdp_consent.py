@@ -3,12 +3,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import timedelta
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -40,8 +38,8 @@ class PdpConsent(models.Model):
     )
 
     _partner_purpose_unique_active = models.Constraint(
-        'EXCLUDE (partner_id WITH =, purpose_id WITH =) WHERE (withdrawn_at IS NULL)',
-        'Active consent already exists for this partner and purpose.',
+        "EXCLUDE (partner_id WITH =, purpose_id WITH =) WHERE (withdrawn_at IS NULL)",
+        "Active consent already exists for this partner and purpose.",
     )
 
     @api.depends("given_at", "purpose_id.requires_renewal_days")
@@ -71,11 +69,14 @@ class PdpConsent(models.Model):
         if not partner:
             return False
         partner_id = partner.id if hasattr(partner, "id") else int(partner)
-        rec = self.sudo().search([
-            ("partner_id", "=", partner_id),
-            ("purpose_code", "=", purpose_code),
-            ("withdrawn_at", "=", False),
-        ], limit=1)
+        rec = self.sudo().search(
+            [
+                ("partner_id", "=", partner_id),
+                ("purpose_code", "=", purpose_code),
+                ("withdrawn_at", "=", False),
+            ],
+            limit=1,
+        )
         if not rec:
             return False
         if rec.expires_at and rec.expires_at < fields.Datetime.now():

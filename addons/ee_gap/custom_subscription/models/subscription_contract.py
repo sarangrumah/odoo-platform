@@ -29,9 +29,7 @@ class SubscriptionContract(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "create_date desc"
 
-    name = fields.Char(
-        required=True, copy=False, default=lambda s: _("New"), tracking=True
-    )
+    name = fields.Char(required=True, copy=False, default=lambda s: _("New"), tracking=True)
     partner_id = fields.Many2one("res.partner", required=True, tracking=True)
     plan_id = fields.Many2one("subscription.plan", required=True, tracking=True)
     company_id = fields.Many2one(
@@ -39,9 +37,7 @@ class SubscriptionContract(models.Model):
         default=lambda s: s.env.company,
         required=True,
     )
-    currency_id = fields.Many2one(
-        related="plan_id.currency_id", store=True, readonly=True
-    )
+    currency_id = fields.Many2one(related="plan_id.currency_id", store=True, readonly=True)
     start_date = fields.Date(default=fields.Date.today, required=True, tracking=True)
     next_billing_date = fields.Date(tracking=True)
     state = fields.Selection(
@@ -91,10 +87,7 @@ class SubscriptionContract(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get("name", _("New")) == _("New"):
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code("subscription.contract")
-                    or "SUB/0001"
-                )
+                vals["name"] = self.env["ir.sequence"].next_by_code("subscription.contract") or "SUB/0001"
         return super().create(vals_list)
 
     # ---------- metrics ----------
@@ -105,8 +98,15 @@ class SubscriptionContract(models.Model):
             inv = rec.invoice_ids.sorted(lambda r: r.invoice_date or fields.Date.today(), reverse=True)
             rec.last_invoice_id = inv[:1].id if inv else False
 
-    @api.depends("invoice_ids", "invoice_ids.payment_state", "invoice_ids.amount_total",
-                 "plan_id", "plan_id.price", "plan_id.recurring_interval", "plan_id.recurring_count")
+    @api.depends(
+        "invoice_ids",
+        "invoice_ids.payment_state",
+        "invoice_ids.amount_total",
+        "plan_id",
+        "plan_id.price",
+        "plan_id.recurring_interval",
+        "plan_id.recurring_count",
+    )
     def _compute_metrics(self):
         for rec in self:
             paid = rec.invoice_ids.filtered(lambda r: r.payment_state in ("paid", "in_payment"))
@@ -137,9 +137,7 @@ class SubscriptionContract(models.Model):
             if rec.plan_id.trial_days and rec.state == "draft":
                 rec.next_billing_date = start + timedelta(days=rec.plan_id.trial_days)
             else:
-                rec.next_billing_date = _advance(
-                    start, rec.plan_id.recurring_interval, rec.plan_id.recurring_count
-                )
+                rec.next_billing_date = _advance(start, rec.plan_id.recurring_interval, rec.plan_id.recurring_count)
             rec.state = "active"
 
     def action_pause(self):
@@ -157,39 +155,47 @@ class SubscriptionContract(models.Model):
             if not rec.plan_id or not rec.plan_id.product_id:
                 raise UserError(_("Plan or its product is not configured."))
             product = rec.plan_id.product_id
-            move = AccountMove.create({
-                "move_type": "out_invoice",
-                "partner_id": rec.partner_id.id,
-                "invoice_date": fields.Date.today(),
-                "currency_id": rec.currency_id.id,
-                "invoice_payment_term_id": rec.payment_term_id.id or False,
-                "x_custom_subscription_id": rec.id,
-                "invoice_line_ids": [(0, 0, {
-                    "product_id": product.id,
-                    "name": "%s — %s" % (rec.plan_id.name, rec.name),
-                    "quantity": 1.0,
-                    "price_unit": rec.plan_id.price,
-                })],
-            })
+            move = AccountMove.create(
+                {
+                    "move_type": "out_invoice",
+                    "partner_id": rec.partner_id.id,
+                    "invoice_date": fields.Date.today(),
+                    "currency_id": rec.currency_id.id,
+                    "invoice_payment_term_id": rec.payment_term_id.id or False,
+                    "x_custom_subscription_id": rec.id,
+                    "invoice_line_ids": [
+                        (
+                            0,
+                            0,
+                            {
+                                "product_id": product.id,
+                                "name": "%s — %s" % (rec.plan_id.name, rec.name),
+                                "quantity": 1.0,
+                                "price_unit": rec.plan_id.price,
+                            },
+                        )
+                    ],
+                }
+            )
             try:
                 move.action_post()
             except Exception as e:
                 _logger.warning("subscription %s invoice post failed: %s", rec.name, e)
             # advance schedule
             base = rec.next_billing_date or fields.Date.today()
-            rec.next_billing_date = _advance(
-                base, rec.plan_id.recurring_interval, rec.plan_id.recurring_count
-            )
+            rec.next_billing_date = _advance(base, rec.plan_id.recurring_interval, rec.plan_id.recurring_count)
             rec.message_post(body=_("Invoice %s generated.") % move.name)
         return True
 
     @api.model
     def cron_generate_invoices(self):
         today = fields.Date.today()
-        due = self.search([
-            ("state", "=", "active"),
-            ("next_billing_date", "<=", today),
-        ])
+        due = self.search(
+            [
+                ("state", "=", "active"),
+                ("next_billing_date", "<=", today),
+            ]
+        )
         for rec in due:
             try:
                 rec.action_invoice_now()
@@ -211,12 +217,15 @@ class SubscriptionContract(models.Model):
             "ltv": float(self.lifetime_value or 0),
             "state": self.state,
             "start_date": self.start_date and self.start_date.isoformat(),
-            "recent_invoices": [{
-                "name": i.name,
-                "date": i.invoice_date and i.invoice_date.isoformat(),
-                "amount": float(i.amount_total or 0),
-                "payment_state": i.payment_state,
-            } for i in invs],
+            "recent_invoices": [
+                {
+                    "name": i.name,
+                    "date": i.invoice_date and i.invoice_date.isoformat(),
+                    "amount": float(i.amount_total or 0),
+                    "payment_state": i.payment_state,
+                }
+                for i in invs
+            ],
         }
 
     def action_churn_predict(self):
@@ -238,19 +247,17 @@ class SubscriptionContract(models.Model):
                     "type": "warning",
                 },
             }
-        summary = (
-            result.get("summary")
-            or result.get("response")
-            or json.dumps(result)[:1000]
-        )
+        summary = result.get("summary") or result.get("response") or json.dumps(result)[:1000]
         # Best-effort: derive priority from result['priority'] or heuristics
         prio = (result.get("priority") or "info").lower()
         if prio not in ("info", "warn", "critical"):
             prio = "info"
-        self.write({
-            "ai_churn_summary": summary,
-            "ai_churn_priority": prio,
-        })
+        self.write(
+            {
+                "ai_churn_summary": summary,
+                "ai_churn_priority": prio,
+            }
+        )
         self.message_post(
             body=_("<b>Churn Prediction (%s)</b><br/>%s") % (prio, summary),
             subtype_xmlid="mail.mt_note",

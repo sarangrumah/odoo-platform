@@ -20,14 +20,18 @@ class AccountingFullCommon(TransactionCase):
         cls.ConsolConfig = cls.env["account.consolidation.config"]
 
         # Two sister companies (Company A: alpha, Company B: bravo).
-        cls.company_a = cls.Company.create({
-            "name": "Alpha Co",
-            "currency_id": cls.env.ref("base.IDR").id,
-        })
-        cls.company_b = cls.Company.create({
-            "name": "Bravo Co",
-            "currency_id": cls.env.ref("base.IDR").id,
-        })
+        cls.company_a = cls.Company.create(
+            {
+                "name": "Alpha Co",
+                "currency_id": cls.env.ref("base.IDR").id,
+            }
+        )
+        cls.company_b = cls.Company.create(
+            {
+                "name": "Bravo Co",
+                "currency_id": cls.env.ref("base.IDR").id,
+            }
+        )
 
         # Cross-link via res.company.partner_id (used by intercompany detection).
         # On company creation, Odoo creates a partner — we rely on it.
@@ -59,18 +63,22 @@ class AccountingFullCommon(TransactionCase):
 
     @classmethod
     def _mk_account(cls, company, code, name, account_type):
-        return cls.Account.create({
-            "code": code,
-            "name": name,
-            "account_type": account_type,
-            "company_ids": [(6, 0, [company.id])],
-        })
+        return cls.Account.create(
+            {
+                "code": code,
+                "name": name,
+                "account_type": account_type,
+                "company_ids": [(6, 0, [company.id])],
+            }
+        )
 
     @classmethod
     def _mk_journal(cls, company, name, jtype, code):
-        return cls.Journal.create({
-            "name": name,
-            "type": jtype,
-            "code": code,
-            "company_id": company.id,
-        })
+        return cls.Journal.create(
+            {
+                "name": name,
+                "type": jtype,
+                "code": code,
+                "company_id": company.id,
+            }
+        )

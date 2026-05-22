@@ -12,12 +12,15 @@ class ReferralPosition(models.Model):
     department_id = fields.Many2one("hr.department")
     job_id = fields.Many2one("hr.job")
     description = fields.Html()
-    reward_amount = fields.Monetary(currency_field="currency_id",
-                                    help="Bonus paid to the referrer when candidate is hired.")
+    reward_amount = fields.Monetary(
+        currency_field="currency_id", help="Bonus paid to the referrer when candidate is hired."
+    )
     currency_id = fields.Many2one("res.currency", default=lambda s: s.env.company.currency_id)
     state = fields.Selection(
         [("open", "Open"), ("on_hold", "On Hold"), ("closed", "Closed")],
-        default="open", required=True, tracking=True,
+        default="open",
+        required=True,
+        tracking=True,
     )
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
     active = fields.Boolean(default=True)

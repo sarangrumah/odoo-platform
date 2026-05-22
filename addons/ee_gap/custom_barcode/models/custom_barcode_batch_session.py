@@ -66,9 +66,8 @@ class CustomBarcodeBatchSession(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals.get("name") == "New":
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code("custom.barcode.batch.session")
-                    or _("Batch Session")
+                vals["name"] = self.env["ir.sequence"].next_by_code("custom.barcode.batch.session") or _(
+                    "Batch Session"
                 )
         return super().create(vals_list)
 
@@ -104,13 +103,9 @@ class CustomBarcodeBatchSession(models.Model):
         status = "unallocated"
 
         if gs1.get("gtin"):
-            product = self.env["product.product"].search(
-                [("barcode", "=", gs1["gtin"])], limit=1
-            )
+            product = self.env["product.product"].search([("barcode", "=", gs1["gtin"])], limit=1)
         if not product:
-            product = self.env["product.product"].search(
-                [("barcode", "=", barcode)], limit=1
-            )
+            product = self.env["product.product"].search([("barcode", "=", barcode)], limit=1)
         if gs1.get("lot") and product:
             lot = self.env["stock.lot"].search(
                 [("name", "=", gs1["lot"]), ("product_id", "=", product.id)],
@@ -156,9 +151,7 @@ class CustomBarcodeBatchSession(models.Model):
         total_allocated = 0
         # Group scan lines by product so we can chain across pickings.
         lines_by_product = defaultdict(list)
-        for line in self.scan_line_ids.filtered(
-            lambda l: l.status in ("ok", "unallocated") and l.product_id
-        ):
+        for line in self.scan_line_ids.filtered(lambda l: l.status in ("ok", "unallocated") and l.product_id):
             lines_by_product[line.product_id.id].append(line)
 
         for product_id, lines in lines_by_product.items():
@@ -221,9 +214,7 @@ class CustomBarcodeBatchSession(models.Model):
         applied_pickings = 0
 
         for picking in self.picking_ids:
-            lines = self.scan_line_ids.filtered(
-                lambda l: l.picking_id.id == picking.id and l.status == "ok"
-            )
+            lines = self.scan_line_ids.filtered(lambda l: l.picking_id.id == picking.id and l.status == "ok")
             if not lines:
                 continue
             session = Session.create(

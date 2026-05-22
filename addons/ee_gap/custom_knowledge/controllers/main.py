@@ -5,6 +5,7 @@ Route: ``/knowledge/share/<token>`` returns a minimal QWeb rendering of
 the article body. Only articles with ``is_shared_externally=True`` and a
 matching ``share_token`` are exposed; everything else 404s.
 """
+
 import logging
 
 from odoo import http
@@ -14,7 +15,6 @@ _logger = logging.getLogger(__name__)
 
 
 class KnowledgePortalController(http.Controller):
-
     @http.route(
         "/knowledge/share/<string:token>",
         type="http",

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Bulk-run phone/NIK normalization on any model."""
+
 import logging
 
 from odoo import _, api, fields, models

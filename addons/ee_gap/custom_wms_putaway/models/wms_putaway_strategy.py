@@ -72,9 +72,7 @@ class WmsPutawayStrategy(models.Model):
     def _compute_suggestion_count(self):
         Suggestion = self.env["custom.wms.putaway.suggestion"]
         for rec in self:
-            rec.suggestion_count = Suggestion.search_count(
-                [("rule_id.strategy_id", "=", rec.id)]
-            )
+            rec.suggestion_count = Suggestion.search_count([("rule_id.strategy_id", "=", rec.id)])
 
     @api.constrains("rule_ids", "rule_set")
     def _check_zwme001_tiers(self):
@@ -84,9 +82,7 @@ class WmsPutawayStrategy(models.Model):
             tiers = rec.rule_ids.mapped("tier")
             for t in tiers:
                 if not 1 <= t <= 6:
-                    raise ValidationError(
-                        _("ZWME001 strategies require tier in [1,6]; got %s.") % t
-                    )
+                    raise ValidationError(_("ZWME001 strategies require tier in [1,6]; got %s.") % t)
 
     def action_view_rules(self):
         self.ensure_one()
@@ -120,18 +116,14 @@ class WmsPutawayStrategy(models.Model):
         self.ensure_one()
         if not move_line or not move_line.product_id:
             return False
-        active_rules = self.rule_ids.filtered(lambda r: r.active).sorted(
-            key=lambda r: (r.tier, r.sequence)
-        )
+        active_rules = self.rule_ids.filtered(lambda r: r.active).sorted(key=lambda r: (r.tier, r.sequence))
         best = None
         best_score = -1
         for rule in active_rules:
             score, reason = rule._evaluate(move_line)
             if score <= 0:
                 continue
-            if best is None or rule.tier < best.tier or (
-                rule.tier == best.tier and score > best_score
-            ):
+            if best is None or rule.tier < best.tier or (rule.tier == best.tier and score > best_score):
                 best = rule
                 best_score = score
                 best_reason = reason
@@ -143,15 +135,17 @@ class WmsPutawayStrategy(models.Model):
         if not best:
             return False
         Suggestion = self.env["custom.wms.putaway.suggestion"]
-        suggestion = Suggestion.create({
-            "picking_id": move_line.picking_id.id,
-            "move_line_id": move_line.id,
-            "original_dest_location_id": move_line.location_dest_id.id,
-            "suggested_location_id": best.target_location_id.id,
-            "rule_id": best.id,
-            "score": best_score,
-            "reason": best_reason,
-        })
+        suggestion = Suggestion.create(
+            {
+                "picking_id": move_line.picking_id.id,
+                "move_line_id": move_line.id,
+                "original_dest_location_id": move_line.location_dest_id.id,
+                "suggested_location_id": best.target_location_id.id,
+                "rule_id": best.id,
+                "score": best_score,
+                "reason": best_reason,
+            }
+        )
         if self.auto_apply_suggestions:
             suggestion.action_apply()
         return suggestion

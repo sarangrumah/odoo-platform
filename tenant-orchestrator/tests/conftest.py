@@ -6,7 +6,7 @@ import hashlib
 import hmac
 import os
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import pytest
 
@@ -27,16 +27,16 @@ def signer() -> Callable[[bytes, int | None], tuple[str, int]]:
     def _do(body: bytes, ts: int | None = None) -> tuple[str, int]:
         ts = ts if ts is not None else int(time.time())
         msg = str(ts).encode() + b"." + body
-        sig = hmac.new(
-            os.environ["ORCHESTRATOR_SHARED_SECRET"].encode(), msg, hashlib.sha256
-        ).hexdigest()
+        sig = hmac.new(os.environ["ORCHESTRATOR_SHARED_SECRET"].encode(), msg, hashlib.sha256).hexdigest()
         return f"t={ts},v1={sig}", ts
+
     return _do
 
 
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     with TestClient(app) as c:

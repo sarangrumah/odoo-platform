@@ -192,10 +192,9 @@ class FleetVehicle(models.Model):
                 continue
             if ID_PLATE_REGEX.match(plate):
                 continue
-            msg = _(
-                "License plate '%(p)s' does not match Indonesia format "
-                "(e.g. 'B 1234 ABC'). Please verify."
-            ) % {"p": rec.license_plate}
+            msg = _("License plate '%(p)s' does not match Indonesia format (e.g. 'B 1234 ABC'). Please verify.") % {
+                "p": rec.license_plate
+            }
             if self.env.context.get("custom_fleet_id_strict_plate"):
                 raise UserError(msg)
             try:
@@ -267,22 +266,28 @@ class FleetVehicle(models.Model):
         """End any active assignment, then create a new one for the new driver."""
         Assignment = self.env["custom.fleet.driver.assignment"].sudo()
         today = fields.Date.context_today(self)
-        active = Assignment.search([
-            ("vehicle_id", "=", self.id),
-            ("status", "=", "active"),
-        ])
+        active = Assignment.search(
+            [
+                ("vehicle_id", "=", self.id),
+                ("status", "=", "active"),
+            ]
+        )
         for a in active:
-            a.write({
-                "end_date": today,
-                "status": "transferred" if new_id else "ended",
-            })
+            a.write(
+                {
+                    "end_date": today,
+                    "status": "transferred" if new_id else "ended",
+                }
+            )
         if new_id:
-            Assignment.create({
-                "vehicle_id": self.id,
-                "partner_id": new_id,
-                "start_date": today,
-                "status": "active",
-            })
+            Assignment.create(
+                {
+                    "vehicle_id": self.id,
+                    "partner_id": new_id,
+                    "start_date": today,
+                    "status": "active",
+                }
+            )
 
     def _pdp_audit_driver_change(self, old_id, new_id):
         try:
@@ -319,9 +324,7 @@ class FleetVehicle(models.Model):
         return bool(
             self.env["ir.module.module"]
             .sudo()
-            .search_count(
-                [("name", "=", "maintenance"), ("state", "=", "installed")]
-            )
+            .search_count([("name", "=", "maintenance"), ("state", "=", "installed")])
         )
 
     def _create_stnk_kir_maintenance_request(self, reason_lines):
@@ -333,13 +336,14 @@ class FleetVehicle(models.Model):
         if not self._maintenance_available():
             return False
         Request = self.env["maintenance.request"].sudo()
-        title = _("STNK/KIR Renewal Needed: %s") % (
-            self.license_plate or self.display_name or self.id
+        title = _("STNK/KIR Renewal Needed: %s") % (self.license_plate or self.display_name or self.id)
+        existing = Request.search(
+            [
+                ("name", "=", title),
+                ("stage_id.done", "=", False),
+            ],
+            limit=1,
         )
-        existing = Request.search([
-            ("name", "=", title),
-            ("stage_id.done", "=", False),
-        ], limit=1)
         if existing:
             return existing
         vals = {
@@ -366,17 +370,20 @@ class FleetVehicle(models.Model):
         """
         today = fields.Date.context_today(self)
         threshold_30 = today + timedelta(days=30)
-        vehicles = self.search([
-            "|",
-            ("x_stnk_status", "in", ("expiring", "expired")),
-            ("x_kir_status", "in", ("expiring", "expired")),
-        ])
+        vehicles = self.search(
+            [
+                "|",
+                ("x_stnk_status", "in", ("expiring", "expired")),
+                ("x_kir_status", "in", ("expiring", "expired")),
+            ]
+        )
         maintenance_on = vehicles and vehicles[0]._maintenance_available()
         for rec in vehicles:
             lines = []
             if rec.x_stnk_status in ("expiring", "expired"):
                 lines.append(
-                    _("STNK %(num)s is %(st)s (expiry %(d)s)") % {
+                    _("STNK %(num)s is %(st)s (expiry %(d)s)")
+                    % {
                         "num": rec.x_stnk_number or "-",
                         "st": rec.x_stnk_status,
                         "d": rec.x_stnk_expiry_date or "-",
@@ -384,7 +391,8 @@ class FleetVehicle(models.Model):
                 )
             if rec.x_kir_status in ("expiring", "expired"):
                 lines.append(
-                    _("KIR %(num)s is %(st)s (expiry %(d)s)") % {
+                    _("KIR %(num)s is %(st)s (expiry %(d)s)")
+                    % {
                         "num": rec.x_kir_number or "-",
                         "st": rec.x_kir_status,
                         "d": rec.x_kir_expiry_date or "-",
@@ -392,7 +400,8 @@ class FleetVehicle(models.Model):
                 )
             if lines:
                 rec.message_post(
-                    body="<b>%s</b><br/>%s" % (
+                    body="<b>%s</b><br/>%s"
+                    % (
                         _("Fleet Expiry Reminder"),
                         "<br/>".join(lines),
                     ),
@@ -401,20 +410,10 @@ class FleetVehicle(models.Model):
             # Auto-create maintenance request if within 30 days
             if maintenance_on:
                 trigger_lines = []
-                if (
-                    rec.x_stnk_expiry_date
-                    and rec.x_stnk_expiry_date <= threshold_30
-                ):
-                    trigger_lines.append(
-                        _("STNK expires on %s") % rec.x_stnk_expiry_date
-                    )
-                if (
-                    rec.x_kir_expiry_date
-                    and rec.x_kir_expiry_date <= threshold_30
-                ):
-                    trigger_lines.append(
-                        _("KIR expires on %s") % rec.x_kir_expiry_date
-                    )
+                if rec.x_stnk_expiry_date and rec.x_stnk_expiry_date <= threshold_30:
+                    trigger_lines.append(_("STNK expires on %s") % rec.x_stnk_expiry_date)
+                if rec.x_kir_expiry_date and rec.x_kir_expiry_date <= threshold_30:
+                    trigger_lines.append(_("KIR expires on %s") % rec.x_kir_expiry_date)
                 if trigger_lines:
                     rec._create_stnk_kir_maintenance_request(trigger_lines)
         return True
@@ -425,19 +424,23 @@ class FleetVehicle(models.Model):
         today = fields.Date.context_today(self)
         soon = today + timedelta(days=14)
         # Vehicles with a date within 14 days, OR odometer reaching threshold soon
-        vehicles = self.search([
-            "|",
-            "&", ("x_next_service_date", "!=", False),
-                 ("x_next_service_date", "<=", soon),
-            ("x_service_due", "=", True),
-        ])
+        vehicles = self.search(
+            [
+                "|",
+                "&",
+                ("x_next_service_date", "!=", False),
+                ("x_next_service_date", "<=", soon),
+                ("x_service_due", "=", True),
+            ]
+        )
         for rec in vehicles:
             parts = []
             if rec.x_next_service_date:
                 parts.append(_("next service date: %s") % rec.x_next_service_date)
             if rec.x_next_service_km:
                 parts.append(
-                    _("next service km: %(t)s (current %(c)s)") % {
+                    _("next service km: %(t)s (current %(c)s)")
+                    % {
                         "t": rec.x_next_service_km,
                         "c": int(rec.x_current_odometer or 0),
                     }

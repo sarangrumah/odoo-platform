@@ -25,12 +25,22 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "TCH", "ASYNC"]
-ignore = ["S101"]  # allow assert in tests
+ignore = [
+  "S101",     # assert allowed (tests + defensive checks)
+  "S104",     # 0.0.0.0 bind is intentional inside containerised services
+  "S110",     # try-except-pass used intentionally in optional integration code
+  "B904",     # raise-without-from not always desired (e.g. plain UserError re-raise)
+  "TC001",    # typing-only-first-party imports
+  "TC002",    # typing-only-third-party imports
+  "TC003",    # typing-only-stdlib imports — moving every annotation import into
+              # TYPE_CHECKING blocks adds noise without runtime/type-check benefit
+  "SIM105",   # contextlib.suppress is heavier than a plain try/except; not always net-better
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

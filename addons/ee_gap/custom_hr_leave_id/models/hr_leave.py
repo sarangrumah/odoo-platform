@@ -53,8 +53,7 @@ class HrLeave(models.Model):
             rec.x_overlapping_holidays_count = len(holidays)
             if holidays:
                 rec.x_overlapping_holidays_warning = _(
-                    "%s public holiday(s) overlap with this leave period and "
-                    "are normally not counted as leave days."
+                    "%s public holiday(s) overlap with this leave period and are normally not counted as leave days."
                 ) % len(holidays)
             else:
                 rec.x_overlapping_holidays_warning = False

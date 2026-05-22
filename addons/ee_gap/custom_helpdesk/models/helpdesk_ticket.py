@@ -27,7 +27,9 @@ class HelpdeskTicket(models.Model):
     partner_id = fields.Many2one("res.partner", string="Customer", tracking=True)
     partner_email = fields.Char(related="partner_id.email", store=False, readonly=True)
     assignee_id = fields.Many2one(
-        "res.users", string="Assigned To", tracking=True,
+        "res.users",
+        string="Assigned To",
+        tracking=True,
         default=lambda self: self.env.user,
     )
     priority = fields.Selection(
@@ -72,10 +74,7 @@ class HelpdeskTicket(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get("name", _("New")) == _("New"):
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code("helpdesk.ticket")
-                    or "HD/0001"
-                )
+                vals["name"] = self.env["ir.sequence"].next_by_code("helpdesk.ticket") or "HD/0001"
             # default priority from team if not explicit
             if vals.get("team_id") and not vals.get("priority"):
                 team = self.env["helpdesk.team"].browse(vals["team_id"])
@@ -102,9 +101,7 @@ class HelpdeskTicket(models.Model):
     def _compute_sla_deadline(self):
         for rec in self:
             if rec.sla_id and rec.create_date:
-                rec.sla_deadline = rec.create_date + timedelta(
-                    hours=rec.sla_id.time_resolve_hours
-                )
+                rec.sla_deadline = rec.create_date + timedelta(hours=rec.sla_id.time_resolve_hours)
             else:
                 rec.sla_deadline = False
 
@@ -215,12 +212,7 @@ class HelpdeskTicket(models.Model):
                     "type": "warning",
                 },
             }
-        text = (
-            result.get("response")
-            or result.get("text")
-            or result.get("summary")
-            or json.dumps(result)[:1000]
-        )
+        text = result.get("response") or result.get("text") or result.get("summary") or json.dumps(result)[:1000]
         self.ai_suggested_text = text
         self.message_post(
             body=_("<b>AI Suggested Response</b><br/>%s") % text,

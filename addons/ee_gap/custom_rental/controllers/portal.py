@@ -9,14 +9,15 @@ from odoo.addons.portal.controllers.portal import CustomerPortal, pager as porta
 
 
 class RentalCustomerPortal(CustomerPortal):
-
     def _prepare_home_portal_values(self, counters):
         values = super()._prepare_home_portal_values(counters)
         if "rental_count" in counters:
             partner = request.env.user.partner_id
-            values["rental_count"] = request.env["rental.order"].search_count([
-                ("partner_id", "=", partner.id),
-            ])
+            values["rental_count"] = request.env["rental.order"].search_count(
+                [
+                    ("partner_id", "=", partner.id),
+                ]
+            )
         return values
 
     def _rental_order_get(self, order_id):
@@ -26,8 +27,7 @@ class RentalCustomerPortal(CustomerPortal):
         order.check_access("read")
         return order
 
-    @http.route(["/my/rentals", "/my/rentals/page/<int:page>"],
-                type="http", auth="user", website=True)
+    @http.route(["/my/rentals", "/my/rentals/page/<int:page>"], type="http", auth="user", website=True)
     def portal_my_rentals(self, page=1, **kw):
         partner = request.env.user.partner_id
         Order = request.env["rental.order"]
@@ -39,41 +39,46 @@ class RentalCustomerPortal(CustomerPortal):
             page=page,
             step=20,
         )
-        rentals = Order.search(domain, order="pickup_dt desc",
-                               limit=20, offset=pager["offset"])
-        return request.render("custom_rental.portal_my_rentals", {
-            "rentals": rentals,
-            "page_name": "rental",
-            "pager": pager,
-            "default_url": "/my/rentals",
-        })
+        rentals = Order.search(domain, order="pickup_dt desc", limit=20, offset=pager["offset"])
+        return request.render(
+            "custom_rental.portal_my_rentals",
+            {
+                "rentals": rentals,
+                "page_name": "rental",
+                "pager": pager,
+                "default_url": "/my/rentals",
+            },
+        )
 
-    @http.route(["/my/rentals/<int:order_id>"],
-                type="http", auth="user", website=True)
+    @http.route(["/my/rentals/<int:order_id>"], type="http", auth="user", website=True)
     def portal_my_rental_detail(self, order_id, report_type=None, **kw):
         try:
             order = self._rental_order_get(order_id)
         except (AccessError, MissingError):
             return request.redirect("/my")
         if report_type == "pdf":
-            pdf, _ct = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
-                "custom_rental.action_report_rental_contract", [order.id])
+            pdf, _ct = (
+                request.env["ir.actions.report"]
+                .sudo()
+                ._render_qweb_pdf("custom_rental.action_report_rental_contract", [order.id])
+            )
             return request.make_response(
                 pdf,
                 headers=[
                     ("Content-Type", "application/pdf"),
-                    ("Content-Disposition",
-                     'attachment; filename="%s.pdf"' % order.name),
+                    ("Content-Disposition", 'attachment; filename="%s.pdf"' % order.name),
                 ],
             )
-        return request.render("custom_rental.portal_my_rental_detail", {
-            "order": order,
-            "rental_order": order,
-            "page_name": "rental",
-        })
+        return request.render(
+            "custom_rental.portal_my_rental_detail",
+            {
+                "order": order,
+                "rental_order": order,
+                "page_name": "rental",
+            },
+        )
 
-    @http.route(["/my/rentals/<int:order_id>/sign"],
-                type="json", auth="user", website=True)
+    @http.route(["/my/rentals/<int:order_id>/sign"], type="json", auth="user", website=True)
     def portal_rental_sign(self, order_id, signature=None, signed_by=None, **kw):
         try:
             order = self._rental_order_get(order_id)
@@ -86,9 +91,11 @@ class RentalCustomerPortal(CustomerPortal):
             base64.b64decode(b64, validate=True)
         except (binascii.Error, ValueError):
             return {"error": "invalid"}
-        order.sudo().write({
-            "customer_signature": b64,
-            "customer_signed_at": fields.Datetime.now(),
-            "customer_signed_by": signed_by or request.env.user.name,
-        })
+        order.sudo().write(
+            {
+                "customer_signature": b64,
+                "customer_signed_at": fields.Datetime.now(),
+                "customer_signed_by": signed_by or request.env.user.name,
+            }
+        )
         return {"ok": True}

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """Load-from-model tests."""
+
 import json
 
 from odoo.tests.common import TransactionCase
 
 
 class TestSpreadsheetLoadModel(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.Workbook = self.env["custom.spreadsheet.workbook"]
@@ -60,8 +60,11 @@ class TestSpreadsheetLoadModel(TransactionCase):
             sheet_name="X",
         )
         rows_before = sum(
-            1 for s in json.loads(wb.data_json)["sheets"] if s["name"] == "X"
-            for k in s["cells"].keys() if k.endswith("_0")
+            1
+            for s in json.loads(wb.data_json)["sheets"]
+            if s["name"] == "X"
+            for k in s["cells"].keys()
+            if k.endswith("_0")
         )
         self.Partner.create({"name": "Append B"})
         wb.action_load_from_model(
@@ -72,8 +75,11 @@ class TestSpreadsheetLoadModel(TransactionCase):
             append=True,
         )
         rows_after = sum(
-            1 for s in json.loads(wb.data_json)["sheets"] if s["name"] == "X"
-            for k in s["cells"].keys() if k.endswith("_0")
+            1
+            for s in json.loads(wb.data_json)["sheets"]
+            if s["name"] == "X"
+            for k in s["cells"].keys()
+            if k.endswith("_0")
         )
         self.assertGreater(rows_after, rows_before)
 

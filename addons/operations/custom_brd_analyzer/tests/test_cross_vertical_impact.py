@@ -12,7 +12,6 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install")
 class TestCrossVerticalImpact(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.Document = self.env["brd.document"]
@@ -30,9 +29,7 @@ class TestCrossVerticalImpact(TransactionCase):
                 "summary": "Coretax integration.",
             }
         )
-        existing2 = self.Catalog.search(
-            [("module_name", "=", "custom_accounting_full")], limit=1
-        )
+        existing2 = self.Catalog.search([("module_name", "=", "custom_accounting_full")], limit=1)
         self.cat_accfull = existing2 or self.Catalog.create(
             {
                 "module_name": "custom_accounting_full",
@@ -55,9 +52,7 @@ class TestCrossVerticalImpact(TransactionCase):
                 "document_attachment_id": attachment.id,
                 "business_domain": "retail",
                 "vertical_target": "retail",
-                "company_profile_json": json.dumps(
-                    {"name": "PT Test", "npwp": "00.000.000.0-000.000"}
-                ),
+                "company_profile_json": json.dumps({"name": "PT Test", "npwp": "00.000.000.0-000.000"}),
             }
         )
 
@@ -94,9 +89,7 @@ class TestCrossVerticalImpact(TransactionCase):
                 "document_id": self.doc.id,
                 "name": "custom_breaking",
                 "affects_existing_module_ids": [(6, 0, [self.cat_coretax.id])],
-                "cross_vertical_impact_json": json.dumps(
-                    {"custom_coretax": ["retail", "fnb"]}
-                ),
+                "cross_vertical_impact_json": json.dumps({"custom_coretax": ["retail", "fnb"]}),
                 "breaking_change": True,
                 "compat_strategy": "fork_warning",
             }
@@ -108,9 +101,7 @@ class TestCrossVerticalImpact(TransactionCase):
             {
                 "document_id": self.doc.id,
                 "name": "custom_critical",
-                "affects_existing_module_ids": [
-                    (6, 0, [self.cat_coretax.id, self.cat_accfull.id])
-                ],
+                "affects_existing_module_ids": [(6, 0, [self.cat_coretax.id, self.cat_accfull.id])],
                 "cross_vertical_impact_json": json.dumps(
                     {
                         "custom_coretax": ["retail", "fnb", "healthcare"],
@@ -193,9 +184,7 @@ class TestCrossVerticalImpact(TransactionCase):
         self.assertEqual(rec.compat_strategy, "extend")
         self.assertFalse(rec.breaking_change)
         affected_names = set(rec.affects_existing_module_ids.mapped("module_name"))
-        self.assertEqual(
-            affected_names, {"custom_coretax", "custom_accounting_full"}
-        )
+        self.assertEqual(affected_names, {"custom_coretax", "custom_accounting_full"})
         parsed = json.loads(rec.cross_vertical_impact_json)
         self.assertEqual(parsed["custom_coretax"], ["retail", "fnb"])
         # impact_severity is computed: 3 distinct verticals (retail, fnb) and no

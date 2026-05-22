@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # License: LGPL-3
 """HHT REST API — all routes HMAC-signed via @secure_endpoint('hht')."""
+
 from __future__ import annotations
 
 import base64
@@ -82,16 +83,20 @@ def _handle_scan(device, data: dict) -> dict:
     Returns {ok, result|error, next_action_hint?}.
     """
     if not device:
-        _log_scan(device, action=data.get("action") or "lookup",
-                  barcode=data.get("barcode"), result="error",
-                  error_message="UNKNOWN_DEVICE", payload=data)
+        _log_scan(
+            device,
+            action=data.get("action") or "lookup",
+            barcode=data.get("barcode"),
+            result="error",
+            error_message="UNKNOWN_DEVICE",
+            payload=data,
+        )
         return {"ok": False, "error": "UNKNOWN_DEVICE"}
 
     action = (data.get("action") or "lookup").strip()
     barcode = (data.get("barcode") or "").strip()
     if not barcode:
-        _log_scan(device, action=action, result="error",
-                  error_message="EMPTY_BARCODE", payload=data)
+        _log_scan(device, action=action, result="error", error_message="EMPTY_BARCODE", payload=data)
         return {"ok": False, "error": "EMPTY_BARCODE"}
 
     location_id = data.get("location_id") or None
@@ -107,7 +112,8 @@ def _handle_scan(device, data: dict) -> dict:
     try:
         if action == "lookup":
             product = env["product.product"].search(
-                ["|", ("barcode", "=", barcode), ("default_code", "=", barcode)], limit=1,
+                ["|", ("barcode", "=", barcode), ("default_code", "=", barcode)],
+                limit=1,
             )
             result_payload = {
                 "product_id": product.id if product else None,
@@ -118,7 +124,8 @@ def _handle_scan(device, data: dict) -> dict:
         elif action in ("receipt", "issue", "transfer", "count"):
             # Resolve product, validate location.
             product = env["product.product"].search(
-                ["|", ("barcode", "=", barcode), ("default_code", "=", barcode)], limit=1,
+                ["|", ("barcode", "=", barcode), ("default_code", "=", barcode)],
+                limit=1,
             )
             if not product:
                 raise UserError(_("Unknown barcode: %s") % barcode)
@@ -135,7 +142,8 @@ def _handle_scan(device, data: dict) -> dict:
         elif action == "handover":
             # Looking up a BAST document by reference.
             bast = env["custom.bast.document"].search(
-                [("name", "=", barcode)], limit=1,
+                [("name", "=", barcode)],
+                limit=1,
             )
             if not bast:
                 raise UserError(_("BAST not found: %s") % barcode)
@@ -148,22 +156,29 @@ def _handle_scan(device, data: dict) -> dict:
             raise UserError(_("Unsupported action: %s") % action)
     except (UserError, ValidationError, AccessError) as e:
         _log_scan(
-            device, action=action, barcode=barcode,
+            device,
+            action=action,
+            barcode=barcode,
             location_id=int(location_id) if location_id else None,
             qty=float(qty or 0.0),
             lot_id=lot_rec.id if lot_rec else None,
             picking_id=int(picking_id) if picking_id else None,
-            result="error", error_message=str(e), payload=data,
+            result="error",
+            error_message=str(e),
+            payload=data,
         )
         return {"ok": False, "error": str(e)}
 
     log = _log_scan(
-        device, action=action, barcode=barcode,
+        device,
+        action=action,
+        barcode=barcode,
         location_id=int(location_id) if location_id else None,
         qty=float(qty or 0.0),
         lot_id=lot_rec.id if lot_rec else None,
         picking_id=int(picking_id) if picking_id else None,
-        result="ok", payload=data,
+        result="ok",
+        payload=data,
     )
     device._touch_seen(summary=f"{action}:{barcode[:64]}")
     return {
@@ -175,12 +190,10 @@ def _handle_scan(device, data: dict) -> dict:
 
 
 class HhtApi(http.Controller):
-
     # ------------------------------------------------------------------
     # /api/hht/scan
     # ------------------------------------------------------------------
-    @http.route("/api/hht/scan", type="http", auth="public",
-                methods=["POST"], csrf=False)
+    @http.route("/api/hht/scan", type="http", auth="public", methods=["POST"], csrf=False)
     @secure_endpoint("hht")
     def scan(self, **_kw):
         data = _json_body()
@@ -190,8 +203,7 @@ class HhtApi(http.Controller):
     # ------------------------------------------------------------------
     # /api/hht/sync — idempotent batch
     # ------------------------------------------------------------------
-    @http.route("/api/hht/sync", type="http", auth="public",
-                methods=["POST"], csrf=False)
+    @http.route("/api/hht/sync", type="http", auth="public", methods=["POST"], csrf=False)
     @secure_endpoint("hht")
     def sync(self, **_kw):
         data = _json_body()
@@ -203,67 +215,70 @@ class HhtApi(http.Controller):
         Queue = request.env["hht.sync.queue"].sudo()
 
         max_items = int(
-            request.env["ir.config_parameter"].sudo().get_param(
-                "custom_hht_bridge.sync_batch_max_items", "100"
-            )
+            request.env["ir.config_parameter"].sudo().get_param("custom_hht_bridge.sync_batch_max_items", "100")
         )
         if len(items) > max_items:
-            return _json({"ok": False, "error": "BATCH_TOO_LARGE",
-                          "max_items": max_items}, status=200)
+            return _json({"ok": False, "error": "BATCH_TOO_LARGE", "max_items": max_items}, status=200)
 
         results = []
         seen_client_ids = set()
         for item in items:
             client_id = (item.get("client_id") or "").strip()
             if not client_id:
-                results.append({"client_id": None, "ok": False,
-                                "error": "MISSING_CLIENT_ID"})
+                results.append({"client_id": None, "ok": False, "error": "MISSING_CLIENT_ID"})
                 continue
             # In-batch dedupe.
             if client_id in seen_client_ids:
-                results.append({"client_id": client_id, "ok": True,
-                                "result": "deduplicated"})
+                results.append({"client_id": client_id, "ok": True, "result": "deduplicated"})
                 continue
             seen_client_ids.add(client_id)
-            existing = Queue.search([
-                ("device_id", "=", device.id),
-                ("client_id", "=", client_id),
-            ], limit=1)
+            existing = Queue.search(
+                [
+                    ("device_id", "=", device.id),
+                    ("client_id", "=", client_id),
+                ],
+                limit=1,
+            )
             if existing:
-                results.append({"client_id": client_id, "ok": True,
-                                "result": "deduplicated",
-                                "state": existing.state})
+                results.append({"client_id": client_id, "ok": True, "result": "deduplicated", "state": existing.state})
                 continue
             try:
-                queue_rec = Queue.create({
-                    "device_id": device.id,
-                    "client_id": client_id,
-                    "batch_id": batch_id or False,
-                    "action": item.get("action") or False,
-                    "payload": item,
-                    "state": "queued",
-                })
+                queue_rec = Queue.create(
+                    {
+                        "device_id": device.id,
+                        "client_id": client_id,
+                        "batch_id": batch_id or False,
+                        "action": item.get("action") or False,
+                        "payload": item,
+                        "state": "queued",
+                    }
+                )
                 # Optimistic apply: run scan handler synchronously.
                 outcome = _handle_scan(device, item)
-                queue_rec.write({
-                    "state": "applied" if outcome.get("ok") else "failed",
-                    "error": outcome.get("error") if not outcome.get("ok") else False,
-                })
-                results.append({"client_id": client_id, "ok": outcome.get("ok"),
-                                "result": outcome.get("result"),
-                                "error": outcome.get("error")})
+                queue_rec.write(
+                    {
+                        "state": "applied" if outcome.get("ok") else "failed",
+                        "error": outcome.get("error") if not outcome.get("ok") else False,
+                    }
+                )
+                results.append(
+                    {
+                        "client_id": client_id,
+                        "ok": outcome.get("ok"),
+                        "result": outcome.get("result"),
+                        "error": outcome.get("error"),
+                    }
+                )
             except Exception as e:
                 _logger.exception("sync item failed: %s", e)
-                results.append({"client_id": client_id, "ok": False,
-                                "error": str(e)})
+                results.append({"client_id": client_id, "ok": False, "error": str(e)})
         device._touch_seen(summary=f"sync:{batch_id or '-'}:{len(items)}")
         return _json({"ok": True, "results": results})
 
     # ------------------------------------------------------------------
     # /api/hht/manifest — preload + ETag
     # ------------------------------------------------------------------
-    @http.route("/api/hht/manifest", type="http", auth="public",
-                methods=["GET"], csrf=False)
+    @http.route("/api/hht/manifest", type="http", auth="public", methods=["GET"], csrf=False)
     @secure_endpoint("hht")
     def manifest(self, **_kw):
         env = request.env(su=True)
@@ -280,7 +295,8 @@ class HhtApi(http.Controller):
         lots = env["stock.lot"].search_read(
             [],
             ["id", "name", "product_id", "write_date"],
-            limit=2000, order="write_date desc",
+            limit=2000,
+            order="write_date desc",
         )
         picking_pending_count = env["stock.picking"].search_count(
             [("state", "in", ("assigned", "confirmed", "waiting"))]
@@ -291,8 +307,7 @@ class HhtApi(http.Controller):
                 wd = r.get("write_date")
                 if wd:
                     timestamps.append(str(wd))
-        etag_basis = ("|".join(sorted(timestamps)) +
-                      f"|pp={picking_pending_count}").encode("utf-8")
+        etag_basis = ("|".join(sorted(timestamps)) + f"|pp={picking_pending_count}").encode("utf-8")
         etag = '"' + hashlib.sha256(etag_basis).hexdigest()[:32] + '"'
         if request.httprequest.headers.get("If-None-Match") == etag:
             return request.make_response("", status=304, headers=[("ETag", etag)])
@@ -317,8 +332,7 @@ class HhtApi(http.Controller):
     # ------------------------------------------------------------------
     # /api/hht/bast/sign
     # ------------------------------------------------------------------
-    @http.route("/api/hht/bast/sign", type="http", auth="public",
-                methods=["POST"], csrf=False)
+    @http.route("/api/hht/bast/sign", type="http", auth="public", methods=["POST"], csrf=False)
     @secure_endpoint("hht")
     def bast_sign(self, **_kw):
         data = _json_body()
@@ -329,26 +343,26 @@ class HhtApi(http.Controller):
         party = (data.get("party") or "").strip()
         signature_b64 = data.get("signature_b64") or ""
         if not bast_id or party not in ("from", "to") or not signature_b64:
-            _log_scan(device, action="handover", result="error",
-                      error_message="BAD_BAST_PAYLOAD", payload=data)
+            _log_scan(device, action="handover", result="error", error_message="BAD_BAST_PAYLOAD", payload=data)
             return _json({"ok": False, "error": "BAD_BAST_PAYLOAD"})
         env = request.env(su=True)
         bast = env["custom.bast.document"].browse(int(bast_id)).exists()
         if not bast:
-            _log_scan(device, action="handover", result="error",
-                      error_message="BAST_NOT_FOUND", payload=data)
+            _log_scan(device, action="handover", result="error", error_message="BAST_NOT_FOUND", payload=data)
             return _json({"ok": False, "error": "BAST_NOT_FOUND"})
         try:
             sig_raw = base64.b64decode(signature_b64, validate=True)
         except Exception:
             return _json({"ok": False, "error": "BAD_SIGNATURE_B64"})
-        attachment = env["ir.attachment"].create({
-            "name": f"bast-sign-{party}-{bast.id}.png",
-            "datas": base64.b64encode(sig_raw).decode("ascii"),
-            "res_model": "custom.bast.document",
-            "res_id": bast.id,
-            "mimetype": "image/png",
-        })
+        attachment = env["ir.attachment"].create(
+            {
+                "name": f"bast-sign-{party}-{bast.id}.png",
+                "datas": base64.b64encode(sig_raw).decode("ascii"),
+                "res_model": "custom.bast.document",
+                "res_id": bast.id,
+                "mimetype": "image/png",
+            }
+        )
         # Soft-write: only set fields if they exist on the model.
         write_vals = {}
         if "signature_from" in bast._fields and party == "from":
@@ -361,18 +375,23 @@ class HhtApi(http.Controller):
             write_vals["gps_long"] = data.get("gps_long")
         if write_vals:
             bast.write(write_vals)
-        _log_scan(device, action="handover", barcode=bast.name,
-                  result="ok", payload=data)
+        _log_scan(device, action="handover", barcode=bast.name, result="ok", payload=data)
         device._touch_seen(summary=f"bast:{bast.name}:{party}")
-        return _json({"ok": True, "result": {
-            "bast_id": bast.id, "attachment_id": attachment.id, "party": party,
-        }})
+        return _json(
+            {
+                "ok": True,
+                "result": {
+                    "bast_id": bast.id,
+                    "attachment_id": attachment.id,
+                    "party": party,
+                },
+            }
+        )
 
     # ------------------------------------------------------------------
     # /api/hht/me
     # ------------------------------------------------------------------
-    @http.route("/api/hht/me", type="http", auth="public",
-                methods=["GET"], csrf=False)
+    @http.route("/api/hht/me", type="http", auth="public", methods=["GET"], csrf=False)
     @secure_endpoint("hht")
     def me(self, **_kw):
         device = _device_from_request()
@@ -385,16 +404,23 @@ class HhtApi(http.Controller):
         if user.has_group("custom_hht_bridge.group_hht_admin"):
             permissions.append("hht_admin")
         tenant = device.tenant_id
-        return _json({"ok": True, "result": {
-            "user": {"id": user.id, "name": user.name, "login": user.login},
-            "device": {
-                "id": device.id, "name": device.name,
-                "device_id": device.device_id, "model": device.model,
-                "enabled": device.enabled,
-            },
-            "tenant": {
-                "id": tenant.id if tenant else None,
-                "name": tenant.display_name if tenant else None,
-            },
-            "permissions": permissions,
-        }})
+        return _json(
+            {
+                "ok": True,
+                "result": {
+                    "user": {"id": user.id, "name": user.name, "login": user.login},
+                    "device": {
+                        "id": device.id,
+                        "name": device.name,
+                        "device_id": device.device_id,
+                        "model": device.model,
+                        "enabled": device.enabled,
+                    },
+                    "tenant": {
+                        "id": tenant.id if tenant else None,
+                        "name": tenant.display_name if tenant else None,
+                    },
+                    "permissions": permissions,
+                },
+            }
+        )

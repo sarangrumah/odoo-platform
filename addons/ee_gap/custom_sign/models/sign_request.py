@@ -60,8 +60,7 @@ class SignRequest(models.Model):
                 if not signer.access_token:
                     signer.access_token = secrets.token_urlsafe(32)
             rec.write({"state": "sent", "sent_at": fields.Datetime.now()})
-            rec._pdp_audit_write("sign_request_sent", rec.id,
-                                 {"signer_count": len(rec.signer_ids)})
+            rec._pdp_audit_write("sign_request_sent", rec.id, {"signer_count": len(rec.signer_ids)})
 
     def action_cancel(self):
         for rec in self:

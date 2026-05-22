@@ -61,8 +61,7 @@ async def predict_capacity(body: PredictIn) -> PredictOut:
     for m in body.metrics:
         last_50 = m.series[-50:]
         summary_lines.append(
-            f"- {m.name} ({m.unit}, max={m.current_max_capacity}): "
-            f"{[(ts, round(v, 3)) for ts, v in last_50]}"
+            f"- {m.name} ({m.unit}, max={m.current_max_capacity}): {[(ts, round(v, 3)) for ts, v in last_50]}"
         )
     user_msg = "\n".join(summary_lines)
 
@@ -82,6 +81,7 @@ async def predict_capacity(body: PredictIn) -> PredictOut:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Provider error: {e}") from e
 
     import json
+
     parsed: dict[str, Any] = {
         "forecast": {},
         "saturation_eta_days": {},

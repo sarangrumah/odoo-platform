@@ -10,7 +10,6 @@ from .common import PayrollIDCommon
 
 @tagged("post_install", "-at_install")
 class TestSPT1721A1(PayrollIDCommon):
-
     def test_annual_aggregation_one_employee(self):
         # 12 months × 10M gross for emp_tk0
         for month in range(1, 13):
@@ -18,11 +17,13 @@ class TestSPT1721A1(PayrollIDCommon):
             slip.action_compute()
             slip.action_approve()
 
-        wizard = self.env["hr.payroll.spt.a1.wizard"].create({
-            "fiscal_year": 2026,
-            "employee_ids": [(6, 0, [self.emp_tk0.id])],
-            "output_format": "xml",
-        })
+        wizard = self.env["hr.payroll.spt.a1.wizard"].create(
+            {
+                "fiscal_year": 2026,
+                "employee_ids": [(6, 0, [self.emp_tk0.id])],
+                "output_format": "xml",
+            }
+        )
         wizard.action_run()
         self.assertTrue(wizard.run_done)
         self.assertTrue(wizard.xml_attachment_id)
@@ -40,11 +41,13 @@ class TestSPT1721A1(PayrollIDCommon):
             slip.action_compute()
             slip.action_approve()
 
-        wizard = self.env["hr.payroll.spt.a1.wizard"].create({
-            "fiscal_year": 2026,
-            "employee_ids": [(6, 0, [self.emp_tk0.id])],
-            "output_format": "xml",
-        })
+        wizard = self.env["hr.payroll.spt.a1.wizard"].create(
+            {
+                "fiscal_year": 2026,
+                "employee_ids": [(6, 0, [self.emp_tk0.id])],
+                "output_format": "xml",
+            }
+        )
         wizard.action_run()
         config = self.Config.get_default()
         data = wizard._compute_employee_annual(self.emp_tk0, config)
@@ -56,9 +59,12 @@ class TestSPT1721A1(PayrollIDCommon):
         self.assertIsNotNone(data["delta"])
 
     def test_no_payslips_raises(self):
-        wizard = self.env["hr.payroll.spt.a1.wizard"].create({
-            "fiscal_year": 1999,  # year with no payslips
-        })
+        wizard = self.env["hr.payroll.spt.a1.wizard"].create(
+            {
+                "fiscal_year": 1999,  # year with no payslips
+            }
+        )
         from odoo.exceptions import UserError
+
         with self.assertRaises(UserError):
             wizard.action_run()

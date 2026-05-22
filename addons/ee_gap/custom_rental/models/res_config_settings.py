@@ -10,7 +10,7 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="custom_rental.config_stock_integration",
         default=True,
         help="When enabled, confirming a rental order creates an outbound "
-             "stock.picking; marking returned creates an inbound picking.",
+        "stock.picking; marking returned creates an inbound picking.",
     )
     rental_default_late_fee_rate = fields.Float(
         string="Default Late Fee Rate (% / day)",

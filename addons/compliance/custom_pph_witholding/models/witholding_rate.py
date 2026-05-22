@@ -29,8 +29,8 @@ class CustomWitholdingRate(models.Model):
         required=True,
         default="general",
         help="Free-text category, e.g. 'sewa', 'jasa_teknik', "
-             "'manajemen', 'general'. Used as a discriminator when "
-             "multiple rates apply to the same pph_type on the same date.",
+        "'manajemen', 'general'. Used as a discriminator when "
+        "multiple rates apply to the same pph_type on the same date.",
     )
     with_npwp_rate = fields.Float(
         string="Rate w/ NPWP (%)",
@@ -42,16 +42,14 @@ class CustomWitholdingRate(models.Model):
         string="Rate w/o NPWP (%)",
         digits=(6, 4),
         required=True,
-        help="Punitive rate (typically 2× the with-NPWP rate per "
-             "UU PPh Pasal 23 ayat (1a)).",
+        help="Punitive rate (typically 2× the with-NPWP rate per UU PPh Pasal 23 ayat (1a)).",
     )
     effective_date_from = fields.Date(required=True)
     effective_date_to = fields.Date(
         help="Leave empty for open-ended validity.",
     )
     legal_basis = fields.Text(
-        help="Citation of the underlying regulation, e.g. "
-             "'UU PPh Pasal 23 ayat (1) huruf c angka 2'.",
+        help="Citation of the underlying regulation, e.g. 'UU PPh Pasal 23 ayat (1) huruf c angka 2'.",
     )
     active = fields.Boolean(default=True)
 

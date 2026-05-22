@@ -2,7 +2,7 @@
 # License: LGPL-3
 from __future__ import annotations
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class HhtSyncQueue(models.Model):
@@ -11,14 +11,21 @@ class HhtSyncQueue(models.Model):
     _order = "received_at desc, id desc"
 
     device_id = fields.Many2one(
-        "hht.device", string="Device", required=True, index=True, ondelete="cascade",
+        "hht.device",
+        string="Device",
+        required=True,
+        index=True,
+        ondelete="cascade",
     )
     queued_at = fields.Datetime(string="Client-side Queued At")
     received_at = fields.Datetime(
-        string="Server-side Received At", default=fields.Datetime.now, required=True,
+        string="Server-side Received At",
+        default=fields.Datetime.now,
+        required=True,
     )
     client_id = fields.Char(
-        string="Client Operation ID", index=True,
+        string="Client Operation ID",
+        index=True,
         help="Stable client-generated id; used for idempotent de-duplication.",
     )
     payload = fields.Json(string="Raw Payload")
@@ -41,7 +48,9 @@ class HhtSyncQueue(models.Model):
             ("failed", "Failed"),
             ("deduped", "Deduplicated"),
         ],
-        default="queued", required=True, index=True,
+        default="queued",
+        required=True,
+        index=True,
     )
     error = fields.Text()
     batch_id = fields.Char(string="Batch ID", index=True)
@@ -62,11 +71,14 @@ class HhtSyncQueue(models.Model):
     @api.model
     def _cron_purge_old_queue(self, days: int = 30):
         from datetime import timedelta
+
         cutoff = fields.Datetime.now() - timedelta(days=days)
-        old = self.search([
-            ("state", "in", ("applied", "deduped")),
-            ("received_at", "<", fields.Datetime.to_string(cutoff)),
-        ])
+        old = self.search(
+            [
+                ("state", "in", ("applied", "deduped")),
+                ("received_at", "<", fields.Datetime.to_string(cutoff)),
+            ]
+        )
         count = len(old)
         old.unlink()
         return count

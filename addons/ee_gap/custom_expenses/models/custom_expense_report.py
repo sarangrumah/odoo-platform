@@ -95,9 +95,7 @@ class CustomExpenseReport(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals.get("name") == _("New"):
-                vals["name"] = self.env["ir.sequence"].next_by_code(
-                    "custom.expense.report"
-                ) or _("New")
+                vals["name"] = self.env["ir.sequence"].next_by_code("custom.expense.report") or _("New")
         return super().create(vals_list)
 
     @api.constrains("expense_ids", "employee_id")
@@ -105,12 +103,14 @@ class CustomExpenseReport(models.Model):
         for rep in self:
             for exp in rep.expense_ids:
                 if exp.employee_id and exp.employee_id != rep.employee_id:
-                    raise UserError(_(
-                        "Expense '%(name)s' belongs to %(emp)s, not %(report_emp)s.",
-                        name=exp.name or "?",
-                        emp=exp.employee_id.name,
-                        report_emp=rep.employee_id.name,
-                    ))
+                    raise UserError(
+                        _(
+                            "Expense '%(name)s' belongs to %(emp)s, not %(report_emp)s.",
+                            name=exp.name or "?",
+                            emp=exp.employee_id.name,
+                            report_emp=rep.employee_id.name,
+                        )
+                    )
 
     # ------------------------------------------------------------------
     # Workflow actions
@@ -174,15 +174,18 @@ class CustomExpenseReport(models.Model):
         if not partner:
             raise UserError(_("Employee %s has no work contact for payment.") % self.employee_id.name)
 
-        journal = self.env["account.journal"].sudo().search(
-            [("type", "in", ("bank", "cash")), ("company_id", "=", self.company_id.id)],
-            limit=1,
+        journal = (
+            self.env["account.journal"]
+            .sudo()
+            .search(
+                [("type", "in", ("bank", "cash")), ("company_id", "=", self.company_id.id)],
+                limit=1,
+            )
         )
 
         # Only reimburse own_account / non-corporate-card expenses
         reimbursable = self.expense_ids.filtered(
-            lambda e: not e.x_corporate_card_id
-            and getattr(e, "payment_mode", "own_account") != "company_account"
+            lambda e: not e.x_corporate_card_id and getattr(e, "payment_mode", "own_account") != "company_account"
         )
         if not reimbursable:
             self.state = "paid"
@@ -194,20 +197,23 @@ class CustomExpenseReport(models.Model):
 
         amount = sum(reimbursable.mapped("total_amount"))
         Payment = self.env["account.payment"].sudo()
-        payment = Payment.create({
-            "payment_type": "outbound",
-            "partner_type": "supplier",
-            "partner_id": partner.id,
-            "amount": float(amount or 0.0),
-            "currency_id": self.currency_id.id,
-            "journal_id": journal.id if journal else False,
-            "ref": _("Expense Report: %s") % self.name,
-            "memo": _("Expense Report: %s") % self.name,
-        })
+        payment = Payment.create(
+            {
+                "payment_type": "outbound",
+                "partner_type": "supplier",
+                "partner_id": partner.id,
+                "amount": float(amount or 0.0),
+                "currency_id": self.currency_id.id,
+                "journal_id": journal.id if journal else False,
+                "ref": _("Expense Report: %s") % self.name,
+                "memo": _("Expense Report: %s") % self.name,
+            }
+        )
         self.payment_ids = [(4, payment.id)]
         self.state = "paid"
         self.message_post(
-            body=_("Payment %(pid)s registered for %(amt)s.") % {
+            body=_("Payment %(pid)s registered for %(amt)s.")
+            % {
                 "pid": payment.id,
                 "amt": amount,
             },

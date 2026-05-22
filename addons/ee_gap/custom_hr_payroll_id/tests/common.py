@@ -19,23 +19,27 @@ class PayrollIDCommon(TransactionCase):
         cls.config = cls.Config.get_default()
 
         # Test employees — three PTKP statuses (each maps to one TER cat)
-        cls.emp_tk0 = cls._make_emp("Karyawan TK0", "TK/0")          # → A
-        cls.emp_k1 = cls._make_emp("Karyawan K1", "K/1")             # → B
-        cls.emp_k3 = cls._make_emp("Karyawan K3", "K/3")             # → C
+        cls.emp_tk0 = cls._make_emp("Karyawan TK0", "TK/0")  # → A
+        cls.emp_k1 = cls._make_emp("Karyawan K1", "K/1")  # → B
+        cls.emp_k3 = cls._make_emp("Karyawan K3", "K/3")  # → C
 
     @classmethod
     def _make_emp(cls, name: str, ptkp: str):
-        return cls.Employee.create({
-            "name": name,
-            "x_custom_ptkp_status": ptkp,
-            "x_custom_employment_type": "pegawai_tetap",
-        })
+        return cls.Employee.create(
+            {
+                "name": name,
+                "x_custom_ptkp_status": ptkp,
+                "x_custom_employment_type": "pegawai_tetap",
+            }
+        )
 
     def _make_slip(self, employee, gross: float, month: int = 6, year: int = 2026, is_thr: bool = False):
-        return self.Payslip.create({
-            "employee_id": employee.id,
-            "period_year": year,
-            "period_month": str(month),
-            "gross_salary": gross,
-            "is_thr": is_thr,
-        })
+        return self.Payslip.create(
+            {
+                "employee_id": employee.id,
+                "period_year": year,
+                "period_month": str(month),
+                "gross_salary": gross,
+                "is_thr": is_thr,
+            }
+        )

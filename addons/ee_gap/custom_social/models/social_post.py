@@ -28,8 +28,7 @@ class SocialPost(models.Model):
     media_attachment_id = fields.Many2one("ir.attachment", ondelete="set null")
     scheduled_at = fields.Datetime(required=True, tracking=True)
     published_at = fields.Datetime(readonly=True)
-    external_post_id = fields.Char(readonly=True, copy=False,
-                                   help="Platform-issued ID of the published post.")
+    external_post_id = fields.Char(readonly=True, copy=False, help="Platform-issued ID of the published post.")
     state = fields.Selection(POST_STATES, default="draft", required=True, tracking=True, index=True)
     last_error = fields.Text(readonly=True)
 
@@ -68,25 +67,29 @@ class SocialPost(models.Model):
         try:
             # Real implementation would dispatch to a platform-specific adapter
             external_id = f"manual-{fields.Datetime.now().isoformat()}"
-            self.write({
-                "state": "published",
-                "published_at": fields.Datetime.now(),
-                "external_post_id": external_id,
-                "last_error": False,
-            })
-            self._pdp_audit_write("social_post_published", self.id,
-                                  {"platform": self.account_id.platform,
-                                   "external_id": external_id})
+            self.write(
+                {
+                    "state": "published",
+                    "published_at": fields.Datetime.now(),
+                    "external_post_id": external_id,
+                    "last_error": False,
+                }
+            )
+            self._pdp_audit_write(
+                "social_post_published", self.id, {"platform": self.account_id.platform, "external_id": external_id}
+            )
         except Exception as e:
             _logger.exception("Social publish failed for post %s", self.id)
             self.write({"state": "failed", "last_error": str(e)})
 
     @api.model
     def _cron_publish_due(self):
-        due = self.sudo().search([
-            ("state", "=", "scheduled"),
-            ("scheduled_at", "<=", fields.Datetime.now()),
-        ])
+        due = self.sudo().search(
+            [
+                ("state", "=", "scheduled"),
+                ("scheduled_at", "<=", fields.Datetime.now()),
+            ]
+        )
         for post in due:
             try:
                 post._publish()

@@ -115,15 +115,17 @@ class WhatsappMessage(models.Model):
                     consent_ok = Consent.check_consent(rec.to_partner_id, purpose_code)
 
             if not consent_ok and category == "marketing":
-                raise UserError(_(
-                    "Cannot send marketing WhatsApp to %s: no active PDP consent "
-                    "for purpose 'whatsapp_marketing'."
-                ) % (rec.to_partner_id.display_name or rec.to_phone))
+                raise UserError(
+                    _("Cannot send marketing WhatsApp to %s: no active PDP consent for purpose 'whatsapp_marketing'.")
+                    % (rec.to_partner_id.display_name or rec.to_phone)
+                )
 
             if not consent_ok:
                 _logger.warning(
                     "whatsapp.message %s: sending %s without verified consent (purpose=%s)",
-                    rec.id, category, purpose_code,
+                    rec.id,
+                    category,
+                    purpose_code,
                 )
 
             rec.consent_verified = consent_ok
@@ -154,7 +156,8 @@ class WhatsappMessage(models.Model):
                 # Fall back to inline send if the queue is unavailable.
                 _logger.warning(
                     "queue_job dispatch failed for whatsapp.message %s: %s — sending inline",
-                    rec.id, e,
+                    rec.id,
+                    e,
                 )
                 rec.action_send()
         return True
@@ -174,17 +177,20 @@ class WhatsappMessage(models.Model):
             fake_id = f"sandbox-{uuid.uuid4().hex[:16]}"
             _logger.info(
                 "[whatsapp sandbox] account=%s to=%s template=%s body=%s -> %s",
-                account.name, self.to_phone,
+                account.name,
+                self.to_phone,
                 self.template_id.name if self.template_id else None,
                 (self.body or "")[:120],
                 fake_id,
             )
-            self.write({
-                "state": "sent",
-                "sent_at": fields.Datetime.now(),
-                "provider_message_id": fake_id,
-                "error_message": False,
-            })
+            self.write(
+                {
+                    "state": "sent",
+                    "sent_at": fields.Datetime.now(),
+                    "provider_message_id": fake_id,
+                    "error_message": False,
+                }
+            )
             return
 
         payload = self._build_payload()
@@ -194,18 +200,22 @@ class WhatsappMessage(models.Model):
             provider_id = messages[0].get("id") if messages else None
             if not provider_id:
                 raise RuntimeError(f"Meta response missing messages[0].id: {response!r}")
-            self.write({
-                "state": "sent",
-                "sent_at": fields.Datetime.now(),
-                "provider_message_id": provider_id,
-                "error_message": False,
-            })
+            self.write(
+                {
+                    "state": "sent",
+                    "sent_at": fields.Datetime.now(),
+                    "provider_message_id": provider_id,
+                    "error_message": False,
+                }
+            )
         except Exception as e:
             _logger.exception("whatsapp.message %s send failed", self.id)
-            self.write({
-                "state": "failed",
-                "error_message": str(e)[:2000],
-            })
+            self.write(
+                {
+                    "state": "failed",
+                    "error_message": str(e)[:2000],
+                }
+            )
 
     def _build_payload(self) -> dict:
         """Return a Meta Cloud API messages payload for this record.
@@ -298,10 +308,13 @@ class WhatsappMessage(models.Model):
             body = f"[{msg_type} message]"
 
         # Try to resolve the partner by phone.
-        partner = self.env["res.partner"].sudo().search(
-            ["|", ("phone", "ilike", from_phone[-9:]),
-                  ("mobile", "ilike", from_phone[-9:])],
-            limit=1,
+        partner = (
+            self.env["res.partner"]
+            .sudo()
+            .search(
+                ["|", ("phone", "ilike", from_phone[-9:]), ("mobile", "ilike", from_phone[-9:])],
+                limit=1,
+            )
         )
 
         vals = {

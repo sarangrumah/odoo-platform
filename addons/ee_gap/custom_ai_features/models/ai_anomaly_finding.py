@@ -54,9 +54,7 @@ class AiAnomalyFinding(models.Model):
 
     def _compute_res_ref(self):
         for rec in self:
-            rec.res_ref = (
-                f"{rec.res_model},{rec.res_id}" if rec.res_model and rec.res_id else False
-            )
+            rec.res_ref = f"{rec.res_model},{rec.res_id}" if rec.res_model and rec.res_id else False
 
     @api.depends("res_model", "res_id")
     def _compute_res_name(self):
@@ -83,8 +81,7 @@ class AiAnomalyFinding(models.Model):
 
     def action_triage(self):
         for rec in self:
-            rec.write({"state": "triaged", "triaged_by_id": self.env.user.id,
-                       "triaged_at": fields.Datetime.now()})
+            rec.write({"state": "triaged", "triaged_by_id": self.env.user.id, "triaged_at": fields.Datetime.now()})
             rec._pdp_audit_write("anomaly_triaged", rec.id, None)
 
     def action_dismiss(self):

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -64,9 +64,7 @@ class ApprovalMixin(models.AbstractModel):
         for rec in self:
             req = Req._create_for_record(rec)
             if not req:
-                raise UserError(
-                    _("No active approval matrix matches this %s.") % rec._description
-                )
+                raise UserError(_("No active approval matrix matches this %s.") % rec._description)
             if req.state == "draft":
                 req.action_submit()
             rec.x_custom_approval_request_id = req.id
@@ -108,8 +106,8 @@ class ApprovalMixin(models.AbstractModel):
         req = self.x_custom_approval_request_id
         if not req:
             raise UserError(
-                _("This record requires approval (matrix '%s'). "
-                  "Click 'Request Approval' before continuing.") % matrix.name
+                _("This record requires approval (matrix '%s'). Click 'Request Approval' before continuing.")
+                % matrix.name
             )
         if req.state == "approved":
             return True
@@ -117,8 +115,11 @@ class ApprovalMixin(models.AbstractModel):
             raise UserError(_("This record's approval was rejected. Cancel and revise to resubmit."))
         if req.state in ("draft", "pending"):
             raise UserError(
-                _("Approval is %(state)s on tier '%(tier)s'. Wait for completion before continuing.",
-                  state=req.state, tier=req.current_tier_id.name or "?")
+                _(
+                    "Approval is %(state)s on tier '%(tier)s'. Wait for completion before continuing.",
+                    state=req.state,
+                    tier=req.current_tier_id.name or "?",
+                )
             )
         if req.state == "cancelled":
             raise UserError(_("Previous approval was cancelled. Start a new approval request."))

@@ -83,11 +83,7 @@ def _json_body() -> dict:
 def _find_transaction(reference: str):
     if not reference:
         return request.env["payment.transaction"]
-    return (
-        request.env["payment.transaction"]
-        .sudo()
-        .search([("reference", "=", reference)], limit=1)
-    )
+    return request.env["payment.transaction"].sudo().search([("reference", "=", reference)], limit=1)
 
 
 def _reconcile_transaction(tx, new_state: str, raw_payload: dict) -> bool:
@@ -127,7 +123,6 @@ def _reconcile_transaction(tx, new_state: str, raw_payload: dict) -> bool:
 
 
 class IdPaymentWebhookController(http.Controller):
-
     # ---------------- Midtrans ----------------
 
     @http.route(
@@ -223,16 +218,8 @@ class IdPaymentWebhookController(http.Controller):
         raw_bytes = request.httprequest.get_data() or b""
         body = _json_body()
         # DOKU shape: {"order": {"invoice_number": "..."}, "transaction": {"status": "SUCCESS"}}
-        invoice_number = (
-            (body.get("order") or {}).get("invoice_number")
-            or body.get("invoice_number")
-            or ""
-        ).strip()
-        status = (
-            (body.get("transaction") or {}).get("status")
-            or body.get("status")
-            or ""
-        ).strip().upper()
+        invoice_number = ((body.get("order") or {}).get("invoice_number") or body.get("invoice_number") or "").strip()
+        status = ((body.get("transaction") or {}).get("status") or body.get("status") or "").strip().upper()
 
         tx = _find_transaction(invoice_number)
         if not tx:

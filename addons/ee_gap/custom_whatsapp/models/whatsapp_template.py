@@ -98,10 +98,12 @@ class WhatsappTemplate(models.Model):
         and update ``status`` from the matching entry. Sandbox accounts
         are skipped (log only).
         """
-        pending = self.sudo().search([
-            ("status", "=", "pending_review"),
-            ("meta_template_id", "!=", False),
-        ])
+        pending = self.sudo().search(
+            [
+                ("status", "=", "pending_review"),
+                ("meta_template_id", "!=", False),
+            ]
+        )
         for tpl in pending:
             account = tpl.account_id
             if not account or not account.is_active:
@@ -109,7 +111,8 @@ class WhatsappTemplate(models.Model):
             if account.sandbox_mode:
                 _logger.info(
                     "[whatsapp template poll] account=%s template=%s sandbox -> skip",
-                    account.name, tpl.name,
+                    account.name,
+                    tpl.name,
                 )
                 continue
             try:
@@ -118,9 +121,12 @@ class WhatsappTemplate(models.Model):
                 entries = body.get("data") or []
                 # Match by language too — Meta returns one row per (name, language).
                 match = next(
-                    (e for e in entries
-                     if (e.get("language") or "").lower() == (tpl.language_code or "").lower()
-                     or not tpl.language_code),
+                    (
+                        e
+                        for e in entries
+                        if (e.get("language") or "").lower() == (tpl.language_code or "").lower()
+                        or not tpl.language_code
+                    ),
                     None,
                 )
                 if not match and entries:
@@ -133,9 +139,13 @@ class WhatsappTemplate(models.Model):
                     tpl.write({"status": new_status})
                     _logger.info(
                         "[whatsapp template poll] %s -> %s (%s)",
-                        tpl.name, new_status, upstream,
+                        tpl.name,
+                        new_status,
+                        upstream,
                     )
             except Exception as e:
                 _logger.warning(
-                    "[whatsapp template poll] failed for %s: %s", tpl.name, e,
+                    "[whatsapp template poll] failed for %s: %s",
+                    tpl.name,
+                    e,
                 )

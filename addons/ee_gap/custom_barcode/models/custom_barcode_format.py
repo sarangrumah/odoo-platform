@@ -10,45 +10,66 @@ _logger = logging.getLogger(__name__)
 class CustomBarcodeFormat(models.Model):
     """Auto-generate barcodes on records of selected models using a configured
     ir.sequence + prefix/suffix. Optionally produces an EAN-13 check digit."""
+
     _name = "custom.barcode.format"
     _description = "Barcode Format"
     _order = "sequence, id"
 
     name = fields.Char(required=True)
     sequence = fields.Integer(default=10)
-    code = fields.Selection([
-        ("Code128", "CODE128"),
-        ("EAN13", "EAN-13"),
-        ("EAN8", "EAN-8"),
-        ("QR", "QR"),
-    ], default="Code128", required=True)
+    code = fields.Selection(
+        [
+            ("Code128", "CODE128"),
+            ("EAN13", "EAN-13"),
+            ("EAN8", "EAN-8"),
+            ("QR", "QR"),
+        ],
+        default="Code128",
+        required=True,
+    )
     prefix = fields.Char(default="")
     suffix = fields.Char(default="")
     sequence_id = fields.Many2one(
-        "ir.sequence", string="Number Sequence",
+        "ir.sequence",
+        string="Number Sequence",
         help="Sequence used to draw the running number embedded in the barcode.",
     )
     applied_models = fields.Many2many(
-        "ir.model", "custom_barcode_format_model_rel",
-        "format_id", "model_id",
-        domain=[("model", "in", [
-            "product.product", "product.template",
-            "stock.lot", "stock.location",
-        ])],
+        "ir.model",
+        "custom_barcode_format_model_rel",
+        "format_id",
+        "model_id",
+        domain=[
+            (
+                "model",
+                "in",
+                [
+                    "product.product",
+                    "product.template",
+                    "stock.lot",
+                    "stock.location",
+                ],
+            )
+        ],
         string="Applied To",
     )
     company_id = fields.Many2one(
-        "res.company", default=lambda s: s.env.company,
+        "res.company",
+        default=lambda s: s.env.company,
     )
     active = fields.Boolean(default=True)
 
     @api.model
     def _format_for_model(self, model_name):
-        return self.search([
-            ("active", "=", True),
-            ("applied_models.model", "=", model_name),
-            ("company_id", "in", (False, self.env.company.id)),
-        ], limit=1, order="sequence, id")
+        return self.search(
+            [
+                ("active", "=", True),
+                ("applied_models.model", "=", model_name),
+                ("company_id", "in", (False, self.env.company.id)),
+            ],
+            limit=1,
+            order="sequence, id",
+        )
 
     def generate(self):
         """Return a fresh barcode string for this format."""
@@ -83,6 +104,7 @@ class CustomBarcodeFormat(models.Model):
 class _BarcodeAutoMixin(models.AbstractModel):
     """Shared helper: on create, if a barcode field is empty and a format is
     configured for this model, auto-populate it."""
+
     _name = "custom.barcode.auto.mixin"
     _description = "Auto-Barcode Helper"
 
@@ -105,8 +127,7 @@ class ProductProduct(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        self.env["custom.barcode.auto.mixin"]._custom_barcode_autogenerate(
-            vals_list, field="barcode")
+        self.env["custom.barcode.auto.mixin"]._custom_barcode_autogenerate(vals_list, field="barcode")
         return super().create(vals_list)
 
 
@@ -115,6 +136,5 @@ class StockLot(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        self.env["custom.barcode.auto.mixin"]._custom_barcode_autogenerate(
-            vals_list, field="name")
+        self.env["custom.barcode.auto.mixin"]._custom_barcode_autogenerate(vals_list, field="name")
         return super().create(vals_list)

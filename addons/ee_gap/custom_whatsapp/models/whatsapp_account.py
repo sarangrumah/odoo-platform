@@ -120,8 +120,7 @@ class WhatsappAccount(models.Model):
         """
         self.ensure_one()
         if not self.phone_number_id:
-            raise UserError(_("WhatsApp account '%s' has no phone_number_id configured.")
-                            % self.name)
+            raise UserError(_("WhatsApp account '%s' has no phone_number_id configured.") % self.name)
         base = f"{META_GRAPH_BASE}/{self.phone_number_id}"
         return f"{base}/{endpoint}" if endpoint else base
 
@@ -129,16 +128,14 @@ class WhatsappAccount(models.Model):
         """Build a WhatsApp Business Account scoped URL."""
         self.ensure_one()
         if not self.business_account_id:
-            raise UserError(_("WhatsApp account '%s' has no business_account_id configured.")
-                            % self.name)
+            raise UserError(_("WhatsApp account '%s' has no business_account_id configured.") % self.name)
         return f"{META_GRAPH_BASE}/{self.business_account_id}/{endpoint}"
 
     def _get_headers(self) -> dict[str, str]:
         self.ensure_one()
         token = self.sudo().access_token or ""
         if not token and not self.sandbox_mode:
-            raise UserError(_("WhatsApp account '%s' has no access_token configured.")
-                            % self.name)
+            raise UserError(_("WhatsApp account '%s' has no access_token configured.") % self.name)
         return {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
@@ -147,8 +144,9 @@ class WhatsappAccount(models.Model):
 
     # ----- HTTP -----
 
-    def _request(self, method: str, url: str, *, json_body: dict | None = None,
-                 params: dict | None = None) -> dict[str, Any]:
+    def _request(
+        self, method: str, url: str, *, json_body: dict | None = None, params: dict | None = None
+    ) -> dict[str, Any]:
         """Perform an HTTP request with retry + circuit breaker.
 
         Returns the parsed JSON body on success. Raises ``RuntimeError``
@@ -160,8 +158,7 @@ class WhatsappAccount(models.Model):
 
         if _circuit_open(self.id):
             raise RuntimeError(
-                f"WhatsApp circuit breaker OPEN for account '{self.name}' "
-                f"(req={request_id}). Auto-resets in ~1h."
+                f"WhatsApp circuit breaker OPEN for account '{self.name}' (req={request_id}). Auto-resets in ~1h."
             )
 
         headers = self._get_headers()
@@ -174,10 +171,15 @@ class WhatsappAccount(models.Model):
             try:
                 _logger.info(
                     "[whatsapp http] req=%s account=%s attempt=%s %s %s",
-                    request_id, self.name, attempt, method, url,
+                    request_id,
+                    self.name,
+                    attempt,
+                    method,
+                    url,
                 )
                 resp = requests.request(
-                    method, url,
+                    method,
+                    url,
                     headers=headers,
                     json=json_body,
                     params=params,
@@ -190,7 +192,8 @@ class WhatsappAccount(models.Model):
                     if attempt < _MAX_RETRIES:
                         _logger.warning(
                             "[whatsapp http] req=%s 429 received, sleeping %ss",
-                            request_id, retry_after,
+                            request_id,
+                            retry_after,
                         )
                         time.sleep(min(retry_after, 30))
                         continue
@@ -198,7 +201,8 @@ class WhatsappAccount(models.Model):
                 if resp.status_code >= 500 and attempt < _MAX_RETRIES:
                     _logger.warning(
                         "[whatsapp http] req=%s status=%s, retrying",
-                        request_id, resp.status_code,
+                        request_id,
+                        resp.status_code,
                     )
                     time.sleep(_BACKOFF_BASE * (2 ** (attempt - 1)))
                     continue
@@ -206,14 +210,14 @@ class WhatsappAccount(models.Model):
                 if resp.status_code >= 400:
                     # Don't include token in error text. resp.text is OK; Meta
                     # error bodies do not echo Authorization.
-                    raise RuntimeError(
-                        f"HTTP {resp.status_code}: {resp.text[:400]}"
-                    )
+                    raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:400]}")
 
                 _circuit_record_success(self.id)
                 _logger.info(
                     "[whatsapp http] req=%s ok status=%s latency=%sms",
-                    request_id, resp.status_code, latency_ms,
+                    request_id,
+                    resp.status_code,
+                    latency_ms,
                 )
                 try:
                     return resp.json() if resp.content else {}
@@ -231,7 +235,8 @@ class WhatsappAccount(models.Model):
         if tripped:
             _logger.error(
                 "[whatsapp http] req=%s circuit OPENED for account=%s",
-                request_id, self.name,
+                request_id,
+                self.name,
             )
         raise RuntimeError(
             f"WhatsApp request failed after {_MAX_RETRIES} attempts "

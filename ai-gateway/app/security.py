@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import time
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 import redis.asyncio as redis_async
 import structlog
@@ -36,9 +36,7 @@ class HMACMiddleware(BaseHTTPMiddleware):
     HMAC computed as: HMAC-SHA256(secret, "<ts>.<raw_body>")
     """
 
-    async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         if request.url.path in EXEMPT_PATHS or not request.url.path.startswith("/v1/"):
             return await call_next(request)
 
@@ -88,9 +86,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.redis = redis_client
 
-    async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         if request.url.path in EXEMPT_PATHS or not request.url.path.startswith("/v1/"):
             return await call_next(request)
 

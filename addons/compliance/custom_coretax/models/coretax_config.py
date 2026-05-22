@@ -37,23 +37,26 @@ class CoretaxConfig(models.Model):
         default=lambda self: self.env.company,
         index=True,
         help="Company that owns this Coretax configuration. Each company has its own "
-             "NPWP, sertel, and adapter credentials.",
+        "NPWP, sertel, and adapter credentials.",
     )
 
     # ----- Taxpayer identity -----
-    npwp = fields.Char(string="NPWP", size=16, required=True,
-                       help="NPWP perusahaan, digits only (15 legacy or 16 NIK-based).")
+    npwp = fields.Char(
+        string="NPWP", size=16, required=True, help="NPWP perusahaan, digits only (15 legacy or 16 NIK-based)."
+    )
     taxpayer_name = fields.Char(string="Nama Wajib Pajak", required=True)
     taxpayer_address = fields.Text(string="Alamat")
-    kpp_code = fields.Char(string="KPP Code", size=3,
-                           help="3-digit Kantor Pelayanan Pajak code.")
+    kpp_code = fields.Char(string="KPP Code", size=3, help="3-digit Kantor Pelayanan Pajak code.")
 
     # ----- Sertifikat Elektronik (encrypted at rest) -----
     sertel_filename = fields.Char(string="Sertel Filename")
-    sertel_data = fields.Binary(string="Sertel (.p12)", attachment=False,
-                                 help="Stored AS NULL on this record; ciphertext lives "
-                                      "in ir.config_parameter via custom.ir.config. Field is "
-                                      "exposed only as an upload sink in the sertel wizard.")
+    sertel_data = fields.Binary(
+        string="Sertel (.p12)",
+        attachment=False,
+        help="Stored AS NULL on this record; ciphertext lives "
+        "in ir.config_parameter via custom.ir.config. Field is "
+        "exposed only as an upload sink in the sertel wizard.",
+    )
     sertel_uploaded = fields.Boolean(string="Sertel Uploaded", compute="_compute_sertel_uploaded")
     sertel_expiry = fields.Date(string="Sertel Expiry")
 
@@ -71,22 +74,22 @@ class CoretaxConfig(models.Model):
     aspp_credential_key = fields.Char(
         string="ASPP Credential Key",
         help="ir.config_parameter key under which the ASPP credential is stored "
-             "encrypted via custom.ir.config. The credential plaintext is never "
-             "stored on this record.",
+        "encrypted via custom.ir.config. The credential plaintext is never "
+        "stored on this record.",
     )
 
     _npwp_unique = models.Constraint(
-        'unique(npwp)',
-        'NPWP must be unique across Coretax configurations.',
+        "unique(npwp)",
+        "NPWP must be unique across Coretax configurations.",
     )
 
     @api.constrains("npwp")
     def _check_npwp(self):
         for rec in self:
             if rec.npwp and not _NPWP_DIGITS_RE.match(rec.npwp):
-                raise ValidationError(_(
-                    "NPWP must be 15 or 16 digits (digits only, no dots/dashes). Got: %s"
-                ) % rec.npwp)
+                raise ValidationError(
+                    _("NPWP must be 15 or 16 digits (digits only, no dots/dashes). Got: %s") % rec.npwp
+                )
 
     @api.constrains("kpp_code")
     def _check_kpp(self):

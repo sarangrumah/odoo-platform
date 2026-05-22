@@ -19,7 +19,8 @@ class EliminationProposal(models.Model):
     )
     chart_id = fields.Many2one(
         "custom.consolidation.chart",
-        required=True, ondelete="cascade",
+        required=True,
+        ondelete="cascade",
     )
     rule_id = fields.Many2one(
         "custom.elimination.rule",
@@ -35,10 +36,13 @@ class EliminationProposal(models.Model):
             ("rejected", "Rejected"),
             ("cancelled", "Cancelled"),
         ],
-        default="draft", copy=False, required=True,
+        default="draft",
+        copy=False,
+        required=True,
     )
     total_amount = fields.Monetary(
-        currency_field="currency_id", readonly=True,
+        currency_field="currency_id",
+        readonly=True,
     )
     currency_id = fields.Many2one(
         "res.currency",
@@ -61,8 +65,11 @@ class EliminationProposal(models.Model):
     def _compute_proposed_lines(self):
         for rec in self:
             rec.proposed_line_ids = rec.line_ids
+
     move_id = fields.Many2one(
-        "account.move", readonly=True, copy=False,
+        "account.move",
+        readonly=True,
+        copy=False,
     )
     notes = fields.Text()
 
@@ -79,29 +86,39 @@ class EliminationProposal(models.Model):
                 ("date", ">=", proposal.date_from),
                 ("date", "<=", proposal.date_to),
             ]
-            a_lines = AML.search(base_domain + [
-                ("company_id", "=", rule.company_a_id.id),
-                ("account_id", "=", rule.account_a_id.id),
-            ])
-            b_lines = AML.search(base_domain + [
-                ("company_id", "=", rule.company_b_id.id),
-                ("account_id", "=", rule.account_b_id.id),
-            ])
+            a_lines = AML.search(
+                base_domain
+                + [
+                    ("company_id", "=", rule.company_a_id.id),
+                    ("account_id", "=", rule.account_a_id.id),
+                ]
+            )
+            b_lines = AML.search(
+                base_domain
+                + [
+                    ("company_id", "=", rule.company_b_id.id),
+                    ("account_id", "=", rule.account_b_id.id),
+                ]
+            )
             a_amount = sum(a_lines.mapped("balance"))
             b_amount = sum(b_lines.mapped("balance"))
             elim = min(abs(a_amount), abs(b_amount))
-            ProposalLine.create({
-                "proposal_id": proposal.id,
-                "account_id": rule.account_a_id.id,
-                "company_id": rule.company_a_id.id,
-                "amount": a_amount,
-            })
-            ProposalLine.create({
-                "proposal_id": proposal.id,
-                "account_id": rule.account_b_id.id,
-                "company_id": rule.company_b_id.id,
-                "amount": b_amount,
-            })
+            ProposalLine.create(
+                {
+                    "proposal_id": proposal.id,
+                    "account_id": rule.account_a_id.id,
+                    "company_id": rule.company_a_id.id,
+                    "amount": a_amount,
+                }
+            )
+            ProposalLine.create(
+                {
+                    "proposal_id": proposal.id,
+                    "account_id": rule.account_b_id.id,
+                    "company_id": rule.company_b_id.id,
+                    "amount": b_amount,
+                }
+            )
             proposal.total_amount = elim
             proposal.state = "proposed"
             proposal.notes = (
@@ -136,36 +153,60 @@ class EliminationProposal(models.Model):
         self.ensure_one()
         rule = self.rule_id
         Journal = self.env["account.journal"].sudo()
-        journal = Journal.search([
-            ("company_id", "=", rule.company_a_id.id),
-            ("type", "=", "general"),
-        ], limit=1)
-        if not journal:
-            raise UserError(_(
-                "No general journal in company %(c)s.", c=rule.company_a_id.name,
-            ))
-        return self.env["account.move"].sudo().with_company(rule.company_a_id).create({
-            "journal_id": journal.id,
-            "date": self.date_to,
-            "move_type": "entry",
-            "ref": _("IC Elimination: %(name)s [%(d1)s..%(d2)s]") % {
-                "name": rule.name, "d1": self.date_from, "d2": self.date_to,
-            },
-            "line_ids": [
-                (0, 0, {
-                    "account_id": rule.account_a_id.id,
-                    "name": _("Eliminate A: %s") % rule.account_a_id.code,
-                    "debit": self.total_amount,
-                    "credit": 0.0,
-                }),
-                (0, 0, {
-                    "account_id": rule.account_b_id.id,
-                    "name": _("Eliminate B: %s") % rule.account_b_id.code,
-                    "debit": 0.0,
-                    "credit": self.total_amount,
-                }),
+        journal = Journal.search(
+            [
+                ("company_id", "=", rule.company_a_id.id),
+                ("type", "=", "general"),
             ],
-        })
+            limit=1,
+        )
+        if not journal:
+            raise UserError(
+                _(
+                    "No general journal in company %(c)s.",
+                    c=rule.company_a_id.name,
+                )
+            )
+        return (
+            self.env["account.move"]
+            .sudo()
+            .with_company(rule.company_a_id)
+            .create(
+                {
+                    "journal_id": journal.id,
+                    "date": self.date_to,
+                    "move_type": "entry",
+                    "ref": _("IC Elimination: %(name)s [%(d1)s..%(d2)s]")
+                    % {
+                        "name": rule.name,
+                        "d1": self.date_from,
+                        "d2": self.date_to,
+                    },
+                    "line_ids": [
+                        (
+                            0,
+                            0,
+                            {
+                                "account_id": rule.account_a_id.id,
+                                "name": _("Eliminate A: %s") % rule.account_a_id.code,
+                                "debit": self.total_amount,
+                                "credit": 0.0,
+                            },
+                        ),
+                        (
+                            0,
+                            0,
+                            {
+                                "account_id": rule.account_b_id.id,
+                                "name": _("Eliminate B: %s") % rule.account_b_id.code,
+                                "debit": 0.0,
+                                "credit": self.total_amount,
+                            },
+                        ),
+                    ],
+                }
+            )
+        )
 
 
 class EliminationProposalLine(models.Model):
@@ -174,7 +215,8 @@ class EliminationProposalLine(models.Model):
 
     proposal_id = fields.Many2one(
         "custom.elimination.proposal",
-        required=True, ondelete="cascade",
+        required=True,
+        ondelete="cascade",
     )
     company_id = fields.Many2one("res.company", required=True)
     account_id = fields.Many2one("account.account", required=True)

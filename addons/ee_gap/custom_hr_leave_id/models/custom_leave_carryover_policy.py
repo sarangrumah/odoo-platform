@@ -26,14 +26,12 @@ class CustomLeaveCarryoverPolicy(models.Model):
     max_carryover_days = fields.Integer(
         string="Max Carry-Over Days",
         default=5,
-        help="Maximum number of unused leave days that may be carried over to "
-        "the following year.",
+        help="Maximum number of unused leave days that may be carried over to the following year.",
     )
     expiry_months_after_year_end = fields.Integer(
         string="Expiry (Months After Year-End)",
         default=3,
-        help="Number of months after the year-end before carried-over days "
-        "expire (default 3 months = end of March).",
+        help="Number of months after the year-end before carried-over days expire (default 3 months = end of March).",
     )
     is_active = fields.Boolean(string="Active", default=True)
     notes = fields.Text(string="Notes")
@@ -74,8 +72,7 @@ class CustomLeaveCarryoverPolicy(models.Model):
         Allocation = self.env["hr.leave.allocation"].sudo()
         active_policies = self.search([("is_active", "=", True)])
         _logger.info(
-            "custom_hr_leave_id: cron_apply_carryover processing %s policies "
-            "for prev_year=%s",
+            "custom_hr_leave_id: cron_apply_carryover processing %s policies for prev_year=%s",
             len(active_policies),
             prev_year,
         )
@@ -92,13 +89,11 @@ class CustomLeaveCarryoverPolicy(models.Model):
             for allocation in allocations:
                 remaining = max(
                     0.0,
-                    (allocation.number_of_days or 0.0)
-                    - (allocation.leaves_taken or 0.0),
+                    (allocation.number_of_days or 0.0) - (allocation.leaves_taken or 0.0),
                 )
                 carry = min(remaining, policy.max_carryover_days)
                 _logger.info(
-                    "custom_hr_leave_id: would carry %.1f days "
-                    "(remaining=%.1f, cap=%d) for employee_id=%s type=%s",
+                    "custom_hr_leave_id: would carry %.1f days (remaining=%.1f, cap=%d) for employee_id=%s type=%s",
                     carry,
                     remaining,
                     policy.max_carryover_days,

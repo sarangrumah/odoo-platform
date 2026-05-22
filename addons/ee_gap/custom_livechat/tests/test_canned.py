@@ -11,12 +11,14 @@ class TestCannedResponseExpand(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.Canned = cls.env["custom.livechat.canned.response"]
-        cls.greet = cls.Canned.create({
-            "name": "Greeting",
-            "shortcut": "hi",
-            "body": "<p>Hello there!</p>",
-            "category": "Greeting",
-        })
+        cls.greet = cls.Canned.create(
+            {
+                "name": "Greeting",
+                "shortcut": "hi",
+                "body": "<p>Hello there!</p>",
+                "category": "Greeting",
+            }
+        )
 
     def test_expand_canned_found_increments_usage(self):
         before = self.greet.times_used

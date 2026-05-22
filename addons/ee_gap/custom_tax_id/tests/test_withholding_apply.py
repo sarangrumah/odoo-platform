@@ -10,7 +10,6 @@ from .common import TaxIdCommon
 
 @tagged("post_install", "-at_install")
 class TestWithholdingApply(TaxIdCommon):
-
     def test_post_creates_withholding_line(self):
         bill = self._make_vendor_bill(self.vendor_npwp, 1_000_000)
         bill.action_post()
@@ -39,28 +38,38 @@ class TestWithholdingApply(TaxIdCommon):
         self.assertEqual(wh.bupot_id.partner_id, self.vendor_npwp)
 
     def test_total_withheld_aggregated(self):
-        bill = self.Move.create({
-            "move_type": "in_invoice",
-            "partner_id": self.vendor_npwp.id,
-            "journal_id": self.purchase_journal.id,
-            "invoice_date": "2026-01-15",
-            "invoice_line_ids": [
-                (0, 0, {
-                    "name": "Jasa #1",
-                    "product_id": self.product_jasa.id,
-                    "quantity": 1.0,
-                    "price_unit": 500_000,
-                    "account_id": self.expense_account.id,
-                }),
-                (0, 0, {
-                    "name": "Jasa #2",
-                    "product_id": self.product_jasa.id,
-                    "quantity": 1.0,
-                    "price_unit": 500_000,
-                    "account_id": self.expense_account.id,
-                }),
-            ],
-        })
+        bill = self.Move.create(
+            {
+                "move_type": "in_invoice",
+                "partner_id": self.vendor_npwp.id,
+                "journal_id": self.purchase_journal.id,
+                "invoice_date": "2026-01-15",
+                "invoice_line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "name": "Jasa #1",
+                            "product_id": self.product_jasa.id,
+                            "quantity": 1.0,
+                            "price_unit": 500_000,
+                            "account_id": self.expense_account.id,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "name": "Jasa #2",
+                            "product_id": self.product_jasa.id,
+                            "quantity": 1.0,
+                            "price_unit": 500_000,
+                            "account_id": self.expense_account.id,
+                        },
+                    ),
+                ],
+            }
+        )
         bill.action_post()
         # 2 lines × 2% × 500,000 = 20,000 total
         self.assertEqual(len(bill.x_custom_withholding_line_ids), 2)
@@ -74,16 +83,24 @@ class TestWithholdingApply(TaxIdCommon):
         self.assertEqual(len(bill.x_custom_withholding_line_ids), 1)
 
     def test_sales_invoice_does_not_trigger_withholding(self):
-        sale = self.Move.create({
-            "move_type": "out_invoice",
-            "partner_id": self.vendor_npwp.id,
-            "invoice_date": "2026-01-15",
-            "invoice_line_ids": [(0, 0, {
-                "name": "Sale",
-                "quantity": 1.0,
-                "price_unit": 1_000_000,
-                "account_id": self.expense_account.id,
-            })],
-        })
+        sale = self.Move.create(
+            {
+                "move_type": "out_invoice",
+                "partner_id": self.vendor_npwp.id,
+                "invoice_date": "2026-01-15",
+                "invoice_line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "name": "Sale",
+                            "quantity": 1.0,
+                            "price_unit": 1_000_000,
+                            "account_id": self.expense_account.id,
+                        },
+                    )
+                ],
+            }
+        )
         sale._custom_apply_withholding()
         self.assertFalse(sale.x_custom_withholding_line_ids)

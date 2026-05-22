@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import date
 
-from dateutil.relativedelta import relativedelta
 
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests import tagged
@@ -10,7 +9,6 @@ from odoo.tests.common import TransactionCase
 
 @tagged("post_install", "-at_install")
 class TestCustomFixedAsset(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -18,43 +16,56 @@ class TestCustomFixedAsset(TransactionCase):
         cls.Account = cls.env["account.account"]
         cls.Journal = cls.env["account.journal"]
 
-        cls.asset_account = cls.Account.create({
-            "name": "FA - Equipment",
-            "code": "150100",
-            "account_type": "asset_fixed",
-            "company_ids": [(6, 0, [cls.company.id])],
-        })
-        cls.accum_account = cls.Account.create({
-            "name": "FA - Accum. Depreciation",
-            "code": "150900",
-            "account_type": "asset_fixed",
-            "company_ids": [(6, 0, [cls.company.id])],
-        })
-        cls.expense_account = cls.Account.create({
-            "name": "Depreciation Expense",
-            "code": "610100",
-            "account_type": "expense",
-            "company_ids": [(6, 0, [cls.company.id])],
-        })
-        cls.journal = cls.Journal.search([
-            ("type", "=", "general"),
-            ("company_id", "=", cls.company.id),
-        ], limit=1) or cls.Journal.create({
-            "name": "Misc Operations",
-            "code": "MISC",
-            "type": "general",
-            "company_id": cls.company.id,
-        })
+        cls.asset_account = cls.Account.create(
+            {
+                "name": "FA - Equipment",
+                "code": "150100",
+                "account_type": "asset_fixed",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.accum_account = cls.Account.create(
+            {
+                "name": "FA - Accum. Depreciation",
+                "code": "150900",
+                "account_type": "asset_fixed",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.expense_account = cls.Account.create(
+            {
+                "name": "Depreciation Expense",
+                "code": "610100",
+                "account_type": "expense",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.journal = cls.Journal.search(
+            [
+                ("type", "=", "general"),
+                ("company_id", "=", cls.company.id),
+            ],
+            limit=1,
+        ) or cls.Journal.create(
+            {
+                "name": "Misc Operations",
+                "code": "MISC",
+                "type": "general",
+                "company_id": cls.company.id,
+            }
+        )
 
-        cls.group = cls.env["custom.fixed.asset.group"].create({
-            "name": "Equipment",
-            "code": "EQ",
-            "default_useful_life_months": 12,
-            "default_asset_account_id": cls.asset_account.id,
-            "default_depreciation_account_id": cls.accum_account.id,
-            "default_expense_account_id": cls.expense_account.id,
-            "default_journal_id": cls.journal.id,
-        })
+        cls.group = cls.env["custom.fixed.asset.group"].create(
+            {
+                "name": "Equipment",
+                "code": "EQ",
+                "default_useful_life_months": 12,
+                "default_asset_account_id": cls.asset_account.id,
+                "default_depreciation_account_id": cls.accum_account.id,
+                "default_expense_account_id": cls.expense_account.id,
+                "default_journal_id": cls.journal.id,
+            }
+        )
 
     def _make_asset(self, **overrides):
         vals = {
@@ -107,34 +118,42 @@ class TestCustomFixedAsset(TransactionCase):
         asset.action_confirm()
         asset._post_due_depreciation(as_of=date(2025, 4, 5))
 
-        gain_account = self.Account.create({
-            "name": "Gain on disposal",
-            "code": "799100",
-            "account_type": "income_other",
-            "company_ids": [(6, 0, [self.company.id])],
-        })
-        loss_account = self.Account.create({
-            "name": "Loss on disposal",
-            "code": "699100",
-            "account_type": "expense",
-            "company_ids": [(6, 0, [self.company.id])],
-        })
-        proceeds_account = self.Account.create({
-            "name": "Disposal proceeds clearing",
-            "code": "110900",
-            "account_type": "asset_current",
-            "company_ids": [(6, 0, [self.company.id])],
-        })
+        gain_account = self.Account.create(
+            {
+                "name": "Gain on disposal",
+                "code": "799100",
+                "account_type": "income_other",
+                "company_ids": [(6, 0, [self.company.id])],
+            }
+        )
+        loss_account = self.Account.create(
+            {
+                "name": "Loss on disposal",
+                "code": "699100",
+                "account_type": "expense",
+                "company_ids": [(6, 0, [self.company.id])],
+            }
+        )
+        proceeds_account = self.Account.create(
+            {
+                "name": "Disposal proceeds clearing",
+                "code": "110900",
+                "account_type": "asset_current",
+                "company_ids": [(6, 0, [self.company.id])],
+            }
+        )
 
-        wiz = self.env["custom.fixed.asset.disposal.wizard"].create({
-            "asset_id": asset.id,
-            "disposal_date": date(2025, 4, 30),
-            "disposal_value": 10000.0,  # NBV is 9000 -> 1000 gain
-            "gain_account_id": gain_account.id,
-            "loss_account_id": loss_account.id,
-            "receivable_account_id": proceeds_account.id,
-            "create_journal_entry": True,
-        })
+        wiz = self.env["custom.fixed.asset.disposal.wizard"].create(
+            {
+                "asset_id": asset.id,
+                "disposal_date": date(2025, 4, 30),
+                "disposal_value": 10000.0,  # NBV is 9000 -> 1000 gain
+                "gain_account_id": gain_account.id,
+                "loss_account_id": loss_account.id,
+                "receivable_account_id": proceeds_account.id,
+                "create_journal_entry": True,
+            }
+        )
         self.assertAlmostEqual(wiz.gain_loss, 1000.0, places=2)
         wiz.action_dispose()
         self.assertEqual(asset.state, "disposed")
@@ -180,6 +199,7 @@ class TestCustomFixedAsset(TransactionCase):
         """
         from contextlib import contextmanager
         from odoo import fields as odoo_fields
+
         original = odoo_fields.Date.context_today
 
         @contextmanager
@@ -189,4 +209,5 @@ class TestCustomFixedAsset(TransactionCase):
                 yield
             finally:
                 odoo_fields.Date.context_today = original
+
         return _cm()

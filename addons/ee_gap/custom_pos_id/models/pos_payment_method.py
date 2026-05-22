@@ -114,15 +114,9 @@ class PosPaymentMethod(models.Model):
         """
         self.ensure_one()
         if self.x_qris_provider == "manual":
-            raise UserError(_(
-                "Payment method %s is configured as manual QRIS; "
-                "no payload is generated."
-            ) % self.name)
+            raise UserError(_("Payment method %s is configured as manual QRIS; no payload is generated.") % self.name)
 
-        merchant_account = (
-            self.x_qris_mid
-            or _PROVIDER_STUB_MIDS.get(self.x_qris_provider, "ID1014UNKNOWN")
-        )
+        merchant_account = self.x_qris_mid or _PROVIDER_STUB_MIDS.get(self.x_qris_provider, "ID1014UNKNOWN")
         merchant_id = self.x_qris_merchant_id or "0000000000"
         merchant_name = (self.x_qris_merchant_name or self.name or "MERCHANT")[:25]
         merchant_city = (self.x_qris_merchant_city or "JAKARTA")[:15]
@@ -135,17 +129,14 @@ class PosPaymentMethod(models.Model):
         merchant_info = _tlv("00", "ID.CO.QRIS.WWW") + _tlv("01", merchant_account) + _tlv("02", merchant_id)
         parts.append(_tlv("26", merchant_info))
         parts.append(_tlv("52", "5812"))  # MCC: convenience stores; placeholder
-        parts.append(_tlv("53", "360"))   # Currency: IDR
+        parts.append(_tlv("53", "360"))  # Currency: IDR
         if transaction_amount and float(transaction_amount) > 0:
             # Field 54: amount (numeric, two decimals stripped if integer IDR)
-            amount_str = (
-                f"{float(transaction_amount):.2f}".rstrip("0").rstrip(".")
-                or "0"
-            )
+            amount_str = f"{float(transaction_amount):.2f}".rstrip("0").rstrip(".") or "0"
             parts.append(_tlv("54", amount_str))
-        parts.append(_tlv("58", "ID"))                 # Country
-        parts.append(_tlv("59", merchant_name))        # Merchant name
-        parts.append(_tlv("60", merchant_city))        # Merchant city
+        parts.append(_tlv("58", "ID"))  # Country
+        parts.append(_tlv("59", merchant_name))  # Merchant name
+        parts.append(_tlv("60", merchant_city))  # Merchant city
         payload_wo_crc = "".join(parts) + "6304"
         crc = _crc16_ccitt(payload_wo_crc)
         payload = payload_wo_crc + crc
@@ -154,7 +145,9 @@ class PosPaymentMethod(models.Model):
 
         _logger.info(
             "QRIS payload generated method=%s provider=%s amount=%s",
-            self.name, self.x_qris_provider, transaction_amount,
+            self.name,
+            self.x_qris_provider,
+            transaction_amount,
         )
         return {
             "payload": payload,
@@ -175,9 +168,7 @@ class PosPaymentMethod(models.Model):
         try:
             import qrcode  # type: ignore[import-not-found]
         except ImportError:
-            _logger.warning(
-                "qrcode package not available; returning payload without PNG."
-            )
+            _logger.warning("qrcode package not available; returning payload without PNG.")
             return None
         img = qrcode.make(payload)
         buf = io.BytesIO()

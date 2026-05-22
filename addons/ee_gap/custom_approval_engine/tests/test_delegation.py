@@ -11,7 +11,6 @@ from .common import ApprovalTestCommon
 
 
 class TestDelegation(ApprovalTestCommon):
-
     def _open_request_with_a_as_approver(self):
         m = self._make_matrix("Single tier")
         self._add_tier(m, name="A only", approvers=[self.user_approver_a])
@@ -22,13 +21,15 @@ class TestDelegation(ApprovalTestCommon):
 
     def test_active_delegation_replaces_approver(self):
         now = fields.Datetime.now()
-        self.Delegation.create({
-            "user_id": self.user_approver_a.id,
-            "delegate_to_id": self.user_delegate.id,
-            "valid_from": now - timedelta(hours=1),
-            "valid_until": now + timedelta(hours=1),
-            "reason": "Sick leave",
-        })
+        self.Delegation.create(
+            {
+                "user_id": self.user_approver_a.id,
+                "delegate_to_id": self.user_delegate.id,
+                "valid_from": now - timedelta(hours=1),
+                "valid_until": now + timedelta(hours=1),
+                "reason": "Sick leave",
+            }
+        )
 
         req = self._open_request_with_a_as_approver()
         # Pending list resolved at submit time should already reflect delegation
@@ -37,13 +38,15 @@ class TestDelegation(ApprovalTestCommon):
 
     def test_expired_delegation_does_not_apply(self):
         past = fields.Datetime.now() - timedelta(days=7)
-        self.Delegation.create({
-            "user_id": self.user_approver_a.id,
-            "delegate_to_id": self.user_delegate.id,
-            "valid_from": past - timedelta(hours=1),
-            "valid_until": past,
-            "reason": "Old",
-        })
+        self.Delegation.create(
+            {
+                "user_id": self.user_approver_a.id,
+                "delegate_to_id": self.user_delegate.id,
+                "valid_from": past - timedelta(hours=1),
+                "valid_until": past,
+                "reason": "Old",
+            }
+        )
 
         req = self._open_request_with_a_as_approver()
         self.assertIn(self.user_approver_a, req.pending_approver_ids)
@@ -51,13 +54,15 @@ class TestDelegation(ApprovalTestCommon):
 
     def test_inactive_delegation_does_not_apply(self):
         now = fields.Datetime.now()
-        d = self.Delegation.create({
-            "user_id": self.user_approver_a.id,
-            "delegate_to_id": self.user_delegate.id,
-            "valid_from": now - timedelta(hours=1),
-            "valid_until": now + timedelta(hours=1),
-            "active": False,
-        })
+        d = self.Delegation.create(
+            {
+                "user_id": self.user_approver_a.id,
+                "delegate_to_id": self.user_delegate.id,
+                "valid_from": now - timedelta(hours=1),
+                "valid_until": now + timedelta(hours=1),
+                "active": False,
+            }
+        )
         self.assertFalse(d.active)
 
         req = self._open_request_with_a_as_approver()
@@ -65,12 +70,14 @@ class TestDelegation(ApprovalTestCommon):
 
     def test_delegation_attribution_in_history(self):
         now = fields.Datetime.now()
-        self.Delegation.create({
-            "user_id": self.user_approver_a.id,
-            "delegate_to_id": self.user_delegate.id,
-            "valid_from": now - timedelta(hours=1),
-            "valid_until": now + timedelta(hours=1),
-        })
+        self.Delegation.create(
+            {
+                "user_id": self.user_approver_a.id,
+                "delegate_to_id": self.user_delegate.id,
+                "valid_from": now - timedelta(hours=1),
+                "valid_until": now + timedelta(hours=1),
+            }
+        )
 
         req = self._open_request_with_a_as_approver()
         # Delegate approves on behalf of A

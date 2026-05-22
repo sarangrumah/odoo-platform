@@ -91,9 +91,14 @@ class MaintenanceEquipment(models.Model):
         help="Computed from MTBF (mtbf_hours / 8h per day) added to last maintenance.",
     )
 
-    @api.depends("maintenance_ids", "maintenance_ids.stage_id.done",
-                 "maintenance_ids.maintenance_type", "maintenance_ids.close_date",
-                 "maintenance_ids.request_date", "effective_date")
+    @api.depends(
+        "maintenance_ids",
+        "maintenance_ids.stage_id.done",
+        "maintenance_ids.maintenance_type",
+        "maintenance_ids.close_date",
+        "maintenance_ids.request_date",
+        "effective_date",
+    )
     def _compute_failure_stats(self):
         Request = self.env["maintenance.request"]
         for eq in self:
@@ -143,8 +148,7 @@ class MaintenanceEquipment(models.Model):
             else:
                 eq.x_mtbf_hours = 0.0
 
-    @api.depends("x_mtbf_hours", "x_last_iot_breach", "x_iot_threshold_metric",
-                 "effective_date", "x_last_failure_at")
+    @api.depends("x_mtbf_hours", "x_last_iot_breach", "x_iot_threshold_metric", "effective_date", "x_last_failure_at")
     def _compute_predicted_next_maintenance(self):
         for eq in self:
             via = "manual"
@@ -179,7 +183,8 @@ class MaintenanceEquipment(models.Model):
                         "MTBF (hours): %(mtbf).2f\n"
                         "Predicted via: %(via)s\n"
                         "Predicted date: %(date)s"
-                    ) % {
+                    )
+                    % {
                         "mtbf": eq.x_mtbf_hours or 0.0,
                         "via": eq.x_predicted_via or "manual",
                         "date": target,
@@ -209,10 +214,7 @@ class MaintenanceEquipment(models.Model):
         tracked = ("owner_user_id", "employee_id", "department_id")
         old = {}
         if any(k in vals for k in tracked):
-            old = {
-                r.id: {k: (r[k].id if hasattr(r[k], "id") else r[k]) for k in tracked}
-                for r in self
-            }
+            old = {r.id: {k: (r[k].id if hasattr(r[k], "id") else r[k]) for k in tracked} for r in self}
         res = super().write(vals)
         if old:
             for rec in self:
@@ -266,9 +268,7 @@ class MaintenanceEquipment(models.Model):
 
         Reading = self.env.get("iot.reading")
         if Reading is None:
-            _logger.info(
-                "custom_maintenance: iot.reading model not found; skipping breach scan."
-            )
+            _logger.info("custom_maintenance: iot.reading model not found; skipping breach scan.")
             return
 
         Request = self.env["maintenance.request"]
@@ -299,9 +299,12 @@ class MaintenanceEquipment(models.Model):
 
             if not eq.x_auto_request_on_breach:
                 _logger.info(
-                    "custom_maintenance: breach on equipment %s (%s %s %s, value=%s) "
-                    "but auto-request disabled.",
-                    eq.display_name, metric, op, threshold, latest.value,
+                    "custom_maintenance: breach on equipment %s (%s %s %s, value=%s) but auto-request disabled.",
+                    eq.display_name,
+                    metric,
+                    op,
+                    threshold,
+                    latest.value,
                 )
                 continue
 
@@ -316,7 +319,8 @@ class MaintenanceEquipment(models.Model):
                         "Metric: %(metric)s\nOperator: %(op)s\n"
                         "Threshold: %(thr)s\nObserved value: %(val)s\n"
                         "Recorded at: %(ts)s"
-                    ) % {
+                    )
+                    % {
                         "metric": metric,
                         "op": op,
                         "thr": threshold,
@@ -329,5 +333,6 @@ class MaintenanceEquipment(models.Model):
             )
             _logger.info(
                 "custom_maintenance: created request for equipment %s (value=%s)",
-                eq.display_name, latest.value,
+                eq.display_name,
+                latest.value,
             )

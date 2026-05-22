@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import logging
 
-from odoo import api, models
+from odoo import models
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)

@@ -38,12 +38,14 @@ async def lifespan(app: FastAPI):
     # Start backup scheduler (importing lazily to avoid circulars at module load)
     if settings.enable_backup_scheduler:
         from . import scheduler
+
         scheduler.start()
 
     yield
 
     if settings.enable_backup_scheduler:
         from . import scheduler
+
         scheduler.stop()
     close_all()
 

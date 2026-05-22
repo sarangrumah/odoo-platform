@@ -91,8 +91,7 @@ class CustomSurveyNpsSummary(models.Model):
                     # (or answer_score for scored questions). Pick whichever is set.
                     raw = (
                         line.value_numerical_box
-                        if "value_numerical_box" in line._fields
-                        and line.value_numerical_box is not False
+                        if "value_numerical_box" in line._fields and line.value_numerical_box is not False
                         else None
                     )
                     if raw is None and "answer_score" in line._fields:
@@ -125,38 +124,48 @@ class CustomSurveyNpsSummary(models.Model):
             return False
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow([
-            "Reference",
-            "Survey",
-            "Date From",
-            "Date To",
-            "Promoters",
-            "Passives",
-            "Detractors",
-            "Responses",
-            "NPS Score",
-        ])
+        writer.writerow(
+            [
+                "Reference",
+                "Survey",
+                "Date From",
+                "Date To",
+                "Promoters",
+                "Passives",
+                "Detractors",
+                "Responses",
+                "NPS Score",
+            ]
+        )
         for rec in self:
-            writer.writerow([
-                rec.name or "",
-                rec.survey_id.title or "",
-                rec.date_from or "",
-                rec.date_to or "",
-                rec.promoter_count,
-                rec.passive_count,
-                rec.detractor_count,
-                rec.response_count,
-                "%.2f" % (rec.nps_score or 0.0),
-            ])
+            writer.writerow(
+                [
+                    rec.name or "",
+                    rec.survey_id.title or "",
+                    rec.date_from or "",
+                    rec.date_to or "",
+                    rec.promoter_count,
+                    rec.passive_count,
+                    rec.detractor_count,
+                    rec.response_count,
+                    "%.2f" % (rec.nps_score or 0.0),
+                ]
+            )
         data = buf.getvalue().encode("utf-8")
-        attachment = self.env["ir.attachment"].sudo().create({
-            "name": "nps_summary_export.csv",
-            "type": "binary",
-            "datas": base64.b64encode(data),
-            "mimetype": "text/csv",
-            "res_model": self._name,
-            "res_id": self[0].id if len(self) == 1 else 0,
-        })
+        attachment = (
+            self.env["ir.attachment"]
+            .sudo()
+            .create(
+                {
+                    "name": "nps_summary_export.csv",
+                    "type": "binary",
+                    "datas": base64.b64encode(data),
+                    "mimetype": "text/csv",
+                    "res_model": self._name,
+                    "res_id": self[0].id if len(self) == 1 else 0,
+                }
+            )
+        )
         if hasattr(self, "message_post"):
             for rec in self:
                 rec.message_post(body=_("NPS summary CSV exported."))

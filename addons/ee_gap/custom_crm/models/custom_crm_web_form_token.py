@@ -6,6 +6,7 @@ landing page or chat-bot) to push lead payloads into Odoo. The actual HTTP
 endpoint lives in another module; this model holds the token, partner
 metadata, and the ingestion logic.
 """
+
 from __future__ import annotations
 
 import logging
@@ -73,10 +74,12 @@ class CustomCrmWebFormToken(models.Model):
             "team_id": rec.team_id.id if rec.team_id else False,
         }
         lead = self.env["crm.lead"].sudo().create(lead_vals)
-        rec.sudo().write({
-            "captured_at": fields.Datetime.now(),
-            "use_count": rec.use_count + 1,
-        })
+        rec.sudo().write(
+            {
+                "captured_at": fields.Datetime.now(),
+                "use_count": rec.use_count + 1,
+            }
+        )
         return lead.id
 
     def action_rotate_token(self):

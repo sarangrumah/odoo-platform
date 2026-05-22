@@ -8,7 +8,6 @@ in psycopg, so we rely on the regex-validated input *plus* psycopg's
 
 from __future__ import annotations
 
-import psycopg
 from psycopg import sql
 
 from .db import superuser_connection
@@ -112,6 +111,7 @@ def set_admin_password(db_name: str, login: str, password: str) -> None:
     psycopg parameter binding protects against injection.
     """
     from passlib.hash import pbkdf2_sha512
+
     hashed = pbkdf2_sha512.hash(password)
     with superuser_connection(db=db_name) as conn, conn.cursor() as cur:
         cur.execute(

@@ -65,11 +65,13 @@ class CycleCountLine(models.Model):
         for rec in self:
             rec.status = "approved"
             if rec.variance_qty:
-                self.env["custom.cycle.count.adjustment"].create({
-                    "line_id": rec.id,
-                    "approved_by_id": self.env.user.id,
-                    "approved_at": fields.Datetime.now(),
-                })
+                self.env["custom.cycle.count.adjustment"].create(
+                    {
+                        "line_id": rec.id,
+                        "approved_by_id": self.env.user.id,
+                        "approved_at": fields.Datetime.now(),
+                    }
+                )
 
     def action_reject(self):
         if not self.env.user.has_group("custom_wms_cycle_count.group_cycle_count_supervisor"):

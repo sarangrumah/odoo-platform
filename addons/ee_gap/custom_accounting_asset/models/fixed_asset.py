@@ -82,8 +82,7 @@ class CustomFixedAsset(models.Model):
     declining_factor = fields.Float(
         string="Declining Factor",
         default=2.0,
-        help="Factor applied to the straight-line rate when method = declining "
-             "balance (e.g. 2.0 = double declining).",
+        help="Factor applied to the straight-line rate when method = declining balance (e.g. 2.0 = double declining).",
     )
 
     # ------------------------------------------------------------------
@@ -143,15 +142,20 @@ class CustomFixedAsset(models.Model):
     )
     disposal_date = fields.Date(readonly=True, copy=False)
     disposal_value = fields.Monetary(
-        currency_field="currency_id", readonly=True, copy=False,
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
     )
     disposal_gain_loss = fields.Monetary(
-        currency_field="currency_id", readonly=True, copy=False,
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
     )
     disposal_move_id = fields.Many2one(
         comodel_name="account.move",
         string="Disposal Journal Entry",
-        readonly=True, copy=False,
+        readonly=True,
+        copy=False,
     )
 
     _sql_constraints = [
@@ -169,32 +173,36 @@ class CustomFixedAsset(models.Model):
     def _check_useful_life(self):
         for asset in self:
             if asset.depreciation_method != "none" and asset.useful_life_months < 1:
-                raise ValidationError(_(
-                    "Asset \"%(name)s\": useful life must be at least 1 month.",
-                    name=asset.name,
-                ))
+                raise ValidationError(
+                    _(
+                        'Asset "%(name)s": useful life must be at least 1 month.',
+                        name=asset.name,
+                    )
+                )
 
     @api.constrains("salvage_value", "acquisition_value")
     def _check_salvage(self):
         for asset in self:
             if asset.salvage_value < 0:
-                raise ValidationError(_(
-                    "Asset \"%(name)s\": salvage value cannot be negative.",
-                    name=asset.name,
-                ))
+                raise ValidationError(
+                    _(
+                        'Asset "%(name)s": salvage value cannot be negative.',
+                        name=asset.name,
+                    )
+                )
             if asset.salvage_value > asset.acquisition_value:
-                raise ValidationError(_(
-                    "Asset \"%(name)s\": salvage value cannot exceed acquisition value.",
-                    name=asset.name,
-                ))
+                raise ValidationError(
+                    _(
+                        'Asset "%(name)s": salvage value cannot exceed acquisition value.',
+                        name=asset.name,
+                    )
+                )
 
     @api.constrains("declining_factor", "depreciation_method")
     def _check_declining_factor(self):
         for asset in self:
             if asset.depreciation_method == "declining" and asset.declining_factor <= 0:
-                raise ValidationError(_(
-                    "Declining factor must be strictly positive."
-                ))
+                raise ValidationError(_("Declining factor must be strictly positive."))
 
     # ------------------------------------------------------------------
     # On-change: pull defaults from group
@@ -253,18 +261,13 @@ class CustomFixedAsset(models.Model):
 
         # Drop unposted lines so we can rebuild from current parameters.
         self.depreciation_line_ids.filtered(lambda l: not l.posted).unlink()
-        posted_amount = sum(
-            self.depreciation_line_ids.filtered("posted").mapped("amount")
-        )
+        posted_amount = sum(self.depreciation_line_ids.filtered("posted").mapped("amount"))
         remaining = max(0.0, base - posted_amount)
         if remaining <= 0:
             return
 
         start = self.acquisition_date or fields.Date.context_today(self)
-        first_seq = (
-            max(self.depreciation_line_ids.mapped("sequence")) + 1
-            if self.depreciation_line_ids else 1
-        )
+        first_seq = max(self.depreciation_line_ids.mapped("sequence")) + 1 if self.depreciation_line_ids else 1
         months_left = months - len(self.depreciation_line_ids.filtered("posted"))
         if months_left <= 0:
             return
@@ -281,12 +284,14 @@ class CustomFixedAsset(models.Model):
                 else:
                     amount = monthly
                     running += amount
-                vals_list.append({
-                    "asset_id": self.id,
-                    "sequence": first_seq + i,
-                    "date": line_date,
-                    "amount": amount,
-                })
+                vals_list.append(
+                    {
+                        "asset_id": self.id,
+                        "sequence": first_seq + i,
+                        "date": line_date,
+                        "amount": amount,
+                    }
+                )
         elif self.depreciation_method == "declining":
             # Declining balance: each month depreciate (factor / total_months)
             # of the remaining NBV. Switch to straight-line on the residual in
@@ -304,12 +309,14 @@ class CustomFixedAsset(models.Model):
                         amount = round(remaining - running, 2)
                     nbv -= amount
                     running += amount
-                vals_list.append({
-                    "asset_id": self.id,
-                    "sequence": first_seq + i,
-                    "date": line_date,
-                    "amount": amount,
-                })
+                vals_list.append(
+                    {
+                        "asset_id": self.id,
+                        "sequence": first_seq + i,
+                        "date": line_date,
+                        "amount": amount,
+                    }
+                )
 
         if vals_list:
             self.env["custom.fixed.asset.depreciation.line"].create(vals_list)
@@ -323,38 +330,48 @@ class CustomFixedAsset(models.Model):
                 raise UserError(_("Only draft assets can be confirmed."))
             if asset.depreciation_method != "none":
                 if not asset.expense_account_id or not asset.depreciation_account_id:
-                    raise UserError(_(
-                        "Asset \"%(name)s\": depreciation expense and accumulated "
-                        "depreciation accounts must be set before confirming.",
-                        name=asset.name,
-                    ))
+                    raise UserError(
+                        _(
+                            'Asset "%(name)s": depreciation expense and accumulated '
+                            "depreciation accounts must be set before confirming.",
+                            name=asset.name,
+                        )
+                    )
                 if not asset.journal_id:
-                    raise UserError(_(
-                        "Asset \"%(name)s\": depreciation journal must be set.",
-                        name=asset.name,
-                    ))
+                    raise UserError(
+                        _(
+                            'Asset "%(name)s": depreciation journal must be set.',
+                            name=asset.name,
+                        )
+                    )
                 asset._build_schedule()
             asset.state = "running"
 
     def action_cancel(self):
         for asset in self:
             if asset.depreciation_line_ids.filtered("posted"):
-                raise UserError(_(
-                    "Cannot cancel asset \"%(name)s\": depreciation entries have "
-                    "already been posted. Reverse them first.",
-                    name=asset.name,
-                ))
-        self.filtered(lambda a: a.state in ("draft", "running")).write({
-            "state": "cancelled",
-        })
+                raise UserError(
+                    _(
+                        'Cannot cancel asset "%(name)s": depreciation entries have '
+                        "already been posted. Reverse them first.",
+                        name=asset.name,
+                    )
+                )
+        self.filtered(lambda a: a.state in ("draft", "running")).write(
+            {
+                "state": "cancelled",
+            }
+        )
 
     def action_reset_draft(self):
         for asset in self:
             if asset.depreciation_line_ids.filtered("posted"):
-                raise UserError(_(
-                    "Asset \"%(name)s\" has posted depreciation; cannot reset.",
-                    name=asset.name,
-                ))
+                raise UserError(
+                    _(
+                        'Asset "%(name)s" has posted depreciation; cannot reset.',
+                        name=asset.name,
+                    )
+                )
         self.depreciation_line_ids.unlink()
         self.write({"state": "draft"})
 
@@ -384,31 +401,34 @@ class CustomFixedAsset(models.Model):
         for asset in self:
             if asset.state != "running":
                 continue
-            due = asset.depreciation_line_ids.filtered(
-                lambda l: not l.posted and l.date <= as_of
-            ).sorted("date")
+            due = asset.depreciation_line_ids.filtered(lambda l: not l.posted and l.date <= as_of).sorted("date")
             for line in due:
                 move_vals = {
                     "date": line.date,
                     "journal_id": asset.journal_id.id,
                     "company_id": asset.company_id.id,
-                    "ref": _("Depreciation %(code)s #%(seq)s",
-                             code=asset.code, seq=line.sequence),
+                    "ref": _("Depreciation %(code)s #%(seq)s", code=asset.code, seq=line.sequence),
                     "line_ids": [
-                        (0, 0, {
-                            "name": _("Depreciation %(name)s",
-                                      name=asset.name),
-                            "account_id": asset.expense_account_id.id,
-                            "debit": line.amount,
-                            "credit": 0.0,
-                        }),
-                        (0, 0, {
-                            "name": _("Accum. depreciation %(name)s",
-                                      name=asset.name),
-                            "account_id": asset.depreciation_account_id.id,
-                            "debit": 0.0,
-                            "credit": line.amount,
-                        }),
+                        (
+                            0,
+                            0,
+                            {
+                                "name": _("Depreciation %(name)s", name=asset.name),
+                                "account_id": asset.expense_account_id.id,
+                                "debit": line.amount,
+                                "credit": 0.0,
+                            },
+                        ),
+                        (
+                            0,
+                            0,
+                            {
+                                "name": _("Accum. depreciation %(name)s", name=asset.name),
+                                "account_id": asset.depreciation_account_id.id,
+                                "debit": 0.0,
+                                "credit": line.amount,
+                            },
+                        ),
                     ],
                 }
                 move = AccountMove.create(move_vals)

@@ -14,7 +14,7 @@ from starlette.responses import Response
 
 from .config import get_settings
 from .routers import anomaly, chat, classify, embed, nlq, predict, workflow
-from .security import HMACMiddleware, RateLimitMiddleware
+from .security import HMACMiddleware
 
 
 def _configure_logging(level: str) -> None:

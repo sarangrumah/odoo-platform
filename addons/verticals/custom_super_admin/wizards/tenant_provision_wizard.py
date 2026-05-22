@@ -18,8 +18,8 @@ class TenantProvisionWizard(models.TransientModel):
     slug = fields.Char(
         required=True,
         help="Lowercase identifier 2-63 chars (letters/digits/underscore, "
-             "must start with a letter). Will also be the DB name and the "
-             "subdomain (e.g. acme → acme.platform.localhost).",
+        "must start with a letter). Will also be the DB name and the "
+        "subdomain (e.g. acme → acme.platform.localhost).",
     )
     display_name = fields.Char(required=True)
     plan_tier = fields.Selection(
@@ -29,12 +29,8 @@ class TenantProvisionWizard(models.TransientModel):
     )
     contact_email = fields.Char()
     contact_phone = fields.Char()
-    csm_user_id = fields.Many2one(
-        "res.users", string="CSM", default=lambda self: self.env.user
-    )
-    backup_schedule_cron = fields.Char(
-        default="0 2 * * *", help="Standard 5-field cron expression."
-    )
+    csm_user_id = fields.Many2one("res.users", string="CSM", default=lambda self: self.env.user)
+    backup_schedule_cron = fields.Char(default="0 2 * * *", help="Standard 5-field cron expression.")
     feature_pajakku = fields.Boolean(string="Enable Pajakku Coretax adapter", default=False)
     feature_marketplace = fields.Boolean(string="Enable marketplace vertical", default=False)
     install_modules_extra = fields.Char(
@@ -52,8 +48,8 @@ class TenantProvisionWizard(models.TransientModel):
         for rec in self:
             if rec.slug and not SLUG_RE.match(rec.slug):
                 raise ValidationError(
-                    _("Slug must match %s (lowercase letters/digits/underscore, "
-                      "start with a letter, length 2-63).") % SLUG_RE.pattern
+                    _("Slug must match %s (lowercase letters/digits/underscore, start with a letter, length 2-63).")
+                    % SLUG_RE.pattern
                 )
 
     def action_provision(self):
@@ -84,9 +80,7 @@ class TenantProvisionWizard(models.TransientModel):
                 "custom_pdp_retention",
                 "custom_coretax",
             ]
-            payload["install_modules"] = from_defaults + [
-                m.strip() for m in extra.split(",") if m.strip()
-            ]
+            payload["install_modules"] = from_defaults + [m.strip() for m in extra.split(",") if m.strip()]
 
         client = self.env["custom.super.admin.orchestrator.client"].sudo()
         try:
@@ -95,11 +89,13 @@ class TenantProvisionWizard(models.TransientModel):
             raise UserError(_("Provision failed: %s") % e) from e
 
         # Mirror result back so ops can capture credentials ONCE
-        self.write({
-            "admin_password": result.get("admin_password"),
-            "fernet_key_dek": result.get("fernet_key_dek"),
-            "run_done": True,
-        })
+        self.write(
+            {
+                "admin_password": result.get("admin_password"),
+                "fernet_key_dek": result.get("fernet_key_dek"),
+                "run_done": True,
+            }
+        )
 
         # Trigger immediate sync so the new tenant appears in the list
         self.env["tenant.registry"].sudo()._cron_sync_from_orchestrator()

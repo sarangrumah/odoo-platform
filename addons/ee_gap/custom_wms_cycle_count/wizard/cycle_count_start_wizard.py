@@ -38,9 +38,7 @@ class CycleCountStartWizard(models.TransientModel):
         if method == "abc_velocity":
             quants = quants.sorted(
                 key=lambda q: (
-                    {"A": 0, "B": 1, "C": 2}.get(
-                        getattr(q.product_id, "abc_class", "B") or "B", 1
-                    ),
+                    {"A": 0, "B": 1, "C": 2}.get(getattr(q.product_id, "abc_class", "B") or "B", 1),
                     -(q.quantity or 0.0),
                 )
             )
@@ -52,9 +50,7 @@ class CycleCountStartWizard(models.TransientModel):
             # Already scoped; just trim.
             quants = quants[:limit]
         elif method == "by_value":
-            quants = quants.sorted(
-                key=lambda q: -((q.product_id.standard_price or 0.0) * (q.quantity or 0.0))
-            )[:limit]
+            quants = quants.sorted(key=lambda q: -((q.product_id.standard_price or 0.0) * (q.quantity or 0.0)))[:limit]
         elif method == "last_counted":
             # Sort by last counted ascending; quants without history come first.
             Line = self.env["custom.cycle.count.line"]
@@ -68,20 +64,25 @@ class CycleCountStartWizard(models.TransientModel):
                 key = (h["product_id"][0], h["location_id"][0])
                 last_map.setdefault(key, h["counted_at"])
             quants = quants.sorted(
-                key=lambda q: last_map.get((q.product_id.id, q.location_id.id)) or fields.Datetime.from_string("1970-01-01 00:00:00")
+                key=lambda q: (
+                    last_map.get((q.product_id.id, q.location_id.id))
+                    or fields.Datetime.from_string("1970-01-01 00:00:00")
+                )
             )[:limit]
         else:
             quants = quants[:limit]
 
         vals_list = []
         for seq, q in enumerate(quants, start=1):
-            vals_list.append({
-                "sequence": seq * 10,
-                "location_id": q.location_id.id,
-                "product_id": q.product_id.id,
-                "lot_id": q.lot_id.id if q.lot_id else False,
-                "expected_qty": q.quantity or 0.0,
-            })
+            vals_list.append(
+                {
+                    "sequence": seq * 10,
+                    "location_id": q.location_id.id,
+                    "product_id": q.product_id.id,
+                    "lot_id": q.lot_id.id if q.lot_id else False,
+                    "expected_qty": q.quantity or 0.0,
+                }
+            )
         return vals_list
 
     def action_start(self):
@@ -91,12 +92,14 @@ class CycleCountStartWizard(models.TransientModel):
             raise UserError(_("Plan is required."))
         limit = self.target_count or plan.target_count_per_period or 50
         Session = self.env["custom.cycle.count.session"]
-        session = Session.create({
-            "plan_id": plan.id,
-            "scheduled_date": self.scheduled_date or fields.Date.context_today(self),
-            "assigned_user_ids": [(6, 0, self.user_ids.ids)],
-            "company_id": plan.company_id.id,
-        })
+        session = Session.create(
+            {
+                "plan_id": plan.id,
+                "scheduled_date": self.scheduled_date or fields.Date.context_today(self),
+                "assigned_user_ids": [(6, 0, self.user_ids.ids)],
+                "company_id": plan.company_id.id,
+            }
+        )
         seed = self._build_seed_lines(plan, limit)
         for v in seed:
             v["session_id"] = session.id

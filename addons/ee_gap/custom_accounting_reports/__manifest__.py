@@ -2,8 +2,8 @@
 {
     "name": "Custom Accounting Reports",
     "summary": "Production-grade financial reports engine (P&L, BS, GL, "
-               "TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank "
-               "Book, Journal Audit) for the Custom Platform.",
+    "TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank "
+    "Book, Journal Audit) for the Custom Platform.",
     "description": """
 Custom Accounting Reports
 =========================

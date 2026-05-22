@@ -12,37 +12,47 @@ class TestChatbotStep(TransactionCase):
         super().setUpClass()
         cls.Script = cls.env["custom.livechat.chatbot.script"]
         cls.Step = cls.env["custom.livechat.chatbot.step"]
-        cls.script = cls.Script.create({
-            "name": "Welcome Bot",
-            "is_active": True,
-        })
+        cls.script = cls.Script.create(
+            {
+                "name": "Welcome Bot",
+                "is_active": True,
+            }
+        )
         # Sequence: greet -> question -> end
-        cls.step_greet = cls.Step.create({
-            "script_id": cls.script.id,
-            "sequence": 10,
-            "step_type": "text",
-            "message": "Hi! Welcome.",
-        })
-        cls.step_question = cls.Step.create({
-            "script_id": cls.script.id,
-            "sequence": 20,
-            "step_type": "question",
-            "message": "Are you here for billing?",
-            "expected_answers": "yes|y, billing",
-        })
-        cls.step_end_no = cls.Step.create({
-            "script_id": cls.script.id,
-            "sequence": 30,
-            "step_type": "end",
-            "message": "OK, have a great day!",
-        })
+        cls.step_greet = cls.Step.create(
+            {
+                "script_id": cls.script.id,
+                "sequence": 10,
+                "step_type": "text",
+                "message": "Hi! Welcome.",
+            }
+        )
+        cls.step_question = cls.Step.create(
+            {
+                "script_id": cls.script.id,
+                "sequence": 20,
+                "step_type": "question",
+                "message": "Are you here for billing?",
+                "expected_answers": "yes|y, billing",
+            }
+        )
+        cls.step_end_no = cls.Step.create(
+            {
+                "script_id": cls.script.id,
+                "sequence": 30,
+                "step_type": "end",
+                "message": "OK, have a great day!",
+            }
+        )
         # Default fallback for the question (used when no expected match)
-        cls.step_fallback = cls.Step.create({
-            "script_id": cls.script.id,
-            "sequence": 100,
-            "step_type": "forward_to_operator",
-            "message": "Let me hand you to a human.",
-        })
+        cls.step_fallback = cls.Step.create(
+            {
+                "script_id": cls.script.id,
+                "sequence": 100,
+                "step_type": "forward_to_operator",
+                "message": "Let me hand you to a human.",
+            }
+        )
         cls.step_question.next_step_default = cls.step_fallback.id
 
     def test_first_step(self):
@@ -75,13 +85,15 @@ class TestChatbotStep(TransactionCase):
         self.assertFalse(result["found"])
 
     def test_bad_regex_falls_back_to_substring(self):
-        bad = self.Step.create({
-            "script_id": self.script.id,
-            "sequence": 5,
-            "step_type": "question",
-            "message": "Pick a topic.",
-            "expected_answers": "[invalid(regex, hello",
-        })
+        bad = self.Step.create(
+            {
+                "script_id": self.script.id,
+                "sequence": 5,
+                "step_type": "question",
+                "message": "Pick a topic.",
+                "expected_answers": "[invalid(regex, hello",
+            }
+        )
         self.assertTrue(bad._match_user_message("say hello world"))
         self.assertFalse(bad._match_user_message("goodbye"))
 

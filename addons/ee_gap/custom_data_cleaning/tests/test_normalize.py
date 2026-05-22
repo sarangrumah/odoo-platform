@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for the normalization helpers."""
+
 from odoo.tests.common import TransactionCase, tagged
 
 from ..models.custom_dedup_rule import (
@@ -11,7 +12,6 @@ from ..models.custom_dedup_rule import (
 
 @tagged("post_install", "-at_install", "custom_data_cleaning")
 class TestNormalizeHelpers(TransactionCase):
-
     def test_normalize_phone_helper(self):
         # All four input forms collapse to the same canonical output
         self.assertEqual(_normalize_phone_id("081234567890"), "+6281234567890")

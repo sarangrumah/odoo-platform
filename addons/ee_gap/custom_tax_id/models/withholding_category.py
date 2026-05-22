@@ -30,12 +30,11 @@ class WithholdingCategory(models.Model):
     )
     legal_basis = fields.Char(help="e.g. Pasal 23 UU PPh, PMK 141/2015")
     bupot_object_code = fields.Char(
-        help="Kode objek pajak as referenced by Coretax e-Bupot XML. "
-             "See PER-04/PJ/2023 attachment."
+        help="Kode objek pajak as referenced by Coretax e-Bupot XML. See PER-04/PJ/2023 attachment."
     )
     active = fields.Boolean(default=True)
 
     _code_uniq = models.Constraint(
-        'unique(code)',
-        'Withholding category code must be unique.',
+        "unique(code)",
+        "Withholding category code must be unique.",
     )

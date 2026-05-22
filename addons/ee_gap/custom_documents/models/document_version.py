@@ -16,8 +16,8 @@ class DocumentVersion(models.Model):
     uploaded_at = fields.Datetime(default=fields.Datetime.now, required=True)
 
     _uniq_document_version = models.Constraint(
-        'unique(document_id, version)',
-        'Version number must be unique per document.',
+        "unique(document_id, version)",
+        "Version number must be unique per document.",
     )
 
     def write(self, vals):

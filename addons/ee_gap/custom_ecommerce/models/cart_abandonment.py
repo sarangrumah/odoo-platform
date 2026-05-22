@@ -124,24 +124,26 @@ class CartAbandonment(models.Model):
         drafts = SaleOrder.search(domain)
         sent = 0
         for order in drafts:
-            record = self.sudo().search(
-                [("sale_order_id", "=", order.id)], limit=1
-            )
+            record = self.sudo().search([("sale_order_id", "=", order.id)], limit=1)
             if not record:
-                record = self.sudo().create({
-                    "cart_partner_id": order.partner_id.id,
-                    "sale_order_id": order.id,
-                    "cart_amount": order.amount_total,
-                    "abandoned_at": fields.Datetime.now(),
-                })
+                record = self.sudo().create(
+                    {
+                        "cart_partner_id": order.partner_id.id,
+                        "sale_order_id": order.id,
+                        "cart_amount": order.amount_total,
+                        "abandoned_at": fields.Datetime.now(),
+                    }
+                )
             if record.reminder_sent:
                 continue
             channel = record._dispatch_reminder()
-            record.write({
-                "reminder_sent": channel != "none",
-                "reminder_sent_at": fields.Datetime.now(),
-                "reminder_channel": channel,
-            })
+            record.write(
+                {
+                    "reminder_sent": channel != "none",
+                    "reminder_sent_at": fields.Datetime.now(),
+                    "reminder_channel": channel,
+                }
+            )
             if channel != "none":
                 sent += 1
         return sent
@@ -184,11 +186,15 @@ class CartAbandonment(models.Model):
         )
         if not marketing_purpose:
             return False
-        return bool(Consent.sudo().search_count([
-            ("partner_id", "=", partner.id),
-            ("purpose_id", "=", marketing_purpose.id),
-            ("state", "=", "granted"),
-        ]))
+        return bool(
+            Consent.sudo().search_count(
+                [
+                    ("partner_id", "=", partner.id),
+                    ("purpose_id", "=", marketing_purpose.id),
+                    ("state", "=", "granted"),
+                ]
+            )
+        )
 
     def _send_email_reminder(self):
         self.ensure_one()
@@ -210,7 +216,6 @@ class CartAbandonment(models.Model):
         # Real send is module-private; we just message_post a marker so
         # the audit trail captures the dispatch intent.
         self.message_post(
-            body=_(
-                "WhatsApp cart-abandonment reminder dispatched to %s for cart %s."
-            ) % (self.cart_partner_id.display_name, self.sale_order_id.name)
+            body=_("WhatsApp cart-abandonment reminder dispatched to %s for cart %s.")
+            % (self.cart_partner_id.display_name, self.sale_order_id.name)
         )

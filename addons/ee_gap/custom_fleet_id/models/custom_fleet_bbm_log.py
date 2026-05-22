@@ -135,6 +135,4 @@ class CustomFleetBbmLog(models.Model):
         for rec in self:
             if rec.vehicle_id and rec.odometer_km:
                 if rec.odometer_km > (rec.vehicle_id.x_current_odometer or 0):
-                    rec.vehicle_id.sudo().write(
-                        {"x_current_odometer": rec.odometer_km}
-                    )
+                    rec.vehicle_id.sudo().write({"x_current_odometer": rec.odometer_km})

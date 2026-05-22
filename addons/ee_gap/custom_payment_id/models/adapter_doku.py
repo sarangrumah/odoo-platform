@@ -45,11 +45,7 @@ class DokuAdapter(models.AbstractModel):
     # -------- Base adapter overrides --------
 
     def _base_url(self, provider) -> str:
-        return (
-            "https://api-sandbox.doku.com"
-            if provider.x_id_sandbox
-            else "https://api.doku.com"
-        )
+        return "https://api-sandbox.doku.com" if provider.x_id_sandbox else "https://api.doku.com"
 
     def _endpoint(self, provider, payload: dict) -> str:
         kind = payload.get("_kind") or "checkout"
@@ -63,9 +59,7 @@ class DokuAdapter(models.AbstractModel):
         client_id = (provider.x_id_client_key or "").strip()
         secret = (provider.x_id_server_key or "").strip()
         if not client_id or not secret:
-            raise UserError(
-                _("DOKU Client-Id and Secret Key must both be configured.")
-            )
+            raise UserError(_("DOKU Client-Id and Secret Key must both be configured."))
         request_id = uuid.uuid4().hex
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         # We don't know the resolved endpoint from inside _auth_headers
@@ -149,23 +143,15 @@ class DokuAdapter(models.AbstractModel):
         payload = self._build_checkout_payload(provider, transaction)
         # Set context so _auth_headers can compute the correct path.
         path = self._endpoint(provider, payload)
-        result = self.with_context(doku_request_path=path).send(
-            provider, payload, transaction=transaction
-        )
+        result = self.with_context(doku_request_path=path).send(provider, payload, transaction=transaction)
         if not result["ok"]:
             # Mock-mode fallback only when no sandbox creds are provisioned
             # (the auth header path would have raised). If we get here
             # with a real network error, surface it.
-            raise UserError(
-                _("DOKU checkout create failed (HTTP %s): %s")
-                % (result["http_status"], result["body"])
-            )
+            raise UserError(_("DOKU checkout create failed (HTTP %s): %s") % (result["http_status"], result["body"]))
         body = result["body"] if isinstance(result["body"], dict) else {}
         # DOKU response shape: {"response": {"payment": {"url": "..."}}}
-        url = (
-            body.get("response", {}).get("payment", {}).get("url")
-            or body.get("checkout_url")
-        )
+        url = body.get("response", {}).get("payment", {}).get("url") or body.get("checkout_url")
         if not url:
             _logger.warning("DOKU checkout response missing url field: %s", body)
             raise UserError(_("DOKU checkout response missing payment.url: %s") % body)

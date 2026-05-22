@@ -10,7 +10,6 @@ from .common import PayrollIDCommon
 
 @tagged("post_install", "-at_install")
 class TestPayslipCompute(PayrollIDCommon):
-
     def test_ter_method_used_for_non_december(self):
         slip = self._make_slip(self.emp_tk0, 10_000_000, month=6)
         slip.action_compute()
@@ -51,8 +50,10 @@ class TestPayslipCompute(PayrollIDCommon):
             slip.gross_salary
             + (slip.tunjangan_jabatan or 0)
             + (slip.tunjangan_lain or 0)
-            - slip.bpjs_kesehatan_emp - slip.bpjs_jht_emp
-            - slip.bpjs_jp_emp - slip.pph21
+            - slip.bpjs_kesehatan_emp
+            - slip.bpjs_jht_emp
+            - slip.bpjs_jp_emp
+            - slip.pph21
         )
         self.assertAlmostEqual(slip.take_home_pay, expected_thp, places=2)
 

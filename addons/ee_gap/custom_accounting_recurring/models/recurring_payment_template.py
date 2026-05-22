@@ -28,33 +28,42 @@ class RecurringPaymentTemplate(models.Model):
 
     name = fields.Char(required=True, tracking=True)
     code = fields.Char(
-        copy=False, readonly=True, default=lambda self: _("New"),
+        copy=False,
+        readonly=True,
+        default=lambda self: _("New"),
     )
     active = fields.Boolean(default=True)
     company_id = fields.Many2one(
-        "res.company", required=True,
+        "res.company",
+        required=True,
         default=lambda self: self.env.company,
     )
     currency_id = fields.Many2one(
-        "res.currency", required=True,
+        "res.currency",
+        required=True,
         default=lambda self: self.env.company.currency_id,
     )
     partner_id = fields.Many2one(
-        "res.partner", required=True, tracking=True,
+        "res.partner",
+        required=True,
+        tracking=True,
     )
     payment_type = fields.Selection(
         [
             ("inbound", "Receive Money"),
             ("outbound", "Send Money"),
         ],
-        default="outbound", required=True,
+        default="outbound",
+        required=True,
     )
     journal_id = fields.Many2one(
-        "account.journal", required=True,
+        "account.journal",
+        required=True,
         domain="[('company_id', '=', company_id), ('type', 'in', ('bank', 'cash'))]",
     )
     amount = fields.Monetary(
-        required=True, currency_field="currency_id",
+        required=True,
+        currency_field="currency_id",
     )
     period = fields.Selection(
         [
@@ -62,7 +71,8 @@ class RecurringPaymentTemplate(models.Model):
             ("quarterly", "Quarterly"),
             ("yearly", "Yearly"),
         ],
-        default="monthly", required=True,
+        default="monthly",
+        required=True,
     )
     next_date = fields.Date(
         string="Next Run",
@@ -81,30 +91,30 @@ class RecurringPaymentTemplate(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("code") or vals.get("code") == _("New"):
-                vals["code"] = (
-                    self.env["ir.sequence"].next_by_code(
-                        "custom.recurring.journal.template"
-                    ) or _("New")
-                )
+                vals["code"] = self.env["ir.sequence"].next_by_code("custom.recurring.journal.template") or _("New")
         return super().create(vals_list)
 
     @api.constrains("amount")
     def _check_amount(self):
         for tpl in self:
             if tpl.amount <= 0:
-                raise ValidationError(_(
-                    "Recurring payment '%(name)s': amount must be positive.",
-                    name=tpl.name,
-                ))
+                raise ValidationError(
+                    _(
+                        "Recurring payment '%(name)s': amount must be positive.",
+                        name=tpl.name,
+                    )
+                )
 
     @api.constrains("end_date", "next_date")
     def _check_end_date(self):
         for tpl in self:
             if tpl.end_date and tpl.next_date and tpl.end_date < tpl.next_date:
-                raise ValidationError(_(
-                    "Template '%(name)s': end date is before next run date.",
-                    name=tpl.name,
-                ))
+                raise ValidationError(
+                    _(
+                        "Template '%(name)s': end date is before next run date.",
+                        name=tpl.name,
+                    )
+                )
 
     def action_run_now(self):
         for tpl in self:
@@ -113,9 +123,12 @@ class RecurringPaymentTemplate(models.Model):
     def _generate_one(self):
         self.ensure_one()
         if not self.active:
-            raise UserError(_(
-                "Template '%(name)s' is archived.", name=self.name,
-            ))
+            raise UserError(
+                _(
+                    "Template '%(name)s' is archived.",
+                    name=self.name,
+                )
+            )
         partner_type = "customer" if self.payment_type == "inbound" else "supplier"
         payment_vals = {
             "partner_id": self.partner_id.id,
@@ -127,27 +140,27 @@ class RecurringPaymentTemplate(models.Model):
             "memo": self.code or self.name,
             "company_id": self.company_id.id,
         }
-        payment = (
-            self.env["account.payment"]
-            .with_company(self.company_id)
-            .create(payment_vals)
-        )
+        payment = self.env["account.payment"].with_company(self.company_id).create(payment_vals)
         if self.auto_post:
             payment.action_post()
         offset = PERIOD_OFFSETS[self.period]
-        self.write({
-            "last_generated_at": fields.Datetime.now(),
-            "next_date": self.next_date + offset,
-        })
+        self.write(
+            {
+                "last_generated_at": fields.Datetime.now(),
+                "next_date": self.next_date + offset,
+            }
+        )
         return payment
 
     @api.model
     def _cron_generate_due(self):
         today = fields.Date.context_today(self)
-        due = self.search([
-            ("active", "=", True),
-            ("next_date", "<=", today),
-        ])
+        due = self.search(
+            [
+                ("active", "=", True),
+                ("next_date", "<=", today),
+            ]
+        )
         generated = 0
         for tpl in due:
             try:
@@ -158,7 +171,8 @@ class RecurringPaymentTemplate(models.Model):
             except Exception as exc:  # noqa: BLE001 - cron resilience
                 _logger.exception(
                     "custom.recurring.payment.template: failed on %s: %s",
-                    tpl.display_name, exc,
+                    tpl.display_name,
+                    exc,
                 )
                 self.env.cr.rollback()
         return generated

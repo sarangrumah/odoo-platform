@@ -18,6 +18,7 @@ Tuple elements are parsed via ``ast`` so multiline strings and quotes are
 preserved verbatim. The original indentation of ``_sql_constraints`` is reused
 for each emitted assignment.
 """
+
 from __future__ import annotations
 
 import ast
@@ -81,10 +82,7 @@ def migrate_file(path: Path) -> bool:
             msg_src = ast.unparse(msg_node)
             leading = "" if i == 0 else indent
             new_lines.append(
-                f"{leading}_{name} = models.Constraint(\n"
-                f"{indent}    {sql_src},\n"
-                f"{indent}    {msg_src},\n"
-                f"{indent})\n"
+                f"{leading}_{name} = models.Constraint(\n{indent}    {sql_src},\n{indent}    {msg_src},\n{indent})\n"
             )
         new_text = "".join(new_lines)
 

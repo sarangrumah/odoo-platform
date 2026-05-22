@@ -10,7 +10,6 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "custom_pph_witholding")
 class TestWitholdingEngine(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -26,12 +25,8 @@ class TestWitholdingEngine(TransactionCase):
                 "effective_date_from": "2024-01-01",
             }
         )
-        cls.partner_npwp = cls.Partner.create(
-            {"name": "PT With NPWP", "vat": "0123456789012345"}
-        )
-        cls.partner_no_npwp = cls.Partner.create(
-            {"name": "Mr. No NPWP", "vat": False}
-        )
+        cls.partner_npwp = cls.Partner.create({"name": "PT With NPWP", "vat": "0123456789012345"})
+        cls.partner_no_npwp = cls.Partner.create({"name": "Mr. No NPWP", "vat": False})
 
     def test_01_with_npwp_uses_lower_rate(self):
         result = self.Engine.compute(
@@ -92,9 +87,7 @@ class TestWitholdingEngine(TransactionCase):
             service_category="general",
             state="applied",
         )
-        application = self.env["custom.witholding.application"].browse(
-            result["application_id"]
-        )
+        application = self.env["custom.witholding.application"].browse(result["application_id"])
         self.assertTrue(application.exists())
         self.assertEqual(application.withheld, 100_000)
         self.assertEqual(application.state, "applied")

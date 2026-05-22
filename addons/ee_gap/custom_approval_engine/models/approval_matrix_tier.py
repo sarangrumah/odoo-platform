@@ -74,8 +74,9 @@ class ApprovalMatrixTier(models.Model):
 
     notify_on_overdue = fields.Boolean(default=True)
 
-    @api.constrains("approver_type", "approver_ids", "approver_group_id", "approver_domain",
-                    "on_overdue", "escalation_user_id")
+    @api.constrains(
+        "approver_type", "approver_ids", "approver_group_id", "approver_domain", "on_overdue", "escalation_user_id"
+    )
     def _check_config(self):
         for rec in self:
             if rec.approver_type == "user" and not rec.approver_ids:
@@ -89,13 +90,10 @@ class ApprovalMatrixTier(models.Model):
                         raise ValueError("Domain must be a list literal")
                 except (SyntaxError, ValueError) as e:
                     raise ValidationError(
-                        _("Tier '%(name)s': invalid approver domain: %(err)s",
-                          name=rec.name, err=e)
+                        _("Tier '%(name)s': invalid approver domain: %(err)s", name=rec.name, err=e)
                     ) from e
             if rec.on_overdue == "escalate_to_user" and not rec.escalation_user_id:
-                raise ValidationError(
-                    _("Tier '%s': fallback user required for escalate-to-user.") % rec.name
-                )
+                raise ValidationError(_("Tier '%s': fallback user required for escalate-to-user.") % rec.name)
 
     @api.constrains("sla_hours")
     def _check_sla(self):
@@ -115,9 +113,7 @@ class ApprovalMatrixTier(models.Model):
             return self.approver_group_id.users.filtered(lambda u: not u.share)
         if self.approver_type == "manager_of_creator":
             creator = getattr(record, "create_uid", False) or self.env.user
-            employee = self.env["hr.employee"].sudo().search(
-                [("user_id", "=", creator.id)], limit=1
-            )
+            employee = self.env["hr.employee"].sudo().search([("user_id", "=", creator.id)], limit=1)
             mgr = employee.parent_id.user_id if employee and employee.parent_id else False
             return mgr or Users.browse()
         if self.approver_type == "domain":

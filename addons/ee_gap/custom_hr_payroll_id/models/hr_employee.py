@@ -26,16 +26,14 @@ class HrEmployee(models.Model):
     x_custom_npwp = fields.Char(string="NPWP", size=20)
     x_custom_nik = fields.Char(string="NIK", size=20)
     x_custom_kk_no = fields.Char(string="KK Number", size=20)
-    x_custom_ptkp_status = fields.Selection(
-        PTKP_STATUS, string="PTKP Status", default="TK/0"
-    )
+    x_custom_ptkp_status = fields.Selection(PTKP_STATUS, string="PTKP Status", default="TK/0")
     x_custom_ter_category = fields.Selection(
         [("A", "Kategori A"), ("B", "Kategori B"), ("C", "Kategori C")],
         string="TER Category",
         compute="_compute_ter_category",
         store=True,
         help="Auto-derived from PTKP Status per PP 58/2023. "
-             "A = TK/0, TK/1, K/0; B = TK/2, TK/3, K/1, K/2; C = K/3, K/I/*.",
+        "A = TK/0, TK/1, K/0; B = TK/2, TK/3, K/1, K/2; C = K/3, K/I/*.",
     )
     x_custom_employment_type = fields.Selection(
         [
@@ -55,10 +53,9 @@ class HrEmployee(models.Model):
     @api.depends("x_custom_ptkp_status")
     def _compute_ter_category(self):
         from .hr_payroll_ter import PTKP_TO_TER_CATEGORY
+
         for rec in self:
-            rec.x_custom_ter_category = PTKP_TO_TER_CATEGORY.get(
-                rec.x_custom_ptkp_status or "TK/0", "A"
-            )
+            rec.x_custom_ter_category = PTKP_TO_TER_CATEGORY.get(rec.x_custom_ptkp_status or "TK/0", "A")
 
     @api.constrains("x_custom_nik")
     def _check_nik(self):

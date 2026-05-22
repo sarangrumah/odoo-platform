@@ -10,7 +10,8 @@ from . import account_payment
 # raises TypeError at registry load. Only import when hr_payroll is present.
 try:
     import odoo.modules.module
-    if 'hr_payroll' in odoo.modules.module.get_modules():
+
+    if "hr_payroll" in odoo.modules.module.get_modules():
         from . import hr_payslip  # noqa: F401
 except Exception:
     pass

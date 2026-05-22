@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -44,10 +44,12 @@ class HrPayslipBatchWizard(models.TransientModel):
         Employee = self.env["hr.employee"].sudo()
         Payslip = self.env["hr.payslip"].sudo()
 
-        employees = self.employee_ids or Employee.search([
-            ("active", "=", True),
-            ("company_id", "=", self.env.company.id),
-        ])
+        employees = self.employee_ids or Employee.search(
+            [
+                ("active", "=", True),
+                ("company_id", "=", self.env.company.id),
+            ]
+        )
         if not employees:
             raise UserError(_("No employees in scope."))
 
@@ -66,21 +68,23 @@ class HrPayslipBatchWizard(models.TransientModel):
                 if self.skip_if_exists:
                     skipped += 1
                     continue
-                raise UserError(_(
-                    "Payslip already exists for %s in %s-%s. "
-                    "Tick 'Skip if exists' to ignore."
-                ) % (emp.name, self.period_year, self.period_month))
+                raise UserError(
+                    _("Payslip already exists for %s in %s-%s. Tick 'Skip if exists' to ignore.")
+                    % (emp.name, self.period_year, self.period_month)
+                )
 
             try:
                 # Take gross_salary from employee record (operator pre-fills this on
                 # hr.employee; for production setups this comes from contract).
-                slip = Payslip.create({
-                    "employee_id": emp.id,
-                    "period_year": self.period_year,
-                    "period_month": self.period_month,
-                    "is_thr": self.is_thr,
-                    "gross_salary": getattr(emp, "x_custom_gaji_pokok", 0.0) or 0.0,
-                })
+                slip = Payslip.create(
+                    {
+                        "employee_id": emp.id,
+                        "period_year": self.period_year,
+                        "period_month": self.period_month,
+                        "is_thr": self.is_thr,
+                        "gross_salary": getattr(emp, "x_custom_gaji_pokok", 0.0) or 0.0,
+                    }
+                )
                 slip.action_compute()
                 if self.auto_approve:
                     slip.action_approve()
@@ -95,14 +99,18 @@ class HrPayslipBatchWizard(models.TransientModel):
             f"<p>{skipped} skipped (already existed).</p>",
         ]
         if errors:
-            parts.append(f'<div class="alert alert-danger"><b>{len(errors)} errors:</b><ul>'
-                         + "".join(f"<li>{e}</li>" for e in errors)
-                         + "</ul></div>")
-        self.write({
-            "run_done": True,
-            "payslip_ids": [(6, 0, created.ids)],
-            "summary": "".join(parts),
-        })
+            parts.append(
+                f'<div class="alert alert-danger"><b>{len(errors)} errors:</b><ul>'
+                + "".join(f"<li>{e}</li>" for e in errors)
+                + "</ul></div>"
+            )
+        self.write(
+            {
+                "run_done": True,
+                "payslip_ids": [(6, 0, created.ids)],
+                "summary": "".join(parts),
+            }
+        )
         return {
             "type": "ir.actions.act_window",
             "res_model": self._name,

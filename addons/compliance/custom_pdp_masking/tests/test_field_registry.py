@@ -8,7 +8,6 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "custom_pdp_masking")
 class TestFieldRegistry(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -74,6 +73,7 @@ class TestFieldRegistry(TransactionCase):
 
     def test_04_field_existence_validation(self):
         from odoo.exceptions import ValidationError
+
         partner_model = self.env.ref("base.model_res_partner")
         with self.assertRaises(ValidationError):
             self.Registry.create(

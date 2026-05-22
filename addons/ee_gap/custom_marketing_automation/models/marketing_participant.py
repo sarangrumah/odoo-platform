@@ -25,8 +25,8 @@ class MarketingParticipant(models.Model):
     completed_at = fields.Datetime(readonly=True)
 
     _unique_campaign_partner = models.Constraint(
-        'unique(campaign_id, partner_id)',
-        'Partner already in this campaign.',
+        "unique(campaign_id, partner_id)",
+        "Partner already in this campaign.",
     )
 
     def _pdp_audit_classification(self):
@@ -43,13 +43,16 @@ class MarketingParticipant(models.Model):
         if step.kind == "email" and step.mail_template_id:
             step.mail_template_id.sudo().send_mail(self.partner_id.id, force_send=False)
             self._pdp_audit_write(
-                "marketing_email_sent", self.id,
+                "marketing_email_sent",
+                self.id,
                 {"campaign": self.campaign_id.name, "step": step.name},
             )
         elif step.kind == "tag" and step.partner_category_id:
-            self.partner_id.sudo().write({
-                "category_id": [(4, step.partner_category_id.id)],
-            })
+            self.partner_id.sudo().write(
+                {
+                    "category_id": [(4, step.partner_category_id.id)],
+                }
+            )
         # 'wait' = no-op; the next_action_at increment handles the pause
 
         # Advance pointer
@@ -60,20 +63,23 @@ class MarketingParticipant(models.Model):
             return
         next_step = siblings[idx + 1]
         delay_hours = next_step.wait_hours if next_step.kind == "wait" else 1.0
-        self.write({
-            "current_step_id": next_step.id,
-            "next_action_at": fields.Datetime.now() + timedelta(hours=delay_hours),
-        })
+        self.write(
+            {
+                "current_step_id": next_step.id,
+                "next_action_at": fields.Datetime.now() + timedelta(hours=delay_hours),
+            }
+        )
 
     def _complete(self):
-        self.write({
-            "state": "completed",
-            "completed_at": fields.Datetime.now(),
-            "current_step_id": False,
-        })
+        self.write(
+            {
+                "state": "completed",
+                "completed_at": fields.Datetime.now(),
+                "current_step_id": False,
+            }
+        )
 
     def action_opt_out(self):
         for rec in self:
             rec.write({"state": "opted_out"})
-            rec._pdp_audit_write("marketing_opt_out", rec.id,
-                                 {"campaign": rec.campaign_id.name})
+            rec._pdp_audit_write("marketing_opt_out", rec.id, {"campaign": rec.campaign_id.name})

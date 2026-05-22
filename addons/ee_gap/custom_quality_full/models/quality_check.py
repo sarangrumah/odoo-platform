@@ -26,14 +26,24 @@ class QualityCheck(models.Model):
     alert_id = fields.Many2one("quality.alert", readonly=True, copy=False)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
     inspection_line_ids = fields.One2many(
-        "custom.quality.inspection.line", "check_id", string="Inspection Lines",
+        "custom.quality.inspection.line",
+        "check_id",
+        string="Inspection Lines",
     )
     signature_ids = fields.One2many(
-        "custom.quality.signature", "check_id", string="Signatures",
+        "custom.quality.signature",
+        "check_id",
+        string="Signatures",
     )
-    overall_result = fields.Selection([
-        ("pass", "Pass"), ("fail", "Fail"), ("na", "N/A"),
-    ], compute="_compute_overall_result", store=True)
+    overall_result = fields.Selection(
+        [
+            ("pass", "Pass"),
+            ("fail", "Fail"),
+            ("na", "N/A"),
+        ],
+        compute="_compute_overall_result",
+        store=True,
+    )
 
     @api.depends("inspection_line_ids.pass_fail", "inspection_line_ids.is_required")
     def _compute_overall_result(self):
@@ -69,12 +79,17 @@ class QualityCheck(models.Model):
         for rec in self:
             if rec.check_kind == "measure":
                 pt = rec.point_id
-                if (pt.measure_min and rec.measure_value < pt.measure_min) or \
-                   (pt.measure_max and rec.measure_value > pt.measure_max):
-                    raise UserError(_(
-                        "Measurement %(val)s outside [%(min)s, %(max)s] — use 'Fail' instead.",
-                        val=rec.measure_value, min=pt.measure_min, max=pt.measure_max,
-                    ))
+                if (pt.measure_min and rec.measure_value < pt.measure_min) or (
+                    pt.measure_max and rec.measure_value > pt.measure_max
+                ):
+                    raise UserError(
+                        _(
+                            "Measurement %(val)s outside [%(min)s, %(max)s] — use 'Fail' instead.",
+                            val=rec.measure_value,
+                            min=pt.measure_min,
+                            max=pt.measure_max,
+                        )
+                    )
             rec.write({"state": "pass", "performed_at": fields.Datetime.now()})
             rec._pdp_audit_write("quality_check_pass", rec.id, None)
 
@@ -82,12 +97,18 @@ class QualityCheck(models.Model):
         for rec in self:
             rec.write({"state": "fail", "performed_at": fields.Datetime.now()})
             # Auto-raise an alert
-            alert = self.env["quality.alert"].sudo().create({
-                "name": f"NCR from check {rec.name}",
-                "check_id": rec.id,
-                "product_id": rec.product_id.id,
-                "severity": "major",
-                "description": rec.note or "",
-            })
+            alert = (
+                self.env["quality.alert"]
+                .sudo()
+                .create(
+                    {
+                        "name": f"NCR from check {rec.name}",
+                        "check_id": rec.id,
+                        "product_id": rec.product_id.id,
+                        "severity": "major",
+                        "description": rec.note or "",
+                    }
+                )
+            )
             rec.write({"alert_id": alert.id})
             rec._pdp_audit_write("quality_check_fail", rec.id, {"alert_id": alert.id})

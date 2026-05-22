@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Aged Payable: open AP per vendor bucketed by overdue days."""
+
 from odoo import models
 
 

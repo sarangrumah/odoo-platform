@@ -131,11 +131,13 @@ class CustomRecruitmentWebhookLog(models.Model):
             payload_str = str(data)
             _logger.warning("ingest_payload: payload not JSON-serializable: %s", exc)
 
-        log = self.create({
-            "source": source,
-            "payload_json": payload_str,
-            "processed": False,
-        })
+        log = self.create(
+            {
+                "source": source,
+                "payload_json": payload_str,
+                "processed": False,
+            }
+        )
 
         try:
             norm = _normalize_payload(source, data)
@@ -159,18 +161,23 @@ class CustomRecruitmentWebhookLog(models.Model):
                 if job:
                     vals["job_id"] = job.id
             applicant = self.env["hr.applicant"].create(vals)
-            log.write({
-                "applicant_id": applicant.id,
-                "processed": True,
-            })
+            log.write(
+                {
+                    "applicant_id": applicant.id,
+                    "processed": True,
+                }
+            )
             _logger.info(
                 "custom_recruitment_id: ingested applicant %s from %s",
-                applicant.id, source,
+                applicant.id,
+                source,
             )
         except Exception as exc:  # noqa: BLE001
-            log.write({
-                "processed": False,
-                "error_message": str(exc),
-            })
+            log.write(
+                {
+                    "processed": False,
+                    "error_message": str(exc),
+                }
+            )
             _logger.exception("custom_recruitment_id: webhook ingest failed")
         return log

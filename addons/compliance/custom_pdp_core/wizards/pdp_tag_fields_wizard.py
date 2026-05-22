@@ -35,8 +35,10 @@ class PdpTagFieldsWizard(models.TransientModel):
             "tag": "display_notification",
             "params": {
                 "title": "PDP Tagging",
-                "message": "Tagged %d fields as %s" % (
-                    len(self.field_ids), self.classification_id.code,
+                "message": "Tagged %d fields as %s"
+                % (
+                    len(self.field_ids),
+                    self.classification_id.code,
                 ),
                 "type": "success",
                 "sticky": False,

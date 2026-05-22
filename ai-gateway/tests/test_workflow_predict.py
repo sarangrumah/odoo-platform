@@ -30,13 +30,15 @@ def test_predict_without_hmac_returns_401(client):
 
 def test_predict_parses_structured_json_response(client, signer, fake_provider):
     fake_provider.response = FakeChatResponse(
-        content=json.dumps({
-            "forecast": {"disk_used_pct": {"30d": 92.5}},
-            "saturation_eta_days": {"disk": 18.0},
-            "recommend_upgrade": [
-                {"component": "disk", "urgency": "warn", "rationale": "ETA <30d"},
-            ],
-        })
+        content=json.dumps(
+            {
+                "forecast": {"disk_used_pct": {"30d": 92.5}},
+                "saturation_eta_days": {"disk": 18.0},
+                "recommend_upgrade": [
+                    {"component": "disk", "urgency": "warn", "rationale": "ETA <30d"},
+                ],
+            }
+        )
     )
 
     body = json.dumps(_valid_payload()).encode()
@@ -56,11 +58,17 @@ def test_predict_parses_structured_json_response(client, signer, fake_provider):
 
 def test_predict_handles_fenced_json_response(client, signer, fake_provider):
     """LLMs sometimes wrap JSON in a ```json fence — the router should strip it."""
-    fenced = "```json\n" + json.dumps({
-        "forecast": {},
-        "saturation_eta_days": {"cpu": None},
-        "recommend_upgrade": [],
-    }) + "\n```"
+    fenced = (
+        "```json\n"
+        + json.dumps(
+            {
+                "forecast": {},
+                "saturation_eta_days": {"cpu": None},
+                "recommend_upgrade": [],
+            }
+        )
+        + "\n```"
+    )
     fake_provider.response = FakeChatResponse(content=fenced)
 
     body = json.dumps(_valid_payload()).encode()

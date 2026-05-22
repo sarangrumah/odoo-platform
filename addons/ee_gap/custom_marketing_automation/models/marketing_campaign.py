@@ -52,21 +52,30 @@ class MarketingCampaign(models.Model):
                     raise_if_not_found=False,
                 )
                 if consent_purpose:
-                    valid = self.env["pdp.consent"].sudo().search([
-                        ("partner_id", "in", partners.ids),
-                        ("purpose_id", "=", consent_purpose.id),
-                        ("withdrawn_at", "=", False),
-                    ]).mapped("partner_id")
+                    valid = (
+                        self.env["pdp.consent"]
+                        .sudo()
+                        .search(
+                            [
+                                ("partner_id", "in", partners.ids),
+                                ("purpose_id", "=", consent_purpose.id),
+                                ("withdrawn_at", "=", False),
+                            ]
+                        )
+                        .mapped("partner_id")
+                    )
                     partners = valid
             Participant = self.env["marketing.participant"].sudo()
             first_step = rec.step_ids.sorted("sequence")[:1]
             for p in partners:
-                Participant.create({
-                    "campaign_id": rec.id,
-                    "partner_id": p.id,
-                    "current_step_id": first_step.id if first_step else False,
-                    "state": "active",
-                })
+                Participant.create(
+                    {
+                        "campaign_id": rec.id,
+                        "partner_id": p.id,
+                        "current_step_id": first_step.id if first_step else False,
+                        "state": "active",
+                    }
+                )
             rec.write({"state": "running", "started_at": fields.Datetime.now()})
 
     def action_pause(self):
@@ -84,14 +93,17 @@ class MarketingCampaign(models.Model):
     def _cron_tick(self):
         """Advance every active participant in every running campaign."""
         Participant = self.env["marketing.participant"].sudo()
-        active = Participant.search([
-            ("state", "=", "active"),
-            ("campaign_id.state", "=", "running"),
-            ("next_action_at", "<=", fields.Datetime.now()),
-        ])
+        active = Participant.search(
+            [
+                ("state", "=", "active"),
+                ("campaign_id.state", "=", "running"),
+                ("next_action_at", "<=", fields.Datetime.now()),
+            ]
+        )
         for p in active:
             try:
                 p._advance()
             except Exception:
                 import logging
+
                 logging.getLogger(__name__).exception("participant %s advance failed", p.id)

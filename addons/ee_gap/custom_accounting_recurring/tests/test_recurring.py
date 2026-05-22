@@ -14,7 +14,6 @@ from odoo.tests.common import TransactionCase
 
 @tagged("post_install", "-at_install")
 class TestRecurringJournalTemplate(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -22,24 +21,30 @@ class TestRecurringJournalTemplate(TransactionCase):
         cls.Move = cls.env["account.move"]
         cls.Template = cls.env["custom.recurring.journal.template"]
         # Build minimal chart pieces
-        cls.account_debit = cls.env["account.account"].create({
-            "code": "RECT-DR-01",
-            "name": "Recurring Debit",
-            "account_type": "expense",
-            "company_ids": [(6, 0, [cls.company.id])],
-        })
-        cls.account_credit = cls.env["account.account"].create({
-            "code": "RECT-CR-01",
-            "name": "Recurring Credit",
-            "account_type": "liability_current",
-            "company_ids": [(6, 0, [cls.company.id])],
-        })
-        cls.journal = cls.env["account.journal"].create({
-            "name": "Recurring Misc",
-            "code": "RECMI",
-            "type": "general",
-            "company_id": cls.company.id,
-        })
+        cls.account_debit = cls.env["account.account"].create(
+            {
+                "code": "RECT-DR-01",
+                "name": "Recurring Debit",
+                "account_type": "expense",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.account_credit = cls.env["account.account"].create(
+            {
+                "code": "RECT-CR-01",
+                "name": "Recurring Credit",
+                "account_type": "liability_current",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.journal = cls.env["account.journal"].create(
+            {
+                "name": "Recurring Misc",
+                "code": "RECMI",
+                "type": "general",
+                "company_id": cls.company.id,
+            }
+        )
 
     def _make_template(self, **overrides):
         vals = {
@@ -50,18 +55,26 @@ class TestRecurringJournalTemplate(TransactionCase):
             "next_date": date.today() - timedelta(days=1),
             "auto_post": False,
             "line_ids": [
-                (0, 0, {
-                    "name": "Debit",
-                    "account_id": self.account_debit.id,
-                    "debit": 100.0,
-                    "credit": 0.0,
-                }),
-                (0, 0, {
-                    "name": "Credit",
-                    "account_id": self.account_credit.id,
-                    "debit": 0.0,
-                    "credit": 100.0,
-                }),
+                (
+                    0,
+                    0,
+                    {
+                        "name": "Debit",
+                        "account_id": self.account_debit.id,
+                        "debit": 100.0,
+                        "credit": 0.0,
+                    },
+                ),
+                (
+                    0,
+                    0,
+                    {
+                        "name": "Credit",
+                        "account_id": self.account_credit.id,
+                        "debit": 0.0,
+                        "credit": 100.0,
+                    },
+                ),
             ],
         }
         vals.update(overrides)
@@ -69,16 +82,18 @@ class TestRecurringJournalTemplate(TransactionCase):
 
     def test_unbalanced_template_rejected(self):
         with self.assertRaises(ValidationError):
-            self.Template.create({
-                "name": "bad",
-                "company_id": self.company.id,
-                "journal_id": self.journal.id,
-                "next_date": date.today(),
-                "line_ids": [
-                    (0, 0, {"account_id": self.account_debit.id, "debit": 50.0}),
-                    (0, 0, {"account_id": self.account_credit.id, "credit": 99.0}),
-                ],
-            })
+            self.Template.create(
+                {
+                    "name": "bad",
+                    "company_id": self.company.id,
+                    "journal_id": self.journal.id,
+                    "next_date": date.today(),
+                    "line_ids": [
+                        (0, 0, {"account_id": self.account_debit.id, "debit": 50.0}),
+                        (0, 0, {"account_id": self.account_credit.id, "credit": 99.0}),
+                    ],
+                }
+            )
 
     def test_cron_generates_balanced_move_and_advances_date(self):
         tpl = self._make_template()
@@ -93,7 +108,8 @@ class TestRecurringJournalTemplate(TransactionCase):
         self.assertEqual(debit_total, credit_total)
         self.assertEqual(debit_total, 100.0)
         self.assertEqual(
-            tpl.next_date, original_next + relativedelta(months=1),
+            tpl.next_date,
+            original_next + relativedelta(months=1),
             "next_date must advance by one period",
         )
 
@@ -123,33 +139,39 @@ class TestRecurringJournalTemplate(TransactionCase):
 
 @tagged("post_install", "-at_install")
 class TestRecurringPaymentTemplate(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.company = cls.env.company
         cls.partner = cls.env["res.partner"].create({"name": "Recurring Vendor"})
-        cls.bank_journal = cls.env["account.journal"].search([
-            ("type", "=", "bank"),
-            ("company_id", "=", cls.company.id),
-        ], limit=1)
+        cls.bank_journal = cls.env["account.journal"].search(
+            [
+                ("type", "=", "bank"),
+                ("company_id", "=", cls.company.id),
+            ],
+            limit=1,
+        )
         if not cls.bank_journal:
-            cls.bank_journal = cls.env["account.journal"].create({
-                "name": "Bank Recurring",
-                "code": "BNKR",
-                "type": "bank",
-                "company_id": cls.company.id,
-            })
+            cls.bank_journal = cls.env["account.journal"].create(
+                {
+                    "name": "Bank Recurring",
+                    "code": "BNKR",
+                    "type": "bank",
+                    "company_id": cls.company.id,
+                }
+            )
 
     def test_amount_must_be_positive(self):
         with self.assertRaises(ValidationError):
-            self.env["custom.recurring.payment.template"].create({
-                "name": "bad",
-                "company_id": self.company.id,
-                "partner_id": self.partner.id,
-                "payment_type": "outbound",
-                "journal_id": self.bank_journal.id,
-                "amount": 0,
-                "period": "monthly",
-                "next_date": date.today(),
-            })
+            self.env["custom.recurring.payment.template"].create(
+                {
+                    "name": "bad",
+                    "company_id": self.company.id,
+                    "partner_id": self.partner.id,
+                    "payment_type": "outbound",
+                    "journal_id": self.bank_journal.id,
+                    "amount": 0,
+                    "period": "monthly",
+                    "next_date": date.today(),
+                }
+            )

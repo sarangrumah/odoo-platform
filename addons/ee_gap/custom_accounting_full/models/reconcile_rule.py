@@ -22,13 +22,15 @@ class ReconcileRule(models.Model):
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
     company_id = fields.Many2one(
-        "res.company", required=True,
+        "res.company",
+        required=True,
         default=lambda self: self.env.company,
     )
     journal_ids = fields.Many2many(
         "account.journal",
         "custom_reconcile_rule_journal_rel",
-        "rule_id", "journal_id",
+        "rule_id",
+        "journal_id",
         string="Journals",
         domain="[('type', 'in', ('bank', 'cash')), ('company_id', '=', company_id)]",
         help="Leave empty to match all bank/cash journals in the company.",
@@ -38,13 +40,11 @@ class ReconcileRule(models.Model):
     amount_tolerance = fields.Float(default=0.0)
     match_reference_regex = fields.Char(
         string="Reference Regex",
-        help="Optional Python regex tested against the statement line "
-             "payment_ref/ref/narration.",
+        help="Optional Python regex tested against the statement line payment_ref/ref/narration.",
     )
     match_date_window_days = fields.Integer(
         default=7,
-        help="Search candidate move lines whose date is within +/- N days of "
-             "the statement line.",
+        help="Search candidate move lines whose date is within +/- N days of the statement line.",
     )
     payment_match_partner_field = fields.Selection(
         [
@@ -56,13 +56,11 @@ class ReconcileRule(models.Model):
     )
     target_account_id = fields.Many2one(
         "account.account",
-        help="Counterpart account for unmatched residual (bank fees, "
-             "interest, write-offs).",
+        help="Counterpart account for unmatched residual (bank fees, interest, write-offs).",
     )
     auto_validate = fields.Boolean(
         default=False,
-        help="When checked, the rule reconciles statement lines without "
-             "human confirmation.",
+        help="When checked, the rule reconciles statement lines without human confirmation.",
     )
 
     @api.constrains("match_reference_regex")
@@ -72,10 +70,13 @@ class ReconcileRule(models.Model):
                 try:
                     re.compile(rule.match_reference_regex)
                 except re.error as exc:
-                    raise ValidationError(_(
-                        "Rule '%(name)s' regex is invalid: %(err)s",
-                        name=rule.name, err=str(exc),
-                    )) from exc
+                    raise ValidationError(
+                        _(
+                            "Rule '%(name)s' regex is invalid: %(err)s",
+                            name=rule.name,
+                            err=str(exc),
+                        )
+                    ) from exc
 
     # ---------- matching ----------
     def _candidate_move_lines(self, stmt_line):
@@ -85,15 +86,17 @@ class ReconcileRule(models.Model):
             ("company_id", "=", stmt_line.company_id.id),
             ("parent_state", "=", "posted"),
             ("reconciled", "=", False),
-            ("account_id.account_type", "in",
-                ("asset_receivable", "liability_payable")),
+            ("account_id.account_type", "in", ("asset_receivable", "liability_payable")),
         ]
         if self.match_partner and stmt_line.partner_id:
             if self.payment_match_partner_field == "parent_id":
-                domain.append((
-                    "partner_id.commercial_partner_id",
-                    "=", stmt_line.partner_id.commercial_partner_id.id,
-                ))
+                domain.append(
+                    (
+                        "partner_id.commercial_partner_id",
+                        "=",
+                        stmt_line.partner_id.commercial_partner_id.id,
+                    )
+                )
             else:
                 domain.append(("partner_id", "=", stmt_line.partner_id.id))
         elif self.match_partner and not stmt_line.partner_id:
@@ -114,9 +117,7 @@ class ReconcileRule(models.Model):
             if abs(stmt_amt - line_amt) > max(0.005, self.amount_tolerance):
                 return False
         if self.match_reference_regex:
-            stmt_ref = (
-                stmt_line.payment_ref or stmt_line.ref or stmt_line.narration or ""
-            )
+            stmt_ref = stmt_line.payment_ref or stmt_line.ref or stmt_line.narration or ""
             try:
                 if not re.search(self.match_reference_regex, stmt_ref or ""):
                     return False
@@ -131,10 +132,13 @@ class ReconcileRule(models.Model):
         matched_total = 0
         for company in Companies:
             StmtLine = self.env["account.bank.statement.line"].sudo()
-            lines = StmtLine.search([
-                ("company_id", "=", company.id),
-                ("is_reconciled", "=", False),
-            ], limit=1000)
+            lines = StmtLine.search(
+                [
+                    ("company_id", "=", company.id),
+                    ("is_reconciled", "=", False),
+                ],
+                limit=1000,
+            )
             for line in lines:
                 if line._custom_apply_reconcile_rules():
                     matched_total += 1
@@ -160,23 +164,25 @@ class AccountBankStatementLineReconcile(models.Model):
     custom_reconcile_rule_id = fields.Many2one(
         "custom.reconcile.rule",
         string="Auto-Reconcile Rule",
-        readonly=True, copy=False,
+        readonly=True,
+        copy=False,
     )
     custom_auto_matched = fields.Boolean(
         string="Auto-Matched",
-        readonly=True, copy=False,
+        readonly=True,
+        copy=False,
     )
 
     def _custom_applicable_rules(self):
         self.ensure_one()
         Rule = self.env["custom.reconcile.rule"].sudo()
-        rules = Rule.search([
-            ("active", "=", True),
-            ("company_id", "=", self.company_id.id),
-        ])
-        return rules.filtered(
-            lambda r: not r.journal_ids or self.journal_id in r.journal_ids
+        rules = Rule.search(
+            [
+                ("active", "=", True),
+                ("company_id", "=", self.company_id.id),
+            ]
         )
+        return rules.filtered(lambda r: not r.journal_ids or self.journal_id in r.journal_ids)
 
     def _custom_apply_reconcile_rules(self):
         """Try each applicable rule until one matches; return True if matched."""
@@ -195,8 +201,12 @@ class AccountBankStatementLineReconcile(models.Model):
             if rule.auto_validate:
                 try:
                     counterpart = self.move_id.line_ids.filtered(
-                        lambda l: l.account_id.account_type in (
-                            "asset_receivable", "liability_payable",
+                        lambda l: (
+                            l.account_id.account_type
+                            in (
+                                "asset_receivable",
+                                "liability_payable",
+                            )
                         )
                     )
                     if counterpart:
@@ -205,7 +215,8 @@ class AccountBankStatementLineReconcile(models.Model):
                 except Exception as exc:  # noqa: BLE001
                     _logger.warning(
                         "Auto reconcile failed for stmt line %s: %s",
-                        self.id, exc,
+                        self.id,
+                        exc,
                     )
             return True
         return False

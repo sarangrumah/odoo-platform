@@ -34,23 +34,17 @@ class CoretaxAdapterBase(models.AbstractModel):
                 "message": str,
             }
         """
-        raise NotImplementedError(
-            _("submit_xml() must be implemented by the concrete adapter")
-        )
+        raise NotImplementedError(_("submit_xml() must be implemented by the concrete adapter"))
 
     @api.model
     def query_nsfp(self, submission_uuid: str) -> str | None:
         """Return the assigned NSFP (17-char) for an approved submission, or None."""
-        raise NotImplementedError(
-            _("query_nsfp() must be implemented by the concrete adapter")
-        )
+        raise NotImplementedError(_("query_nsfp() must be implemented by the concrete adapter"))
 
     @api.model
     def download_response(self, submission_uuid: str) -> bytes:
         """Return the DJP response payload (XML/PDF bytes)."""
-        raise NotImplementedError(
-            _("download_response() must be implemented by the concrete adapter")
-        )
+        raise NotImplementedError(_("download_response() must be implemented by the concrete adapter"))
 
     # ----- Dispatcher -----
     @api.model
@@ -62,9 +56,13 @@ class CoretaxAdapterBase(models.AbstractModel):
         }
         model_name = mapping.get(config.adapter_type)
         if not model_name or model_name not in self.env:
-            raise UserError(_(
-                "Coretax adapter '%s' is not installed. Install the corresponding "
-                "Custom adapter module or switch to manual.") % config.adapter_type)
+            raise UserError(
+                _(
+                    "Coretax adapter '%s' is not installed. Install the corresponding "
+                    "Custom adapter module or switch to manual."
+                )
+                % config.adapter_type
+            )
         return self.env[model_name]
 
 
@@ -80,8 +78,10 @@ class CoretaxAdapterManual(models.AbstractModel):
         return {
             "submission_uuid": None,
             "status": "manual_required",
-            "message": _("XML generated. Upload via Coretax portal and record the "
-                         "submission reference on the invoice once issued."),
+            "message": _(
+                "XML generated. Upload via Coretax portal and record the "
+                "submission reference on the invoice once issued."
+            ),
         }
 
     @api.model
@@ -91,7 +91,9 @@ class CoretaxAdapterManual(models.AbstractModel):
 
     @api.model
     def download_response(self, submission_uuid: str) -> bytes:
-        raise UserError(_(
-            "Manual adapter cannot fetch responses automatically. Download the "
-            "approval PDF/XML from the Coretax portal and attach it to the invoice."
-        ))
+        raise UserError(
+            _(
+                "Manual adapter cannot fetch responses automatically. Download the "
+                "approval PDF/XML from the Coretax portal and attach it to the invoice."
+            )
+        )

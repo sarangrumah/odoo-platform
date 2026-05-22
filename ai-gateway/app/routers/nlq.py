@@ -48,8 +48,7 @@ class NlqOut(BaseModel):
 @router.post("/nlq", response_model=NlqOut)
 async def nlq(body: NlqIn) -> NlqOut:
     schema_text = "\n".join(
-        f"- {m.model}: {', '.join(m.fields)}"
-        + (f"  ({m.description})" if m.description else "")
+        f"- {m.model}: {', '.join(m.fields)}" + (f"  ({m.description})" if m.description else "")
         for m in body.schema_hint
     )
     user_msg = (

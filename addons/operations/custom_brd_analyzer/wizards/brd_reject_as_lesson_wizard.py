@@ -20,9 +20,7 @@ class BrdRejectAsLessonWizard(models.TransientModel):
     _name = "brd.reject.as.lesson.wizard"
     _description = "Reject Recommendation and Save as Lesson"
 
-    recommendation_id = fields.Many2one(
-        "brd.recommendation", required=True, ondelete="cascade"
-    )
+    recommendation_id = fields.Many2one("brd.recommendation", required=True, ondelete="cascade")
     name = fields.Char(required=True)
     section_pattern = fields.Text(required=True)
     rejected_proposals = fields.Char(
@@ -49,17 +47,18 @@ class BrdRejectAsLessonWizard(models.TransientModel):
         if not Rec.exists():
             return defaults
         related = Rec.related_section_ids
-        snippet = " | ".join(
-            (s.title or "").strip() + ": " + (s.content or "").strip()[:300]
-            for s in related[:3]
-        )[:500]
-        defaults.update({
-            "recommendation_id": Rec.id,
-            "name": f"Reject {Rec.name}",
-            "section_pattern": snippet or (Rec.scope or "")[:500],
-            "rejected_proposals": Rec.name or "",
-            "reason": f"Rejected manually by analyst on review of BRD '{Rec.document_id.display_name}'.",
-        })
+        snippet = " | ".join((s.title or "").strip() + ": " + (s.content or "").strip()[:300] for s in related[:3])[
+            :500
+        ]
+        defaults.update(
+            {
+                "recommendation_id": Rec.id,
+                "name": f"Reject {Rec.name}",
+                "section_pattern": snippet or (Rec.scope or "")[:500],
+                "rejected_proposals": Rec.name or "",
+                "reason": f"Rejected manually by analyst on review of BRD '{Rec.document_id.display_name}'.",
+            }
+        )
         return defaults
 
     def action_save_lesson(self):
@@ -67,15 +66,17 @@ class BrdRejectAsLessonWizard(models.TransientModel):
         if not self.correct_module_ids:
             raise UserError(_("Pick at least one existing module that covers the capability."))
         rejected = [t.strip() for t in (self.rejected_proposals or "").split(",") if t.strip()]
-        lesson = self.env["brd.lesson"].create({
-            "name": self.name,
-            "section_pattern": self.section_pattern,
-            "rejected_proposals": rejected,
-            "correct_modules": [(6, 0, self.correct_module_ids.ids)],
-            "reason": self.reason,
-            "severity": self.severity,
-            "source_recommendation_id": self.recommendation_id.id,
-        })
+        lesson = self.env["brd.lesson"].create(
+            {
+                "name": self.name,
+                "section_pattern": self.section_pattern,
+                "rejected_proposals": rejected,
+                "correct_modules": [(6, 0, self.correct_module_ids.ids)],
+                "reason": self.reason,
+                "severity": self.severity,
+                "source_recommendation_id": self.recommendation_id.id,
+            }
+        )
         self.recommendation_id.write({"state": "canceled"})
         return {
             "type": "ir.actions.act_window",

@@ -69,11 +69,13 @@ class MailingTrace(models.Model):
         for email in emails:
             if not email:
                 continue
-            count = self.sudo().search_count([
-                ("email", "=", email),
-                ("failure_type", "=", "mail_bounce"),
-                ("trace_status", "=", "bounce"),
-            ])
+            count = self.sudo().search_count(
+                [
+                    ("email", "=", email),
+                    ("failure_type", "=", "mail_bounce"),
+                    ("trace_status", "=", "bounce"),
+                ]
+            )
             if count < HARD_BOUNCE_BLACKLIST_THRESHOLD:
                 continue
             existing = Blacklist.search([("email", "=", email)], limit=1)
@@ -82,18 +84,17 @@ class MailingTrace(models.Model):
             try:
                 Blacklist._add(
                     email,
-                    message=(
-                        "Auto-blacklisted by custom_email_marketing after %d "
-                        "hard bounces" % count
-                    ),
+                    message=("Auto-blacklisted by custom_email_marketing after %d hard bounces" % count),
                 )
                 _logger.info(
                     "[custom_email_marketing] auto-blacklisted %s after %d bounces",
-                    email, count,
+                    email,
+                    count,
                 )
             except Exception as exc:  # pragma: no cover — defensive
                 _logger.warning(
                     "[custom_email_marketing] failed to blacklist %s: %s",
-                    email, exc,
+                    email,
+                    exc,
                 )
         return True

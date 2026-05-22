@@ -36,7 +36,8 @@ class CustomApplyWitholdingWizard(models.TransientModel):
     preview_rule_id = fields.Many2one("custom.witholding.rate", readonly=True)
 
     application_id = fields.Many2one(
-        "custom.witholding.application", readonly=True,
+        "custom.witholding.application",
+        readonly=True,
     )
 
     def action_preview(self):

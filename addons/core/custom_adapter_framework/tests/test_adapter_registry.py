@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import patch
 
 from odoo.tests import TransactionCase, tagged
 
 from ..models.adapter_base import BaseAdapter, AdapterResponse, CircuitBreakerOpenError
-from ..models.adapter_registry import register_adapter, get_adapter_class, unregister_adapter
+from ..models.adapter_registry import register_adapter, get_adapter_class
 
 
 @register_adapter("custom_test_mock")
@@ -32,7 +31,6 @@ class _MockAdapter(BaseAdapter):
 
 @tagged("post_install", "-at_install")
 class TestAdapterRegistry(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

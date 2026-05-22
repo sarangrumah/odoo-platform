@@ -33,16 +33,20 @@ class TestDedupHash(TransactionCase):
         self.assertFalse(_compute_dedup_hash(None, None))
 
     def test_second_applicant_flagged_as_duplicate(self):
-        a1 = self.Applicant.create({
-            "partner_name": "Budi Santoso",
-            "email_from": "budi@example.com",
-            "partner_phone": "+62 812 1111 2222",
-        })
-        a2 = self.Applicant.create({
-            "partner_name": "Budi S.",
-            "email_from": "BUDI@example.com",
-            "partner_phone": "0812-1111-2222",
-        })
+        a1 = self.Applicant.create(
+            {
+                "partner_name": "Budi Santoso",
+                "email_from": "budi@example.com",
+                "partner_phone": "+62 812 1111 2222",
+            }
+        )
+        a2 = self.Applicant.create(
+            {
+                "partner_name": "Budi S.",
+                "email_from": "BUDI@example.com",
+                "partner_phone": "0812-1111-2222",
+            }
+        )
         # Refresh computed/store fields.
         a1.invalidate_recordset()
         a2.invalidate_recordset()
@@ -53,16 +57,20 @@ class TestDedupHash(TransactionCase):
         self.assertEqual(a2.x_duplicate_of, a1)
 
     def test_unrelated_applicants_not_flagged(self):
-        a1 = self.Applicant.create({
-            "partner_name": "Ani",
-            "email_from": "ani@example.com",
-            "partner_phone": "+62 812 9999 0000",
-        })
-        a2 = self.Applicant.create({
-            "partner_name": "Citra",
-            "email_from": "citra@example.com",
-            "partner_phone": "+62 812 3333 4444",
-        })
+        a1 = self.Applicant.create(
+            {
+                "partner_name": "Ani",
+                "email_from": "ani@example.com",
+                "partner_phone": "+62 812 9999 0000",
+            }
+        )
+        a2 = self.Applicant.create(
+            {
+                "partner_name": "Citra",
+                "email_from": "citra@example.com",
+                "partner_phone": "+62 812 3333 4444",
+            }
+        )
         a1.invalidate_recordset()
         a2.invalidate_recordset()
         self.assertNotEqual(a1.x_dedup_hash, a2.x_dedup_hash)

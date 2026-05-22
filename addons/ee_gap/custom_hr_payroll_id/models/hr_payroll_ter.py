@@ -26,12 +26,20 @@ TER_CATEGORY_SELECTION = [
 
 # Mapping from PTKP code → TER category
 PTKP_TO_TER_CATEGORY = {
-    "TK/0": "A", "TK/1": "A", "K/0": "A",
-    "TK/2": "B", "TK/3": "B", "K/1": "B", "K/2": "B",
+    "TK/0": "A",
+    "TK/1": "A",
+    "K/0": "A",
+    "TK/2": "B",
+    "TK/3": "B",
+    "K/1": "B",
+    "K/2": "B",
     "K/3": "C",
     # K/I/* status (combined spouses) — defaults to category C; operator
     # can override per employee if the spouse files independently.
-    "K/I/0": "C", "K/I/1": "C", "K/I/2": "C", "K/I/3": "C",
+    "K/I/0": "C",
+    "K/I/1": "C",
+    "K/I/2": "C",
+    "K/I/3": "C",
 }
 
 
@@ -48,7 +56,9 @@ class HrPayrollTERBracket(models.Model):
     _order = "category, lower_bound"
 
     category = fields.Selection(
-        TER_CATEGORY_SELECTION, required=True, index=True,
+        TER_CATEGORY_SELECTION,
+        required=True,
+        index=True,
     )
     lower_bound = fields.Float(required=True, help="Inclusive lower bound in IDR.")
     upper_bound = fields.Float(
@@ -76,9 +86,7 @@ class HrPayrollTERBracket(models.Model):
         """Return the effective rate (as a fraction, e.g. 0.05) for the given gross."""
         if monthly_gross <= 0:
             return 0.0
-        brackets = self.sudo().search(
-            [("category", "=", category), ("active", "=", True)], order="lower_bound asc"
-        )
+        brackets = self.sudo().search([("category", "=", category), ("active", "=", True)], order="lower_bound asc")
         for b in brackets:
             if monthly_gross < b.lower_bound:
                 continue

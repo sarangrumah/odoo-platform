@@ -41,13 +41,9 @@ class WmsPutawaySuggestion(models.Model):
     suggested_location_id = fields.Many2one("stock.location", required=True)
     overridden_location_id = fields.Many2one("stock.location", string="Operator Override")
     rule_id = fields.Many2one("custom.wms.putaway.rule", ondelete="set null")
-    strategy_id = fields.Many2one(
-        related="rule_id.strategy_id", store=True, index=True
-    )
+    strategy_id = fields.Many2one(related="rule_id.strategy_id", store=True, index=True)
     score = fields.Integer(default=0, tracking=True)
-    confidence_score = fields.Integer(
-        compute="_compute_confidence", store=True, help="Alias for score (0..100)."
-    )
+    confidence_score = fields.Integer(compute="_compute_confidence", store=True, help="Alias for score (0..100).")
     reason = fields.Char()
     status = fields.Selection(STATUS, default="pending", tracking=True, index=True)
     applied_at = fields.Datetime()

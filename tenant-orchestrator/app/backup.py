@@ -6,9 +6,8 @@ import hashlib
 import os
 import shutil
 import subprocess
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 import boto3
 import structlog
@@ -65,13 +64,20 @@ def _pg_dump(db_name: str, out_path: Path) -> None:
     env["PGPASSWORD"] = s.pg_super_password
     cmd = [
         "pg_dump",
-        "-h", s.pg_host,
-        "-p", str(s.pg_port),
-        "-U", s.pg_super_user,
-        "-d", db_name,
-        "-F", "c",        # custom format — supports parallel restore
-        "-Z", "6",
-        "-f", str(out_path),
+        "-h",
+        s.pg_host,
+        "-p",
+        str(s.pg_port),
+        "-U",
+        s.pg_super_user,
+        "-d",
+        db_name,
+        "-F",
+        "c",  # custom format — supports parallel restore
+        "-Z",
+        "6",
+        "-f",
+        str(out_path),
     ]
     log.info("backup.pg_dump", db=db_name, out=str(out_path))
     res = subprocess.run(cmd, env=env, capture_output=True, check=False, text=True)
@@ -85,10 +91,14 @@ def _pg_restore(db_name: str, in_path: Path) -> None:
     env["PGPASSWORD"] = s.pg_super_password
     cmd = [
         "pg_restore",
-        "-h", s.pg_host,
-        "-p", str(s.pg_port),
-        "-U", s.pg_super_user,
-        "-d", db_name,
+        "-h",
+        s.pg_host,
+        "-p",
+        str(s.pg_port),
+        "-U",
+        s.pg_super_user,
+        "-d",
+        db_name,
         "--no-owner",
         "--no-acl",
         "--clean",
@@ -131,7 +141,7 @@ def run_backup(slug: str, kind: str = "manual", actor: str = "system") -> dict:
         raise ValueError(f"Cannot backup tenant in state '{t['state']}'")
 
     ensure_bucket()
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     bid = registry.record_backup_start(slug, kind)
 
     tmp_dir = Path(s.backup_tmp_dir) / slug / started_at.strftime("%Y%m%dT%H%M%SZ")
@@ -175,7 +185,9 @@ def run_backup(slug: str, kind: str = "manual", actor: str = "system") -> dict:
             last_backup_id=s3_key,
         )
         registry.log_action(
-            slug, "backup", actor,
+            slug,
+            "backup",
+            actor,
             {"kind": kind, "s3_key": s3_key, "size_bytes": size, "sha256": checksum},
             "success",
         )
@@ -194,7 +206,7 @@ def restore_backup(
     slug: str,
     s3_key: str,
     *,
-    target_db: Optional[str] = None,
+    target_db: str | None = None,
     actor: str = "system",
 ) -> str:
     """Download a backup and pg_restore into ``target_db`` (or ``<slug>_staging``)."""
@@ -218,16 +230,17 @@ def restore_backup(
         _pg_restore(target, local)
 
         registry.log_action(
-            slug, "restore", actor,
-            {"s3_key": s3_key, "target_db": target}, "success",
+            slug,
+            "restore",
+            actor,
+            {"s3_key": s3_key, "target_db": target},
+            "success",
         )
         log.info("backup.restored", slug=slug, target=target, key=s3_key)
         return target
     except Exception as e:
         log.exception("backup.restore_failed", slug=slug)
-        registry.log_action(
-            slug, "restore", actor, {"s3_key": s3_key}, "failure", error=str(e)
-        )
+        registry.log_action(slug, "restore", actor, {"s3_key": s3_key}, "failure", error=str(e))
         raise
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -237,7 +250,7 @@ def prune_expired(actor: str = "scheduler") -> int:
     """Delete expired backup objects from S3 + registry rows."""
     s = get_settings()
     client = _s3()
-    expired = registry.expired_backups(datetime.now(timezone.utc))
+    expired = registry.expired_backups(datetime.now(UTC))
     n = 0
     for row in expired:
         try:
@@ -248,8 +261,12 @@ def prune_expired(actor: str = "scheduler") -> int:
         except Exception as e:
             log.exception("backup.prune_failed", id=row["id"])
             registry.log_action(
-                row["tenant_slug"], "backup_prune", actor,
-                {"backup_id": row["id"]}, "failure", error=str(e),
+                row["tenant_slug"],
+                "backup_prune",
+                actor,
+                {"backup_id": row["id"]},
+                "failure",
+                error=str(e),
             )
     if n:
         log.info("backup.pruned", count=n)

@@ -28,7 +28,8 @@ class FSMWorkOrder(models.Model):
     required_skill_ids = fields.Many2many(
         "fsm.skill",
         "fsm_wo_required_skill_rel",
-        "wo_id", "skill_id",
+        "wo_id",
+        "skill_id",
         string="Required Skills",
     )
 
@@ -41,7 +42,9 @@ class FSMWorkOrder(models.Model):
     state = fields.Selection(WO_STATES, default="draft", required=True, tracking=True, index=True)
 
     material_ids = fields.One2many(
-        "fsm.work.order.material", "work_order_id", string="Materials Consumed",
+        "fsm.work.order.material",
+        "work_order_id",
+        string="Materials Consumed",
     )
     notes_completion = fields.Text()
     customer_signature = fields.Binary(string="Customer Signature")
@@ -84,11 +87,13 @@ class FSMWorkOrder(models.Model):
                 continue
             missing = rec.required_skill_ids - rec.technician_id.skill_ids
             if missing:
-                raise UserError(_(
-                    "Technician %(tech)s lacks required skill(s): %(skills)s",
-                    tech=rec.technician_id.name,
-                    skills=", ".join(missing.mapped("name")),
-                ))
+                raise UserError(
+                    _(
+                        "Technician %(tech)s lacks required skill(s): %(skills)s",
+                        tech=rec.technician_id.name,
+                        skills=", ".join(missing.mapped("name")),
+                    )
+                )
 
     def action_schedule(self):
         for rec in self:
@@ -116,8 +121,7 @@ class FSMWorkOrder(models.Model):
             if rec.state not in ("in_progress", "on_hold"):
                 raise UserError(_("Cannot complete from state %s.") % rec.state)
             rec.write({"state": "done", "completed_at": fields.Datetime.now()})
-            rec._pdp_audit_write("fsm_wo_complete", rec.id,
-                                 {"duration_hours": rec.duration_hours})
+            rec._pdp_audit_write("fsm_wo_complete", rec.id, {"duration_hours": rec.duration_hours})
 
     def action_cancel(self):
         for rec in self:
@@ -128,10 +132,11 @@ class FSMWorkOrder(models.Model):
 
     def action_capture_signature(self, signature_b64: str, signed_by: str):
         self.ensure_one()
-        self.write({
-            "customer_signature": signature_b64,
-            "signed_by_name": signed_by,
-            "signed_at": fields.Datetime.now(),
-        })
-        self._pdp_audit_write("fsm_wo_signature_captured", self.id,
-                              {"signed_by": signed_by})
+        self.write(
+            {
+                "customer_signature": signature_b64,
+                "signed_by_name": signed_by,
+                "signed_at": fields.Datetime.now(),
+            }
+        )
+        self._pdp_audit_write("fsm_wo_signature_captured", self.id, {"signed_by": signed_by})

@@ -6,6 +6,7 @@ DataWedge wedge-style scanners may not be able to compute HMAC signatures
 themselves. This endpoint accepts a simpler payload bound to the device
 serial and is guarded by an IP allow-list (separate from `secure_endpoint`).
 """
+
 from __future__ import annotations
 
 import json
@@ -21,9 +22,15 @@ _logger = logging.getLogger(__name__)
 
 
 def _ip_allowed() -> bool:
-    allowed = request.env["ir.config_parameter"].sudo().get_param(
-        "custom_hht_bridge.datawedge.allowed_cidrs", "0.0.0.0/0",
-    ) or ""
+    allowed = (
+        request.env["ir.config_parameter"]
+        .sudo()
+        .get_param(
+            "custom_hht_bridge.datawedge.allowed_cidrs",
+            "0.0.0.0/0",
+        )
+        or ""
+    )
     if not allowed.strip():
         return True
     httpreq = request.httprequest
@@ -50,9 +57,7 @@ def _ip_allowed() -> bool:
 
 
 class HhtDataWedge(http.Controller):
-
-    @http.route("/api/hht/datawedge", type="http", auth="public",
-                methods=["POST"], csrf=False)
+    @http.route("/api/hht/datawedge", type="http", auth="public", methods=["POST"], csrf=False)
     def datawedge(self, **kw):
         if not _ip_allowed():
             return _json({"ok": False, "error": "IP_NOT_ALLOWED"}, status=403)
@@ -73,13 +78,21 @@ class HhtDataWedge(http.Controller):
             return _json({"ok": False, "error": "MISSING_FIELDS"})
         device = request.env["hht.device"].sudo()._find_by_serial(serial)
         if not device:
-            _log_scan(None, action="lookup", barcode=barcode,
-                      result="error", error_message="UNKNOWN_DEVICE_SERIAL",
-                      payload=data)
+            _log_scan(
+                None,
+                action="lookup",
+                barcode=barcode,
+                result="error",
+                error_message="UNKNOWN_DEVICE_SERIAL",
+                payload=data,
+            )
             return _json({"ok": False, "error": "UNKNOWN_DEVICE_SERIAL"})
         # Wrap into the canonical scan handler with action=lookup.
-        outcome = _handle_scan(device, {
-            "barcode": barcode,
-            "action": data.get("action") or "lookup",
-        })
+        outcome = _handle_scan(
+            device,
+            {
+                "barcode": barcode,
+                "action": data.get("action") or "lookup",
+            },
+        )
         return _json(outcome)

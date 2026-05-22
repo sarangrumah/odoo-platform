@@ -78,13 +78,16 @@ class TransferOrder(models.Model):
         for rec in self:
             if rec.stock_move_id:
                 continue
-            move = engine.materialize({
-                "source_location_id": rec.source_location_id.id,
-                "target_location_id": rec.target_location_id.id,
-                "product_id": rec.product_id.id,
-                "lot_id": rec.lot_id.id if rec.lot_id else False,
-                "planned_qty": rec.planned_qty,
-                "name": rec.name,
-                "company_id": rec.company_id.id,
-            }, transfer_order=rec)
+            move = engine.materialize(
+                {
+                    "source_location_id": rec.source_location_id.id,
+                    "target_location_id": rec.target_location_id.id,
+                    "product_id": rec.product_id.id,
+                    "lot_id": rec.lot_id.id if rec.lot_id else False,
+                    "planned_qty": rec.planned_qty,
+                    "name": rec.name,
+                    "company_id": rec.company_id.id,
+                },
+                transfer_order=rec,
+            )
             rec.stock_move_id = move.id

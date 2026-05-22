@@ -36,15 +36,13 @@ class CoretaxBuktiPotong(models.Model):
         index=True,
     )
 
-    tarif = fields.Float(string="Tarif (%)", digits=(6, 4),
-                         help="Withholding rate in percent, e.g. 2.0 for 2%.")
+    tarif = fields.Float(string="Tarif (%)", digits=(6, 4), help="Withholding rate in percent, e.g. 2.0 for 2%.")
     dpp = fields.Monetary(string="Dasar Pengenaan Pajak", currency_field="currency_id")
     pph_terpotong = fields.Monetary(string="PPh Terpotong", currency_field="currency_id")
     currency_id = fields.Many2one(
         "res.currency",
         string="Currency",
-        default=lambda self: self.env.ref("base.IDR", raise_if_not_found=False)
-        or self.env.company.currency_id,
+        default=lambda self: self.env.ref("base.IDR", raise_if_not_found=False) or self.env.company.currency_id,
         required=True,
     )
 
@@ -64,8 +62,7 @@ class CoretaxBuktiPotong(models.Model):
     )
 
     attachment_id = fields.Many2one("ir.attachment", string="Original Document")
-    account_move_id = fields.Many2one("account.move", string="Linked Invoice/Bill",
-                                       ondelete="set null", index=True)
+    account_move_id = fields.Many2one("account.move", string="Linked Invoice/Bill", ondelete="set null", index=True)
 
     state = fields.Selection(
         selection=[
@@ -86,8 +83,8 @@ class CoretaxBuktiPotong(models.Model):
     notes = fields.Text(string="Notes")
 
     _no_bupot_unique_per_source = models.Constraint(
-        'unique(no_bupot, source)',
-        'Bukti Potong number must be unique per source (issued/received).',
+        "unique(no_bupot, source)",
+        "Bukti Potong number must be unique per source (issued/received).",
     )
 
     @api.constrains("period_month")

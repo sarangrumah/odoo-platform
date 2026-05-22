@@ -22,7 +22,8 @@ class ResPartner(models.Model):
         if not target_number:
             return False
         return self.env["voip.call"].log_outbound(
-            partner_id=self.id, number=target_number,
+            partner_id=self.id,
+            number=target_number,
         )
 
     def action_view_voip_calls(self):

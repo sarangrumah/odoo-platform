@@ -23,12 +23,15 @@ class IotDevice(models.Model):
     code = fields.Char(required=True, index=True)
     kind = fields.Selection(DEVICE_KINDS, default="sensor", required=True)
     location = fields.Char()
-    api_token = fields.Char(readonly=True, copy=False, index=True,
-                             help="Required in POST /iot/ingest header X-Device-Token.")
+    api_token = fields.Char(
+        readonly=True, copy=False, index=True, help="Required in POST /iot/ingest header X-Device-Token."
+    )
     last_seen_at = fields.Datetime(readonly=True)
     status = fields.Selection(
         [("online", "Online"), ("offline", "Offline"), ("decommissioned", "Decommissioned")],
-        default="offline", required=True, tracking=True,
+        default="offline",
+        required=True,
+        tracking=True,
     )
     threshold_ids = fields.One2many("iot.threshold", "device_id")
     reading_count = fields.Integer(compute="_compute_counts")
@@ -37,8 +40,8 @@ class IotDevice(models.Model):
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
 
     _code_uniq = models.Constraint(
-        'unique(code)',
-        'Device code must be unique.',
+        "unique(code)",
+        "Device code must be unique.",
     )
 
     def _compute_counts(self):

@@ -50,19 +50,19 @@ class CustomHubAuditEvent(models.Model):
     _order = "id asc"
     _rec_name = "summary"
 
-    timestamp = fields.Datetime(
-        required=True, default=fields.Datetime.now, index=True
-    )
+    timestamp = fields.Datetime(required=True, default=fields.Datetime.now, index=True)
     user_id = fields.Many2one(
-        "res.users", string="Actor",
-        default=lambda self: self.env.user.id, index=True,
+        "res.users",
+        string="Actor",
+        default=lambda self: self.env.user.id,
+        index=True,
     )
-    event_type = fields.Selection(
-        _EVENT_TYPES, required=True, index=True
-    )
+    event_type = fields.Selection(_EVENT_TYPES, required=True, index=True)
     tenant_id = fields.Many2one(
-        "tenant.registry", string="Tenant",
-        ondelete="set null", index=True,
+        "tenant.registry",
+        string="Tenant",
+        ondelete="set null",
+        index=True,
     )
     object_ref = fields.Reference(
         selection="_selection_object_ref",
@@ -109,9 +109,7 @@ class CustomHubAuditEvent(models.Model):
             if hasattr(v, "isoformat"):
                 v = v.isoformat()
             doc[fname] = v
-        return json.dumps(
-            doc, sort_keys=True, default=str, separators=(",", ":")
-        ).encode("utf-8")
+        return json.dumps(doc, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8")
 
     @api.model
     def _compute_hash(self, vals: dict) -> str:
@@ -127,7 +125,9 @@ class CustomHubAuditEvent(models.Model):
             # Resolve prev_hash from the latest existing row if not set.
             if not vals.get("prev_hash"):
                 latest = self.sudo().search(
-                    [], order="id desc", limit=1,
+                    [],
+                    order="id desc",
+                    limit=1,
                 )
                 vals["prev_hash"] = latest.hash if latest else ""
             if not vals.get("timestamp"):
@@ -140,24 +140,22 @@ class CustomHubAuditEvent(models.Model):
 
     def write(self, vals):
         # Allow internal fields to be updated only during install (e.g. seeding).
-        raise UserError(_(
-            "Hub audit events are append-only. "
-            "Modification is forbidden — create a new event instead."
-        ))
+        raise UserError(_("Hub audit events are append-only. Modification is forbidden — create a new event instead."))
 
     def unlink(self):
-        raise UserError(_(
-            "Hub audit events are append-only and cannot be deleted. "
-            "If retention requires purging, do so via a controlled "
-            "database-level archive procedure, not through the UI."
-        ))
+        raise UserError(
+            _(
+                "Hub audit events are append-only and cannot be deleted. "
+                "If retention requires purging, do so via a controlled "
+                "database-level archive procedure, not through the UI."
+            )
+        )
 
     # ------------------------------------------------------------------
     # Convenience API
     # ------------------------------------------------------------------
     @api.model
-    def log(self, event_type, summary, payload=None, tenant_id=False,
-            object_ref=False, user_id=False):
+    def log(self, event_type, summary, payload=None, tenant_id=False, object_ref=False, user_id=False):
         """Convenience helper — used by other modules to add an event."""
         vals = {
             "event_type": event_type,
@@ -181,9 +179,7 @@ class CustomHubAuditEvent(models.Model):
                 "user_id": r.user_id.id if r.user_id else False,
                 "event_type": r.event_type,
                 "tenant_id": r.tenant_id.id if r.tenant_id else False,
-                "object_ref": r.object_ref and (
-                    f"{r.object_ref._name},{r.object_ref.id}"
-                ) or False,
+                "object_ref": r.object_ref and (f"{r.object_ref._name},{r.object_ref.id}") or False,
                 "summary": r.summary,
                 "payload": r.payload,
                 "prev_hash": prev,

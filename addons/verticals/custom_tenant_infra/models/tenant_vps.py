@@ -10,7 +10,6 @@ that the orchestrator resolves at SSH-time.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -80,7 +79,11 @@ class TenantVps(models.Model):
     docker_version = fields.Char()
 
     state = fields.Selection(
-        VPS_STATES, default="registered", required=True, tracking=True, index=True,
+        VPS_STATES,
+        default="registered",
+        required=True,
+        tracking=True,
+        index=True,
     )
 
     prometheus_target_url = fields.Char(string="Prometheus Target URL")
@@ -92,10 +95,13 @@ class TenantVps(models.Model):
     last_health_check_at = fields.Datetime()
 
     environment_ids = fields.One2many(
-        "tenant.environment", "vps_id", string="Environments",
+        "tenant.environment",
+        "vps_id",
+        string="Environments",
     )
     environment_count = fields.Integer(
-        compute="_compute_environment_count", store=False,
+        compute="_compute_environment_count",
+        store=False,
     )
 
     _sql_constraints = [
@@ -117,9 +123,7 @@ class TenantVps(models.Model):
         self.ensure_one()
         allowed = ALLOWED_TRANSITIONS.get(self.state, set())
         if new_state not in allowed and new_state != self.state:
-            raise UserError(
-                _("Invalid VPS state transition: %s → %s") % (self.state, new_state)
-            )
+            raise UserError(_("Invalid VPS state transition: %s → %s") % (self.state, new_state))
 
     def _set_state(self, new_state: str) -> None:
         self.ensure_one()
@@ -167,10 +171,7 @@ class TenantVps(models.Model):
     def action_deploy_odoo_stack(self):
         for rec in self:
             if rec.state not in ("active", "degraded"):
-                raise UserError(
-                    _("VPS must be active before deploying a stack (current: %s)")
-                    % rec.state
-                )
+                raise UserError(_("VPS must be active before deploying a stack (current: %s)") % rec.state)
             envs = rec.environment_ids.filtered(lambda e: e.env_type in ("dev", "staging", "prod"))
             if not envs:
                 raise UserError(_("No environments linked to this VPS."))

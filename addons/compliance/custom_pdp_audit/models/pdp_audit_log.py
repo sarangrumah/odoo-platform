@@ -38,9 +38,11 @@ class PdpAuditLog(models.Model):
         # init — but cluster-init only fires for DB `postgres` on first boot,
         # so per-tenant DBs need this idempotent re-apply during module init.
         import os as _os
+
         _sql_path = _os.path.join(
             _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
-            "data", "pdp_schema.sql",
+            "data",
+            "pdp_schema.sql",
         )
         if _os.path.isfile(_sql_path):
             with open(_sql_path, "r", encoding="utf-8") as _f:
@@ -82,7 +84,8 @@ class PdpAuditLog(models.Model):
         else:
             broken = ", ".join(str(r[0]) for r in rows[:10])
             msg = "Audit chain BROKEN at row(s): %s%s" % (
-                broken, " ..." if len(rows) > 10 else "",
+                broken,
+                " ..." if len(rows) > 10 else "",
             )
             kind = "danger"
         return {

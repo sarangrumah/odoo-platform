@@ -12,5 +12,5 @@ class ResPartner(models.Model):
         string="Vertical Example Tag",
         default="example",
         help="Free-form tag used by the Custom Vertical (Example) module. "
-             "Replace with vertical-specific fields when forking.",
+        "Replace with vertical-specific fields when forking.",
     )

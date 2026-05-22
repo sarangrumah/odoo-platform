@@ -15,13 +15,13 @@ def test_valid_slugs(slug):
 @pytest.mark.parametrize(
     "slug",
     [
-        "",            # empty
-        "a",           # too short
-        "1acme",       # cannot start with digit
-        "Acme",        # no uppercase
-        "acme-corp",   # no dash
-        "acme.corp",   # no dot
-        "a" * 64,      # too long
+        "",  # empty
+        "a",  # too short
+        "1acme",  # cannot start with digit
+        "Acme",  # no uppercase
+        "acme-corp",  # no dash
+        "acme.corp",  # no dot
+        "a" * 64,  # too long
         "drop table",  # spaces
     ],
 )

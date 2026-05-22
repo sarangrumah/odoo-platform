@@ -24,9 +24,7 @@ class HelpdeskTicket(models.Model):
             raise UserError(_("Ticket has no customer set."))
         phone = partner.mobile or partner.phone
         if not phone:
-            raise UserError(_(
-                "Customer %s has no phone/mobile set; cannot send WhatsApp."
-            ) % partner.display_name)
+            raise UserError(_("Customer %s has no phone/mobile set; cannot send WhatsApp.") % partner.display_name)
 
         Account = self.env["whatsapp.account"]
         account = Account.search(
@@ -36,9 +34,7 @@ class HelpdeskTicket(models.Model):
         if not account:
             raise UserError(_("No active WhatsApp account configured."))
 
-        body = _(
-            "Halo %(name)s,\n\nUpdate tiket %(ticket)s: %(subject)s\nStatus: %(state)s"
-        ) % {
+        body = _("Halo %(name)s,\n\nUpdate tiket %(ticket)s: %(subject)s\nStatus: %(state)s") % {
             "name": partner.name or "",
             "ticket": self.name or "",
             "subject": getattr(self, "subject", "") or self.name or "",

@@ -11,7 +11,9 @@ class HhtRegenerateSecretWizard(models.TransientModel):
     _description = "Rotate HHT Device API Secret"
 
     device_id = fields.Many2one(
-        "hht.device", string="Device", required=True,
+        "hht.device",
+        string="Device",
+        required=True,
         default=lambda self: self.env.context.get("active_id"),
     )
     confirm = fields.Boolean(
@@ -23,6 +25,7 @@ class HhtRegenerateSecretWizard(models.TransientModel):
         self.ensure_one()
         if not self.confirm:
             from odoo.exceptions import UserError
+
             raise UserError(_("Please tick the confirmation checkbox."))
         if not self.env.user.has_group("custom_hht_bridge.group_hht_admin"):
             raise AccessError(_("Only HHT admins may rotate device secrets."))

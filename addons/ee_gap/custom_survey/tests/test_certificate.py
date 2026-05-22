@@ -5,7 +5,6 @@ from odoo.tests.common import TransactionCase
 
 
 class TestCertificate(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.Survey = self.env["survey.survey"]
@@ -30,6 +29,7 @@ class TestCertificate(TransactionCase):
         survey = self._make_survey(x_is_certification=False)
         ui = self.UserInput.create({"survey_id": survey.id})
         from odoo.exceptions import UserError
+
         with self.assertRaises(UserError):
             survey.action_issue_certificate(ui)
 

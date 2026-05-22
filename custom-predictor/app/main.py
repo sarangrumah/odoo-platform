@@ -80,7 +80,9 @@ async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
     scheduler.add_job(run_once, "interval", hours=s.interval_hours, args=[prom], id="predict_loop", next_run_time=None)
     # Seed run in 2 minutes (after Prom warms up)
-    scheduler.add_job(run_once, "date", run_date=datetime.now() + __import__("datetime").timedelta(minutes=2), args=[prom])
+    scheduler.add_job(
+        run_once, "date", run_date=datetime.now() + __import__("datetime").timedelta(minutes=2), args=[prom]
+    )
     scheduler.start()
 
     try:

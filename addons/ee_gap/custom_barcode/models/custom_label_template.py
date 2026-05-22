@@ -16,36 +16,47 @@ class CustomLabelTemplate(models.Model):
     The template_source uses ``{{field}}`` or ``{{rel.field}}`` placeholders
     that are substituted against an arbitrary record at render time.
     """
+
     _name = "custom.label.template"
     _description = "Label Template"
     _order = "sequence, id"
 
     name = fields.Char(required=True)
     sequence = fields.Integer(default=10)
-    paper_format = fields.Selection([
-        ("zebra_2x1", "Zebra 2x1 inch (203 dpi)"),
-        ("zebra_4x6", "Zebra 4x6 inch (203 dpi)"),
-        ("thermal_50x30", "Thermal 50x30 mm"),
-        ("a4_30up", "A4 30-up sheet"),
-        ("custom", "Custom (use width_mm / height_mm)"),
-    ], default="zebra_2x1", required=True)
+    paper_format = fields.Selection(
+        [
+            ("zebra_2x1", "Zebra 2x1 inch (203 dpi)"),
+            ("zebra_4x6", "Zebra 4x6 inch (203 dpi)"),
+            ("thermal_50x30", "Thermal 50x30 mm"),
+            ("a4_30up", "A4 30-up sheet"),
+            ("custom", "Custom (use width_mm / height_mm)"),
+        ],
+        default="zebra_2x1",
+        required=True,
+    )
     width_mm = fields.Float(default=50.0)
     height_mm = fields.Float(default=25.0)
-    output_mode = fields.Selection([
-        ("zpl", "ZPL (Zebra)"),
-        ("escpos", "ESC/POS (Thermal)"),
-        ("pdf", "PDF"),
-    ], default="zpl", required=True)
+    output_mode = fields.Selection(
+        [
+            ("zpl", "ZPL (Zebra)"),
+            ("escpos", "ESC/POS (Thermal)"),
+            ("pdf", "PDF"),
+        ],
+        default="zpl",
+        required=True,
+    )
     template_source = fields.Text(
         help="Template body. Use {{field}} placeholders (dot-notation for "
-             "related fields, e.g. {{product_id.default_code}}).",
+        "related fields, e.g. {{product_id.default_code}}).",
     )
     applies_to = fields.Many2one(
-        "ir.model", string="Applies To",
+        "ir.model",
+        string="Applies To",
         help="Target model whose records this template renders.",
     )
     company_id = fields.Many2one(
-        "res.company", default=lambda s: s.env.company,
+        "res.company",
+        default=lambda s: s.env.company,
     )
     active = fields.Boolean(default=True)
     notes = fields.Text()

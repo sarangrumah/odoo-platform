@@ -60,10 +60,12 @@ async def build_bundle(prom: PromClient, window_seconds: int = 7 * 24 * 3600) ->
             series = await prom.query_range(spec["query"], window_seconds=window_seconds, step_seconds=900)
         except Exception:
             series = None
-        metrics.append({
-            "name": spec["name"],
-            "unit": spec["unit"],
-            "current_max_capacity": spec["max"],
-            "series": series.points if series else [],
-        })
+        metrics.append(
+            {
+                "name": spec["name"],
+                "unit": spec["unit"],
+                "current_max_capacity": spec["max"],
+                "series": series.points if series else [],
+            }
+        )
     return Bundle(metrics=metrics)

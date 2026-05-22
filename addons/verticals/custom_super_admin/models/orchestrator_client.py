@@ -31,9 +31,7 @@ class OrchestratorClient(models.AbstractModel):
 
     @api.model
     def _base_url(self) -> str:
-        param = self.env["ir.config_parameter"].sudo().get_param(
-            "custom_super_admin.orchestrator_url"
-        )
+        param = self.env["ir.config_parameter"].sudo().get_param("custom_super_admin.orchestrator_url")
         return (param or DEFAULT_BASE_URL).rstrip("/")
 
     @api.model
@@ -47,9 +45,7 @@ class OrchestratorClient(models.AbstractModel):
     ) -> dict[str, Any] | list[dict[str, Any]]:
         url = f"{self._base_url()}{path}"
         body_bytes = json.dumps(body).encode() if body is not None else b""
-        header, _ = self.env["custom.security"].sudo().sign_for(
-            "ORCHESTRATOR_SHARED_SECRET", body_bytes
-        )
+        header, _ = self.env["custom.security"].sudo().sign_for("ORCHESTRATOR_SHARED_SECRET", body_bytes)
         actor_name = actor or (self.env.user.login if self.env.user else "system")
         headers = {
             "Content-Type": "application/json",
@@ -61,11 +57,12 @@ class OrchestratorClient(models.AbstractModel):
         if resp.status_code >= 400:
             _logger.warning(
                 "orchestrator.error method=%s path=%s status=%s body=%s",
-                method, path, resp.status_code, resp.text[:300],
+                method,
+                path,
+                resp.status_code,
+                resp.text[:300],
             )
-            raise RuntimeError(
-                f"Orchestrator {method} {path} → {resp.status_code}: {resp.text[:200]}"
-            )
+            raise RuntimeError(f"Orchestrator {method} {path} → {resp.status_code}: {resp.text[:200]}")
         if resp.status_code == 204 or not resp.content:
             return {}
         return resp.json()
@@ -87,9 +84,7 @@ class OrchestratorClient(models.AbstractModel):
 
     @api.model
     def suspend(self, slug: str, reason: str | None = None) -> dict:
-        return self._request(
-            "POST", f"/v1/tenants/{slug}/suspend", body={"reason": reason}
-        )  # type: ignore[return-value]
+        return self._request("POST", f"/v1/tenants/{slug}/suspend", body={"reason": reason})  # type: ignore[return-value]
 
     @api.model
     def resume(self, slug: str) -> dict:
@@ -97,23 +92,17 @@ class OrchestratorClient(models.AbstractModel):
 
     @api.model
     def archive(self, slug: str, retention_days: int = 30) -> dict:
-        return self._request(
-            "DELETE", f"/v1/tenants/{slug}", body={"retention_days": retention_days}
-        )  # type: ignore[return-value]
+        return self._request("DELETE", f"/v1/tenants/{slug}", body={"retention_days": retention_days})  # type: ignore[return-value]
 
     # ----- Backups -----
 
     @api.model
     def list_backups(self, slug: str, limit: int = 100) -> list[dict]:
-        return self._request(
-            "GET", f"/v1/tenants/{slug}/backups?limit={limit}"
-        )  # type: ignore[return-value]
+        return self._request("GET", f"/v1/tenants/{slug}/backups?limit={limit}")  # type: ignore[return-value]
 
     @api.model
     def run_backup(self, slug: str, kind: str = "manual") -> dict:
-        return self._request(
-            "POST", f"/v1/tenants/{slug}/backups", body={"kind": kind}
-        )  # type: ignore[return-value]
+        return self._request("POST", f"/v1/tenants/{slug}/backups", body={"kind": kind})  # type: ignore[return-value]
 
     @api.model
     def restore_backup(self, slug: str, s3_key: str, target_db: str | None = None) -> dict:

@@ -8,6 +8,7 @@ service. Wizards push the desired ``report_code`` + filters via the
 builds its context, then hands off to a router QWeb template that
 in turn includes the per-report layout.
 """
+
 from odoo import models
 
 
@@ -37,17 +38,15 @@ class CustomReportDispatch(models.AbstractModel):
         data = data or {}
         report_code = data.get("report_code") or "trial_balance"
         model_name = REPORT_MODEL_MAP.get(
-            report_code, "custom.report.trial.balance",
+            report_code,
+            "custom.report.trial.balance",
         )
         report = self.env[model_name]
         ctx = report._compute(data.get("options") or data.get("filters"))
         return {
             "doc_ids": docids,
             "doc_model": data.get("doc_model", ""),
-            "docs": (
-                self.env[data["doc_model"]].browse(docids)
-                if data.get("doc_model") else []
-            ),
+            "docs": (self.env[data["doc_model"]].browse(docids) if data.get("doc_model") else []),
             "report_code": report_code,
             **ctx,
         }

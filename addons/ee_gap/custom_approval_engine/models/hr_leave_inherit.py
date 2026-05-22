@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 
 
 class HrLeave(models.Model):
@@ -38,10 +38,7 @@ class HrLeave(models.Model):
         if not self.employee_id or not self.employee_id.user_id:
             return
         user = self.employee_id.user_id
-        manager = (
-            self.employee_id.parent_id.user_id
-            if self.employee_id.parent_id else False
-        )
+        manager = self.employee_id.parent_id.user_id if self.employee_id.parent_id else False
         OOO = self.env["approval.ooo"].sudo()
         vals = {
             "user_id": user.id,

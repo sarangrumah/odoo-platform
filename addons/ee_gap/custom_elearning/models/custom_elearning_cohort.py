@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-from datetime import date, timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -76,9 +75,7 @@ class CustomElearningCohort(models.Model):
         Employee = self.env["hr.employee"]
         dept = department_id or self.department_id.id
         if not dept:
-            raise UserError(
-                _("No department supplied for auto-enrolment.")
-            )
+            raise UserError(_("No department supplied for auto-enrolment."))
         if isinstance(dept, models.BaseModel):
             dept_id = dept.id
         else:
@@ -96,9 +93,7 @@ class CustomElearningCohort(models.Model):
 
         new_partners = partners - self.member_ids
         if new_partners:
-            self.write(
-                {"member_ids": [(4, p.id) for p in new_partners]}
-            )
+            self.write({"member_ids": [(4, p.id) for p in new_partners]})
             # Also create the slide.channel.partner enrolment row.
             SCP = self.env["slide.channel.partner"]
             for p in new_partners:
@@ -117,10 +112,8 @@ class CustomElearningCohort(models.Model):
                         }
                     )
             self.message_post(
-                body=_(
-                    "Auto-enrolled %(count)s member(s) from department "
-                    "%(dept)s."
-                ) % {
+                body=_("Auto-enrolled %(count)s member(s) from department %(dept)s.")
+                % {
                     "count": len(new_partners),
                     "dept": self.env["hr.department"].browse(dept_id).name,
                 }
@@ -179,8 +172,7 @@ class CustomElearningCohort(models.Model):
                     sent += 1
                 except Exception as exc:  # pragma: no cover - defensive
                     _logger.warning(
-                        "custom_elearning: reminder send failed cohort=%s "
-                        "partner=%s: %s",
+                        "custom_elearning: reminder send failed cohort=%s partner=%s: %s",
                         self.id,
                         partner.id,
                         exc,
@@ -188,14 +180,11 @@ class CustomElearningCohort(models.Model):
             else:
                 # Fallback: post a chatter note on the cohort.
                 self.message_post(
-                    body=_(
-                        "Reminder owed to %(name)s — completion %(c).0f%%"
-                    ) % {"name": partner.display_name, "c": completion}
+                    body=_("Reminder owed to %(name)s — completion %(c).0f%%")
+                    % {"name": partner.display_name, "c": completion}
                 )
                 sent += 1
         if sent:
             self.last_reminder_date = today
-            self.message_post(
-                body=_("Dispatched %s completion reminder(s).") % sent
-            )
+            self.message_post(body=_("Dispatched %s completion reminder(s).") % sent)
         return sent

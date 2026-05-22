@@ -22,9 +22,7 @@ class CustomLivechatChatbotScript(models.Model):
         string="Steps",
         copy=True,
     )
-    step_count = fields.Integer(
-        string="Step Count", compute="_compute_step_count"
-    )
+    step_count = fields.Integer(string="Step Count", compute="_compute_step_count")
 
     @api.depends("step_ids")
     def _compute_step_count(self):

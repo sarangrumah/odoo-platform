@@ -26,9 +26,14 @@ class QualityPoint(models.Model):
     sequence = fields.Integer(default=10)
     product_id = fields.Many2one("product.product")
     operation = fields.Selection(
-        [("incoming", "Incoming Goods"), ("manufacturing", "Manufacturing"),
-         ("outgoing", "Outgoing"), ("ad_hoc", "Ad-hoc")],
-        default="manufacturing", required=True,
+        [
+            ("incoming", "Incoming Goods"),
+            ("manufacturing", "Manufacturing"),
+            ("outgoing", "Outgoing"),
+            ("ad_hoc", "Ad-hoc"),
+        ],
+        default="manufacturing",
+        required=True,
     )
     check_kind = fields.Selection(CHECK_KINDS, required=True, default="pass_fail")
     frequency = fields.Selection(FREQUENCIES, required=True, default="every")
@@ -39,7 +44,7 @@ class QualityPoint(models.Model):
     active = fields.Boolean(default=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
     default_test_id = fields.Many2one(
-        "custom.quality.test", string="Default Test Template",
-        help="When provided, new quality.check records seeded from this "
-             "point will copy the test's inspection lines.",
+        "custom.quality.test",
+        string="Default Test Template",
+        help="When provided, new quality.check records seeded from this point will copy the test's inspection lines.",
     )

@@ -13,10 +13,12 @@ class PartnerLedgerWizard(models.TransientModel):
         default=lambda self: date.today().replace(month=1, day=1),
     )
     date_to = fields.Date(
-        required=True, default=lambda self: date.today(),
+        required=True,
+        default=lambda self: date.today(),
     )
     company_ids = fields.Many2many(
-        "res.company", default=lambda self: self.env.companies,
+        "res.company",
+        default=lambda self: self.env.companies,
     )
     partner_ids = fields.Many2many("res.partner")
     partner_kind = fields.Selection(
@@ -25,7 +27,8 @@ class PartnerLedgerWizard(models.TransientModel):
             ("receivable", "Receivable Only"),
             ("payable", "Payable Only"),
         ],
-        default="both", required=True,
+        default="both",
+        required=True,
     )
     posted_only = fields.Boolean(default=True)
 
@@ -51,6 +54,4 @@ class PartnerLedgerWizard(models.TransientModel):
                 "date_to": self.date_to.isoformat(),
             },
         }
-        return self.env.ref(
-            "custom_accounting_reports.action_report_custom_financial"
-        ).report_action(self, data=data)
+        return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)

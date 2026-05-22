@@ -54,7 +54,7 @@ class AccountTax(models.Model):
         digits=(12, 6),
         default=1.0,
         help="Multiplier applied to the subtotal when 'DPP Method = Nilai Lain'. "
-             "E.g. 11/12 ≈ 0.916667 for the PPN 11%-effective-via-12% transition.",
+        "E.g. 11/12 ≈ 0.916667 for the PPN 11%-effective-via-12% transition.",
     )
     x_custom_dpp_category = fields.Selection(
         DPP_CATEGORY_SELECTION,
@@ -78,17 +78,23 @@ class AccountTax(models.Model):
 
     def _eval_tax_amount_price_excluded(self, batch, raw_base, evaluation_context):
         return super()._eval_tax_amount_price_excluded(
-            batch, self._dpp_adjust(raw_base), evaluation_context,
+            batch,
+            self._dpp_adjust(raw_base),
+            evaluation_context,
         )
 
     def _eval_tax_amount_price_included(self, batch, raw_base, evaluation_context):
         return super()._eval_tax_amount_price_included(
-            batch, self._dpp_adjust(raw_base), evaluation_context,
+            batch,
+            self._dpp_adjust(raw_base),
+            evaluation_context,
         )
 
     def _eval_tax_amount_fixed_amount(self, batch, raw_base, evaluation_context):
         return super()._eval_tax_amount_fixed_amount(
-            batch, self._dpp_adjust(raw_base), evaluation_context,
+            batch,
+            self._dpp_adjust(raw_base),
+            evaluation_context,
         )
 
     @api.constrains("x_custom_dpp_method", "x_custom_dpp_factor")
@@ -96,6 +102,4 @@ class AccountTax(models.Model):
         for rec in self:
             if rec.x_custom_dpp_method == "nilai_lain":
                 if not rec.x_custom_dpp_factor or rec.x_custom_dpp_factor <= 0:
-                    raise ValidationError(
-                        _("DPP Nilai Lain requires a positive ``dpp_factor`` (e.g. 11/12).")
-                    )
+                    raise ValidationError(_("DPP Nilai Lain requires a positive ``dpp_factor`` (e.g. 11/12)."))

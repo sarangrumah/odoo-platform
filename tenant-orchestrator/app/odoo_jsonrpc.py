@@ -42,9 +42,7 @@ class _OdooConfig:
         self.url = os.environ.get("ODOO_MGMT_URL", "http://odoo-mgmt:8069").rstrip("/")
         self.db = os.environ.get("ODOO_MGMT_DB", "odoo_mgmt")
         self.user = os.environ.get("ODOO_MGMT_USER", "admin")
-        self.password = os.environ.get("ODOO_MGMT_PASSWORD") or os.environ.get(
-            "ODOO_MGMT_API_KEY", ""
-        )
+        self.password = os.environ.get("ODOO_MGMT_PASSWORD") or os.environ.get("ODOO_MGMT_API_KEY", "")
         self.timeout = float(os.environ.get("ODOO_MGMT_TIMEOUT", "30"))
 
 
@@ -143,9 +141,8 @@ def call(
         if body.get("error"):
             err = body["error"]
             data = err.get("data") or {}
-            raise OdooRpcError(
-                f"Odoo RPC error on {model}.{method}: {err.get('message')}: {data.get('message') or data.get('debug', '')[:300]}"
-            )
+            detail = data.get("message") or data.get("debug", "")[:300]
+            raise OdooRpcError(f"Odoo RPC error on {model}.{method}: {err.get('message')}: {detail}")
         return body.get("result")
 
     try:

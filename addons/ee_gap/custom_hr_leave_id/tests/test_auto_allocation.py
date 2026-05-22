@@ -14,9 +14,7 @@ class TestAutoAllocation(TransactionCase):
         self.Allocation = self.env["hr.leave.allocation"]
 
         # Ensure at least one annual-leave type with the ID category exists.
-        self.annual_type = self.LeaveType.search(
-            [("x_id_leave_category", "=", "cuti_tahunan")], limit=1
-        )
+        self.annual_type = self.LeaveType.search([("x_id_leave_category", "=", "cuti_tahunan")], limit=1)
         if not self.annual_type:
             self.annual_type = self.LeaveType.create(
                 {
@@ -31,9 +29,7 @@ class TestAutoAllocation(TransactionCase):
 
     def test_auto_allocation_creates_record(self):
         before = self.Allocation.search_count([])
-        employee = self.Employee.create(
-            {"name": "Test Auto Allocation", "x_auto_leave_allocation": True}
-        )
+        employee = self.Employee.create({"name": "Test Auto Allocation", "x_auto_leave_allocation": True})
         after = self.Allocation.search_count([])
         # At least one new allocation should exist for this employee/type.
         self.assertGreater(after, before)
@@ -53,11 +49,7 @@ class TestAutoAllocation(TransactionCase):
 
     def test_no_allocation_when_flag_off(self):
         before = self.Allocation.search_count([])
-        employee = self.Employee.create(
-            {"name": "Test No Auto", "x_auto_leave_allocation": False}
-        )
+        employee = self.Employee.create({"name": "Test No Auto", "x_auto_leave_allocation": False})
         after = self.Allocation.search_count([])
         self.assertEqual(after, before)
-        self.assertFalse(
-            self.Allocation.search([("employee_id", "=", employee.id)])
-        )
+        self.assertFalse(self.Allocation.search([("employee_id", "=", employee.id)]))

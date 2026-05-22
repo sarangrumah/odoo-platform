@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import secrets
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class Document(models.Model):
@@ -15,7 +15,8 @@ class Document(models.Model):
     tag_ids = fields.Many2many(
         "document.tag",
         "document_tag_rel",
-        "doc_id", "tag_id",
+        "doc_id",
+        "tag_id",
         string="Tags",
     )
     classification_id = fields.Many2one(
@@ -43,7 +44,9 @@ class Document(models.Model):
     owner_id = fields.Many2one("res.users", default=lambda s: s.env.user, required=True)
     state = fields.Selection(
         [("draft", "Draft"), ("published", "Published"), ("archived", "Archived")],
-        default="draft", required=True, tracking=True,
+        default="draft",
+        required=True,
+        tracking=True,
     )
 
     @api.depends("workspace_id")
@@ -68,12 +71,14 @@ class Document(models.Model):
         records = super().create(vals_list)
         Version = self.env["document.version"].sudo()
         for rec in records:
-            Version.create({
-                "document_id": rec.id,
-                "attachment_id": rec.attachment_id.id,
-                "comment": "Initial version",
-                "version": 1,
-            })
+            Version.create(
+                {
+                    "document_id": rec.id,
+                    "attachment_id": rec.attachment_id.id,
+                    "comment": "Initial version",
+                    "version": 1,
+                }
+            )
         return records
 
     def action_publish(self):
@@ -88,11 +93,14 @@ class Document(models.Model):
 
     def action_generate_share_link(self):
         from datetime import timedelta
+
         for rec in self:
-            rec.write({
-                "share_token": secrets.token_urlsafe(32),
-                "share_expires_at": fields.Datetime.now() + timedelta(days=7),
-            })
+            rec.write(
+                {
+                    "share_token": secrets.token_urlsafe(32),
+                    "share_expires_at": fields.Datetime.now() + timedelta(days=7),
+                }
+            )
             rec._pdp_audit_write("document_share_link_generated", rec.id, None)
         return True
 
@@ -104,15 +112,23 @@ class Document(models.Model):
     def action_upload_new_version(self, attachment_id: int, comment: str = ""):
         """Called after the user uploads a replacement file."""
         self.ensure_one()
-        latest = self.env["document.version"].sudo().search(
-            [("document_id", "=", self.id)], order="version desc", limit=1,
+        latest = (
+            self.env["document.version"]
+            .sudo()
+            .search(
+                [("document_id", "=", self.id)],
+                order="version desc",
+                limit=1,
+            )
         )
         new_version = (latest.version + 1) if latest else 1
-        self.env["document.version"].sudo().create({
-            "document_id": self.id,
-            "attachment_id": attachment_id,
-            "version": new_version,
-            "comment": comment,
-        })
+        self.env["document.version"].sudo().create(
+            {
+                "document_id": self.id,
+                "attachment_id": attachment_id,
+                "version": new_version,
+                "comment": comment,
+            }
+        )
         self.write({"attachment_id": attachment_id})
         self._pdp_audit_write("document_new_version", self.id, {"version": new_version})

@@ -47,13 +47,12 @@ class HrJob(models.Model):
             ext = "JS-MOCK-%s" % uuid.uuid4().hex[:12].upper()
             job.write({"x_external_post_id_jobstreet": ext})
             job.message_post(
-                body=_(
-                    "Job posted to <b>Jobstreet</b> (stub). External post ID: <code>%s</code>"
-                ) % ext,
+                body=_("Job posted to <b>Jobstreet</b> (stub). External post ID: <code>%s</code>") % ext,
             )
             _logger.info(
                 "custom_recruitment_id: job %s posted to Jobstreet stub id=%s",
-                job.id, ext,
+                job.id,
+                ext,
             )
         return True
 
@@ -69,12 +68,11 @@ class HrJob(models.Model):
             ext = "GL-MOCK-%s" % uuid.uuid4().hex[:12].upper()
             job.write({"x_external_post_id_glints": ext})
             job.message_post(
-                body=_(
-                    "Job posted to <b>Glints</b> (stub). External post ID: <code>%s</code>"
-                ) % ext,
+                body=_("Job posted to <b>Glints</b> (stub). External post ID: <code>%s</code>") % ext,
             )
             _logger.info(
                 "custom_recruitment_id: job %s posted to Glints stub id=%s",
-                job.id, ext,
+                job.id,
+                ext,
             )
         return True

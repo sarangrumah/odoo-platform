@@ -247,6 +247,7 @@ def _probe_server_time(base_url: str) -> None:
     global _TIME_OFFSET
     try:
         from email.utils import parsedate_to_datetime
+
         with urllib.request.urlopen(f"{base_url.rstrip('/')}/health", timeout=10) as r:
             server_date = r.headers.get("Date")
         if server_date:
@@ -265,7 +266,9 @@ def _sign(secret: str, body: bytes) -> tuple[str, str]:
     return f"t={ts},v1={digest}", ts
 
 
-def call_ai_gateway(*, system: str, user: str, base_url: str, secret: str, quality: str = "fast", max_tokens: int = 4000) -> str:
+def call_ai_gateway(
+    *, system: str, user: str, base_url: str, secret: str, quality: str = "fast", max_tokens: int = 4000
+) -> str:
     body_dict = {
         "messages": [{"role": "user", "content": user}],
         "system": system,
@@ -333,10 +336,17 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="Print the prompt, do not call LLM or write.")
     ap.add_argument("--limit", type=int, default=0, help="Cap how many modules to process this run (0 = no cap).")
     ap.add_argument("--gateway", default=DEFAULT_GATEWAY_URL, help=f"AI gateway URL (default {DEFAULT_GATEWAY_URL}).")
-    ap.add_argument("--secret", default=os.environ.get("GATEWAY_SHARED_SECRET", ""),
-                    help="HMAC shared secret (default: env GATEWAY_SHARED_SECRET).")
-    ap.add_argument("--quality", choices=("fast", "high"), default="fast",
-                    help="Model tier: 'fast' = Sonnet 4.6 (~Rp 1-2rb/modul), 'high' = Opus 4.7 (~Rp 5-10rb/modul). Default 'fast'.")
+    ap.add_argument(
+        "--secret",
+        default=os.environ.get("GATEWAY_SHARED_SECRET", ""),
+        help="HMAC shared secret (default: env GATEWAY_SHARED_SECRET).",
+    )
+    ap.add_argument(
+        "--quality",
+        choices=("fast", "high"),
+        default="fast",
+        help="Model tier: 'fast' = Sonnet 4.6 (~Rp 1-2rb/modul), 'high' = Opus 4.7 (~Rp 5-10rb/modul). Default 'fast'.",
+    )
     ap.add_argument("--sleep", type=float, default=2.0, help="Seconds to sleep between calls (default 2.0).")
     args = ap.parse_args()
 
@@ -381,7 +391,9 @@ def main() -> int:
             print("--- END ---")
             continue
         try:
-            body = call_ai_gateway(system=SYSTEM_PROMPT, user=user, base_url=args.gateway, secret=args.secret, quality=args.quality)
+            body = call_ai_gateway(
+                system=SYSTEM_PROMPT, user=user, base_url=args.gateway, secret=args.secret, quality=args.quality
+            )
         except urllib.error.HTTPError as e:
             err_body = ""
             try:
@@ -407,8 +419,10 @@ def main() -> int:
     if failed:
         print(f"\n{len(failed)} failed: {', '.join(failed)}", file=sys.stderr)
         return 1
-    print(f"\nOK — {len(target)} knowledge file(s) generated. Review the diffs, "
-          f"flip ``status: draft`` to ``status: reviewed`` in each, then commit.")
+    print(
+        f"\nOK — {len(target)} knowledge file(s) generated. Review the diffs, "
+        f"flip ``status: draft`` to ``status: reviewed`` in each, then commit."
+    )
     return 0
 
 

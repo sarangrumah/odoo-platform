@@ -4,12 +4,13 @@
 A cron rebuilds the top-N trending tags per period by summing post counts
 and view counts over the last 7 days.
 """
+
 from __future__ import annotations
 
 import logging
 from datetime import timedelta
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -30,12 +31,8 @@ class ForumTrendingTopic(models.Model):
 
     display_name = fields.Char(compute="_compute_display_name", store=True)
 
-    forum_id = fields.Many2one(
-        "forum.forum", string="Forum", required=True, ondelete="cascade", index=True
-    )
-    tag_id = fields.Many2one(
-        "forum.tag", string="Tag", required=True, ondelete="cascade", index=True
-    )
+    forum_id = fields.Many2one("forum.forum", string="Forum", required=True, ondelete="cascade", index=True)
+    tag_id = fields.Many2one("forum.tag", string="Tag", required=True, ondelete="cascade", index=True)
     score = fields.Integer(string="Trend Score", default=0)
     period = fields.Selection(
         selection=[
@@ -47,9 +44,7 @@ class ForumTrendingTopic(models.Model):
         required=True,
         index=True,
     )
-    compute_date = fields.Datetime(
-        string="Computed At", default=fields.Datetime.now, index=True
-    )
+    compute_date = fields.Datetime(string="Computed At", default=fields.Datetime.now, index=True)
     post_count = fields.Integer(string="Posts (window)", default=0)
     view_count = fields.Integer(string="Views (window)", default=0)
     rank = fields.Integer(string="Rank", default=0)
@@ -103,16 +98,13 @@ class ForumTrendingTopic(models.Model):
             views = getattr(post, "views", 0) or 0
             for tag in tags:
                 key = (forum_id, tag.id)
-                bucket = buckets.setdefault(
-                    key, {"post_count": 0, "view_count": 0}
-                )
+                bucket = buckets.setdefault(key, {"post_count": 0, "view_count": 0})
                 bucket["post_count"] += 1
                 bucket["view_count"] += views
 
         # Score = post_count * 2 + view_count.  Posts weigh more than passive views.
         scored = [
-            (forum_id, tag_id, b["post_count"] * 2 + b["view_count"], b)
-            for (forum_id, tag_id), b in buckets.items()
+            (forum_id, tag_id, b["post_count"] * 2 + b["view_count"], b) for (forum_id, tag_id), b in buckets.items()
         ]
         # Per-forum top N.
         by_forum: dict[int, list] = {}
@@ -129,20 +121,20 @@ class ForumTrendingTopic(models.Model):
         written = 0
         for forum_id, items in by_forum.items():
             for rank_idx, (tag_id, score, b) in enumerate(items, start=1):
-                self.create({
-                    "forum_id": forum_id,
-                    "tag_id": tag_id,
-                    "period": period,
-                    "score": score,
-                    "post_count": b["post_count"],
-                    "view_count": b["view_count"],
-                    "rank": rank_idx,
-                    "compute_date": now,
-                })
+                self.create(
+                    {
+                        "forum_id": forum_id,
+                        "tag_id": tag_id,
+                        "period": period,
+                        "score": score,
+                        "post_count": b["post_count"],
+                        "view_count": b["view_count"],
+                        "rank": rank_idx,
+                        "compute_date": now,
+                    }
+                )
                 written += 1
-        _logger.info(
-            "custom_forum trending: wrote %s rows for period=%s", written, period
-        )
+        _logger.info("custom_forum trending: wrote %s rows for period=%s", written, period)
         return written
 
     @api.model

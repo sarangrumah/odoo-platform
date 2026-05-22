@@ -34,7 +34,7 @@ class CustomLivechatChatbotStep(models.Model):
     expected_answers = fields.Char(
         string="Expected Answers",
         help="Comma-separated regex patterns. Matched against the visitor "
-             "reply (case-insensitive) for 'question' steps.",
+        "reply (case-insensitive) for 'question' steps.",
     )
     next_step_default = fields.Many2one(
         "custom.livechat.chatbot.step",

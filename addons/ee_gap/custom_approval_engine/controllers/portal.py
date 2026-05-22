@@ -9,17 +9,18 @@ from odoo.http import request
 
 
 class ApprovalPortal(http.Controller):
-
     @http.route("/my/approvals", type="http", auth="user", website=True)
     def my_approvals(self):
         user = request.env.user
-        pending = request.env["approval.request"].sudo().search(
-            [("pending_approver_ids", "in", [user.id]), ("state", "=", "pending")],
-            order="due_at asc",
+        pending = (
+            request.env["approval.request"]
+            .sudo()
+            .search(
+                [("pending_approver_ids", "in", [user.id]), ("state", "=", "pending")],
+                order="due_at asc",
+            )
         )
-        return request.render(
-            "custom_approval_engine.portal_my_approvals", {"pending": pending}
-        )
+        return request.render("custom_approval_engine.portal_my_approvals", {"pending": pending})
 
     @http.route("/my/approvals/<int:request_id>", type="http", auth="user", website=True)
     def approval_detail(self, request_id: int):
@@ -30,9 +31,7 @@ class ApprovalPortal(http.Controller):
         user = request.env.user
         if user not in req.pending_approver_ids and user != req.requested_by_id:
             raise AccessError("You don't have access to this approval request.")
-        return request.render(
-            "custom_approval_engine.portal_approval_detail", {"req": req}
-        )
+        return request.render("custom_approval_engine.portal_approval_detail", {"req": req})
 
     @http.route(
         "/my/approvals/<int:request_id>/decide",

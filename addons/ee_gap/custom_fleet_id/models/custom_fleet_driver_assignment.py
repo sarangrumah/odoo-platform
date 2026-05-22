@@ -90,13 +90,14 @@ class CustomFleetDriverAssignment(models.Model):
         for rec in self:
             if rec.status != "active":
                 continue
-            dup = self.search_count([
-                ("vehicle_id", "=", rec.vehicle_id.id),
-                ("status", "=", "active"),
-                ("id", "!=", rec.id),
-            ])
+            dup = self.search_count(
+                [
+                    ("vehicle_id", "=", rec.vehicle_id.id),
+                    ("status", "=", "active"),
+                    ("id", "!=", rec.id),
+                ]
+            )
             if dup:
                 raise ValidationError(
-                    _("Vehicle %s already has an active driver assignment.")
-                    % rec.vehicle_id.display_name
+                    _("Vehicle %s already has an active driver assignment.") % rec.vehicle_id.display_name
                 )

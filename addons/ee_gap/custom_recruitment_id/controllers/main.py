@@ -36,15 +36,12 @@ _ALLOWED_SOURCES = ("jobstreet", "glints", "linkedin", "kalibrr", "direct")
 def _verify_signature(source: str, raw_body: bytes, provided: str) -> bool:
     if not provided:
         return False
-    secret = (
-        request.env["ir.config_parameter"]
-        .sudo()
-        .get_param("custom_recruitment_id.webhook_secret_%s" % source, "")
-    )
+    secret = request.env["ir.config_parameter"].sudo().get_param("custom_recruitment_id.webhook_secret_%s" % source, "")
     if not secret:
         # Without a configured secret, reject — fail closed.
         _logger.warning(
-            "custom_recruitment_id: missing webhook secret for source=%s", source,
+            "custom_recruitment_id: missing webhook secret for source=%s",
+            source,
         )
         return False
     digest = hmac.new(
@@ -60,7 +57,6 @@ def _verify_signature(source: str, raw_body: bytes, provided: str) -> bool:
 
 
 class CustomRecruitmentWebhookController(http.Controller):
-
     @http.route(
         "/custom_recruitment_id/webhook/<string:source>",
         type="http",
@@ -78,7 +74,8 @@ class CustomRecruitmentWebhookController(http.Controller):
         provided = request.httprequest.headers.get("X-Signature", "")
         if not _verify_signature(source, raw, provided):
             _logger.warning(
-                "custom_recruitment_id: signature mismatch for source=%s", source,
+                "custom_recruitment_id: signature mismatch for source=%s",
+                source,
             )
             return request.make_response("unauthorized", status=401)
 
@@ -86,17 +83,22 @@ class CustomRecruitmentWebhookController(http.Controller):
             data = json.loads(raw.decode("utf-8")) if raw else {}
         except (ValueError, UnicodeDecodeError) as exc:
             _logger.warning(
-                "custom_recruitment_id: bad JSON for source=%s: %s", source, exc,
+                "custom_recruitment_id: bad JSON for source=%s: %s",
+                source,
+                exc,
             )
             return request.make_response("bad json", status=400)
 
         try:
             request.env["custom.recruitment.webhook.log"].sudo().ingest_payload(
-                source, data,
+                source,
+                data,
             )
         except Exception as exc:  # noqa: BLE001
             _logger.exception(
-                "custom_recruitment_id: ingest failed for source=%s: %s", source, exc,
+                "custom_recruitment_id: ingest failed for source=%s: %s",
+                source,
+                exc,
             )
             return request.make_response("ingest error", status=500)
 

@@ -9,7 +9,6 @@ from .common import TaxIdCommon
 
 
 class TestNpwpValidation(TaxIdCommon):
-
     def test_15_digit_npwp_is_valid(self):
         p = self.Partner.create({"name": "Test", "x_custom_npwp": "012345678901234"})
         self.assertEqual(p.x_custom_npwp_status, "valid")

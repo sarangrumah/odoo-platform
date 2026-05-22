@@ -35,12 +35,14 @@ class SignRequestSigner(models.Model):
     def mark_opened(self, ip: str | None = None, ua: str | None = None):
         for rec in self:
             if rec.state == "waiting":
-                rec.write({
-                    "state": "opened",
-                    "opened_at": fields.Datetime.now(),
-                    "ip_address": ip,
-                    "user_agent": ua,
-                })
+                rec.write(
+                    {
+                        "state": "opened",
+                        "opened_at": fields.Datetime.now(),
+                        "ip_address": ip,
+                        "user_agent": ua,
+                    }
+                )
 
     def submit_signature(self, signature_data: bytes | None = None, signature_text: str | None = None):
         for rec in self:
@@ -48,14 +50,17 @@ class SignRequestSigner(models.Model):
                 raise UserError(_("Signer already responded."))
             if not signature_data and not signature_text:
                 raise UserError(_("Provide either a drawn signature or a typed name."))
-            rec.write({
-                "state": "signed",
-                "signed_at": fields.Datetime.now(),
-                "signature_data": signature_data,
-                "signature_text": signature_text,
-            })
+            rec.write(
+                {
+                    "state": "signed",
+                    "signed_at": fields.Datetime.now(),
+                    "signature_data": signature_data,
+                    "signature_text": signature_text,
+                }
+            )
             rec.request_id._pdp_audit_write(
-                "sign_signer_signed", rec.request_id.id,
+                "sign_signer_signed",
+                rec.request_id.id,
                 {"signer_id": rec.id, "email": rec.email},
             )
             rec.request_id._refresh_state()
@@ -64,6 +69,5 @@ class SignRequestSigner(models.Model):
         for rec in self:
             rec.write({"state": "declined"})
             rec.request_id.message_post(
-                body=_("Signer %(name)s declined: %(reason)s",
-                       name=rec.name, reason=reason or "—"),
+                body=_("Signer %(name)s declined: %(reason)s", name=rec.name, reason=reason or "—"),
             )

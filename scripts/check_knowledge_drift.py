@@ -21,11 +21,9 @@ Either mode reports a clean list so devs can act:
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import subprocess
 import sys
-from pathlib import Path
 
 _SOURCE_SUBDIRS = ("models/", "controllers/", "wizards/", "wizard/")
 _MANIFEST = "__manifest__.py"
@@ -67,11 +65,14 @@ def detect_drift(changed: list[str]) -> dict[str, dict]:
         if not m:
             continue
         category, module, rest = m.group(1), m.group(2), m.group(3)
-        entry = per_module.setdefault(module, {
-            "source_touched": False,
-            "knowledge_touched": False,
-            "path": f"addons/{category}/{module}",
-        })
+        entry = per_module.setdefault(
+            module,
+            {
+                "source_touched": False,
+                "knowledge_touched": False,
+                "path": f"addons/{category}/{module}",
+            },
+        )
         if rest == _KNOWLEDGE:
             entry["knowledge_touched"] = True
         elif _is_source(rest):
@@ -97,8 +98,7 @@ def main() -> int:
     if not changed:
         return 0
     per_module = detect_drift(changed)
-    drifted = {m: e for m, e in per_module.items()
-               if e["source_touched"] and not e["knowledge_touched"]}
+    drifted = {m: e for m, e in per_module.items() if e["source_touched"] and not e["knowledge_touched"]}
     if not drifted:
         return 0
 

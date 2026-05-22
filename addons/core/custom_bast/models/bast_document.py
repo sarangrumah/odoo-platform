@@ -13,11 +13,17 @@ class CustomBastDocument(models.Model):
     _rec_name = "name"
 
     name = fields.Char(
-        required=True, copy=False, readonly=True, default=lambda self: _("New"), tracking=True,
+        required=True,
+        copy=False,
+        readonly=True,
+        default=lambda self: _("New"),
+        tracking=True,
     )
     reference = fields.Reference(
         selection="_selection_reference_models",
-        string="Source Document", index=True, tracking=True,
+        string="Source Document",
+        index=True,
+        tracking=True,
     )
     kind = fields.Selection(
         [
@@ -27,10 +33,14 @@ class CustomBastDocument(models.Model):
             ("installation", "Installation"),
             ("handover", "Handover"),
         ],
-        required=True, default="handover", tracking=True,
+        required=True,
+        default="handover",
+        tracking=True,
     )
     date_handover = fields.Datetime(
-        required=True, default=fields.Datetime.now, tracking=True,
+        required=True,
+        default=fields.Datetime.now,
+        tracking=True,
     )
     location_id = fields.Many2one("stock.location", string="Location")
     location_text = fields.Char(string="Location (free text)")
@@ -52,12 +62,18 @@ class CustomBastDocument(models.Model):
             ("completed", "Completed"),
             ("voided", "Voided"),
         ],
-        default="draft", required=True, tracking=True, index=True, copy=False,
+        default="draft",
+        required=True,
+        tracking=True,
+        index=True,
+        copy=False,
     )
     note = fields.Text()
     line_ids = fields.One2many("custom.bast.line", "bast_id", string="Lines", copy=True)
     company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, required=True,
+        "res.company",
+        default=lambda self: self.env.company,
+        required=True,
     )
 
     _sql_constraints = [

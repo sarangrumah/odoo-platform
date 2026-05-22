@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import os
 
-import pytest
-
 # Ensure required env exists for Settings(min_length=32)
 os.environ.setdefault("GATEWAY_SHARED_SECRET", "x" * 64)
 

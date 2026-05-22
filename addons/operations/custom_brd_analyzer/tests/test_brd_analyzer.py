@@ -8,7 +8,6 @@ import json
 from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase, tagged
-from odoo.exceptions import UserError
 
 
 MOCK_AI_RESPONSE = {
@@ -66,7 +65,6 @@ MOCK_AI_RESPONSE = {
 
 @tagged("post_install", "-at_install")
 class TestBrdAnalyzer(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.Document = self.env["brd.document"]

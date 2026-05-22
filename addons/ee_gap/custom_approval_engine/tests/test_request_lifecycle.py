@@ -11,7 +11,6 @@ from .common import ApprovalTestCommon
 
 @tagged("post_install", "-at_install")
 class TestRequestLifecycle(ApprovalTestCommon):
-
     def _build_two_tier_matrix(self):
         m = self._make_matrix("Two-tier PO")
         self._add_tier(m, sequence=10, name="Dept Head", approvers=[self.user_approver_a])
@@ -72,7 +71,8 @@ class TestRequestLifecycle(ApprovalTestCommon):
     def test_require_all_waits_for_every_approver(self):
         m = self._make_matrix("Require all")
         self._add_tier(
-            m, name="Co-approval",
+            m,
+            name="Co-approval",
             approvers=[self.user_approver_a, self.user_approver_b],
             require_all=True,
         )

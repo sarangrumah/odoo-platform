@@ -11,15 +11,13 @@ from .common import ApprovalTestCommon
 
 
 class TestEscalation(ApprovalTestCommon):
-
     def _expire(self, req):
         """Force the request's due_at to the past so it counts as overdue."""
         req.write({"due_at": fields.Datetime.now() - timedelta(hours=1)})
 
     def test_auto_approve_advances(self):
         m = self._make_matrix("Auto-approve chain")
-        self._add_tier(m, sequence=10, name="T1", approvers=[self.user_approver_a],
-                       on_overdue="auto_approve")
+        self._add_tier(m, sequence=10, name="T1", approvers=[self.user_approver_a], on_overdue="auto_approve")
         self._add_tier(m, sequence=20, name="T2", approvers=[self.user_approver_b])
         po = self._make_po()
         req = self.Request._create_for_record(po, matrix=m)
@@ -31,15 +29,12 @@ class TestEscalation(ApprovalTestCommon):
 
         self.assertEqual(req.current_tier_id.name, "T2")
         # An auto-approved line should exist for T1
-        auto = req.history_ids.filtered(
-            lambda l: l.tier_name == "T1" and l.action == "approved"
-        )
+        auto = req.history_ids.filtered(lambda l: l.tier_name == "T1" and l.action == "approved")
         self.assertTrue(auto)
 
     def test_escalate_to_next_advances(self):
         m = self._make_matrix("Escalate chain")
-        self._add_tier(m, sequence=10, name="T1", approvers=[self.user_approver_a],
-                       on_overdue="escalate_to_next")
+        self._add_tier(m, sequence=10, name="T1", approvers=[self.user_approver_a], on_overdue="escalate_to_next")
         self._add_tier(m, sequence=20, name="T2", approvers=[self.user_approver_b])
         po = self._make_po()
         req = self.Request._create_for_record(po, matrix=m)
@@ -50,16 +45,18 @@ class TestEscalation(ApprovalTestCommon):
         req.invalidate_recordset()
 
         self.assertEqual(req.current_tier_id.name, "T2")
-        escalated = req.history_ids.filtered(
-            lambda l: l.tier_name == "T1" and l.action == "escalated"
-        )
+        escalated = req.history_ids.filtered(lambda l: l.tier_name == "T1" and l.action == "escalated")
         self.assertTrue(escalated)
 
     def test_escalate_to_user_reroutes_approver(self):
         m = self._make_matrix("Fallback chain")
         self._add_tier(
-            m, sequence=10, name="T1", approvers=[self.user_approver_a],
-            on_overdue="escalate_to_user", escalation_user=self.user_fallback,
+            m,
+            sequence=10,
+            name="T1",
+            approvers=[self.user_approver_a],
+            on_overdue="escalate_to_user",
+            escalation_user=self.user_fallback,
         )
         po = self._make_po()
         req = self.Request._create_for_record(po, matrix=m)

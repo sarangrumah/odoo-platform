@@ -14,8 +14,7 @@ class CoretaxPajakkuUsage(models.Model):
     _order = "period desc, company_id"
 
     company_id = fields.Many2one("res.company", required=True, index=True)
-    period = fields.Date(required=True, index=True,
-                         help="First day of the month being tracked.")
+    period = fields.Date(required=True, index=True, help="First day of the month being tracked.")
 
     api_calls = fields.Integer(default=0)
     faktur_submits = fields.Integer(default=0)
@@ -25,8 +24,8 @@ class CoretaxPajakkuUsage(models.Model):
     last_updated_at = fields.Datetime(default=fields.Datetime.now)
 
     _uniq_company_period = models.Constraint(
-        'unique(company_id, period)',
-        'One usage row per company per month.',
+        "unique(company_id, period)",
+        "One usage row per company per month.",
     )
 
     # --------------------------------------------------------------

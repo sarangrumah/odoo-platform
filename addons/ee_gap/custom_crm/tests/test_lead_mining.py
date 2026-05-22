@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Happy-path tests for custom.crm.lead.mining.request."""
+
 from __future__ import annotations
 
 from odoo.exceptions import UserError
@@ -8,14 +9,15 @@ from odoo.tests import TransactionCase, tagged
 
 @tagged("post_install", "-at_install")
 class TestLeadMining(TransactionCase):
-
     def test_create_then_generate_leads(self):
-        req = self.env["custom.crm.lead.mining.request"].create({
-            "industry": "Logistics",
-            "country_id": self.env.ref("base.id").id,
-            "employees_range": "11_50",
-            "lead_number": 3,
-        })
+        req = self.env["custom.crm.lead.mining.request"].create(
+            {
+                "industry": "Logistics",
+                "country_id": self.env.ref("base.id").id,
+                "employees_range": "11_50",
+                "lead_number": 3,
+            }
+        )
         self.assertEqual(req.state, "draft")
         self.assertEqual(req.credits_used, 0)
         self.assertTrue(req.name and req.name != "New")
@@ -31,9 +33,11 @@ class TestLeadMining(TransactionCase):
             self.assertEqual(lead.x_lead_mining_request_id, req)
 
     def test_estimate_returns_notification(self):
-        req = self.env["custom.crm.lead.mining.request"].create({
-            "lead_number": 2,
-        })
+        req = self.env["custom.crm.lead.mining.request"].create(
+            {
+                "lead_number": 2,
+            }
+        )
         action = req.action_get_lead_count()
         self.assertEqual(action["type"], "ir.actions.client")
         self.assertEqual(action["tag"], "display_notification")

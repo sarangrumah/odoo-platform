@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 DIRECTIONS = [("inbound", "Inbound"), ("outbound", "Outbound")]
@@ -47,18 +47,26 @@ class VoipCall(models.Model):
     @api.model
     def log_outbound(self, partner_id: int, number: str, user_id: int | None = None):
         """Click-to-call helper — instantiates a placeholder log row."""
-        provider = self.env["voip.provider"].sudo().search(
-            [("active", "=", True)], limit=1, order="sequence",
+        provider = (
+            self.env["voip.provider"]
+            .sudo()
+            .search(
+                [("active", "=", True)],
+                limit=1,
+                order="sequence",
+            )
         )
         if not provider:
             return self.browse()
-        rec = self.sudo().create({
-            "provider_id": provider.id,
-            "direction": "outbound",
-            "partner_id": partner_id,
-            "user_id": user_id or self.env.user.id,
-            "other_number": number,
-        })
+        rec = self.sudo().create(
+            {
+                "provider_id": provider.id,
+                "direction": "outbound",
+                "partner_id": partner_id,
+                "user_id": user_id or self.env.user.id,
+                "other_number": number,
+            }
+        )
         rec._pdp_audit_write("voip_outbound_started", rec.id, {"partner": partner_id})
         return rec
 
@@ -74,6 +82,6 @@ class VoipCall(models.Model):
         for rec in self:
             if not rec.ended_at:
                 rec.write({"ended_at": fields.Datetime.now()})
-            rec._pdp_audit_write("voip_call_ended", rec.id,
-                                 {"duration_seconds": rec.duration_seconds,
-                                  "outcome": rec.outcome})
+            rec._pdp_audit_write(
+                "voip_call_ended", rec.id, {"duration_seconds": rec.duration_seconds, "outcome": rec.outcome}
+            )

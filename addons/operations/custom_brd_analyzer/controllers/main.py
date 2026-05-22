@@ -14,7 +14,6 @@ _logger = logging.getLogger(__name__)
 
 
 class BrdReportController(http.Controller):
-
     # ---- helpers ----
 
     def _get_doc_for_user(self, doc_id: int):
@@ -53,8 +52,10 @@ class BrdReportController(http.Controller):
         if not doc:
             return request.not_found()
         try:
-            pdf, _ct = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
-                "custom_brd_analyzer.action_report_brd", [doc.id]
+            pdf, _ct = (
+                request.env["ir.actions.report"]
+                .sudo()
+                ._render_qweb_pdf("custom_brd_analyzer.action_report_brd", [doc.id])
             )
         except Exception as exc:  # pragma: no cover - depends on wkhtmltopdf
             _logger.warning("BRD PDF render failed: %s", exc)
@@ -88,9 +89,9 @@ class BrdReportController(http.Controller):
             safe = (r.name or "rec").replace("-", "_")
             mermaid_lines.append(f'    {safe}["{r.name}"]')
             for d in r.depends_on_module_ids:
-                mermaid_lines.append(f'    {safe} --> {d.module_name}')
+                mermaid_lines.append(f"    {safe} --> {d.module_name}")
             for i in r.impact_module_ids:
-                mermaid_lines.append(f'    {safe} -.-> {i.module_name}')
+                mermaid_lines.append(f"    {safe} -.-> {i.module_name}")
         mermaid_src = "\n".join(mermaid_lines)
 
         values = {
@@ -115,7 +116,9 @@ class BrdReportController(http.Controller):
                             "fit_score": analyses.get(s.id) and analyses[s.id].fit_score or 0,
                             "gap_status": analyses.get(s.id) and analyses[s.id].gap_status or "unclear",
                             "gap_severity": analyses.get(s.id) and analyses[s.id].gap_severity or "should_have",
-                            "mapped": analyses.get(s.id) and analyses[s.id].mapped_module_ids.mapped("module_name") or [],
+                            "mapped": analyses.get(s.id)
+                            and analyses[s.id].mapped_module_ids.mapped("module_name")
+                            or [],
                             "notes": analyses.get(s.id) and analyses[s.id].notes or "",
                         }
                         for s in sections

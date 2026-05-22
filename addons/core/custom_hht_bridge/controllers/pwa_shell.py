@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # License: LGPL-3
 """PWA shell endpoints: HTML, web manifest, service worker."""
+
 from __future__ import annotations
 
 import json
@@ -160,7 +161,6 @@ self.addEventListener('sync', (event) => {
 
 
 class HhtPwaShell(http.Controller):
-
     @http.route("/hht", type="http", auth="user", methods=["GET"], csrf=False)
     def hht_root(self, **_kw):
         return request.redirect("/hht/", code=301)
@@ -171,7 +171,10 @@ class HhtPwaShell(http.Controller):
 
     @http.route(
         "/hht/manifest.webmanifest",
-        type="http", auth="public", methods=["GET"], csrf=False,
+        type="http",
+        auth="public",
+        methods=["GET"],
+        csrf=False,
     )
     def hht_manifest(self, **_kw):
         body = json.dumps(_MANIFEST, separators=(",", ":"))

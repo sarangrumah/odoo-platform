@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import base64
-import io
 from xml.etree import ElementTree as ET
 
 from odoo.tests.common import TransactionCase, tagged
@@ -12,15 +11,12 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "custom_coretax_bupot")
 class TestBupot(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.Bupot = cls.env["custom.bupot.unifikasi"]
         cls.BupotLine = cls.env["custom.bupot.unifikasi.line"]
-        cls.period = cls.Bupot.create(
-            {"month": "5", "year": "2026"}
-        )
+        cls.period = cls.Bupot.create({"month": "5", "year": "2026"})
 
     def _mk_line(self, **kw):
         defaults = {
@@ -52,9 +48,7 @@ class TestBupot(TransactionCase):
     def test_03_generate_xml_and_validate_structure(self):
         self._mk_line()
         self._mk_line(pph_type="26", rate=20.0, withheld_amount=200_000.0)
-        wizard = self.env["custom.bupot.xml.export.wizard"].create(
-            {"bupot_id": self.period.id}
-        )
+        wizard = self.env["custom.bupot.xml.export.wizard"].create({"bupot_id": self.period.id})
         wizard.action_generate()
         self.assertTrue(wizard.output_file)
         self.assertEqual(self.period.state, "generated")
@@ -70,11 +64,7 @@ class TestBupot(TransactionCase):
         l2 = self._mk_line(pph_type="22", rate=2.5, withheld_amount=25_000.0)
         # Pretend export + submit happened.
         self.period.state = "submitted"
-        csv_body = (
-            "internal_ref,bupot_number\n"
-            f"{l1.internal_ref},2310000000001\n"
-            f"{l2.internal_ref},2310000000002\n"
-        )
+        csv_body = f"internal_ref,bupot_number\n{l1.internal_ref},2310000000001\n{l2.internal_ref},2310000000002\n"
         wizard = self.env["custom.bupot.number.upload.wizard"].create(
             {
                 "bupot_id": self.period.id,

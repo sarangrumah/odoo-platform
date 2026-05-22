@@ -64,7 +64,7 @@ class CustomDashboardTile(models.Model):
     )
     formula_expression = fields.Text(
         help="Python expression for formula tile_type. Context: env, model, "
-             "domain, fields. Example: env['sale.order'].search_count(domain)",
+        "domain, fields. Example: env['sale.order'].search_count(domain)",
     )
     refresh_interval_seconds = fields.Integer(
         default=300,
@@ -74,7 +74,7 @@ class CustomDashboardTile(models.Model):
     cached_value = fields.Text(
         readonly=True,
         help="Cached result as JSON text. Scalar tiles store {'value':..} and "
-             "chart tiles store {'labels':[..], 'data':[..]}.",
+        "chart tiles store {'labels':[..], 'data':[..]}.",
     )
     cached_display = fields.Char(
         compute="_compute_cached_display",
@@ -118,7 +118,8 @@ class CustomDashboardTile(models.Model):
             value = safe_eval(raw, {})
         except Exception as e:
             raise UserError(
-                _("Invalid domain on tile %(name)s: %(err)s") % {
+                _("Invalid domain on tile %(name)s: %(err)s")
+                % {
                     "name": self.name,
                     "err": e,
                 }
@@ -169,8 +170,10 @@ class CustomDashboardTile(models.Model):
             value = safe_eval(expr, ctx)
         except Exception as e:
             raise UserError(
-                _("Formula error on tile %(name)s: %(err)s") % {
-                    "name": self.name, "err": e,
+                _("Formula error on tile %(name)s: %(err)s")
+                % {
+                    "name": self.name,
+                    "err": e,
                 }
             )
         return {"value": value}
@@ -204,22 +207,27 @@ class CustomDashboardTile(models.Model):
         for tile in self:
             payload, err = None, False
             if not tile.model_name and tile.tile_type != "formula":
-                tile.write({
-                    "cached_value": json.dumps({"value": 0}),
-                    "cached_at": now,
-                    "last_error": False,
-                })
+                tile.write(
+                    {
+                        "cached_value": json.dumps({"value": 0}),
+                        "cached_at": now,
+                        "last_error": False,
+                    }
+                )
                 continue
             if tile.model_name and tile.model_name not in self.env:
                 _logger.warning(
                     "Dashboard tile %s references unknown model %s",
-                    tile.name, tile.model_name,
+                    tile.name,
+                    tile.model_name,
                 )
-                tile.write({
-                    "cached_value": json.dumps({"value": None}),
-                    "cached_at": now,
-                    "last_error": _("Unknown model: %s") % tile.model_name,
-                })
+                tile.write(
+                    {
+                        "cached_value": json.dumps({"value": None}),
+                        "cached_at": now,
+                        "last_error": _("Unknown model: %s") % tile.model_name,
+                    }
+                )
                 continue
             try:
                 Model = self.env[tile.model_name].sudo() if tile.model_name else None
@@ -244,15 +252,19 @@ class CustomDashboardTile(models.Model):
             except Exception as e:
                 _logger.warning(
                     "Dashboard tile refresh failed (tile=%s, model=%s): %s",
-                    tile.name, tile.model_name, e,
+                    tile.name,
+                    tile.model_name,
+                    e,
                 )
                 err = str(e)
                 payload = {"value": None}
-            tile.write({
-                "cached_value": json.dumps(payload, default=str),
-                "cached_at": now,
-                "last_error": err or False,
-            })
+            tile.write(
+                {
+                    "cached_value": json.dumps(payload, default=str),
+                    "cached_at": now,
+                    "last_error": err or False,
+                }
+            )
         return True
 
     # ---------- cron ----------

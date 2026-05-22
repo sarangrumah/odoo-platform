@@ -10,8 +10,7 @@ class AppointmentResource(models.Model):
     name = fields.Char(required=True)
     user_id = fields.Many2one("res.users", domain="[('share', '=', False)]")
     timezone = fields.Char(default="Asia/Jakarta")
-    capacity = fields.Integer(default=1,
-                              help="Number of simultaneous bookings the resource can accept.")
+    capacity = fields.Integer(default=1, help="Number of simultaneous bookings the resource can accept.")
     active = fields.Boolean(default=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
 

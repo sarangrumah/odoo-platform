@@ -12,6 +12,6 @@ class DocumentTag(models.Model):
     active = fields.Boolean(default=True)
 
     _name_uniq = models.Constraint(
-        'unique(name)',
-        'Tag name must be unique.',
+        "unique(name)",
+        "Tag name must be unique.",
     )

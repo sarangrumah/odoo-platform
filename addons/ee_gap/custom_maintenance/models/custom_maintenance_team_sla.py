@@ -63,9 +63,7 @@ class CustomMaintenanceTeamSla(models.Model):
             if rec.response_hours < 0 or rec.resolve_hours < 0:
                 raise ValidationError(_("SLA hours must be non-negative."))
             if rec.resolve_hours and rec.response_hours and rec.response_hours > rec.resolve_hours:
-                raise ValidationError(
-                    _("Response time should not exceed resolution time.")
-                )
+                raise ValidationError(_("Response time should not exceed resolution time."))
 
     @api.model
     def _find_for(self, team_id, priority):

@@ -17,26 +17,38 @@ class EliminationRule(models.Model):
     active = fields.Boolean(default=True)
     chart_id = fields.Many2one(
         "custom.consolidation.chart",
-        required=True, ondelete="cascade",
+        required=True,
+        ondelete="cascade",
     )
     company_a_id = fields.Many2one(
-        "res.company", string="Company A", required=True, ondelete="restrict",
+        "res.company",
+        string="Company A",
+        required=True,
+        ondelete="restrict",
     )
     company_b_id = fields.Many2one(
-        "res.company", string="Company B", required=True, ondelete="restrict",
+        "res.company",
+        string="Company B",
+        required=True,
+        ondelete="restrict",
     )
     account_a_id = fields.Many2one(
-        "account.account", required=True, ondelete="restrict",
+        "account.account",
+        required=True,
+        ondelete="restrict",
         domain="[('company_ids', 'in', company_a_id)]",
         help="Account in company A to be eliminated.",
     )
     account_b_id = fields.Many2one(
-        "account.account", required=True, ondelete="restrict",
+        "account.account",
+        required=True,
+        ondelete="restrict",
         domain="[('company_ids', 'in', company_b_id)]",
         help="Counterpart account in company B.",
     )
     match_partner_id = fields.Many2one(
-        "res.partner", string="Match Partner",
+        "res.partner",
+        string="Match Partner",
         ondelete="set null",
         help="Restrict matching to this partner across both companies.",
     )
@@ -53,7 +65,8 @@ class EliminationRule(models.Model):
             ("by_partner", "By Partner (matching IC partner)"),
             ("by_reference", "By Reference (move ref equality)"),
         ],
-        default="exact", required=True,
+        default="exact",
+        required=True,
     )
     partner_id = fields.Many2one(
         "res.partner",
@@ -65,7 +78,9 @@ class EliminationRule(models.Model):
     def _check_distinct_companies(self):
         for rule in self:
             if rule.company_a_id == rule.company_b_id:
-                raise ValidationError(_(
-                    "Elimination rule '%(name)s': companies A and B must differ.",
-                    name=rule.name,
-                ))
+                raise ValidationError(
+                    _(
+                        "Elimination rule '%(name)s': companies A and B must differ.",
+                        name=rule.name,
+                    )
+                )

@@ -29,8 +29,7 @@ class CustomFrontdeskVisitor(models.Model):
         "res.partner",
         string="Visitor Partner",
         index=True,
-        help="Optional link to a res.partner so historical visits "
-             "aggregate on that contact.",
+        help="Optional link to a res.partner so historical visits aggregate on that contact.",
     )
     host_employee_id = fields.Many2one(
         "hr.employee",
@@ -62,9 +61,7 @@ class CustomFrontdeskVisitor(models.Model):
     )
     badge_number = fields.Char(
         copy=False,
-        default=lambda self: self.env["ir.sequence"].next_by_code(
-            "custom.frontdesk.visitor.badge"
-        ) or "/",
+        default=lambda self: self.env["ir.sequence"].next_by_code("custom.frontdesk.visitor.badge") or "/",
     )
     notes = fields.Text()
     whatsapp_notified = fields.Boolean(default=False)
@@ -75,15 +72,14 @@ class CustomFrontdeskVisitor(models.Model):
         copy=False,
         index=True,
         help="One-time token used in the QR code printed on the "
-             "pre-registration email. Visitor scans it at the kiosk to "
-             "self-check-in.",
+        "pre-registration email. Visitor scans it at the kiosk to "
+        "self-check-in.",
     )
     kiosk_token_used = fields.Boolean(default=False)
     qr_code_image = fields.Binary(
         compute="_compute_qr_code_image",
         string="QR Code",
-        help="PNG QR encoding the kiosk_token. Embedded in the badge "
-             "and pre-registration email.",
+        help="PNG QR encoding the kiosk_token. Embedded in the badge and pre-registration email.",
     )
 
     @api.depends("kiosk_token")
@@ -100,11 +96,10 @@ class CustomFrontdeskVisitor(models.Model):
             try:
                 import qrcode  # type: ignore
 
-                base = self.env["ir.config_parameter"].sudo().get_param(
-                    "web.base.url", default=""
-                )
+                base = self.env["ir.config_parameter"].sudo().get_param("web.base.url", default="")
                 payload = "%s/custom_frontdesk/kiosk_checkin/%s" % (
-                    base.rstrip("/"), rec.kiosk_token,
+                    base.rstrip("/"),
+                    rec.kiosk_token,
                 )
                 buf = io.BytesIO()
                 qrcode.make(payload).save(buf, format="PNG")
@@ -124,19 +119,23 @@ class CustomFrontdeskVisitor(models.Model):
 
     def action_check_in(self):
         for rec in self:
-            rec.write({
-                "state": "checked_in",
-                "check_in_time": fields.Datetime.now(),
-            })
+            rec.write(
+                {
+                    "state": "checked_in",
+                    "check_in_time": fields.Datetime.now(),
+                }
+            )
             rec._notify_host_whatsapp()
         return True
 
     def action_check_out(self):
         for rec in self:
-            rec.write({
-                "state": "checked_out",
-                "check_out_time": fields.Datetime.now(),
-            })
+            rec.write(
+                {
+                    "state": "checked_out",
+                    "check_out_time": fields.Datetime.now(),
+                }
+            )
         return True
 
     def action_cancel(self):
@@ -151,9 +150,7 @@ class CustomFrontdeskVisitor(models.Model):
         )
         for rec in self:
             if rec.state != "expected":
-                raise UserError(_(
-                    "Only visitors in state 'Expected' can be pre-registered."
-                ))
+                raise UserError(_("Only visitors in state 'Expected' can be pre-registered."))
             if not rec.kiosk_token:
                 rec.kiosk_token = self._new_kiosk_token()
                 rec.kiosk_token_used = False
@@ -164,7 +161,8 @@ class CustomFrontdeskVisitor(models.Model):
                 except Exception as e:  # pragma: no cover
                     _logger.warning(
                         "Frontdesk: pre-register email failed for %s: %s",
-                        rec.name, e,
+                        rec.name,
+                        e,
                     )
             # WhatsApp via template (best-effort)
             rec._send_preregister_whatsapp()
@@ -173,9 +171,7 @@ class CustomFrontdeskVisitor(models.Model):
     def action_print_badge(self):
         """Return the QWeb-HTML badge report action."""
         self.ensure_one()
-        return self.env.ref(
-            "custom_frontdesk.action_report_visitor_badge"
-        ).report_action(self)
+        return self.env.ref("custom_frontdesk.action_report_visitor_badge").report_action(self)
 
     def action_view_visits_for_partner(self):
         """Open a list of all visits for the same partner."""
@@ -202,7 +198,8 @@ class CustomFrontdeskVisitor(models.Model):
         if not token:
             raise UserError(_("Missing kiosk token."))
         visitor = self.sudo().search(
-            [("kiosk_token", "=", token)], limit=1,
+            [("kiosk_token", "=", token)],
+            limit=1,
         )
         if not visitor:
             raise UserError(_("Unknown or expired QR code."))
@@ -211,11 +208,13 @@ class CustomFrontdeskVisitor(models.Model):
         if visitor.state == "cancelled":
             raise UserError(_("This visit was cancelled."))
         if visitor.state == "expected":
-            visitor.write({
-                "state": "checked_in",
-                "check_in_time": fields.Datetime.now(),
-                "kiosk_token_used": True,
-            })
+            visitor.write(
+                {
+                    "state": "checked_in",
+                    "check_in_time": fields.Datetime.now(),
+                    "kiosk_token_used": True,
+                }
+            )
             visitor._notify_host_whatsapp()
         else:
             visitor.write({"kiosk_token_used": True})
@@ -237,19 +236,19 @@ class CustomFrontdeskVisitor(models.Model):
             if rec.id_number:
                 tail = rec.id_number[-4:] if len(rec.id_number) > 4 else ""
                 masked = ("*" * max(0, len(rec.id_number) - 4)) + tail
-            rows.append({
-                "id": rec.id,
-                "name": rec.name,
-                "visitor_company": rec.visitor_company or "",
-                "host": rec.host_employee_id.name or "",
-                "station": rec.station_id.name or "",
-                "check_in_time": fields.Datetime.to_string(rec.check_in_time)
-                                 if rec.check_in_time else "",
-                "check_out_time": fields.Datetime.to_string(rec.check_out_time)
-                                  if rec.check_out_time else "",
-                "state": rec.state,
-                "id_number_masked": masked,
-            })
+            rows.append(
+                {
+                    "id": rec.id,
+                    "name": rec.name,
+                    "visitor_company": rec.visitor_company or "",
+                    "host": rec.host_employee_id.name or "",
+                    "station": rec.station_id.name or "",
+                    "check_in_time": fields.Datetime.to_string(rec.check_in_time) if rec.check_in_time else "",
+                    "check_out_time": fields.Datetime.to_string(rec.check_out_time) if rec.check_out_time else "",
+                    "state": rec.state,
+                    "id_number_masked": masked,
+                }
+            )
         return rows
 
     # ---------- whatsapp notifications ----------
@@ -299,7 +298,8 @@ class CustomFrontdeskVisitor(models.Model):
             except Exception as e:  # pragma: no cover
                 _logger.warning(
                     "Frontdesk: WhatsApp notify failed for visitor %s: %s",
-                    rec.name, e,
+                    rec.name,
+                    e,
                 )
         return True
 
@@ -314,14 +314,12 @@ class CustomFrontdeskVisitor(models.Model):
         if template and template.body_text:
             body = template.body_text
         else:
-            body = _(
-                "Tamu Anda {{name}} dari {{company}} sudah check-in di {{station}}."
-            )
+            body = _("Tamu Anda {{name}} dari {{company}} sudah check-in di {{station}}.")
         return (
             body.replace("{{name}}", self.name or "")
-                .replace("{{company}}", self.visitor_company or "-")
-                .replace("{{station}}", self.station_id.name or "-")
-                .replace("{{purpose}}", self.purpose or "-")
+            .replace("{{company}}", self.visitor_company or "-")
+            .replace("{{station}}", self.station_id.name or "-")
+            .replace("{{purpose}}", self.purpose or "-")
         )
 
     def _send_preregister_whatsapp(self):
@@ -334,11 +332,10 @@ class CustomFrontdeskVisitor(models.Model):
         account = Account.search([("active", "=", True)], limit=1)
         if not account:
             return False
-        base = self.env["ir.config_parameter"].sudo().get_param(
-            "web.base.url", default=""
-        )
+        base = self.env["ir.config_parameter"].sudo().get_param("web.base.url", default="")
         link = "%s/custom_frontdesk/kiosk_checkin/%s" % (
-            base.rstrip("/"), self.kiosk_token or "",
+            base.rstrip("/"),
+            self.kiosk_token or "",
         )
         body = _(
             "Halo %(name)s, kunjungan Anda ke %(station)s telah "
@@ -349,13 +346,17 @@ class CustomFrontdeskVisitor(models.Model):
             "link": link,
         }
         try:
-            Message.sudo().create({
-                "account_id": account.id,
-                "to_phone": self.phone,
-                "body": body,
-            })
+            Message.sudo().create(
+                {
+                    "account_id": account.id,
+                    "to_phone": self.phone,
+                    "body": body,
+                }
+            )
         except Exception as e:  # pragma: no cover
             _logger.warning(
-                "Frontdesk: pre-register WA failed for %s: %s", self.name, e,
+                "Frontdesk: pre-register WA failed for %s: %s",
+                self.name,
+                e,
             )
         return True

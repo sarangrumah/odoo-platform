@@ -1,7 +1,6 @@
 from collections import defaultdict
-from datetime import date
 
-from odoo import api, fields, models
+from odoo import fields, models
 
 
 class CustomEsgReport(models.Model):
@@ -65,9 +64,7 @@ class CustomEsgReport(models.Model):
             )
             rows_html.append(
                 "<p><strong>Framework:</strong> {fw}</p>".format(
-                    fw=dict(self._fields["framework"].selection).get(
-                        report.framework, report.framework or ""
-                    )
+                    fw=dict(self._fields["framework"].selection).get(report.framework, report.framework or "")
                 )
             )
 
@@ -75,12 +72,8 @@ class CustomEsgReport(models.Model):
                 meas_list = buckets.get(cat_key)
                 if not meas_list:
                     continue
-                rows_html.append(
-                    "<h3>{label}</h3>".format(label=category_labels[cat_key])
-                )
-                rows_html.append(
-                    "<table class='table table-sm' border='1' cellpadding='4' cellspacing='0'>"
-                )
+                rows_html.append("<h3>{label}</h3>".format(label=category_labels[cat_key]))
+                rows_html.append("<table class='table table-sm' border='1' cellpadding='4' cellspacing='0'>")
                 rows_html.append(
                     "<thead><tr>"
                     "<th>Code</th><th>Metric</th><th>Unit</th>"

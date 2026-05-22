@@ -22,26 +22,16 @@ _logger = logging.getLogger(__name__)
 
 # (hub menu xmlid, target action xmlid)
 _OPTIONAL_MENU_LINKS = [
-    ("custom_hub_console.menu_hub_monitoring",
-     "custom_ops_monitor.action_health_dashboard"),
-    ("custom_hub_console.menu_hub_tenant_health",
-     "custom_ops_monitor.action_tenant_health"),
-    ("custom_hub_console.menu_hub_capacity",
-     "custom_ops_monitor.action_capacity_forecast"),
-    ("custom_hub_console.menu_hub_incidents",
-     "custom_ops_monitor.action_ops_incident"),
-    ("custom_hub_console.menu_hub_brd_documents",
-     "custom_brd_analyzer.action_brd_document"),
-    ("custom_hub_console.menu_hub_brd_recommendations",
-     "custom_brd_analyzer.action_brd_recommendation"),
-    ("custom_hub_console.menu_hub_brd_capability",
-     "custom_brd_analyzer.action_capability_entry"),
-    ("custom_hub_console.menu_hub_hht_devices",
-     "custom_hht_bridge.action_hht_device"),
-    ("custom_hub_console.menu_hub_ai_anomaly",
-     "custom_ai_features.action_anomaly_finding"),
-    ("custom_hub_console.menu_hub_ai_nlq",
-     "custom_ai_features.action_nlq_session"),
+    ("custom_hub_console.menu_hub_monitoring", "custom_ops_monitor.action_health_dashboard"),
+    ("custom_hub_console.menu_hub_tenant_health", "custom_ops_monitor.action_tenant_health"),
+    ("custom_hub_console.menu_hub_capacity", "custom_ops_monitor.action_capacity_forecast"),
+    ("custom_hub_console.menu_hub_incidents", "custom_ops_monitor.action_ops_incident"),
+    ("custom_hub_console.menu_hub_brd_documents", "custom_brd_analyzer.action_brd_document"),
+    ("custom_hub_console.menu_hub_brd_recommendations", "custom_brd_analyzer.action_brd_recommendation"),
+    ("custom_hub_console.menu_hub_brd_capability", "custom_brd_analyzer.action_capability_entry"),
+    ("custom_hub_console.menu_hub_hht_devices", "custom_hht_bridge.action_hht_device"),
+    ("custom_hub_console.menu_hub_ai_anomaly", "custom_ai_features.action_anomaly_finding"),
+    ("custom_hub_console.menu_hub_ai_nlq", "custom_ai_features.action_nlq_session"),
 ]
 
 
@@ -61,9 +51,7 @@ def _post_install_link_menus(env):
             if action_id:
                 a_module, a_name = action_xmlid.split(".", 1)
                 # Fetch the action record to get its model+id "ir.actions.act_window,42"
-                a_rec = IrData.search(
-                    [("module", "=", a_module), ("name", "=", a_name)], limit=1
-                )
+                a_rec = IrData.search([("module", "=", a_module), ("name", "=", a_name)], limit=1)
                 if a_rec:
                     menu.action = f"{a_rec.model},{action_id}"
                     linked += 1
@@ -76,11 +64,14 @@ def _post_install_link_menus(env):
         except Exception as exc:  # pragma: no cover - defensive
             _logger.warning(
                 "[hub_console] post-install link failed for %s -> %s: %s",
-                menu_xmlid, action_xmlid, exc,
+                menu_xmlid,
+                action_xmlid,
+                exc,
             )
     _logger.info(
         "[hub_console] post-install: %s optional menus linked, %s hidden",
-        linked, hidden,
+        linked,
+        hidden,
     )
 
     # Seed module catalog so the Hub Admin "Module Deployments" page is
@@ -89,7 +80,9 @@ def _post_install_link_menus(env):
         out = env["custom.hub.module.catalog"].sudo()._action_scan_all()
         _logger.info(
             "[hub_console] post-install catalog seed: created=%s updated=%s total=%s",
-            out.get("created"), out.get("updated"), out.get("total"),
+            out.get("created"),
+            out.get("updated"),
+            out.get("total"),
         )
     except Exception as exc:  # pragma: no cover - defensive
         _logger.warning("[hub_console] post-install catalog seed failed: %s", exc)

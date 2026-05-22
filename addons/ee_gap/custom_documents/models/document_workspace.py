@@ -15,7 +15,8 @@ class DocumentWorkspace(models.Model):
     member_ids = fields.Many2many(
         "res.users",
         "document_workspace_user_rel",
-        "workspace_id", "user_id",
+        "workspace_id",
+        "user_id",
         string="Members",
     )
     default_classification_id = fields.Many2one(
@@ -26,6 +27,6 @@ class DocumentWorkspace(models.Model):
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
 
     _code_uniq = models.Constraint(
-        'unique(code)',
-        'Workspace code must be unique.',
+        "unique(code)",
+        "Workspace code must be unique.",
     )

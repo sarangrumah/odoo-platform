@@ -18,17 +18,13 @@ class TestDevCycle(TransactionCase):
         )
 
     def test_create_cycle_branch_suggestion(self):
-        cycle = self.env["dev.cycle"].create(
-            {"brd_recommendation_id": self.rec.id, "name": "Cycle A"}
-        )
+        cycle = self.env["dev.cycle"].create({"brd_recommendation_id": self.rec.id, "name": "Cycle A"})
         self.assertTrue(cycle.branch_name.startswith("feature/brd-"))
         self.assertIn("custom-foo-bar", cycle.branch_name)
         self.assertEqual(cycle.state, "backlog")
 
     def test_state_machine_forward(self):
-        cycle = self.env["dev.cycle"].create(
-            {"brd_recommendation_id": self.rec.id, "name": "Cycle B"}
-        )
+        cycle = self.env["dev.cycle"].create({"brd_recommendation_id": self.rec.id, "name": "Cycle B"})
         cycle.action_start()
         self.assertEqual(cycle.state, "in_dev")
         self.assertTrue(cycle.started_at)
@@ -42,9 +38,7 @@ class TestDevCycle(TransactionCase):
         self.assertTrue(cycle.completed_at)
 
     def test_state_machine_rejects_big_jump_back(self):
-        cycle = self.env["dev.cycle"].create(
-            {"brd_recommendation_id": self.rec.id, "name": "Cycle C"}
-        )
+        cycle = self.env["dev.cycle"].create({"brd_recommendation_id": self.rec.id, "name": "Cycle C"})
         cycle.action_start()
         cycle.action_to_review()
         cycle.action_to_qa()
@@ -57,8 +51,6 @@ class TestDevCycle(TransactionCase):
         self.assertEqual(self.rec.dev_cycle_count, 1)
 
     def test_unknown_state_raises(self):
-        cycle = self.env["dev.cycle"].create(
-            {"brd_recommendation_id": self.rec.id, "name": "Cycle D"}
-        )
+        cycle = self.env["dev.cycle"].create({"brd_recommendation_id": self.rec.id, "name": "Cycle D"})
         with self.assertRaises(UserError):
             cycle.action_transition_state("nonsense")

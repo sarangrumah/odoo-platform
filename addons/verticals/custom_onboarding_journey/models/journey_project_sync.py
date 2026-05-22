@@ -107,9 +107,7 @@ class OnboardingJourneySync(models.Model):
                 # Heuristic: if task name matches a stage code, mark it.
                 for code, _label in self._fields["stage"].selection:
                     if task.name and task.name.strip().lower() == code:
-                        task.with_context(_skip_journey_sync=True).write(
-                            {"journey_stage_marker": code}
-                        )
+                        task.with_context(_skip_journey_sync=True).write({"journey_stage_marker": code})
                         break
         return new_proj
 
@@ -144,21 +142,24 @@ class OnboardingJourneySync(models.Model):
         ) or Stage.search([("name", "=", column_name)], limit=1)
         if not target_stage:
             _logger.info(
-                "journey-sync: no project.task.type %r found; skipping", column_name,
+                "journey-sync: no project.task.type %r found; skipping",
+                column_name,
             )
             return
-        marker = self.env["project.task"].sudo().search(
-            [
-                ("project_id", "=", self.project_id.id),
-                ("journey_stage_marker", "=", new_stage),
-            ],
-            limit=1,
+        marker = (
+            self.env["project.task"]
+            .sudo()
+            .search(
+                [
+                    ("project_id", "=", self.project_id.id),
+                    ("journey_stage_marker", "=", new_stage),
+                ],
+                limit=1,
+            )
         )
         if not marker:
             return
-        marker.with_context(_skip_journey_sync=True).write(
-            {"stage_id": target_stage.id}
-        )
+        marker.with_context(_skip_journey_sync=True).write({"stage_id": target_stage.id})
 
 
 class ProjectProjectSync(models.Model):
@@ -186,18 +187,14 @@ class ProjectProjectSync(models.Model):
                 Journey = self.env["onboarding.journey"].sudo()
                 journeys = Journey.search([("project_id", "in", self.ids)])
                 for j in journeys:
-                    j.with_context(_skip_journey_sync=True).write(
-                        {"project_orphaned": True}
-                    )
+                    j.with_context(_skip_journey_sync=True).write({"project_orphaned": True})
         return result
 
     def unlink(self):
         Journey = self.env["onboarding.journey"].sudo()
         journeys = Journey.search([("project_id", "in", self.ids)])
         for j in journeys:
-            j.with_context(_skip_journey_sync=True).write(
-                {"project_orphaned": True, "project_id": False}
-            )
+            j.with_context(_skip_journey_sync=True).write({"project_orphaned": True, "project_id": False})
         return super().unlink()
 
 
@@ -213,7 +210,7 @@ class ProjectTaskSync(models.Model):
     journey_stage_marker = fields.Char(
         index=True,
         help="If set, this task is the 'marker' for that onboarding stage. "
-             "Moving it across kanban columns updates the journey stage.",
+        "Moving it across kanban columns updates the journey stage.",
     )
 
     def _compute_journey_id(self):
@@ -243,7 +240,8 @@ class ProjectTaskSync(models.Model):
                 continue
             # Last-write-wins: only apply if our move is "newer".
             journey.with_context(
-                _skip_journey_sync=True, _force_stage=True,
+                _skip_journey_sync=True,
+                _force_stage=True,
             ).write(
                 {
                     "stage": mapped,

@@ -6,12 +6,13 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install")
 class TestTileCompute(TransactionCase):
-
     def setUp(self):
         super().setUp()
-        self.dashboard = self.env["custom.dashboard"].create({
-            "name": "Test Dashboard",
-        })
+        self.dashboard = self.env["custom.dashboard"].create(
+            {
+                "name": "Test Dashboard",
+            }
+        )
 
     def _make_tile(self, **vals):
         base = {

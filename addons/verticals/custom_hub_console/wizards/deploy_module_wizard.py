@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -28,13 +28,17 @@ class CustomHubDeployModuleWizard(models.TransientModel):
     _description = "Deploy Module to Tenant(s) Wizard"
 
     catalog_id = fields.Many2one(
-        "custom.hub.module.catalog", required=True, string="Module",
+        "custom.hub.module.catalog",
+        required=True,
+        string="Module",
     )
     tenant_ids = fields.Many2many(
         "tenant.registry",
         relation="custom_hub_deploy_wizard_tenant_rel",
-        column1="wizard_id", column2="tenant_id",
-        string="Tenants", required=True,
+        column1="wizard_id",
+        column2="tenant_id",
+        string="Tenants",
+        required=True,
     )
     deploy_mode = fields.Selection(
         [
@@ -42,11 +46,12 @@ class CustomHubDeployModuleWizard(models.TransientModel):
             ("upgrade", "Upgrade"),
             ("uninstall", "Uninstall"),
         ],
-        required=True, default="install",
+        required=True,
+        default="install",
     )
     schedule_at = fields.Datetime(
         help="If set, deployments are recorded but not executed now; an "
-             "external scheduler / ops process is expected to pick them up."
+        "external scheduler / ops process is expected to pick them up."
     )
     confirmed = fields.Boolean(
         string="I confirm",
@@ -59,7 +64,7 @@ class CustomHubDeployModuleWizard(models.TransientModel):
         string="Use Canary Rollout",
         default=True,
         help="Run the safe sequence: resolve deps, pre-backup, deploy to "
-             "canary env, healthcheck, then full rollout (or rollback).",
+        "canary env, healthcheck, then full rollout (or rollback).",
     )
     # target_environment_id (M2O to tenant.environment) injected by
     # custom_tenant_infra. See hub_module_deployment_extension.py.
@@ -67,9 +72,7 @@ class CustomHubDeployModuleWizard(models.TransientModel):
     def action_confirm(self):
         self.ensure_one()
         if not self.confirmed:
-            raise UserError(_(
-                "Please tick the confirmation box before proceeding."
-            ))
+            raise UserError(_("Please tick the confirmation box before proceeding."))
         if not self.tenant_ids:
             raise UserError(_("Select at least one tenant."))
 
@@ -130,19 +133,14 @@ class CustomHubModuleDeploymentCanary(models.Model):
                 if rec.healthcheck_passed:
                     rec.action_rollout_full()
                 else:
-                    rec.error_message = (
-                        rec.error_message
-                        or "Healthcheck did not pass; rolling back."
-                    )
+                    rec.error_message = rec.error_message or "Healthcheck did not pass; rolling back."
                     if rec.rollback_snapshot_id:
                         rec.action_rollback()
                     else:
                         rec.canary_phase = "rolled_back"
                         rec.state = "failed"
             except Exception as exc:  # noqa: BLE001
-                _logger.exception(
-                    "[hub_deploy] canary sequence aborted: %s", exc
-                )
+                _logger.exception("[hub_deploy] canary sequence aborted: %s", exc)
                 rec.error_message = f"Canary sequence aborted: {exc}"
                 rec.state = "failed"
         return True

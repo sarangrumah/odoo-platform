@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo import fields, models
 
 
 CANDIDATE_STATES = [
@@ -49,21 +48,22 @@ class ReferralCandidate(models.Model):
                 continue
             rec.write({"state": "hired", "hired_at": fields.Datetime.now()})
             rec._materialise_reward()
-            rec._pdp_audit_write("referral_hired", rec.id,
-                                 {"position": rec.position_id.name})
+            rec._pdp_audit_write("referral_hired", rec.id, {"position": rec.position_id.name})
 
     def _materialise_reward(self):
         self.ensure_one()
         if self.reward_id or not self.position_id.reward_amount:
             return
         Reward = self.env["referral.reward"].sudo()
-        self.reward_id = Reward.create({
-            "candidate_id": self.id,
-            "referrer_id": self.referrer_id.id,
-            "amount": self.position_id.reward_amount,
-            "currency_id": self.position_id.currency_id.id,
-            "state": "pending",
-        }).id
+        self.reward_id = Reward.create(
+            {
+                "candidate_id": self.id,
+                "referrer_id": self.referrer_id.id,
+                "amount": self.position_id.reward_amount,
+                "currency_id": self.position_id.currency_id.id,
+                "state": "pending",
+            }
+        ).id
 
     def action_reject(self):
         for rec in self:

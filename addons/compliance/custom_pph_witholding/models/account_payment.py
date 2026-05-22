@@ -34,10 +34,7 @@ class AccountPayment(models.Model):
             for bill in bills:
                 # Detect any negative-amount tax on the bill as a proxy
                 # for "withholding tax was applied here".
-                has_wh = any(
-                    line.tax_line_id and line.tax_line_id.amount < 0
-                    for line in bill.line_ids
-                )
+                has_wh = any(line.tax_line_id and line.tax_line_id.amount < 0 for line in bill.line_ids)
                 if not has_wh:
                     continue
                 Engine.compute_and_log(

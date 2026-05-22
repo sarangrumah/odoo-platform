@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Recompute forum.post.x_helpful_count when votes change."""
+
 from odoo import api, models
 
 

@@ -38,17 +38,21 @@ class ProjectTask(models.Model):
     # ---------- pomodoro buttons ----------
 
     def action_pomodoro_start_focus(self):
-        self.write({
-            "x_pomodoro_state": "focus",
-            "x_pomodoro_started_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "x_pomodoro_state": "focus",
+                "x_pomodoro_started_at": fields.Datetime.now(),
+            }
+        )
         return True
 
     def action_pomodoro_start_break(self):
-        self.write({
-            "x_pomodoro_state": "break",
-            "x_pomodoro_started_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "x_pomodoro_state": "break",
+                "x_pomodoro_started_at": fields.Datetime.now(),
+            }
+        )
         return True
 
     def action_pomodoro_done(self):
@@ -76,32 +80,40 @@ class ProjectTask(models.Model):
             elapsed = (now - task.x_pomodoro_started_at).total_seconds() / 60.0
             if task.x_pomodoro_state == "focus":
                 if elapsed >= max(task.x_pomodoro_minutes_focus or 25, 1):
-                    task.write({
-                        "x_pomodoro_state": "break",
-                        "x_pomodoro_started_at": now,
-                    })
-                    transitions.append({
-                        "task_id": task.id,
-                        "from": "focus",
-                        "to": "break",
-                        "elapsed_minutes": elapsed,
-                    })
+                    task.write(
+                        {
+                            "x_pomodoro_state": "break",
+                            "x_pomodoro_started_at": now,
+                        }
+                    )
+                    transitions.append(
+                        {
+                            "task_id": task.id,
+                            "from": "focus",
+                            "to": "break",
+                            "elapsed_minutes": elapsed,
+                        }
+                    )
                     task.message_post(
                         body=_("Pomodoro: focus complete, switched to break."),
                         subtype_xmlid="mail.mt_note",
                     )
             elif task.x_pomodoro_state == "break":
                 if elapsed >= max(task.x_pomodoro_minutes_break or 5, 1):
-                    task.write({
-                        "x_pomodoro_state": "idle",
-                        "x_pomodoro_started_at": False,
-                    })
-                    transitions.append({
-                        "task_id": task.id,
-                        "from": "break",
-                        "to": "idle",
-                        "elapsed_minutes": elapsed,
-                    })
+                    task.write(
+                        {
+                            "x_pomodoro_state": "idle",
+                            "x_pomodoro_started_at": False,
+                        }
+                    )
+                    transitions.append(
+                        {
+                            "task_id": task.id,
+                            "from": "break",
+                            "to": "idle",
+                            "elapsed_minutes": elapsed,
+                        }
+                    )
                     task.message_post(
                         body=_("Pomodoro: break complete, cycle finished."),
                         subtype_xmlid="mail.mt_note",
@@ -114,10 +126,12 @@ class ProjectTask(models.Model):
 
         Picks all tasks with an active pomodoro state and calls tick on them.
         """
-        active = self.search([
-            ("x_pomodoro_state", "in", ("focus", "break")),
-            ("x_pomodoro_started_at", "!=", False),
-        ])
+        active = self.search(
+            [
+                ("x_pomodoro_state", "in", ("focus", "break")),
+                ("x_pomodoro_started_at", "!=", False),
+            ]
+        )
         if active:
             active.action_pomodoro_tick()
         return True
@@ -149,12 +163,7 @@ class ProjectTask(models.Model):
             if isinstance(item, str):
                 text = item.strip()
             elif isinstance(item, dict):
-                text = (
-                    item.get("text")
-                    or item.get("name")
-                    or item.get("title")
-                    or ""
-                ).strip()
+                text = (item.get("text") or item.get("name") or item.get("title") or "").strip()
             else:
                 continue
             if text:
@@ -221,17 +230,21 @@ class ProjectTask(models.Model):
     def _standup_user_summary(self, user, since_dt, until_dt):
         """Return ``(done_yesterday, in_progress_today)`` recordsets for user."""
         # Tasks the user closed since `since_dt`
-        done = self.search([
-            ("user_ids", "in", user.id),
-            ("state", "in", ("1_done", "1_canceled")),
-            ("write_date", ">=", since_dt),
-            ("write_date", "<", until_dt),
-        ])
+        done = self.search(
+            [
+                ("user_ids", "in", user.id),
+                ("state", "in", ("1_done", "1_canceled")),
+                ("write_date", ">=", since_dt),
+                ("write_date", "<", until_dt),
+            ]
+        )
         # Tasks still open assigned to user (in-progress / planned)
-        in_progress = self.search([
-            ("user_ids", "in", user.id),
-            ("state", "in", ("01_in_progress", "02_changes_requested", "03_approved")),
-        ])
+        in_progress = self.search(
+            [
+                ("user_ids", "in", user.id),
+                ("state", "in", ("01_in_progress", "02_changes_requested", "03_approved")),
+            ]
+        )
         return done, in_progress
 
     @api.model
@@ -241,16 +254,19 @@ class ProjectTask(models.Model):
         Done yesterday + In-progress today, scoped by assigned user.
         """
         template = self.env.ref(
-            "custom_todo.mail_template_daily_standup", raise_if_not_found=False,
+            "custom_todo.mail_template_daily_standup",
+            raise_if_not_found=False,
         )
         if not template:
             _logger.warning("custom_todo: standup template missing, skipping cron")
             return False
         Users = self.env["res.users"]
-        users = Users.search([
-            ("active", "=", True),
-            ("share", "=", False),
-        ])
+        users = Users.search(
+            [
+                ("active", "=", True),
+                ("share", "=", False),
+            ]
+        )
         today = fields.Datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         yesterday = today - timedelta(days=1)
         sent = 0
@@ -266,7 +282,9 @@ class ProjectTask(models.Model):
             }
             try:
                 template.with_context(**ctx).send_mail(
-                    user.id, force_send=False, email_values={"email_to": user.email},
+                    user.id,
+                    force_send=False,
+                    email_values={"email_to": user.email},
                 )
                 sent += 1
             except Exception as e:  # pragma: no cover - defensive

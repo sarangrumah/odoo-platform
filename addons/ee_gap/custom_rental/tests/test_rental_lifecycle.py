@@ -8,26 +8,29 @@ from odoo.exceptions import ValidationError
 
 @tagged("post_install", "-at_install")
 class TestRentalLifecycle(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.partner = cls.env["res.partner"].create({"name": "Test Renter"})
-        cls.asset = cls.env["rental.asset"].create({
-            "name": "Asset One",
-            "code": "ASSET-LC-1",
-            "daily_rate": 50.0,
-        })
+        cls.asset = cls.env["rental.asset"].create(
+            {
+                "name": "Asset One",
+                "code": "ASSET-LC-1",
+                "daily_rate": 50.0,
+            }
+        )
 
     def _make_order(self, days=2):
         now = datetime(2025, 1, 1, 10, 0)
-        return self.env["rental.order"].create({
-            "partner_id": self.partner.id,
-            "asset_id": self.asset.id,
-            "pickup_dt": now,
-            "return_dt_expected": now + timedelta(days=days),
-            "daily_rate": 50.0,
-        })
+        return self.env["rental.order"].create(
+            {
+                "partner_id": self.partner.id,
+                "asset_id": self.asset.id,
+                "pickup_dt": now,
+                "return_dt_expected": now + timedelta(days=days),
+                "daily_rate": 50.0,
+            }
+        )
 
     def test_schedule_overlap_rejected(self):
         self._make_order(days=3).action_confirm()
@@ -48,13 +51,14 @@ class TestRentalLifecycle(TransactionCase):
         self.assertTrue(order.late_fee_line_ids)
 
     def test_picking_creation_when_enabled(self):
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_rental.config_stock_integration", "True")
-        product = self.env["product.product"].create({
-            "name": "Asset Stock",
-            "type": "consu",
-            "is_storable": True,
-        })
+        self.env["ir.config_parameter"].sudo().set_param("custom_rental.config_stock_integration", "True")
+        product = self.env["product.product"].create(
+            {
+                "name": "Asset Stock",
+                "type": "consu",
+                "is_storable": True,
+            }
+        )
         self.asset.product_id = product.id
         order = self._make_order(days=1)
         order.action_confirm()

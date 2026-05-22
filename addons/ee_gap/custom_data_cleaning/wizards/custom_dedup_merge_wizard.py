@@ -8,6 +8,7 @@ database referencing the duplicate IDs is rewritten to point at the master,
 then the duplicates are unlinked. Conflict resolution keeps the master
 value and posts an audit message describing what was discarded.
 """
+
 import json
 import logging
 
@@ -39,8 +40,7 @@ class CustomDedupMergeWizard(models.TransientModel):
     master_id_int = fields.Integer(
         string="Master Record ID",
         required=True,
-        help="Numeric primary key of the record to KEEP. Other duplicates "
-             "will be merged into it.",
+        help="Numeric primary key of the record to KEEP. Other duplicates will be merged into it.",
     )
     preview = fields.Char(
         string="Preview",
@@ -59,11 +59,13 @@ class CustomDedupMergeWizard(models.TransientModel):
         if candidate_id:
             cand = self.env["custom.dedup.candidate"].browse(candidate_id)
             ids = cand._get_record_ids()
-            vals.update({
-                "candidate_id": candidate_id,
-                "record_ids_json": json.dumps(ids),
-                "master_id_int": ids[0] if ids else 0,
-            })
+            vals.update(
+                {
+                    "candidate_id": candidate_id,
+                    "record_ids_json": json.dumps(ids),
+                    "master_id_int": ids[0] if ids else 0,
+                }
+            )
         return vals
 
     # ------------------------------------------------------------------
@@ -104,9 +106,15 @@ class CustomDedupMergeWizard(models.TransientModel):
         for dup in duplicates:
             dup_vals = dup.read()[0]
             for fname, fdef in Model._fields.items():
-                if fname in ("id", "create_date", "create_uid",
-                             "write_date", "write_uid", "display_name",
-                             "__last_update"):
+                if fname in (
+                    "id",
+                    "create_date",
+                    "create_uid",
+                    "write_date",
+                    "write_uid",
+                    "display_name",
+                    "__last_update",
+                ):
                     continue
                 if fdef.type in ("one2many", "many2many"):
                     continue
@@ -117,14 +125,26 @@ class CustomDedupMergeWizard(models.TransientModel):
                 if m_val in (None, False, "") and d_val not in (None, False, ""):
                     # Fill empty master from duplicate
                     try:
-                        master.write({fname: d_val if fdef.type != "many2one" else (d_val[0] if isinstance(d_val, (list, tuple)) else d_val)})
+                        master.write(
+                            {
+                                fname: d_val
+                                if fdef.type != "many2one"
+                                else (d_val[0] if isinstance(d_val, (list, tuple)) else d_val)
+                            }
+                        )
                         master_vals[fname] = d_val
                     except Exception as exc:
                         _logger.debug("merge fill %s skipped: %s", fname, exc)
                 elif m_val and d_val and m_val != d_val and fdef.type not in ("binary",):
-                    conflicts.append("%s: kept %r, discarded %r (from id=%d)" % (
-                        fname, m_val, d_val, dup.id,
-                    ))
+                    conflicts.append(
+                        "%s: kept %r, discarded %r (from id=%d)"
+                        % (
+                            fname,
+                            m_val,
+                            d_val,
+                            dup.id,
+                        )
+                    )
 
         # ------- Reassign FKs across DB -------
         cr = self.env.cr
@@ -155,7 +175,10 @@ class CustomDedupMergeWizard(models.TransientModel):
                     )
                 except Exception as exc:  # pragma: no cover
                     _logger.warning(
-                        "FK reassign skipped on %s.%s: %s", table, column, exc,
+                        "FK reassign skipped on %s.%s: %s",
+                        table,
+                        column,
+                        exc,
                     )
                     cr.rollback()
 

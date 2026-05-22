@@ -10,7 +10,10 @@ class CustomBastLine(models.Model):
     _order = "bast_id, sequence, id"
 
     bast_id = fields.Many2one(
-        "custom.bast.document", required=True, ondelete="cascade", index=True,
+        "custom.bast.document",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     sequence = fields.Integer(default=10)
     item_description = fields.Char(required=True)
@@ -24,7 +27,8 @@ class CustomBastLine(models.Model):
             ("damaged", "Damaged"),
             ("partial", "Partial"),
         ],
-        default="good", required=True,
+        default="good",
+        required=True,
     )
     photo = fields.Binary(attachment=True)
     note = fields.Char()

@@ -36,9 +36,7 @@ class PutawayEngine(models.AbstractModel):
         strategies = Strategy.search([("active", "=", True), ("warehouse_id", "=", warehouse.id)])
         proposals: list[dict] = []
         for strategy in strategies:
-            for rule in strategy.rule_ids.filtered(lambda r: r.active).sorted(
-                key=lambda r: (r.tier, r.sequence)
-            ):
+            for rule in strategy.rule_ids.filtered(lambda r: r.active).sorted(key=lambda r: (r.tier, r.sequence)):
                 score, reason = self._score_rule(rule, move_line)
                 if score <= 0:
                     continue
@@ -46,13 +44,15 @@ class PutawayEngine(models.AbstractModel):
                 if not loc:
                     cands = rule._candidate_locations()
                     loc = cands[:1]
-                proposals.append({
-                    "location_id": loc.id if loc else False,
-                    "score": score,
-                    "rule_id": rule.id,
-                    "reason": reason,
-                    "tier": rule.tier,
-                })
+                proposals.append(
+                    {
+                        "location_id": loc.id if loc else False,
+                        "score": score,
+                        "rule_id": rule.id,
+                        "reason": reason,
+                        "tier": rule.tier,
+                    }
+                )
         proposals.sort(key=lambda d: (d.get("tier") or 9999, -d["score"]))
         return proposals
 
@@ -112,9 +112,7 @@ class PutawayEngine(models.AbstractModel):
         if capacity <= 0:
             return 0, _("Location has no volume capacity")
         if used + product_vol > capacity:
-            return 0, _("Oversized: needs %.3fm3, free %.3fm3") % (
-                product_vol, max(0.0, capacity - used)
-            )
+            return 0, _("Oversized: needs %.3fm3, free %.3fm3") % (product_vol, max(0.0, capacity - used))
         free_ratio = (capacity - used - product_vol) / capacity
         # Higher = better fit (less wasted space relative to product)
         score = int(60 + 40 * (1.0 - max(0.0, min(1.0, free_ratio))))
@@ -176,15 +174,17 @@ class PutawayEngine(models.AbstractModel):
             return False
         top = proposals[0]
         Suggestion = self.env["custom.wms.putaway.suggestion"]
-        sugg = Suggestion.create({
-            "picking_id": move_line.picking_id.id,
-            "move_line_id": move_line.id,
-            "original_dest_location_id": move_line.location_dest_id.id,
-            "suggested_location_id": top["location_id"],
-            "rule_id": top["rule_id"],
-            "score": top["score"],
-            "reason": top["reason"],
-        })
+        sugg = Suggestion.create(
+            {
+                "picking_id": move_line.picking_id.id,
+                "move_line_id": move_line.id,
+                "original_dest_location_id": move_line.location_dest_id.id,
+                "suggested_location_id": top["location_id"],
+                "rule_id": top["rule_id"],
+                "score": top["score"],
+                "reason": top["reason"],
+            }
+        )
         if top["score"] > 90 and top["location_id"]:
             sugg.action_apply()
         return sugg

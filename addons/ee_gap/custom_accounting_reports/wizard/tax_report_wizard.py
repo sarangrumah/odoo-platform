@@ -13,10 +13,12 @@ class TaxReportWizard(models.TransientModel):
         default=lambda self: date.today().replace(month=1, day=1),
     )
     date_to = fields.Date(
-        required=True, default=lambda self: date.today(),
+        required=True,
+        default=lambda self: date.today(),
     )
     company_ids = fields.Many2many(
-        "res.company", default=lambda self: self.env.companies,
+        "res.company",
+        default=lambda self: self.env.companies,
     )
     posted_only = fields.Boolean(default=True)
 
@@ -40,6 +42,4 @@ class TaxReportWizard(models.TransientModel):
                 "date_to": self.date_to.isoformat(),
             },
         }
-        return self.env.ref(
-            "custom_accounting_reports.action_report_custom_financial"
-        ).report_action(self, data=data)
+        return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)

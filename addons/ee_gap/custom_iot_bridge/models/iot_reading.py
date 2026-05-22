@@ -9,8 +9,7 @@ class IotReading(models.Model):
     _order = "recorded_at desc"
 
     device_id = fields.Many2one("iot.device", required=True, ondelete="cascade", index=True)
-    metric = fields.Char(required=True, index=True,
-                          help="Free-form metric key, e.g. 'temperature_c'.")
+    metric = fields.Char(required=True, index=True, help="Free-form metric key, e.g. 'temperature_c'.")
     value = fields.Float(required=True)
     unit = fields.Char()
     recorded_at = fields.Datetime(required=True, default=fields.Datetime.now, index=True)

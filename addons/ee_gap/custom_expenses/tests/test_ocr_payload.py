@@ -9,34 +9,39 @@ from odoo.tests.common import TransactionCase
 
 
 class TestOcrPayload(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.Expense = cls.env["hr.expense"]
         cls.employee = cls.env["hr.employee"].create({"name": "OCR Tester"})
-        cls.product = cls.env["product.product"].create({
-            "name": "Meals",
-            "default_code": "MEAL",
-            "can_be_expensed": True,
-        })
-        cls.expense = cls.Expense.create({
-            "name": "Lunch receipt",
-            "employee_id": cls.employee.id,
-            "product_id": cls.product.id,
-            "total_amount": 0.0,
-        })
+        cls.product = cls.env["product.product"].create(
+            {
+                "name": "Meals",
+                "default_code": "MEAL",
+                "can_be_expensed": True,
+            }
+        )
+        cls.expense = cls.Expense.create(
+            {
+                "name": "Lunch receipt",
+                "employee_id": cls.employee.id,
+                "product_id": cls.product.id,
+                "total_amount": 0.0,
+            }
+        )
 
     def _attach_dummy_receipt(self, expense):
         raw = b"%PDF-1.4 fake receipt bytes"
-        return self.env["ir.attachment"].create({
-            "name": "receipt.pdf",
-            "res_model": expense._name,
-            "res_id": expense.id,
-            "type": "binary",
-            "datas": base64.b64encode(raw).decode("ascii"),
-            "mimetype": "application/pdf",
-        })
+        return self.env["ir.attachment"].create(
+            {
+                "name": "receipt.pdf",
+                "res_model": expense._name,
+                "res_id": expense.id,
+                "type": "binary",
+                "datas": base64.b64encode(raw).decode("ascii"),
+                "mimetype": "application/pdf",
+            }
+        )
 
     def test_payload_includes_image_base64_when_attached(self):
         self._attach_dummy_receipt(self.expense)
@@ -51,11 +56,13 @@ class TestOcrPayload(TransactionCase):
 
     def test_payload_empty_image_when_no_attachment(self):
         # Fresh expense, no attachment
-        exp = self.Expense.create({
-            "name": "Empty",
-            "employee_id": self.employee.id,
-            "product_id": self.product.id,
-        })
+        exp = self.Expense.create(
+            {
+                "name": "Empty",
+                "employee_id": self.employee.id,
+                "product_id": self.product.id,
+            }
+        )
         payload = exp._custom_ai_payload()
         self.assertEqual(payload["image_base64"], "")
 

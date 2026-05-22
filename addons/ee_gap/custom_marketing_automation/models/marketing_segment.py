@@ -12,7 +12,8 @@ class MarketingSegment(models.Model):
 
     name = fields.Char(required=True)
     model_id = fields.Many2one(
-        "ir.model", required=True,
+        "ir.model",
+        required=True,
         ondelete="cascade",
         domain="[('model', 'in', ('res.partner',))]",
         default=lambda s: s.env.ref("base.model_res_partner").id,
@@ -36,9 +37,7 @@ class MarketingSegment(models.Model):
         for rec in self:
             try:
                 Model = self.env[rec.model_id.model]
-                rec.contact_count = Model.sudo().search_count(
-                    ast.literal_eval(rec.filter_domain or "[]")
-                )
+                rec.contact_count = Model.sudo().search_count(ast.literal_eval(rec.filter_domain or "[]"))
             except Exception:
                 rec.contact_count = 0
 

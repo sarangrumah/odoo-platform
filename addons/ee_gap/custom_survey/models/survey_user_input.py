@@ -45,11 +45,7 @@ class SurveyUserInput(models.Model):
                 # Best-effort max-score lookup; standard survey stores max on question.suggested_answer_ids
                 max_score = 0.0
                 if "suggested_answer_ids" in q._fields and q.suggested_answer_ids:
-                    pos = [
-                        (a.answer_score or 0.0)
-                        for a in q.suggested_answer_ids
-                        if (a.answer_score or 0.0) > 0
-                    ]
+                    pos = [(a.answer_score or 0.0) for a in q.suggested_answer_ids if (a.answer_score or 0.0) > 0]
                     if pos:
                         max_score = max(pos)
                 if max_score <= 0.0:
@@ -57,9 +53,7 @@ class SurveyUserInput(models.Model):
                     max_score = 10.0
                 total_weighted += entry["score"] * weight
                 total_max += max_score * weight
-            rec.x_weighted_score = (
-                (total_weighted / total_max * 100.0) if total_max > 0.0 else 0.0
-            )
+            rec.x_weighted_score = (total_weighted / total_max * 100.0) if total_max > 0.0 else 0.0
 
     def _action_done(self):
         """Hook into completion to update linked appraisal + issue certificate."""

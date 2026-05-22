@@ -16,14 +16,15 @@ class RentalAsset(models.Model):
     deposit_amount = fields.Monetary(currency_field="currency_id", default=0.0)
     currency_id = fields.Many2one("res.currency", default=lambda s: s.env.company.currency_id)
     state = fields.Selection(
-        [("available", "Available"), ("on_rent", "On Rent"),
-         ("maintenance", "Maintenance"), ("retired", "Retired")],
-        default="available", required=True, tracking=True,
+        [("available", "Available"), ("on_rent", "On Rent"), ("maintenance", "Maintenance"), ("retired", "Retired")],
+        default="available",
+        required=True,
+        tracking=True,
     )
     active = fields.Boolean(default=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
 
     _code_uniq = models.Constraint(
-        'unique(code)',
-        'Asset code must be unique.',
+        "unique(code)",
+        "Asset code must be unique.",
     )

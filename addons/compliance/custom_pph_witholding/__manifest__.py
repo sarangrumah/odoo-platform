@@ -2,7 +2,7 @@
 {
     "name": "Custom PPh Witholding Engine",
     "summary": "Generic PPh witholding engine (rates registry + computation "
-               "+ application log) for Indonesian Income Tax.",
+    "+ application log) for Indonesian Income Tax.",
     "description": """
 Custom PPh Witholding Engine
 ============================

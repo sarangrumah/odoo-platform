@@ -148,9 +148,7 @@ class CustomDedupRule(models.Model):
             return ""
         text = str(value).strip()
         lower_field = (field_name or "").lower()
-        if self.normalize_phone_id and lower_field in (
-            "phone", "mobile", "phone_id", "x_phone", "x_mobile"
-        ):
+        if self.normalize_phone_id and lower_field in ("phone", "mobile", "phone_id", "x_phone", "x_mobile"):
             return _normalize_phone_id(text) or ""
         if self.normalize_email_case and lower_field in ("email", "email_normalized", "x_email"):
             return text.lower().strip()
@@ -186,12 +184,15 @@ class CustomDedupRule(models.Model):
             except Exception as exc:  # pragma: no cover — defensive
                 _logger.exception(
                     "custom_data_cleaning: scan failed to read %s: %s",
-                    rule.model_name, exc,
+                    rule.model_name,
+                    exc,
                 )
-                rule.write({
-                    "last_run_at": fields.Datetime.now(),
-                    "last_match_count": 0,
-                })
+                rule.write(
+                    {
+                        "last_run_at": fields.Datetime.now(),
+                        "last_match_count": 0,
+                    }
+                )
                 continue
 
             buckets = {}
@@ -207,7 +208,9 @@ class CustomDedupRule(models.Model):
                 except Exception as exc:  # pragma: no cover
                     _logger.warning(
                         "custom_data_cleaning: skip rec %s on rule %s: %s",
-                        rec.get("id"), rule.name, exc,
+                        rec.get("id"),
+                        rule.name,
+                        exc,
                     )
 
             Candidate = self.env["custom.dedup.candidate"]
@@ -218,30 +221,30 @@ class CustomDedupRule(models.Model):
                 ids = [r["id"] for r in group]
                 preview_parts = []
                 for r in group[:3]:
-                    label = (
-                        r.get("display_name")
-                        or r.get("name")
-                        or r.get(fields_list[0])
-                        or "ID %s" % r["id"]
-                    )
+                    label = r.get("display_name") or r.get("name") or r.get(fields_list[0]) or "ID %s" % r["id"]
                     preview_parts.append(str(label))
                 preview = " | ".join(preview_parts)
                 if len(group) > 3:
                     preview += " (+%d more)" % (len(group) - 3)
-                Candidate.create({
-                    "rule_id": rule.id,
-                    "res_ids_json": json.dumps(ids),
-                    "preview": preview[:255],
-                    "match_key": " || ".join(str(k) for k in key)[:255],
-                })
+                Candidate.create(
+                    {
+                        "rule_id": rule.id,
+                        "res_ids_json": json.dumps(ids),
+                        "preview": preview[:255],
+                        "match_key": " || ".join(str(k) for k in key)[:255],
+                    }
+                )
                 created += 1
 
-            rule.write({
-                "last_run_at": fields.Datetime.now(),
-                "last_match_count": created,
-            })
+            rule.write(
+                {
+                    "last_run_at": fields.Datetime.now(),
+                    "last_match_count": created,
+                }
+            )
             rule.message_post(
-                body=_("Scan complete: %(n)d duplicate group(s) found across %(t)d record(s).") % {
+                body=_("Scan complete: %(n)d duplicate group(s) found across %(t)d record(s).")
+                % {
                     "n": created,
                     "t": len(records),
                 }

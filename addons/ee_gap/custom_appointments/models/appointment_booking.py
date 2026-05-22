@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -64,17 +63,22 @@ class AppointmentBooking(models.Model):
             if not rec.start_dt or not rec.end_dt:
                 continue
             # Capacity check — count overlapping confirmed bookings
-            overlap = self.sudo().search([
-                ("resource_id", "=", rec.resource_id.id),
-                ("state", "=", "confirmed"),
-                ("id", "!=", rec.id),
-                ("start_dt", "<", rec.end_dt),
-                ("end_dt", ">", rec.start_dt),
-            ])
+            overlap = self.sudo().search(
+                [
+                    ("resource_id", "=", rec.resource_id.id),
+                    ("state", "=", "confirmed"),
+                    ("id", "!=", rec.id),
+                    ("start_dt", "<", rec.end_dt),
+                    ("end_dt", ">", rec.start_dt),
+                ]
+            )
             if len(overlap) >= rec.resource_id.capacity:
-                raise ValidationError(_(
-                    "Resource '%s' is fully booked for this slot (capacity %s).",
-                ) % (rec.resource_id.name, rec.resource_id.capacity))
+                raise ValidationError(
+                    _(
+                        "Resource '%s' is fully booked for this slot (capacity %s).",
+                    )
+                    % (rec.resource_id.name, rec.resource_id.capacity)
+                )
 
     def action_confirm(self):
         for rec in self:

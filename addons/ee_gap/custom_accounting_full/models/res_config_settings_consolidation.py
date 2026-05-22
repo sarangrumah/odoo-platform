@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from odoo import api, fields, models
+from odoo import fields, models
 
 
 class ResConfigSettings(models.TransientModel):
@@ -13,5 +13,5 @@ class ResConfigSettings(models.TransientModel):
         string="Enable Intercompany Consolidation",
         config_parameter="custom_accounting_full.intercompany_active",
         help="When enabled, exposes the multi-chart consolidation menu "
-             "(custom.consolidation.chart / mappings / elimination rules).",
+        "(custom.consolidation.chart / mappings / elimination rules).",
     )

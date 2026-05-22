@@ -5,44 +5,55 @@ from odoo.tests.common import TransactionCase
 
 
 class TestAnonymity(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.Survey = self.env["survey.survey"]
         self.Partner = self.env["res.partner"]
-        self.partner = self.Partner.create({
-            "name": "Test Respondent",
-            "email": "respondent@example.com",
-        })
+        self.partner = self.Partner.create(
+            {
+                "name": "Test Respondent",
+                "email": "respondent@example.com",
+            }
+        )
 
     def test_partial_keeps_partner(self):
-        survey = self.Survey.create({
-            "title": "Partial Survey",
-            "x_anonymity": "partial",
-        })
-        ui = self.env["survey.user_input"].create({
-            "survey_id": survey.id,
-            "partner_id": self.partner.id,
-        })
+        survey = self.Survey.create(
+            {
+                "title": "Partial Survey",
+                "x_anonymity": "partial",
+            }
+        )
+        ui = self.env["survey.user_input"].create(
+            {
+                "survey_id": survey.id,
+                "partner_id": self.partner.id,
+            }
+        )
         # Partial mode keeps the partner attached.
         self.assertEqual(ui.partner_id, self.partner)
 
     def test_identified_keeps_partner(self):
-        survey = self.Survey.create({
-            "title": "Identified Survey",
-            "x_anonymity": "identified",
-        })
-        ui = self.env["survey.user_input"].create({
-            "survey_id": survey.id,
-            "partner_id": self.partner.id,
-        })
+        survey = self.Survey.create(
+            {
+                "title": "Identified Survey",
+                "x_anonymity": "identified",
+            }
+        )
+        ui = self.env["survey.user_input"].create(
+            {
+                "survey_id": survey.id,
+                "partner_id": self.partner.id,
+            }
+        )
         self.assertEqual(ui.partner_id, self.partner)
 
     def test_fully_anonymous_strips_partner_via_create_answer(self):
-        survey = self.Survey.create({
-            "title": "Anon Survey",
-            "x_anonymity": "fully_anonymous",
-        })
+        survey = self.Survey.create(
+            {
+                "title": "Anon Survey",
+                "x_anonymity": "fully_anonymous",
+            }
+        )
         # The override targets _create_answer; call it directly with a partner.
         try:
             user_inputs = survey._create_answer(partner=self.partner)

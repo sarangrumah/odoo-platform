@@ -32,7 +32,6 @@ class CircuitBreakerOpenError(RuntimeError):
 
 
 class BaseAdapter:
-
     DEFAULT_TIMEOUT_S = 15
     DEFAULT_RETRY_COUNT = 3
     DEFAULT_CB_THRESHOLD = 5
@@ -49,11 +48,17 @@ class BaseAdapter:
     def health_check(self) -> AdapterResponse:
         return self.call("health", payload=None, method="GET")
 
-    def call(self, endpoint: str, payload: Any = None, timeout: Optional[int] = None,
-             method: str = "POST", extra_headers: Optional[dict] = None) -> AdapterResponse:
+    def call(
+        self,
+        endpoint: str,
+        payload: Any = None,
+        timeout: Optional[int] = None,
+        method: str = "POST",
+        extra_headers: Optional[dict] = None,
+    ) -> AdapterResponse:
         self._cb_precheck()
         timeout = timeout or (self.config.timeout_s if self.config else self.DEFAULT_TIMEOUT_S)
-        retries = (self.config.retry_count if self.config else self.DEFAULT_RETRY_COUNT)
+        retries = self.config.retry_count if self.config else self.DEFAULT_RETRY_COUNT
         url = self._build_url(endpoint)
         body = b"" if payload is None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
         last_exc: Optional[Exception] = None
@@ -61,8 +66,7 @@ class BaseAdapter:
             t0 = time.time()
             try:
                 headers = self._build_headers(body, extra_headers)
-                resp = requests.request(method, url, data=body if body else None,
-                                        headers=headers, timeout=timeout)
+                resp = requests.request(method, url, data=body if body else None, headers=headers, timeout=timeout)
                 latency_ms = int((time.time() - t0) * 1000)
                 result = self._handle_response(resp, latency_ms)
                 self._log_call(endpoint, body, result)
@@ -76,17 +80,21 @@ class BaseAdapter:
             except requests.RequestException as exc:
                 latency_ms = int((time.time() - t0) * 1000)
                 last_exc = exc
-                _logger.warning("Adapter %s call %s failed (attempt %s): %s",
-                                getattr(self.config, "name", "?"), endpoint, attempt + 1, exc)
+                _logger.warning(
+                    "Adapter %s call %s failed (attempt %s): %s",
+                    getattr(self.config, "name", "?"),
+                    endpoint,
+                    attempt + 1,
+                    exc,
+                )
                 self._cb_record_failure()
                 fail = AdapterResponse(ok=False, status_code=0, error=str(exc), latency_ms=latency_ms)
                 self._log_call(endpoint, body, fail)
             # exponential backoff with cap, only if more attempts remain
             if attempt + 1 < retries:
-                delay = min(self.BACKOFF_CAP_S, self.BACKOFF_BASE_S * (2 ** attempt))
+                delay = min(self.BACKOFF_CAP_S, self.BACKOFF_BASE_S * (2**attempt))
                 time.sleep(delay)
-        return AdapterResponse(ok=False, status_code=0,
-                               error=str(last_exc) if last_exc else "exhausted_retries")
+        return AdapterResponse(ok=False, status_code=0, error=str(last_exc) if last_exc else "exhausted_retries")
 
     # --- signing ---
 
@@ -111,6 +119,7 @@ class BaseAdapter:
             headers["Authorization"] = f"Bearer {self._get_secret()}"
         elif auth == "basic":
             import base64
+
             token = base64.b64encode(self._get_secret().encode("utf-8")).decode("ascii")
             headers["Authorization"] = f"Basic {token}"
         if extra:
@@ -155,19 +164,19 @@ class BaseAdapter:
                 # The probe outcome will commit the transition via _cb_record_*.
                 self.config.sudo().write({"status": "active"})
             else:
-                raise CircuitBreakerOpenError(
-                    f"adapter {self.config.name} circuit open; cooldown not elapsed"
-                )
+                raise CircuitBreakerOpenError(f"adapter {self.config.name} circuit open; cooldown not elapsed")
 
     def _cb_record_success(self) -> None:
         if not self.config:
             return
         if self.config.consecutive_failures or self.config.status != "active":
-            self.config.sudo().write({
-                "consecutive_failures": 0,
-                "status": "active",
-                "circuit_opened_at": False,
-            })
+            self.config.sudo().write(
+                {
+                    "consecutive_failures": 0,
+                    "status": "active",
+                    "circuit_opened_at": False,
+                }
+            )
 
     def _cb_record_failure(self) -> None:
         if not self.config:
@@ -183,6 +192,7 @@ class BaseAdapter:
     @staticmethod
     def _now_dt():
         from odoo import fields as _fields
+
         return _fields.Datetime.now()
 
     # --- audit log hook ---
@@ -192,14 +202,16 @@ class BaseAdapter:
             return
         try:
             req_hash = hashlib.sha256(body or b"").hexdigest() if body else ""
-            self.env["custom.adapter.call.log"].sudo().create({
-                "config_id": self.config.id,
-                "endpoint": endpoint,
-                "request_hash": req_hash,
-                "response_status": result.status_code,
-                "latency_ms": result.latency_ms,
-                "error": (result.error or "")[:512] if result.error else False,
-                "ok": result.ok,
-            })
+            self.env["custom.adapter.call.log"].sudo().create(
+                {
+                    "config_id": self.config.id,
+                    "endpoint": endpoint,
+                    "request_hash": req_hash,
+                    "response_status": result.status_code,
+                    "latency_ms": result.latency_ms,
+                    "error": (result.error or "")[:512] if result.error else False,
+                    "ok": result.ok,
+                }
+            )
         except Exception as e:  # pragma: no cover - never block business call
             _logger.error("adapter call log write failed: %s", e)

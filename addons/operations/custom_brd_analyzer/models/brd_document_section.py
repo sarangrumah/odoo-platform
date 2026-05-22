@@ -11,9 +11,7 @@ class BrdDocumentSection(models.Model):
     _description = "BRD Document Section"
     _order = "document_id, sequence, id"
 
-    document_id = fields.Many2one(
-        "brd.document", required=True, ondelete="cascade", index=True
-    )
+    document_id = fields.Many2one("brd.document", required=True, ondelete="cascade", index=True)
     sequence = fields.Integer(default=10, index=True)
     title = fields.Char(required=True)
     content = fields.Text()

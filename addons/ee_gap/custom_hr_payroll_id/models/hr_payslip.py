@@ -54,9 +54,7 @@ class HrPayslip(models.Model):
         default=lambda self: self.env.company,
         required=True,
     )
-    currency_id = fields.Many2one(
-        "res.currency", related="company_id.currency_id", store=True
-    )
+    currency_id = fields.Many2one("res.currency", related="company_id.currency_id", store=True)
     period_year = fields.Integer(required=True, default=lambda s: fields.Date.today().year)
     period_month = fields.Selection(
         [(str(i), f"{i:02d}") for i in range(1, 13)],
@@ -118,8 +116,8 @@ class HrPayslip(models.Model):
     )
 
     _uniq_employee_period = models.Constraint(
-        'unique(employee_id, period_year, period_month, is_thr)',
-        'Only one payslip per employee per period (regular vs THR are distinct).',
+        "unique(employee_id, period_year, period_month, is_thr)",
+        "Only one payslip per employee per period (regular vs THR are distinct).",
     )
 
     @api.depends("employee_id", "period_year", "period_month", "is_thr")
@@ -213,22 +211,24 @@ class HrPayslip(models.Model):
         thp = gross_total_month - deductions
 
         # Persist computed totals
-        self.write({
-            "bpjs_kesehatan_emp": bpjs_kes_emp,
-            "bpjs_kesehatan_company": bpjs_kes_co,
-            "bpjs_jht_emp": bpjs_jht_emp,
-            "bpjs_jht_company": bpjs_jht_co,
-            "bpjs_jp_emp": bpjs_jp_emp,
-            "bpjs_jp_company": bpjs_jp_co,
-            "bpjs_jkk": bpjs_jkk,
-            "bpjs_jkm": bpjs_jkm,
-            "pph21": pph_month,
-            "take_home_pay": thp,
-            "calc_method_used": method_used,
-            "ter_category_used": ter_cat,
-            "ter_rate_used": ter_rate,
-            "state": "computed",
-        })
+        self.write(
+            {
+                "bpjs_kesehatan_emp": bpjs_kes_emp,
+                "bpjs_kesehatan_company": bpjs_kes_co,
+                "bpjs_jht_emp": bpjs_jht_emp,
+                "bpjs_jht_company": bpjs_jht_co,
+                "bpjs_jp_emp": bpjs_jp_emp,
+                "bpjs_jp_company": bpjs_jp_co,
+                "bpjs_jkk": bpjs_jkk,
+                "bpjs_jkm": bpjs_jkm,
+                "pph21": pph_month,
+                "take_home_pay": thp,
+                "calc_method_used": method_used,
+                "ter_category_used": ter_cat,
+                "ter_rate_used": ter_rate,
+                "state": "computed",
+            }
+        )
 
         # Generate breakdown lines
         Line = self.env["hr.payslip.line"]
@@ -245,14 +245,16 @@ class HrPayslip(models.Model):
         ]
         for s, code, label, typ, amt in line_vals:
             if amt or typ == "info":
-                Line.create({
-                    "payslip_id": self.id,
-                    "sequence": s,
-                    "code": code,
-                    "label": label,
-                    "type": typ,
-                    "amount": amt,
-                })
+                Line.create(
+                    {
+                        "payslip_id": self.id,
+                        "sequence": s,
+                        "code": code,
+                        "label": label,
+                        "type": typ,
+                        "amount": amt,
+                    }
+                )
 
     # ---------- workflow ----------
 
@@ -275,30 +277,36 @@ class HrPayslip(models.Model):
         if not partner:
             # Fall back to employee resource_id name; create a minimal partner so
             # the Bupot has a counterparty reference. Operator can later replace.
-            partner = self.env["res.partner"].sudo().create({
-                "name": self.employee_id.name,
-                "is_company": False,
-            })
+            partner = (
+                self.env["res.partner"]
+                .sudo()
+                .create(
+                    {
+                        "name": self.employee_id.name,
+                        "is_company": False,
+                    }
+                )
+            )
         try:
-            self.bupot_id = Bupot.create({
-                "no_bupot": f"DRAFT-PPH21-{self.period_year}{self.period_month:0>2}-{self.employee_id.id}",
-                "partner_id": partner.id,
-                "jenis_pph": "21",
-                "tarif": self.ter_rate_used or 0.0,
-                "dpp": self.gross_salary + (self.tunjangan_jabatan or 0) + (self.tunjangan_lain or 0),
-                "pph_terpotong": self.pph21,
-                "currency_id": self.currency_id.id,
-                "tanggal_bupot": fields.Date.context_today(self),
-                "period_year": self.period_year,
-                "period_month": int(self.period_month or 0),
-                "source": "issued",
-                "state": "draft",
-            }).id
+            self.bupot_id = Bupot.create(
+                {
+                    "no_bupot": f"DRAFT-PPH21-{self.period_year}{self.period_month:0>2}-{self.employee_id.id}",
+                    "partner_id": partner.id,
+                    "jenis_pph": "21",
+                    "tarif": self.ter_rate_used or 0.0,
+                    "dpp": self.gross_salary + (self.tunjangan_jabatan or 0) + (self.tunjangan_lain or 0),
+                    "pph_terpotong": self.pph21,
+                    "currency_id": self.currency_id.id,
+                    "tanggal_bupot": fields.Date.context_today(self),
+                    "period_year": self.period_year,
+                    "period_month": int(self.period_month or 0),
+                    "source": "issued",
+                    "state": "draft",
+                }
+            ).id
         except Exception as e:
             _logger.warning("Failed to create Bupot PPh 21 for payslip %s: %s", self.name, e)
-            self.message_post(
-                body=_("Failed to auto-create Bupot PPh 21: %s") % e
-            )
+            self.message_post(body=_("Failed to auto-create Bupot PPh 21: %s") % e)
 
     def action_pay(self):
         self.write({"state": "paid"})

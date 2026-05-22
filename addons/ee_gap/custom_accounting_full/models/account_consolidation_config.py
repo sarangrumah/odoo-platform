@@ -99,12 +99,8 @@ class ConsolidationConfig(models.Model):
             ["account_id", "company_id"],
             lazy=False,
         )
-        accounts = self.env["account.account"].browse(
-            {g["account_id"][0] for g in groups if g.get("account_id")}
-        )
-        companies = self.env["res.company"].browse(
-            {g["company_id"][0] for g in groups if g.get("company_id")}
-        )
+        accounts = self.env["account.account"].browse({g["account_id"][0] for g in groups if g.get("account_id")})
+        companies = self.env["res.company"].browse({g["company_id"][0] for g in groups if g.get("company_id")})
         accounts_map = {a.id: a for a in accounts}
         companies_map = {c.id: c for c in companies}
 
@@ -120,17 +116,19 @@ class ConsolidationConfig(models.Model):
             # env.company.root_id; rebind the account to the row's company to
             # get the per-company code instead of False.
             account_code = a.with_company(c).code
-            rows.append({
-                "company_id": c.id,
-                "company_name": c.name,
-                "account_id": a.id,
-                "account_code": account_code,
-                "account_name": a.name,
-                "account_type": a.account_type,
-                "debit": debit,
-                "credit": credit,
-                "balance": debit - credit,
-            })
+            rows.append(
+                {
+                    "company_id": c.id,
+                    "company_name": c.name,
+                    "account_id": a.id,
+                    "account_code": account_code,
+                    "account_name": a.name,
+                    "account_type": a.account_type,
+                    "debit": debit,
+                    "credit": credit,
+                    "balance": debit - credit,
+                }
+            )
         return rows
 
     def _compute_eliminations(self, balance_rows):
@@ -169,15 +167,18 @@ class ConsolidationConfig(models.Model):
         elim_account_codes: dict[int, Any] = {}
         for r in rows:
             key = r["account_code"] or f"_aid_{r['account_id']}"
-            acc = by_account.setdefault(key, {
-                "account_id": r["account_id"],
-                "account_code": r["account_code"],
-                "account_name": r["account_name"],
-                "account_type": r["account_type"],
-                "by_company": {cid: 0.0 for cid in company_ids},
-                "elimination": 0.0,
-                "consolidated": 0.0,
-            })
+            acc = by_account.setdefault(
+                key,
+                {
+                    "account_id": r["account_id"],
+                    "account_code": r["account_code"],
+                    "account_name": r["account_name"],
+                    "account_type": r["account_type"],
+                    "by_company": {cid: 0.0 for cid in company_ids},
+                    "elimination": 0.0,
+                    "consolidated": 0.0,
+                },
+            )
             acc["by_company"][r["company_id"]] += r["balance"]
             if r["account_id"] in {*self.elimination_account_ids.ids}:
                 elim_account_codes[r["account_id"]] = key

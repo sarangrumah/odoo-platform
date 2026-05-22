@@ -7,17 +7,18 @@ from .common import PajakkuCommon
 
 
 class TestTransactionState(PajakkuCommon):
-
-    def _mk_tx(self, state: str = "queued", retry_count: int = 0) -> "models.Model":
-        return self.Tx.create({
-            "company_id": self.config.company_id.id,
-            "config_id": self.config.id,
-            "transaction_type": "efaktur_keluaran",
-            "state": state,
-            "retry_count": retry_count,
-            "payload": __import__("base64").b64encode(b"<xml/>"),
-            "payload_filename": "p.xml",
-        })
+    def _mk_tx(self, state: str = "queued", retry_count: int = 0) -> "models.Model":  # noqa: F821 — `models` is a quoted forward reference; Odoo resolves it at type-check time
+        return self.Tx.create(
+            {
+                "company_id": self.config.company_id.id,
+                "config_id": self.config.id,
+                "transaction_type": "efaktur_keluaran",
+                "state": state,
+                "retry_count": retry_count,
+                "payload": __import__("base64").b64encode(b"<xml/>"),
+                "payload_filename": "p.xml",
+            }
+        )
 
     def test_mark_submitting_sets_state(self):
         tx = self._mk_tx()

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Integration tests for action_apply_to_picking — qty_done + lot handling."""
+
 from odoo.tests.common import TransactionCase
 
 
@@ -61,9 +62,7 @@ class TestApplyPicking(TransactionCase):
 
     def test_apply_updates_move_line_qty(self):
         picking = self._make_picking(self.product, 5.0)
-        session = self.Session.create(
-            {"picking_id": picking.id, "state": "scanning"}
-        )
+        session = self.Session.create({"picking_id": picking.id, "state": "scanning"})
         # Two scans of 2 each — should end up qty_done = 4.0
         for _ in range(2):
             self.ScanLine.create(
@@ -77,9 +76,7 @@ class TestApplyPicking(TransactionCase):
             )
         session.action_apply_to_picking()
 
-        move_lines = picking.move_line_ids.filtered(
-            lambda m: m.product_id.id == self.product.id
-        )
+        move_lines = picking.move_line_ids.filtered(lambda m: m.product_id.id == self.product.id)
         self.assertTrue(move_lines)
         qty_field = "qty_done" if "qty_done" in move_lines._fields else "quantity"
         total = sum(getattr(m, qty_field) or 0.0 for m in move_lines)
@@ -87,9 +84,7 @@ class TestApplyPicking(TransactionCase):
 
     def test_apply_creates_lot_for_tracked_product(self):
         picking = self._make_picking(self.product_lot, 3.0)
-        session = self.Session.create(
-            {"picking_id": picking.id, "state": "scanning"}
-        )
+        session = self.Session.create({"picking_id": picking.id, "state": "scanning"})
         self.ScanLine.create(
             {
                 "session_id": session.id,
@@ -110,9 +105,7 @@ class TestApplyPicking(TransactionCase):
             limit=1,
         )
         self.assertTrue(lot, "Expected a new stock.lot to be created from the scan")
-        ml = picking.move_line_ids.filtered(
-            lambda m: m.product_id.id == self.product_lot.id
-        )
+        ml = picking.move_line_ids.filtered(lambda m: m.product_id.id == self.product_lot.id)
         self.assertTrue(ml)
         self.assertEqual(ml[:1].lot_id.id, lot.id)
 
@@ -132,9 +125,7 @@ class TestApplyPicking(TransactionCase):
 
     def test_summary_helper_returns_rows(self):
         picking = self._make_picking(self.product, 5.0)
-        session = self.Session.create(
-            {"picking_id": picking.id, "state": "scanning"}
-        )
+        session = self.Session.create({"picking_id": picking.id, "state": "scanning"})
         self.ScanLine.create(
             {
                 "session_id": session.id,

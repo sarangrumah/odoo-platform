@@ -51,7 +51,5 @@ class OpenAIProvider(LLMProvider):
 
     async def embed(self, text: str | list[str], model: str | None = None) -> list[list[float]]:
         items = [text] if isinstance(text, str) else text
-        resp = await self._client.embeddings.create(
-            input=items, model=model or "text-embedding-3-small"
-        )
+        resp = await self._client.embeddings.create(input=items, model=model or "text-embedding-3-small")
         return [d.embedding for d in resp.data]

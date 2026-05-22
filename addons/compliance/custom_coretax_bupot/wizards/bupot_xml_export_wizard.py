@@ -38,10 +38,7 @@ class CustomBupotXmlExportWizard(models.TransientModel):
         if not period.line_ids:
             raise UserError(_("No bupot lines in this period."))
         xml_bytes = self._build_xml(period)
-        fname = (
-            f"BPU_{period.company_id.id}_{period.year}_"
-            f"{int(period.month):02d}.xml"
-        )
+        fname = f"BPU_{period.company_id.id}_{period.year}_{int(period.month):02d}.xml"
         attachment = self.env["ir.attachment"].create(
             {
                 "name": fname,
@@ -78,41 +75,23 @@ class CustomBupotXmlExportWizard(models.TransientModel):
         )
         for line in period.line_ids:
             out.write(b"  <Bupot>\n")
-            out.write(
-                f"    <InternalRef>{escape(line.internal_ref or '')}</InternalRef>\n".encode()
-            )
-            out.write(
-                f"    <NomorBuktiPotong>{escape(line.bupot_number or '')}</NomorBuktiPotong>\n".encode()
-            )
+            out.write(f"    <InternalRef>{escape(line.internal_ref or '')}</InternalRef>\n".encode())
+            out.write(f"    <NomorBuktiPotong>{escape(line.bupot_number or '')}</NomorBuktiPotong>\n".encode())
             out.write(f"    <JenisPPh>{line.pph_type}</JenisPPh>\n".encode())
-            out.write(
-                f"    <TanggalTransaksi>{line.transaction_date or ''}</TanggalTransaksi>\n".encode()
-            )
+            out.write(f"    <TanggalTransaksi>{line.transaction_date or ''}</TanggalTransaksi>\n".encode())
             out.write(b"    <Dipotong>\n")
-            out.write(
-                f"      <NPWP>{escape(line.cuttee_npwp or '')}</NPWP>\n".encode()
-            )
-            out.write(
-                f"      <NITKU>{escape(line.cuttee_nitku or '')}</NITKU>\n".encode()
-            )
-            out.write(
-                f"      <Nama>{escape(line.cuttee_name or '')}</Nama>\n".encode()
-            )
+            out.write(f"      <NPWP>{escape(line.cuttee_npwp or '')}</NPWP>\n".encode())
+            out.write(f"      <NITKU>{escape(line.cuttee_nitku or '')}</NITKU>\n".encode())
+            out.write(f"      <Nama>{escape(line.cuttee_name or '')}</Nama>\n".encode())
             out.write(b"    </Dipotong>\n")
-            out.write(
-                f"    <JumlahBruto>{line.gross_amount:.2f}</JumlahBruto>\n".encode()
-            )
+            out.write(f"    <JumlahBruto>{line.gross_amount:.2f}</JumlahBruto>\n".encode())
             out.write(f"    <DPP>{line.dpp_amount:.2f}</DPP>\n".encode())
             out.write(f"    <Tarif>{line.rate:.4f}</Tarif>\n".encode())
-            out.write(
-                f"    <JumlahPPh>{line.withheld_amount:.2f}</JumlahPPh>\n".encode()
-            )
+            out.write(f"    <JumlahPPh>{line.withheld_amount:.2f}</JumlahPPh>\n".encode())
             doc_ref = ""
             if line.doc_ref:
                 doc_ref = f"{line.doc_ref._name},{line.doc_ref.id}"
-            out.write(
-                f"    <DocRef>{escape(doc_ref)}</DocRef>\n".encode()
-            )
+            out.write(f"    <DocRef>{escape(doc_ref)}</DocRef>\n".encode())
             out.write(b"  </Bupot>\n")
         out.write(b"</BuktiPotongUnifikasi>\n")
         return out.getvalue()

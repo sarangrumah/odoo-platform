@@ -7,7 +7,6 @@ from .common import ApprovalTestCommon
 
 
 class TestMatrixResolution(ApprovalTestCommon):
-
     def test_no_active_matrix_returns_none(self):
         po = self._make_po()
         matrix = self.Matrix._resolve_for(po)
@@ -31,9 +30,7 @@ class TestMatrixResolution(ApprovalTestCommon):
 
     def test_condition_domain_filters(self):
         # Domain on amount_total: a PO with no lines = 0, so this won't match
-        m = self._make_matrix(
-            "Big POs", priority=10, condition_domain="[('amount_total','>',100000)]"
-        )
+        m = self._make_matrix("Big POs", priority=10, condition_domain="[('amount_total','>',100000)]")
         self._add_tier(m, approvers=[self.user_approver_a])
         po = self._make_po()
         self.assertFalse(self.Matrix._resolve_for(po))

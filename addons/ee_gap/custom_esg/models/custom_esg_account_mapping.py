@@ -37,10 +37,7 @@ class CustomEsgAccountMapping(models.Model):
     unit_cost = fields.Float(
         string="Unit Cost (Currency / Activity Unit)",
         digits=(16, 4),
-        help=(
-            "Optional: divide aml.balance by this to derive activity "
-            "quantity. If 0, use aml.quantity instead."
-        ),
+        help=("Optional: divide aml.balance by this to derive activity quantity. If 0, use aml.quantity instead."),
     )
     is_active = fields.Boolean(string="Active", default=True)
     company_id = fields.Many2one(
@@ -110,16 +107,8 @@ class CustomEsgAccountMapping(models.Model):
                     "period_end": aml.date,
                     "value": value_kg_co2,
                     "source_document": ref,
-                    "notes": (
-                        "Auto-collected from account.move.line %d "
-                        "(factor: %s)"
-                    )
-                    % (aml.id, mp.factor_id.name),
-                    "company_id": (
-                        aml.company_id.id
-                        or mp.company_id.id
-                        or self.env.company.id
-                    ),
+                    "notes": ("Auto-collected from account.move.line %d (factor: %s)") % (aml.id, mp.factor_id.name),
+                    "company_id": (aml.company_id.id or mp.company_id.id or self.env.company.id),
                     "state": "draft",
                 }
                 if not vals["metric_id"]:

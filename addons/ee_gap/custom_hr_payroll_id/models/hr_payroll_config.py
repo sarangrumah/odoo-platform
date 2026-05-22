@@ -16,7 +16,9 @@ class HrPayrollConfig(models.Model):
     name = fields.Char(default="Default", required=True)
     active = fields.Boolean(default=True)
     company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, ondelete="cascade",
+        "res.company",
+        default=lambda self: self.env.company,
+        ondelete="cascade",
     )
 
     # ---- Calculation method ----
@@ -28,7 +30,7 @@ class HrPayrollConfig(models.Model):
         default="ter",
         required=True,
         help="TER applies a flat monthly bracket per Kategori A/B/C (mapped from PTKP). "
-             "December always reconciles via annual progressive regardless of method.",
+        "December always reconciles via annual progressive regardless of method.",
     )
 
     # PTKP per PMK 101/2016 (still current as of 2024)
@@ -65,8 +67,7 @@ class HrPayrollConfig(models.Model):
 
     @api.model
     def get_default(self):
-        rec = self.search([("active", "=", True),
-                           ("company_id", "in", (False, self.env.company.id))], limit=1)
+        rec = self.search([("active", "=", True), ("company_id", "in", (False, self.env.company.id))], limit=1)
         if not rec:
             rec = self.create({"name": "Default"})
         return rec
@@ -74,11 +75,17 @@ class HrPayrollConfig(models.Model):
     def get_ptkp(self, status):
         self.ensure_one()
         mapping = {
-            "TK/0": self.ptkp_tk0, "TK/1": self.ptkp_tk1,
-            "TK/2": self.ptkp_tk2, "TK/3": self.ptkp_tk3,
-            "K/0": self.ptkp_k0, "K/1": self.ptkp_k1,
-            "K/2": self.ptkp_k2, "K/3": self.ptkp_k3,
-            "K/I/0": self.ptkp_ki0, "K/I/1": self.ptkp_ki1,
-            "K/I/2": self.ptkp_ki2, "K/I/3": self.ptkp_ki3,
+            "TK/0": self.ptkp_tk0,
+            "TK/1": self.ptkp_tk1,
+            "TK/2": self.ptkp_tk2,
+            "TK/3": self.ptkp_tk3,
+            "K/0": self.ptkp_k0,
+            "K/1": self.ptkp_k1,
+            "K/2": self.ptkp_k2,
+            "K/3": self.ptkp_k3,
+            "K/I/0": self.ptkp_ki0,
+            "K/I/1": self.ptkp_ki1,
+            "K/I/2": self.ptkp_ki2,
+            "K/I/3": self.ptkp_ki3,
         }
         return mapping.get(status, self.ptkp_tk0)

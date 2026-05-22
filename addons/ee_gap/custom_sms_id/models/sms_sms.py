@@ -26,7 +26,7 @@ class SmsSms(models.Model):
         ondelete="set null",
         index=True,
         help="If set, this sms.sms record was dispatched through the "
-             "custom adapter instead of Odoo IAP. Populated automatically.",
+        "custom adapter instead of Odoo IAP. Populated automatically.",
     )
 
     # -------- routing --------
@@ -35,13 +35,17 @@ class SmsSms(models.Model):
         """Return the active custom account for this company, or False."""
         self.ensure_one()
         company = self.env.company
-        return self.env["custom.sms.account"].sudo().search(
-            [
-                ("is_active", "=", True),
-                ("company_id", "in", (False, company.id)),
-            ],
-            order="company_id desc, id asc",
-            limit=1,
+        return (
+            self.env["custom.sms.account"]
+            .sudo()
+            .search(
+                [
+                    ("is_active", "=", True),
+                    ("company_id", "in", (False, company.id)),
+                ],
+                order="company_id desc, id asc",
+                limit=1,
+            )
         )
 
     def _send_via_custom_adapter(self, account):
@@ -55,27 +59,33 @@ class SmsSms(models.Model):
                 self.body or "",
                 purpose="transactional",
             )
-        except Exception as e:
+        except Exception:
             _logger.exception("custom_sms_id: adapter send failed for sms.sms %s", self.id)
-            self.write({
-                "state": "error",
-                "failure_type": "sms_server",
-                "x_custom_account_id": account.id,
-            })
+            self.write(
+                {
+                    "state": "error",
+                    "failure_type": "sms_server",
+                    "x_custom_account_id": account.id,
+                }
+            )
             return False
 
         if result.get("ok"):
-            self.write({
-                "state": "sent",
-                "failure_type": False,
-                "x_custom_account_id": account.id,
-            })
+            self.write(
+                {
+                    "state": "sent",
+                    "failure_type": False,
+                    "x_custom_account_id": account.id,
+                }
+            )
             return True
-        self.write({
-            "state": "error",
-            "failure_type": "sms_server",
-            "x_custom_account_id": account.id,
-        })
+        self.write(
+            {
+                "state": "error",
+                "failure_type": "sms_server",
+                "x_custom_account_id": account.id,
+            }
+        )
         return False
 
     # -------- override standard send --------

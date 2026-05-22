@@ -11,6 +11,7 @@ Notes:
 - A session id (cookie ``custom_attendance_kiosk``) is recorded on each
   record for traceability.
 """
+
 import secrets
 
 from odoo import http
@@ -18,7 +19,6 @@ from odoo.http import request
 
 
 class AttendanceKioskController(http.Controller):
-
     _COOKIE_NAME = "custom_attendance_kiosk"
 
     # ------------------------------------------------------------------
@@ -63,16 +63,12 @@ class AttendanceKioskController(http.Controller):
         session_id = request.httprequest.cookies.get(self._COOKIE_NAME) or ""
 
         if not pin or not pin.isdigit() or len(pin) < 4:
-            return request.redirect(
-                "/custom_attendance/kiosk?status=error&message=Invalid+PIN"
-            )
+            return request.redirect("/custom_attendance/kiosk?status=error&message=Invalid+PIN")
 
         Attendance = request.env["hr.attendance"].sudo()
         employee = Attendance._kiosk_resolve_employee_by_pin(pin)
         if not employee:
-            return request.redirect(
-                "/custom_attendance/kiosk?status=error&message=PIN+not+recognised"
-            )
+            return request.redirect("/custom_attendance/kiosk?status=error&message=PIN+not+recognised")
 
         try:
             lat_f = float(lat) if lat else None
@@ -89,12 +85,10 @@ class AttendanceKioskController(http.Controller):
             )
         except Exception as exc:
             return request.redirect(
-                "/custom_attendance/kiosk?status=error&message=%s"
-                % (str(exc).replace(" ", "+"))[:160]
+                "/custom_attendance/kiosk?status=error&message=%s" % (str(exc).replace(" ", "+"))[:160]
             )
 
         verb = "Checked+in" if action == "check_in" else "Checked+out"
         return request.redirect(
-            "/custom_attendance/kiosk?status=ok&message=%s+%s"
-            % (verb, (employee.name or "").replace(" ", "+"))
+            "/custom_attendance/kiosk?status=ok&message=%s+%s" % (verb, (employee.name or "").replace(" ", "+"))
         )

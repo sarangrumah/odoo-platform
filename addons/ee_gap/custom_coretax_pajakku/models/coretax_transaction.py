@@ -24,12 +24,12 @@ TRANSACTION_TYPES = [
 ]
 
 STATES = [
-    ("queued", "Queued"),          # local — not yet sent
+    ("queued", "Queued"),  # local — not yet sent
     ("submitting", "Submitting"),  # in-flight
     ("submitted", "Submitted (waiting DJP)"),
     ("approved", "Approved"),
     ("rejected", "Rejected"),
-    ("error", "Error"),            # transport / auth failure
+    ("error", "Error"),  # transport / auth failure
 ]
 
 
@@ -53,7 +53,9 @@ class CoretaxTransaction(models.Model):
     # Origin document (one of these is set depending on transaction_type)
     account_move_id = fields.Many2one("account.move", string="Source Invoice", ondelete="set null")
     bukti_potong_id = fields.Many2one(
-        "custom.coretax.bukti.potong", string="Source Bukti Potong", ondelete="set null",
+        "custom.coretax.bukti.potong",
+        string="Source Bukti Potong",
+        ondelete="set null",
     )
 
     # Payload + response (kept for audit + reprocessing)
@@ -91,23 +93,26 @@ class CoretaxTransaction(models.Model):
     # ----- State helpers -----
 
     def mark_submitting(self):
-        self.write({
-            "state": "submitting",
-            "submitted_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "state": "submitting",
+                "submitted_at": fields.Datetime.now(),
+            }
+        )
 
     def mark_submitted(self, external_uuid: str, response_xml: bytes | None = None):
         vals = {"state": "submitted", "external_uuid": external_uuid}
         if response_xml:
             import base64
+
             vals["response_xml"] = base64.b64encode(response_xml)
             vals["response_filename"] = f"{external_uuid}-submit-ack.xml"
         self.write(vals)
-        self._pdp_audit_write("coretax_pajakku_submitted", self.id,
-                              {"uuid": external_uuid})
+        self._pdp_audit_write("coretax_pajakku_submitted", self.id, {"uuid": external_uuid})
 
     def mark_approved(self, nsfp: str, response_pdf: bytes | None = None):
         import base64
+
         vals = {
             "state": "approved",
             "nsfp": nsfp,
@@ -124,32 +129,30 @@ class CoretaxTransaction(models.Model):
                 self.account_move_id.sudo().write({"x_custom_coretax_status": "approved"})
         if self.bukti_potong_id and hasattr(self.bukti_potong_id, "no_bupot"):
             self.bukti_potong_id.sudo().write({"no_bupot": nsfp})
-        self._pdp_audit_write("coretax_pajakku_approved", self.id,
-                              {"uuid": self.external_uuid, "nsfp": nsfp})
+        self._pdp_audit_write("coretax_pajakku_approved", self.id, {"uuid": self.external_uuid, "nsfp": nsfp})
 
     def mark_rejected(self, status_code: str, message: str):
-        self.write({
-            "state": "rejected",
-            "djp_status_code": status_code,
-            "djp_message": message,
-            "completed_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "state": "rejected",
+                "djp_status_code": status_code,
+                "djp_message": message,
+                "completed_at": fields.Datetime.now(),
+            }
+        )
         if self.account_move_id and hasattr(self.account_move_id, "coretax_status"):
             self.account_move_id.sudo().write({"coretax_status": "rejected_djp"})
         self.message_post(
-            body=_("DJP rejected this submission: <b>%(code)s</b> — %(msg)s",
-                   code=status_code, msg=message),
+            body=_("DJP rejected this submission: <b>%(code)s</b> — %(msg)s", code=status_code, msg=message),
         )
-        self._pdp_audit_write("coretax_pajakku_rejected", self.id,
-                              {"uuid": self.external_uuid, "code": status_code})
+        self._pdp_audit_write("coretax_pajakku_rejected", self.id, {"uuid": self.external_uuid, "code": status_code})
 
     def mark_error(self, error: str, increment_retry: bool = True):
         vals = {"state": "error", "last_error": error[:2000]}
         if increment_retry:
             vals["retry_count"] = self.retry_count + 1
         self.write(vals)
-        self._pdp_audit_write("coretax_pajakku_error", self.id,
-                              {"retry_count": self.retry_count, "error": error[:200]})
+        self._pdp_audit_write("coretax_pajakku_error", self.id, {"retry_count": self.retry_count, "error": error[:200]})
 
     def action_retry(self):
         """Re-queue an errored / rejected transaction for resubmission by the cron."""

@@ -13,12 +13,8 @@ class CustomConsolidationMapping(models.Model):
     _order = "chart_id, company_id, source_account_id"
     _check_company_auto = True
 
-    chart_id = fields.Many2one(
-        "custom.consolidation.chart", required=True, ondelete="cascade"
-    )
-    company_id = fields.Many2one(
-        "res.company", required=True, ondelete="cascade"
-    )
+    chart_id = fields.Many2one("custom.consolidation.chart", required=True, ondelete="cascade")
+    company_id = fields.Many2one("res.company", required=True, ondelete="cascade")
     source_account_id = fields.Many2one(
         "account.account",
         string="Local Account",

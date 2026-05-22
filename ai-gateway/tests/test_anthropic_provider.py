@@ -147,9 +147,7 @@ async def test_last_tool_marked_cacheable(fake_anthropic):
 
 async def test_usage_tokens_propagate(fake_anthropic):
     provider = AnthropicProvider()
-    resp = await provider.chat(
-        ChatRequest(messages=[Message(role="user", content="hi")])
-    )
+    resp = await provider.chat(ChatRequest(messages=[Message(role="user", content="hi")]))
     assert resp.input_tokens == 7
     assert resp.output_tokens == 3
     assert resp.cache_read_tokens == 11

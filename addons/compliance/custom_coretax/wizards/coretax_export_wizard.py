@@ -55,20 +55,14 @@ class CoretaxExportWizard(models.TransientModel):
         "custom.coretax.config",
         string="Coretax Configuration",
         required=True,
-        default=lambda self: self.env["custom.coretax.config"].search(
-            [("active", "=", True)], limit=1
-        ),
+        default=lambda self: self.env["custom.coretax.config"].search([("active", "=", True)], limit=1),
     )
 
-    document_type = fields.Selection(DOCUMENT_TYPES, string="Document Type",
-                                      required=True, default="efaktur_keluaran")
-    period_year_from = fields.Integer(string="Year From", required=True,
-                                       default=lambda self: date.today().year)
+    document_type = fields.Selection(DOCUMENT_TYPES, string="Document Type", required=True, default="efaktur_keluaran")
+    period_year_from = fields.Integer(string="Year From", required=True, default=lambda self: date.today().year)
     period_month_from = fields.Integer(string="Month From", required=True, default=1)
-    period_year_to = fields.Integer(string="Year To", required=True,
-                                     default=lambda self: date.today().year)
-    period_month_to = fields.Integer(string="Month To", required=True,
-                                      default=lambda self: date.today().month)
+    period_year_to = fields.Integer(string="Year To", required=True, default=lambda self: date.today().year)
+    period_month_to = fields.Integer(string="Month To", required=True, default=lambda self: date.today().month)
 
     xml_filename = fields.Char(string="Generated Filename", readonly=True)
     xml_file = fields.Binary(string="Generated XML", readonly=True, attachment=False)
@@ -83,34 +77,41 @@ class CoretaxExportWizard(models.TransientModel):
 
         records = self._gather_records()
         if not records:
-            raise UserError(_(
-                "No %s records found in the selected period."
-            ) % dict(DOCUMENT_TYPES).get(self.document_type, self.document_type))
+            raise UserError(
+                _("No %s records found in the selected period.")
+                % dict(DOCUMENT_TYPES).get(self.document_type, self.document_type)
+            )
 
         xml_bytes = self._build_xml(records)
         warning = self._validate_xml(xml_bytes)
 
         filename = "coretax_%s_%04d%02d-%04d%02d.xml" % (
             self.document_type,
-            self.period_year_from, self.period_month_from,
-            self.period_year_to, self.period_month_to,
+            self.period_year_from,
+            self.period_month_from,
+            self.period_year_to,
+            self.period_month_to,
         )
 
         # Persist an ir.attachment for traceability + download
-        attachment = self.env["ir.attachment"].create({
-            "name": filename,
-            "datas": base64.b64encode(xml_bytes),
-            "res_model": self._name,
-            "res_id": self.id,
-            "mimetype": "application/xml",
-        })
+        attachment = self.env["ir.attachment"].create(
+            {
+                "name": filename,
+                "datas": base64.b64encode(xml_bytes),
+                "res_model": self._name,
+                "res_id": self.id,
+                "mimetype": "application/xml",
+            }
+        )
 
-        self.write({
-            "xml_filename": filename,
-            "xml_file": base64.b64encode(xml_bytes),
-            "validation_warning": warning or False,
-            "record_count": len(records),
-        })
+        self.write(
+            {
+                "xml_filename": filename,
+                "xml_file": base64.b64encode(xml_bytes),
+                "validation_warning": warning or False,
+                "record_count": len(records),
+            }
+        )
 
         self._audit_log_export(filename, len(records))
 
@@ -128,15 +129,21 @@ class CoretaxExportWizard(models.TransientModel):
         """
         domain_period = self._period_domain("invoice_date")
         if self.document_type == "efaktur_keluaran":
-            return self.env["account.move"].search([
-                ("move_type", "in", ("out_invoice", "out_refund")),
-                ("state", "=", "posted"),
-            ] + domain_period)
+            return self.env["account.move"].search(
+                [
+                    ("move_type", "in", ("out_invoice", "out_refund")),
+                    ("state", "=", "posted"),
+                ]
+                + domain_period
+            )
         if self.document_type == "faktur_masukan":
-            return self.env["account.move"].search([
-                ("move_type", "in", ("in_invoice", "in_refund")),
-                ("state", "=", "posted"),
-            ] + domain_period)
+            return self.env["account.move"].search(
+                [
+                    ("move_type", "in", ("in_invoice", "in_refund")),
+                    ("state", "=", "posted"),
+                ]
+                + domain_period
+            )
 
         # Bupot variants
         bupot_jenis_map = {
@@ -148,7 +155,8 @@ class CoretaxExportWizard(models.TransientModel):
         }
         jenis = bupot_jenis_map[self.document_type]
         bupot_domain = [
-            "&", "&",
+            "&",
+            "&",
             ("period_year", ">=", self.period_year_from),
             ("period_year", "<=", self.period_year_to),
             ("state", "in", ("confirmed", "exported", "submitted", "approved")),
@@ -167,8 +175,7 @@ class CoretaxExportWizard(models.TransientModel):
         else:
             end = date(end_year, end_month + 1, 1)
             end = date(end.year, end.month, 1)
-        return [(date_field, ">=", start.isoformat()),
-                (date_field, "<", end.isoformat())]
+        return [(date_field, ">=", start.isoformat()), (date_field, "<", end.isoformat())]
 
     # ----- XML build -----
     def _build_xml(self, records) -> bytes:
@@ -178,10 +185,8 @@ class CoretaxExportWizard(models.TransientModel):
         etree.SubElement(root, "TaxpayerNPWP").text = self.config_id.npwp or ""
         etree.SubElement(root, "TaxpayerName").text = self.config_id.taxpayer_name or ""
         period = etree.SubElement(root, "Period")
-        etree.SubElement(period, "From").text = "%04d-%02d" % (
-            self.period_year_from, self.period_month_from)
-        etree.SubElement(period, "To").text = "%04d-%02d" % (
-            self.period_year_to, self.period_month_to)
+        etree.SubElement(period, "From").text = "%04d-%02d" % (self.period_year_from, self.period_month_from)
+        etree.SubElement(period, "To").text = "%04d-%02d" % (self.period_year_to, self.period_month_to)
 
         items = etree.SubElement(root, "Items")
         if self.document_type in ("efaktur_keluaran", "faktur_masukan"):
@@ -191,18 +196,15 @@ class CoretaxExportWizard(models.TransientModel):
             for bup in records:
                 self._append_bupot(items, bup)
 
-        return etree.tostring(root, pretty_print=True, xml_declaration=True,
-                              encoding="UTF-8")
+        return etree.tostring(root, pretty_print=True, xml_declaration=True, encoding="UTF-8")
 
     def _append_invoice(self, parent, inv):
         node = etree.SubElement(parent, "Faktur")
         etree.SubElement(node, "NSFP").text = inv.x_custom_nsfp or ""
         etree.SubElement(node, "StatusCode").text = inv.x_custom_coretax_status_code or "00"
         etree.SubElement(node, "InvoiceNumber").text = inv.name or ""
-        etree.SubElement(node, "InvoiceDate").text = (
-            inv.invoice_date.isoformat() if inv.invoice_date else "")
-        etree.SubElement(node, "CounterpartyNPWP").text = (
-            inv.partner_id.vat or "").replace(".", "").replace("-", "")
+        etree.SubElement(node, "InvoiceDate").text = inv.invoice_date.isoformat() if inv.invoice_date else ""
+        etree.SubElement(node, "CounterpartyNPWP").text = (inv.partner_id.vat or "").replace(".", "").replace("-", "")
         etree.SubElement(node, "CounterpartyName").text = inv.partner_id.name or ""
         etree.SubElement(node, "DPP").text = "%.2f" % (inv.amount_untaxed or 0.0)
         etree.SubElement(node, "PPN").text = "%.2f" % (inv.amount_tax or 0.0)
@@ -211,11 +213,9 @@ class CoretaxExportWizard(models.TransientModel):
     def _append_bupot(self, parent, bup):
         node = etree.SubElement(parent, "BuktiPotong")
         etree.SubElement(node, "NoBupot").text = bup.no_bupot or ""
-        etree.SubElement(node, "Tanggal").text = (
-            bup.tanggal_bupot.isoformat() if bup.tanggal_bupot else "")
+        etree.SubElement(node, "Tanggal").text = bup.tanggal_bupot.isoformat() if bup.tanggal_bupot else ""
         etree.SubElement(node, "JenisPPh").text = (bup.jenis_pph or "").replace("_", ".")
-        etree.SubElement(node, "CounterpartyNPWP").text = (
-            bup.partner_id.vat or "").replace(".", "").replace("-", "")
+        etree.SubElement(node, "CounterpartyNPWP").text = (bup.partner_id.vat or "").replace(".", "").replace("-", "")
         etree.SubElement(node, "CounterpartyName").text = bup.partner_id.name or ""
         etree.SubElement(node, "Tarif").text = "%.4f" % (bup.tarif or 0.0)
         etree.SubElement(node, "DPP").text = "%.2f" % (bup.dpp or 0.0)
@@ -248,13 +248,15 @@ class CoretaxExportWizard(models.TransientModel):
     # ----- Audit log -----
     def _audit_log_export(self, filename: str, count: int) -> None:
         cr = self.env.cr
-        payload = json.dumps({
-            "document_type": self.document_type,
-            "filename": filename,
-            "records": count,
-            "period_from": "%04d-%02d" % (self.period_year_from, self.period_month_from),
-            "period_to": "%04d-%02d" % (self.period_year_to, self.period_month_to),
-        })
+        payload = json.dumps(
+            {
+                "document_type": self.document_type,
+                "filename": filename,
+                "records": count,
+                "period_from": "%04d-%02d" % (self.period_year_from, self.period_month_from),
+                "period_to": "%04d-%02d" % (self.period_year_to, self.period_month_to),
+            }
+        )
         cr.execute(
             """
             INSERT INTO pdp.audit_log

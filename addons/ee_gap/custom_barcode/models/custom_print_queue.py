@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -9,6 +9,7 @@ _logger = logging.getLogger(__name__)
 class CustomPrintQueue(models.Model):
     """Async print-job spool. A cron picks queued jobs and dispatches them
     through the configured `custom.printer.config`."""
+
     _name = "custom.print.queue"
     _description = "Print Queue"
     _order = "create_date desc, id desc"
@@ -20,16 +21,22 @@ class CustomPrintQueue(models.Model):
     res_model = fields.Char(required=True)
     res_ids = fields.Text(help="Comma-separated record IDs to render.")
     copies = fields.Integer(default=1)
-    state = fields.Selection([
-        ("queued", "Queued"),
-        ("printing", "Printing"),
-        ("done", "Done"),
-        ("failed", "Failed"),
-    ], default="queued", required=True, index=True)
+    state = fields.Selection(
+        [
+            ("queued", "Queued"),
+            ("printing", "Printing"),
+            ("done", "Done"),
+            ("failed", "Failed"),
+        ],
+        default="queued",
+        required=True,
+        index=True,
+    )
     sent_at = fields.Datetime(readonly=True)
     error = fields.Text(readonly=True)
     company_id = fields.Many2one(
-        "res.company", default=lambda s: s.env.company,
+        "res.company",
+        default=lambda s: s.env.company,
     )
 
     def _ids_iter(self):
@@ -56,13 +63,10 @@ class CustomPrintQueue(models.Model):
                 records = model.browse(rec_ids).exists()
                 payload = b""
                 for rec in records:
-                    payload += job.label_template_id.render(
-                        rec, qty=max(1, job.copies or 1))
+                    payload += job.label_template_id.render(rec, qty=max(1, job.copies or 1))
                     payload += b"\n"
                 job.printer_id.send_raw(payload)
-                job.write({"state": "done",
-                           "sent_at": fields.Datetime.now(),
-                           "error": False})
+                job.write({"state": "done", "sent_at": fields.Datetime.now(), "error": False})
             except Exception as e:
                 _logger.exception("Print job %s failed", job.name)
                 job.write({"state": "failed", "error": str(e)})
