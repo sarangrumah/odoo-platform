@@ -39,6 +39,7 @@ shows a user-friendly install hint.
         "custom_ai_features",
         "custom_ai_bridge",
         "custom_approval_engine",
+        "custom_super_admin",
         "project",
         "custom_documents",
         "mail",

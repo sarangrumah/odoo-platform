@@ -28,6 +28,7 @@ Provides:
         "custom_pdp_audit",
         "custom_bast",
         "custom_barcode",
+        "custom_super_admin",
         "stock",
         "mail",
         "web",
