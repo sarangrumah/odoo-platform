@@ -1,0 +1,26 @@
+# Hadolint config — referenced by .github/workflows/ci.yml (container-scan job).
+#
+# Two warning-level rules are globally ignored:
+#
+#   DL3008 — "Pin versions in apt get install"
+#     Triggers on `apt-get install <pkg>` without `<pkg>=<version>` pin.
+#     Our 3 Dockerfiles (odoo, ai-gateway, custom-predictor) install a small
+#     set of stable system tools (ca-certificates, curl, git, gcc, xmlsec1, ...)
+#     from the base image's Debian repos. Pinning these is brittle — Debian
+#     point releases shift versions frequently, breaking the build whenever
+#     the base image moves. We accept "latest from base image" semantics here.
+#
+#   DL3013 — "Pin versions in pip"
+#     Triggers on `pip install <pkg>` without `<pkg>==<version>` pin OR
+#     `-r requirements.txt`. Our actual app dependencies ARE pinned (see e.g.
+#     ai-gateway/Dockerfile lines 30-39 with `==` pins, or odoo/Dockerfile's
+#     `-r /tmp/requirements.txt`). The lint trigger is on `pip install --upgrade
+#     pip` — we accept the unpinned pip self-upgrade.
+#
+# All other hadolint rules remain active. Re-enable either of the above if
+# the project moves toward fully-deterministic image builds (e.g. with apt-pin
+# files or a hash-pinned base image).
+
+ignored:
+  - DL3008
+  - DL3013

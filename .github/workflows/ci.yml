@@ -82,6 +82,7 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: ${{ matrix.image }}/Dockerfile
+          config: .hadolint.yaml
           failure-threshold: warning
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@v0.36.0
