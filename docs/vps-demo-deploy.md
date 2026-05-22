@@ -113,7 +113,7 @@ mkdir -p data/{backups,odoo-filestore,nginx-cache,caddy/data,caddy/config}
 
 # Bind-mount ownership: container user IDs di image base masing-masing tidak
 # match host root. Set ownership sebelum boot supaya container nggak crash.
-chown -R 101:101 data/odoo-filestore    # uid 101 = 'odoo' di odoo:19.0
+chown -R 100:101 data/odoo-filestore    # odoo:19.0 image: uid 100, gid 101
 chown -R 999:999 data/backups           # uid 999 = 'postgres' di pgbackup-local
 
 # Start prod + TLS (Caddy ACME di depan nginx)
