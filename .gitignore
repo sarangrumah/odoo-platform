@@ -12,8 +12,12 @@ age.txt
 .secrets.dec.yaml
 
 # ----- Runtime data (bind volumes) -----
-data/
-!data/.gitkeep
+# Anchored: only top-level /data/ (bind mounts). Without the leading slash,
+# the pattern matched every nested `data/` in the tree — including
+# `addons/*/data/` — which silently hid module seed files from version
+# control and broke `make install` on fresh deployments.
+/data/
+!/data/.gitkeep
 
 # ----- Python -----
 __pycache__/
