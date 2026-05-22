@@ -85,7 +85,10 @@ services:
       - "${NGINX_HTTP_PORT:-18000}:80"
       - "${NGINX_HTTPS_PORT:-18443}:443"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      # Use 127.0.0.1 explicitly: 'localhost' may resolve to ::1 first inside
+      # the container, but nginx default config listens IPv4-only on 0.0.0.0:80
+      # → connection refused on the v6 socket.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
