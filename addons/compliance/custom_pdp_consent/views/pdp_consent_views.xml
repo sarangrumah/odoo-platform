@@ -64,7 +64,7 @@
                 <separator/>
                     <filter string="Purpose" name="g_purpose" context="{'group_by':'purpose_id'}"/>
                     <filter string="State" name="g_state" context="{'group_by':'state'}"/>
-                
+
             </search>
         </field>
     </record>

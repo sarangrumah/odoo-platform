@@ -108,10 +108,10 @@
                     <filter name="filter_knowledge_draft" string="Knowledge Draft" domain="[('knowledge_status','=','draft')]"/>
                     <filter name="filter_knowledge_reviewed" string="Knowledge Reviewed" domain="[('knowledge_status','=','reviewed')]"/>
                     <filter name="filter_knowledge_drift" string="Knowledge Drift" domain="[('knowledge_status','=','drift')]"/>
-                    
+
                         <filter name="group_category" string="Category" context="{'group_by':'category'}"/>
                         <filter name="group_maturity" string="Maturity" context="{'group_by':'maturity'}"/>
-                    
+
                 </search>
             </field>
         </record>

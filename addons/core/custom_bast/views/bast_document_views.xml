@@ -137,10 +137,10 @@
                 <filter name="filter_pickup" string="Pickup" domain="[('kind','=','pickup')]"/>
                 <filter name="filter_return" string="Return" domain="[('kind','=','return')]"/>
                 <filter name="filter_delivery" string="Delivery" domain="[('kind','=','delivery')]"/>
-                
+
                     <filter name="group_state" string="State" context="{'group_by':'state'}"/>
                     <filter name="group_kind" string="Kind" context="{'group_by':'kind'}"/>
-                
+
             </search>
         </field>
     </record>

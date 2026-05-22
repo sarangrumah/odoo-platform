@@ -53,14 +53,14 @@
                         domain="[('date', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
                 <filter string="Last 30 Days" name="last30"
                         domain="[('date', '&gt;=', (context_today() - relativedelta(days=30)).strftime('%Y-%m-%d'))]"/>
-                
+
                     <filter string="Tenant" name="g_tenant"
                             context="{'group_by': 'tenant_id'}"/>
                     <filter string="Model" name="g_model"
                             context="{'group_by': 'model_name'}"/>
                     <filter string="Date (Month)" name="g_date"
                             context="{'group_by': 'date:month'}"/>
-                
+
             </search>
         </field>
     </record>

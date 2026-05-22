@@ -115,14 +115,14 @@
                         domain="[('enabled', '=', True)]"/>
                 <filter string="Disabled" name="filter_disabled"
                         domain="[('enabled', '=', False)]"/>
-                
+
                     <filter string="Tenant" name="g_tenant"
                             context="{'group_by': 'tenant_id'}"/>
                     <filter string="Model" name="g_model"
                             context="{'group_by': 'model'}"/>
                     <filter string="Status" name="g_status"
                             context="{'group_by': 'status'}"/>
-                
+
             </search>
         </field>
     </record>

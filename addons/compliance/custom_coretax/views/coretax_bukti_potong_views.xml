@@ -98,7 +98,7 @@
                     <filter string="Jenis PPh" name="g_jenis" context="{'group_by':'jenis_pph'}"/>
                     <filter string="Source" name="g_source" context="{'group_by':'source'}"/>
                     <filter string="State" name="g_state" context="{'group_by':'state'}"/>
-                
+
             </search>
         </field>
     </record>

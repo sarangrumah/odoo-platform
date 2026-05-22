@@ -56,14 +56,14 @@
                 <field name="user_id"/>
                 <field name="tenant_id"/>
                 <field name="event_type"/>
-                
+
                     <filter string="Event Type" name="g_evt"
                             context="{'group_by': 'event_type'}"/>
                     <filter string="Tenant" name="g_tenant"
                             context="{'group_by': 'tenant_id'}"/>
                     <filter string="User" name="g_user"
                             context="{'group_by': 'user_id'}"/>
-                
+
             </search>
         </field>
     </record>

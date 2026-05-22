@@ -111,10 +111,10 @@
                 <filter name="state_draft" string="Draft" domain="[('state','=','draft')]"/>
                 <filter name="state_submitted" string="Submitted" domain="[('state','=','submitted')]"/>
                 <filter name="state_accepted" string="Accepted" domain="[('state','=','accepted')]"/>
-                
+
                     <filter name="g_year" string="Year" context="{'group_by': 'year'}"/>
                     <filter name="g_state" string="State" context="{'group_by': 'state'}"/>
-                
+
             </search>
         </field>
     </record>
