@@ -43,8 +43,13 @@ class DocumentAutoClassify(models.Model):
 
         code = result.get("classification_code")
         if code:
-            classification = self.env["pdp.classification"].sudo().search(
-                [("code", "=", code)], limit=1,
+            classification = (
+                self.env["pdp.classification"]
+                .sudo()
+                .search(
+                    [("code", "=", code)],
+                    limit=1,
+                )
             )
             if classification:
                 self.classification_id = classification.id
@@ -62,7 +67,7 @@ class DocumentAutoClassify(models.Model):
         if result.get("rationale"):
             self.message_post(
                 body=f"<b>AI classification:</b> {code} (confidence {result.get('confidence', 0):.2f}) — "
-                     f"{result['rationale']}",
+                f"{result['rationale']}",
             )
 
     def _extract_text_excerpt(self) -> str | None:

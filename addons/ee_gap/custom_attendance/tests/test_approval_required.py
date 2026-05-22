@@ -6,7 +6,6 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "custom_attendance")
 class TestApprovalRequiredAnomaly(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.Employee = self.env["hr.employee"]

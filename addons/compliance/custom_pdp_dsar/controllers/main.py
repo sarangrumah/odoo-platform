@@ -11,9 +11,7 @@ _logger = logging.getLogger(__name__)
 
 
 class PdpDsarController(http.Controller):
-
-    @http.route(["/dsar/request"], type="jsonrpc", auth="public",
-                methods=["POST"], csrf=False, sitemap=False)
+    @http.route(["/dsar/request"], type="jsonrpc", auth="public", methods=["POST"], csrf=False, sitemap=False)
     def dsar_request(self, **kw):
         payload = kw or {}
         try:
@@ -30,16 +28,27 @@ class PdpDsarController(http.Controller):
             return {"ok": False, "error": "subject_email is required"}
 
         # Try to match an existing partner by email
-        partner = request.env["res.partner"].sudo().search(
-            [("email", "=ilike", subject_email)], limit=1,
+        partner = (
+            request.env["res.partner"]
+            .sudo()
+            .search(
+                [("email", "=ilike", subject_email)],
+                limit=1,
+            )
         )
-        rec = request.env["pdp.dsar.request"].sudo().create({
-            "subject_email": subject_email,
-            "subject_nik": subject_nik,
-            "request_kind": kind,
-            "partner_id": partner.id if partner else False,
-            "state": "received",
-        })
+        rec = (
+            request.env["pdp.dsar.request"]
+            .sudo()
+            .create(
+                {
+                    "subject_email": subject_email,
+                    "subject_nik": subject_nik,
+                    "request_kind": kind,
+                    "partner_id": partner.id if partner else False,
+                    "state": "received",
+                }
+            )
+        )
         return {
             "ok": True,
             "dsar_id": rec.id,

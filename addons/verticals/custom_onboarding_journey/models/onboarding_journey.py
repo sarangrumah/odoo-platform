@@ -163,7 +163,7 @@ class OnboardingJourney(models.Model):
     # ------------------------------------------------------------------ payload
     company_profile_json = fields.Text(
         help='JSON profile captured at intake: {"name", "logo_url", "npwp", '
-             '"bank": {...}, "modules_wishlist": [...], "narrative": "..."}.',
+        '"bank": {...}, "modules_wishlist": [...], "narrative": "..."}.',
     )
 
     # ------------------------------------------------------------------ public + sync metadata
@@ -176,8 +176,7 @@ class OnboardingJourney(models.Model):
     sync_version = fields.Integer(
         default=0,
         copy=False,
-        help="Bumped on every stage write to drive last-write-wins resolution "
-             "against the linked project tasks.",
+        help="Bumped on every stage write to drive last-write-wins resolution against the linked project tasks.",
     )
 
     transition_ids = fields.One2many(
@@ -203,17 +202,23 @@ class OnboardingJourney(models.Model):
     @api.depends("brd_recommendation_ids.estimated_md")
     def _compute_mandays_estimate(self):
         for rec in self:
-            rec.mandays_estimate = sum(
-                (r.estimated_md or 0) for r in rec.brd_recommendation_ids
-            )
+            rec.mandays_estimate = sum((r.estimated_md or 0) for r in rec.brd_recommendation_ids)
 
     @api.depends("stage")
     def _compute_progress_pct(self):
         # Linear stage index over the happy path.
         happy = [
-            "draft", "intake", "brd_uploaded", "brd_analyzed",
-            "recommendations_ready", "go_no_go", "provisioning_requested",
-            "provisioning_in_progress", "tenant_live", "handover", "closed",
+            "draft",
+            "intake",
+            "brd_uploaded",
+            "brd_analyzed",
+            "recommendations_ready",
+            "go_no_go",
+            "provisioning_requested",
+            "provisioning_in_progress",
+            "tenant_live",
+            "handover",
+            "closed",
         ]
         for rec in self:
             if rec.stage == "rejected":
@@ -255,14 +260,16 @@ class OnboardingJourney(models.Model):
                 allowed = _FORWARD.get(old, set())
                 if new_stage not in allowed and not self.env.context.get("_force_stage"):
                     raise ValidationError(
-                        _("Illegal stage transition: %(old)s -> %(new)s") % {
-                            "old": old, "new": new_stage,
+                        _("Illegal stage transition: %(old)s -> %(new)s")
+                        % {
+                            "old": old,
+                            "new": new_stage,
                         }
                     )
             # Bump sync version on stage move.
-            vals["sync_version"] = max(
-                (r.sync_version or 0) for r in self
-            ) + 1 if self else (vals.get("sync_version") or 1)
+            vals["sync_version"] = (
+                max((r.sync_version or 0) for r in self) + 1 if self else (vals.get("sync_version") or 1)
+            )
 
         result = super().write(vals)
 
@@ -281,9 +288,7 @@ class OnboardingJourney(models.Model):
                 rec.message_post(body=_("Stage moved to %s") % new_stage)
                 # Auto-archive linked project when journey closes.
                 if new_stage == "closed" and rec.project_id and rec.project_id.active:
-                    rec.project_id.with_context(_skip_journey_sync=True).write(
-                        {"active": False}
-                    )
+                    rec.project_id.with_context(_skip_journey_sync=True).write({"active": False})
         return result
 
     def _origin_stage_cache(self):
@@ -292,7 +297,9 @@ class OnboardingJourney(models.Model):
         # In Odoo 19 ORM the previous value is no longer easily available in
         # write() post-super; we approximate via the latest transition row.
         last = self.env["onboarding.stage.transition"].search(
-            [("journey_id", "=", self.id)], order="transitioned_at desc, id desc", limit=1,
+            [("journey_id", "=", self.id)],
+            order="transitioned_at desc, id desc",
+            limit=1,
         )
         return last.to_stage if last else False
 

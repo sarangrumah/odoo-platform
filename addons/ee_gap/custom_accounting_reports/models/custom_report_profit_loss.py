@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Profit & Loss: Revenue / COGS / Op Ex / Other / Tax with YTD."""
+
 from datetime import date as date_cls
 
 from odoo import models
@@ -50,16 +51,28 @@ class CustomReportProfitLoss(models.AbstractModel):
 
         lines = []
         revenue = self._section(
-            "Revenue", REVENUE_TYPES, balances, flip_sign=True,
+            "Revenue",
+            REVENUE_TYPES,
+            balances,
+            flip_sign=True,
         )
         cogs = self._section(
-            "Cost of Goods Sold", COGS_TYPES, balances, flip_sign=False,
+            "Cost of Goods Sold",
+            COGS_TYPES,
+            balances,
+            flip_sign=False,
         )
         op_ex = self._section(
-            "Operating Expenses", EXPENSE_TYPES, balances, flip_sign=False,
+            "Operating Expenses",
+            EXPENSE_TYPES,
+            balances,
+            flip_sign=False,
         )
         other = self._section(
-            "Other Expenses", OTHER_TYPES, balances, flip_sign=False,
+            "Other Expenses",
+            OTHER_TYPES,
+            balances,
+            flip_sign=False,
         )
 
         gross_profit = revenue["subtotal"] - cogs["subtotal"]
@@ -81,32 +94,47 @@ class CustomReportProfitLoss(models.AbstractModel):
         ytd_net = ytd_revenue - ytd_cogs - ytd_opex - ytd_other
 
         lines.append(revenue)
-        lines.append({
-            "type": "total", "label": "Total Revenue",
-            "signed_balance": revenue["subtotal"],
-            "ytd": ytd_revenue,
-        })
+        lines.append(
+            {
+                "type": "total",
+                "label": "Total Revenue",
+                "signed_balance": revenue["subtotal"],
+                "ytd": ytd_revenue,
+            }
+        )
         lines.append(cogs)
-        lines.append({
-            "type": "total", "label": "Total COGS",
-            "signed_balance": cogs["subtotal"],
-            "ytd": ytd_cogs,
-        })
-        lines.append({
-            "type": "total", "label": "Gross Profit",
-            "signed_balance": gross_profit,
-            "ytd": ytd_revenue - ytd_cogs,
-        })
+        lines.append(
+            {
+                "type": "total",
+                "label": "Total COGS",
+                "signed_balance": cogs["subtotal"],
+                "ytd": ytd_cogs,
+            }
+        )
+        lines.append(
+            {
+                "type": "total",
+                "label": "Gross Profit",
+                "signed_balance": gross_profit,
+                "ytd": ytd_revenue - ytd_cogs,
+            }
+        )
         lines.append(op_ex)
-        lines.append({
-            "type": "total", "label": "Operating Profit",
-            "signed_balance": operating_profit,
-            "ytd": ytd_revenue - ytd_cogs - ytd_opex,
-        })
+        lines.append(
+            {
+                "type": "total",
+                "label": "Operating Profit",
+                "signed_balance": operating_profit,
+                "ytd": ytd_revenue - ytd_cogs - ytd_opex,
+            }
+        )
         lines.append(other)
-        lines.append({
-            "type": "grand_total", "label": "Net Profit / (Loss)",
-            "signed_balance": net_profit,
-            "ytd": ytd_net,
-        })
+        lines.append(
+            {
+                "type": "grand_total",
+                "label": "Net Profit / (Loss)",
+                "signed_balance": net_profit,
+                "ytd": ytd_net,
+            }
+        )
         return lines

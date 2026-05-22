@@ -2,7 +2,7 @@
 import logging
 import secrets
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -51,36 +51,34 @@ class EventRegistration(models.Model):
             event = reg.event_id
             template = event.x_whatsapp_ticket_template_id
             if not template:
-                _logger.info(
-                    "Skip WA ticket: event %s has no whatsapp template", event.name
-                )
+                _logger.info("Skip WA ticket: event %s has no whatsapp template", event.name)
                 continue
             partner = reg.partner_id
             phone = partner and (partner.mobile or partner.phone) or False
             if not phone:
-                _logger.info(
-                    "Skip WA ticket reg %s: partner has no phone", reg.id
-                )
+                _logger.info("Skip WA ticket reg %s: partner has no phone", reg.id)
                 continue
-            msg = Message.create({
-                "template_id": template.id,
-                "partner_id": partner.id,
-                "phone": phone,
-                "body": template.body or "",
-                "model": reg._name,
-                "res_id": reg.id,
-            })
+            msg = Message.create(
+                {
+                    "template_id": template.id,
+                    "partner_id": partner.id,
+                    "phone": phone,
+                    "body": template.body or "",
+                    "model": reg._name,
+                    "res_id": reg.id,
+                }
+            )
             try:
                 msg.action_send()
             except Exception as e:  # pragma: no cover
-                _logger.warning(
-                    "WA ticket send failed reg=%s: %s", reg.id, e
-                )
+                _logger.warning("WA ticket send failed reg=%s: %s", reg.id, e)
                 continue
             reg.x_whatsapp_ticket_sent = True
             _logger.info(
                 "WA ticket sent reg=%s event=%s phone=%s",
-                reg.id, event.name, phone,
+                reg.id,
+                event.name,
+                phone,
             )
         return True
 
@@ -113,10 +111,12 @@ class EventRegistration(models.Model):
                 "checked_in_at": fields.Datetime.to_string(reg.x_checked_in_at),
             }
         now = fields.Datetime.now()
-        reg.write({
-            "x_checked_in_at": now,
-            "x_checked_in_by_user_id": self.env.user.id,
-        })
+        reg.write(
+            {
+                "x_checked_in_at": now,
+                "x_checked_in_by_user_id": self.env.user.id,
+            }
+        )
         # also flip CE event.registration state to attended where available
         if "state" in reg._fields:
             try:

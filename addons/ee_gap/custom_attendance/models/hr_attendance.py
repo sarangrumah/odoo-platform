@@ -113,10 +113,7 @@ class HrAttendance(models.Model):
         phi2 = math.radians(lat2)
         d_phi = math.radians(lat2 - lat1)
         d_lambda = math.radians(lon2 - lon1)
-        a = (
-            math.sin(d_phi / 2.0) ** 2
-            + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2.0) ** 2
-        )
+        a = math.sin(d_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2.0) ** 2
         c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         return earth_radius_m * c
 
@@ -195,9 +192,7 @@ class HrAttendance(models.Model):
     def action_request_approval(self):
         for rec in self:
             if rec.x_approval_state not in ("draft", "rejected"):
-                raise UserError(
-                    _("Approval can only be requested from draft or rejected state.")
-                )
+                raise UserError(_("Approval can only be requested from draft or rejected state."))
             rec.x_approval_state = "pending"
             # Notify manager via activity
             manager_user = False
@@ -209,10 +204,8 @@ class HrAttendance(models.Model):
                 rec.activity_schedule(
                     "mail.mail_activity_data_todo",
                     summary=_("Attendance approval requested"),
-                    note=_(
-                        "Anomalous attendance for %(emp)s "
-                        "(worked %(h).2f h) requires your review."
-                    ) % {
+                    note=_("Anomalous attendance for %(emp)s (worked %(h).2f h) requires your review.")
+                    % {
                         "emp": rec.employee_id.name or "",
                         "h": rec.worked_hours or 0.0,
                     },
@@ -267,9 +260,7 @@ class HrAttendance(models.Model):
                 self.message_post(body=_("No overtime hours to push to payroll."))
             return False
         if not self.employee_id:
-            raise UserError(
-                _("Cannot create a work entry without an employee linked.")
-            )
+            raise UserError(_("Cannot create a work entry without an employee linked."))
         if not self.check_in:
             raise UserError(_("Attendance has no check-in datetime."))
 
@@ -307,9 +298,8 @@ class HrAttendance(models.Model):
         )
         if hasattr(self, "message_post"):
             self.message_post(
-                body=_(
-                    "Created overtime work entry <b>%(name)s</b> (%(hours).2f h)."
-                ) % {
+                body=_("Created overtime work entry <b>%(name)s</b> (%(hours).2f h).")
+                % {
                     "name": work_entry.display_name or work_entry.name,
                     "hours": self.x_overtime_hours,
                 }
@@ -323,9 +313,7 @@ class HrAttendance(models.Model):
                 try:
                     rec.x_payroll_work_entry_id.sudo().state = "cancelled"
                 except Exception as exc:  # pragma: no cover
-                    _logger.warning(
-                        "Could not cancel work entry on unlink: %s", exc
-                    )
+                    _logger.warning("Could not cancel work entry on unlink: %s", exc)
         return super().unlink()
 
     # ==================================================================
@@ -351,21 +339,13 @@ class HrAttendance(models.Model):
         confidence = 0.0
         if isinstance(result, dict):
             confidence = float(
-                result.get("confidence")
-                or result.get("score")
-                or (result.get("data") or {}).get("confidence")
-                or 0.0
+                result.get("confidence") or result.get("score") or (result.get("data") or {}).get("confidence") or 0.0
             )
         self.x_face_recognition_confidence = confidence
         if confidence < 0.6:
             self.x_approval_required = True
             if hasattr(self, "message_post"):
-                self.message_post(
-                    body=_(
-                        "Face confidence %.2f below threshold 0.60; "
-                        "approval required."
-                    ) % confidence
-                )
+                self.message_post(body=_("Face confidence %.2f below threshold 0.60; approval required.") % confidence)
         return confidence
 
     # ==================================================================

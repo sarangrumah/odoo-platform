@@ -24,8 +24,7 @@ class CustomExpenseCorporateCard(models.Model):
         string="Masked Card Number",
         required=True,
         tracking=True,
-        help="Display format only, e.g. '**** **** **** 1234'. "
-             "Never store the full PAN.",
+        help="Display format only, e.g. '**** **** **** 1234'. Never store the full PAN.",
     )
     employee_id = fields.Many2one(
         "hr.employee",
@@ -72,17 +71,21 @@ class CustomExpenseCorporateCard(models.Model):
             cleaned = card.masked_number.strip()
             digits = re.sub(r"\D", "", cleaned)
             if pan_like.match(cleaned) and len(digits) >= 13 and "*" not in cleaned:
-                raise ValidationError(_(
-                    "Masked card number must contain mask characters (e.g. "
-                    "'**** **** **** 1234'). Storing a full PAN is forbidden."
-                ))
+                raise ValidationError(
+                    _(
+                        "Masked card number must contain mask characters (e.g. "
+                        "'**** **** **** 1234'). Storing a full PAN is forbidden."
+                    )
+                )
 
     def _compute_expense_count(self):
         Expense = self.env["hr.expense"].sudo()
         for card in self:
-            card.expense_count = Expense.search_count([
-                ("x_corporate_card_id", "=", card.id),
-            ])
+            card.expense_count = Expense.search_count(
+                [
+                    ("x_corporate_card_id", "=", card.id),
+                ]
+            )
 
     def action_view_expenses(self):
         self.ensure_one()

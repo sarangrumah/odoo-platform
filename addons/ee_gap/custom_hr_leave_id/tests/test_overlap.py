@@ -29,9 +29,7 @@ class TestOverlappingHolidays(TransactionCase):
             }
         )
 
-        self.employee = self.Employee.create(
-            {"name": "Test Overlap Employee", "x_auto_leave_allocation": False}
-        )
+        self.employee = self.Employee.create({"name": "Test Overlap Employee", "x_auto_leave_allocation": False})
         self.leave_type = self.LeaveType.create(
             {
                 "name": "Test Type Overlap",

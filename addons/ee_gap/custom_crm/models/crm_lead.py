@@ -37,8 +37,7 @@ class CrmLead(models.Model):
         string="Predictive Score",
         compute="_compute_predictive_score",
         store=True,
-        help="Rules-based predictive score (0-100). Heuristic stand-in for "
-             "Odoo EE Predictive Lead Scoring.",
+        help="Rules-based predictive score (0-100). Heuristic stand-in for Odoo EE Predictive Lead Scoring.",
     )
 
     # ---------- lead enrichment (stub) ----------
@@ -76,10 +75,12 @@ class CrmLead(models.Model):
             if not total:
                 source_winrate_cache[source_id] = 0.0
                 return 0.0
-            won = Lead.search_count([
-                ("source_id", "=", source_id),
-                ("won_status", "=", "won"),
-            ])
+            won = Lead.search_count(
+                [
+                    ("source_id", "=", source_id),
+                    ("won_status", "=", "won"),
+                ]
+            )
             rate = won / total
             source_winrate_cache[source_id] = rate
             return rate
@@ -188,11 +189,7 @@ class CrmLead(models.Model):
 
         score = 0.0
         try:
-            raw_score = (
-                result.get("score")
-                if isinstance(result, dict)
-                else None
-            )
+            raw_score = result.get("score") if isinstance(result, dict) else None
             if raw_score is not None:
                 score = float(raw_score)
         except (TypeError, ValueError):
@@ -205,13 +202,16 @@ class CrmLead(models.Model):
             or json.dumps(result)[:1000]
         )
 
-        self.write({
-            "x_ai_score": score,
-            "x_ai_reasoning": reasoning,
-            "x_ai_scored_date": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "x_ai_score": score,
+                "x_ai_reasoning": reasoning,
+                "x_ai_scored_date": fields.Datetime.now(),
+            }
+        )
         self.message_post(
-            body=_("<b>AI Lead Score</b>: %(score).2f<br/>%(reason)s") % {
+            body=_("<b>AI Lead Score</b>: %(score).2f<br/>%(reason)s")
+            % {
                 "score": score,
                 "reason": reasoning,
             },
@@ -252,14 +252,17 @@ class CrmLead(models.Model):
                 "source": "mock",
                 "industry": "Technology",
                 "employees": "11-50",
-                "website": self.website or f"https://www.example.com/{(self.partner_name or 'lead').lower().replace(' ', '-')}",
+                "website": self.website
+                or f"https://www.example.com/{(self.partner_name or 'lead').lower().replace(' ', '-')}",
                 "linkedin": f"https://www.linkedin.com/company/{(self.partner_name or 'lead').lower().replace(' ', '-')}",
             }
 
-        self.write({
-            "x_enrichment_data": json.dumps(enrichment, default=str)[:8000],
-            "x_enriched_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "x_enrichment_data": json.dumps(enrichment, default=str)[:8000],
+                "x_enriched_at": fields.Datetime.now(),
+            }
+        )
 
         # Optionally enrich the linked partner with mock metadata.
         if self.partner_id:
@@ -270,8 +273,7 @@ class CrmLead(models.Model):
                 self.partner_id.sudo().write(partner_vals)
 
         self.message_post(
-            body=_("<b>Lead Enriched</b><br/><pre>%s</pre>")
-            % json.dumps(enrichment, indent=2, default=str)[:2000],
+            body=_("<b>Lead Enriched</b><br/><pre>%s</pre>") % json.dumps(enrichment, indent=2, default=str)[:2000],
             subtype_xmlid="mail.mt_note",
         )
         return True

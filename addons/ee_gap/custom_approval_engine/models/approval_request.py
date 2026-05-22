@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -39,9 +39,7 @@ class ApprovalRequest(models.Model):
     )
     res_name = fields.Char(string="Record Name", compute="_compute_res_name", store=True)
 
-    requested_by_id = fields.Many2one(
-        "res.users", default=lambda self: self.env.user, required=True
-    )
+    requested_by_id = fields.Many2one("res.users", default=lambda self: self.env.user, required=True)
     company_id = fields.Many2one("res.company", default=lambda self: self.env.company)
 
     state = fields.Selection(STATES, default="draft", required=True, tracking=True, index=True)
@@ -122,15 +120,16 @@ class ApprovalRequest(models.Model):
         )
         if existing:
             return existing
-        req = self.sudo().create({
-            "matrix_id": matrix.id,
-            "res_model": record._name,
-            "res_id": record.id,
-            "company_id": (
-                record.company_id.id if hasattr(record, "company_id") and record.company_id
-                else self.env.company.id
-            ),
-        })
+        req = self.sudo().create(
+            {
+                "matrix_id": matrix.id,
+                "res_model": record._name,
+                "res_id": record.id,
+                "company_id": (
+                    record.company_id.id if hasattr(record, "company_id") and record.company_id else self.env.company.id
+                ),
+            }
+        )
         return req
 
     # ---------------------------------------------------------------- lifecycle
@@ -142,15 +141,16 @@ class ApprovalRequest(models.Model):
             first_tier = rec.matrix_id.tier_ids.sorted("sequence")[:1]
             if not first_tier:
                 raise UserError(_("Matrix '%s' has no tiers.") % rec.matrix_id.name)
-            rec.write({
-                "state": "pending",
-                "current_tier_id": first_tier.id,
-                "due_at": fields.Datetime.now() + timedelta(hours=first_tier.sla_hours),
-            })
+            rec.write(
+                {
+                    "state": "pending",
+                    "current_tier_id": first_tier.id,
+                    "due_at": fields.Datetime.now() + timedelta(hours=first_tier.sla_hours),
+                }
+            )
             rec._refresh_pending_approvers()
             rec._notify_pending()
-            rec._pdp_audit_write("approval_submit", rec.id,
-                                 {"matrix": rec.matrix_id.name, "tier": first_tier.name})
+            rec._pdp_audit_write("approval_submit", rec.id, {"matrix": rec.matrix_id.name, "tier": first_tier.name})
         return True
 
     def action_approve(self, comment: str | None = None):
@@ -168,11 +168,9 @@ class ApprovalRequest(models.Model):
 
             # When require_all, check whether all approvers have approved at this tier
             if tier.require_all:
-                approved_users = (
-                    sudo_rec.history_ids
-                    .filtered(lambda l: l.tier_id == tier and l.action == "approved")
-                    .mapped("action_user_id")
-                )
+                approved_users = sudo_rec.history_ids.filtered(
+                    lambda l: l.tier_id == tier and l.action == "approved"
+                ).mapped("action_user_id")
                 if not all(u in approved_users for u in sudo_rec.pending_approver_ids):
                     # Still waiting on others
                     continue
@@ -187,11 +185,13 @@ class ApprovalRequest(models.Model):
             if effective_user not in rec.pending_approver_ids:
                 raise UserError(_("You are not in the pending approver list for the current tier."))
             rec._record_line(rec.current_tier_id, effective_user, "rejected", comment)
-            rec.write({
-                "state": "rejected",
-                "final_decision_user_id": effective_user.id,
-                "decided_at": fields.Datetime.now(),
-            })
+            rec.write(
+                {
+                    "state": "rejected",
+                    "final_decision_user_id": effective_user.id,
+                    "decided_at": fields.Datetime.now(),
+                }
+            )
             try:
                 rec.sudo().message_post(body=_("Request rejected by %s") % effective_user.name)
             except Exception:
@@ -216,11 +216,13 @@ class ApprovalRequest(models.Model):
         idx = list(tiers).index(self.current_tier_id) if self.current_tier_id in tiers else -1
         if idx + 1 >= len(tiers):
             # Final tier approved → request approved
-            self.write({
-                "state": "approved",
-                "final_decision_user_id": self.env.user.id,
-                "decided_at": fields.Datetime.now(),
-            })
+            self.write(
+                {
+                    "state": "approved",
+                    "final_decision_user_id": self.env.user.id,
+                    "decided_at": fields.Datetime.now(),
+                }
+            )
             # mail.message creation may hit ACLs for the acting user; the
             # decision itself is already persisted, so swallow notify errors.
             try:
@@ -230,10 +232,12 @@ class ApprovalRequest(models.Model):
             self._pdp_audit_write("approval_complete", self.id, None)
             return
         next_tier = tiers[idx + 1]
-        self.write({
-            "current_tier_id": next_tier.id,
-            "due_at": fields.Datetime.now() + timedelta(hours=next_tier.sla_hours),
-        })
+        self.write(
+            {
+                "current_tier_id": next_tier.id,
+                "due_at": fields.Datetime.now() + timedelta(hours=next_tier.sla_hours),
+            }
+        )
         self._refresh_pending_approvers()
         try:
             self._notify_pending()
@@ -242,14 +246,16 @@ class ApprovalRequest(models.Model):
         self._pdp_audit_write("approval_advance", self.id, {"to_tier": next_tier.name})
 
     def _record_line(self, tier, user, action: str, comment: str | None):
-        self.env["approval.request.line"].sudo().create({
-            "request_id": self.id,
-            "tier_id": tier.id if tier else False,
-            "action_user_id": user.id,
-            "action": action,
-            "comment": comment,
-            "delegated_from_id": self._delegator_for(user).id if self._delegator_for(user) else False,
-        })
+        self.env["approval.request.line"].sudo().create(
+            {
+                "request_id": self.id,
+                "tier_id": tier.id if tier else False,
+                "action_user_id": user.id,
+                "action": action,
+                "comment": comment,
+                "delegated_from_id": self._delegator_for(user).id if self._delegator_for(user) else False,
+            }
+        )
 
     def _effective_actor(self):
         """Return the user performing the action — current user (delegation handled separately)."""
@@ -257,9 +263,7 @@ class ApprovalRequest(models.Model):
 
     def _delegator_for(self, user):
         """If ``user`` is acting on behalf of someone via active delegation, return that delegator."""
-        delegation = self.env["approval.delegation"].sudo()._find_delegating(
-            user=user, model_name=self.res_model
-        )
+        delegation = self.env["approval.delegation"].sudo()._find_delegating(user=user, model_name=self.res_model)
         return delegation.user_id if delegation else self.env["res.users"]
 
     def _refresh_pending_approvers(self):
@@ -296,9 +300,7 @@ class ApprovalRequest(models.Model):
         self.ensure_one()
         if not self.pending_approver_ids:
             return
-        template = self.env.ref(
-            "custom_approval_engine.mail_template_approval_pending", raise_if_not_found=False
-        )
+        template = self.env.ref("custom_approval_engine.mail_template_approval_pending", raise_if_not_found=False)
         if not template:
             return
         # Notification is best-effort: the lifecycle decision is already
@@ -308,9 +310,7 @@ class ApprovalRequest(models.Model):
             try:
                 template.with_context(approver=u).sudo().send_mail(self.id, force_send=False)
             except Exception:
-                _logger.exception(
-                    "approval %s: send_mail to %s failed (non-fatal)", self.id, u.login
-                )
+                _logger.exception("approval %s: send_mail to %s failed (non-fatal)", self.id, u.login)
 
     # ---------------------------------------------------------------- escalation cron
 
@@ -339,22 +339,25 @@ class ApprovalRequest(models.Model):
             return
         action = tier.on_overdue
         if action == "auto_approve":
-            self._record_line(tier, self.env.ref("base.user_root"), "approved",
-                              "Auto-approved on SLA breach")
+            self._record_line(tier, self.env.ref("base.user_root"), "approved", "Auto-approved on SLA breach")
             self._advance_to_next_tier()
         elif action == "escalate_to_next":
-            self._record_line(tier, self.env.ref("base.user_root"), "escalated",
-                              "Escalated to next tier on SLA breach")
+            self._record_line(tier, self.env.ref("base.user_root"), "escalated", "Escalated to next tier on SLA breach")
             self._advance_to_next_tier()
         elif action == "escalate_to_user":
             target = tier.escalation_user_id
             if not target:
                 _logger.warning("approval.request %s overdue, escalation_user missing", self.id)
                 return
-            self.write({"pending_approver_ids": [(6, 0, [target.id])],
-                        "due_at": fields.Datetime.now() + timedelta(hours=tier.sla_hours)})
-            self._record_line(tier, self.env.ref("base.user_root"), "escalated",
-                              f"Escalated to fallback approver {target.name}")
+            self.write(
+                {
+                    "pending_approver_ids": [(6, 0, [target.id])],
+                    "due_at": fields.Datetime.now() + timedelta(hours=tier.sla_hours),
+                }
+            )
+            self._record_line(
+                tier, self.env.ref("base.user_root"), "escalated", f"Escalated to fallback approver {target.name}"
+            )
             self._notify_pending()
         # action == 'none' → just notify (re-send pending notice)
         elif action == "none":

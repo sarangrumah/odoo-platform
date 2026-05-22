@@ -9,7 +9,6 @@ post-process the result.
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
 
 from odoo import api, models
 
@@ -29,10 +28,16 @@ class PdpMaskedMixin(models.AbstractModel):
         key = self._name
         if key in cache:
             return cache[key]
-        fields = self.env["ir.model.fields"].sudo().search([
-            ("model", "=", self._name),
-            ("x_pdp_classification_id", "!=", False),
-        ])
+        fields = (
+            self.env["ir.model.fields"]
+            .sudo()
+            .search(
+                [
+                    ("model", "=", self._name),
+                    ("x_pdp_classification_id", "!=", False),
+                ]
+            )
+        )
         out = {f.name: f.x_pdp_classification_id.code for f in fields}
         cache[key] = out
         return out

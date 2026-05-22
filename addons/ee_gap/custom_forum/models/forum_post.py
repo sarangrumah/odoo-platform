@@ -39,8 +39,7 @@ class ForumPost(models.Model):
     x_pdp_author_masked = fields.Boolean(
         string="Mask author identity",
         default=False,
-        help="When enabled, the author identity is masked in public displays "
-        "according to PDP requirements.",
+        help="When enabled, the author identity is masked in public displays according to PDP requirements.",
     )
 
     # ---------- EE-gap: Reputation enhancement ----------
@@ -60,9 +59,7 @@ class ForumPost(models.Model):
                 post.x_helpful_count = 0
                 continue
             try:
-                post.x_helpful_count = sum(
-                    1 for v in post.vote_ids if str(v.vote) == "1"
-                )
+                post.x_helpful_count = sum(1 for v in post.vote_ids if str(v.vote) == "1")
             except Exception:  # pragma: no cover - defensive
                 post.x_helpful_count = 0
 
@@ -90,8 +87,10 @@ class ForumPost(models.Model):
     @api.model
     def _get_spam_threshold(self):
         try:
-            raw = self.env["ir.config_parameter"].sudo().get_param(
-                _SPAM_THRESHOLD_PARAM, default=str(_DEFAULT_SPAM_THRESHOLD)
+            raw = (
+                self.env["ir.config_parameter"]
+                .sudo()
+                .get_param(_SPAM_THRESHOLD_PARAM, default=str(_DEFAULT_SPAM_THRESHOLD))
             )
             return float(raw)
         except (TypeError, ValueError):
@@ -101,17 +100,13 @@ class ForumPost(models.Model):
         """Schedule an activity for the Forum Moderation Manager group."""
         self.ensure_one()
         try:
-            mod_group = self.env.ref(
-                "custom_forum.group_manager", raise_if_not_found=False
-            )
+            mod_group = self.env.ref("custom_forum.group_manager", raise_if_not_found=False)
         except Exception:  # pragma: no cover
             mod_group = None
         if not mod_group or not mod_group.user_ids:
             return
         try:
-            activity_type = self.env.ref(
-                "mail.mail_activity_data_todo", raise_if_not_found=False
-            )
+            activity_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
         except Exception:  # pragma: no cover
             activity_type = None
         if not activity_type:
@@ -124,7 +119,8 @@ class ForumPost(models.Model):
                     note=_(
                         "Post '%(name)s' was auto-flagged by AI moderation."
                         "<br/>Label: <b>%(label)s</b> — Score: %(score).2f"
-                    ) % {
+                    )
+                    % {
                         "name": self.name or _("(no title)"),
                         "label": label,
                         "score": score,
@@ -134,16 +130,15 @@ class ForumPost(models.Model):
             except Exception as e:  # pragma: no cover - best-effort
                 _logger.warning(
                     "Failed scheduling forum moderation activity for user %s: %s",
-                    user.id, e,
+                    user.id,
+                    e,
                 )
 
     def _email_forum_admin_spam(self, score):
         """Send a notice email to the moderation manager when spam crosses threshold."""
         self.ensure_one()
         try:
-            mod_group = self.env.ref(
-                "custom_forum.group_manager", raise_if_not_found=False
-            )
+            mod_group = self.env.ref("custom_forum.group_manager", raise_if_not_found=False)
         except Exception:  # pragma: no cover
             mod_group = None
         if not mod_group or not mod_group.user_ids:
@@ -157,14 +152,16 @@ class ForumPost(models.Model):
                     "<b>Spam threshold exceeded</b><br/>"
                     "AI score %(score).2f for post '%(name)s'. Auto-closed and "
                     "notified the forum admins."
-                ) % {"score": score, "name": self.name or ""},
+                )
+                % {"score": score, "name": self.name or ""},
                 partner_ids=partner_ids,
                 subtype_xmlid="mail.mt_comment",
             )
         except Exception as e:  # pragma: no cover - best-effort
             _logger.warning(
                 "Failed sending spam notification email for post %s: %s",
-                self.id, e,
+                self.id,
+                e,
             )
 
     # ---------- AI action ----------

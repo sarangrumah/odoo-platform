@@ -67,8 +67,7 @@ class BrdExtractor:
         if kind == "pptx":
             return self.extract_pptx(binary)
         raise ExtractorDependencyError(
-            "Unsupported BRD file. Provide PDF, DOCX or PPTX. "
-            "Got mime=%r filename=%r" % (mime, filename)
+            "Unsupported BRD file. Provide PDF, DOCX or PPTX. Got mime=%r filename=%r" % (mime, filename)
         )
 
     @staticmethod
@@ -90,8 +89,7 @@ class BrdExtractor:
     def extract_pdf(self, binary: bytes) -> dict[str, Any]:
         if fitz is None:
             raise ExtractorDependencyError(
-                "PyMuPDF is not installed in this Odoo runtime. "
-                "Install with: pip install PyMuPDF"
+                "PyMuPDF is not installed in this Odoo runtime. Install with: pip install PyMuPDF"
             )
         sections: list[dict] = []
         full_text_parts: list[str] = []
@@ -138,8 +136,7 @@ class BrdExtractor:
     def extract_docx(self, binary: bytes) -> dict[str, Any]:
         if docx is None:
             raise ExtractorDependencyError(
-                "python-docx is not installed in this Odoo runtime. "
-                "Install with: pip install python-docx"
+                "python-docx is not installed in this Odoo runtime. Install with: pip install python-docx"
             )
         document = docx.Document(io.BytesIO(binary))  # type: ignore[union-attr]
         sections: list[dict] = []
@@ -162,7 +159,12 @@ class BrdExtractor:
                     level = int(style.replace("Heading", "").strip() or "1")
                 except ValueError:
                     level = 1
-                current = {"title": text.strip() or f"Heading {len(sections) + 1}", "content": "", "level": max(1, level), "page": 1}
+                current = {
+                    "title": text.strip() or f"Heading {len(sections) + 1}",
+                    "content": "",
+                    "level": max(1, level),
+                    "page": 1,
+                }
             else:
                 if current is None:
                     current = {"title": "Introduction", "content": "", "level": 1, "page": 1}
@@ -180,8 +182,7 @@ class BrdExtractor:
     def extract_pptx(self, binary: bytes) -> dict[str, Any]:
         if Presentation is None:
             raise ExtractorDependencyError(
-                "python-pptx is not installed in this Odoo runtime. "
-                "Install with: pip install python-pptx"
+                "python-pptx is not installed in this Odoo runtime. Install with: pip install python-pptx"
             )
         prs = Presentation(io.BytesIO(binary))  # type: ignore[misc]
         sections: list[dict] = []

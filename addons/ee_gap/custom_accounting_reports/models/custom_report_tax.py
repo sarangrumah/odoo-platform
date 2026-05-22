@@ -3,6 +3,7 @@
 position. Cross-references the optional ``custom.coretax.transaction``
 when the Coretax module is installed.
 """
+
 from odoo import models
 
 
@@ -53,10 +54,12 @@ class CustomReportTax(models.AbstractModel):
         coretax_link = {}
         if "custom.coretax.transaction" in self.env:
             Coretax = self.env["custom.coretax.transaction"]
-            coretax_rows = Coretax.sudo().search([
-                ("create_date", ">=", filters["date_from"]),
-                ("create_date", "<=", filters["date_to"]),
-            ])
+            coretax_rows = Coretax.sudo().search(
+                [
+                    ("create_date", ">=", filters["date_from"]),
+                    ("create_date", "<=", filters["date_to"]),
+                ]
+            )
             for ct in coretax_rows:
                 tax_id = getattr(ct, "tax_id", False)
                 if tax_id:
@@ -65,36 +68,37 @@ class CustomReportTax(models.AbstractModel):
         groups = {}
         for tax in taxes:
             cat = self._classify(tax)
-            grp = groups.setdefault(cat, {
-                "type": "category",
-                "category": cat,
-                "label": {
-                    "output": "Output VAT (PPN Keluaran)",
-                    "input": "Input VAT (PPN Masukan)",
-                    "withholding": "Withholding (PPh)",
-                    "other": "Other Taxes",
-                }[cat],
-                "taxes": [],
-                "base_subtotal": 0.0,
-                "tax_subtotal": 0.0,
-            })
+            grp = groups.setdefault(
+                cat,
+                {
+                    "type": "category",
+                    "category": cat,
+                    "label": {
+                        "output": "Output VAT (PPN Keluaran)",
+                        "input": "Input VAT (PPN Masukan)",
+                        "withholding": "Withholding (PPh)",
+                        "other": "Other Taxes",
+                    }[cat],
+                    "taxes": [],
+                    "base_subtotal": 0.0,
+                    "tax_subtotal": 0.0,
+                },
+            )
             base = base_by_tax.get(tax.id, 0.0)
             tax_amt = tax_by_tax.get(tax.id, 0.0)
-            fiscal_position = (
-                getattr(tax, "fiscal_position_ids", None)
-                and tax.fiscal_position_ids.mapped("name")
-                or []
+            fiscal_position = getattr(tax, "fiscal_position_ids", None) and tax.fiscal_position_ids.mapped("name") or []
+            grp["taxes"].append(
+                {
+                    "tax_id": tax.id,
+                    "tax_name": tax.name,
+                    "tax_rate": tax.amount,
+                    "tax_use": tax.type_tax_use,
+                    "fiscal_position": ", ".join(fiscal_position),
+                    "base_amount": base,
+                    "tax_amount": tax_amt,
+                    "coretax_ids": coretax_link.get(tax.id, []),
+                }
             )
-            grp["taxes"].append({
-                "tax_id": tax.id,
-                "tax_name": tax.name,
-                "tax_rate": tax.amount,
-                "tax_use": tax.type_tax_use,
-                "fiscal_position": ", ".join(fiscal_position),
-                "base_amount": base,
-                "tax_amount": tax_amt,
-                "coretax_ids": coretax_link.get(tax.id, []),
-            })
             grp["base_subtotal"] += base
             grp["tax_subtotal"] += tax_amt
 
@@ -103,11 +107,14 @@ class CustomReportTax(models.AbstractModel):
         for grp in groups.values():
             for t in grp["taxes"]:
                 fp = t["fiscal_position"] or "—"
-                row = fp_subtotals.setdefault(fp, {
-                    "fiscal_position": fp,
-                    "base_subtotal": 0.0,
-                    "tax_subtotal": 0.0,
-                })
+                row = fp_subtotals.setdefault(
+                    fp,
+                    {
+                        "fiscal_position": fp,
+                        "base_subtotal": 0.0,
+                        "tax_subtotal": 0.0,
+                    },
+                )
                 row["base_subtotal"] += t["base_amount"]
                 row["tax_subtotal"] += t["tax_amount"]
 
@@ -121,24 +128,27 @@ class CustomReportTax(models.AbstractModel):
                 total_tax += grp["tax_subtotal"]
 
         # Output vs Input balance (PPN payable / refundable)
-        net_ppn = (
-            groups.get("output", {}).get("tax_subtotal", 0.0)
-            - groups.get("input", {}).get("tax_subtotal", 0.0)
+        net_ppn = groups.get("output", {}).get("tax_subtotal", 0.0) - groups.get("input", {}).get("tax_subtotal", 0.0)
+        lines.append(
+            {
+                "type": "fp_breakdown",
+                "label": "Per Fiscal Position",
+                "rows": list(fp_subtotals.values()),
+            }
         )
-        lines.append({
-            "type": "fp_breakdown",
-            "label": "Per Fiscal Position",
-            "rows": list(fp_subtotals.values()),
-        })
-        lines.append({
-            "type": "total",
-            "label": "Net PPN (Output - Input)",
-            "tax_amount": net_ppn,
-        })
-        lines.append({
-            "type": "grand_total",
-            "label": "Grand Total",
-            "base_amount": total_base,
-            "tax_amount": total_tax,
-        })
+        lines.append(
+            {
+                "type": "total",
+                "label": "Net PPN (Output - Input)",
+                "tax_amount": net_ppn,
+            }
+        )
+        lines.append(
+            {
+                "type": "grand_total",
+                "label": "Grand Total",
+                "base_amount": total_base,
+                "tax_amount": total_tax,
+            }
+        )
         return lines

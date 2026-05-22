@@ -70,7 +70,6 @@ def _verify_turnstile(secret: str, token: str, remote_ip: str | None) -> bool:
 
 
 class OnboardingPublicIntake(http.Controller):
-
     @http.route(
         "/onboarding/public/intake",
         type="json",
@@ -95,11 +94,15 @@ class OnboardingPublicIntake(http.Controller):
             return {"error": "turnstile_failed"}
 
         # Persist the raw payload (whatever was sent — caller responsibility).
-        submission = request.env["onboarding.public.submission"].sudo().create(
-            {
-                "raw_payload_json": json.dumps(payload, ensure_ascii=False, default=str),
-                "source_ip_hash": ip_hash or False,
-            }
+        submission = (
+            request.env["onboarding.public.submission"]
+            .sudo()
+            .create(
+                {
+                    "raw_payload_json": json.dumps(payload, ensure_ascii=False, default=str),
+                    "source_ip_hash": ip_hash or False,
+                }
+            )
         )
 
         base_url = ICP.get_param("web.base.url", "")
@@ -121,8 +124,13 @@ class OnboardingPublicIntake(http.Controller):
         journey = Journey.search([("public_status_token", "=", token)], limit=1)
         # Fallback: token belongs to a submission that was promoted.
         if not journey:
-            sub = request.env["onboarding.public.submission"].sudo().search(
-                [("public_token", "=", token)], limit=1,
+            sub = (
+                request.env["onboarding.public.submission"]
+                .sudo()
+                .search(
+                    [("public_token", "=", token)],
+                    limit=1,
+                )
             )
             if sub and sub.journey_id:
                 journey = sub.journey_id

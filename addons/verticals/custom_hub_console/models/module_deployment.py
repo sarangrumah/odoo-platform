@@ -18,7 +18,7 @@ import json
 import logging
 from datetime import timedelta
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -68,8 +68,10 @@ class CustomHubModuleDeployment(models.Model):
         tracking=True,
     )
     requested_by_id = fields.Many2one(
-        "res.users", string="Requested By",
-        default=lambda self: self.env.user.id, required=True,
+        "res.users",
+        string="Requested By",
+        default=lambda self: self.env.user.id,
+        required=True,
     )
     requested_at = fields.Datetime(default=fields.Datetime.now, required=True)
     started_at = fields.Datetime()
@@ -85,8 +87,7 @@ class CustomHubModuleDeployment(models.Model):
     # depends on hub_console).
     dep_graph_resolved_json = fields.Text(
         string="Resolved Dependency Graph",
-        help="JSON: {'order': [...], 'missing': [...]} produced by "
-             "action_resolve_dependencies().",
+        help="JSON: {'order': [...], 'missing': [...]} produced by action_resolve_dependencies().",
     )
     canary_phase = fields.Selection(
         [
@@ -114,8 +115,10 @@ class CustomHubModuleDeployment(models.Model):
         with a clear message — do not raise so wizard commits."""
         for rec in self:
             rec.started_at = fields.Datetime.now()
-            rec.state = "installing" if rec.deploy_mode == "install" else (
-                "upgrading" if rec.deploy_mode == "upgrade" else "installing"
+            rec.state = (
+                "installing"
+                if rec.deploy_mode == "install"
+                else ("upgrading" if rec.deploy_mode == "upgrade" else "installing")
             )
             try:
                 client = self.env["custom.super.admin.orchestrator.client"].sudo()
@@ -128,22 +131,15 @@ class CustomHubModuleDeployment(models.Model):
                     f"/v1/tenants/{slug}/modules/{rec.deploy_mode}",
                     body={"module": module},
                 )
-                rec.state = (
-                    "uninstalled" if rec.deploy_mode == "uninstall"
-                    else "installed"
-                )
+                rec.state = "uninstalled" if rec.deploy_mode == "uninstall" else "installed"
                 rec.completed_at = fields.Datetime.now()
                 rec.error_message = False
                 self._log_audit(rec, "module_deploy", success=True)
             except Exception as exc:  # noqa: BLE001 - tolerant by design
-                _logger.warning(
-                    "[hub_deploy] orchestrator unreachable: %s", exc
-                )
+                _logger.warning("[hub_deploy] orchestrator unreachable: %s", exc)
                 rec.state = "failed"
                 rec.completed_at = fields.Datetime.now()
-                rec.error_message = (
-                    f"Orchestrator API not reachable or returned error: {exc}"
-                )
+                rec.error_message = f"Orchestrator API not reachable or returned error: {exc}"
                 self._log_audit(rec, "module_deploy", success=False, error=str(exc))
         return True
 
@@ -187,15 +183,15 @@ class CustomHubModuleDeployment(models.Model):
                 # rows themselves (rare — catalog stores M2M to itself, but
                 # if a module manifest depended on something un-scanned this
                 # would let us flag it).
-                referenced = {
-                    name for d in root.depends_module_ids for name in [d.module_name]
-                }
+                referenced = {name for d in root.depends_module_ids for name in [d.module_name]}
                 present = set(order)
                 missing = sorted(referenced - present)
             payload = {"order": order, "missing": missing}
             rec.dep_graph_resolved_json = json.dumps(payload, sort_keys=True)
             self._log_audit(
-                rec, "deps_resolved", success=True,
+                rec,
+                "deps_resolved",
+                success=True,
                 extra={"order_len": len(order), "missing": missing},
             )
         return True
@@ -217,9 +213,7 @@ class CustomHubModuleDeployment(models.Model):
                 try:
                     Backup._cron_sync_for(slug)
                 except Exception as sync_exc:  # noqa: BLE001
-                    _logger.debug(
-                        "[hub_deploy] backup sync skipped: %s", sync_exc
-                    )
+                    _logger.debug("[hub_deploy] backup sync skipped: %s", sync_exc)
                 snapshot = Backup.search(
                     [("tenant_slug", "=", slug)],
                     order="started_at desc, id desc",
@@ -228,16 +222,19 @@ class CustomHubModuleDeployment(models.Model):
                 if snapshot:
                     rec.rollback_snapshot_id = snapshot.id
                 self._log_audit(
-                    rec, "pre_backup", success=bool(snapshot),
+                    rec,
+                    "pre_backup",
+                    success=bool(snapshot),
                     extra={"snapshot_id": snapshot.id if snapshot else None},
                 )
             except Exception as exc:  # noqa: BLE001
                 _logger.warning("[hub_deploy] pre-backup failed: %s", exc)
-                rec.error_message = (
-                    f"Pre-deploy backup failed: {exc}"
-                )
+                rec.error_message = f"Pre-deploy backup failed: {exc}"
                 self._log_audit(
-                    rec, "pre_backup", success=False, error=str(exc),
+                    rec,
+                    "pre_backup",
+                    success=False,
+                    error=str(exc),
                 )
         return True
 
@@ -267,7 +264,9 @@ class CustomHubModuleDeployment(models.Model):
                 rec.started_at = fields.Datetime.now()
                 rec.state = "installing"
                 self._log_audit(
-                    rec, "deploy_canary", success=True,
+                    rec,
+                    "deploy_canary",
+                    success=True,
                     extra={"env": target_env.name if target_env else None},
                 )
             except Exception as exc:  # noqa: BLE001
@@ -275,7 +274,10 @@ class CustomHubModuleDeployment(models.Model):
                 rec.error_message = f"Canary deploy failed: {exc}"
                 rec.state = "failed"
                 self._log_audit(
-                    rec, "deploy_canary", success=False, error=str(exc),
+                    rec,
+                    "deploy_canary",
+                    success=False,
+                    error=str(exc),
                 )
         return True
 
@@ -302,13 +304,13 @@ class CustomHubModuleDeployment(models.Model):
                     if snap.snapshot_at and snap.snapshot_at >= threshold:
                         passed = True
             except KeyError:
-                _logger.info(
-                    "[hub_deploy] tenant.health model unavailable; skipping"
-                )
+                _logger.info("[hub_deploy] tenant.health model unavailable; skipping")
             rec.healthcheck_passed = passed
             rec.healthcheck_at = fields.Datetime.now()
             self._log_audit(
-                rec, "healthcheck", success=passed,
+                rec,
+                "healthcheck",
+                success=passed,
                 extra={"passed": passed},
             )
         return True
@@ -317,11 +319,11 @@ class CustomHubModuleDeployment(models.Model):
         """Promote canary to full rollout. Gated on ``healthcheck_passed``."""
         for rec in self:
             if not rec.healthcheck_passed:
-                rec.error_message = (
-                    "Cannot promote to full rollout: healthcheck did not pass."
-                )
+                rec.error_message = "Cannot promote to full rollout: healthcheck did not pass."
                 self._log_audit(
-                    rec, "rollout_full", success=False,
+                    rec,
+                    "rollout_full",
+                    success=False,
                     error="healthcheck_not_passed",
                 )
                 continue
@@ -335,10 +337,7 @@ class CustomHubModuleDeployment(models.Model):
                     body={"module": module, "phase": "full"},
                 )
                 rec.canary_phase = "full"
-                rec.state = (
-                    "uninstalled" if rec.deploy_mode == "uninstall"
-                    else "installed"
-                )
+                rec.state = "uninstalled" if rec.deploy_mode == "uninstall" else "installed"
                 rec.completed_at = fields.Datetime.now()
                 rec.error_message = False
                 self._log_audit(rec, "rollout_full", success=True)
@@ -347,7 +346,10 @@ class CustomHubModuleDeployment(models.Model):
                 rec.state = "failed"
                 rec.error_message = f"Full rollout failed: {exc}"
                 self._log_audit(
-                    rec, "rollout_full", success=False, error=str(exc),
+                    rec,
+                    "rollout_full",
+                    success=False,
+                    error=str(exc),
                 )
         return True
 
@@ -357,11 +359,11 @@ class CustomHubModuleDeployment(models.Model):
         for rec in self:
             snapshot = rec.rollback_snapshot_id
             if not snapshot or not snapshot.s3_key:
-                rec.error_message = (
-                    "Cannot rollback: no snapshot linked or snapshot has no s3_key."
-                )
+                rec.error_message = "Cannot rollback: no snapshot linked or snapshot has no s3_key."
                 self._log_audit(
-                    rec, "rollback", success=False,
+                    rec,
+                    "rollback",
+                    success=False,
                     error="no_snapshot",
                 )
                 continue
@@ -374,20 +376,21 @@ class CustomHubModuleDeployment(models.Model):
                 rec.canary_phase = "rolled_back"
                 rec.state = "failed"
                 rec.completed_at = fields.Datetime.now()
-                rec.error_message = (
-                    rec.error_message
-                    or "Rolled back to snapshot "
-                       f"{snapshot.id} ({snapshot.s3_key})."
-                )
+                rec.error_message = rec.error_message or f"Rolled back to snapshot {snapshot.id} ({snapshot.s3_key})."
                 self._log_audit(
-                    rec, "rollback", success=True,
+                    rec,
+                    "rollback",
+                    success=True,
                     extra={"snapshot_id": snapshot.id},
                 )
             except Exception as exc:  # noqa: BLE001
                 _logger.warning("[hub_deploy] rollback failed: %s", exc)
                 rec.error_message = f"Rollback failed: {exc}"
                 self._log_audit(
-                    rec, "rollback", success=False, error=str(exc),
+                    rec,
+                    "rollback",
+                    success=False,
+                    error=str(exc),
                 )
         return True
 

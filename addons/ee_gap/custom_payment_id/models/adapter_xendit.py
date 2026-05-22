@@ -63,17 +63,12 @@ class XenditAdapter(models.AbstractModel):
         payload = self._build_invoice_payload(provider, transaction)
         result = self.send(provider, payload, transaction=transaction)
         if not result["ok"]:
-            raise UserError(
-                _("Xendit invoice create failed (HTTP %s): %s")
-                % (result["http_status"], result["body"])
-            )
+            raise UserError(_("Xendit invoice create failed (HTTP %s): %s") % (result["http_status"], result["body"]))
         body = result["body"] if isinstance(result["body"], dict) else {}
         invoice_id = body.get("id")
         invoice_url = body.get("invoice_url")
         if not invoice_id or not invoice_url:
-            raise UserError(
-                _("Xendit invoice response missing id/invoice_url: %s") % body
-            )
+            raise UserError(_("Xendit invoice response missing id/invoice_url: %s") % body)
         return {"id": invoice_id, "invoice_url": invoice_url, "raw": body}
 
     def create_checkout(self, provider, transaction) -> dict:
@@ -90,9 +85,7 @@ class XenditAdapter(models.AbstractModel):
             "external_id": transaction.reference,
             "amount": int(round(transaction.amount)),
             "payer_email": partner.email or "",
-            "description": (
-                transaction.reference or _("Payment via Odoo")
-            ),
+            "description": (transaction.reference or _("Payment via Odoo")),
             "currency": (transaction.currency_id.name or "IDR"),
         }
 
@@ -115,10 +108,7 @@ class XenditAdapter(models.AbstractModel):
             endpoint_override=f"/payment_requests/{ref}/refunds",
         )
         if not result["ok"]:
-            raise UserError(
-                _("Xendit refund failed (HTTP %s): %s")
-                % (result["http_status"], result["body"])
-            )
+            raise UserError(_("Xendit refund failed (HTTP %s): %s") % (result["http_status"], result["body"]))
         return result["body"] if isinstance(result["body"], dict) else {"raw": result["body"]}
 
     # -------- Webhook verification --------

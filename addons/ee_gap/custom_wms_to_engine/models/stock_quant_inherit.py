@@ -25,10 +25,12 @@ class StockQuant(models.Model):
             # Stamp low-water mark rules so the cron knows to re-evaluate.
             try:
                 Rule = self.env["custom.to.rule"]
-                rules = Rule.sudo().search([
-                    ("active", "=", True),
-                    ("trigger", "=", "low_water_mark"),
-                ])
+                rules = Rule.sudo().search(
+                    [
+                        ("active", "=", True),
+                        ("trigger", "=", "low_water_mark"),
+                    ]
+                )
                 if rules:
                     rules.write({"last_run_at": fields.Datetime.now()})
             except Exception as exc:  # pragma: no cover - never break write

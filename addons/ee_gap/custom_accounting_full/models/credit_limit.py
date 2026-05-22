@@ -14,8 +14,8 @@ class ResPartnerCreditLimit(models.Model):
         string="Credit Limit (Custom)",
         currency_field="currency_id",
         help="Maximum outstanding receivable amount allowed. Mirrors and "
-             "supersedes the base account ``credit_limit`` for partners "
-             "subject to the custom credit check.",
+        "supersedes the base account ``credit_limit`` for partners "
+        "subject to the custom credit check.",
     )
     custom_credit_limit_check_method = fields.Selection(
         [
@@ -26,9 +26,9 @@ class ResPartnerCreditLimit(models.Model):
         default="warning",
         string="Credit Check Method",
         help="Behaviour when a sale.order exceeds the credit limit. "
-             "Defaults to 'warning'. Left nullable so partners created via "
-             "indirect chains (res.users -> hr.employee -> partner) don't "
-             "trip the NOT NULL constraint before the ORM default fires.",
+        "Defaults to 'warning'. Left nullable so partners created via "
+        "indirect chains (res.users -> hr.employee -> partner) don't "
+        "trip the NOT NULL constraint before the ORM default fires.",
     )
     custom_outstanding_amount = fields.Monetary(
         compute="_compute_custom_credit_metrics",
@@ -43,7 +43,9 @@ class ResPartnerCreditLimit(models.Model):
 
     # Spec-aligned aliases (related fields)
     credit_limit_check_method = fields.Selection(
-        related="custom_credit_limit_check_method", readonly=False, store=True,
+        related="custom_credit_limit_check_method",
+        readonly=False,
+        store=True,
         string="Credit Check Method (Spec)",
     )
     outstanding_amount = fields.Monetary(
@@ -61,21 +63,22 @@ class ResPartnerCreditLimit(models.Model):
     def _compute_custom_credit_metrics(self):
         Move = self.env["account.move"]
         for partner in self:
-            invoices = Move.search([
-                ("partner_id", "=", partner.id),
-                ("move_type", "in", ("out_invoice", "out_refund")),
-                ("state", "=", "posted"),
-                ("payment_state", "in", ("not_paid", "partial")),
-            ])
+            invoices = Move.search(
+                [
+                    ("partner_id", "=", partner.id),
+                    ("move_type", "in", ("out_invoice", "out_refund")),
+                    ("state", "=", "posted"),
+                    ("payment_state", "in", ("not_paid", "partial")),
+                ]
+            )
             outstanding = sum(invoices.mapped("amount_residual"))
             partner.custom_outstanding_amount = outstanding
             partner.custom_credit_available = max(
-                (partner.custom_credit_limit or 0.0) - outstanding, 0.0,
+                (partner.custom_credit_limit or 0.0) - outstanding,
+                0.0,
             )
             partner.outstanding_amount = outstanding
-            partner.available_credit = (
-                (partner.custom_credit_limit or 0.0) - outstanding
-            )
+            partner.available_credit = (partner.custom_credit_limit or 0.0) - outstanding
 
 
 class CreditCheckLog(models.Model):
@@ -116,7 +119,8 @@ class SaleOrderCreditCheck(models.Model):
     custom_credit_check_log_id = fields.Many2one(
         "custom.credit.check.log",
         string="Credit Check Log",
-        readonly=True, copy=False,
+        readonly=True,
+        copy=False,
     )
 
     def action_confirm(self):
@@ -164,14 +168,21 @@ class SaleOrderCreditCheck(models.Model):
         log = self.env["custom.credit.check.log"].sudo().create(log_vals)
         self.custom_credit_check_log_id = log.id
         if decision == "blocked":
-            raise UserError(_(
-                "Credit limit exceeded for %(p)s: outstanding %(o).2f + "
-                "this order %(t).2f would exceed limit %(l).2f.",
-                p=partner.display_name,
-                o=outstanding, t=order_total, l=limit,
-            ))
+            raise UserError(
+                _(
+                    "Credit limit exceeded for %(p)s: outstanding %(o).2f + "
+                    "this order %(t).2f would exceed limit %(l).2f.",
+                    p=partner.display_name,
+                    o=outstanding,
+                    t=order_total,
+                    l=limit,
+                )
+            )
         if decision == "warn":
-            self.message_post(body=_(
-                "Credit warning: projected total %(pj).2f exceeds limit "
-                "%(l).2f.", pj=projected, l=limit,
-            ))
+            self.message_post(
+                body=_(
+                    "Credit warning: projected total %(pj).2f exceeds limit %(l).2f.",
+                    pj=projected,
+                    l=limit,
+                )
+            )

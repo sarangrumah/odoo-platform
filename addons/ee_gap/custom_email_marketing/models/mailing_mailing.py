@@ -12,10 +12,7 @@ class MailingMailing(models.Model):
     x_consent_purpose_id = fields.Many2one(
         "pdp.consent.purpose",
         string="Required Consent Purpose",
-        help=(
-            "If set, only recipients with an active pdp.consent record under "
-            "this purpose will receive the mailing."
-        ),
+        help=("If set, only recipients with an active pdp.consent record under this purpose will receive the mailing."),
     )
     x_gallery_template_id = fields.Many2one(
         "custom.email.template.gallery",
@@ -59,29 +56,30 @@ class MailingMailing(models.Model):
                 unsubscribe_url = self._get_unsubscribe_url(email_to, res_id)
             except Exception as exc:  # pragma: no cover — defensive
                 _logger.warning(
-                    "[custom_email_marketing] mailing %s: failed to build "
-                    "unsubscribe URL for %s/%s: %s",
-                    self.id, res_id, email_to, exc,
+                    "[custom_email_marketing] mailing %s: failed to build unsubscribe URL for %s/%s: %s",
+                    self.id,
+                    res_id,
+                    email_to,
+                    exc,
                 )
         unsubscribe_html = (
-            '<p>Untuk berhenti berlangganan, klik tautan berikut: '
+            "<p>Untuk berhenti berlangganan, klik tautan berikut: "
             '<a href="%s">%s</a>.</p>' % (unsubscribe_url, _("Berhenti Berlangganan"))
             if unsubscribe_url
-            else '<p>Untuk berhenti berlangganan, gunakan tautan unsubscribe '
-                 'di email ini.</p>'
+            else "<p>Untuk berhenti berlangganan, gunakan tautan unsubscribe di email ini.</p>"
         )
         return (
-            '<hr/>'
+            "<hr/>"
             '<div style="font-size:11px;color:#666;">'
-            '<p><strong>Pemberitahuan UU PDP:</strong> '
-            'Anda menerima email ini karena memberikan persetujuan kepada '
-            'pengendali data <strong>%(controller)s</strong>. '
-            'Anda berhak menarik persetujuan kapan saja.'
-            '</p>'
-            '%(unsub)s'
-            '<p>Pertanyaan terkait data pribadi: hubungi Data Protection '
+            "<p><strong>Pemberitahuan UU PDP:</strong> "
+            "Anda menerima email ini karena memberikan persetujuan kepada "
+            "pengendali data <strong>%(controller)s</strong>. "
+            "Anda berhak menarik persetujuan kapan saja."
+            "</p>"
+            "%(unsub)s"
+            "<p>Pertanyaan terkait data pribadi: hubungi Data Protection "
             'Officer di <a href="mailto:%(dpo)s">%(dpo)s</a>.</p>'
-            '</div>'
+            "</div>"
         ) % {
             "controller": controller_name,
             "dpo": dpo_email,
@@ -112,8 +110,9 @@ class MailingMailing(models.Model):
             records = self.env[model].sudo().browse(list(res_ids)).exists()
         except KeyError:
             _logger.warning(
-                "[custom_email_marketing] mailing %s: unknown model %s, "
-                "skipping consent filter", self.id, model,
+                "[custom_email_marketing] mailing %s: unknown model %s, skipping consent filter",
+                self.id,
+                model,
             )
             return list(res_ids), 0
         for rec in records:
@@ -142,10 +141,11 @@ class MailingMailing(models.Model):
                 kept, filtered = mailing._filter_recipients_by_consent(source_ids)
                 mailing.sudo().write({"x_consent_filtered_count": filtered})
                 _logger.info(
-                    "[custom_email_marketing] mailing %s: PDP consent filter "
-                    "purpose=%s kept=%d filtered=%d",
-                    mailing.id, mailing.x_consent_purpose_id.code,
-                    len(kept), filtered,
+                    "[custom_email_marketing] mailing %s: PDP consent filter purpose=%s kept=%d filtered=%d",
+                    mailing.id,
+                    mailing.x_consent_purpose_id.code,
+                    len(kept),
+                    filtered,
                 )
                 effective_res_ids = kept
                 if not effective_res_ids:
@@ -162,9 +162,11 @@ class MailingMailing(models.Model):
                     footer = mailing._get_pdp_footer_html()
                     mailing.body_html = (original_body or "") + footer
                 if mailing.x_gallery_template_id:
-                    mailing.x_gallery_template_id.sudo().write({
-                        "times_used": mailing.x_gallery_template_id.times_used + 1,
-                    })
+                    mailing.x_gallery_template_id.sudo().write(
+                        {
+                            "times_used": mailing.x_gallery_template_id.times_used + 1,
+                        }
+                    )
                 super(MailingMailing, mailing)._action_send_mail(
                     res_ids=effective_res_ids,
                 )

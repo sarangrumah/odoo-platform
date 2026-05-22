@@ -7,6 +7,7 @@ Scope: addons/ (excluding _vendor).  Vendor / stock Odoo / Enterprise modules
 are treated as "external" — if a model isn't defined in any scanned module,
 we assume it comes from stock Odoo and skip it (we can't validate those here).
 """
+
 from __future__ import annotations
 
 import ast
@@ -128,9 +129,11 @@ def transitive_deps(mod: str) -> set[str]:
 
 def main() -> int:
     find_modules()
-    print(f"Scanned {len(module_path)} custom modules; "
-          f"{sum(len(v) for v in inherits.values())} _inherit references; "
-          f"{len(defined_by)} unique models defined.\n")
+    print(
+        f"Scanned {len(module_path)} custom modules; "
+        f"{sum(len(v) for v in inherits.values())} _inherit references; "
+        f"{len(defined_by)} unique models defined.\n"
+    )
 
     problems: list[tuple[str, str, str, str, int]] = []
     same_module_ok = 0
@@ -154,9 +157,11 @@ def main() -> int:
             problems.append((mod, model, target, fpath, line))
 
     if not problems:
-        print("OK — no missing depends detected. "
-              f"({same_module_ok} same-module inherits, "
-              f"{external_skipped} external/stock inherits skipped.)")
+        print(
+            "OK — no missing depends detected. "
+            f"({same_module_ok} same-module inherits, "
+            f"{external_skipped} external/stock inherits skipped.)"
+        )
         return 0
 
     print(f"FOUND {len(problems)} missing-dependency issue(s):\n")

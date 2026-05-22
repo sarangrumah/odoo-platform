@@ -16,7 +16,8 @@ class FiscalYear(models.Model):
     name = fields.Char(required=True, tracking=True)
     code = fields.Char()
     company_id = fields.Many2one(
-        "res.company", required=True,
+        "res.company",
+        required=True,
         default=lambda self: self.env.company,
     )
     date_from = fields.Date(required=True)
@@ -27,44 +28,57 @@ class FiscalYear(models.Model):
             ("open", "Open"),
             ("closed", "Closed"),
         ],
-        default="draft", copy=False, tracking=True,
+        default="draft",
+        copy=False,
+        tracking=True,
     )
     move_count = fields.Integer(
-        compute="_compute_move_count", string="# Posted Moves",
+        compute="_compute_move_count",
+        string="# Posted Moves",
     )
 
     @api.depends("date_from", "date_to", "company_id")
     def _compute_move_count(self):
         Move = self.env["account.move"]
         for fy in self:
-            fy.move_count = Move.search_count([
-                ("company_id", "=", fy.company_id.id),
-                ("date", ">=", fy.date_from),
-                ("date", "<=", fy.date_to),
-                ("state", "=", "posted"),
-            ])
+            fy.move_count = Move.search_count(
+                [
+                    ("company_id", "=", fy.company_id.id),
+                    ("date", ">=", fy.date_from),
+                    ("date", "<=", fy.date_to),
+                    ("state", "=", "posted"),
+                ]
+            )
 
     @api.constrains("date_from", "date_to", "company_id")
     def _check_dates_and_overlap(self):
         for fy in self:
             if fy.date_from > fy.date_to:
-                raise ValidationError(_(
-                    "Fiscal year '%(name)s': start date must be before end date.",
-                    name=fy.name,
-                ))
-            overlap = self.search([
-                ("id", "!=", fy.id),
-                ("company_id", "=", fy.company_id.id),
-                ("date_from", "<=", fy.date_to),
-                ("date_to", ">=", fy.date_from),
-            ], limit=1)
+                raise ValidationError(
+                    _(
+                        "Fiscal year '%(name)s': start date must be before end date.",
+                        name=fy.name,
+                    )
+                )
+            overlap = self.search(
+                [
+                    ("id", "!=", fy.id),
+                    ("company_id", "=", fy.company_id.id),
+                    ("date_from", "<=", fy.date_to),
+                    ("date_to", ">=", fy.date_from),
+                ],
+                limit=1,
+            )
             if overlap:
-                raise ValidationError(_(
-                    "Fiscal year '%(name)s' overlaps with '%(other)s' "
-                    "(%(d1)s — %(d2)s).",
-                    name=fy.name, other=overlap.name,
-                    d1=overlap.date_from, d2=overlap.date_to,
-                ))
+                raise ValidationError(
+                    _(
+                        "Fiscal year '%(name)s' overlaps with '%(other)s' (%(d1)s — %(d2)s).",
+                        name=fy.name,
+                        other=overlap.name,
+                        d1=overlap.date_from,
+                        d2=overlap.date_to,
+                    )
+                )
 
     def action_open(self):
         self.write({"state": "open"})
@@ -72,9 +86,7 @@ class FiscalYear(models.Model):
     def action_reset_draft(self):
         for fy in self:
             if fy.state == "closed":
-                raise ValidationError(_(
-                    "Cannot reset a closed fiscal year to draft."
-                ))
+                raise ValidationError(_("Cannot reset a closed fiscal year to draft."))
             fy.state = "draft"
 
     def action_open_close_wizard(self):

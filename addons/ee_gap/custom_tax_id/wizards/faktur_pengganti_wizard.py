@@ -31,8 +31,7 @@ class FakturPenggantiWizard(models.TransientModel):
     source_move_id = fields.Many2one(
         "account.move",
         required=True,
-        domain="[('move_type','in',('out_invoice','out_refund')),"
-               "('state','=','posted')]",
+        domain="[('move_type','in',('out_invoice','out_refund')),('state','=','posted')]",
     )
     reason = fields.Text(
         required=True,
@@ -89,10 +88,13 @@ class FakturPenggantiWizard(models.TransientModel):
             raise UserError(_("Source move is required."))
         current_kode = self._extract_kode_status(src) or 0
         if current_kode >= 9:
-            raise UserError(_(
-                "Source Faktur already at kode_status %s. DJP limit is 09 — "
-                "cancel and issue a new Faktur instead of pengganti."
-            ) % f"{current_kode:02d}")
+            raise UserError(
+                _(
+                    "Source Faktur already at kode_status %s. DJP limit is 09 — "
+                    "cancel and issue a new Faktur instead of pengganti."
+                )
+                % f"{current_kode:02d}"
+            )
 
         # Copy with new context
         new_vals = {
@@ -109,9 +111,11 @@ class FakturPenggantiWizard(models.TransientModel):
             copy.invoice_line_ids.unlink()
 
         # Mark source as replaced
-        src.write({
-            "x_custom_coretax_replaced_by_id": copy.id,
-        })
+        src.write(
+            {
+                "x_custom_coretax_replaced_by_id": copy.id,
+            }
+        )
         # Best-effort: clear source NSFP since DJP voids it on pengganti approval
         if hasattr(src, "x_custom_nsfp"):
             src.write({"x_custom_nsfp": False})
@@ -121,7 +125,8 @@ class FakturPenggantiWizard(models.TransientModel):
         # Audit (action constrained to pdp.audit_log allowed values + varchar(16))
         try:
             src._pdp_audit_write(
-                "custom", src.id,
+                "custom",
+                src.id,
                 {
                     "kind": "faktur_pengganti_issued",
                     "new_move_id": copy.id,
@@ -142,6 +147,7 @@ class FakturPenggantiWizard(models.TransientModel):
 
 class AccountMoveReplacementLink(models.Model):
     """Fields added to ``account.move`` so the wizard can link pengganti chain."""
+
     _inherit = "account.move"
 
     x_custom_coretax_replacement_of_id = fields.Many2one(

@@ -26,18 +26,18 @@ def _parse_weight_kg(raw):
     # The caller passes the (value, n_decimals) tuple already split.
     value, n = raw
     try:
-        return float(value) / (10 ** n)
+        return float(value) / (10**n)
     except (ValueError, TypeError):
         return None
 
 
 _GS1_AI = {
     "01": ("gtin", 14, str),
-    "10": ("lot", None, str),       # variable-length, FNC1 terminated
+    "10": ("lot", None, str),  # variable-length, FNC1 terminated
     "17": ("exp_date", 6, _parse_date_yyMMdd),
     "11": ("prod_date", 6, _parse_date_yyMMdd),
-    "21": ("serial", None, str),    # variable
-    "30": ("count", None, str),     # variable
+    "21": ("serial", None, str),  # variable
+    "30": ("count", None, str),  # variable
 }
 # AIs 310n / 320n: net weight (kg / lb) with n decimals.  GS1 codes these as a
 # 4-character AI where the 4th digit is the implied-decimal indicator n, e.g.
@@ -96,10 +96,7 @@ class CustomBarcodeScanSession(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals.get("name") == "New":
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code("custom.barcode.scan.session")
-                    or _("Scan Session")
-                )
+                vals["name"] = self.env["ir.sequence"].next_by_code("custom.barcode.scan.session") or _("Scan Session")
         return super().create(vals_list)
 
     # ---------- computes ----------
@@ -222,9 +219,7 @@ class CustomBarcodeScanSession(models.Model):
 
         # GS1 path first.
         if gs1.get("gtin"):
-            product = self.env["product.product"].search(
-                [("barcode", "=", gs1["gtin"])], limit=1
-            )
+            product = self.env["product.product"].search([("barcode", "=", gs1["gtin"])], limit=1)
         if gs1.get("lot") and product:
             lot = self.env["stock.lot"].search(
                 [("name", "=", gs1["lot"]), ("product_id", "=", product.id)],
@@ -233,13 +228,9 @@ class CustomBarcodeScanSession(models.Model):
 
         # Plain lookup fallback.
         if not product:
-            product = self.env["product.product"].search(
-                [("barcode", "=", barcode)], limit=1
-            )
+            product = self.env["product.product"].search([("barcode", "=", barcode)], limit=1)
         if not lot:
-            lot = self.env["stock.lot"].search(
-                [("name", "=", barcode)], limit=1
-            )
+            lot = self.env["stock.lot"].search([("name", "=", barcode)], limit=1)
         if not product and lot:
             product = lot.product_id
 
@@ -247,8 +238,7 @@ class CustomBarcodeScanSession(models.Model):
             status = "not_found"
 
         if product and self.line_ids.filtered(
-            lambda l: l.product_id.id == product.id
-            and l.lot_id.id == (lot.id if lot else False)
+            lambda l: l.product_id.id == product.id and l.lot_id.id == (lot.id if lot else False)
         ):
             status = "duplicate"
 
@@ -339,9 +329,7 @@ class CustomBarcodeScanSession(models.Model):
 
                 if not ml:
                     # Create a new move.line on the first move for that product.
-                    move = picking.move_ids.filtered(
-                        lambda m: m.product_id.id == line.product_id.id
-                    )[:1]
+                    move = picking.move_ids.filtered(lambda m: m.product_id.id == line.product_id.id)[:1]
                     if not move:
                         # No demand on the picking for this product — skip.
                         continue

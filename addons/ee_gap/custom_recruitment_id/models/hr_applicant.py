@@ -40,7 +40,8 @@ def _compute_dedup_hash(email, phone):
     if not e and not p:
         return False
     raw = ("%s|%s" % (e, p)).encode("utf-8")
-    return hashlib.sha1(raw).hexdigest()
+    # Hash used as a dedup/lookup key, not security — bandit B324
+    return hashlib.sha1(raw, usedforsecurity=False).hexdigest()
 
 
 class HrApplicant(models.Model):
@@ -171,15 +172,15 @@ class HrApplicant(models.Model):
             limit=1,
         )
         if existing:
-            self.sudo().write({
-                "x_duplicate_of": existing.id,
-                "x_is_duplicate": True,
-            })
+            self.sudo().write(
+                {
+                    "x_duplicate_of": existing.id,
+                    "x_is_duplicate": True,
+                }
+            )
             self.message_post(
-                body=_(
-                    "Flagged as duplicate of applicant <b>%s</b> (#%d) "
-                    "based on email + phone match."
-                ) % (existing.partner_name or "?", existing.id),
+                body=_("Flagged as duplicate of applicant <b>%s</b> (#%d) based on email + phone match.")
+                % (existing.partner_name or "?", existing.id),
             )
             return True
         return False
@@ -211,9 +212,8 @@ class HrApplicant(models.Model):
             "default_name": name,
             "default_partner_ids": [(6, 0, list(set(partner_ids)))],
             "default_user_id": (interviewers and interviewers[0].id) or self.env.user.id,
-            "default_description": _(
-                "Interview for applicant %s\nJob: %s\nSource: %s"
-            ) % (
+            "default_description": _("Interview for applicant %s\nJob: %s\nSource: %s")
+            % (
                 self.partner_name or "?",
                 (job and job.name) or "—",
                 self.x_job_board_source or "manual",
@@ -233,9 +233,7 @@ class HrApplicant(models.Model):
     # ---------- Offer letter print ----------
     def action_print_offer_letter(self):
         self.ensure_one()
-        return self.env.ref(
-            "custom_recruitment_id.action_report_offer_letter"
-        ).report_action(self)
+        return self.env.ref("custom_recruitment_id.action_report_offer_letter").report_action(self)
 
     # ---------- PDP-aware anonymization cron ----------
     @api.model
@@ -260,19 +258,19 @@ class HrApplicant(models.Model):
         for applicant in expired:
             redacted_name = "REDACTED-%d" % applicant.id
             redacted_email = "redacted-%d@example.invalid" % applicant.id
-            applicant.write({
-                "partner_name": redacted_name,
-                "email_from": redacted_email,
-                "partner_phone": False,
-                "x_external_id": False,
-                "x_pdp_consent_given": False,
-                "x_dedup_hash": False,
-            })
+            applicant.write(
+                {
+                    "partner_name": redacted_name,
+                    "email_from": redacted_email,
+                    "partner_phone": False,
+                    "x_external_id": False,
+                    "x_pdp_consent_given": False,
+                    "x_dedup_hash": False,
+                }
+            )
             applicant.message_post(
-                body=_(
-                    "PDP retention horizon (%s) reached. PII fields anonymized "
-                    "per UU PDP. Stage history preserved."
-                ) % applicant.x_pdp_retention_until,
+                body=_("PDP retention horizon (%s) reached. PII fields anonymized per UU PDP. Stage history preserved.")
+                % applicant.x_pdp_retention_until,
                 subject=_("PDP Auto-Purge"),
             )
             # Audit trail via pdp.audit_log (raw insert — see custom_pdp_audit mixin).
@@ -293,22 +291,23 @@ class HrApplicant(models.Model):
                         "hr.applicant",
                         applicant.id,
                         "write",
-                        json.dumps({
-                            "partner_name": "REDACTED",
-                            "email_from": "REDACTED",
-                            "partner_phone": "REDACTED",
-                            "x_external_id": "REDACTED",
-                        }),
+                        json.dumps(
+                            {
+                                "partner_name": "REDACTED",
+                                "email_from": "REDACTED",
+                                "partner_phone": "REDACTED",
+                                "x_external_id": "REDACTED",
+                            }
+                        ),
                         "pii",
                         "PDP retention horizon reached — auto-anonymize",
                     ),
                 )
             except Exception as exc:  # pragma: no cover
                 _logger.warning(
-                    "custom_recruitment_id: pdp.audit_log insert failed for "
-                    "applicant %s: %s", applicant.id, exc,
+                    "custom_recruitment_id: pdp.audit_log insert failed for applicant %s: %s",
+                    applicant.id,
+                    exc,
                 )
-        _logger.info(
-            "custom_recruitment_id: anonymized %d expired applicants", len(expired)
-        )
+        _logger.info("custom_recruitment_id: anonymized %d expired applicants", len(expired))
         return len(expired)

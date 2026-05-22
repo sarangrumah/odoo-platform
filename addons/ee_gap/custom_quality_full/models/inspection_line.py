@@ -6,22 +6,30 @@ class CustomQualityInspectionLine(models.Model):
     """A single question / measurement attached to a quality.check, allowing
     multi-line inspection checklists with min/max ranges or accepted-value
     sets."""
+
     _name = "custom.quality.inspection.line"
     _description = "Quality Inspection Line"
     _order = "check_id, sequence, id"
 
     check_id = fields.Many2one(
-        "quality.check", required=True, ondelete="cascade", index=True,
+        "quality.check",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     sequence = fields.Integer(default=10)
     question = fields.Char(required=True)
-    response_type = fields.Selection([
-        ("text", "Free Text"),
-        ("number", "Numeric"),
-        ("boolean", "Yes / No"),
-        ("photo", "Photo"),
-        ("select", "Selection"),
-    ], default="boolean", required=True)
+    response_type = fields.Selection(
+        [
+            ("text", "Free Text"),
+            ("number", "Numeric"),
+            ("boolean", "Yes / No"),
+            ("photo", "Photo"),
+            ("select", "Selection"),
+        ],
+        default="boolean",
+        required=True,
+    )
     is_required = fields.Boolean(default=True)
     expected_min = fields.Float()
     expected_max = fields.Float()
@@ -32,15 +40,20 @@ class CustomQualityInspectionLine(models.Model):
     actual_value = fields.Char()
     actual_photo = fields.Binary(attachment=True)
     actual_photo_filename = fields.Char()
-    pass_fail = fields.Selection([
-        ("pass", "Pass"),
-        ("fail", "Fail"),
-        ("na", "N/A"),
-    ], compute="_compute_pass_fail", store=True)
+    pass_fail = fields.Selection(
+        [
+            ("pass", "Pass"),
+            ("fail", "Fail"),
+            ("na", "N/A"),
+        ],
+        compute="_compute_pass_fail",
+        store=True,
+    )
     note = fields.Char()
 
-    @api.depends("response_type", "actual_value", "actual_photo",
-                 "expected_min", "expected_max", "expected_set", "is_required")
+    @api.depends(
+        "response_type", "actual_value", "actual_photo", "expected_min", "expected_max", "expected_set", "is_required"
+    )
     def _compute_pass_fail(self):
         for line in self:
             if not line.is_required and not line.actual_value and not line.actual_photo:

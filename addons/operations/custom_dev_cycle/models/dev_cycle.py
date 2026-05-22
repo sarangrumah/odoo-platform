@@ -103,9 +103,7 @@ class DevCycle(models.Model):
     completed_at = fields.Datetime(readonly=True)
 
     pr_ids = fields.One2many("dev.cycle.pr", "cycle_id", string="Pull Requests")
-    deployment_ids = fields.One2many(
-        "dev.cycle.deployment", "cycle_id", string="Deployments"
-    )
+    deployment_ids = fields.One2many("dev.cycle.deployment", "cycle_id", string="Deployments")
     pr_count = fields.Integer(compute="_compute_pr_count")
     deployment_count = fields.Integer(compute="_compute_deployment_count")
 
@@ -168,10 +166,7 @@ class DevCycle(models.Model):
             if new_state == "done" and not rec.completed_at:
                 vals["completed_at"] = fields.Datetime.now()
             rec.write(vals)
-            rec.message_post(
-                body=_("State transitioned: %(old)s → %(new)s")
-                % {"old": rec.state, "new": new_state}
-            )
+            rec.message_post(body=_("State transitioned: %(old)s → %(new)s") % {"old": rec.state, "new": new_state})
         return True
 
     def action_start(self):

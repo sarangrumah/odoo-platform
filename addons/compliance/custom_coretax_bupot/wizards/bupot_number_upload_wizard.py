@@ -45,9 +45,7 @@ class CustomBupotNumberUploadWizard(models.TransientModel):
         raw = base64.b64decode(self.csv_file).decode("utf-8-sig", errors="replace")
         reader = csv.DictReader(io.StringIO(raw))
         if not reader.fieldnames or "internal_ref" not in reader.fieldnames or "bupot_number" not in reader.fieldnames:
-            raise UserError(
-                _("CSV must contain headers: internal_ref, bupot_number")
-            )
+            raise UserError(_("CSV must contain headers: internal_ref, bupot_number"))
         Line = self.env["custom.bupot.unifikasi.line"]
         matched, missing, ambiguous = 0, [], []
         for row in reader:
@@ -55,9 +53,7 @@ class CustomBupotNumberUploadWizard(models.TransientModel):
             num = (row.get("bupot_number") or "").strip()
             if not ref or not num:
                 continue
-            lines = Line.search(
-                [("bupot_id", "=", self.bupot_id.id), ("internal_ref", "=", ref)]
-            )
+            lines = Line.search([("bupot_id", "=", self.bupot_id.id), ("internal_ref", "=", ref)])
             if not lines:
                 missing.append(ref)
                 continue

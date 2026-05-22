@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-import ast
 import json
 import logging
 from typing import Any
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -23,8 +22,17 @@ ALLOWED_SCHEMA: list[dict[str, Any]] = [
     },
     {
         "model": "account.move",
-        "fields": ["id", "name", "partner_id", "move_type", "state", "invoice_date",
-                   "amount_total", "amount_residual", "currency_id"],
+        "fields": [
+            "id",
+            "name",
+            "partner_id",
+            "move_type",
+            "state",
+            "invoice_date",
+            "amount_total",
+            "amount_residual",
+            "currency_id",
+        ],
         "description": "Invoices, vendor bills (in_invoice/out_invoice).",
     },
     {
@@ -39,8 +47,17 @@ ALLOWED_SCHEMA: list[dict[str, Any]] = [
     },
     {
         "model": "hr.payslip",
-        "fields": ["id", "name", "employee_id", "period_year", "period_month",
-                   "gross_salary", "pph21", "take_home_pay", "state"],
+        "fields": [
+            "id",
+            "name",
+            "employee_id",
+            "period_year",
+            "period_month",
+            "gross_salary",
+            "pph21",
+            "take_home_pay",
+            "state",
+        ],
         "description": "Indonesian payslips (PPh 21).",
     },
     {
@@ -75,7 +92,9 @@ class AiNlqSession(models.Model):
     @api.model
     def open_or_create_for_user(self):
         rec = self.sudo().search(
-            [("user_id", "=", self.env.user.id)], order="create_date desc", limit=1,
+            [("user_id", "=", self.env.user.id)],
+            order="create_date desc",
+            limit=1,
         )
         if not rec:
             rec = self.sudo().create({"name": f"NLQ {self.env.user.login}"})
@@ -93,11 +112,13 @@ class AiNlqSession(models.Model):
             return ALLOWED_SCHEMA
         masked = []
         for s in ALLOWED_SCHEMA:
-            masked.append({
-                "model": s["model"],
-                "fields": [f for f in s["fields"] if f not in PII_FIELDS],
-                "description": s.get("description"),
-            })
+            masked.append(
+                {
+                    "model": s["model"],
+                    "fields": [f for f in s["fields"] if f not in PII_FIELDS],
+                    "description": s.get("description"),
+                }
+            )
         return masked
 
     def ask(self, question: str) -> "models.Model":
@@ -107,47 +128,54 @@ class AiNlqSession(models.Model):
         Message = self.env["ai.nlq.message"].sudo()
 
         # Persist the user message
-        Message.create({
-            "session_id": self.id,
-            "role": "user",
-            "content": question,
-        })
+        Message.create(
+            {
+                "session_id": self.id,
+                "role": "user",
+                "content": question,
+            }
+        )
 
         try:
             plan = AI._nlq(
                 question=question,
                 schema_hint=self._allowed_schema_for_user(),
                 locale=self.env.user.lang or "id_ID",
-                user_can_view_pii=self.env.user.has_group(
-                    "custom_pdp_masking.group_view_pii"
-                ),
+                user_can_view_pii=self.env.user.has_group("custom_pdp_masking.group_view_pii"),
             )
         except Exception as e:
-            return Message.create({
-                "session_id": self.id,
-                "role": "assistant",
-                "content": f"AI error: {e}",
-                "is_error": True,
-            })
+            return Message.create(
+                {
+                    "session_id": self.id,
+                    "role": "assistant",
+                    "content": f"AI error: {e}",
+                    "is_error": True,
+                }
+            )
 
         if plan.get("error"):
-            return Message.create({
-                "session_id": self.id,
-                "role": "assistant",
-                "content": f"⚠ {plan.get('rationale') or plan['error']}",
-                "is_error": True,
-            })
+            return Message.create(
+                {
+                    "session_id": self.id,
+                    "role": "assistant",
+                    "content": f"⚠ {plan.get('rationale') or plan['error']}",
+                    "is_error": True,
+                }
+            )
 
         result_rows = self._execute_plan(plan)
-        msg = Message.create({
-            "session_id": self.id,
-            "role": "assistant",
-            "content": plan.get("rationale", ""),
-            "plan_json": json.dumps(plan, ensure_ascii=False),
-            "result_json": json.dumps(result_rows, ensure_ascii=False, default=str),
-        })
+        msg = Message.create(
+            {
+                "session_id": self.id,
+                "role": "assistant",
+                "content": plan.get("rationale", ""),
+                "plan_json": json.dumps(plan, ensure_ascii=False),
+                "result_json": json.dumps(result_rows, ensure_ascii=False, default=str),
+            }
+        )
         self._pdp_audit_write(
-            "nlq_question_answered", self.id,
+            "nlq_question_answered",
+            self.id,
             {"model": plan.get("model"), "row_count": len(result_rows)},
         )
         return msg

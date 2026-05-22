@@ -38,9 +38,7 @@ class OnboardingGoNoGoWizard(models.TransientModel):
         self.ensure_one()
         journey = self.journey_id
         if self.decision == "no_go":
-            journey.with_context(
-                _transition_notes=self.rejection_reason or "No-Go"
-            ).write({"stage": "rejected"})
+            journey.with_context(_transition_notes=self.rejection_reason or "No-Go").write({"stage": "rejected"})
             return {"type": "ir.actions.act_window_close"}
 
         # Go path: create approval.request, link, advance stage.
@@ -66,9 +64,7 @@ class OnboardingGoNoGoWizard(models.TransientModel):
                 _logger.info(
                     "go-no-go: no approval matrix for onboarding.journey; skipping",
                 )
-        journey.with_context(_transition_notes="Go decision").write(
-            {"stage": "go_no_go"}
-        )
+        journey.with_context(_transition_notes="Go decision").write({"stage": "go_no_go"})
         return {
             "type": "ir.actions.act_window",
             "res_model": "onboarding.journey",

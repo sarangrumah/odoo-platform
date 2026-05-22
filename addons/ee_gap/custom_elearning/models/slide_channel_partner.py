@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
-from odoo import _, fields, models
+from odoo import fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -26,8 +26,7 @@ class SlideChannelPartner(models.Model):
         string="Certificate Report",
         compute="_compute_report_certificate_id",
         store=False,
-        help="Convenience pointer to the qweb-pdf report used for this "
-             "channel's certificate.",
+        help="Convenience pointer to the qweb-pdf report used for this channel's certificate.",
     )
 
     def _compute_report_certificate_id(self):
@@ -36,10 +35,7 @@ class SlideChannelPartner(models.Model):
             raise_if_not_found=False,
         )
         for rec in self:
-            rec.report_certificate_id = (
-                rec.channel_id.x_certificate_template_id
-                or default_report
-            )
+            rec.report_certificate_id = rec.channel_id.x_certificate_template_id or default_report
 
     # ---------------- Hooks ----------------
 
@@ -77,8 +73,7 @@ class SlideChannelPartner(models.Model):
                 rec._assign_hr_skill(code)
             except Exception as exc:  # pragma: no cover - defensive
                 _logger.warning(
-                    "custom_elearning: skill assignment failed for "
-                    "partner=%s channel=%s code=%s: %s",
+                    "custom_elearning: skill assignment failed for partner=%s channel=%s code=%s: %s",
                     rec.partner_id.id,
                     channel.id,
                     code,
@@ -100,13 +95,9 @@ class SlideChannelPartner(models.Model):
         skill = Skill.search([("name", "=", code)], limit=1)
         if not skill:
             return False
-        employees = Employee.search(
-            [("work_contact_id", "=", self.partner_id.id)]
-        )
+        employees = Employee.search([("work_contact_id", "=", self.partner_id.id)])
         if not employees:
-            employees = Employee.search(
-                [("user_id.partner_id", "=", self.partner_id.id)]
-            )
+            employees = Employee.search([("user_id.partner_id", "=", self.partner_id.id)])
         if not employees:
             return False
         # If hr.employee.skill exists, create the relation row.

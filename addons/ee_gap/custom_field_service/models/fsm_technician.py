@@ -14,7 +14,8 @@ class FSMTechnician(models.Model):
     skill_ids = fields.Many2many(
         "fsm.skill",
         "fsm_technician_skill_rel",
-        "technician_id", "skill_id",
+        "technician_id",
+        "skill_id",
         string="Skills",
     )
     active = fields.Boolean(default=True)
@@ -25,7 +26,9 @@ class FSMTechnician(models.Model):
     def _compute_open_wo_count(self):
         WO = self.env["fsm.work.order"].sudo()
         for rec in self:
-            rec.open_wo_count = WO.search_count([
-                ("technician_id", "=", rec.id),
-                ("state", "in", ("scheduled", "in_progress", "on_hold")),
-            ])
+            rec.open_wo_count = WO.search_count(
+                [
+                    ("technician_id", "=", rec.id),
+                    ("state", "in", ("scheduled", "in_progress", "on_hold")),
+                ]
+            )

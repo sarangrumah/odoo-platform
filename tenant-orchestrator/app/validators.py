@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -34,7 +34,7 @@ class _VPSBase(BaseModel):
 
     vps_id: int = Field(ge=1)
     hostname: str = Field(min_length=1, max_length=255)
-    public_ip: Optional[str] = None
+    public_ip: str | None = None
     ssh_user: str = Field(default="root", min_length=1, max_length=64)
     ssh_port: int = Field(default=22, ge=1, le=65535)
     ssh_credential_ref: str = Field(
@@ -50,7 +50,7 @@ class VPSRegisterRequest(_VPSBase):
 class BootstrapRequest(_VPSBase):
     """POST /v1/vps/{id}/bootstrap — runs harden_os + install_docker + install_caddy."""
 
-    tenant_slug: Optional[str] = None
+    tenant_slug: str | None = None
 
 
 class DeployStackRequest(_VPSBase):
@@ -59,8 +59,8 @@ class DeployStackRequest(_VPSBase):
     env_type: Literal["dev", "staging", "prod"] = "dev"
     tenant_slug: str = Field(min_length=2, max_length=63, pattern=SLUG_RE.pattern)
     db_name: str = Field(min_length=2, max_length=63, pattern=SLUG_RE.pattern)
-    pg_password: Optional[str] = None
-    workers: Optional[int] = Field(default=2, ge=1, le=32)
+    pg_password: str | None = None
+    workers: int | None = Field(default=2, ge=1, le=32)
 
 
 class SyncAddonsRequest(_VPSBase):
@@ -81,7 +81,7 @@ class ReplicateRequest(BaseModel):
 
     target_tenant_slug: str = Field(min_length=2, max_length=63, pattern=SLUG_RE.pattern)
     target_env: Literal["prod", "staging", "dev"] = "staging"
-    target_db: Optional[str] = Field(
+    target_db: str | None = Field(
         default=None,
         description="Override target DB name. Defaults to '<slug>_<env>'.",
     )
@@ -110,13 +110,13 @@ class IntakeSubmitRequest(BaseModel):
     vertical_target: str = Field(min_length=2, max_length=40)
     modules_wishlist: list[str] = Field(default_factory=list, max_length=50)
     business_process_narrative: str = Field(min_length=50, max_length=20000)
-    company_logo_base64: Optional[str] = Field(default=None, max_length=2_000_000)
-    npwp: Optional[str] = Field(default=None, max_length=32)
-    bank_name: Optional[str] = Field(default=None, max_length=100)
-    bank_account: Optional[str] = Field(default=None, max_length=64)
+    company_logo_base64: str | None = Field(default=None, max_length=2_000_000)
+    npwp: str | None = Field(default=None, max_length=32)
+    bank_name: str | None = Field(default=None, max_length=100)
+    bank_account: str | None = Field(default=None, max_length=64)
     turnstile_token: str = Field(min_length=1, max_length=4096)
-    brd_file_base64s: Optional[list[str]] = Field(default=None, max_length=5)
-    source_ip: Optional[str] = Field(default=None, max_length=64)
+    brd_file_base64s: list[str] | None = Field(default=None, max_length=5)
+    source_ip: str | None = Field(default=None, max_length=64)
 
 
 class IntakeSubmitResponse(BaseModel):
@@ -128,6 +128,6 @@ class IntakeStatusResponse(BaseModel):
     token: str
     stage: str
     status: str
-    target_go_live: Optional[str] = None
-    progress_pct: Optional[float] = None
-    journey_id: Optional[int] = None
+    target_go_live: str | None = None
+    progress_pct: float | None = None
+    journey_id: int | None = None

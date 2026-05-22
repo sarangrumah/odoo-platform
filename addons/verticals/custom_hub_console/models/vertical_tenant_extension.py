@@ -75,7 +75,7 @@ class TenantRegistryHub(models.Model):
         column2="capability_id",
         string="Assigned Capabilities",
         help="BRD-analyzer capability entries assigned to this tenant. "
-             "Populated only when custom_brd_analyzer is installed.",
+        "Populated only when custom_brd_analyzer is installed.",
     )
     module_count = fields.Integer(
         string="Module Count",
@@ -109,9 +109,7 @@ class TenantRegistryHub(models.Model):
     def _hub_is_module_installed(self, name):
         """Return True if the given technical module is installed."""
         return bool(
-            self.env["ir.module.module"]
-            .sudo()
-            .search_count([("name", "=", name), ("state", "=", "installed")])
+            self.env["ir.module.module"].sudo().search_count([("name", "=", name), ("state", "=", "installed")])
         )
 
     # -----------------------------------------------------------------
@@ -120,9 +118,7 @@ class TenantRegistryHub(models.Model):
     @api.depends("assigned_module_ids", "assigned_capability_ids")
     def _compute_module_count(self):
         for rec in self:
-            rec.module_count = (
-                len(rec.assigned_module_ids) + len(rec.assigned_capability_ids)
-            )
+            rec.module_count = len(rec.assigned_module_ids) + len(rec.assigned_capability_ids)
 
     def _compute_health_status(self):
         has_health = self._hub_is_module_installed("custom_ops_monitor")
@@ -137,9 +133,7 @@ class TenantRegistryHub(models.Model):
                     order="create_date desc",
                     limit=1,
                 )
-                rec.health_status = (
-                    getattr(latest, "status", False) or "unknown"
-                )
+                rec.health_status = getattr(latest, "status", False) or "unknown"
             except Exception as exc:  # pragma: no cover - defensive
                 _logger.debug("[hub] health compute failed: %s", exc)
                 rec.health_status = "unknown"

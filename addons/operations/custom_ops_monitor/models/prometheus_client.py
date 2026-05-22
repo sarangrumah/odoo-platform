@@ -6,16 +6,15 @@ handlers. Uses ``urllib.request`` so the addon has zero extra Python
 dependencies beyond the Odoo base. If ``requests`` is vendored elsewhere
 that's fine, but we don't require it here.
 """
+
 from __future__ import annotations
 
 import json
 import logging
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime
-from typing import Any, Optional
 
 _logger = logging.getLogger(__name__)
 
@@ -25,7 +24,6 @@ class PrometheusError(RuntimeError):
 
 
 class PrometheusClient:
-
     DEFAULT_TIMEOUT_S = 5
 
     def __init__(self, base_url: str, timeout_s: int = DEFAULT_TIMEOUT_S):
@@ -34,13 +32,23 @@ class PrometheusClient:
 
     @classmethod
     def from_env(cls, env) -> "PrometheusClient":
-        url = env["ir.config_parameter"].sudo().get_param(
-            "custom_ops_monitor.prometheus_url",
-            "http://prometheus:9090",
+        url = (
+            env["ir.config_parameter"]
+            .sudo()
+            .get_param(
+                "custom_ops_monitor.prometheus_url",
+                "http://prometheus:9090",
+            )
         )
-        timeout = int(env["ir.config_parameter"].sudo().get_param(
-            "custom_ops_monitor.prometheus_timeout_s", "5",
-        ) or 5)
+        timeout = int(
+            env["ir.config_parameter"]
+            .sudo()
+            .get_param(
+                "custom_ops_monitor.prometheus_timeout_s",
+                "5",
+            )
+            or 5
+        )
         return cls(url, timeout_s=timeout)
 
     # ------------------------------------------------------------------
@@ -60,9 +68,7 @@ class PrometheusClient:
         except ValueError as e:
             raise PrometheusError(f"non-json response: {e}") from e
         if data.get("status") != "success":
-            raise PrometheusError(
-                f"prometheus error: {data.get('errorType')}: {data.get('error')}"
-            )
+            raise PrometheusError(f"prometheus error: {data.get('errorType')}: {data.get('error')}")
         return data.get("data", {})
 
     # ------------------------------------------------------------------
@@ -74,19 +80,23 @@ class PrometheusClient:
         return data.get("result", []) or []
 
     def query_range(
-        self, promql: str,
+        self,
+        promql: str,
         start: float | datetime,
         end: float | datetime,
         step: str = "60s",
     ) -> list[dict]:
         s = start.timestamp() if isinstance(start, datetime) else float(start)
         e = end.timestamp() if isinstance(end, datetime) else float(end)
-        data = self._get("/api/v1/query_range", {
-            "query": promql,
-            "start": f"{s:.0f}",
-            "end": f"{e:.0f}",
-            "step": step,
-        })
+        data = self._get(
+            "/api/v1/query_range",
+            {
+                "query": promql,
+                "start": f"{s:.0f}",
+                "end": f"{e:.0f}",
+                "step": step,
+            },
+        )
         return data.get("result", []) or []
 
     # ------------------------------------------------------------------

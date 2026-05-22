@@ -36,13 +36,10 @@ class CustomSpreadsheetVersion(models.Model):
 
     def action_restore(self):
         self.ensure_one()
-        self.workbook_id.with_context(
-            spreadsheet_skip_versioning=True
-        ).write({"data_json": self.data_json_snapshot})
+        self.workbook_id.with_context(spreadsheet_skip_versioning=True).write({"data_json": self.data_json_snapshot})
         self.workbook_id.message_post(
-            body=_(
-                "<b>Restored to version #%(v)s</b> (saved by %(u)s on %(d)s)"
-            ) % {
+            body=_("<b>Restored to version #%(v)s</b> (saved by %(u)s on %(d)s)")
+            % {
                 "v": self.version_no,
                 "u": self.saved_by.name or "",
                 "d": fields.Datetime.to_string(self.saved_at) or "",

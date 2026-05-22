@@ -16,7 +16,9 @@ class OnboardingBrdUploadWizard(models.TransientModel):
     _description = "Onboarding BRD Upload Wizard"
 
     journey_id = fields.Many2one(
-        "onboarding.journey", required=True, ondelete="cascade",
+        "onboarding.journey",
+        required=True,
+        ondelete="cascade",
     )
     attachment_ids = fields.Many2many(
         "ir.attachment",
@@ -52,9 +54,9 @@ class OnboardingBrdUploadWizard(models.TransientModel):
 
         # Move journey forward.
         if self.journey_id.stage in ("draft", "intake"):
-            self.journey_id.with_context(
-                _transition_notes="BRD(s) uploaded via wizard"
-            ).write({"stage": "brd_uploaded"})
+            self.journey_id.with_context(_transition_notes="BRD(s) uploaded via wizard").write(
+                {"stage": "brd_uploaded"}
+            )
 
         return {
             "type": "ir.actions.act_window",

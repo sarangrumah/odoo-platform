@@ -8,8 +8,7 @@ plaintext on this record; the secret-set flag indicates presence.
 
 from __future__ import annotations
 
-from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo import fields, models
 
 
 class CoretaxConfigPajakku(models.Model):
@@ -24,18 +23,17 @@ class CoretaxConfigPajakku(models.Model):
     pajakku_enabled = fields.Boolean(
         string="Pajakku enabled",
         help="Master switch. Even with credentials set, the adapter will refuse to "
-             "send while this is off — useful kill-switch during incidents.",
+        "send while this is off — useful kill-switch during incidents.",
     )
     pajakku_api_url = fields.Char(
         string="Pajakku API URL",
-        help="Leave empty to use the standard sandbox / production URL based on the "
-             "sandbox toggle below.",
+        help="Leave empty to use the standard sandbox / production URL based on the sandbox toggle below.",
     )
     pajakku_sandbox_mode = fields.Boolean(
         string="Sandbox mode",
         default=True,
         help="Until production credentials are validated, keep this on so accidental "
-             "submissions don't reach the live DJP environment.",
+        "submissions don't reach the live DJP environment.",
     )
     pajakku_client_id = fields.Char(string="Pajakku Client ID")
 
@@ -71,14 +69,18 @@ class CoretaxConfigPajakku(models.Model):
     def _compute_pajakku_counts(self):
         Tx = self.env["custom.coretax.transaction"].sudo()
         for rec in self:
-            rec.pajakku_pending_tx = Tx.search_count([
-                ("config_id", "=", rec.id),
-                ("state", "in", ("queued", "submitting", "submitted")),
-            ])
-            rec.pajakku_error_tx = Tx.search_count([
-                ("config_id", "=", rec.id),
-                ("state", "in", ("error", "rejected")),
-            ])
+            rec.pajakku_pending_tx = Tx.search_count(
+                [
+                    ("config_id", "=", rec.id),
+                    ("state", "in", ("queued", "submitting", "submitted")),
+                ]
+            )
+            rec.pajakku_error_tx = Tx.search_count(
+                [
+                    ("config_id", "=", rec.id),
+                    ("state", "in", ("error", "rejected")),
+                ]
+            )
 
     # ------------------------------------------------------------------
     # Public helpers — used by the Pajakku adapter
@@ -107,11 +109,13 @@ class CoretaxConfigPajakku(models.Model):
         self.ensure_one()
         Adapter = self.env["custom.coretax.adapter.pajakku"]
         result = Adapter.test_connection(self)
-        self.write({
-            "pajakku_last_test": fields.Datetime.now(),
-            "pajakku_last_test_ok": result.get("ok", False),
-            "pajakku_last_test_message": result.get("message", "")[:240],
-        })
+        self.write(
+            {
+                "pajakku_last_test": fields.Datetime.now(),
+                "pajakku_last_test_ok": result.get("ok", False),
+                "pajakku_last_test_message": result.get("message", "")[:240],
+            }
+        )
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",

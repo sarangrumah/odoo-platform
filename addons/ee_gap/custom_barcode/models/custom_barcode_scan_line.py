@@ -31,8 +31,7 @@ class CustomBarcodeScanLine(models.Model):
     picking_id = fields.Many2one(
         "stock.picking",
         string="Allocated To",
-        help="Set when this line was distributed/allocated to a specific picking "
-             "by a batch or cluster session.",
+        help="Set when this line was distributed/allocated to a specific picking by a batch or cluster session.",
     )
     product_id = fields.Many2one(
         "product.product",
@@ -64,7 +63,7 @@ class CustomBarcodeScanLine(models.Model):
     x_gs1_parsed = fields.Text(
         string="GS1 Parsed",
         help="JSON-encoded dict of parsed GS1 Application Identifiers "
-             "(e.g. {'gtin': '...', 'lot': '...', 'exp_date': '2026-01-31', 'weight': 1.25}).",
+        "(e.g. {'gtin': '...', 'lot': '...', 'exp_date': '2026-01-31', 'weight': 1.25}).",
     )
 
     @api.constrains("session_id", "batch_session_id", "cluster_run_id")
@@ -72,9 +71,7 @@ class CustomBarcodeScanLine(models.Model):
         for rec in self:
             owners = [rec.session_id, rec.batch_session_id, rec.cluster_run_id]
             if not any(owners):
-                raise ValidationError(
-                    "Scan line must belong to a session, batch or cluster run."
-                )
+                raise ValidationError("Scan line must belong to a session, batch or cluster run.")
 
     def get_gs1_dict(self):
         """Return parsed GS1 payload as a Python dict (or {} if absent/invalid)."""

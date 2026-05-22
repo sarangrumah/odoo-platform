@@ -22,7 +22,6 @@ _TS_DRIFT_MAX_S = 300
 
 
 class _NonceStore:
-
     _redis_client = None
     _redis_probed = False
 
@@ -34,6 +33,7 @@ class _NonceStore:
         try:
             import redis  # type: ignore
             from odoo.tools import config as _odoo_config
+
             url = _odoo_config.get("custom_core_redis_url") or _odoo_config.get("redis_url")
             if url:
                 cls._redis_client = redis.from_url(url, socket_timeout=0.25, socket_connect_timeout=0.25)
@@ -51,7 +51,7 @@ class _NonceStore:
                 _NONCE_CACHE.pop(k, None)
         if key in _NONCE_CACHE:
             return True
-        client = cls._redis(  )
+        client = cls._redis()
         if client is not None:
             try:
                 redis_key = f"custom_core:nonce:{key}"
@@ -107,8 +107,7 @@ def _verify_hmac(scope: str, body: bytes, signature: str, timestamp: str) -> Opt
     if not secret:
         return "NO_SECRET_CONFIGURED"
     # Canonical form: ASCII timestamp || raw body bytes, HMAC-SHA256 hex.
-    expected = hmac.new(secret.encode("utf-8"), timestamp.encode("utf-8") + body,
-                        hashlib.sha256).hexdigest()
+    expected = hmac.new(secret.encode("utf-8"), timestamp.encode("utf-8") + body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, signature):
         return "BAD_SIGNATURE"
     nonce_key = f"{scope}:{ts}:{signature}"
@@ -121,19 +120,26 @@ def _log_attempt(scope: str, endpoint: str, body: bytes, status: int, error: Opt
     try:
         env = request.env(su=True)
         if "custom.adapter.call.log" in env:
-            cfg = env["custom.adapter.config"].sudo().search(
-                [("name", "=", f"secure_endpoint:{scope}")], limit=1,
+            cfg = (
+                env["custom.adapter.config"]
+                .sudo()
+                .search(
+                    [("name", "=", f"secure_endpoint:{scope}")],
+                    limit=1,
+                )
             )
             if cfg:
-                env["custom.adapter.call.log"].sudo().create({
-                    "config_id": cfg.id,
-                    "endpoint": endpoint,
-                    "request_hash": hashlib.sha256(body or b"").hexdigest() if body else "",
-                    "response_status": status,
-                    "latency_ms": 0,
-                    "error": (error or "")[:512] if error else False,
-                    "ok": error is None,
-                })
+                env["custom.adapter.call.log"].sudo().create(
+                    {
+                        "config_id": cfg.id,
+                        "endpoint": endpoint,
+                        "request_hash": hashlib.sha256(body or b"").hexdigest() if body else "",
+                        "response_status": status,
+                        "latency_ms": 0,
+                        "error": (error or "")[:512] if error else False,
+                        "ok": error is None,
+                    }
+                )
     except Exception as e:  # pragma: no cover
         _logger.debug("secure_endpoint log skipped: %s", e)
 
@@ -150,7 +156,8 @@ def secure_endpoint(scope_name: str):
                 _logger.warning("secure_endpoint %s: IP %s not whitelisted", scope_name, remote)
                 _log_attempt(scope_name, httpreq.path, b"", 403, "IP_NOT_ALLOWED")
                 return request.make_json_response(
-                    {"ok": False, "error_code": "IP_NOT_ALLOWED"}, status=403,
+                    {"ok": False, "error_code": "IP_NOT_ALLOWED"},
+                    status=403,
                 )
             body = httpreq.get_data() or b""
             signature = httpreq.headers.get("X-Signature", "")
@@ -160,11 +167,14 @@ def secure_endpoint(scope_name: str):
                 _logger.warning("secure_endpoint %s rejected: %s", scope_name, err)
                 _log_attempt(scope_name, httpreq.path, body, 401, err)
                 return request.make_json_response(
-                    {"ok": False, "error_code": err}, status=401,
+                    {"ok": False, "error_code": err},
+                    status=401,
                 )
             _log_attempt(scope_name, httpreq.path, body, 200, None)
             return func(*args, **kwargs)
+
         return _inner
+
     return _wrap
 
 

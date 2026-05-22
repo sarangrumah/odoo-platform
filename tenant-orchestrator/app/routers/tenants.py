@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
@@ -18,12 +18,12 @@ class TenantIn(BaseModel):
     slug: str = Field(min_length=2, max_length=63, pattern=r"^[a-z][a-z0-9_]{1,62}$")
     display_name: str = Field(min_length=1, max_length=128)
     plan_tier: str = "standard"
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = None
-    csm_user_id: Optional[int] = None
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = None
+    csm_user_id: int | None = None
     features: dict[str, Any] = Field(default_factory=dict)
-    backup_schedule_cron: Optional[str] = None
-    install_modules: Optional[list[str]] = None
+    backup_schedule_cron: str | None = None
+    install_modules: list[str] | None = None
 
 
 class TenantOut(BaseModel):
@@ -44,12 +44,12 @@ class ProvisionResult(BaseModel):
     slug: str
     db_name: str
     admin_login: str
-    admin_password: str          # returned ONCE — ops must capture
-    fernet_key_dek: str          # returned ONCE — Odoo caches in-memory
+    admin_password: str  # returned ONCE — ops must capture
+    fernet_key_dek: str  # returned ONCE — Odoo caches in-memory
 
 
 class SuspendIn(BaseModel):
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class ArchiveIn(BaseModel):
@@ -73,7 +73,7 @@ def _row_to_out(row: dict) -> TenantOut:
 
 
 @router.get("", response_model=list[TenantOut])
-def list_tenants_endpoint(state: Optional[str] = None) -> list[TenantOut]:
+def list_tenants_endpoint(state: str | None = None) -> list[TenantOut]:
     return [_row_to_out(r) for r in registry.list_tenants(state=state)]
 
 

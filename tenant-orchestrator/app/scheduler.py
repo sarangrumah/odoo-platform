@@ -8,8 +8,6 @@ poll every minute, sync jobs to current tenant list).
 
 from __future__ import annotations
 
-from typing import Optional
-
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -20,7 +18,7 @@ from . import provisioner, registry
 
 log = structlog.get_logger()
 
-_scheduler: Optional[AsyncIOScheduler] = None
+_scheduler: AsyncIOScheduler | None = None
 _JOB_PREFIX = "tenant-backup:"
 
 

@@ -7,7 +7,6 @@ from .common import PayrollIDCommon
 
 
 class TestTerTable(PayrollIDCommon):
-
     def test_kategori_a_bracket_lookup(self):
         # 7,000,000 falls in TER A bracket 6,750,001-7,500,000 → 1.25%
         rate = self.TER.get_rate("A", 7_000_000)

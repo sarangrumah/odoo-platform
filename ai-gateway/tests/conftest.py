@@ -6,8 +6,9 @@ import hashlib
 import hmac
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 
@@ -96,6 +97,7 @@ def fake_provider(monkeypatch) -> FakeProvider:
 def client():
     """FastAPI TestClient with lifespan (so middleware + redis stub initialise)."""
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     with TestClient(app) as c:

@@ -74,7 +74,7 @@ class PosOrder(models.Model):
         copy=False,
         readonly=True,
         help="Amount added or subtracted from the cash kembalian to round to "
-             "the nearest IDR step configured on the POS.",
+        "the nearest IDR step configured on the POS.",
     )
     x_idr_rounded_change = fields.Monetary(
         string="Rounded Change",
@@ -181,13 +181,17 @@ class PosOrder(models.Model):
             if points <= 0:
                 order.x_loyalty_credited = True
                 continue
-            partner.sudo().write({
-                "x_loyalty_balance": (partner.x_loyalty_balance or 0) + points,
-            })
+            partner.sudo().write(
+                {
+                    "x_loyalty_balance": (partner.x_loyalty_balance or 0) + points,
+                }
+            )
             order.x_loyalty_credited = True
             _logger.info(
                 "Credited %s loyalty points to partner %s from order %s",
-                points, partner.display_name, order.name,
+                points,
+                partner.display_name,
+                order.name,
             )
         return True
 
@@ -206,9 +210,7 @@ class PosOrder(models.Model):
             qty = getattr(line, "qty", 0)
             product = getattr(line, "product_id", False)
             subtotal = getattr(line, "price_subtotal_incl", 0.0)
-            lines.append(
-                f"- {product.display_name if product else ''} x{qty} = {subtotal:,.0f}"
-            )
+            lines.append(f"- {product.display_name if product else ''} x{qty} = {subtotal:,.0f}")
         lines.append("")
         lines.append(_("Total: IDR %s") % f"{self.amount_total:,.0f}")
         if self.x_loyalty_points_earned:
@@ -226,25 +228,31 @@ class PosOrder(models.Model):
         config = self.config_id
         account = config.x_whatsapp_account_id if config else False
         if not account:
-            raise UserError(_(
-                "No WhatsApp account configured on POS %s."
-            ) % (config.name if config else ""))
+            raise UserError(_("No WhatsApp account configured on POS %s.") % (config.name if config else ""))
         phone = self._partner_phone()
         if not phone:
             raise UserError(_("Customer has no phone number for WhatsApp delivery."))
-        msg = self.env["whatsapp.message"].sudo().create({
-            "account_id": account.id,
-            "to_phone": phone,
-            "to_partner_id": self.partner_id.id,
-            "body": self._build_ereceipt_body(),
-            "direction": "outbound",
-            "state": "draft",
-        })
+        msg = (
+            self.env["whatsapp.message"]
+            .sudo()
+            .create(
+                {
+                    "account_id": account.id,
+                    "to_phone": phone,
+                    "to_partner_id": self.partner_id.id,
+                    "body": self._build_ereceipt_body(),
+                    "direction": "outbound",
+                    "state": "draft",
+                }
+            )
+        )
         try:
             msg.action_send()
         except Exception as e:
             _logger.warning(
-                "POS WA e-receipt failed order=%s: %s", self.name, e,
+                "POS WA e-receipt failed order=%s: %s",
+                self.name,
+                e,
             )
             raise
         return msg
@@ -254,25 +262,31 @@ class PosOrder(models.Model):
         config = self.config_id
         account = config.x_sms_account_id if config else False
         if not account:
-            raise UserError(_(
-                "No SMS account configured on POS %s."
-            ) % (config.name if config else ""))
+            raise UserError(_("No SMS account configured on POS %s.") % (config.name if config else ""))
         phone = self._partner_phone()
         if not phone:
             raise UserError(_("Customer has no phone number for SMS delivery."))
-        msg = self.env["custom.sms.message"].sudo().create({
-            "account_id": account.id,
-            "to_phone": phone,
-            "to_partner_id": self.partner_id.id,
-            "body": self._build_ereceipt_body(),
-            "purpose": "transactional",
-            "state": "draft",
-        })
+        msg = (
+            self.env["custom.sms.message"]
+            .sudo()
+            .create(
+                {
+                    "account_id": account.id,
+                    "to_phone": phone,
+                    "to_partner_id": self.partner_id.id,
+                    "body": self._build_ereceipt_body(),
+                    "purpose": "transactional",
+                    "state": "draft",
+                }
+            )
+        )
         try:
             msg.action_send()
         except Exception as e:
             _logger.warning(
-                "POS SMS e-receipt failed order=%s: %s", self.name, e,
+                "POS SMS e-receipt failed order=%s: %s",
+                self.name,
+                e,
             )
             raise
         return msg
@@ -293,7 +307,8 @@ class PosOrder(models.Model):
             else:
                 _logger.info(
                     "POS e-receipt skipped for order %s (channel=%s)",
-                    order.name, channel,
+                    order.name,
+                    channel,
                 )
             order.write({"x_eperformance_receipt_sent": True})
         return True

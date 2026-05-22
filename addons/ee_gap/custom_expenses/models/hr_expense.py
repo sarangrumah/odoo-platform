@@ -67,7 +67,7 @@ class HrExpense(models.Model):
         ondelete="set null",
         copy=False,
         help="If set, the expense is paid via this corporate card and is "
-             "excluded from the employee reimbursement queue.",
+        "excluded from the employee reimbursement queue.",
     )
 
     # ------------------------------------------------------------------
@@ -96,9 +96,7 @@ class HrExpense(models.Model):
     @api.model
     def _default_mileage_rate(self) -> float:
         try:
-            raw = self.env["ir.config_parameter"].sudo().get_param(
-                CONFIG_PARAM_MILEAGE_RATE, str(DEFAULT_MILEAGE_RATE)
-            )
+            raw = self.env["ir.config_parameter"].sudo().get_param(CONFIG_PARAM_MILEAGE_RATE, str(DEFAULT_MILEAGE_RATE))
             return float(raw)
         except (TypeError, ValueError):
             return DEFAULT_MILEAGE_RATE
@@ -141,11 +139,14 @@ class HrExpense(models.Model):
         # For mileage, only auto-recompute total when km/rate explicitly change
         if any(k in vals for k in ("x_mileage_km", "x_mileage_rate")):
             for exp in self:
-                merged = {**{
-                    "x_mileage_km": exp.x_mileage_km,
-                    "x_mileage_rate": exp.x_mileage_rate,
-                    "x_is_mileage": exp.x_is_mileage,
-                }, **vals}
+                merged = {
+                    **{
+                        "x_mileage_km": exp.x_mileage_km,
+                        "x_mileage_rate": exp.x_mileage_rate,
+                        "x_is_mileage": exp.x_is_mileage,
+                    },
+                    **vals,
+                }
                 if merged.get("x_is_mileage") and merged.get("x_mileage_km") and merged.get("x_mileage_rate"):
                     vals.setdefault("total_amount", merged["x_mileage_km"] * merged["x_mileage_rate"])
         return super().write(vals)
@@ -182,10 +183,14 @@ class HrExpense(models.Model):
         if not att and getattr(self, "attachment_ids", False):
             att = self.attachment_ids.sorted(key=lambda a: a.create_date or fields.Datetime.now(), reverse=True)[:1]
         if not att:
-            att = self.env["ir.attachment"].sudo().search(
-                [("res_model", "=", self._name), ("res_id", "=", self.id)],
-                order="create_date desc",
-                limit=1,
+            att = (
+                self.env["ir.attachment"]
+                .sudo()
+                .search(
+                    [("res_model", "=", self._name), ("res_id", "=", self.id)],
+                    order="create_date desc",
+                    limit=1,
+                )
             )
         return att
 
@@ -276,7 +281,8 @@ class HrExpense(models.Model):
                     "<b>AI Receipt OCR</b><br/>"
                     "Vendor: %(vendor)s<br/>Amount: %(amount)s %(curr)s<br/>"
                     "Tax: %(tax)s<br/>Date: %(date)s<br/>Confidence: %(conf)s"
-                ) % {
+                )
+                % {
                     "vendor": vals.get("x_ai_extracted_vendor") or "-",
                     "amount": vals.get("x_ai_extracted_amount") or "-",
                     "curr": vals.get("x_ai_extracted_currency_code") or "",
@@ -300,12 +306,7 @@ class HrExpense(models.Model):
         vals = {}
         if not isinstance(result, dict):
             return vals
-        ocr_text = (
-            result.get("ocr_text")
-            or result.get("text")
-            or result.get("raw")
-            or ""
-        )
+        ocr_text = result.get("ocr_text") or result.get("text") or result.get("raw") or ""
         if ocr_text:
             vals["x_receipt_ocr_text"] = ocr_text[:65000]
         amount = result.get("amount") or result.get("total")
@@ -385,21 +386,27 @@ class HrExpense(models.Model):
         if not partner:
             return False
 
-        journal = self.env["account.journal"].sudo().search(
-            [("type", "in", ("bank", "cash")), ("company_id", "=", self.company_id.id)],
-            limit=1,
+        journal = (
+            self.env["account.journal"]
+            .sudo()
+            .search(
+                [("type", "in", ("bank", "cash")), ("company_id", "=", self.company_id.id)],
+                limit=1,
+            )
         )
         Payment = self.env["account.payment"].sudo()
-        payment = Payment.create({
-            "payment_type": "outbound",
-            "partner_type": "supplier",
-            "partner_id": partner.id,
-            "amount": float(self.total_amount or 0.0),
-            "currency_id": self.currency_id.id if self.currency_id else self.env.company.currency_id.id,
-            "journal_id": journal.id if journal else False,
-            "ref": _("Reimbursement: %s") % (self.name or ""),
-            "memo": _("Reimbursement: %s") % (self.name or ""),
-        })
+        payment = Payment.create(
+            {
+                "payment_type": "outbound",
+                "partner_type": "supplier",
+                "partner_id": partner.id,
+                "amount": float(self.total_amount or 0.0),
+                "currency_id": self.currency_id.id if self.currency_id else self.env.company.currency_id.id,
+                "journal_id": journal.id if journal else False,
+                "ref": _("Reimbursement: %s") % (self.name or ""),
+                "memo": _("Reimbursement: %s") % (self.name or ""),
+            }
+        )
         self.message_post(
             body=_("Reimbursement payment %s registered for %s.") % (payment.id, partner.display_name),
             subtype_xmlid="mail.mt_note",

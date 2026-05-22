@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -41,8 +40,7 @@ class CustomDashboardTileWizard(models.TransientModel):
     measure_field_id = fields.Many2one(
         "ir.model.fields",
         string="Measure Field",
-        domain="[('model_id', '=', ir_model_id), "
-               "('ttype', 'in', ['integer','float','monetary'])]",
+        domain="[('model_id', '=', ir_model_id), ('ttype', 'in', ['integer','float','monetary'])]",
     )
     groupby_field_id = fields.Many2one(
         "ir.model.fields",
@@ -63,30 +61,34 @@ class CustomDashboardTileWizard(models.TransientModel):
     def action_preview(self):
         """Build a transient tile, refresh it, and display the result."""
         self.ensure_one()
-        Tile = self.env["custom.dashboard.tile"].new({
-            "dashboard_id": self.dashboard_id.id,
-            "name": self.name or "Preview",
-            "tile_type": self.tile_type,
-            "model_name": self.model_name,
-            "domain": self.domain or "[]",
-            "measure_field": self.measure_field_id.name or False,
-            "groupby_field": self.groupby_field_id.name or False,
-            "formula_expression": self.formula_expression or False,
-            "refresh_interval_seconds": self.refresh_interval_seconds or 300,
-        })
+        Tile = self.env["custom.dashboard.tile"].new(
+            {
+                "dashboard_id": self.dashboard_id.id,
+                "name": self.name or "Preview",
+                "tile_type": self.tile_type,
+                "model_name": self.model_name,
+                "domain": self.domain or "[]",
+                "measure_field": self.measure_field_id.name or False,
+                "groupby_field": self.groupby_field_id.name or False,
+                "formula_expression": self.formula_expression or False,
+                "refresh_interval_seconds": self.refresh_interval_seconds or 300,
+            }
+        )
         # NewId records can't call write/search reliably; create a real one,
         # refresh, then unlink to avoid polluting the DB.
-        tile = self.env["custom.dashboard.tile"].create({
-            "dashboard_id": self.dashboard_id.id,
-            "name": (self.name or "Preview") + " (preview)",
-            "tile_type": self.tile_type,
-            "model_name": self.model_name,
-            "domain": self.domain or "[]",
-            "measure_field": self.measure_field_id.name or False,
-            "groupby_field": self.groupby_field_id.name or False,
-            "formula_expression": self.formula_expression or False,
-            "refresh_interval_seconds": self.refresh_interval_seconds or 300,
-        })
+        tile = self.env["custom.dashboard.tile"].create(
+            {
+                "dashboard_id": self.dashboard_id.id,
+                "name": (self.name or "Preview") + " (preview)",
+                "tile_type": self.tile_type,
+                "model_name": self.model_name,
+                "domain": self.domain or "[]",
+                "measure_field": self.measure_field_id.name or False,
+                "groupby_field": self.groupby_field_id.name or False,
+                "formula_expression": self.formula_expression or False,
+                "refresh_interval_seconds": self.refresh_interval_seconds or 300,
+            }
+        )
         try:
             tile.action_refresh()
             self.preview_result = tile.cached_value or ""
@@ -104,18 +106,20 @@ class CustomDashboardTileWizard(models.TransientModel):
         self.ensure_one()
         if not self.dashboard_id:
             raise UserError(_("Choose a dashboard first."))
-        tile = self.env["custom.dashboard.tile"].create({
-            "dashboard_id": self.dashboard_id.id,
-            "name": self.name,
-            "tile_type": self.tile_type,
-            "model_name": self.model_name,
-            "domain": self.domain or "[]",
-            "measure_field": self.measure_field_id.name or False,
-            "groupby_field": self.groupby_field_id.name or False,
-            "formula_expression": self.formula_expression or False,
-            "refresh_interval_seconds": self.refresh_interval_seconds or 300,
-            "color": self.color or "#1f77b4",
-        })
+        tile = self.env["custom.dashboard.tile"].create(
+            {
+                "dashboard_id": self.dashboard_id.id,
+                "name": self.name,
+                "tile_type": self.tile_type,
+                "model_name": self.model_name,
+                "domain": self.domain or "[]",
+                "measure_field": self.measure_field_id.name or False,
+                "groupby_field": self.groupby_field_id.name or False,
+                "formula_expression": self.formula_expression or False,
+                "refresh_interval_seconds": self.refresh_interval_seconds or 300,
+                "color": self.color or "#1f77b4",
+            }
+        )
         tile.action_refresh()
         return {
             "type": "ir.actions.act_window",

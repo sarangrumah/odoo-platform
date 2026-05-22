@@ -75,9 +75,7 @@ class CustomEsgEmissionFactor(models.Model):
         if isinstance(factor_code_or_id, int):
             factor = Factor.browse(factor_code_or_id)
         else:
-            factor = Factor.search(
-                [("name", "=", factor_code_or_id)], limit=1
-            )
+            factor = Factor.search([("name", "=", factor_code_or_id)], limit=1)
         if not factor:
             return 0.0
         return float(activity_value or 0.0) * factor.kg_co2_per_unit

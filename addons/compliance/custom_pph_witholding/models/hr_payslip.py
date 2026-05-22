@@ -41,7 +41,8 @@ try:
                 except Exception as e:
                     _logger.warning(
                         "PPh21 witholding compute failed on payslip %s: %s",
-                        slip.id, e,
+                        slip.id,
+                        e,
                     )
 
 except (KeyError, ValueError, TypeError):

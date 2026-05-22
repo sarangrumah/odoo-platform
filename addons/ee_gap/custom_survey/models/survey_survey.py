@@ -83,15 +83,9 @@ class SurveySurvey(models.Model):
             "<p>Score: {score}%</p>"
             "<p>Issued: {issue_date} - Valid until: {valid_until}</p>"
         )
-        participant_name = (
-            user_input.partner_id.display_name
-            or user_input.email
-            or _("Anonymous")
-        )
+        participant_name = user_input.partner_id.display_name or user_input.email or _("Anonymous")
         issue_date = fields.Date.context_today(self)
-        valid_until = fields.Date.add(
-            issue_date, months=self.x_certificate_validity_months or 12
-        )
+        valid_until = fields.Date.add(issue_date, months=self.x_certificate_validity_months or 12)
         score_pct = 0.0
         if "x_weighted_score" in user_input._fields:
             score_pct = user_input.x_weighted_score or 0.0
@@ -142,19 +136,23 @@ class SurveySurvey(models.Model):
             mimetype = "text/html"
             ext = "html"
 
-        attachment = self.env["ir.attachment"].sudo().create({
-            "name": "Certificate - %s.%s" % (self.title or "Survey", ext),
-            "type": "binary",
-            "raw": raw,
-            "mimetype": mimetype,
-            "res_model": "survey.user_input",
-            "res_id": user_input.id,
-        })
+        attachment = (
+            self.env["ir.attachment"]
+            .sudo()
+            .create(
+                {
+                    "name": "Certificate - %s.%s" % (self.title or "Survey", ext),
+                    "type": "binary",
+                    "raw": raw,
+                    "mimetype": mimetype,
+                    "res_model": "survey.user_input",
+                    "res_id": user_input.id,
+                }
+            )
+        )
 
         # Email participant if possible
-        email_to = user_input.email or (
-            user_input.partner_id.email if user_input.partner_id else False
-        )
+        email_to = user_input.email or (user_input.partner_id.email if user_input.partner_id else False)
         if email_to:
             mail_values = {
                 "subject": _("Your Certificate: %s") % (self.title or ""),
@@ -168,7 +166,8 @@ class SurveySurvey(models.Model):
         # Audit trail via mail.thread when available
         if hasattr(self, "message_post"):
             self.message_post(
-                body=_("Certificate issued to %s (score %.2f%%).") % (
+                body=_("Certificate issued to %s (score %.2f%%).")
+                % (
                     user_input.partner_id.display_name or email_to or _("Anonymous"),
                     score_pct,
                 ),

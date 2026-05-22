@@ -35,8 +35,7 @@ class AccountAnalyticLine(models.Model):
         string="Overtime Hours",
         compute="_compute_overtime_hours",
         store=True,
-        help="Hours above the standard daily threshold "
-             "(currently %s h/day)." % STANDARD_DAILY_HOURS,
+        help="Hours above the standard daily threshold (currently %s h/day)." % STANDARD_DAILY_HOURS,
     )
     x_billed_invoice_line_id = fields.Many2one(
         "account.move.line",
@@ -104,9 +103,7 @@ class AccountAnalyticLine(models.Model):
     def action_reset_to_draft(self):
         for line in self:
             if line.x_billed_invoice_line_id:
-                raise UserError(
-                    _("Cannot reset a timesheet already invoiced (line %s).") % line.id
-                )
+                raise UserError(_("Cannot reset a timesheet already invoiced (line %s).") % line.id)
             line.x_validation_state = "draft"
         return True
 
@@ -136,19 +133,12 @@ class AccountAnalyticLine(models.Model):
         self.ensure_one()
         if self.x_overtime_hours <= 0.0:
             if hasattr(self, "message_post"):
-                self.message_post(
-                    body=_("No overtime hours to convert into a work entry.")
-                )
+                self.message_post(body=_("No overtime hours to convert into a work entry."))
             return False
         if not self.employee_id:
-            raise UserError(
-                _("Cannot create an overtime work entry without an employee.")
-            )
+            raise UserError(_("Cannot create an overtime work entry without an employee."))
         if self.x_validation_state != "validated":
-            raise UserError(
-                _("Only validated timesheets can be fed to payroll. "
-                  "Submit/validate the entry first.")
-            )
+            raise UserError(_("Only validated timesheets can be fed to payroll. Submit/validate the entry first."))
 
         WorkEntry = self.env["hr.work.entry"].sudo()
         wet = self._ensure_overtime_work_entry_type()
@@ -177,11 +167,8 @@ class AccountAnalyticLine(models.Model):
         self.x_overtime_work_entry_id = work_entry.id
         if hasattr(self, "message_post"):
             self.message_post(
-                body=_(
-                    "Created overtime work entry <b>%(name)s</b> "
-                    "(%(hours).2f h)."
-                ) % {"name": work_entry.display_name or work_entry.name,
-                     "hours": self.x_overtime_hours}
+                body=_("Created overtime work entry <b>%(name)s</b> (%(hours).2f h).")
+                % {"name": work_entry.display_name or work_entry.name, "hours": self.x_overtime_hours}
             )
         return work_entry
 

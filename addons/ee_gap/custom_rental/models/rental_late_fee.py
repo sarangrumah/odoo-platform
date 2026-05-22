@@ -5,12 +5,16 @@ from odoo import _, fields, models
 class CustomRentalLateFeeLine(models.Model):
     """One row per cron tick per overdue order — keeps an audit trail
     of why the cumulative late_fee_total grew on a given day."""
+
     _name = "custom.rental.late.fee.line"
     _description = "Rental Late Fee Daily Accrual"
     _order = "accrued_on desc, id desc"
 
     order_id = fields.Many2one(
-        "rental.order", required=True, ondelete="cascade", index=True,
+        "rental.order",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     accrued_on = fields.Date(required=True, default=fields.Date.context_today)
     days_overdue = fields.Float(required=True)

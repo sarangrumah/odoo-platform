@@ -17,7 +17,12 @@ class ResConfigSettings(models.TransientModel):
         default="fast",
     )
     custom_ai_provider_override = fields.Selection(
-        [("", "Use gateway default"), ("anthropic", "Anthropic Claude"), ("openai", "OpenAI"), ("ollama", "Local Ollama")],
+        [
+            ("", "Use gateway default"),
+            ("anthropic", "Anthropic Claude"),
+            ("openai", "OpenAI"),
+            ("ollama", "Local Ollama"),
+        ],
         string="Provider Override",
         config_parameter="custom_ai.provider_override",
     )

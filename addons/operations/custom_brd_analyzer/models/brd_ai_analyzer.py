@@ -168,7 +168,16 @@ DEFAULT_JSON_SCHEMA = {
             "type": "array",
             "items": {
                 "type": "object",
-                "required": ["name", "scope", "capability_tags", "estimated_md", "depends", "impact_modules", "justification", "severity"],
+                "required": [
+                    "name",
+                    "scope",
+                    "capability_tags",
+                    "estimated_md",
+                    "depends",
+                    "impact_modules",
+                    "justification",
+                    "severity",
+                ],
                 "properties": {
                     "name": {"type": "string"},
                     "scope": {"type": "string"},
@@ -301,17 +310,18 @@ class BrdAiAnalyzer:
             if len(raw_dump) > 60000:
                 raw_dump = raw_dump[:60000] + "\n…(truncated)"
             try:
-                brd_doc.sudo().write({
-                    "last_ai_raw": raw_dump or False,
-                    "last_ai_at": fields.Datetime.now(),
-                })
+                brd_doc.sudo().write(
+                    {
+                        "last_ai_raw": raw_dump or False,
+                        "last_ai_at": fields.Datetime.now(),
+                    }
+                )
             except Exception:  # noqa: BLE001
                 pass
 
         for batch in self._chunk(sections, _SECTION_BATCH_SIZE):
             section_blob = [
-                {"section_id": s.id, "title": s.title or "", "content": (s.content or "")[:3000]}
-                for s in batch
+                {"section_id": s.id, "title": s.title or "", "content": (s.content or "")[:3000]} for s in batch
             ]
             try:
                 user_msg = user_template.format(
@@ -386,7 +396,8 @@ class BrdAiAnalyzer:
             batch_recs = parsed.get("recommendations") or []
             _logger.info(
                 "brd_ai_analyzer: parsed batch -> %d sections, %d recommendations",
-                len(batch_secs), len(batch_recs),
+                len(batch_secs),
+                len(batch_recs),
             )
             merged["sections"].extend(batch_secs)
             merged["recommendations"].extend(batch_recs)
@@ -398,9 +409,7 @@ class BrdAiAnalyzer:
             merged["overall_fit_pct"] = int(fit_total / scored)
 
         # ----- Pass 2: deep-dive on partial/missing/unclear sections --------
-        deep_enabled = Param.get_param(
-            "custom_brd_analyzer.deep_dive_enabled", default="1"
-        )
+        deep_enabled = Param.get_param("custom_brd_analyzer.deep_dive_enabled", default="1")
         if str(deep_enabled).strip() not in ("0", "false", "False", ""):
             try:
                 self._deep_dive(brd_doc, merged, raw_responses)
@@ -474,7 +483,8 @@ class BrdAiAnalyzer:
                     "module_name": entry.module_name,
                     "category": entry.category or "",
                     "maturity": entry.maturity or "",
-                    "tags": entry.capability_tag_ids.mapped("technical_code") or entry.capability_tag_ids.mapped("name"),
+                    "tags": entry.capability_tag_ids.mapped("technical_code")
+                    or entry.capability_tag_ids.mapped("name"),
                     "deployed_in_verticals": sorted(set(deployments_by_catalog.get(entry.id, []))),
                 }
             )
@@ -542,14 +552,17 @@ class BrdAiAnalyzer:
           ``drop_recommendation_names`` for any reviewed section.
         """
         Param = self.env["ir.config_parameter"].sudo()
-        max_calls = int(Param.get_param("custom_brd_analyzer.deep_dive_max_calls", default=_DEEP_DIVE_MAX_CALLS) or _DEEP_DIVE_MAX_CALLS)
+        max_calls = int(
+            Param.get_param("custom_brd_analyzer.deep_dive_max_calls", default=_DEEP_DIVE_MAX_CALLS)
+            or _DEEP_DIVE_MAX_CALLS
+        )
         time_budget = float(
             Param.get_param("custom_brd_analyzer.deep_dive_time_budget_s", default=_DEEP_DIVE_TIME_BUDGET_S)
             or _DEEP_DIVE_TIME_BUDGET_S
         )
-        deep_quality = Param.get_param(
-            "custom_brd_analyzer.deep_dive_quality", default=_DEEP_DIVE_QUALITY
-        ) or _DEEP_DIVE_QUALITY
+        deep_quality = (
+            Param.get_param("custom_brd_analyzer.deep_dive_quality", default=_DEEP_DIVE_QUALITY) or _DEEP_DIVE_QUALITY
+        )
         started_at = time.monotonic()
 
         sections = merged.get("sections") or []
@@ -570,9 +583,7 @@ class BrdAiAnalyzer:
         # Build a fast lookup from BRD section_id -> the actual record so we
         # can read title/content (the model only gets the trimmed batch view).
         Section = self.env["brd.document.section"].sudo()
-        record_by_id: dict[int, Any] = {
-            s.id: s for s in Section.search([("document_id", "=", brd_doc.id)])
-        }
+        record_by_id: dict[int, Any] = {s.id: s for s in Section.search([("document_id", "=", brd_doc.id)])}
 
         # Track which recommendations to drop (set of names).
         drop_names: set[str] = set()
@@ -586,9 +597,11 @@ class BrdAiAnalyzer:
             elapsed = time.monotonic() - started_at
             if elapsed >= time_budget:
                 _logger.info(
-                    "brd_ai_analyzer: deep-dive time budget exhausted "
-                    "(elapsed=%.1fs, budget=%.1fs, done=%d/%d)",
-                    elapsed, time_budget, calls, len(todo),
+                    "brd_ai_analyzer: deep-dive time budget exhausted (elapsed=%.1fs, budget=%.1fs, done=%d/%d)",
+                    elapsed,
+                    time_budget,
+                    calls,
+                    len(todo),
                 )
                 break
             sec_id = int(sec.get("section_id") or 0)
@@ -599,7 +612,7 @@ class BrdAiAnalyzer:
             # Pick candidates: pass-1 mapped names first, fall back to tag match.
             cand_names: list[str] = list(sec.get("mapped_module_names") or [])
             if len(cand_names) < _DEEP_DIVE_CANDIDATES_PER_SECTION:
-                for tag in (sec.get("capabilities_mentioned") or []):
+                for tag in sec.get("capabilities_mentioned") or []:
                     for name in tag_index.get(tag, []):
                         if name not in cand_names:
                             cand_names.append(name)
@@ -661,12 +674,13 @@ class BrdAiAnalyzer:
         if drop_names:
             before = len(merged.get("recommendations") or [])
             merged["recommendations"] = [
-                r for r in (merged.get("recommendations") or [])
-                if (r.get("name") or "") not in drop_names
+                r for r in (merged.get("recommendations") or []) if (r.get("name") or "") not in drop_names
             ]
             _logger.info(
                 "brd_ai_analyzer: deep-dive dropped %d/%d recommendation(s): %s",
-                before - len(merged["recommendations"]), before, sorted(drop_names),
+                before - len(merged["recommendations"]),
+                before,
+                sorted(drop_names),
             )
 
         if deep_raw:
@@ -747,16 +761,17 @@ class BrdAiAnalyzer:
 
     def _call_ai_deep_dive(self, *, user_message: str, quality: str = _DEEP_DIVE_QUALITY) -> str:
         # Deep-dive system prompt is fixed across all calls in this run → cache.
-        cached_system = (
-            f"{DEEP_DIVE_SYSTEM_PROMPT}\n\n"
-            f"<!-- cache_control: ephemeral -->\n"
-        )
-        result = self.env["custom.ai"].sudo()._chat(
-            messages=[{"role": "user", "content": user_message}],
-            system=cached_system,
-            quality=quality if quality in ("fast", "high") else _DEEP_DIVE_QUALITY,
-            max_tokens=_DEEP_DIVE_MAX_TOKENS,
-            temperature=0.2,
+        cached_system = f"{DEEP_DIVE_SYSTEM_PROMPT}\n\n<!-- cache_control: ephemeral -->\n"
+        result = (
+            self.env["custom.ai"]
+            .sudo()
+            ._chat(
+                messages=[{"role": "user", "content": user_message}],
+                system=cached_system,
+                quality=quality if quality in ("fast", "high") else _DEEP_DIVE_QUALITY,
+                max_tokens=_DEEP_DIVE_MAX_TOKENS,
+                temperature=0.2,
+            )
         )
         return self._unwrap_text(result)
 
@@ -775,12 +790,16 @@ class BrdAiAnalyzer:
         )
         # ai-gateway accepts quality ∈ {"fast","high"}. BRD analysis benefits
         # from the quality model (claude-opus-4-7) — fewer JSON parse retries.
-        result = self.env["custom.ai"].sudo()._chat(
-            messages=[{"role": "user", "content": user_message}],
-            system=cached_system,
-            quality="high",
-            max_tokens=_AI_MAX_TOKENS,
-            temperature=0.2,
+        result = (
+            self.env["custom.ai"]
+            .sudo()
+            ._chat(
+                messages=[{"role": "user", "content": user_message}],
+                system=cached_system,
+                quality="high",
+                max_tokens=_AI_MAX_TOKENS,
+                temperature=0.2,
+            )
         )
         # custom_ai_bridge gateway returns provider-shaped JSON; tolerate a few
         # common shapes.
@@ -1013,17 +1032,12 @@ class BrdAiAnalyzer:
             affects_names = rec.get("affects_existing_modules") or []
             affects_ids: list[int] = []
             if Catalog is not None and affects_names:
-                affects_ids = Catalog.search(
-                    [("module_name", "in", list(affects_names))]
-                ).ids
+                affects_ids = Catalog.search([("module_name", "in", list(affects_names))]).ids
             cross_map = rec.get("cross_vertical_impact")
             cross_json = ""
             if isinstance(cross_map, dict):
                 # Coerce values to list[str] for predictable storage.
-                clean = {
-                    str(k): [str(x) for x in (v if isinstance(v, list) else [])]
-                    for k, v in cross_map.items()
-                }
+                clean = {str(k): [str(x) for x in (v if isinstance(v, list) else [])] for k, v in cross_map.items()}
                 cross_json = json.dumps(clean, ensure_ascii=False)
             compat = rec.get("compat_strategy")
             if compat not in ("extend", "abstract_base", "feature_flag", "fork_warning"):
@@ -1052,7 +1066,9 @@ class BrdAiAnalyzer:
 
         # Second pass: sibling links.
         for rec_rec, sibling_names in name_to_rec.values():
-            sibs = [name_to_rec[n][0].id for n in sibling_names if n in name_to_rec and name_to_rec[n][0].id != rec_rec.id]
+            sibs = [
+                name_to_rec[n][0].id for n in sibling_names if n in name_to_rec and name_to_rec[n][0].id != rec_rec.id
+            ]
             if sibs:
                 rec_rec.write({"depends_on_proposed_ids": [(6, 0, sibs)]})
 
@@ -1061,10 +1077,12 @@ class BrdAiAnalyzer:
         raw_dump = "\n\n--- BATCH ---\n\n".join(raw_responses)
         if len(raw_dump) > 60000:
             raw_dump = raw_dump[:60000] + "\n…(truncated)"
-        brd_doc.write({
-            "state": "analyzed",
-            "last_ai_raw": raw_dump or False,
-            "last_ai_at": fields.Datetime.now(),
-            "last_ai_section_count": len(parsed.get("sections") or []),
-            "last_ai_recommendation_count": len(parsed.get("recommendations") or []),
-        })
+        brd_doc.write(
+            {
+                "state": "analyzed",
+                "last_ai_raw": raw_dump or False,
+                "last_ai_at": fields.Datetime.now(),
+                "last_ai_section_count": len(parsed.get("sections") or []),
+                "last_ai_recommendation_count": len(parsed.get("recommendations") or []),
+            }
+        )

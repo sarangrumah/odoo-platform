@@ -9,11 +9,13 @@ class AgedReceivableWizard(models.TransientModel):
     _description = "Aged Receivable Wizard"
 
     date_to = fields.Date(
-        string="As Of", required=True,
+        string="As Of",
+        required=True,
         default=lambda self: date.today(),
     )
     company_ids = fields.Many2many(
-        "res.company", default=lambda self: self.env.companies,
+        "res.company",
+        default=lambda self: self.env.companies,
     )
     partner_ids = fields.Many2many("res.partner")
 
@@ -38,6 +40,4 @@ class AgedReceivableWizard(models.TransientModel):
                 "date_to": self.date_to.isoformat(),
             },
         }
-        return self.env.ref(
-            "custom_accounting_reports.action_report_custom_financial"
-        ).report_action(self, data=data)
+        return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)

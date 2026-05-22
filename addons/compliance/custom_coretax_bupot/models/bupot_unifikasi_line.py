@@ -37,17 +37,12 @@ class CustomBupotUnifikasiLine(models.Model):
     internal_ref = fields.Char(
         required=True,
         copy=False,
-        default=lambda self: self.env["ir.sequence"].next_by_code(
-            "custom.bupot.unifikasi.line"
-        )
-        or "/",
-        help="Internal reference. Mapped to DJP-assigned bupot_number "
-             "via the CSV upload wizard.",
+        default=lambda self: self.env["ir.sequence"].next_by_code("custom.bupot.unifikasi.line") or "/",
+        help="Internal reference. Mapped to DJP-assigned bupot_number via the CSV upload wizard.",
     )
     bupot_number = fields.Char(
         string="No. Bukti Potong (DJP)",
-        help="Assigned by DJP Coretax after acceptance. Filled via "
-             "the CSV upload wizard.",
+        help="Assigned by DJP Coretax after acceptance. Filled via the CSV upload wizard.",
     )
     pph_type = fields.Selection(
         selection=PPH_TYPES,
@@ -95,10 +90,7 @@ class CustomBupotUnifikasiLine(models.Model):
         for rec in self:
             if rec.cuttee_npwp and not _NPWP_RE.match(rec.cuttee_npwp):
                 raise ValidationError(
-                    _(
-                        "NPWP %(value)s on line %(ref)s is invalid. "
-                        "Expected 15 or 16 numeric digits."
-                    )
+                    _("NPWP %(value)s on line %(ref)s is invalid. Expected 15 or 16 numeric digits.")
                     % {"value": rec.cuttee_npwp, "ref": rec.internal_ref}
                 )
 

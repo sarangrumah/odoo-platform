@@ -36,7 +36,9 @@ class QualityAlert(models.Model):
     closed_at = fields.Datetime(readonly=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
     capa_ids = fields.One2many(
-        "custom.quality.capa", "alert_id", string="CAPA Actions",
+        "custom.quality.capa",
+        "alert_id",
+        string="CAPA Actions",
     )
     capa_count = fields.Integer(compute="_compute_capa_count")
 
@@ -58,8 +60,7 @@ class QualityAlert(models.Model):
     def action_resolve(self):
         for rec in self:
             rec.write({"state": "resolved", "resolved_at": fields.Datetime.now()})
-            rec._pdp_audit_write("quality_alert_resolved", rec.id,
-                                 {"severity": rec.severity})
+            rec._pdp_audit_write("quality_alert_resolved", rec.id, {"severity": rec.severity})
 
     def action_close(self):
         for rec in self:

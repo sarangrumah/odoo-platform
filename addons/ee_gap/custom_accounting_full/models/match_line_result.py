@@ -12,7 +12,9 @@ class MatchLineResult(models.Model):
     _order = "result_id, id"
 
     result_id = fields.Many2one(
-        "custom.match.result", required=True, ondelete="cascade",
+        "custom.match.result",
+        required=True,
+        ondelete="cascade",
     )
     bill_line_id = fields.Many2one("account.move.line")
     po_line_id = fields.Many2one("purchase.order.line")

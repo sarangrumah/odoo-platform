@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import secrets
-from datetime import date
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
@@ -18,7 +17,10 @@ class HhtDevice(models.Model):
 
     name = fields.Char(required=True, tracking=True)
     device_id = fields.Char(
-        string="Device Serial / ID", required=True, index=True, tracking=True,
+        string="Device Serial / ID",
+        required=True,
+        index=True,
+        tracking=True,
         help="Unique physical/browser identifier (e.g. TC52-SN12345 or browser fp).",
     )
     model = fields.Selection(
@@ -35,17 +37,27 @@ class HhtDevice(models.Model):
         tracking=True,
     )
     tenant_id = fields.Many2one(
-        "tenant.registry", string="Tenant", ondelete="set null", index=True,
+        "tenant.registry",
+        string="Tenant",
+        ondelete="set null",
+        index=True,
     )
     user_id = fields.Many2one(
-        "res.users", string="Default Operator",
-        default=lambda self: self.env.user, required=True,
+        "res.users",
+        string="Default Operator",
+        default=lambda self: self.env.user,
+        required=True,
     )
     api_key = fields.Char(
-        string="API Key", readonly=True, copy=False, index=True,
+        string="API Key",
+        readonly=True,
+        copy=False,
+        index=True,
     )
     api_secret = fields.Char(
-        string="API Secret", readonly=True, copy=False,
+        string="API Secret",
+        readonly=True,
+        copy=False,
         help="Shared secret used for HMAC-SHA256 request signing.",
     )
     allowed_cidrs = fields.Char(
@@ -57,7 +69,8 @@ class HhtDevice(models.Model):
     last_action_at = fields.Datetime(readonly=True)
     last_action_summary = fields.Char(readonly=True)
     scan_count_today = fields.Integer(
-        string="Scans Today", compute="_compute_scan_count_today",
+        string="Scans Today",
+        compute="_compute_scan_count_today",
     )
     status = fields.Selection(
         [
@@ -65,7 +78,8 @@ class HhtDevice(models.Model):
             ("disabled", "Disabled"),
             ("quarantined", "Quarantined"),
         ],
-        compute="_compute_status", store=False,
+        compute="_compute_status",
+        store=False,
     )
     scan_log_count = fields.Integer(compute="_compute_counts")
     sync_queue_count = fields.Integer(compute="_compute_counts")
@@ -85,14 +99,19 @@ class HhtDevice(models.Model):
         Log = self.env["hht.scan.log"]
         today_start = fields.Datetime.to_string(
             fields.Datetime.context_timestamp(self, fields.Datetime.now()).replace(
-                hour=0, minute=0, second=0, microsecond=0,
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
             )
         )
         for rec in self:
-            rec.scan_count_today = Log.search_count([
-                ("device_id", "=", rec.id),
-                ("scanned_at", ">=", today_start),
-            ])
+            rec.scan_count_today = Log.search_count(
+                [
+                    ("device_id", "=", rec.id),
+                    ("scanned_at", ">=", today_start),
+                ]
+            )
 
     def _compute_status(self):
         for rec in self:
@@ -132,6 +151,7 @@ class HhtDevice(models.Model):
     @api.constrains("allowed_cidrs")
     def _check_allowed_cidrs(self):
         import ipaddress
+
         for rec in self:
             if not rec.allowed_cidrs:
                 continue
@@ -197,9 +217,13 @@ class HhtDevice(models.Model):
     def _find_by_api_key(self, api_key: str):
         if not api_key:
             return self.browse()
-        return self.sudo().search([
-            ("api_key", "=", api_key), ("enabled", "=", True),
-        ], limit=1)
+        return self.sudo().search(
+            [
+                ("api_key", "=", api_key),
+                ("enabled", "=", True),
+            ],
+            limit=1,
+        )
 
     @api.model
     def _cron_reset_scan_count_today(self):
@@ -212,6 +236,10 @@ class HhtDevice(models.Model):
     def _find_by_serial(self, serial: str):
         if not serial:
             return self.browse()
-        return self.sudo().search([
-            ("device_id", "=", serial), ("enabled", "=", True),
-        ], limit=1)
+        return self.sudo().search(
+            [
+                ("device_id", "=", serial),
+                ("enabled", "=", True),
+            ],
+            limit=1,
+        )

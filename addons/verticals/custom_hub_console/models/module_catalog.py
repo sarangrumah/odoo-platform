@@ -15,7 +15,6 @@ import ast
 import logging
 import os
 import re
-from datetime import datetime
 
 from odoo import api, fields, models
 
@@ -63,7 +62,7 @@ class CustomHubModuleCatalog(models.Model):
         string="Installed Module",
         ondelete="set null",
         help="Link to the Odoo ir.module.module row when this catalog "
-             "entry corresponds to a module installed in *this* database.",
+        "entry corresponds to a module installed in *this* database.",
     )
     summary = fields.Text()
     capability_tag_ids = fields.Many2many(
@@ -82,14 +81,11 @@ class CustomHubModuleCatalog(models.Model):
     )
     models_own_count = fields.Integer(default=0)
     models_inherit_count = fields.Integer(default=0)
-    deployment_count = fields.Integer(
-        compute="_compute_deployment_count", store=False
-    )
+    deployment_count = fields.Integer(compute="_compute_deployment_count", store=False)
     last_scanned = fields.Datetime()
 
     _sql_constraints = [
-        ("module_name_uniq", "unique(module_name)",
-         "Catalog entry module_name must be unique."),
+        ("module_name_uniq", "unique(module_name)", "Catalog entry module_name must be unique."),
     ]
 
     # ------------------------------------------------------------------
@@ -99,8 +95,7 @@ class CustomHubModuleCatalog(models.Model):
         Deployment = self.env["custom.hub.module.deployment"].sudo()
         for rec in self:
             rec.deployment_count = Deployment.search_count(
-                [("catalog_id", "=", rec.id),
-                 ("state", "in", ("installed", "upgrading"))]
+                [("catalog_id", "=", rec.id), ("state", "in", ("installed", "upgrading"))]
             )
 
     # ------------------------------------------------------------------
@@ -141,9 +136,7 @@ class CustomHubModuleCatalog(models.Model):
                 if not meta:
                     continue
                 models_own, models_inherit = self._count_models(module_path)
-                installed = Modules.search(
-                    [("name", "=", name)], limit=1
-                )
+                installed = Modules.search([("name", "=", name)], limit=1)
                 vals = {
                     "module_name": name,
                     "version": meta.get("version") or "",
@@ -163,9 +156,7 @@ class CustomHubModuleCatalog(models.Model):
                 else:
                     vals["maturity"] = "partial"
 
-                existing = self.search(
-                    [("module_name", "=", name)], limit=1
-                )
+                existing = self.search([("module_name", "=", name)], limit=1)
                 if existing:
                     existing.write(vals)
                     updated += 1
@@ -175,7 +166,9 @@ class CustomHubModuleCatalog(models.Model):
                 total += 1
         _logger.info(
             "[hub_catalog] scan complete: created=%s updated=%s total=%s",
-            created, updated, total,
+            created,
+            updated,
+            total,
         )
         return {"created": created, "updated": updated, "total": total}
 
@@ -197,9 +190,7 @@ class CustomHubModuleCatalog(models.Model):
             return None
 
     _NAME_RE = re.compile(r"^\s*_name\s*=\s*['\"]([\w.]+)['\"]", re.MULTILINE)
-    _INHERIT_RE = re.compile(
-        r"^\s*_inherit\s*=\s*['\"]([\w.]+)['\"]", re.MULTILINE
-    )
+    _INHERIT_RE = re.compile(r"^\s*_inherit\s*=\s*['\"]([\w.]+)['\"]", re.MULTILINE)
 
     @api.model
     def _count_models(self, module_path: str) -> tuple[int, int]:

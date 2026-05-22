@@ -18,5 +18,5 @@ class ProductTemplate(models.Model):
         "tax.withholding.category",
         string="PPh Withholding Category",
         help="If set, vendor bill lines on this product default to this PPh "
-             "category — useful for jasa konsultan, sewa, royalti, dst.",
+        "category — useful for jasa konsultan, sewa, royalti, dst.",
     )

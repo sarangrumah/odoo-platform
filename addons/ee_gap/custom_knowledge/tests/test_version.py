@@ -4,7 +4,6 @@ from odoo.tests import TransactionCase, tagged
 
 @tagged("post_install", "-at_install")
 class TestKnowledgeVersioning(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.article = self.env["knowledge.article"].create(
@@ -45,9 +44,7 @@ class TestKnowledgeVersioning(TransactionCase):
         self.assertEqual(self.article.version_count, 0)
 
     def test_share_token_autogen(self):
-        a = self.env["knowledge.article"].create(
-            {"name": "Sharable", "is_shared_externally": True}
-        )
+        a = self.env["knowledge.article"].create({"name": "Sharable", "is_shared_externally": True})
         self.assertTrue(a.share_token)
         self.assertGreaterEqual(len(a.share_token), 16)
 

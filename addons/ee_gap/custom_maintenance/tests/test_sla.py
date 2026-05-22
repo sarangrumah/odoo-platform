@@ -6,7 +6,6 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "custom_maintenance")
 class TestMaintenanceSla(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.Sla = self.env["custom.maintenance.team.sla"]
@@ -15,9 +14,7 @@ class TestMaintenanceSla(TransactionCase):
         self.Request = self.env["maintenance.request"]
         self.Stage = self.env["maintenance.stage"]
         self.team = self.Team.create({"name": "SLA Test Team"})
-        self.equipment = self.Equipment.create(
-            {"name": "SLA Test Equipment", "maintenance_team_id": self.team.id}
-        )
+        self.equipment = self.Equipment.create({"name": "SLA Test Equipment", "maintenance_team_id": self.team.id})
         self.sla = self.Sla.create(
             {
                 "name": "High SLA",
@@ -76,9 +73,7 @@ class TestMaintenanceSla(TransactionCase):
         )
         done_stage = self.Stage.search([("done", "=", True)], limit=1)
         if not done_stage:
-            done_stage = self.Stage.create(
-                {"name": "Done (test)", "done": True, "sequence": 99}
-            )
+            done_stage = self.Stage.create({"name": "Done (test)", "done": True, "sequence": 99})
         req.write({"stage_id": done_stage.id})
         req._compute_sla_status()
         self.assertEqual(req.x_sla_status, "done")

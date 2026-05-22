@@ -80,9 +80,7 @@ class PaymentProvider(models.Model):
         self.ensure_one()
         adapter = self._get_id_adapter()
         if not adapter:
-            raise UserError(
-                _("Provider '%s' is not an Indonesia gateway.") % self.name
-            )
+            raise UserError(_("Provider '%s' is not an Indonesia gateway.") % self.name)
         # Use the sudo-protected server key field requires manager group;
         # surface a friendly error when missing rather than failing later.
         if not self.sudo().x_id_server_key:
@@ -96,9 +94,8 @@ class PaymentProvider(models.Model):
             "tag": "display_notification",
             "params": {
                 "title": _("Connection Test"),
-                "message": _(
-                    "HTTP %(status)s in %(latency)d ms (log id %(log)s)"
-                ) % {
+                "message": _("HTTP %(status)s in %(latency)d ms (log id %(log)s)")
+                % {
                     "status": result.get("http_status"),
                     "latency": result.get("latency_ms") or 0,
                     "log": result.get("log_id"),

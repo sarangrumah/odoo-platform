@@ -20,7 +20,6 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any
 
 import requests
 
@@ -101,9 +100,7 @@ class IdPaymentAdapter(models.AbstractModel):
         }
         model_name = mapping.get(code)
         if not model_name:
-            raise UserError(
-                _("No Indonesia adapter registered for provider code '%s'.") % code
-            )
+            raise UserError(_("No Indonesia adapter registered for provider code '%s'.") % code)
         return self.env[model_name]
 
     # -------- Subclass overrides (defaults raise) --------
@@ -169,13 +166,17 @@ class IdPaymentAdapter(models.AbstractModel):
                 % provider.name
             )
 
-        log = self.env["custom.payment.id.log"].sudo().create(
-            {
-                "provider_id": provider.id,
-                "transaction_id": transaction.id if transaction else False,
-                "request_payload": json.dumps(payload, ensure_ascii=False, default=str),
-                "state": "queued",
-            }
+        log = (
+            self.env["custom.payment.id.log"]
+            .sudo()
+            .create(
+                {
+                    "provider_id": provider.id,
+                    "transaction_id": transaction.id if transaction else False,
+                    "request_payload": json.dumps(payload, ensure_ascii=False, default=str),
+                    "state": "queued",
+                }
+            )
         )
 
         endpoint = endpoint_override or self._endpoint(provider, payload)
@@ -214,9 +215,7 @@ class IdPaymentAdapter(models.AbstractModel):
                     }
                 )
                 if resp.status_code >= 400:
-                    log.write(
-                        {"state": "failed", "error_message": f"HTTP {resp.status_code}"}
-                    )
+                    log.write({"state": "failed", "error_message": f"HTTP {resp.status_code}"})
                     _circuit_record_failure(self.env, provider)
                     return {
                         "ok": False,

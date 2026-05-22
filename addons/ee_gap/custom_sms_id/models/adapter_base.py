@@ -101,9 +101,7 @@ class CustomSmsAdapterBase(models.AbstractModel):
 
             {"ok": bool, "provider_message_id": str | None, "message": str}
         """
-        raise NotImplementedError(
-            "custom.sms.adapter.base.send must be overridden by a provider subclass"
-        )
+        raise NotImplementedError("custom.sms.adapter.base.send must be overridden by a provider subclass")
 
     @api.model
     def test_connection(self, account) -> dict:
@@ -121,14 +119,18 @@ class CustomSmsAdapterBase(models.AbstractModel):
     def _check_circuit(self, account) -> None:
         """Raise UserError if the breaker for ``account`` is open."""
         if _circuit_open(account.id):
-            raise UserError(_(
-                "SMS circuit breaker is OPEN for account '%s'. Will auto-reset "
-                "in up to 5 minutes, or fix the underlying error and retry."
-            ) % account.display_name)
+            raise UserError(
+                _(
+                    "SMS circuit breaker is OPEN for account '%s'. Will auto-reset "
+                    "in up to 5 minutes, or fix the underlying error and retry."
+                )
+                % account.display_name
+            )
 
     @api.model
-    def _post(self, url: str, data: dict | None = None, *, auth: tuple | None = None,
-              timeout: int = 30, account=None) -> requests.Response:
+    def _post(
+        self, url: str, data: dict | None = None, *, auth: tuple | None = None, timeout: int = 30, account=None
+    ) -> requests.Response:
         """POST with retry x3 exponential backoff + circuit-breaker awareness.
 
         Honours ``Retry-After`` on HTTP 429. Logs request latency.
@@ -137,9 +139,7 @@ class CustomSmsAdapterBase(models.AbstractModel):
         """
         account_id = account.id if account else 0
         if account and _circuit_open(account_id):
-            raise UserError(_(
-                "SMS circuit breaker OPEN for account '%s'. Refusing to POST."
-            ) % account.display_name)
+            raise UserError(_("SMS circuit breaker OPEN for account '%s'. Refusing to POST.") % account.display_name)
 
         attempt = 0
         last_exc: Exception | None = None
@@ -151,7 +151,10 @@ class CustomSmsAdapterBase(models.AbstractModel):
                 latency_ms = (time.monotonic() - start) * 1000.0
                 _logger.info(
                     "[custom_sms_id] POST %s attempt=%s status=%s latency_ms=%.1f",
-                    url, attempt, resp.status_code, latency_ms,
+                    url,
+                    attempt,
+                    resp.status_code,
+                    latency_ms,
                 )
 
                 if resp.status_code == 429:
@@ -180,8 +183,9 @@ class CustomSmsAdapterBase(models.AbstractModel):
                     if account:
                         if _circuit_record_failure(account_id):
                             _logger.warning(
-                                "[custom_sms_id] circuit OPENED for account %s "
-                                "after HTTP %s", account_id, resp.status_code,
+                                "[custom_sms_id] circuit OPENED for account %s after HTTP %s",
+                                account_id,
+                                resp.status_code,
                             )
                     raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:300]}")
 
@@ -194,7 +198,9 @@ class CustomSmsAdapterBase(models.AbstractModel):
                 last_exc = e
                 _logger.warning(
                     "[custom_sms_id] POST %s attempt=%s transport-error: %s",
-                    url, attempt, e,
+                    url,
+                    attempt,
+                    e,
                 )
                 if attempt < _MAX_RETRIES:
                     time.sleep(_BACKOFF_BASE * (2 ** (attempt - 1)))

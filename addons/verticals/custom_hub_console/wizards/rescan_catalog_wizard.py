@@ -15,10 +15,7 @@ class CustomHubRescanCatalogWizard(models.TransientModel):
     def action_run(self):
         self.ensure_one()
         out = self.env["custom.hub.module.catalog"].sudo()._action_scan_all()
-        self.result_summary = _(
-            "Scan complete: created=%(created)s updated=%(updated)s "
-            "total=%(total)s"
-        ) % out
+        self.result_summary = _("Scan complete: created=%(created)s updated=%(updated)s total=%(total)s") % out
         return {
             "type": "ir.actions.act_window",
             "name": _("Module Catalog"),

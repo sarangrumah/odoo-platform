@@ -1,0 +1,43 @@
+# Root pyproject.toml — currently exists only to host repo-wide ruff config.
+#
+# Service-level projects (ai-gateway/, tenant-orchestrator/, custom-predictor/)
+# have their own pyproject.toml that ruff auto-discovers and takes precedence
+# inside those subdirectories. Settings here apply to everything else, which
+# is mostly Odoo addons in addons/.
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+# Exclude vendored upstream code so direct `ruff check` / `ruff format`
+# invocations also skip them (the pre-commit-config has an equivalent global
+# exclude, but that only applies when ruff runs through pre-commit).
+extend-exclude = [
+  "addons/_vendor/**",
+  "**/static/lib/**",
+  "**/.next/**",
+]
+
+# Note: ruff defaults to `select = ["E", "F"]` (pycodestyle errors + pyflakes).
+# We intentionally keep that minimal default repo-wide. The service-level
+# projects (ai-gateway/, tenant-orchestrator/, custom-predictor/) opt into
+# broader rule sets via their own pyproject.toml. Bringing the same rule set
+# repo-wide would dump ~900 new violations on Odoo addons that have never been
+# linted that way — handle that as a separate cleanup, not as part of #6.
+
+[tool.ruff.lint]
+ignore = [
+  "E501",  # line length enforced by ruff-format, not the linter
+  "E741",  # Odoo conventions tolerate l/I/O as iteration variables
+  "F841",  # unused locals: 10 sites in addons/ flagged — none look load-bearing
+           # but each merits manual review (see followup issue), out of scope
+           # for ci-lint cleanup
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Odoo modules use __init__.py for side-effect imports (models, controllers,
+# etc.). These look "unused" to ruff but are essential for module loading.
+"**/__init__.py" = ["F401"]
+
+# Migration scripts inherently import then call symbols dynamically.
+"**/migrations/**" = ["F401", "F811"]

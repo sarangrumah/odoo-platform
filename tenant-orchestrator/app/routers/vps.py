@@ -13,8 +13,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -30,7 +30,10 @@ def _demo_mode() -> bool:
     """``PLATFORM_DEMO_MODE=true`` short-circuits SSH-dependent actions to
     a friendly stub response so a fresh UAT install never returns 502."""
     return os.environ.get("PLATFORM_DEMO_MODE", "false").lower() in (
-        "1", "true", "yes", "on",
+        "1",
+        "true",
+        "yes",
+        "on",
     )
 
 
@@ -49,6 +52,8 @@ def _credential_skip_response(detail: str) -> JSONResponse:
             ),
         },
     )
+
+
 from ..validators import (
     BootstrapRequest,
     DeployStackRequest,
@@ -136,9 +141,7 @@ def register_vps(body: VPSRegisterRequest, request: Request) -> dict:
         return _credential_skip_response(str(e))
     except Exception as e:  # noqa: BLE001
         log.warning("vps.register.ssh_failed host=%s err=%s", target.hostname, e)
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY, f"SSH connect failed: {e}"
-        ) from e
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"SSH connect failed: {e}") from e
     log.info("vps.registered host=%s actor=%s", target.hostname, actor)
     return {
         "ok": True,
@@ -239,7 +242,7 @@ def health(
     hostname: str,
     ssh_user: str = "root",
     ssh_port: int = 22,
-    ssh_credential_ref: Optional[str] = None,
+    ssh_credential_ref: str | None = None,
 ) -> dict:
     """Quick SSH + docker-ps probe. Returns ``{ok: bool, output: str}``."""
     if not ssh_credential_ref:
@@ -264,10 +267,7 @@ def health(
         return {
             "ok": False,
             "skipped": True,
-            "reason": (
-                "ssh credential could not be resolved — configure vault:// or "
-                f"use file:// ref. detail: {e}"
-            ),
+            "reason": (f"ssh credential could not be resolved — configure vault:// or use file:// ref. detail: {e}"),
         }
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": str(e)}

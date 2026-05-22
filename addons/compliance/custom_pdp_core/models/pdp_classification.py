@@ -31,8 +31,8 @@ class PdpClassification(models.Model):
     active = fields.Boolean(default=True)
 
     _code_uniq = models.Constraint(
-        'unique(code)',
-        'Classification code must be unique.',
+        "unique(code)",
+        "Classification code must be unique.",
     )
 
     @api.constrains("code")

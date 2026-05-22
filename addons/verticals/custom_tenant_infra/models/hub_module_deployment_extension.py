@@ -16,7 +16,7 @@ class HubModuleDeploymentEnv(models.Model):
         string="Target Environment",
         ondelete="set null",
         help="Optional staging/prod environment row from tenant_infra. "
-             "When unset the deployment targets the tenant default.",
+        "When unset the deployment targets the tenant default.",
     )
 
 
@@ -28,5 +28,5 @@ class HubDeployModuleWizardEnv(models.TransientModel):
         string="Canary Environment",
         ondelete="set null",
         help="Optional explicit staging environment to target. If empty "
-             "the deployment auto-picks a staging env for each tenant.",
+        "the deployment auto-picks a staging env for each tenant.",
     )

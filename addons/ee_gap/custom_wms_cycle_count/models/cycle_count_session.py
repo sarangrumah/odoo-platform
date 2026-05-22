@@ -49,8 +49,9 @@ class CycleCountSession(models.Model):
                 vals["name"] = seq or _("CC/NEW")
         return super().create(vals_list)
 
-    @api.depends("line_ids", "line_ids.variance_qty", "line_ids.expected_qty",
-                 "line_ids.counted_qty", "line_ids.product_id")
+    @api.depends(
+        "line_ids", "line_ids.variance_qty", "line_ids.expected_qty", "line_ids.counted_qty", "line_ids.product_id"
+    )
     def _compute_counts(self):
         for rec in self:
             rec.line_count = len(rec.line_ids)
@@ -76,9 +77,9 @@ class CycleCountSession(models.Model):
     def action_close(self):
         for rec in self:
             if rec.line_ids.filtered(lambda l: l.status not in ("approved", "skipped")):
-                raise UserError(_(
-                    "All lines must be approved or skipped before closing session %s."
-                ) % rec.display_name)
+                raise UserError(
+                    _("All lines must be approved or skipped before closing session %s.") % rec.display_name
+                )
             rec.state = "closed"
             rec.completed_at = fields.Datetime.now()
 

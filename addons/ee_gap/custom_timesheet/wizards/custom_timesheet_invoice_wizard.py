@@ -9,18 +9,14 @@ class CustomTimesheetInvoiceWizard(models.TransientModel):
 
     sale_order_id = fields.Many2one("sale.order", string="Sale Order")
     partner_id = fields.Many2one("res.partner", string="Customer", required=True)
-    date_from = fields.Date(string="Date From", required=True,
-                            default=lambda self: fields.Date.context_today(self))
-    date_to = fields.Date(string="Date To", required=True,
-                          default=lambda self: fields.Date.context_today(self))
+    date_from = fields.Date(string="Date From", required=True, default=lambda self: fields.Date.context_today(self))
+    date_to = fields.Date(string="Date To", required=True, default=lambda self: fields.Date.context_today(self))
     line_ids = fields.One2many(
         "custom.timesheet.invoice.wizard.line",
         "wizard_id",
         string="Timesheet Lines",
     )
-    company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, required=True
-    )
+    company_id = fields.Many2one("res.company", default=lambda self: self.env.company, required=True)
 
     @api.onchange("partner_id", "date_from", "date_to", "sale_order_id")
     def _onchange_filters(self):
@@ -31,15 +27,19 @@ class CustomTimesheetInvoiceWizard(models.TransientModel):
         AAL = self.env["account.analytic.line"].sudo()
         lines = AAL.search(domain)
         self.line_ids = [
-            (0, 0, {
-                "analytic_line_id": l.id,
-                "date": l.date,
-                "employee_id": l.employee_id.id,
-                "project_id": l.project_id.id,
-                "unit_amount": l.unit_amount,
-                "billing_rate": l.x_billing_rate,
-                "selected": True,
-            })
+            (
+                0,
+                0,
+                {
+                    "analytic_line_id": l.id,
+                    "date": l.date,
+                    "employee_id": l.employee_id.id,
+                    "project_id": l.project_id.id,
+                    "unit_amount": l.unit_amount,
+                    "billing_rate": l.x_billing_rate,
+                    "selected": True,
+                },
+            )
             for l in lines
         ]
 
@@ -90,7 +90,8 @@ class CustomTimesheetInvoiceWizard(models.TransientModel):
             # Resolve product from sale_line if present.
             product = aal.so_line.product_id if aal.so_line else False
             line_vals = {
-                "name": "%s - %s" % (
+                "name": "%s - %s"
+                % (
                     aal.project_id.name or "",
                     aal.name or aal.employee_id.name or "",
                 ),

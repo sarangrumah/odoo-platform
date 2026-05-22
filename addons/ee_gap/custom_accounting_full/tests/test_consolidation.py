@@ -13,49 +13,62 @@ from .common import AccountingFullCommon
 
 @tagged("post_install", "-at_install")
 class TestConsolidation(AccountingFullCommon):
-
     def _post_simple_journal(self, company, debit_account, credit_account, amount, journal):
         """Post a manual journal entry (skips the invoice machinery)."""
-        move = self.Move.with_company(company).create({
-            "move_type": "entry",
-            "journal_id": journal.id,
-            "date": date.today(),
-            "company_id": company.id,
-            "line_ids": [
-                (0, 0, {
-                    "name": "Debit",
-                    "account_id": debit_account.id,
-                    "debit": amount,
-                    "credit": 0.0,
-                }),
-                (0, 0, {
-                    "name": "Credit",
-                    "account_id": credit_account.id,
-                    "debit": 0.0,
-                    "credit": amount,
-                }),
-            ],
-        })
+        move = self.Move.with_company(company).create(
+            {
+                "move_type": "entry",
+                "journal_id": journal.id,
+                "date": date.today(),
+                "company_id": company.id,
+                "line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "name": "Debit",
+                            "account_id": debit_account.id,
+                            "debit": amount,
+                            "credit": 0.0,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "name": "Credit",
+                            "account_id": credit_account.id,
+                            "debit": 0.0,
+                            "credit": amount,
+                        },
+                    ),
+                ],
+            }
+        )
         move.action_post()
         return move
 
     def test_perimeter_includes_parent_and_subs(self):
-        config = self.ConsolConfig.create({
-            "name": "FY",
-            "fiscal_year": date.today().year,
-            "parent_company_id": self.company_a.id,
-            "subsidiary_ids": [(6, 0, [self.company_b.id])],
-        })
+        config = self.ConsolConfig.create(
+            {
+                "name": "FY",
+                "fiscal_year": date.today().year,
+                "parent_company_id": self.company_a.id,
+                "subsidiary_ids": [(6, 0, [self.company_b.id])],
+            }
+        )
         self.assertEqual(config.perimeter_company_ids(), self.company_a | self.company_b)
 
     def test_parent_in_subsidiaries_rejected(self):
         with self.assertRaises(ValidationError):
-            self.ConsolConfig.create({
-                "name": "Bad",
-                "fiscal_year": date.today().year,
-                "parent_company_id": self.company_a.id,
-                "subsidiary_ids": [(6, 0, [self.company_a.id])],
-            })
+            self.ConsolConfig.create(
+                {
+                    "name": "Bad",
+                    "fiscal_year": date.today().year,
+                    "parent_company_id": self.company_a.id,
+                    "subsidiary_ids": [(6, 0, [self.company_a.id])],
+                }
+            )
 
     def test_trial_balance_aggregates_both_companies(self):
         # Post 1,000,000 in Co A and 500,000 in Co B on the same code (11100 → 41000)
@@ -63,17 +76,17 @@ class TestConsolidation(AccountingFullCommon):
         # Manual moves use a generic journal — create one for each company:
         misc_a = self._mk_journal(self.company_a, "Misc A", "general", "MISC-A")
         misc_b = self._mk_journal(self.company_b, "Misc B", "general", "MISC-B")
-        self._post_simple_journal(self.company_a, self.rec_account_a, self.rev_account_a,
-                                  1_000_000, misc_a)
-        self._post_simple_journal(self.company_b, self.rec_account_b, self.rev_account_b,
-                                  500_000, misc_b)
+        self._post_simple_journal(self.company_a, self.rec_account_a, self.rev_account_a, 1_000_000, misc_a)
+        self._post_simple_journal(self.company_b, self.rec_account_b, self.rev_account_b, 500_000, misc_b)
 
-        config = self.ConsolConfig.create({
-            "name": "FY",
-            "fiscal_year": date.today().year,
-            "parent_company_id": self.company_a.id,
-            "subsidiary_ids": [(6, 0, [self.company_b.id])],
-        })
+        config = self.ConsolConfig.create(
+            {
+                "name": "FY",
+                "fiscal_year": date.today().year,
+                "parent_company_id": self.company_a.id,
+                "subsidiary_ids": [(6, 0, [self.company_b.id])],
+            }
+        )
         data = config.build_trial_balance(date.today().replace(month=1, day=1), date.today())
         accounts_by_code = {a["account_code"]: a for a in data["accounts"]}
         self.assertIn("11100", accounts_by_code)
@@ -95,13 +108,15 @@ class TestConsolidation(AccountingFullCommon):
         self._post_simple_journal(self.company_a, self.ic_recv_a, self.rev_account_a, 200, misc_a)
         self._post_simple_journal(self.company_b, self.exp_account_b, self.ic_pay_b, 200, misc_b)
 
-        config = self.ConsolConfig.create({
-            "name": "FY",
-            "fiscal_year": date.today().year,
-            "parent_company_id": self.company_a.id,
-            "subsidiary_ids": [(6, 0, [self.company_b.id])],
-            "elimination_account_ids": [(6, 0, [self.ic_recv_a.id, self.ic_pay_b.id])],
-        })
+        config = self.ConsolConfig.create(
+            {
+                "name": "FY",
+                "fiscal_year": date.today().year,
+                "parent_company_id": self.company_a.id,
+                "subsidiary_ids": [(6, 0, [self.company_b.id])],
+                "elimination_account_ids": [(6, 0, [self.ic_recv_a.id, self.ic_pay_b.id])],
+            }
+        )
         data = config.build_trial_balance(date.today().replace(month=1, day=1), date.today())
         by_code = {a["account_code"]: a for a in data["accounts"]}
         # IC receivable in A should have 200, eliminated to 0

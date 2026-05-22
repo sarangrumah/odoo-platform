@@ -6,6 +6,7 @@ nodes that aggregate accounts or account types and feed into Balance
 Sheet / P&L / Cash Flow renderers. Editable at runtime via
 Configuration → Financial Report Trees.
 """
+
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
@@ -59,7 +60,7 @@ class CustomReportFinancial(models.Model):
     sign = fields.Integer(
         default=1,
         help="+1 keeps the natural sign, -1 flips it. Use -1 for "
-             "revenue/liability/equity sections to display positively.",
+        "revenue/liability/equity sections to display positively.",
     )
     style = fields.Selection(
         selection=[
@@ -81,7 +82,7 @@ class CustomReportFinancial(models.Model):
     account_type_ids = fields.Char(
         string="Account Types",
         help="Comma-separated list of ``account.account.account_type`` "
-             "values (e.g. ``asset_current,asset_non_current``).",
+        "values (e.g. ``asset_current,asset_non_current``).",
     )
     company_id = fields.Many2one(
         comodel_name="res.company",
@@ -93,23 +94,16 @@ class CustomReportFinancial(models.Model):
     @api.constrains("parent_id")
     def _check_node_recursion(self):
         if not self._check_recursion():
-            raise ValidationError(_(
-                "A financial report node cannot be its own ancestor."
-            ))
+            raise ValidationError(_("A financial report node cannot be its own ancestor."))
 
     @api.depends("code", "name")
     def _compute_display_name(self):
         for rec in self:
-            rec.display_name = (
-                f"[{rec.code}] {rec.name}" if rec.code else rec.name or ""
-            )
+            rec.display_name = f"[{rec.code}] {rec.name}" if rec.code else rec.name or ""
 
     def get_account_type_codes(self):
         self.ensure_one()
-        return [
-            c.strip() for c in (self.account_type_ids or "").split(",")
-            if c.strip()
-        ]
+        return [c.strip() for c in (self.account_type_ids or "").split(",") if c.strip()]
 
     # ------------------------------------------------------------------
     # Aggregation
@@ -139,14 +133,16 @@ class CustomReportFinancial(models.Model):
     def _flatten(self, balance_cache, type_cache, lines, depth=0):
         self.ensure_one()
         value = self._node_value(balance_cache, type_cache)
-        lines.append({
-            "type": self.style or "normal",
-            "label": self.name,
-            "code": self.code,
-            "level": depth,
-            "signed_balance": value,
-            "style": self.style,
-        })
+        lines.append(
+            {
+                "type": self.style or "normal",
+                "label": self.name,
+                "code": self.code,
+                "level": depth,
+                "signed_balance": value,
+                "style": self.style,
+            }
+        )
         if self.type == "computed":
             for child in self.children_ids:
                 child._flatten(balance_cache, type_cache, lines, depth + 1)
@@ -165,28 +161,26 @@ class CustomReportFinancialRenderer(models.AbstractModel):
     def _build_lines(self, filters):
         report_id = filters.get("financial_report_id")
         if not report_id:
-            return [{
-                "type": "warning",
-                "label": _("Select a Financial Report tree to render."),
-            }]
+            return [
+                {
+                    "type": "warning",
+                    "label": _("Select a Financial Report tree to render."),
+                }
+            ]
         root = self.env["custom.report.financial"].browse(report_id)
         if not root.exists():
-            return [{
-                "type": "warning",
-                "label": _(
-                    "Financial report tree %(rid)s no longer exists.",
-                    rid=report_id,
-                ),
-            }]
+            return [
+                {
+                    "type": "warning",
+                    "label": _(
+                        "Financial report tree %(rid)s no longer exists.",
+                        rid=report_id,
+                    ),
+                }
+            ]
         per_account = self._get_account_balances(filters)
-        balance_cache = {
-            row["account_id"]: row["balance"]
-            for row in per_account.values()
-        }
-        type_cache = {
-            row["account_id"]: row["account_type"]
-            for row in per_account.values()
-        }
+        balance_cache = {row["account_id"]: row["balance"] for row in per_account.values()}
+        type_cache = {row["account_id"]: row["account_type"] for row in per_account.values()}
         lines = []
         root._flatten(balance_cache, type_cache, lines)
         return lines

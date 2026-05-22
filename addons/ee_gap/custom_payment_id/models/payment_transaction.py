@@ -55,19 +55,13 @@ class PaymentTransaction(models.Model):
         for tx in id_txs:
             adapter = tx.provider_id._get_id_adapter()
             if not adapter:
-                raise UserError(
-                    _("Provider '%s' has no Indonesia adapter.") % tx.provider_id.name
-                )
+                raise UserError(_("Provider '%s' has no Indonesia adapter.") % tx.provider_id.name)
             result = adapter.create_checkout(tx.provider_id, tx)
             tx.write(
                 {
                     "x_id_redirect_url": result.get("redirect_url"),
                     "provider_reference": result.get("reference") or tx.reference,
-                    "x_id_raw_response": (
-                        str(result.get("raw"))[:65000]
-                        if result.get("raw") is not None
-                        else False
-                    ),
+                    "x_id_raw_response": (str(result.get("raw"))[:65000] if result.get("raw") is not None else False),
                 }
             )
             # Pending until the gateway notifies us of success.
@@ -96,9 +90,7 @@ class PaymentTransaction(models.Model):
         if not adapter or not hasattr(adapter, "refund"):
             raise UserError(_("Refund not supported for this provider yet."))
         body = adapter.refund(self.provider_id, self, amount=amount)
-        self.message_post(
-            body=_("Refund issued via %s: %s") % (self.provider_code, body)
-        )
+        self.message_post(body=_("Refund issued via %s: %s") % (self.provider_code, body))
         return body
 
 

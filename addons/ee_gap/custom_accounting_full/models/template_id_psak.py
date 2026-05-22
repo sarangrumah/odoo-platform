@@ -13,6 +13,7 @@ The 5-digit code structure is preserved per PSAK convention:
   7xxxx  Pendapatan / Beban Lain (Other Income/Expense)
   8xxxx  Pajak Penghasilan (Income Tax)
 """
+
 from odoo import models
 from odoo.addons.account.models.chart_template import template
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Small extension of stock.picking used by the QWeb barcode summary report."""
+
 from collections import defaultdict
 
 from odoo import models
@@ -10,9 +11,7 @@ class StockPicking(models.Model):
 
     def _barcode_summary_sessions(self):
         self.ensure_one()
-        return self.env["custom.barcode.scan.session"].search(
-            [("picking_id", "=", self.id)]
-        )
+        return self.env["custom.barcode.scan.session"].search([("picking_id", "=", self.id)])
 
     def _barcode_summary_rows(self):
         """Return list of dicts: {product, expected, scanned, deviation_pct}."""
@@ -23,9 +22,7 @@ class StockPicking(models.Model):
 
         scanned = defaultdict(float)
         sessions = self._barcode_summary_sessions()
-        for line in sessions.mapped("line_ids").filtered(
-            lambda l: l.status == "ok" and l.product_id
-        ):
+        for line in sessions.mapped("line_ids").filtered(lambda l: l.status == "ok" and l.product_id):
             scanned[line.product_id.id] += line.quantity
 
         product_ids = set(expected.keys()) | set(scanned.keys())

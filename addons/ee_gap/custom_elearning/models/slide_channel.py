@@ -59,8 +59,7 @@ class SlideChannel(models.Model):
     # without a hard FK dependency.
     x_completion_appraisal_skill_code = fields.Char(
         string="Completion Skill Code",
-        help="Code of the skill (hr.skill or appraisal.skill) to award upon "
-             "course completion.",
+        help="Code of the skill (hr.skill or appraisal.skill) to award upon course completion.",
     )
 
     # ---------------- Actions ----------------
@@ -90,9 +89,7 @@ class SlideChannel(models.Model):
             )
 
         if not scp_records:
-            raise UserError(
-                _("No completed members found for course '%s'.") % self.name
-            )
+            raise UserError(_("No completed members found for course '%s'.") % self.name)
 
         # Stamp completion record(s) and increment counter
         report = self.env.ref(
@@ -101,9 +98,7 @@ class SlideChannel(models.Model):
         )
         for scp in scp_records:
             scp._stamp_certificate_issued()
-        self.x_certificate_generated_count = (
-            self.x_certificate_generated_count or 0
-        ) + len(scp_records)
+        self.x_certificate_generated_count = (self.x_certificate_generated_count or 0) + len(scp_records)
         self.message_post(
             body=_("Generated %s certificate(s).") % len(scp_records),
         )
@@ -121,9 +116,7 @@ class SlideChannel(models.Model):
         member whose completion is still below 50%.
         """
         Cohort = self.env["custom.elearning.cohort"]
-        cohorts = Cohort.search(
-            [("state", "in", ("open", "running"))]
-        )
+        cohorts = Cohort.search([("state", "in", ("open", "running"))])
         sent = 0
         for cohort in cohorts:
             sent += cohort.action_send_completion_reminders()

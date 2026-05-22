@@ -26,8 +26,7 @@ class HrEmployee(models.Model):
                     employee._x_create_initial_annual_allocations()
                 except Exception:
                     _logger.exception(
-                        "custom_hr_leave_id: failed to auto-create annual "
-                        "allocation for employee id=%s",
+                        "custom_hr_leave_id: failed to auto-create annual allocation for employee id=%s",
                         employee.id,
                     )
         return employees
@@ -63,9 +62,7 @@ class HrEmployee(models.Model):
         # Pro-rate 12 annual leave days based on remaining year fraction.
         prorated = max(0, round(12.0 * remaining_days / total_days))
 
-        annual_types = LeaveType.search(
-            [("x_id_leave_category", "=", "cuti_tahunan")]
-        )
+        annual_types = LeaveType.search([("x_id_leave_category", "=", "cuti_tahunan")])
         for ltype in annual_types:
             existing = Allocation.search(
                 [

@@ -22,7 +22,8 @@ class CustomEmailApplyTemplateWizard(models.TransientModel):
     preview_subject = fields.Char(related="template_id.subject", readonly=True)
     preview_body = fields.Html(related="template_id.body_html", readonly=True)
     preview_thumbnail = fields.Binary(
-        related="template_id.preview_thumbnail", readonly=True,
+        related="template_id.preview_thumbnail",
+        readonly=True,
     )
 
     def action_apply(self):

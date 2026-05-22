@@ -5,6 +5,7 @@ from . import account_consolidation_config
 from . import account_consolidation_mapping
 from . import account_analytic_extension
 from . import res_company_inherit
+
 # v0.2.0 — additional EE-gap features
 from . import consolidation_chart
 from . import consolidation_mapping

@@ -18,22 +18,28 @@ class CustomRentalPricing(models.Model):
     quoting a duration we pick the combination that yields the lowest
     total price.
     """
+
     _name = "custom.rental.pricing"
     _description = "Rental Pricing Tier"
     _order = "product_template_id, unit, duration"
 
     name = fields.Char(compute="_compute_name", store=True)
     product_template_id = fields.Many2one(
-        "product.template", required=True, ondelete="cascade", index=True,
+        "product.template",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     duration = fields.Integer(required=True, default=1)
     unit = fields.Selection(
         [("hour", "Hour"), ("day", "Day"), ("week", "Week"), ("month", "Month")],
-        required=True, default="day",
+        required=True,
+        default="day",
     )
     price = fields.Monetary(required=True, currency_field="currency_id")
     currency_id = fields.Many2one(
-        "res.currency", required=True,
+        "res.currency",
+        required=True,
         default=lambda s: s.env.company.currency_id,
     )
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
@@ -81,7 +87,8 @@ class CustomRentalPricing(models.Model):
             ccy = currency or tiers[0].currency_id
             if currency and tiers[0].currency_id and currency != tiers[0].currency_id:
                 price = tiers[0].currency_id._convert(
-                    price, currency,
+                    price,
+                    currency,
                     self.env.company,
                     fields.Date.context_today(self),
                 )

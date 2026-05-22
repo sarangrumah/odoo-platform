@@ -9,6 +9,7 @@ Extends the original scaffold with:
 - Snapshot-on-body-change version history
 - Apply-template helper that clones template body
 """
+
 import logging
 import secrets
 
@@ -60,10 +61,7 @@ class KnowledgeArticle(models.Model):
         "article_id",
         "group_id",
         string="Restricted Read Groups",
-        help=(
-            "If set, only members of these groups can read this article. "
-            "When empty, all Knowledge users may read."
-        ),
+        help=("If set, only members of these groups can read this article. When empty, all Knowledge users may read."),
     )
     color = fields.Integer()
     display_name = fields.Char(
@@ -255,9 +253,7 @@ class KnowledgeArticle(models.Model):
                 "is_shared_externally": True,
             }
         )
-        base = (
-            self.env["ir.config_parameter"].sudo().get_param("web.base.url") or ""
-        ).rstrip("/")
+        base = (self.env["ir.config_parameter"].sudo().get_param("web.base.url") or "").rstrip("/")
         url = "%s/knowledge/share/%s" % (base, self.share_token)
         return {
             "type": "ir.actions.client",
@@ -352,10 +348,7 @@ class KnowledgeArticle(models.Model):
                 [("id", "in", accessible), ("name", "ilike", query)],
                 limit=limit,
             )
-            return [
-                {"id": h.id, "name": h.name, "rank": 0.0, "snippet": ""}
-                for h in hits
-            ]
+            return [{"id": h.id, "name": h.name, "rank": 0.0, "snippet": ""} for h in hits]
         return rows
 
     # ------------------------------------------------------------------
@@ -371,6 +364,4 @@ class KnowledgeArticle(models.Model):
                 "target": "self",
                 "res_id": self.id,
             }
-        return super()._get_access_action(
-            access_uid=access_uid, force_website=force_website
-        )
+        return super()._get_access_action(access_uid=access_uid, force_website=force_website)

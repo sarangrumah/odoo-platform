@@ -16,10 +16,7 @@ class CustomEsgMetric(models.Model):
 
     framework_codes = fields.Char(
         string="Framework Codes",
-        help=(
-            "Comma-separated framework:code mapping, "
-            "e.g. 'GRI:302-1,POJK51:E1,SASB:EM-CG-110a.1'."
-        ),
+        help=("Comma-separated framework:code mapping, e.g. 'GRI:302-1,POJK51:E1,SASB:EM-CG-110a.1'."),
     )
 
     @api.model
@@ -31,9 +28,7 @@ class CustomEsgMetric(models.Model):
         if not framework:
             return self.browse([])
         framework_norm = framework.strip().upper()
-        candidates = self.search(
-            [("framework_codes", "!=", False), ("is_active", "=", True)]
-        )
+        candidates = self.search([("framework_codes", "!=", False), ("is_active", "=", True)])
         hits = self.browse([])
         for metric in candidates:
             tokens = (metric.framework_codes or "").split(",")

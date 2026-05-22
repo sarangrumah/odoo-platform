@@ -47,7 +47,6 @@ def _resolve_cycle(env, pr_url, branch_name=None):
 
 
 class DevCycleWebhook(http.Controller):
-
     # ------------------------------------------------------------------
     # GitHub
     # ------------------------------------------------------------------
@@ -74,17 +73,14 @@ class DevCycleWebhook(http.Controller):
                     "ok": False,
                     "ignored": True,
                     "reason": (
-                        "github webhook secret not configured — set "
-                        "dev_cycle.github_webhook_secret in Settings"
+                        "github webhook secret not configured — set dev_cycle.github_webhook_secret in Settings"
                     ),
                 },
                 status=200,
             )
         if not sig_header.startswith("sha256="):
             return _json_response({"status": "error", "reason": "missing_signature"}, status=401)
-        expected = "sha256=" + hmac.new(
-            secret.encode("utf-8"), raw, hashlib.sha256
-        ).hexdigest()
+        expected = "sha256=" + hmac.new(secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(expected, sig_header):
             return _json_response({"status": "error", "reason": "bad_signature"}, status=401)
 
@@ -127,9 +123,7 @@ class DevCycleWebhook(http.Controller):
 
         merged_at_raw = pr.get("merged_at")
         merged_by = (pr.get("merged_by") or {}).get("login") or False
-        reviewers = ",".join(
-            r.get("login") for r in (pr.get("requested_reviewers") or []) if r.get("login")
-        )
+        reviewers = ",".join(r.get("login") for r in (pr.get("requested_reviewers") or []) if r.get("login"))
         vals = {
             "pr_number": pr_number,
             "state": state,
@@ -137,12 +131,8 @@ class DevCycleWebhook(http.Controller):
             "merged_at": merged_at_raw and merged_at_raw.replace("T", " ").rstrip("Z") or False,
             "merged_by": merged_by,
         }
-        pr_rec = env["dev.cycle.pr"].sudo().upsert_from_webhook(
-            cycle, "github", pr_url, vals
-        )
-        cycle.sudo().message_post(
-            body=f"GitHub PR webhook: action={action} state={state} url={pr_url}"
-        )
+        pr_rec = env["dev.cycle.pr"].sudo().upsert_from_webhook(cycle, "github", pr_url, vals)
+        cycle.sudo().message_post(body=f"GitHub PR webhook: action={action} state={state} url={pr_url}")
         return {"status": "ok", "pr_id": pr_rec.id, "cycle_id": cycle.id}
 
     def _handle_github_review(self, env, payload):
@@ -153,9 +143,7 @@ class DevCycleWebhook(http.Controller):
         if not cycle:
             return {"status": "no_cycle"}
         review_state = (payload.get("review") or {}).get("state") or ""
-        cycle.sudo().message_post(
-            body=f"GitHub review on PR {pr_url}: {review_state}"
-        )
+        cycle.sudo().message_post(body=f"GitHub review on PR {pr_url}: {review_state}")
         return {"status": "ok"}
 
     def _handle_github_check_run(self, env, payload):
@@ -183,12 +171,8 @@ class DevCycleWebhook(http.Controller):
             cycle = _resolve_cycle(env, pr_url)
             if not cycle:
                 continue
-            pr_rec = env["dev.cycle.pr"].sudo().upsert_from_webhook(
-                cycle, "github", pr_url, {"ci_status": ci}
-            )
-            cycle.sudo().message_post(
-                body=f"GitHub check_run: status={status} conclusion={conclusion} → ci={ci}"
-            )
+            pr_rec = env["dev.cycle.pr"].sudo().upsert_from_webhook(cycle, "github", pr_url, {"ci_status": ci})
+            cycle.sudo().message_post(body=f"GitHub check_run: status={status} conclusion={conclusion} → ci={ci}")
             results.append({"pr_id": pr_rec.id, "cycle_id": cycle.id})
         return {"status": "ok", "results": results}
 
@@ -216,8 +200,7 @@ class DevCycleWebhook(http.Controller):
                     "ok": False,
                     "ignored": True,
                     "reason": (
-                        "gitlab webhook secret not configured — set "
-                        "dev_cycle.gitlab_webhook_secret in Settings"
+                        "gitlab webhook secret not configured — set dev_cycle.gitlab_webhook_secret in Settings"
                     ),
                 },
                 status=200,
@@ -268,12 +251,8 @@ class DevCycleWebhook(http.Controller):
             "state": state,
             "merged_at": merged_at or False,
         }
-        pr_rec = env["dev.cycle.pr"].sudo().upsert_from_webhook(
-            cycle, "gitlab", pr_url, vals
-        )
-        cycle.sudo().message_post(
-            body=f"GitLab MR webhook: state={state} url={pr_url}"
-        )
+        pr_rec = env["dev.cycle.pr"].sudo().upsert_from_webhook(cycle, "gitlab", pr_url, vals)
+        cycle.sudo().message_post(body=f"GitLab MR webhook: state={state} url={pr_url}")
         return {"status": "ok", "pr_id": pr_rec.id, "cycle_id": cycle.id}
 
     def _handle_gitlab_pipeline(self, env, payload):
@@ -295,10 +274,6 @@ class DevCycleWebhook(http.Controller):
             ci = "error"
         else:
             ci = "pending"
-        pr_rec = env["dev.cycle.pr"].sudo().upsert_from_webhook(
-            cycle, "gitlab", pr_url, {"ci_status": ci}
-        )
-        cycle.sudo().message_post(
-            body=f"GitLab pipeline: status={status} → ci={ci}"
-        )
+        pr_rec = env["dev.cycle.pr"].sudo().upsert_from_webhook(cycle, "gitlab", pr_url, {"ci_status": ci})
+        cycle.sudo().message_post(body=f"GitLab pipeline: status={status} → ci={ci}")
         return {"status": "ok", "pr_id": pr_rec.id, "cycle_id": cycle.id}

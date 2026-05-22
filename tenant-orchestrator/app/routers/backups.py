@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request, status
@@ -64,7 +64,7 @@ def run_backup_endpoint(slug: str, body: BackupRunIn, request: Request) -> dict:
 
 class RestoreIn(BaseModel):
     s3_key: str
-    target_db: Optional[str] = Field(
+    target_db: str | None = Field(
         default=None,
         description="If absent, restored to '<slug>_staging' (non-destructive).",
     )
@@ -75,9 +75,7 @@ def restore_backup_endpoint(slug: str, body: RestoreIn, request: Request) -> dic
     assert_valid_slug(slug)
     actor = getattr(request.state, "actor", "system")
     try:
-        target = backup_svc.restore_backup(
-            slug, s3_key=body.s3_key, target_db=body.target_db, actor=actor
-        )
+        target = backup_svc.restore_backup(slug, s3_key=body.s3_key, target_db=body.target_db, actor=actor)
         return {"slug": slug, "restored_to_db": target}
     except LookupError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Tenant '{slug}' not found")
@@ -112,7 +110,9 @@ def get_backup_endpoint(backup_id: int) -> BackupOut:
 
 @admin_router.post("/{backup_id}/replicate", status_code=status.HTTP_202_ACCEPTED)
 def replicate_backup_endpoint(
-    backup_id: int, body: ReplicateRequest, request: Request,
+    backup_id: int,
+    body: ReplicateRequest,
+    request: Request,
 ) -> dict:
     """Restore a specific backup into the target tenant's <env> DB."""
     actor = getattr(request.state, "actor", "system")
@@ -127,9 +127,12 @@ def replicate_backup_endpoint(
 
     log.info(
         "backup.replicate.start",
-        backup_id=backup_id, source_slug=row["tenant_slug"],
-        target_slug=body.target_tenant_slug, target_env=body.target_env,
-        target_db=target_db, actor=actor,
+        backup_id=backup_id,
+        source_slug=row["tenant_slug"],
+        target_slug=body.target_tenant_slug,
+        target_env=body.target_env,
+        target_db=target_db,
+        actor=actor,
     )
     try:
         restored = backup_svc.restore_backup(
@@ -157,7 +160,8 @@ def replicate_backup_endpoint(
 
 @admin_router.post("/enforce-retention", status_code=status.HTTP_200_OK)
 def enforce_retention_endpoint(
-    body: EnforceRetentionRequest, request: Request,
+    body: EnforceRetentionRequest,
+    request: Request,
 ) -> dict:
     """Delete backups older than ``retention_days`` for the given tenant.
 
@@ -186,8 +190,11 @@ def enforce_retention_endpoint(
 
     log.info(
         "backup.retention.enforced",
-        slug=body.tenant_slug, retention_days=body.retention_days,
-        marked_expired=expired_count, pruned=pruned, actor=actor,
+        slug=body.tenant_slug,
+        retention_days=body.retention_days,
+        marked_expired=expired_count,
+        pruned=pruned,
+        actor=actor,
     )
     return {
         "tenant_slug": body.tenant_slug,

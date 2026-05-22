@@ -70,9 +70,11 @@ class BrdKnowledgeRegenWizard(models.TransientModel):
 
     def _do_manual(self):
         # Reset the drift lock to the current source hash; rescan picks it up.
-        self.entry_id.sudo().write({
-            "last_knowledge_source_hash": self.entry_id.source_hash or "",
-        })
+        self.entry_id.sudo().write(
+            {
+                "last_knowledge_source_hash": self.entry_id.source_hash or "",
+            }
+        )
         # If knowledge_md exists, status returns to draft/reviewed based on
         # the file frontmatter; trigger a rescan to refresh.
         self.env["custom.module.capability.entry"].sudo()._scan_all_modules()
@@ -83,29 +85,36 @@ class BrdKnowledgeRegenWizard(models.TransientModel):
         Param = self.env["ir.config_parameter"].sudo()
         script = Param.get_param("custom_brd_analyzer.regen_script_path", default=_DEFAULT_SCRIPT)
         if not os.path.isfile(script):
-            raise UserError(_(
-                "Generator script not found at %s. Set "
-                "ir.config_parameter custom_brd_analyzer.regen_script_path "
-                "to the correct path inside the Odoo container."
-            ) % script)
+            raise UserError(
+                _(
+                    "Generator script not found at %s. Set "
+                    "ir.config_parameter custom_brd_analyzer.regen_script_path "
+                    "to the correct path inside the Odoo container."
+                )
+                % script
+            )
         if not self.module_name:
             raise UserError(_("Catalog entry has no module_name."))
         secret = os.environ.get("GATEWAY_SHARED_SECRET", "")
         if not secret:
-            raise UserError(_(
-                "GATEWAY_SHARED_SECRET env var not set inside the Odoo container."
-            ))
+            raise UserError(_("GATEWAY_SHARED_SECRET env var not set inside the Odoo container."))
         gateway = os.environ.get("AI_GATEWAY_URL", "http://ai-gateway:8080")
         try:
             proc = subprocess.run(
                 [
-                    "python3", script,
-                    "--module", self.module_name,
+                    "python3",
+                    script,
+                    "--module",
+                    self.module_name,
                     "--force",
-                    "--gateway", gateway,
-                    "--secret", secret,
+                    "--gateway",
+                    gateway,
+                    "--secret",
+                    secret,
                 ],
-                capture_output=True, text=True, timeout=600,
+                capture_output=True,
+                text=True,
+                timeout=600,
             )
         except subprocess.TimeoutExpired:
             raise UserError(_("Regeneration timed out after 10 minutes."))

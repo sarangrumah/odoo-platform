@@ -45,13 +45,13 @@ class CoretaxImportWizard(models.TransientModel):
     _name = "custom.coretax.import.wizard"
     _description = "Coretax XML Import Wizard"
 
-    document_type = fields.Selection(DOCUMENT_TYPES, string="Document Type",
-                                     required=True, default="bupot_unifikasi")
+    document_type = fields.Selection(DOCUMENT_TYPES, string="Document Type", required=True, default="bupot_unifikasi")
     xml_filename = fields.Char(string="Filename")
     xml_file = fields.Binary(string="XML File", required=True, attachment=False)
     source = fields.Selection(
         selection=[("received", "Received"), ("issued", "Issued")],
-        default="received", required=True,
+        default="received",
+        required=True,
     )
 
     created_count = fields.Integer(string="Created Records", readonly=True)
@@ -80,11 +80,13 @@ class CoretaxImportWizard(models.TransientModel):
         else:
             created, skipped, lines = self._import_bupot(root)
 
-        self.write({
-            "created_count": created,
-            "skipped_count": skipped,
-            "log": "\n".join(lines),
-        })
+        self.write(
+            {
+                "created_count": created,
+                "skipped_count": skipped,
+                "log": "\n".join(lines),
+            }
+        )
 
         self._audit_log_import(created, skipped)
 
@@ -107,6 +109,7 @@ class CoretaxImportWizard(models.TransientModel):
         # XPath tolerant of (un)namespaced docs.
         nodes = root.xpath(".//*[local-name()='BuktiPotong']")
         for n in nodes:
+
             def _text(tag: str) -> str:
                 el = n.find(f".//{{*}}{tag}")
                 if el is None:
@@ -123,9 +126,7 @@ class CoretaxImportWizard(models.TransientModel):
             partner = Partner.search([("vat", "=", npwp)], limit=1) if npwp else Partner.browse()
             if not partner and npwp:
                 # fallback: search by stripping common formatting
-                partner = Partner.search(
-                    [("vat", "ilike", npwp[:9])], limit=1
-                )
+                partner = Partner.search([("vat", "ilike", npwp[:9])], limit=1)
 
             if not partner:
                 lines.append("Skip: no partner for NPWP=%s (No.Bupot=%s)" % (npwp, no_bupot))
@@ -142,18 +143,20 @@ class CoretaxImportWizard(models.TransientModel):
                     continue
 
             jenis_raw = _text("JenisPPh").replace(".", "_")
-            jenis_map = {"21": "21", "23": "23", "26": "26",
-                         "4_2": "4_2", "15": "15", "22": "22"}
+            jenis_map = {"21": "21", "23": "23", "26": "26", "4_2": "4_2", "15": "15", "22": "22"}
             jenis = jenis_map.get(jenis_raw)
             if not jenis:
                 lines.append("Skip: unknown JenisPPh=%s for %s" % (jenis_raw, no_bupot))
                 skipped += 1
                 continue
 
-            existing = Bupot.search([
-                ("no_bupot", "=", no_bupot),
-                ("source", "=", self.source),
-            ], limit=1)
+            existing = Bupot.search(
+                [
+                    ("no_bupot", "=", no_bupot),
+                    ("source", "=", self.source),
+                ],
+                limit=1,
+            )
             if existing:
                 lines.append("Skip duplicate: %s" % no_bupot)
                 skipped += 1
@@ -172,19 +175,21 @@ class CoretaxImportWizard(models.TransientModel):
             except ValueError:
                 pph = 0.0
 
-            Bupot.create({
-                "no_bupot": no_bupot,
-                "partner_id": partner.id,
-                "jenis_pph": jenis,
-                "tanggal_bupot": tanggal or fields.Date.context_today(self),
-                "period_year": (tanggal.year if tanggal else fields.Date.context_today(self).year),
-                "period_month": (tanggal.month if tanggal else fields.Date.context_today(self).month),
-                "source": self.source,
-                "tarif": tarif,
-                "dpp": dpp,
-                "pph_terpotong": pph,
-                "state": "confirmed",
-            })
+            Bupot.create(
+                {
+                    "no_bupot": no_bupot,
+                    "partner_id": partner.id,
+                    "jenis_pph": jenis,
+                    "tanggal_bupot": tanggal or fields.Date.context_today(self),
+                    "period_year": (tanggal.year if tanggal else fields.Date.context_today(self).year),
+                    "period_month": (tanggal.month if tanggal else fields.Date.context_today(self).month),
+                    "source": self.source,
+                    "tarif": tarif,
+                    "dpp": dpp,
+                    "pph_terpotong": pph,
+                    "state": "confirmed",
+                }
+            )
             created += 1
             lines.append("OK: %s" % no_bupot)
 
@@ -198,6 +203,7 @@ class CoretaxImportWizard(models.TransientModel):
         Move = self.env["account.move"]
 
         for n in root.xpath(".//*[local-name()='Faktur']"):
+
             def _text(tag: str) -> str:
                 el = n.find(f".//{{*}}{tag}")
                 if el is None:
@@ -232,13 +238,15 @@ class CoretaxImportWizard(models.TransientModel):
     # ----- Audit log -----
     def _audit_log_import(self, created: int, skipped: int) -> None:
         cr = self.env.cr
-        payload = json.dumps({
-            "document_type": self.document_type,
-            "filename": self.xml_filename,
-            "source": self.source,
-            "created": created,
-            "skipped": skipped,
-        })
+        payload = json.dumps(
+            {
+                "document_type": self.document_type,
+                "filename": self.xml_filename,
+                "source": self.source,
+                "created": created,
+                "skipped": skipped,
+            }
+        )
         cr.execute(
             """
             INSERT INTO pdp.audit_log
@@ -253,7 +261,6 @@ class CoretaxImportWizard(models.TransientModel):
                 self._name,
                 self.id,
                 payload,
-                "Coretax XML import — %s (%d created, %d skipped)" % (
-                    self.document_type, created, skipped),
+                "Coretax XML import — %s (%d created, %d skipped)" % (self.document_type, created, skipped),
             ),
         )

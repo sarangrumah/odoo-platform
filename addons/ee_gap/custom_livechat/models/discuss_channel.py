@@ -49,7 +49,7 @@ class DiscussChannel(models.Model):
         readonly=True,
         copy=False,
         help="Hash of the last AI request payload, used to skip duplicate "
-             "AI calls when the conversation context has not changed.",
+        "AI calls when the conversation context has not changed.",
     )
     x_rating = fields.Selection(
         RATING_SELECTION,
@@ -93,6 +93,7 @@ class DiscussChannel(models.Model):
             # Strip basic HTML for transcript readability
             try:
                 from odoo.tools import html2plaintext
+
                 body = html2plaintext(body)
             except Exception:
                 pass
@@ -120,9 +121,9 @@ class DiscussChannel(models.Model):
                 partner = p
                 break
         subject = self.name or _("Live Chat Escalation")
-        description_html = (
-            "<p><b>%s</b></p><pre>%s</pre>"
-            % (_("Escalated from live chat channel #%s") % self.id, escape(transcript))
+        description_html = "<p><b>%s</b></p><pre>%s</pre>" % (
+            _("Escalated from live chat channel #%s") % self.id,
+            escape(transcript),
         )
         priority_map = {"low": "0", "normal": "1", "high": "2", "urgent": "3"}
         ticket_vals = {
@@ -132,10 +133,12 @@ class DiscussChannel(models.Model):
             "priority": priority_map.get(self.x_helpdesk_priority or "normal", "1"),
         }
         ticket = self.env["helpdesk.ticket"].create(ticket_vals)
-        self.write({
-            "x_helpdesk_ticket_id": ticket.id,
-            "x_escalated_to_helpdesk": True,
-        })
+        self.write(
+            {
+                "x_helpdesk_ticket_id": ticket.id,
+                "x_escalated_to_helpdesk": True,
+            }
+        )
         # Post note on the channel
         self.message_post(
             body=_("Chat escalated to Helpdesk ticket <b>%s</b>.") % escape(ticket.name or ""),
@@ -143,8 +146,7 @@ class DiscussChannel(models.Model):
         )
         # Post note on the ticket
         ticket.message_post(
-            body=_("Created from live chat channel <b>%s</b> (id=%s).")
-            % (escape(self.name or ""), self.id),
+            body=_("Created from live chat channel <b>%s</b> (id=%s).") % (escape(self.name or ""), self.id),
             subtype_xmlid="mail.mt_note",
         )
         return {
@@ -166,11 +168,13 @@ class DiscussChannel(models.Model):
         except Exception:
             html2plaintext = lambda x: x  # noqa: E731
         for msg in messages:
-            history.append({
-                "author": msg.author_id.name or msg.email_from or "system",
-                "date": fields.Datetime.to_string(msg.date) if msg.date else "",
-                "body": html2plaintext(msg.body or "")[:1000],
-            })
+            history.append(
+                {
+                    "author": msg.author_id.name or msg.email_from or "system",
+                    "date": fields.Datetime.to_string(msg.date) if msg.date else "",
+                    "body": html2plaintext(msg.body or "")[:1000],
+                }
+            )
         return {
             "channel_id": self.id,
             "channel_name": self.name or "",
@@ -182,21 +186,19 @@ class DiscussChannel(models.Model):
     def _custom_ai_payload_hash(self, payload):
         """Stable hash of the AI payload used for duplicate-call caching."""
         import hashlib
+
         try:
             blob = json.dumps(payload, sort_keys=True, default=str)
         except Exception:
             blob = str(payload)
-        return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+        # Hash used only as a cache/dedup key, not security — bandit B324
+        return hashlib.sha1(blob.encode("utf-8"), usedforsecurity=False).hexdigest()
 
     def action_ai_suggest_reply(self):
         self.ensure_one()
         payload = self._custom_ai_payload()
         payload_hash = self._custom_ai_payload_hash(payload)
-        if (
-            self.x_last_ai_query
-            and self.x_last_ai_query == payload_hash
-            and self.x_ai_suggested_text
-        ):
+        if self.x_last_ai_query and self.x_last_ai_query == payload_hash and self.x_ai_suggested_text:
             return {
                 "type": "ir.actions.client",
                 "tag": "display_notification",
@@ -223,16 +225,13 @@ class DiscussChannel(models.Model):
                     "type": "warning",
                 },
             }
-        text = (
-            result.get("response")
-            or result.get("text")
-            or result.get("summary")
-            or json.dumps(result)[:1000]
+        text = result.get("response") or result.get("text") or result.get("summary") or json.dumps(result)[:1000]
+        self.write(
+            {
+                "x_ai_suggested_text": text,
+                "x_last_ai_query": payload_hash,
+            }
         )
-        self.write({
-            "x_ai_suggested_text": text,
-            "x_last_ai_query": payload_hash,
-        })
         self.message_post(
             body=_("<b>AI Suggested Reply</b><br/>%s") % text,
             author_id=self.env.ref("base.partner_root").id,
@@ -258,9 +257,7 @@ class DiscussChannel(models.Model):
             return self.env["res.users"]
         skill_tags = livechat_channel._skill_tag_list()
         query_lower = (query_text or "").lower()
-        matched_by_skill = bool(
-            skill_tags and any(tag in query_lower for tag in skill_tags)
-        )
+        matched_by_skill = bool(skill_tags and any(tag in query_lower for tag in skill_tags))
         # Round-robin: order by id, skip operators that already have many
         # active livechat channels.
         sorted_ops = operators.sorted(key=lambda u: u.id)
@@ -272,11 +269,17 @@ class DiscussChannel(models.Model):
         Channel = self.env["discuss.channel"].sudo()
         counts = []
         for op in sorted_ops:
-            cnt = Channel.search_count([
-                ("livechat_channel_id", "=", livechat_channel.id),
-                ("livechat_operator_id", "=", op.partner_id.id),
-                ("livechat_end_dt", "=", False),
-            ]) if "livechat_end_dt" in Channel._fields else 0
+            cnt = (
+                Channel.search_count(
+                    [
+                        ("livechat_channel_id", "=", livechat_channel.id),
+                        ("livechat_operator_id", "=", op.partner_id.id),
+                        ("livechat_end_dt", "=", False),
+                    ]
+                )
+                if "livechat_end_dt" in Channel._fields
+                else 0
+            )
             counts.append((cnt, op.id, op))
         counts.sort(key=lambda x: (x[0], x[1]))
         return counts[0][2] if counts else self.env["res.users"]
@@ -296,14 +299,17 @@ class DiscussChannel(models.Model):
                 body = kwargs.get("body") or ""
                 try:
                     from odoo.tools import html2plaintext
+
                     body_text = html2plaintext(body)
                 except Exception:
                     body_text = str(body)
                 operator = self._custom_livechat_pick_operator(body_text)
                 if operator and operator.partner_id:
-                    self.sudo().write({
-                        "livechat_operator_id": operator.partner_id.id,
-                    })
+                    self.sudo().write(
+                        {
+                            "livechat_operator_id": operator.partner_id.id,
+                        }
+                    )
         except Exception as e:
             _logger.debug("Skill routing skipped: %s", e)
         return message
@@ -338,9 +344,11 @@ class DiscussChannel(models.Model):
         channel = self.browse(int(channel_id)).exists()
         if not channel:
             return False
-        channel.sudo().write({
-            "x_rating": rating_str,
-            "x_rating_feedback": feedback or False,
-            "x_rating_requested": False,
-        })
+        channel.sudo().write(
+            {
+                "x_rating": rating_str,
+                "x_rating_feedback": feedback or False,
+                "x_rating_requested": False,
+            }
+        )
         return True

@@ -33,9 +33,7 @@ class CustomLivechatCannedResponse(models.Model):
     def _check_shortcut(self):
         for rec in self:
             if rec.shortcut and (" " in rec.shortcut or len(rec.shortcut) < 2):
-                raise ValidationError(
-                    "Shortcut must be at least 2 characters and contain no spaces."
-                )
+                raise ValidationError("Shortcut must be at least 2 characters and contain no spaces.")
 
     def action_increment_usage(self):
         for rec in self:

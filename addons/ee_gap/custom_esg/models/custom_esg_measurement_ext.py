@@ -25,7 +25,6 @@ class CustomEsgMeasurement(models.Model):
         string="Auditor Signature / Hash",
         tracking=True,
         help=(
-            "Auditor's signature payload — typically a SHA-256 hex digest "
-            "of the evidence file plus auditor identity."
+            "Auditor's signature payload — typically a SHA-256 hex digest of the evidence file plus auditor identity."
         ),
     )

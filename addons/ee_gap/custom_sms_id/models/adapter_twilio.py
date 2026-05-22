@@ -62,7 +62,11 @@ class CustomSmsAdapterTwilio(models.AbstractModel):
             fake_sid = f"SM_sandbox_{uuid.uuid4().hex[:24]}"
             _logger.info(
                 "[custom_sms_id:twilio:sandbox] sid=%s sender=%s to=%s purpose=%s body=%s",
-                fake_sid, account.sender_id, to_phone, purpose, (body or "")[:160],
+                fake_sid,
+                account.sender_id,
+                to_phone,
+                purpose,
+                (body or "")[:160],
             )
             return {
                 "ok": True,
@@ -80,7 +84,11 @@ class CustomSmsAdapterTwilio(models.AbstractModel):
 
         try:
             resp = self.env["custom.sms.adapter.base"]._post(
-                url, data=payload, auth=auth, timeout=30, account=account,
+                url,
+                data=payload,
+                auth=auth,
+                timeout=30,
+                account=account,
             )
         except Exception as e:
             _logger.warning("Twilio send failed for %s: %s", to_phone, e)
@@ -144,7 +152,9 @@ class CustomSmsAdapterTwilio(models.AbstractModel):
         url = _twilio_message_status_url(account.account_sid, provider_message_id)
         try:
             resp = requests.get(
-                url, auth=(account.account_sid, account.auth_token), timeout=15,
+                url,
+                auth=(account.account_sid, account.auth_token),
+                timeout=15,
             )
         except requests.RequestException as e:
             return {"ok": False, "status": None, "message": _("Twilio status fetch failed: %s") % e}

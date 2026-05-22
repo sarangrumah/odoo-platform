@@ -12,7 +12,8 @@ class CustomBastSignWizard(models.TransientModel):
     bast_id = fields.Many2one("custom.bast.document", required=True)
     party = fields.Selection(
         [("from", "From (Releasing)"), ("to", "To (Receiving)")],
-        required=True, default="to",
+        required=True,
+        default="to",
     )
     signature = fields.Binary(string="Signature", required=True, attachment=False)
     signed_by = fields.Char(string="Signed By")

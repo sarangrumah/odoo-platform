@@ -24,7 +24,6 @@ _logger = logging.getLogger(__name__)
 
 
 class WhatsappWebhookController(http.Controller):
-
     @http.route(
         "/custom_whatsapp/webhook/<int:account_id>",
         type="http",
@@ -55,7 +54,8 @@ class WhatsappWebhookController(http.Controller):
 
         _logger.warning(
             "[whatsapp webhook] verify FAILED for account=%s (mode=%s)",
-            account.name, mode,
+            account.name,
+            mode,
         )
         return Response("forbidden", status=403)
 
@@ -106,17 +106,18 @@ class WhatsappWebhookController(http.Controller):
 
     def _dispatch_payload(self, account, payload: dict):
         Message = request.env["whatsapp.message"].sudo()
-        for entry in (payload.get("entry") or []):
-            for change in (entry.get("changes") or []):
+        for entry in payload.get("entry") or []:
+            for change in entry.get("changes") or []:
                 value = change.get("value") or {}
 
                 # 1) Delivery / read / failure status updates
-                for st in (value.get("statuses") or []):
+                for st in value.get("statuses") or []:
                     try:
                         Message._apply_status_update(st)
                     except Exception:
                         _logger.exception(
-                            "[whatsapp webhook] status update failed: %s", st,
+                            "[whatsapp webhook] status update failed: %s",
+                            st,
                         )
 
                 # 2) Inbound messages from end-users
@@ -127,5 +128,6 @@ class WhatsappWebhookController(http.Controller):
                         Message._record_inbound(account, msg, contact)
                     except Exception:
                         _logger.exception(
-                            "[whatsapp webhook] inbound record failed: %s", msg,
+                            "[whatsapp webhook] inbound record failed: %s",
+                            msg,
                         )

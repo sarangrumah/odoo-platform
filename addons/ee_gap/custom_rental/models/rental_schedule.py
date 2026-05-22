@@ -6,6 +6,7 @@ class CustomRentalSchedule(models.Model):
     """Read-only SQL view aggregating rental.order into a calendar-friendly
     schedule. One row per rental.order (we extend this if multi-line rental
     is later introduced)."""
+
     _name = "custom.rental.schedule"
     _description = "Rental Schedule (SQL View)"
     _auto = False
@@ -13,9 +14,9 @@ class CustomRentalSchedule(models.Model):
 
     name = fields.Char(readonly=True)
     order_id = fields.Many2one("rental.order", readonly=True)
-    line_id = fields.Many2one("rental.order", readonly=True,
-                              help="Alias of order_id; reserved for future "
-                                   "multi-line rental support.")
+    line_id = fields.Many2one(
+        "rental.order", readonly=True, help="Alias of order_id; reserved for future multi-line rental support."
+    )
     product_id = fields.Many2one("product.product", readonly=True)
     asset_id = fields.Many2one("rental.asset", readonly=True)
     partner_id = fields.Many2one("res.partner", readonly=True)
@@ -23,9 +24,14 @@ class CustomRentalSchedule(models.Model):
     date_start = fields.Datetime(readonly=True)
     date_stop = fields.Datetime(readonly=True)
     state = fields.Selection(
-        [("draft", "Draft"), ("confirmed", "Confirmed"),
-         ("picked_up", "Picked Up"), ("returned", "Returned"),
-         ("cancelled", "Cancelled"), ("late", "Late")],
+        [
+            ("draft", "Draft"),
+            ("confirmed", "Confirmed"),
+            ("picked_up", "Picked Up"),
+            ("returned", "Returned"),
+            ("cancelled", "Cancelled"),
+            ("late", "Late"),
+        ],
         readonly=True,
     )
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Trial Balance: opening + movement + closing per account."""
+
 from datetime import date as date_cls, timedelta
 
 from odoo import models
@@ -42,34 +43,37 @@ class CustomReportTrialBalance(models.AbstractModel):
 
             movement_debit = p.get("debit", 0.0)
             movement_credit = p.get("credit", 0.0)
-            closing_balance = (
-                opening_balance + movement_debit - movement_credit
-            )
+            closing_balance = opening_balance + movement_debit - movement_credit
             closing_debit = closing_balance if closing_balance > 0 else 0.0
-            closing_credit = (
-                -closing_balance if closing_balance < 0 else 0.0
-            )
+            closing_credit = -closing_balance if closing_balance < 0 else 0.0
 
-            if not any([
-                opening_debit, opening_credit,
-                movement_debit, movement_credit,
-                closing_debit, closing_credit,
-            ]):
+            if not any(
+                [
+                    opening_debit,
+                    opening_credit,
+                    movement_debit,
+                    movement_credit,
+                    closing_debit,
+                    closing_credit,
+                ]
+            ):
                 continue
 
-            lines.append({
-                "type": "account",
-                "account_id": acc.id,
-                "account_code": acc.code,
-                "account_name": acc.name,
-                "account_type": acc.account_type,
-                "opening_debit": opening_debit,
-                "opening_credit": opening_credit,
-                "movement_debit": movement_debit,
-                "movement_credit": movement_credit,
-                "closing_debit": closing_debit,
-                "closing_credit": closing_credit,
-            })
+            lines.append(
+                {
+                    "type": "account",
+                    "account_id": acc.id,
+                    "account_code": acc.code,
+                    "account_name": acc.name,
+                    "account_type": acc.account_type,
+                    "opening_debit": opening_debit,
+                    "opening_credit": opening_credit,
+                    "movement_debit": movement_debit,
+                    "movement_credit": movement_credit,
+                    "closing_debit": closing_debit,
+                    "closing_credit": closing_credit,
+                }
+            )
             total_op_d += opening_debit
             total_op_c += opening_credit
             total_d += movement_debit
@@ -77,14 +81,16 @@ class CustomReportTrialBalance(models.AbstractModel):
             total_cl_d += closing_debit
             total_cl_c += closing_credit
 
-        lines.append({
-            "type": "grand_total",
-            "label": "Grand Total",
-            "opening_debit": total_op_d,
-            "opening_credit": total_op_c,
-            "movement_debit": total_d,
-            "movement_credit": total_c,
-            "closing_debit": total_cl_d,
-            "closing_credit": total_cl_c,
-        })
+        lines.append(
+            {
+                "type": "grand_total",
+                "label": "Grand Total",
+                "opening_debit": total_op_d,
+                "opening_credit": total_op_c,
+                "movement_debit": total_d,
+                "movement_credit": total_c,
+                "closing_debit": total_cl_d,
+                "closing_credit": total_cl_c,
+            }
+        )
         return lines

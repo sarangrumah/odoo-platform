@@ -61,8 +61,7 @@ class CustomDashboard(models.Model):
     last_ai_at = fields.Datetime(readonly=True)
 
     _sql_constraints = [
-        ("share_token_uniq", "unique(share_token)",
-         "Share token must be unique."),
+        ("share_token_uniq", "unique(share_token)", "Share token must be unique."),
     ]
 
     @api.depends("tile_ids")
@@ -74,10 +73,7 @@ class CustomDashboard(models.Model):
     def _compute_share_url(self):
         base = self.env["ir.config_parameter"].sudo().get_param("web.base.url", "")
         for rec in self:
-            rec.share_url = (
-                f"{base}/custom_dashboard/share/{rec.share_token}"
-                if rec.share_token else ""
-            )
+            rec.share_url = f"{base}/custom_dashboard/share/{rec.share_token}" if rec.share_token else ""
 
     # ---------- workflow ----------
 
@@ -119,15 +115,17 @@ class CustomDashboard(models.Model):
         self.ensure_one()
         tiles = []
         for tile in self.tile_ids:
-            tiles.append({
-                "name": tile.name,
-                "tile_type": tile.tile_type,
-                "model_name": tile.model_name or "",
-                "domain": tile.domain or "[]",
-                "measure_field": tile.measure_field or "",
-                "groupby_field": tile.groupby_field or "",
-                "cached_value": tile.cached_value or "",
-            })
+            tiles.append(
+                {
+                    "name": tile.name,
+                    "tile_type": tile.tile_type,
+                    "model_name": tile.model_name or "",
+                    "domain": tile.domain or "[]",
+                    "measure_field": tile.measure_field or "",
+                    "groupby_field": tile.groupby_field or "",
+                    "cached_value": tile.cached_value or "",
+                }
+            )
         return {
             "dashboard": self.name,
             "description": (self.description or "")[:2000],
@@ -168,19 +166,17 @@ class CustomDashboard(models.Model):
                     "type": "warning",
                 },
             }
-        text = (
-            result.get("response")
-            or result.get("text")
-            or result.get("summary")
-            or json.dumps(result)[:1000]
+        text = result.get("response") or result.get("text") or result.get("summary") or json.dumps(result)[:1000]
+        self.write(
+            {
+                "last_ai_question": question,
+                "last_ai_answer": text,
+                "last_ai_at": fields.Datetime.now(),
+            }
         )
-        self.write({
-            "last_ai_question": question,
-            "last_ai_answer": text,
-            "last_ai_at": fields.Datetime.now(),
-        })
         self.message_post(
-            body=_("<b>Ask AI:</b> %(q)s<br/><b>Answer:</b><br/>%(a)s") % {
+            body=_("<b>Ask AI:</b> %(q)s<br/><b>Answer:</b><br/>%(a)s")
+            % {
                 "q": question,
                 "a": text,
             },

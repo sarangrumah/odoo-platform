@@ -13,15 +13,14 @@ Per employee, the wizard:
 from __future__ import annotations
 
 import base64
-import io
 import xml.etree.ElementTree as ET
 from datetime import date
 from typing import Any
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
-from ..models.hr_payslip import PPH21_BRACKETS, _compute_pph21
+from ..models.hr_payslip import _compute_pph21
 
 
 class HrPayrollSPTA1Wizard(models.TransientModel):
@@ -55,18 +54,18 @@ class HrPayrollSPTA1Wizard(models.TransientModel):
         employees = self.employee_ids
         if not employees:
             # Discover from payslip presence in the year
-            employees = (
-                Payslip.search([("period_year", "=", self.fiscal_year)])
-                .mapped("employee_id")
-            )
+            employees = Payslip.search([("period_year", "=", self.fiscal_year)]).mapped("employee_id")
         if not employees:
             raise UserError(_("No payslips found for fiscal year %s.") % self.fiscal_year)
 
         rows = []
-        xml_root = ET.Element("SPT1721A1Batch", attrib={
-            "tahun_pajak": str(self.fiscal_year),
-            "company_npwp": self.env.company.partner_id.x_custom_npwp or "",
-        })
+        xml_root = ET.Element(
+            "SPT1721A1Batch",
+            attrib={
+                "tahun_pajak": str(self.fiscal_year),
+                "company_npwp": self.env.company.partner_id.x_custom_npwp or "",
+            },
+        )
 
         for emp in employees:
             data = self._compute_employee_annual(emp, config)
@@ -77,21 +76,29 @@ class HrPayrollSPTA1Wizard(models.TransientModel):
         attachment = None
         if self.output_format in ("xml", "both"):
             xml_bytes = ET.tostring(xml_root, encoding="utf-8", xml_declaration=True)
-            attachment = self.env["ir.attachment"].sudo().create({
-                "name": f"SPT_1721_A1_{self.fiscal_year}.xml",
-                "type": "binary",
-                "datas": base64.b64encode(xml_bytes),
-                "res_model": self._name,
-                "res_id": self.id,
-                "mimetype": "application/xml",
-            })
+            attachment = (
+                self.env["ir.attachment"]
+                .sudo()
+                .create(
+                    {
+                        "name": f"SPT_1721_A1_{self.fiscal_year}.xml",
+                        "type": "binary",
+                        "datas": base64.b64encode(xml_bytes),
+                        "res_model": self._name,
+                        "res_id": self.id,
+                        "mimetype": "application/xml",
+                    }
+                )
+            )
 
         # Summary HTML
         parts = [f"<h3>SPT 1721 A1 — Tahun Pajak {self.fiscal_year}</h3>"]
-        parts.append('<table class="table table-sm"><thead><tr>'
-                     '<th>Karyawan</th><th>PTKP</th><th>Bruto</th>'
-                     '<th>PPh 21 Terutang</th><th>PPh 21 Dipotong</th>'
-                     '<th>Lebih/Kurang Bayar</th></tr></thead><tbody>')
+        parts.append(
+            '<table class="table table-sm"><thead><tr>'
+            "<th>Karyawan</th><th>PTKP</th><th>Bruto</th>"
+            "<th>PPh 21 Terutang</th><th>PPh 21 Dipotong</th>"
+            "<th>Lebih/Kurang Bayar</th></tr></thead><tbody>"
+        )
         for r in rows:
             diff_class = "text-danger" if r["delta"] > 0 else ("text-success" if r["delta"] < 0 else "")
             parts.append(
@@ -104,16 +111,18 @@ class HrPayrollSPTA1Wizard(models.TransientModel):
             )
         parts.append("</tbody></table>")
 
-        self.write({
-            "run_done": True,
-            "xml_attachment_id": attachment.id if attachment else False,
-            "summary_html": "".join(parts),
-        })
+        self.write(
+            {
+                "run_done": True,
+                "xml_attachment_id": attachment.id if attachment else False,
+                "summary_html": "".join(parts),
+            }
+        )
 
         if self.output_format == "pdf":
-            return self.env.ref(
-                "custom_hr_payroll_id.action_report_spt_1721_a1"
-            ).report_action(self, data={"rows": rows, "fiscal_year": self.fiscal_year})
+            return self.env.ref("custom_hr_payroll_id.action_report_spt_1721_a1").report_action(
+                self, data={"rows": rows, "fiscal_year": self.fiscal_year}
+            )
 
         return {
             "type": "ir.actions.act_window",
@@ -127,15 +136,14 @@ class HrPayrollSPTA1Wizard(models.TransientModel):
 
     def _compute_employee_annual(self, emp, config) -> dict[str, Any]:
         Payslip = self.env["hr.payslip"].sudo()
-        slips = Payslip.search([
-            ("employee_id", "=", emp.id),
-            ("period_year", "=", self.fiscal_year),
-            ("state", "in", ("approved", "paid")),
-        ])
-        bruto_year = sum(
-            (s.gross_salary or 0) + (s.tunjangan_jabatan or 0) + (s.tunjangan_lain or 0)
-            for s in slips
+        slips = Payslip.search(
+            [
+                ("employee_id", "=", emp.id),
+                ("period_year", "=", self.fiscal_year),
+                ("state", "in", ("approved", "paid")),
+            ]
         )
+        bruto_year = sum((s.gross_salary or 0) + (s.tunjangan_jabatan or 0) + (s.tunjangan_lain or 0) for s in slips)
         jht_emp_year = sum(s.bpjs_jht_emp or 0 for s in slips)
         jp_emp_year = sum(s.bpjs_jp_emp or 0 for s in slips)
         pph_paid = sum(s.pph21 or 0 for s in slips)
@@ -173,13 +181,17 @@ class HrPayrollSPTA1Wizard(models.TransientModel):
 
     def _append_xml_employee(self, root, data):
         """Append a <Pegawai> element. Simplified DJP-style structure."""
-        emp_el = ET.SubElement(root, "Pegawai", attrib={
-            "npwp": data["npwp"],
-            "nik": data["nik"],
-            "nama": data["employee_name"],
-            "ptkp": data["ptkp_status"],
-            "kategori_ter": data["ter_category"],
-        })
+        emp_el = ET.SubElement(
+            root,
+            "Pegawai",
+            attrib={
+                "npwp": data["npwp"],
+                "nik": data["nik"],
+                "nama": data["employee_name"],
+                "ptkp": data["ptkp_status"],
+                "kategori_ter": data["ter_category"],
+            },
+        )
         for tag, val in [
             ("BrutoSetahun", data["bruto_year"]),
             ("BiayaJabatan", data["biaya_jabatan"]),

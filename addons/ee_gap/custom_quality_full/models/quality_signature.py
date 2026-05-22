@@ -12,27 +12,37 @@ class CustomQualitySignature(models.Model):
     Hash is computed at create time over signer + context + image bytes;
     subsequent edits to the protected fields are blocked, surfaced via the
     `is_valid` computed field as a tamper indicator."""
+
     _name = "custom.quality.signature"
     _description = "Quality Inspection Signature"
     _order = "signed_at desc, id desc"
 
     check_id = fields.Many2one(
-        "quality.check", ondelete="cascade", index=True,
+        "quality.check",
+        ondelete="cascade",
+        index=True,
     )
     capa_id = fields.Many2one(
-        "custom.quality.capa", ondelete="cascade", index=True,
+        "custom.quality.capa",
+        ondelete="cascade",
+        index=True,
     )
     signer_id = fields.Many2one(
-        "res.users", default=lambda s: s.env.user,
+        "res.users",
+        default=lambda s: s.env.user,
     )
     signer_name = fields.Char()
     signer_email = fields.Char()
     signed_at = fields.Datetime(default=fields.Datetime.now, readonly=True)
-    purpose = fields.Selection([
-        ("operator", "Operator"),
-        ("supervisor", "Supervisor"),
-        ("customer", "Customer"),
-    ], default="operator", required=True)
+    purpose = fields.Selection(
+        [
+            ("operator", "Operator"),
+            ("supervisor", "Supervisor"),
+            ("customer", "Customer"),
+        ],
+        default="operator",
+        required=True,
+    )
     image = fields.Binary(string="Signature Image", attachment=True)
     image_filename = fields.Char(default="signature.png")
     hash = fields.Char(readonly=True, copy=False)
@@ -59,14 +69,15 @@ class CustomQualitySignature(models.Model):
                 image_bytes = base64.b64decode(self.image, validate=False)
             except Exception:
                 image_bytes = b""
-        payload = "|".join([
-            str(self.signer_id.id or ""),
-            str(self.check_id.id or ""),
-            str(self.capa_id.id or ""),
-            (self.signed_at or fields.Datetime.now()).isoformat()
-            if self.signed_at else "",
-            hashlib.sha256(image_bytes).hexdigest(),
-        ])
+        payload = "|".join(
+            [
+                str(self.signer_id.id or ""),
+                str(self.check_id.id or ""),
+                str(self.capa_id.id or ""),
+                (self.signed_at or fields.Datetime.now()).isoformat() if self.signed_at else "",
+                hashlib.sha256(image_bytes).hexdigest(),
+            ]
+        )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     @api.depends("signer_id", "signed_at", "image", "check_id", "capa_id")
@@ -75,9 +86,7 @@ class CustomQualitySignature(models.Model):
             r.is_valid = bool(r.hash) and (r.hash == r._compute_hash())
 
     def write(self, vals):
-        protected = {"signer_id", "signed_at", "check_id", "capa_id",
-                     "image", "image_filename", "purpose"}
+        protected = {"signer_id", "signed_at", "check_id", "capa_id", "image", "image_filename", "purpose"}
         if any(r.hash for r in self) and (set(vals) & protected):
-            raise ValidationError(_(
-                "Cannot modify a signed signature. Create a new one instead."))
+            raise ValidationError(_("Cannot modify a signed signature. Create a new one instead."))
         return super().write(vals)

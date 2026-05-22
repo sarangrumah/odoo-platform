@@ -87,8 +87,13 @@ class PdpMaskingService(models.AbstractModel):
 
     @api.model
     def _policy(self) -> str:
-        return self.env["ir.config_parameter"].sudo().get_param(
-            "pdp.masking.policy", "unmask_with_reason",
+        return (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param(
+                "pdp.masking.policy",
+                "unmask_with_reason",
+            )
         )
 
     @api.model

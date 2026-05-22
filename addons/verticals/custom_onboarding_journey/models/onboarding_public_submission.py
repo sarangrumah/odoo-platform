@@ -76,16 +76,19 @@ class OnboardingPublicSubmission(models.Model):
         immediately show the customer a status link.
         """
         import hashlib
+
         if not isinstance(payload, dict):
             raise UserError(_("payload must be a dict"))
         if not payload.get("company_name"):
             raise UserError(_("company_name is required"))
         source_ip = payload.pop("source_ip", None)
         ip_hash = hashlib.sha256(source_ip.encode("utf-8")).hexdigest()[:32] if source_ip else False
-        rec = self.sudo().create({
-            "raw_payload_json": json.dumps(payload),
-            "source_ip_hash": ip_hash,
-        })
+        rec = self.sudo().create(
+            {
+                "raw_payload_json": json.dumps(payload),
+                "source_ip_hash": ip_hash,
+            }
+        )
         return {
             "id": rec.id,
             "token": rec.public_token,
@@ -113,11 +116,7 @@ class OnboardingPublicSubmission(models.Model):
         except Exception as exc:
             raise UserError(_("Cannot parse submission payload: %s") % exc) from exc
 
-        partner_name = (
-            data.get("partner_name")
-            or data.get("company_name")
-            or _("Unknown")
-        )
+        partner_name = data.get("partner_name") or data.get("company_name") or _("Unknown")
         partner_email = data.get("partner_email") or data.get("contact_email")
         partner_phone = data.get("contact_phone")
         Partner = self.env["res.partner"].sudo()
@@ -160,13 +159,17 @@ class OnboardingPublicSubmission(models.Model):
                 # b64 might be a data URL ("data:application/...;base64,XXX")
                 if isinstance(b64, str) and "," in b64 and b64.startswith("data:"):
                     b64 = b64.split(",", 1)[1]
-                fname = (brd_filenames[idx] if idx < len(brd_filenames) else None) or f"BRD-{partner_name}-{idx + 1}.docx"
-                att = Attachment.create({
-                    "name": fname,
-                    "datas": b64,
-                    "res_model": "brd.document",
-                    "res_id": 0,
-                })
+                fname = (
+                    brd_filenames[idx] if idx < len(brd_filenames) else None
+                ) or f"BRD-{partner_name}-{idx + 1}.docx"
+                att = Attachment.create(
+                    {
+                        "name": fname,
+                        "datas": b64,
+                        "res_model": "brd.document",
+                        "res_id": 0,
+                    }
+                )
                 doc_vals = {
                     "name": fname.rsplit(".", 1)[0],
                     "document_attachment_id": att.id,
@@ -179,12 +182,19 @@ class OnboardingPublicSubmission(models.Model):
                 if data.get("vertical_target") and "vertical_target" in BrdDocument._fields:
                     doc_vals["vertical_target"] = data["vertical_target"]
                 if "company_profile_json" in BrdDocument._fields:
-                    doc_vals["company_profile_json"] = json.dumps({
-                        k: data.get(k) for k in (
-                            "company_name", "contact_email", "contact_phone",
-                            "npwp", "bank_name", "bank_account",
-                        )
-                    })
+                    doc_vals["company_profile_json"] = json.dumps(
+                        {
+                            k: data.get(k)
+                            for k in (
+                                "company_name",
+                                "contact_email",
+                                "contact_phone",
+                                "npwp",
+                                "bank_name",
+                                "bank_account",
+                            )
+                        }
+                    )
                 doc = BrdDocument.create(doc_vals)
                 # Re-point attachment to the created BRD record so the Documents app picks it up.
                 att.write({"res_id": doc.id})

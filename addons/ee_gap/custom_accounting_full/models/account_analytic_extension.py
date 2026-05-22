@@ -17,14 +17,14 @@ class AccountAnalyticAccount(models.Model):
         string="Branch Root",
         default=False,
         help="When True, this analytic account is the root for a legal branch and "
-             "all child analytic accounts are considered part of that branch's books.",
+        "all child analytic accounts are considered part of that branch's books.",
     )
     x_custom_parent_id = fields.Many2one(
         "account.analytic.account",
         string="Parent Analytic Account",
         index=True,
         help="Parent analytic account for branch hierarchy. Replaces the native "
-             "parent_id that was removed in Odoo 19 (hierarchy now lives on plan).",
+        "parent_id that was removed in Odoo 19 (hierarchy now lives on plan).",
     )
     x_custom_branch_root_id = fields.Many2one(
         "account.analytic.account",

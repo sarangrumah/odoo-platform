@@ -15,6 +15,7 @@ The engine provides three responsibilities:
 3.  **Render context** — common header metadata + audit logging
     via :py:meth:`_log_report_run` (writes to ``pdp.audit_log``).
 """
+
 from __future__ import annotations
 
 import json
@@ -109,34 +110,32 @@ class CustomReportEngine(models.AbstractModel):
         merged = self._default_filters()
         for key, value in (filters or {}).items():
             if value in (None, "", False) and key not in (
-                "posted_only", "comparison",
+                "posted_only",
+                "comparison",
             ):
                 continue
             merged[key] = value
 
         for key in (
-            "date_from", "date_to",
-            "comparison_date_from", "comparison_date_to",
+            "date_from",
+            "date_to",
+            "comparison_date_from",
+            "comparison_date_to",
         ):
             value = merged.get(key)
             if isinstance(value, str) and value:
                 merged[key] = date.fromisoformat(value)
 
-        if merged["date_from"] and merged["date_to"] and (
-            merged["date_from"] > merged["date_to"]
-        ):
+        if merged["date_from"] and merged["date_to"] and (merged["date_from"] > merged["date_to"]):
             merged["date_from"], merged["date_to"] = (
-                merged["date_to"], merged["date_from"],
+                merged["date_to"],
+                merged["date_from"],
             )
 
         if merged.get("comparison") and not merged.get("comparison_date_from"):
             span = (merged["date_to"] - merged["date_from"]).days + 1
-            merged["comparison_date_to"] = (
-                merged["date_from"] - timedelta(days=1)
-            )
-            merged["comparison_date_from"] = (
-                merged["comparison_date_to"] - timedelta(days=span - 1)
-            )
+            merged["comparison_date_to"] = merged["date_from"] - timedelta(days=1)
+            merged["comparison_date_from"] = merged["comparison_date_to"] - timedelta(days=span - 1)
 
         # company_ids must always be a non-empty list — fall back to
         # current company so SQL ``IN ()`` cannot crash.
@@ -177,7 +176,8 @@ class CustomReportEngine(models.AbstractModel):
         ``parent_state`` so the filter applies without an explicit JOIN.
         """
         params = [
-            filters["date_from"], filters["date_to"],
+            filters["date_from"],
+            filters["date_to"],
             tuple(filters["company_ids"]) or (0,),
         ]
         query = """
@@ -222,8 +222,13 @@ class CustomReportEngine(models.AbstractModel):
         return query, tuple(params)
 
     def _get_account_balances(
-        self, date_from=None, date_to=None,
-        company_ids=None, journal_ids=None, *, filters=None,
+        self,
+        date_from=None,
+        date_to=None,
+        company_ids=None,
+        journal_ids=None,
+        *,
+        filters=None,
     ):
         """Aggregate debit/credit/balance per account for the period.
 
@@ -244,12 +249,14 @@ class CustomReportEngine(models.AbstractModel):
         if filters is None and isinstance(date_from, dict):
             filters = date_from
         if filters is None:
-            filters = self._get_context_filters({
-                "date_from": date_from,
-                "date_to": date_to,
-                "company_ids": company_ids,
-                "journal_ids": journal_ids or [],
-            })
+            filters = self._get_context_filters(
+                {
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "company_ids": company_ids,
+                    "journal_ids": journal_ids or [],
+                }
+            )
         return self._sum_by_account(filters)
 
     def _sum_by_account(self, filters, account_domain=None):
@@ -259,7 +266,8 @@ class CustomReportEngine(models.AbstractModel):
         the account set (resolved via a fast ``account.account`` search).
         """
         params = [
-            filters["date_from"], filters["date_to"],
+            filters["date_from"],
+            filters["date_to"],
             tuple(filters["company_ids"]) or (0,),
         ]
         sql = """
@@ -294,9 +302,7 @@ class CustomReportEngine(models.AbstractModel):
             params.append(tuple(filters["partner_ids"]))
 
         if account_domain:
-            account_ids = self.env["account.account"].search(
-                account_domain
-            ).ids
+            account_ids = self.env["account.account"].search(account_domain).ids
             if not account_ids:
                 return {}
             sql += " AND aml.account_id IN %s"
@@ -326,9 +332,7 @@ class CustomReportEngine(models.AbstractModel):
     def _get_company_currency(self, filters=None):
         filters = filters or {}
         if filters.get("company_ids"):
-            company = self.env["res.company"].browse(
-                filters["company_ids"][0]
-            )
+            company = self.env["res.company"].browse(filters["company_ids"][0])
             if company.exists():
                 return company.currency_id
         return self.env.company.currency_id
@@ -364,23 +368,27 @@ class CustomReportEngine(models.AbstractModel):
 
     def _coverage_banner(self, filters):
         """Header row consumed by QWeb templates."""
-        return [{
-            "type": "coverage",
-            "date_from": filters["date_from"],
-            "date_to": filters["date_to"],
-            "date_from_str": self._format_date_id(filters["date_from"]),
-            "date_to_str": self._format_date_id(filters["date_to"]),
-            "posted_only": filters.get("posted_only", True),
-        }]
+        return [
+            {
+                "type": "coverage",
+                "date_from": filters["date_from"],
+                "date_to": filters["date_to"],
+                "date_from_str": self._format_date_id(filters["date_from"]),
+                "date_to_str": self._format_date_id(filters["date_to"]),
+                "posted_only": filters.get("posted_only", True),
+            }
+        ]
 
     # ------------------------------------------------------------------
     # Subclass hooks
     # ------------------------------------------------------------------
     def _build_lines(self, filters):
-        raise NotImplementedError(_(
-            "Report %(code)s must override _build_lines().",
-            code=self._report_code or self._name,
-        ))
+        raise NotImplementedError(
+            _(
+                "Report %(code)s must override _build_lines().",
+                code=self._report_code or self._name,
+            )
+        )
 
     def _compute(self, filters=None):
         """Public entry point used by wizards.
@@ -423,14 +431,8 @@ class CustomReportEngine(models.AbstractModel):
             payload = {
                 "report_code": self._report_code,
                 "report_title": self._report_title,
-                "date_from": (
-                    filters["date_from"].isoformat()
-                    if filters.get("date_from") else None
-                ),
-                "date_to": (
-                    filters["date_to"].isoformat()
-                    if filters.get("date_to") else None
-                ),
+                "date_from": (filters["date_from"].isoformat() if filters.get("date_from") else None),
+                "date_to": (filters["date_to"].isoformat() if filters.get("date_to") else None),
                 "company_ids": list(filters.get("company_ids") or []),
                 "journal_ids": list(filters.get("journal_ids") or []),
                 "partner_ids": list(filters.get("partner_ids") or []),
@@ -463,5 +465,6 @@ class CustomReportEngine(models.AbstractModel):
         except Exception as exc:  # pragma: no cover - defensive
             _logger.warning(
                 "custom_accounting_reports: PDP audit log skipped for %s: %s",
-                self._name, exc,
+                self._name,
+                exc,
             )

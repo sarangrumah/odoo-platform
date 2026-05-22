@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import json
 import logging
 from datetime import datetime
 
@@ -10,7 +9,6 @@ _logger = logging.getLogger(__name__)
 
 
 class IotIngestController(http.Controller):
-
     @http.route("/iot/ingest", type="jsonrpc", auth="public", methods=["POST"], csrf=False)
     def ingest(self):
         """Webhook for devices to POST a single reading.
@@ -25,8 +23,13 @@ class IotIngestController(http.Controller):
         if not token:
             return {"error": "missing_token"}
 
-        device = request.env["iot.device"].sudo().search(
-            [("api_token", "=", token), ("active", "=", True)], limit=1,
+        device = (
+            request.env["iot.device"]
+            .sudo()
+            .search(
+                [("api_token", "=", token), ("active", "=", True)],
+                limit=1,
+            )
         )
         if not device:
             return {"error": "invalid_token"}
@@ -44,24 +47,27 @@ class IotIngestController(http.Controller):
         recorded_at = payload.get("recorded_at")
         if recorded_at:
             try:
-                recorded_at = datetime.fromisoformat(recorded_at.replace("Z", "+00:00")) \
-                                       .replace(tzinfo=None)
+                recorded_at = datetime.fromisoformat(recorded_at.replace("Z", "+00:00")).replace(tzinfo=None)
             except ValueError:
                 recorded_at = None
 
         Reading = request.env["iot.reading"].sudo()
-        reading = Reading.with_context(iot_internal_write=True).create({
-            "device_id": device.id,
-            "metric": metric,
-            "value": float(value),
-            "unit": payload.get("unit"),
-            "recorded_at": recorded_at or fields.Datetime.now(),
-            "extra": payload.get("extra") or {},
-        })
-        device.sudo().write({
-            "last_seen_at": fields.Datetime.now(),
-            "status": "online",
-        })
+        reading = Reading.with_context(iot_internal_write=True).create(
+            {
+                "device_id": device.id,
+                "metric": metric,
+                "value": float(value),
+                "unit": payload.get("unit"),
+                "recorded_at": recorded_at or fields.Datetime.now(),
+                "extra": payload.get("extra") or {},
+            }
+        )
+        device.sudo().write(
+            {
+                "last_seen_at": fields.Datetime.now(),
+                "status": "online",
+            }
+        )
 
         # Threshold evaluation
         request.env["iot.threshold"].sudo().evaluate(reading)

@@ -24,9 +24,7 @@ class CustomHubAiUsage(models.Model):
     _order = "date desc, tenant_id, model_name"
     _rec_name = "model_name"
 
-    tenant_id = fields.Many2one(
-        "tenant.registry", string="Tenant", ondelete="cascade", index=True
-    )
+    tenant_id = fields.Many2one("tenant.registry", string="Tenant", ondelete="cascade", index=True)
     date = fields.Date(required=True, index=True)
     model_name = fields.Char(required=True, index=True)
     input_tokens = fields.Integer(default=0)
@@ -37,7 +35,9 @@ class CustomHubAiUsage(models.Model):
     request_count = fields.Integer(default=0)
     cache_hit_rate_pct = fields.Float(
         string="Cache Hit Rate (%)",
-        compute="_compute_cache_hit_rate", store=True, digits=(5, 2),
+        compute="_compute_cache_hit_rate",
+        store=True,
+        digits=(5, 2),
     )
 
     _sql_constraints = [
@@ -51,15 +51,8 @@ class CustomHubAiUsage(models.Model):
     @api.depends("input_tokens", "cache_read_tokens", "cache_creation_tokens")
     def _compute_cache_hit_rate(self):
         for rec in self:
-            total_input = (
-                rec.input_tokens
-                + rec.cache_read_tokens
-                + rec.cache_creation_tokens
-            )
-            rec.cache_hit_rate_pct = (
-                (rec.cache_read_tokens / total_input) * 100.0
-                if total_input else 0.0
-            )
+            total_input = rec.input_tokens + rec.cache_read_tokens + rec.cache_creation_tokens
+            rec.cache_hit_rate_pct = (rec.cache_read_tokens / total_input) * 100.0 if total_input else 0.0
 
     # ------------------------------------------------------------------
     # Cron / refresh
@@ -77,21 +70,20 @@ class CustomHubAiUsage(models.Model):
         # The bridge model exposes a usage_log table or similar; we try
         # a couple of common shapes — and if none are present, no-op.
         if not hasattr(Bridge, "_hub_usage_iter"):
-            _logger.info(
-                "[hub_ai_usage] custom_ai has no _hub_usage_iter helper — "
-                "no aggregation performed."
-            )
+            _logger.info("[hub_ai_usage] custom_ai has no _hub_usage_iter helper — no aggregation performed.")
             return {"rolled_up": 0, "skipped": True}
 
         cutoff = fields.Date.today() - timedelta(days=lookback_days)
-        buckets: dict[tuple, dict] = defaultdict(lambda: {
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "cache_read_tokens": 0,
-            "cache_creation_tokens": 0,
-            "cost_usd": 0.0,
-            "request_count": 0,
-        })
+        buckets: dict[tuple, dict] = defaultdict(
+            lambda: {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cost_usd": 0.0,
+                "request_count": 0,
+            }
+        )
         for row in Bridge._hub_usage_iter(since=cutoff):
             key = (
                 row.get("tenant_id") or False,
@@ -102,19 +94,20 @@ class CustomHubAiUsage(models.Model):
             b["input_tokens"] += int(row.get("input_tokens") or 0)
             b["output_tokens"] += int(row.get("output_tokens") or 0)
             b["cache_read_tokens"] += int(row.get("cache_read_tokens") or 0)
-            b["cache_creation_tokens"] += int(
-                row.get("cache_creation_tokens") or 0
-            )
+            b["cache_creation_tokens"] += int(row.get("cache_creation_tokens") or 0)
             b["cost_usd"] += float(row.get("cost_usd") or 0.0)
             b["request_count"] += int(row.get("request_count") or 1)
 
         rolled = 0
         for (tenant_id, date, model_name), vals in buckets.items():
-            existing = self.search([
-                ("tenant_id", "=", tenant_id or False),
-                ("date", "=", date),
-                ("model_name", "=", model_name),
-            ], limit=1)
+            existing = self.search(
+                [
+                    ("tenant_id", "=", tenant_id or False),
+                    ("date", "=", date),
+                    ("model_name", "=", model_name),
+                ],
+                limit=1,
+            )
             full = {
                 **vals,
                 "tenant_id": tenant_id or False,

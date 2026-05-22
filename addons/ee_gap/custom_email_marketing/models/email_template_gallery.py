@@ -69,7 +69,5 @@ class CustomEmailTemplateGallery(models.Model):
             vals["subject"] = self.subject
         mailing.write(vals)
         self.sudo().write({"times_used": self.times_used + 1})
-        mailing.message_post(
-            body=_("Applied template gallery entry: %s") % self.display_name
-        )
+        mailing.message_post(body=_("Applied template gallery entry: %s") % self.display_name)
         return True

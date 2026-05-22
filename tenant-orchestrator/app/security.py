@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import time
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 import structlog
 from fastapi import Request, Response, status
@@ -64,9 +64,7 @@ class HMACMiddleware(BaseHTTPMiddleware):
 
         body = await request.body()
         msg = ts.encode() + b"." + body
-        expected = hmac.new(
-            settings.orchestrator_shared_secret.encode(), msg, hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(settings.orchestrator_shared_secret.encode(), msg, hashlib.sha256).hexdigest()
 
         if not hmac.compare_digest(expected, given):
             log.warning("hmac.mismatch", path=request.url.path)

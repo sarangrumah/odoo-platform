@@ -17,17 +17,19 @@ class PajakkuCommon(TransactionCase):
         cls.Tx = cls.env["custom.coretax.transaction"]
         cls.Usage = cls.env["custom.coretax.pajakku.usage"]
 
-        cls.config = cls.Config.create({
-            "name": "Test Coretax + Pajakku",
-            "npwp": "012345678901234",
-            "taxpayer_name": "PT Test Pajakku",
-            "kpp_code": "999",
-            "adapter_type": "pajakku",
-            "pajakku_enabled": True,
-            "pajakku_sandbox_mode": True,
-            "pajakku_client_id": "test-client-id",
-            "pajakku_api_url": "https://sandbox-api.pajakku.test",
-        })
+        cls.config = cls.Config.create(
+            {
+                "name": "Test Coretax + Pajakku",
+                "npwp": "012345678901234",
+                "taxpayer_name": "PT Test Pajakku",
+                "kpp_code": "999",
+                "adapter_type": "pajakku",
+                "pajakku_enabled": True,
+                "pajakku_sandbox_mode": True,
+                "pajakku_client_id": "test-client-id",
+                "pajakku_api_url": "https://sandbox-api.pajakku.test",
+            }
+        )
 
         # Stub the encrypted-secret accessor so tests don't need a real KMS key
         cls._secret_patch = mock.patch.object(
@@ -42,14 +44,13 @@ class PajakkuCommon(TransactionCase):
         cls._secret_patch.stop()
         super().tearDownClass()
 
-    def _make_response(self, status_code: int = 200, json_body: dict | None = None,
-                      content: bytes = b"", headers: dict | None = None):
+    def _make_response(
+        self, status_code: int = 200, json_body: dict | None = None, content: bytes = b"", headers: dict | None = None
+    ):
         resp = mock.MagicMock()
         resp.status_code = status_code
         resp.json.return_value = json_body or {}
-        resp.content = content or (
-            __import__("json").dumps(json_body or {}).encode() if json_body else b""
-        )
+        resp.content = content or (__import__("json").dumps(json_body or {}).encode() if json_body else b"")
         resp.headers = headers or {}
         resp.text = (resp.content or b"").decode("utf-8", errors="replace")
         return resp

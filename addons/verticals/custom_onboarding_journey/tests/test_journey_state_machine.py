@@ -24,7 +24,8 @@ class TestJourneyStateMachine(TransactionCase):
         j.write({"stage": "intake"})
         self.assertEqual(j.stage, "intake")
         rows = self.Transition.search(
-            [("journey_id", "=", j.id)], order="id asc",
+            [("journey_id", "=", j.id)],
+            order="id asc",
         )
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[1].to_stage, "intake")
@@ -56,5 +57,6 @@ class TestJourneyStateMachine(TransactionCase):
         j = self.Journey.create({"name": "T6"})
         row = self.Transition.search([("journey_id", "=", j.id)], limit=1)
         from odoo.exceptions import AccessError
+
         with self.assertRaises(AccessError):
             row.write({"notes": "tampered"})

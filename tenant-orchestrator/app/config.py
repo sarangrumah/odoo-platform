@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     pg_host: str = "postgres"
     pg_port: int = 5432
     pg_master_db: str = "postgres"
-    pg_super_user: str = "odoo"                 # POSTGRES_USER (used for CREATEDB)
+    pg_super_user: str = "odoo"  # POSTGRES_USER (used for CREATEDB)
     pg_super_password: str = Field(min_length=16)
     pg_orchestrator_user: str = "tenant_orchestrator"
     pg_orchestrator_password: str = Field(min_length=16)

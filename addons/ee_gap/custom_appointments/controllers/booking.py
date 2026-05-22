@@ -6,11 +6,15 @@ from odoo.http import request
 
 
 class BookingPortal(http.Controller):
-
     @http.route("/book/<string:slug>", type="http", auth="public", website=True)
     def show_type(self, slug):
-        atype = request.env["appointment.type"].sudo().search(
-            [("slug", "=", slug), ("active", "=", True)], limit=1,
+        atype = (
+            request.env["appointment.type"]
+            .sudo()
+            .search(
+                [("slug", "=", slug), ("active", "=", True)],
+                limit=1,
+            )
         )
         if not atype:
             return request.not_found()
@@ -22,27 +26,37 @@ class BookingPortal(http.Controller):
             {"atype": atype, "resource": resource, "slots": slots},
         )
 
-    @http.route("/book/<string:slug>/submit", type="http", auth="public", website=True,
-                methods=["POST"], csrf=True)
+    @http.route("/book/<string:slug>/submit", type="http", auth="public", website=True, methods=["POST"], csrf=True)
     def submit(self, slug, **post):
-        atype = request.env["appointment.type"].sudo().search(
-            [("slug", "=", slug), ("active", "=", True)], limit=1,
+        atype = (
+            request.env["appointment.type"]
+            .sudo()
+            .search(
+                [("slug", "=", slug), ("active", "=", True)],
+                limit=1,
+            )
         )
         if not atype:
             return request.not_found()
         start = datetime.fromisoformat(post["start_dt"])
         end = start + timedelta(minutes=atype.duration_minutes)
         resource_id = int(post["resource_id"])
-        booking = request.env["appointment.booking"].sudo().create({
-            "type_id": atype.id,
-            "resource_id": resource_id,
-            "customer_name": post["customer_name"],
-            "customer_email": post["customer_email"],
-            "customer_phone": post.get("customer_phone"),
-            "start_dt": start,
-            "end_dt": end,
-            "notes": post.get("notes", ""),
-        })
+        booking = (
+            request.env["appointment.booking"]
+            .sudo()
+            .create(
+                {
+                    "type_id": atype.id,
+                    "resource_id": resource_id,
+                    "customer_name": post["customer_name"],
+                    "customer_email": post["customer_email"],
+                    "customer_phone": post.get("customer_phone"),
+                    "start_dt": start,
+                    "end_dt": end,
+                    "notes": post.get("notes", ""),
+                }
+            )
+        )
         return request.render(
             "custom_appointments.booking_confirm",
             {"booking": booking, "atype": atype},

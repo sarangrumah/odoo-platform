@@ -55,9 +55,9 @@ class CustomSpreadsheetImportWizard(models.TransientModel):
 
         self.workbook_id.message_post(
             body=_(
-                "<b>CSV imported</b>: %(n)s row(s) into sheet <i>%(s)s</i> "
-                "(header=%(h)s, delimiter=<code>%(d)s</code>)"
-            ) % {
+                "<b>CSV imported</b>: %(n)s row(s) into sheet <i>%(s)s</i> (header=%(h)s, delimiter=<code>%(d)s</code>)"
+            )
+            % {
                 "n": len(rows),
                 "s": sheet_name,
                 "h": "yes" if self.has_header else "no",

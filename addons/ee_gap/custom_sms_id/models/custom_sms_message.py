@@ -92,15 +92,17 @@ class CustomSmsMessage(models.Model):
                     consent_ok = False
 
             if rec.purpose == "marketing" and not consent_ok:
-                raise UserError(_(
-                    "Cannot send marketing SMS to %s: no active PDP consent "
-                    "for purpose 'sms_marketing'."
-                ) % (rec.to_partner_id.display_name or rec.to_phone))
+                raise UserError(
+                    _("Cannot send marketing SMS to %s: no active PDP consent for purpose 'sms_marketing'.")
+                    % (rec.to_partner_id.display_name or rec.to_phone)
+                )
 
             if not consent_ok:
                 _logger.warning(
                     "custom.sms.message %s: sending %s without verified consent (purpose_code=%s)",
-                    rec.id, rec.purpose, purpose_code,
+                    rec.id,
+                    rec.purpose,
+                    purpose_code,
                 )
 
             rec.consent_verified = consent_ok
@@ -116,22 +118,28 @@ class CustomSmsMessage(models.Model):
                 )
             except Exception as e:
                 _logger.exception("SMS adapter send failed for message %s", rec.id)
-                rec.write({
-                    "state": "failed",
-                    "error_message": str(e),
-                })
+                rec.write(
+                    {
+                        "state": "failed",
+                        "error_message": str(e),
+                    }
+                )
                 continue
 
             if result.get("ok"):
-                rec.write({
-                    "state": "sent",
-                    "sent_at": fields.Datetime.now(),
-                    "provider_message_id": result.get("provider_message_id"),
-                    "error_message": False,
-                })
+                rec.write(
+                    {
+                        "state": "sent",
+                        "sent_at": fields.Datetime.now(),
+                        "provider_message_id": result.get("provider_message_id"),
+                        "error_message": False,
+                    }
+                )
             else:
-                rec.write({
-                    "state": "failed",
-                    "error_message": result.get("message") or "Unknown adapter error",
-                })
+                rec.write(
+                    {
+                        "state": "failed",
+                        "error_message": result.get("message") or "Unknown adapter error",
+                    }
+                )
         return True

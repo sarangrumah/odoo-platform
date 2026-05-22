@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Aged Receivable: open AR per partner bucketed by overdue days."""
+
 from odoo import models
 
 
@@ -61,16 +62,18 @@ class CustomReportAgedReceivable(models.AbstractModel):
             if not residual:
                 continue
             pid = line.partner_id.id or 0
-            row = per_partner.setdefault(pid, {
-                "partner_id": pid,
-                "partner_name": (
-                    line.partner_id.display_name or "No Partner"
-                ),
-                "total": 0.0,
-                **{code: 0.0 for code, _, _, _ in BUCKETS},
-            })
+            row = per_partner.setdefault(
+                pid,
+                {
+                    "partner_id": pid,
+                    "partner_name": (line.partner_id.display_name or "No Partner"),
+                    "total": 0.0,
+                    **{code: 0.0 for code, _, _, _ in BUCKETS},
+                },
+            )
             bucket = self._classify_bucket(
-                line.date_maturity or line.date, as_of,
+                line.date_maturity or line.date,
+                as_of,
             )
             row[bucket] += residual
             row["total"] += residual
@@ -88,10 +91,7 @@ class CustomReportAgedReceivable(models.AbstractModel):
 
         return {
             "type": "aging",
-            "buckets": [
-                {"code": c, "label": label}
-                for c, label, _, _ in BUCKETS
-            ],
+            "buckets": [{"code": c, "label": label} for c, label, _, _ in BUCKETS],
             "rows": partners,
             "grand_total": grand_total,
         }

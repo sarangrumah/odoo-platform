@@ -9,7 +9,9 @@ class SignTemplate(models.Model):
 
     name = fields.Char(required=True)
     attachment_id = fields.Many2one(
-        "ir.attachment", required=True, ondelete="restrict",
+        "ir.attachment",
+        required=True,
+        ondelete="restrict",
         help="The PDF that signers will see.",
     )
     description = fields.Text()

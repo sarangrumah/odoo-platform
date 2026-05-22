@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 
@@ -64,16 +64,20 @@ class ConsolidationReportWizard(models.TransientModel):
         full = self.config_id.build_trial_balance(self.date_from, self.date_to)
         income = ("income", "income_other")
         expense = ("expense", "expense_direct_cost", "expense_depreciation")
-        full["accounts"] = [
-            a for a in full["accounts"] if a["account_type"] in income or a["account_type"] in expense
-        ]
+        full["accounts"] = [a for a in full["accounts"] if a["account_type"] in income or a["account_type"] in expense]
         full["section"] = "profit_loss"
         return full
 
     def _build_bs(self):
         full = self.config_id.build_trial_balance(self.date_from, self.date_to)
-        asset = ("asset_receivable", "asset_cash", "asset_current",
-                 "asset_non_current", "asset_prepayments", "asset_fixed")
+        asset = (
+            "asset_receivable",
+            "asset_cash",
+            "asset_current",
+            "asset_non_current",
+            "asset_prepayments",
+            "asset_fixed",
+        )
         liab = ("liability_payable", "liability_current", "liability_non_current")
         equity = ("equity", "equity_unaffected")
         keep = asset + liab + equity

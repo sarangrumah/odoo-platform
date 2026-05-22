@@ -80,9 +80,13 @@ class TestWebhookHmac(TransactionCase):
         self.assertEqual(log.applicant_id.x_external_id, "LI-7")
 
     def test_ingest_unknown_source_falls_back_to_manual(self):
-        log = self.Log.ingest_payload("totally-bogus", {
-            "name": "Generic", "email": "g@example.com",
-        })
+        log = self.Log.ingest_payload(
+            "totally-bogus",
+            {
+                "name": "Generic",
+                "email": "g@example.com",
+            },
+        )
         self.assertEqual(log.source, "manual")
         self.assertTrue(log.processed)
 
@@ -94,7 +98,9 @@ class TestWebhookHmac(TransactionCase):
         sig = self._sign(self.SECRET_JS, body)
         # Verify the exact same digest we'd produce server-side.
         expected = hmac.new(
-            self.SECRET_JS.encode("utf-8"), body, hashlib.sha256,
+            self.SECRET_JS.encode("utf-8"),
+            body,
+            hashlib.sha256,
         ).hexdigest()
         self.assertEqual(sig, expected)
         # And that the secret is fetched via the documented param name.

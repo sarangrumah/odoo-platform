@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from odoo.tests.common import TransactionCase, tagged
 
 
 @tagged("post_install", "-at_install", "custom_maintenance")
 class TestMtbfMttr(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.Equipment = self.env["maintenance.equipment"]
@@ -14,9 +13,7 @@ class TestMtbfMttr(TransactionCase):
         self.Stage = self.env["maintenance.stage"]
         self.done_stage = self.Stage.search([("done", "=", True)], limit=1)
         if not self.done_stage:
-            self.done_stage = self.Stage.create(
-                {"name": "Done (test)", "done": True, "sequence": 99}
-            )
+            self.done_stage = self.Stage.create({"name": "Done (test)", "done": True, "sequence": 99})
         self.equipment = self.Equipment.create(
             {
                 "name": "Test Equipment MTBF",
@@ -38,15 +35,9 @@ class TestMtbfMttr(TransactionCase):
 
     def test_mtbf_with_three_failures(self):
         """MTBF = window_hours / failures."""
-        self._make_done_request(
-            datetime(2026, 1, 10, 8, 0), datetime(2026, 1, 10, 10, 0)
-        )
-        self._make_done_request(
-            datetime(2026, 2, 10, 8, 0), datetime(2026, 2, 10, 11, 0)
-        )
-        self._make_done_request(
-            datetime(2026, 3, 10, 8, 0), datetime(2026, 3, 10, 14, 0)
-        )
+        self._make_done_request(datetime(2026, 1, 10, 8, 0), datetime(2026, 1, 10, 10, 0))
+        self._make_done_request(datetime(2026, 2, 10, 8, 0), datetime(2026, 2, 10, 11, 0))
+        self._make_done_request(datetime(2026, 3, 10, 8, 0), datetime(2026, 3, 10, 14, 0))
         # Recompute by invalidating
         self.equipment.invalidate_recordset()
         self.assertEqual(self.equipment.x_total_failures, 3)
@@ -57,12 +48,8 @@ class TestMtbfMttr(TransactionCase):
 
     def test_predicted_next_maintenance_from_mtbf(self):
         """Predicted date should be in the future when MTBF > 0."""
-        self._make_done_request(
-            datetime(2026, 1, 10, 8, 0), datetime(2026, 1, 10, 10, 0)
-        )
-        self._make_done_request(
-            datetime(2026, 2, 10, 8, 0), datetime(2026, 2, 10, 11, 0)
-        )
+        self._make_done_request(datetime(2026, 1, 10, 8, 0), datetime(2026, 1, 10, 10, 0))
+        self._make_done_request(datetime(2026, 2, 10, 8, 0), datetime(2026, 2, 10, 11, 0))
         self.equipment.invalidate_recordset()
         # MTBF should be set and predicted via MTBF
         self.assertEqual(self.equipment.x_predicted_via, "mtbf")
@@ -78,12 +65,8 @@ class TestMtbfMttr(TransactionCase):
 
     def test_schedule_predicted_maintenance_creates_preventive(self):
         """Button creates a preventive draft request."""
-        self._make_done_request(
-            datetime(2026, 1, 10, 8, 0), datetime(2026, 1, 10, 10, 0)
-        )
-        self._make_done_request(
-            datetime(2026, 2, 10, 8, 0), datetime(2026, 2, 10, 11, 0)
-        )
+        self._make_done_request(datetime(2026, 1, 10, 8, 0), datetime(2026, 1, 10, 10, 0))
+        self._make_done_request(datetime(2026, 2, 10, 8, 0), datetime(2026, 2, 10, 11, 0))
         self.equipment.invalidate_recordset()
         action = self.equipment.action_schedule_predicted_maintenance()
         self.assertTrue(action)

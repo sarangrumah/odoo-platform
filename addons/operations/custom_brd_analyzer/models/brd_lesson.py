@@ -17,7 +17,7 @@ Two severities:
 
 from __future__ import annotations
 
-from odoo import _, api, fields, models
+from odoo import fields, models
 
 
 class BrdLesson(models.Model):
@@ -34,13 +34,13 @@ class BrdLesson(models.Model):
     section_pattern = fields.Text(
         required=True,
         help="Keywords or phrases the lesson applies to. Whitespace-split; "
-             "tokens of length >= 4 are used for matching against BRD section "
-             "content (case-insensitive substring).",
+        "tokens of length >= 4 are used for matching against BRD section "
+        "content (case-insensitive substring).",
     )
     rejected_proposals = fields.Json(
         default=list,
-        help='JSON list of module-name strings the LLM was wrongly proposing, '
-             'e.g. ["custom_drone_rental", "custom_arka_aim_bridge"].',
+        help="JSON list of module-name strings the LLM was wrongly proposing, "
+        'e.g. ["custom_drone_rental", "custom_arka_aim_bridge"].',
     )
     correct_modules = fields.Many2many(
         "custom.module.capability.entry",
@@ -49,12 +49,11 @@ class BrdLesson(models.Model):
         "module_id",
         string="Use Instead",
         help="The existing modules that already cover the capability the "
-             "LLM was trying to satisfy with a new proposal.",
+        "LLM was trying to satisfy with a new proposal.",
     )
     reason = fields.Text(
         required=True,
-        help="Short paragraph explaining WHY the lesson exists. Becomes the "
-             "rationale visible to the LLM.",
+        help="Short paragraph explaining WHY the lesson exists. Becomes the rationale visible to the LLM.",
     )
     severity = fields.Selection(
         [
@@ -81,7 +80,7 @@ class BrdLesson(models.Model):
         default=0,
         readonly=True,
         help="Number of analyzer runs this lesson has been injected into. "
-             "Lets ops gauge which lessons are pulling weight.",
+        "Lets ops gauge which lessons are pulling weight.",
     )
 
     def action_archive(self):

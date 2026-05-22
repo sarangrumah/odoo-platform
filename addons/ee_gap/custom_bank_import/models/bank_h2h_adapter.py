@@ -14,12 +14,11 @@ left as placeholders because each bank requires onboarding (test-bed URL
 issued at contract signing) — production deployments fill these in via
 the adapter config's ``base_url`` plus the per-bank path constants below.
 """
+
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from datetime import date
-from typing import Any, Optional
 
 from odoo.addons.custom_adapter_framework.models.adapter_base import (
     AdapterResponse,
@@ -58,12 +57,9 @@ class BcaH2HAdapter(BaseAdapter):
         endpoint = self.PATH_BALANCE.format(acct=account_number)
         return self.call(endpoint, method="GET")
 
-    def inquiry_statement(
-        self, account_number: str, date_from: date, date_to: date
-    ) -> AdapterResponse:
+    def inquiry_statement(self, account_number: str, date_from: date, date_to: date) -> AdapterResponse:
         endpoint = (
-            self.PATH_STATEMENT.format(acct=account_number)
-            + f"?EndDate={_iso(date_to)}&StartDate={_iso(date_from)}"
+            self.PATH_STATEMENT.format(acct=account_number) + f"?EndDate={_iso(date_to)}&StartDate={_iso(date_from)}"
         )
         resp = self.call(endpoint, method="GET")
         if resp.ok and resp.data:
@@ -81,12 +77,14 @@ class BcaH2HAdapter(BaseAdapter):
                 amt = -abs(amt)
             else:
                 amt = abs(amt)
-            out.append({
-                "date": row.get("TransactionDate") or row.get("Date"),
-                "description": row.get("TransactionName") or row.get("Description") or "",
-                "ref": row.get("TrailerCode") or row.get("Reference") or "",
-                "amount": amt,
-            })
+            out.append(
+                {
+                    "date": row.get("TransactionDate") or row.get("Date"),
+                    "description": row.get("TransactionName") or row.get("Description") or "",
+                    "ref": row.get("TrailerCode") or row.get("Reference") or "",
+                    "amount": amt,
+                }
+            )
         return out
 
 
@@ -110,9 +108,7 @@ class GenericBankH2HAdapter(BaseAdapter):
             payload={"account_number": account_number},
         )
 
-    def inquiry_statement(
-        self, account_number: str, date_from: date, date_to: date
-    ) -> AdapterResponse:
+    def inquiry_statement(self, account_number: str, date_from: date, date_to: date) -> AdapterResponse:
         resp = self.call(
             self._path("statement", "/statement"),
             method="POST",
@@ -135,6 +131,7 @@ class GenericBankH2HAdapter(BaseAdapter):
 # proper subclass with bank-specific signing/canonicalisation; until then
 # they share the generic transport but get distinct adapter_type names so
 # circuit breakers and logs are tracked separately.
+
 
 @register_adapter("bank_mandiri_h2h")
 class MandiriH2HAdapter(GenericBankH2HAdapter):

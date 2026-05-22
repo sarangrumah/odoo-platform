@@ -9,10 +9,12 @@ class BalanceSheetWizard(models.TransientModel):
     _description = "Balance Sheet Wizard"
 
     date_to = fields.Date(
-        required=True, default=lambda self: date.today(),
+        required=True,
+        default=lambda self: date.today(),
     )
     company_ids = fields.Many2many(
-        "res.company", default=lambda self: self.env.companies,
+        "res.company",
+        default=lambda self: self.env.companies,
     )
     posted_only = fields.Boolean(default=True)
     comparison = fields.Boolean(string="Show Prior Period")
@@ -36,12 +38,7 @@ class BalanceSheetWizard(models.TransientModel):
             "options": {
                 **self._build_filters(),
                 "date_to": self.date_to.isoformat(),
-                "comparison_date_to": (
-                    self.comparison_date_to.isoformat()
-                    if self.comparison_date_to else None
-                ),
+                "comparison_date_to": (self.comparison_date_to.isoformat() if self.comparison_date_to else None),
             },
         }
-        return self.env.ref(
-            "custom_accounting_reports.action_report_custom_financial"
-        ).report_action(self, data=data)
+        return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)

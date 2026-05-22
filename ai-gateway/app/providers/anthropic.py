@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
-import asyncio
-
-from anthropic import AsyncAnthropic, APIStatusError, BadRequestError, InternalServerError
+from anthropic import APIStatusError, AsyncAnthropic, BadRequestError, InternalServerError
 
 from ..config import get_settings
 from .base import ChatRequest, ChatResponse, LLMProvider
@@ -117,7 +116,10 @@ class AnthropicProvider(LLMProvider):
                     wait = 1 + (attempt * attempt) * 2 + attempt  # 1, 3, 7, 15
                     log.warning(
                         "anthropic: transient error (status=%s, msg=%r), retry %d/3 after %ds",
-                        real_status or class_status, msg[:120], attempt + 1, wait,
+                        real_status or class_status,
+                        msg[:120],
+                        attempt + 1,
+                        wait,
                     )
                     last_exc = e
                     await asyncio.sleep(wait)

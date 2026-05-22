@@ -25,51 +25,52 @@ class WithholdingRule(models.Model):
         default=10,
         help="Higher priority wins. Use product/partner-specific overrides at >50.",
     )
-    company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, ondelete="cascade"
-    )
+    company_id = fields.Many2one("res.company", default=lambda self: self.env.company, ondelete="cascade")
 
     category_id = fields.Many2one("tax.withholding.category", required=True, ondelete="restrict")
     pph_kind = fields.Selection(related="category_id.pph_kind", store=True, readonly=True)
 
     tarif = fields.Float(
-        string="Tarif (%)", digits=(6, 4), required=True,
+        string="Tarif (%)",
+        digits=(6, 4),
+        required=True,
         help="Withholding rate as a percent. e.g. 2.0 = 2%.",
     )
     tarif_no_npwp = fields.Float(
-        string="Tarif (Tanpa NPWP) (%)", digits=(6, 4),
+        string="Tarif (Tanpa NPWP) (%)",
+        digits=(6, 4),
         help="Bumped rate applied when vendor has no valid NPWP. "
-             "Typical PPh 23: 2% → 4%. Leave 0 to fall back to the base tarif.",
+        "Typical PPh 23: 2% → 4%. Leave 0 to fall back to the base tarif.",
     )
 
     account_id = fields.Many2one(
         "account.account",
         string="Account Hutang Pajak",
         domain="[('company_ids','in',company_id),('account_type','=','liability_current')]",
-        help="Liability account credited when withholding is recognised. "
-             "Required before the rule can be activated.",
+        help="Liability account credited when withholding is recognised. Required before the rule can be activated.",
     )
 
     # ---- Filters that narrow the resolution ----
     product_category_ids = fields.Many2many(
         "product.category",
         "tax_wh_rule_prod_cat_rel",
-        "rule_id", "category_id",
+        "rule_id",
+        "category_id",
         string="Product Categories",
         help="Apply only when the bill line's product belongs to one of these categories. "
-             "Empty = no product-category filter.",
+        "Empty = no product-category filter.",
     )
     partner_category_ids = fields.Many2many(
         "res.partner.category",
         "tax_wh_rule_part_cat_rel",
-        "rule_id", "tag_id",
+        "rule_id",
+        "tag_id",
         string="Partner Tags",
         help="Apply only when the vendor has one of these tags. Empty = no filter.",
     )
     foreign_only = fields.Boolean(
         string="Foreign Counterparty Only",
-        help="Apply only when vendor's country differs from company country. "
-             "Used to switch from PPh 23 → PPh 26.",
+        help="Apply only when vendor's country differs from company country. Used to switch from PPh 23 → PPh 26.",
     )
 
     notes = fields.Text()
@@ -86,10 +87,13 @@ class WithholdingRule(models.Model):
     def _check_account_when_active(self):
         for rec in self:
             if rec.active and not rec.account_id:
-                raise ValidationError(_(
-                    "Rule '%s' cannot be activated without an Account Hutang Pajak. "
-                    "Set the liability account before activating.", rec.name,
-                ))
+                raise ValidationError(
+                    _(
+                        "Rule '%s' cannot be activated without an Account Hutang Pajak. "
+                        "Set the liability account before activating.",
+                        rec.name,
+                    )
+                )
 
     # ------------------------------------------------------------------
 
@@ -104,16 +108,17 @@ class WithholdingRule(models.Model):
 
         partner = move_line.move_id.partner_id.commercial_partner_id
         company = move_line.move_id.company_id
-        is_foreign = bool(
-            partner.country_id and company.country_id and partner.country_id != company.country_id
-        )
+        is_foreign = bool(partner.country_id and company.country_id and partner.country_id != company.country_id)
         product_categ = move_line.product_id.categ_id
         partner_tags = partner.category_id
 
-        candidates = self.sudo().search([
-            ("active", "=", True),
-            ("company_id", "in", (False, company.id)),
-        ], order="priority desc, sequence asc")
+        candidates = self.sudo().search(
+            [
+                ("active", "=", True),
+                ("company_id", "in", (False, company.id)),
+            ],
+            order="priority desc, sequence asc",
+        )
 
         for rule in candidates:
             if rule.foreign_only and not is_foreign:

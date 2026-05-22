@@ -63,9 +63,7 @@ def _verify_turnstile(token: str, source_ip: str | None) -> None:
         result = resp.json()
     except (httpx.HTTPError, ValueError) as e:
         log.warning("intake.turnstile.error", error=str(e))
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY, "Turnstile verification unreachable"
-        ) from e
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Turnstile verification unreachable") from e
     if not result.get("success"):
         log.warning("intake.turnstile.failed", codes=result.get("error-codes"))
         raise HTTPException(
@@ -150,11 +148,7 @@ def get_intake_status(token: str) -> IntakeStatusResponse:
     sub = submissions[0]
     journey_field = sub.get("journey_id")
     # Odoo returns M2O as [id, display_name] or False
-    journey_id = (
-        journey_field[0]
-        if isinstance(journey_field, (list, tuple)) and journey_field
-        else None
-    )
+    journey_id = journey_field[0] if isinstance(journey_field, (list, tuple)) and journey_field else None
 
     stage = "intake"
     target_go_live: str | None = None

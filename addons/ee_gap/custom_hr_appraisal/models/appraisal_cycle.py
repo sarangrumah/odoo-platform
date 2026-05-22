@@ -15,12 +15,15 @@ class AppraisalCycle(models.Model):
     template_id = fields.Many2one("appraisal.template", required=True)
     state = fields.Selection(
         [("draft", "Draft"), ("running", "Running"), ("closed", "Closed")],
-        default="draft", required=True, tracking=True,
+        default="draft",
+        required=True,
+        tracking=True,
     )
     department_ids = fields.Many2many(
         "hr.department",
         "appraisal_cycle_dept_rel",
-        "cycle_id", "dept_id",
+        "cycle_id",
+        "dept_id",
         string="Departments (empty = all)",
     )
     appraisal_ids = fields.One2many("appraisal.appraisal", "cycle_id")
@@ -45,12 +48,14 @@ class AppraisalCycle(models.Model):
             for emp in employees:
                 if Appraisal.search_count([("cycle_id", "=", rec.id), ("employee_id", "=", emp.id)]):
                     continue
-                Appraisal.create({
-                    "cycle_id": rec.id,
-                    "employee_id": emp.id,
-                    "manager_id": emp.parent_id.id if emp.parent_id else False,
-                    "template_id": rec.template_id.id,
-                })
+                Appraisal.create(
+                    {
+                        "cycle_id": rec.id,
+                        "employee_id": emp.id,
+                        "manager_id": emp.parent_id.id if emp.parent_id else False,
+                        "template_id": rec.template_id.id,
+                    }
+                )
             rec.write({"state": "running"})
 
     def action_close(self):

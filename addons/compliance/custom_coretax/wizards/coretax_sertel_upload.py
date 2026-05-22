@@ -28,9 +28,7 @@ class CoretaxSertelUploadWizard(models.TransientModel):
         "custom.coretax.config",
         string="Coretax Configuration",
         required=True,
-        default=lambda self: self.env["custom.coretax.config"].search(
-            [("active", "=", True)], limit=1
-        ),
+        default=lambda self: self.env["custom.coretax.config"].search([("active", "=", True)], limit=1),
     )
     p12_filename = fields.Char(string="Filename")
     p12_data = fields.Binary(string="Sertel (.p12)", required=True, attachment=False)
@@ -57,6 +55,7 @@ class CoretaxSertelUploadWizard(models.TransientModel):
         # Optional sanity check: try to load via cryptography if available.
         try:
             from cryptography.hazmat.primitives.serialization import pkcs12
+
             pkcs12.load_key_and_certificates(
                 raw,
                 (self.p12_password or "").encode() or None,
@@ -64,15 +63,11 @@ class CoretaxSertelUploadWizard(models.TransientModel):
         except ImportError:
             _logger.warning("cryptography pkcs12 not available — skipping validation")
         except Exception as exc:  # noqa: BLE001 — bubble friendly error
-            raise UserError(_(
-                "Failed to open .p12 with provided password: %s"
-            ) % exc) from exc
+            raise UserError(_("Failed to open .p12 with provided password: %s") % exc) from exc
 
         # Store ciphertext via custom.ir.config (env-keyed Fernet).
         key = f"coretax.sertel.{self.config_id.id}"
-        self.env["custom.ir.config"].set_encrypted(
-            key, base64.b64encode(raw).decode()
-        )
+        self.env["custom.ir.config"].set_encrypted(key, base64.b64encode(raw).decode())
 
         update_vals = {"sertel_filename": self.p12_filename}
         if self.sertel_expiry:
@@ -81,11 +76,15 @@ class CoretaxSertelUploadWizard(models.TransientModel):
 
         self._audit_sertel_access("upload", self.config_id.id, self.p12_filename)
 
-        self.write({
-            "result_message": _("Sertel stored encrypted under ir.config_parameter "
-                                "key %s. Password was not persisted.") % key,
-            "p12_password": False,  # scrub from memory
-        })
+        self.write(
+            {
+                "result_message": _(
+                    "Sertel stored encrypted under ir.config_parameter key %s. Password was not persisted."
+                )
+                % key,
+                "p12_password": False,  # scrub from memory
+            }
+        )
         return {
             "type": "ir.actions.act_window",
             "res_model": self._name,
@@ -97,11 +96,13 @@ class CoretaxSertelUploadWizard(models.TransientModel):
     # ----- Audit log -----
     def _audit_sertel_access(self, op: str, config_id: int, filename: str | None) -> None:
         cr = self.env.cr
-        payload = json.dumps({
-            "operation": op,
-            "config_id": config_id,
-            "filename": filename or "",
-        })
+        payload = json.dumps(
+            {
+                "operation": op,
+                "config_id": config_id,
+                "filename": filename or "",
+            }
+        )
         cr.execute(
             """
             INSERT INTO pdp.audit_log

@@ -6,21 +6,31 @@ non-cash adjustments (depreciation, working capital changes) and
 classify per activity. Account types map to Operating / Investing /
 Financing buckets using Odoo's standard ``account_type``.
 """
+
 from odoo import models
 
 
 OPERATING_TYPES = (
-    "income", "income_other",
-    "expense", "expense_direct_cost", "expense_depreciation",
-    "asset_receivable", "asset_current", "asset_prepayments",
-    "liability_payable", "liability_current",
+    "income",
+    "income_other",
+    "expense",
+    "expense_direct_cost",
+    "expense_depreciation",
+    "asset_receivable",
+    "asset_current",
+    "asset_prepayments",
+    "liability_payable",
+    "liability_current",
 )
 INVESTING_TYPES = (
-    "asset_non_current", "asset_fixed",
+    "asset_non_current",
+    "asset_fixed",
 )
 FINANCING_TYPES = (
-    "liability_non_current", "liability_credit_card",
-    "equity", "equity_unaffected",
+    "liability_non_current",
+    "liability_credit_card",
+    "equity",
+    "equity_unaffected",
 )
 CASH_TYPES = ("asset_cash",)
 
@@ -61,49 +71,68 @@ class CustomReportCashFlow(models.AbstractModel):
         balances = self._get_account_balances(filters)
 
         operating = self._bucket(
-            "Operating Activities", "operating",
-            OPERATING_TYPES, balances, sign=-1,
+            "Operating Activities",
+            "operating",
+            OPERATING_TYPES,
+            balances,
+            sign=-1,
         )
         investing = self._bucket(
-            "Investing Activities", "investing",
-            INVESTING_TYPES, balances, sign=-1,
+            "Investing Activities",
+            "investing",
+            INVESTING_TYPES,
+            balances,
+            sign=-1,
         )
         financing = self._bucket(
-            "Financing Activities", "financing",
-            FINANCING_TYPES, balances, sign=-1,
+            "Financing Activities",
+            "financing",
+            FINANCING_TYPES,
+            balances,
+            sign=-1,
         )
         cash_delta = self._bucket(
-            "Net Change in Cash", "cash",
-            CASH_TYPES, balances, sign=1,
+            "Net Change in Cash",
+            "cash",
+            CASH_TYPES,
+            balances,
+            sign=1,
         )
 
-        lines = [operating, {
-            "type": "subtotal",
-            "label": "Net Cash from Operating Activities",
-            "signed_balance": operating["subtotal"],
-        }, investing, {
-            "type": "subtotal",
-            "label": "Net Cash from Investing Activities",
-            "signed_balance": investing["subtotal"],
-        }, financing, {
-            "type": "subtotal",
-            "label": "Net Cash from Financing Activities",
-            "signed_balance": financing["subtotal"],
-        }]
+        lines = [
+            operating,
+            {
+                "type": "subtotal",
+                "label": "Net Cash from Operating Activities",
+                "signed_balance": operating["subtotal"],
+            },
+            investing,
+            {
+                "type": "subtotal",
+                "label": "Net Cash from Investing Activities",
+                "signed_balance": investing["subtotal"],
+            },
+            financing,
+            {
+                "type": "subtotal",
+                "label": "Net Cash from Financing Activities",
+                "signed_balance": financing["subtotal"],
+            },
+        ]
 
-        net_change = (
-            operating["subtotal"]
-            + investing["subtotal"]
-            + financing["subtotal"]
+        net_change = operating["subtotal"] + investing["subtotal"] + financing["subtotal"]
+        lines.append(
+            {
+                "type": "grand_total",
+                "label": "Net Change in Cash (computed)",
+                "signed_balance": net_change,
+            }
         )
-        lines.append({
-            "type": "grand_total",
-            "label": "Net Change in Cash (computed)",
-            "signed_balance": net_change,
-        })
-        lines.append({
-            "type": "check",
-            "label": "Change in Cash Accounts (observed)",
-            "signed_balance": cash_delta["subtotal"],
-        })
+        lines.append(
+            {
+                "type": "check",
+                "label": "Change in Cash Accounts (observed)",
+                "signed_balance": cash_delta["subtotal"],
+            }
+        )
         return lines

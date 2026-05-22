@@ -33,12 +33,10 @@ class ApprovalMatrix(models.Model):
     priority = fields.Integer(
         default=10,
         help="Higher value wins when multiple matrices match a record. "
-             "Use to layer specific overrides on top of broader defaults.",
+        "Use to layer specific overrides on top of broader defaults.",
     )
     active = fields.Boolean(default=True)
-    company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, ondelete="cascade"
-    )
+    company_id = fields.Many2one("res.company", default=lambda self: self.env.company, ondelete="cascade")
 
     model_id = fields.Many2one(
         "ir.model",
@@ -89,17 +87,14 @@ class ApprovalMatrix(models.Model):
                     raise ValueError("Domain must be a list literal")
             except (SyntaxError, ValueError) as e:
                 raise ValidationError(
-                    _("Invalid condition_domain on matrix '%(name)s': %(err)s",
-                      name=rec.name, err=e)
+                    _("Invalid condition_domain on matrix '%(name)s': %(err)s", name=rec.name, err=e)
                 ) from e
 
     @api.constrains("tier_ids")
     def _check_has_tiers(self):
         for rec in self:
             if rec.active and not rec.tier_ids:
-                raise ValidationError(
-                    _("Matrix '%s' is active but has no tiers. Add at least one.") % rec.name
-                )
+                raise ValidationError(_("Matrix '%s' is active but has no tiers. Add at least one.") % rec.name)
 
     # ---- Resolution ----
 

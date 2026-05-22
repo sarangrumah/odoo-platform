@@ -78,10 +78,12 @@ class CustomTodoTemplate(models.Model):
             window (daily=1d, weekly=7d, monthly=30d).
         """
         now = fields.Datetime.now()
-        templates = self.search([
-            ("is_active", "=", True),
-            ("recurrence_rule", "!=", "none"),
-        ])
+        templates = self.search(
+            [
+                ("is_active", "=", True),
+                ("recurrence_rule", "!=", "none"),
+            ]
+        )
         created = 0
         for tmpl in templates:
             window_days = _RECURRENCE_DAYS.get(tmpl.recurrence_rule)
@@ -97,10 +99,12 @@ class CustomTodoTemplate(models.Model):
             except Exception as e:  # pragma: no cover - defensive
                 _logger.warning(
                     "cron_create_recurring_todos: template %s failed: %s",
-                    tmpl.name, e,
+                    tmpl.name,
+                    e,
                 )
         _logger.info(
             "cron_create_recurring_todos: instantiated %d task(s) from %d active template(s)",
-            created, len(templates),
+            created,
+            len(templates),
         )
         return True

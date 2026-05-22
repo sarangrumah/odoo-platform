@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 
@@ -31,7 +31,8 @@ class ApprovalRequestLine(models.Model):
     action_at = fields.Datetime(default=fields.Datetime.now, required=True)
     comment = fields.Text()
     delegated_from_id = fields.Many2one(
-        "res.users", string="On Behalf Of",
+        "res.users",
+        string="On Behalf Of",
         help="Set when the action was taken via an active delegation.",
     )
 

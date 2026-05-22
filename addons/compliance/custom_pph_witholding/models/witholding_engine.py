@@ -7,8 +7,7 @@ import logging
 import re
 from decimal import Decimal, ROUND_HALF_UP
 
-from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -79,12 +78,11 @@ class CustomWitholdingEngine(models.AbstractModel):
         }
 
     @api.model
-    def compute_and_log(self, partner, amount, pph_type, date=None,
-                        service_category=None, source_doc=None,
-                        state="computed"):
+    def compute_and_log(
+        self, partner, amount, pph_type, date=None, service_category=None, source_doc=None, state="computed"
+    ):
         """Compute + persist a ``custom.witholding.application`` row."""
-        result = self.compute(partner, amount, pph_type, date,
-                              service_category=service_category)
+        result = self.compute(partner, amount, pph_type, date, service_category=service_category)
         vals = {
             "partner_id": partner.id if partner else False,
             "pph_type": pph_type,

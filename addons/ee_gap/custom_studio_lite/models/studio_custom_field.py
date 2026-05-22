@@ -43,13 +43,14 @@ class StudioCustomField(models.Model):
     ir_model_fields_id = fields.Many2one("ir.model.fields", readonly=True, copy=False)
     state = fields.Selection(
         [("draft", "Draft"), ("applied", "Applied"), ("error", "Error")],
-        default="draft", required=True,
+        default="draft",
+        required=True,
     )
     last_error = fields.Text(readonly=True)
 
     _uniq_model_field = models.Constraint(
-        'unique(model_id, technical_name)',
-        'Field name already exists on this model.',
+        "unique(model_id, technical_name)",
+        "Field name already exists on this model.",
     )
 
     def _pdp_audit_classification(self):
@@ -59,8 +60,7 @@ class StudioCustomField(models.Model):
     def _check_technical_name(self):
         for rec in self:
             if not FIELD_NAME_RE.match(rec.technical_name or ""):
-                raise ValidationError(_(
-                    "Technical name must match %s") % FIELD_NAME_RE.pattern)
+                raise ValidationError(_("Technical name must match %s") % FIELD_NAME_RE.pattern)
 
     def action_apply(self):
         """Materialise the declared field on the target model via ir.model.fields."""
@@ -68,12 +68,14 @@ class StudioCustomField(models.Model):
         for rec in self:
             try:
                 if rec.ir_model_fields_id:
-                    rec.ir_model_fields_id.write({
-                        "field_description": rec.name,
-                        "help": rec.help_text,
-                        "required": rec.required,
-                        "readonly": rec.readonly,
-                    })
+                    rec.ir_model_fields_id.write(
+                        {
+                            "field_description": rec.name,
+                            "help": rec.help_text,
+                            "required": rec.required,
+                            "readonly": rec.readonly,
+                        }
+                    )
                 else:
                     vals = {
                         "name": rec.technical_name,
@@ -96,8 +98,9 @@ class StudioCustomField(models.Model):
                         vals["selection"] = str(pairs)
                     rec.ir_model_fields_id = IrField.create(vals).id
                 rec.write({"state": "applied", "last_error": False})
-                rec._pdp_audit_write("studio_field_applied", rec.id,
-                                     {"model": rec.model_name, "field": rec.technical_name})
+                rec._pdp_audit_write(
+                    "studio_field_applied", rec.id, {"model": rec.model_name, "field": rec.technical_name}
+                )
             except Exception as e:
                 rec.write({"state": "error", "last_error": str(e)})
                 rec._pdp_audit_write("studio_field_apply_failed", rec.id, {"error": str(e)})

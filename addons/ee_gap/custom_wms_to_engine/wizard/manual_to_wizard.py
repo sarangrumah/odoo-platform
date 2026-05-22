@@ -26,21 +26,26 @@ class ManualToWizard(models.TransientModel):
             raise UserError(_("Source and target must differ."))
         engine = self.env["custom.to.engine"]
         TO = self.env["custom.transfer.order"]
-        to = TO.create({
-            "source_location_id": self.source_location_id.id,
-            "target_location_id": self.target_location_id.id,
-            "product_id": self.product_id.id,
-            "planned_qty": self.qty,
-            "state": "proposed",
-        })
-        engine.materialize({
-            "source_location_id": self.source_location_id.id,
-            "target_location_id": self.target_location_id.id,
-            "product_id": self.product_id.id,
-            "planned_qty": self.qty,
-            "name": to.name,
-            "company_id": self.env.company.id,
-        }, transfer_order=to)
+        to = TO.create(
+            {
+                "source_location_id": self.source_location_id.id,
+                "target_location_id": self.target_location_id.id,
+                "product_id": self.product_id.id,
+                "planned_qty": self.qty,
+                "state": "proposed",
+            }
+        )
+        engine.materialize(
+            {
+                "source_location_id": self.source_location_id.id,
+                "target_location_id": self.target_location_id.id,
+                "product_id": self.product_id.id,
+                "planned_qty": self.qty,
+                "name": to.name,
+                "company_id": self.env.company.id,
+            },
+            transfer_order=to,
+        )
         return {
             "type": "ir.actions.act_window",
             "name": _("Transfer Order"),

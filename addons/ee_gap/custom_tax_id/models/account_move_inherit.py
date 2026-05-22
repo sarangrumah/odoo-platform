@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -14,7 +14,8 @@ class AccountMove(models.Model):
     _inherit = "account.move"
 
     x_custom_withholding_line_ids = fields.One2many(
-        "account.move.withholding.line", "move_id",
+        "account.move.withholding.line",
+        "move_id",
         string="Withholding Lines",
         copy=False,
     )
@@ -64,17 +65,20 @@ class AccountMove(models.Model):
             tax = round(base * (tarif / 100.0), 2)
             if tax <= 0:
                 continue
-            Line.create({
-                "move_id": self.id,
-                "move_line_id": ml.id,
-                "rule_id": rule.id,
-                "base_amount": base,
-                "tarif": tarif,
-                "tax_amount": tax,
-            })
+            Line.create(
+                {
+                    "move_id": self.id,
+                    "move_line_id": ml.id,
+                    "rule_id": rule.id,
+                    "base_amount": base,
+                    "tarif": tarif,
+                    "tax_amount": tax,
+                }
+            )
             try:
                 self._pdp_audit_write(
-                    "pph_withholding_applied", self.id,
+                    "pph_withholding_applied",
+                    self.id,
                     {
                         "rule": rule.name,
                         "category_code": rule.category_id.code,

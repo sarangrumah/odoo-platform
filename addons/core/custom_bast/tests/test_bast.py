@@ -12,7 +12,6 @@ _SIG = base64.b64encode(b"fake-png-bytes").decode("ascii")
 
 @tagged("post_install", "-at_install")
 class TestCustomBast(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

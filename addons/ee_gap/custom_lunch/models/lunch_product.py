@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Lunch product extensions (Indonesia EE)."""
+
 import logging
 from datetime import date
 
@@ -56,10 +57,8 @@ class LunchProduct(models.Model):
             bad = [t for t in raw_tokens if t[:3] not in DAY_TOKENS]
             if bad:
                 raise ValidationError(
-                    _(
-                        "Invalid weekday token(s): %(bad)s. "
-                        "Allowed: mon, tue, wed, thu, fri, sat, sun."
-                    ) % {"bad": ", ".join(bad)}
+                    _("Invalid weekday token(s): %(bad)s. Allowed: mon, tue, wed, thu, fri, sat, sun.")
+                    % {"bad": ", ".join(bad)}
                 )
 
     @api.model
@@ -73,9 +72,7 @@ class LunchProduct(models.Model):
         today = today or date.today()
         token = DAY_TOKENS[today.weekday()]
         # We need archived rows too, so the cron can re-activate them.
-        products = self.with_context(active_test=False).search(
-            [("x_available_days", "!=", False)]
-        )
+        products = self.with_context(active_test=False).search([("x_available_days", "!=", False)])
         activated = 0
         deactivated = 0
         for prod in products:

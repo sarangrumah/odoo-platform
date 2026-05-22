@@ -10,7 +10,9 @@ class TenantRegistry(models.Model):
     _inherit = "tenant.registry"
 
     environment_ids = fields.One2many(
-        "tenant.environment", "tenant_registry_id", string="Environments",
+        "tenant.environment",
+        "tenant_registry_id",
+        string="Environments",
     )
     primary_vps_id = fields.Many2one(
         "tenant.vps",

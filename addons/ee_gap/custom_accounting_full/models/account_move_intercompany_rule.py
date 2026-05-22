@@ -25,11 +25,17 @@ class IntercompanyRule(models.Model):
     active = fields.Boolean(default=True)
 
     company_from_id = fields.Many2one(
-        "res.company", string="Issuing Company", required=True, ondelete="cascade",
+        "res.company",
+        string="Issuing Company",
+        required=True,
+        ondelete="cascade",
         help="The company that ORIGINATES the document (e.g. issues the sales invoice).",
     )
     company_to_id = fields.Many2one(
-        "res.company", string="Receiving Company", required=True, ondelete="cascade",
+        "res.company",
+        string="Receiving Company",
+        required=True,
+        ondelete="cascade",
         help="The sister company that RECEIVES the mirrored document.",
     )
 
@@ -48,7 +54,7 @@ class IntercompanyRule(models.Model):
         string="Target Journal",
         domain="[('company_id', '=', company_to_id), ('type', 'in', ('purchase', 'sale'))]",
         help="Journal used to post the mirrored move in the receiving company. "
-             "If empty the default purchase/sale journal of the receiving company is used.",
+        "If empty the default purchase/sale journal of the receiving company is used.",
     )
 
     auto_validate = fields.Boolean(
@@ -61,23 +67,22 @@ class IntercompanyRule(models.Model):
     # account codes between them. Empty mapping = mirror uses the same
     # account if it exists in the receiving company (matched by code).
     mapping_ids = fields.One2many(
-        "account.intercompany.account.mapping", "rule_id",
+        "account.intercompany.account.mapping",
+        "rule_id",
         string="Account Mapping",
         copy=True,
     )
 
     _unique_pair_direction = models.Constraint(
-        'unique (company_from_id, company_to_id, direction)',
-        'An intercompany rule for this company pair + direction already exists.',
+        "unique (company_from_id, company_to_id, direction)",
+        "An intercompany rule for this company pair + direction already exists.",
     )
 
     @api.constrains("company_from_id", "company_to_id")
     def _check_distinct_companies(self):
         for rec in self:
             if rec.company_from_id == rec.company_to_id:
-                raise ValidationError(
-                    _("Intercompany rule must point to a different company.")
-                )
+                raise ValidationError(_("Intercompany rule must point to a different company."))
 
     def _map_account(self, src_account):
         """Return the receiving-side account for ``src_account`` per mapping.

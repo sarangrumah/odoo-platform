@@ -124,9 +124,7 @@ class WmsPutawayRule(models.Model):
             return False
         if self.product_domain:
             dom = self._eval_domain(self.product_domain)
-            return bool(
-                self.env["product.product"].search_count([("id", "=", product.id)] + dom)
-            )
+            return bool(self.env["product.product"].search_count([("id", "=", product.id)] + dom))
         return True
 
     def _evaluate(self, move_line):

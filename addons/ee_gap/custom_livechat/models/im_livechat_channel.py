@@ -8,7 +8,7 @@ class ImLivechatChannel(models.Model):
     x_skill_tags = fields.Char(
         string="Skill Tags",
         help="Comma-separated skill tags used by the routing layer to match "
-             "operators against visitor query keywords (e.g. 'billing,refund').",
+        "operators against visitor query keywords (e.g. 'billing,refund').",
     )
 
     def _skill_tag_list(self):

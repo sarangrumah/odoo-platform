@@ -9,7 +9,7 @@ that perimeter rolls up into.
 
 from __future__ import annotations
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import ValidationError
 
 
@@ -35,15 +35,9 @@ class CustomConsolidationChart(models.Model):
         "company_id",
         string="Companies in Scope",
     )
-    account_ids = fields.One2many(
-        "custom.consolidation.chart.account", "chart_id", string="Chart Accounts"
-    )
-    mapping_ids = fields.One2many(
-        "custom.consolidation.mapping", "chart_id", string="Mappings"
-    )
-    elimination_rule_ids = fields.One2many(
-        "custom.elimination.rule", "chart_id", string="Elimination Rules"
-    )
+    account_ids = fields.One2many("custom.consolidation.chart.account", "chart_id", string="Chart Accounts")
+    mapping_ids = fields.One2many("custom.consolidation.mapping", "chart_id", string="Mappings")
+    elimination_rule_ids = fields.One2many("custom.elimination.rule", "chart_id", string="Elimination Rules")
     state = fields.Selection(
         [("draft", "Draft"), ("locked", "Locked")],
         default="draft",
@@ -52,9 +46,7 @@ class CustomConsolidationChart(models.Model):
     )
     notes = fields.Text()
 
-    _unique_chart_code = models.Constraint(
-        "unique (code)", "Consolidation chart code must be unique."
-    )
+    _unique_chart_code = models.Constraint("unique (code)", "Consolidation chart code must be unique.")
 
     def action_lock(self):
         for rec in self:
@@ -72,9 +64,7 @@ class CustomConsolidationChartAccount(models.Model):
     _description = "Consolidation Chart Account"
     _order = "code"
 
-    chart_id = fields.Many2one(
-        "custom.consolidation.chart", required=True, ondelete="cascade"
-    )
+    chart_id = fields.Many2one("custom.consolidation.chart", required=True, ondelete="cascade")
     code = fields.Char(required=True)
     name = fields.Char(required=True, translate=True)
     account_category = fields.Selection(

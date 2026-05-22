@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 FREQUENCY = [
@@ -80,12 +80,14 @@ class CycleCountPlan(models.Model):
     @api.model
     def _cron_generate_sessions(self):
         today = fields.Date.context_today(self)
-        due = self.search([
-            ("state", "=", "active"),
-            ("active", "=", True),
-            ("next_run_date", "<=", today),
-            ("frequency", "!=", "adhoc"),
-        ])
+        due = self.search(
+            [
+                ("state", "=", "active"),
+                ("active", "=", True),
+                ("next_run_date", "<=", today),
+                ("frequency", "!=", "adhoc"),
+            ]
+        )
         Wizard = self.env["custom.cycle.count.start.wizard"]
         for plan in due:
             wiz = Wizard.create({"plan_id": plan.id})

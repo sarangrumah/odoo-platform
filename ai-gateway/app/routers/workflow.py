@@ -36,9 +36,7 @@ class RecommendOut(BaseModel):
 @router.post("/recommend", response_model=RecommendOut)
 async def recommend(body: RecommendIn) -> RecommendOut:
     user_msg = (
-        f"Model: {body.model}\nRecord ID: {body.res_id}\n"
-        f"Locale: {body.locale}\n\n"
-        f"Payload (JSON):\n{body.payload}\n"
+        f"Model: {body.model}\nRecord ID: {body.res_id}\nLocale: {body.locale}\n\nPayload (JSON):\n{body.payload}\n"
     )
     if body.history:
         user_msg += f"\nHistory (last {len(body.history)} interactions):\n{body.history}"
@@ -60,6 +58,7 @@ async def recommend(body: RecommendIn) -> RecommendOut:
     # Best-effort parse — model is instructed to emit JSON in the system prompt;
     # if parsing fails, fall back to raw_text only
     import json
+
     parsed: dict[str, Any] = {"summary": "", "next_actions": [], "priority": "normal", "tags": []}
     try:
         # Strip markdown fence if any

@@ -17,6 +17,7 @@ def test_v1_without_signature_returns_401(client):
 
 def test_v1_with_replay_old_ts_rejected(client, signer):
     import time
+
     header, _ = signer(b"", ts=int(time.time()) - 600)
     r = client.get("/v1/tenants", headers={"X-Custom-Signature": header})
     assert r.status_code == 401

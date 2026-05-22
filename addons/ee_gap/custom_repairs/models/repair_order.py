@@ -163,13 +163,9 @@ class RepairOrder(models.Model):
                 rec.x_warranty_status = "na"
                 rec.x_warranty_until = False
                 continue
-            until = rec.x_purchase_date + relativedelta(
-                months=int(entry.warranty_months or 0)
-            )
+            until = rec.x_purchase_date + relativedelta(months=int(entry.warranty_months or 0))
             rec.x_warranty_until = until
-            rec.x_warranty_status = (
-                "in_warranty" if today <= until else "out_of_warranty"
-            )
+            rec.x_warranty_status = "in_warranty" if today <= until else "out_of_warranty"
 
     # ====================================================================
     # SLA compute
@@ -225,9 +221,7 @@ class RepairOrder(models.Model):
             try:
                 lines = rec._material_line_records()
                 for line in lines:
-                    qty = getattr(line, "product_uom_qty", 0.0) or getattr(
-                        line, "quantity", 0.0
-                    ) or 0.0
+                    qty = getattr(line, "product_uom_qty", 0.0) or getattr(line, "quantity", 0.0) or 0.0
                     unit_cost = 0.0
                     product = getattr(line, "product_id", False)
                     if product and getattr(product, "standard_price", None) is not None:
@@ -265,11 +259,15 @@ class RepairOrder(models.Model):
                 rec.x_quality_check_count = 0
                 continue
             QC = self.env["quality.check"].sudo()
-            checks = QC.search(
-                [
-                    ("name", "like", rec.name or rec.display_name or ""),
-                ]
-            ) if (rec.name or rec.display_name) else QC.browse()
+            checks = (
+                QC.search(
+                    [
+                        ("name", "like", rec.name or rec.display_name or ""),
+                    ]
+                )
+                if (rec.name or rec.display_name)
+                else QC.browse()
+            )
             rec.x_quality_check_ids = checks
             rec.x_quality_check_count = len(checks)
 
@@ -298,9 +296,7 @@ class RepairOrder(models.Model):
         self.ensure_one()
         lines = self._material_line_records()
         for line in lines:
-            qty = getattr(line, "product_uom_qty", 0.0) or getattr(
-                line, "quantity", 0.0
-            ) or 0.0
+            qty = getattr(line, "product_uom_qty", 0.0) or getattr(line, "quantity", 0.0) or 0.0
             if qty and qty > 0:
                 return True
         return False
@@ -332,9 +328,7 @@ class RepairOrder(models.Model):
                 }
             )
         except Exception as exc:  # pragma: no cover (defensive)
-            _logger.info(
-                "custom_repairs: mrp.production stub create skipped (%s)", exc
-            )
+            _logger.info("custom_repairs: mrp.production stub create skipped (%s)", exc)
             return
         self.x_mrp_production_id = production.id
         _logger.info(
@@ -376,10 +370,7 @@ class RepairOrder(models.Model):
                 if rec.x_promised_completion_date
                 else _("belum dijadwalkan")
             )
-            body = _(
-                "Halo %(customer_name)s, status perbaikan %(ref)s: %(state)s. "
-                "Estimasi selesai: %(date)s"
-            ) % {
+            body = _("Halo %(customer_name)s, status perbaikan %(ref)s: %(state)s. Estimasi selesai: %(date)s") % {
                 "customer_name": customer_name,
                 "ref": ref,
                 "state": state_label,

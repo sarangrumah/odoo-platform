@@ -4,7 +4,6 @@ import logging
 from datetime import timedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -50,9 +49,7 @@ class CustomTimesheetWeeklySummary(models.Model):
         default="draft",
         tracking=True,
     )
-    company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, required=True
-    )
+    company_id = fields.Many2one("res.company", default=lambda self: self.env.company, required=True)
 
     _sql_constraints = [
         (
@@ -97,9 +94,7 @@ class CustomTimesheetWeeklySummary(models.Model):
             )
             rec.line_count = len(lines)
             rec.total_hours = sum(lines.mapped("unit_amount"))
-            rec.billable_hours = sum(
-                lines.filtered(lambda l: l.x_billable).mapped("unit_amount")
-            )
+            rec.billable_hours = sum(lines.filtered(lambda l: l.x_billable).mapped("unit_amount"))
             rec.overtime_hours = sum(lines.mapped("x_overtime_hours"))
 
     # ------------------------------------------------------------------
@@ -148,12 +143,7 @@ class CustomTimesheetWeeklySummary(models.Model):
                     "type": "warning",
                 },
             }
-        text = (
-            result.get("summary")
-            or result.get("response")
-            or result.get("text")
-            or json.dumps(result)[:2000]
-        )
+        text = result.get("summary") or result.get("response") or result.get("text") or json.dumps(result)[:2000]
         # Minimal HTML wrap.
         self.summary_html = "<div class='o_ai_summary'>%s</div>" % text
         self.state = "summarized"

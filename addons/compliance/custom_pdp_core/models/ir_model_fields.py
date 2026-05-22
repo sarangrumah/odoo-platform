@@ -11,6 +11,5 @@ class IrModelFields(models.Model):
         "pdp.classification",
         string="PDP Classification",
         ondelete="set null",
-        help="If set, values of this field are governed by the chosen PDP classification "
-             "(audit, masking, retention).",
+        help="If set, values of this field are governed by the chosen PDP classification (audit, masking, retention).",
     )

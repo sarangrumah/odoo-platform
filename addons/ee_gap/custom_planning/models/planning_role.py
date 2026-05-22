@@ -12,7 +12,8 @@ class PlanningRole(models.Model):
     employee_ids = fields.Many2many(
         "hr.employee",
         "planning_role_employee_rel",
-        "role_id", "employee_id",
+        "role_id",
+        "employee_id",
         string="Eligible Employees",
     )
     active = fields.Boolean(default=True)

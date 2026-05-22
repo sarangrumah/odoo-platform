@@ -36,7 +36,7 @@ class AccountMove(models.Model):
         copy=False,
         tracking=True,
         help="Nomor Seri Faktur Pajak — 17 digits assigned by DJP after Coretax "
-             "approval. Format: TT + SS + YYNNNNNNNNNNN.",
+        "approval. Format: TT + SS + YYNNNNNNNNNNN.",
     )
 
     x_custom_coretax_status_code = fields.Selection(
@@ -74,14 +74,10 @@ class AccountMove(models.Model):
     def _check_nsfp(self):
         for rec in self:
             if rec.x_custom_nsfp and not _NSFP_RE.match(rec.x_custom_nsfp):
-                raise ValidationError(_(
-                    "NSFP must be exactly 17 digits (got: %s)."
-                ) % rec.x_custom_nsfp)
+                raise ValidationError(_("NSFP must be exactly 17 digits (got: %s).") % rec.x_custom_nsfp)
 
     @api.constrains("x_custom_coretax_status", "x_custom_nsfp")
     def _check_nsfp_required_on_approval(self):
         for rec in self:
             if rec.x_custom_coretax_status == "approved" and not rec.x_custom_nsfp:
-                raise ValidationError(_(
-                    "Cannot mark a move as Coretax-approved without an NSFP."
-                ))
+                raise ValidationError(_("Cannot mark a move as Coretax-approved without an NSFP."))

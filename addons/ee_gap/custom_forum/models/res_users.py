@@ -5,6 +5,7 @@ CE ``website_forum`` exposes karma directly on ``res.users``; we add a
 derived ``x_indonesia_badge`` so dashboards can group members by tier in
 Bahasa Indonesia.
 """
+
 from odoo import api, fields, models
 
 
@@ -31,8 +32,7 @@ class ResUsers(models.Model):
         string="Forum Badge (ID)",
         compute="_compute_x_indonesia_badge",
         store=True,
-        help="Tier derived from karma: pemula 0+, lanjut 200+, "
-        "ahli 1000+, master 5000+.",
+        help="Tier derived from karma: pemula 0+, lanjut 200+, ahli 1000+, master 5000+.",
     )
 
     @api.depends("karma")

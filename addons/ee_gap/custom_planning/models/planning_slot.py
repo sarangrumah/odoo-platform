@@ -22,7 +22,9 @@ class PlanningSlot(models.Model):
     duration_hours = fields.Float(compute="_compute_duration", store=True)
     state = fields.Selection(
         [("open", "Open"), ("assigned", "Assigned"), ("published", "Published"), ("cancelled", "Cancelled")],
-        default="open", required=True, tracking=True,
+        default="open",
+        required=True,
+        tracking=True,
     )
     notes = fields.Text()
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company)
@@ -48,18 +50,24 @@ class PlanningSlot(models.Model):
                 raise ValidationError(_("End must be after start."))
             if not rec.employee_id:
                 continue
-            overlap = self.sudo().search([
-                ("employee_id", "=", rec.employee_id.id),
-                ("state", "in", ("assigned", "published")),
-                ("id", "!=", rec.id),
-                ("start_dt", "<", rec.end_dt),
-                ("end_dt", ">", rec.start_dt),
-            ], limit=1)
+            overlap = self.sudo().search(
+                [
+                    ("employee_id", "=", rec.employee_id.id),
+                    ("state", "in", ("assigned", "published")),
+                    ("id", "!=", rec.id),
+                    ("start_dt", "<", rec.end_dt),
+                    ("end_dt", ">", rec.start_dt),
+                ],
+                limit=1,
+            )
             if overlap:
-                raise ValidationError(_(
-                    "Employee %(emp)s already has a shift overlapping with this slot (%(other)s).",
-                    emp=rec.employee_id.name, other=overlap.name,
-                ))
+                raise ValidationError(
+                    _(
+                        "Employee %(emp)s already has a shift overlapping with this slot (%(other)s).",
+                        emp=rec.employee_id.name,
+                        other=overlap.name,
+                    )
+                )
 
     def action_assign(self, employee_id: int):
         for rec in self:

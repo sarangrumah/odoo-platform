@@ -6,6 +6,7 @@ draft crm.lead records from an internal seed list when ``action_get_leads`` is
 called. The real EE feature relies on Odoo IAP, which is outside CE scope, so
 the implementation here is intentionally a stub.
 """
+
 from __future__ import annotations
 
 import logging
@@ -94,12 +95,9 @@ class CustomCrmLeadMiningRequest(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals.get("name") == _("New"):
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code(
-                        "custom.crm.lead.mining.request"
-                    )
-                    or _("LM/%s") % fields.Datetime.now().strftime("%Y%m%d%H%M%S")
-                )
+                vals["name"] = self.env["ir.sequence"].next_by_code("custom.crm.lead.mining.request") or _(
+                    "LM/%s"
+                ) % fields.Datetime.now().strftime("%Y%m%d%H%M%S")
         return super().create(vals_list)
 
     # ---------- actions ----------
@@ -128,19 +126,23 @@ class CustomCrmLeadMiningRequest(models.Model):
         created = self.env["crm.lead"]
         wanted = max(0, min(self.lead_number or 0, len(_MOCK_COMPANIES)))
         for partner_name, email, phone in _MOCK_COMPANIES[:wanted]:
-            created |= Lead.create({
-                "name": _("[Mining] %s") % partner_name,
-                "partner_name": partner_name,
-                "email_from": email,
-                "phone": phone,
-                "country_id": self.country_id.id if self.country_id else False,
-                "type": "lead",
-                "x_lead_mining_request_id": self.id,
-            })
-        self.write({
-            "state": "done",
-            "credits_used": (self.credits_used or 0) + len(created),
-        })
+            created |= Lead.create(
+                {
+                    "name": _("[Mining] %s") % partner_name,
+                    "partner_name": partner_name,
+                    "email_from": email,
+                    "phone": phone,
+                    "country_id": self.country_id.id if self.country_id else False,
+                    "type": "lead",
+                    "x_lead_mining_request_id": self.id,
+                }
+            )
+        self.write(
+            {
+                "state": "done",
+                "credits_used": (self.credits_used or 0) + len(created),
+            }
+        )
         return {
             "type": "ir.actions.act_window",
             "name": _("Generated Leads"),

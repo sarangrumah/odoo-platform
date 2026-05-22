@@ -61,15 +61,12 @@ class TenantRegistry(models.Model):
 
     features = fields.Json()
     notes = fields.Text()
-    sync_error = fields.Text(
-        help="Last error returned by the orchestrator for an action on this tenant"
-    )
+    sync_error = fields.Text(help="Last error returned by the orchestrator for an action on this tenant")
 
     # Backup scheduling / replication (Track D)
     backup_schedule = fields.Char(
         default="0 2 * * *",
-        help="Standard 5-field cron expression for scheduled backups (UTC). "
-             "Default: daily at 02:00 UTC.",
+        help="Standard 5-field cron expression for scheduled backups (UTC). Default: daily at 02:00 UTC.",
     )
     backup_retention_days = fields.Integer(
         default=30,
@@ -85,8 +82,8 @@ class TenantRegistry(models.Model):
     )
 
     _slug_uniq = models.Constraint(
-        'unique(slug)',
-        'Tenant slug must be unique.',
+        "unique(slug)",
+        "Tenant slug must be unique.",
     )
 
     # --------------------------------------------------------------
@@ -232,11 +229,7 @@ class TenantRegistry(models.Model):
 
     def action_open_grafana(self):
         self.ensure_one()
-        base = (
-            self.env["ir.config_parameter"]
-            .sudo()
-            .get_param("custom_super_admin.grafana_base_url", "")
-        )
+        base = self.env["ir.config_parameter"].sudo().get_param("custom_super_admin.grafana_base_url", "")
         if not base:
             raise UserError(_("Configure Grafana base URL under Settings."))
         url = f"{base.rstrip('/')}/d/tenant?var-db={self.db_name}"

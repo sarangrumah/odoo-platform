@@ -19,23 +19,17 @@ class AccountMove(models.Model):
         partner = self.partner_id
         phone = partner.mobile or partner.phone
         if not phone:
-            raise UserError(_(
-                "Customer %s has no phone/mobile set; cannot send WhatsApp."
-            ) % partner.display_name)
+            raise UserError(_("Customer %s has no phone/mobile set; cannot send WhatsApp.") % partner.display_name)
 
         Account = self.env["whatsapp.account"]
         account = Account.search(
-            [("is_active", "=", True),
-             ("company_id", "in", (False, self.company_id.id))],
+            [("is_active", "=", True), ("company_id", "in", (False, self.company_id.id))],
             limit=1,
         )
         if not account:
             raise UserError(_("No active WhatsApp account configured."))
 
-        body = _(
-            "Halo %(name)s,\n\nInvoice %(invoice)s sebesar %(total)s telah diterbitkan. "
-            "Jatuh tempo: %(due)s."
-        ) % {
+        body = _("Halo %(name)s,\n\nInvoice %(invoice)s sebesar %(total)s telah diterbitkan. Jatuh tempo: %(due)s.") % {
             "name": partner.name or "",
             "invoice": self.name or "",
             "total": self.amount_total,

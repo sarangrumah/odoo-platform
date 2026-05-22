@@ -39,8 +39,8 @@ class TenantActionLog(models.Model):
     hash_hex = fields.Char(string="Hash")
 
     _master_id_uniq = models.Constraint(
-        'unique(master_id)',
-        'Master log id must be unique in mirror.',
+        "unique(master_id)",
+        "Master log id must be unique in mirror.",
     )
 
     @api.model
@@ -59,13 +59,9 @@ class TenantActionLog(models.Model):
         # Determine if action_log_v is reachable from this DB. tenant_registry
         # is created in the *master* DB only; in tenant DBs the schema does
         # not exist, so attempting to query it raises ``UndefinedTable``.
-        cr.execute(
-            "SELECT 1 FROM information_schema.schemata WHERE schema_name = 'tenant_registry'"
-        )
+        cr.execute("SELECT 1 FROM information_schema.schemata WHERE schema_name = 'tenant_registry'")
         if not cr.fetchone():
-            _logger.debug(
-                "tenant.action.log._cron_sync: tenant_registry schema not visible from this DB; skipping"
-            )
+            _logger.debug("tenant.action.log._cron_sync: tenant_registry schema not visible from this DB; skipping")
             return
 
         cr.execute(
@@ -85,18 +81,20 @@ class TenantActionLog(models.Model):
 
         to_create: list[dict[str, Any]] = []
         for r in rows:
-            to_create.append({
-                "master_id": r["id"],
-                "ts": r["ts"].replace(tzinfo=None) if isinstance(r["ts"], datetime) else r["ts"],
-                "tenant_slug": r["tenant_slug"],
-                "action": r["action"],
-                "actor": r["actor"],
-                "detail": r["detail"] or {},
-                "outcome": r["outcome"],
-                "error": r["error"],
-                "prev_hash_hex": r["prev_hash_hex"],
-                "hash_hex": r["hash_hex"],
-            })
+            to_create.append(
+                {
+                    "master_id": r["id"],
+                    "ts": r["ts"].replace(tzinfo=None) if isinstance(r["ts"], datetime) else r["ts"],
+                    "tenant_slug": r["tenant_slug"],
+                    "action": r["action"],
+                    "actor": r["actor"],
+                    "detail": r["detail"] or {},
+                    "outcome": r["outcome"],
+                    "error": r["error"],
+                    "prev_hash_hex": r["prev_hash_hex"],
+                    "hash_hex": r["hash_hex"],
+                }
+            )
         if to_create:
             self.sudo().create(to_create)
             _logger.info("tenant.action.log: synced %s new rows", len(to_create))

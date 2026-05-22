@@ -8,30 +8,27 @@ from odoo.tests.common import HttpCase, tagged
 
 @tagged("post_install", "-at_install", "custom_dev_cycle")
 class TestDevCycleWebhook(HttpCase):
-
     def setUp(self):
         super().setUp()
         self.secret = "test-secret-please-change"
-        self.env["ir.config_parameter"].sudo().set_param(
-            "dev_cycle.github_webhook_secret", self.secret
-        )
+        self.env["ir.config_parameter"].sudo().set_param("dev_cycle.github_webhook_secret", self.secret)
         doc = self.env["brd.document"].sudo().create({"name": "BRD WH"})
-        self.rec = self.env["brd.recommendation"].sudo().create(
-            {"document_id": doc.id, "name": "custom_wh_target"}
-        )
-        self.cycle = self.env["dev.cycle"].sudo().create(
-            {
-                "name": "Cycle WH",
-                "brd_recommendation_id": self.rec.id,
-                "branch_name": "feature/brd-wh-test",
-                "state": "in_dev",
-            }
+        self.rec = self.env["brd.recommendation"].sudo().create({"document_id": doc.id, "name": "custom_wh_target"})
+        self.cycle = (
+            self.env["dev.cycle"]
+            .sudo()
+            .create(
+                {
+                    "name": "Cycle WH",
+                    "brd_recommendation_id": self.rec.id,
+                    "branch_name": "feature/brd-wh-test",
+                    "state": "in_dev",
+                }
+            )
         )
 
     def _sign(self, body_bytes):
-        return "sha256=" + hmac.new(
-            self.secret.encode("utf-8"), body_bytes, hashlib.sha256
-        ).hexdigest()
+        return "sha256=" + hmac.new(self.secret.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
 
     def test_github_pr_merged_advances_cycle(self):
         payload = {
@@ -63,9 +60,7 @@ class TestDevCycleWebhook(HttpCase):
         data = resp.json()
         self.assertEqual(data.get("status"), "ok")
 
-        pr = self.env["dev.cycle.pr"].sudo().search(
-            [("cycle_id", "=", self.cycle.id)], limit=1
-        )
+        pr = self.env["dev.cycle.pr"].sudo().search([("cycle_id", "=", self.cycle.id)], limit=1)
         self.assertTrue(pr)
         self.assertEqual(pr.state, "merged")
         self.assertEqual(pr.pr_number, 42)

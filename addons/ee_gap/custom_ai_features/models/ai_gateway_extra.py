@@ -22,15 +22,18 @@ class CustomAIExtra(models.AbstractModel):
         context: dict[str, Any] | None = None,
         locale: str = "id_ID",
     ) -> dict[str, Any]:
-        return self._call("/v1/workflow/anomaly", {
-            "model": model,
-            "res_id": res_id,
-            "metric": metric,
-            "latest_value": float(latest_value),
-            "history": [float(v) for v in history],
-            "context": context or {},
-            "locale": locale,
-        })
+        return self._call(
+            "/v1/workflow/anomaly",
+            {
+                "model": model,
+                "res_id": res_id,
+                "metric": metric,
+                "latest_value": float(latest_value),
+                "history": [float(v) for v in history],
+                "context": context or {},
+                "locale": locale,
+            },
+        )
 
     @api.model
     def _classify_document(
@@ -40,12 +43,15 @@ class CustomAIExtra(models.AbstractModel):
         text_excerpt: str | None = None,
         locale: str = "id_ID",
     ) -> dict[str, Any]:
-        return self._call("/v1/workflow/classify-document", {
-            "filename": filename,
-            "mimetype": mimetype,
-            "text_excerpt": text_excerpt,
-            "locale": locale,
-        })
+        return self._call(
+            "/v1/workflow/classify-document",
+            {
+                "filename": filename,
+                "mimetype": mimetype,
+                "text_excerpt": text_excerpt,
+                "locale": locale,
+            },
+        )
 
     @api.model
     def _nlq(
@@ -55,9 +61,12 @@ class CustomAIExtra(models.AbstractModel):
         locale: str = "id_ID",
         user_can_view_pii: bool = False,
     ) -> dict[str, Any]:
-        return self._call("/v1/workflow/nlq", {
-            "question": question,
-            "schema_hint": schema_hint,
-            "locale": locale,
-            "user_can_view_pii": user_can_view_pii,
-        })
+        return self._call(
+            "/v1/workflow/nlq",
+            {
+                "question": question,
+                "schema_hint": schema_hint,
+                "locale": locale,
+                "user_can_view_pii": user_can_view_pii,
+            },
+        )

@@ -84,33 +84,39 @@ class PdpDsarRequest(models.Model):
             except Exception as e:
                 _logger.info("DSAR AI summary skipped: %s", e)
                 r.ai_summary = None
-            att = self.env["ir.attachment"].create({
-                "name": f"{r.name}.zip",
-                "type": "binary",
-                "datas": base64.b64encode(zip_bytes),
-                "res_model": r._name,
-                "res_id": r.id,
-                "mimetype": "application/zip",
-            })
+            att = self.env["ir.attachment"].create(
+                {
+                    "name": f"{r.name}.zip",
+                    "type": "binary",
+                    "datas": base64.b64encode(zip_bytes),
+                    "res_model": r._name,
+                    "res_id": r.id,
+                    "mimetype": "application/zip",
+                }
+            )
             r.response_attachment_id = att.id
             r.state = "delivered"
             r.delivered_at = fields.Datetime.now()
-            r._pdp_audit_write("dsar", r.id, {"transition": "delivered", "attachment_id": att.id},
-                               reason="DSAR dossier delivered")
+            r._pdp_audit_write(
+                "dsar", r.id, {"transition": "delivered", "attachment_id": att.id}, reason="DSAR dossier delivered"
+            )
 
     def action_reject(self):
         for r in self:
             r.state = "rejected"
-            r._pdp_audit_write("dsar", r.id, {"transition": "rejected"},
-                               reason=r.rejection_reason or "DSAR rejected")
+            r._pdp_audit_write("dsar", r.id, {"transition": "rejected"}, reason=r.rejection_reason or "DSAR rejected")
 
     def action_anonymize(self):
         for r in self:
             if not r.partner_id:
                 raise UserError("Resolve the subject partner before anonymizing.")
             self._anonymize_subject(r.partner_id.id)
-            r._pdp_audit_write("dsar", r.id, {"transition": "anonymized", "partner_id": r.partner_id.id},
-                               reason="DSAR-driven anonymization")
+            r._pdp_audit_write(
+                "dsar",
+                r.id,
+                {"transition": "anonymized", "partner_id": r.partner_id.id},
+                reason="DSAR-driven anonymization",
+            )
 
     # ---------- helpers ----------
 
@@ -157,10 +163,13 @@ class PdpDsarRequest(models.Model):
     def _build_zip(self, data: dict) -> bytes:
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("manifest.json", json.dumps(
-                {"generated_at": datetime.utcnow().isoformat() + "Z", "models": list(data.keys())},
-                indent=2,
-            ))
+            zf.writestr(
+                "manifest.json",
+                json.dumps(
+                    {"generated_at": datetime.utcnow().isoformat() + "Z", "models": list(data.keys())},
+                    indent=2,
+                ),
+            )
             for model_name, rows in data.items():
                 safe = model_name.replace(".", "_")
                 zf.writestr(f"{safe}.json", json.dumps(rows, default=str, indent=2))
@@ -177,11 +186,13 @@ class PdpDsarRequest(models.Model):
                     "dossiers for Indonesian UU PDP DSAR responses. Output Indonesian. "
                     "Do not invent data; only summarize what is provided."
                 ),
-                messages=[{
-                    "role": "user",
-                    "content": "Buat ringkasan dossier DSAR berikut (jumlah record per model, kategori data): "
-                               + json.dumps({k: len(v) for k, v in data.items()}),
-                }],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "Buat ringkasan dossier DSAR berikut (jumlah record per model, kategori data): "
+                        + json.dumps({k: len(v) for k, v in data.items()}),
+                    }
+                ],
                 quality="fast",
                 max_tokens=512,
                 temperature=0.2,

@@ -34,8 +34,8 @@ class Appraisal(models.Model):
     closed_at = fields.Datetime(readonly=True)
 
     _uniq_cycle_employee = models.Constraint(
-        'unique(cycle_id, employee_id)',
-        'Employee already has an appraisal for this cycle.',
+        "unique(cycle_id, employee_id)",
+        "Employee already has an appraisal for this cycle.",
     )
 
     def _pdp_audit_classification(self):
@@ -54,13 +54,15 @@ class Appraisal(models.Model):
         Line = self.env["appraisal.line"].sudo()
         for rec in records:
             for item in rec.template_id.item_ids:
-                Line.create({
-                    "appraisal_id": rec.id,
-                    "template_item_id": item.id,
-                    "name": item.name,
-                    "competency": item.competency,
-                    "weight": item.weight,
-                })
+                Line.create(
+                    {
+                        "appraisal_id": rec.id,
+                        "template_item_id": item.id,
+                        "name": item.name,
+                        "competency": item.competency,
+                        "weight": item.weight,
+                    }
+                )
         return records
 
     def action_start_self_review(self):
@@ -80,11 +82,9 @@ class Appraisal(models.Model):
             if rec.state != "manager_review":
                 raise UserError(_("Can only submit during manager review."))
             rec.write({"state": "calibration", "submitted_at_manager": fields.Datetime.now()})
-            rec._pdp_audit_write("appraisal_manager_submitted", rec.id,
-                                 {"overall_score": float(rec.overall_score)})
+            rec._pdp_audit_write("appraisal_manager_submitted", rec.id, {"overall_score": float(rec.overall_score)})
 
     def action_close(self):
         for rec in self:
             rec.write({"state": "closed", "closed_at": fields.Datetime.now()})
-            rec._pdp_audit_write("appraisal_closed", rec.id,
-                                 {"overall_score": float(rec.overall_score)})
+            rec._pdp_audit_write("appraisal_closed", rec.id, {"overall_score": float(rec.overall_score)})

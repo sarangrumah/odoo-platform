@@ -29,10 +29,8 @@ class SlideSlide(models.Model):
         threshold = float(self.x_passing_score or 0.0)
         passed = value >= threshold
         self.message_post(
-            body=_(
-                "Quiz check: score=%(score).2f%% threshold=%(threshold).2f%% "
-                "-> %(result)s"
-            ) % {
+            body=_("Quiz check: score=%(score).2f%% threshold=%(threshold).2f%% -> %(result)s")
+            % {
                 "score": value,
                 "threshold": threshold,
                 "result": _("PASSED") if passed else _("FAILED"),

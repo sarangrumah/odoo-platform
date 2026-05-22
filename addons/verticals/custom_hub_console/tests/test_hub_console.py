@@ -19,7 +19,6 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "custom_hub_console")
 class TestHubConsole(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -30,14 +29,16 @@ class TestHubConsole(TransactionCase):
         cls.Wizard = cls.env["custom.hub.deploy.module.wizard"]
 
         # Stand up a fake tenant so deployment rows have something to point at.
-        cls.tenant = cls.Tenant.sudo().create({
-            "slug": "test-vertical",
-            "display_name": "Test Vertical",
-            "db_name": "test_vertical",
-            "state": "active",
-            "business_domain": "ppob",
-            "deployment_topology": "centralized",
-        })
+        cls.tenant = cls.Tenant.sudo().create(
+            {
+                "slug": "test-vertical",
+                "display_name": "Test Vertical",
+                "db_name": "test_vertical",
+                "state": "active",
+                "business_domain": "ppob",
+                "deployment_topology": "centralized",
+            }
+        )
 
     # ------------------------------------------------------------------
     # 1. Catalog scan
@@ -48,9 +49,7 @@ class TestHubConsole(TransactionCase):
         # The platform ships well over 30 addons across buckets; assert
         # at least a healthy minimum so we know the scanner walked them.
         self.assertGreaterEqual(
-            result["total"], 20,
-            f"Catalog scan only found {result['total']} modules — "
-            f"expected at least 20."
+            result["total"], 20, f"Catalog scan only found {result['total']} modules — expected at least 20."
         )
         # And the catalog table reflects what scan reported.
         self.assertGreaterEqual(self.Catalog.search_count([]), 20)
@@ -69,15 +68,11 @@ class TestHubConsole(TransactionCase):
             )
         # Every event's prev_hash should equal the prior event's hash.
         prev_hash = ""
-        prior = self.Audit.sudo().search(
-            [("id", "<", events[0].id)], order="id desc", limit=1)
+        prior = self.Audit.sudo().search([("id", "<", events[0].id)], order="id desc", limit=1)
         if prior:
             prev_hash = prior.hash
         for ev in events.sorted("id"):
-            self.assertEqual(
-                ev.prev_hash, prev_hash,
-                f"Event {ev.id} prev_hash should match prior row's hash"
-            )
+            self.assertEqual(ev.prev_hash, prev_hash, f"Event {ev.id} prev_hash should match prior row's hash")
             self.assertTrue(ev.hash, "Hash must be computed on create")
             prev_hash = ev.hash
 
@@ -115,20 +110,24 @@ class TestHubConsole(TransactionCase):
         self.assertTrue(catalog, "Catalog should have at least one entry")
 
         audit_before = self.Audit.search_count([])
-        wizard = self.Wizard.create({
-            "catalog_id": catalog.id,
-            "tenant_ids": [(6, 0, [self.tenant.id])],
-            "deploy_mode": "install",
-            "confirmed": True,
-        })
+        wizard = self.Wizard.create(
+            {
+                "catalog_id": catalog.id,
+                "tenant_ids": [(6, 0, [self.tenant.id])],
+                "deploy_mode": "install",
+                "confirmed": True,
+            }
+        )
         action = wizard.action_confirm()
         self.assertEqual(action["res_model"], "custom.hub.module.deployment")
 
         # Deployment row created.
-        deploys = self.Deployment.search([
-            ("tenant_id", "=", self.tenant.id),
-            ("catalog_id", "=", catalog.id),
-        ])
+        deploys = self.Deployment.search(
+            [
+                ("tenant_id", "=", self.tenant.id),
+                ("catalog_id", "=", catalog.id),
+            ]
+        )
         self.assertTrue(deploys)
         # Orchestrator will fail in the test env → state should be 'failed',
         # but the audit event should still have been emitted.
@@ -140,10 +139,12 @@ class TestHubConsole(TransactionCase):
     # ------------------------------------------------------------------
     def test_tenant_extension_fields(self):
         # Created in setUpClass with business_domain='ppob'.
-        found = self.Tenant.search([
-            ("business_domain", "=", "ppob"),
-            ("slug", "=", "test-vertical"),
-        ])
+        found = self.Tenant.search(
+            [
+                ("business_domain", "=", "ppob"),
+                ("slug", "=", "test-vertical"),
+            ]
+        )
         self.assertIn(self.tenant, found)
         self.assertEqual(self.tenant.deployment_topology, "centralized")
         # module_count should compute (zero modules assigned for now).

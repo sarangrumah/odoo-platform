@@ -33,11 +33,7 @@ class MidtransAdapter(models.AbstractModel):
 
     def _base_url(self, provider) -> str:
         # Snap endpoints live on app.* (NOT api.*) per Midtrans docs.
-        return (
-            "https://app.sandbox.midtrans.com"
-            if provider.x_id_sandbox
-            else "https://app.midtrans.com"
-        )
+        return "https://app.sandbox.midtrans.com" if provider.x_id_sandbox else "https://app.midtrans.com"
 
     def _endpoint(self, provider, payload: dict) -> str:
         return "/snap/v1/transactions"
@@ -67,17 +63,12 @@ class MidtransAdapter(models.AbstractModel):
         payload = self._build_snap_payload(provider, transaction)
         result = self.send(provider, payload, transaction=transaction)
         if not result["ok"]:
-            raise UserError(
-                _("Midtrans Snap create failed (HTTP %s): %s")
-                % (result["http_status"], result["body"])
-            )
+            raise UserError(_("Midtrans Snap create failed (HTTP %s): %s") % (result["http_status"], result["body"]))
         body = result["body"] if isinstance(result["body"], dict) else {}
         token = body.get("token")
         redirect = body.get("redirect_url")
         if not token or not redirect:
-            raise UserError(
-                _("Midtrans Snap response missing token/redirect_url: %s") % body
-            )
+            raise UserError(_("Midtrans Snap response missing token/redirect_url: %s") % body)
         return {"token": token, "redirect_url": redirect, "raw": body}
 
     def create_checkout(self, provider, transaction) -> dict:
@@ -142,10 +133,7 @@ class MidtransAdapter(models.AbstractModel):
             endpoint_override=endpoint_override,
         )
         if not result["ok"]:
-            raise UserError(
-                _("Midtrans refund failed (HTTP %s): %s")
-                % (result["http_status"], result["body"])
-            )
+            raise UserError(_("Midtrans refund failed (HTTP %s): %s") % (result["http_status"], result["body"]))
         return result["body"] if isinstance(result["body"], dict) else {"raw": result["body"]}
 
     # -------- Webhook signature verification --------
@@ -190,11 +178,7 @@ class MidtransCoreAdapter(models.AbstractModel):
     _description = "Midtrans Core API adapter (refund/status)"
 
     def _base_url(self, provider) -> str:
-        return (
-            "https://api.sandbox.midtrans.com"
-            if provider.x_id_sandbox
-            else "https://api.midtrans.com"
-        )
+        return "https://api.sandbox.midtrans.com" if provider.x_id_sandbox else "https://api.midtrans.com"
 
     def _endpoint(self, provider, payload: dict) -> str:
         # endpoint_override is always supplied for this shim.

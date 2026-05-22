@@ -4,20 +4,18 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-import psycopg
 from psycopg.rows import dict_row
 
 from .db import master_connection
-
 
 # ---------------------------------------------------------------------------
 # Tenants table
 # ---------------------------------------------------------------------------
 
 
-def list_tenants(state: Optional[str] = None) -> list[dict[str, Any]]:
+def list_tenants(state: str | None = None) -> list[dict[str, Any]]:
     with master_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
         if state:
             cur.execute(
@@ -29,7 +27,7 @@ def list_tenants(state: Optional[str] = None) -> list[dict[str, Any]]:
         return cur.fetchall()
 
 
-def get_tenant(slug: str) -> Optional[dict[str, Any]]:
+def get_tenant(slug: str) -> dict[str, Any] | None:
     with master_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             "SELECT * FROM tenant_registry.tenants WHERE slug = %s",
@@ -90,10 +88,10 @@ def set_state(
     slug: str,
     state: str,
     *,
-    suspended_at: Optional[datetime] = None,
-    archived_at: Optional[datetime] = None,
-    purge_after: Optional[datetime] = None,
-    activated_at: Optional[datetime] = None,
+    suspended_at: datetime | None = None,
+    archived_at: datetime | None = None,
+    purge_after: datetime | None = None,
+    activated_at: datetime | None = None,
 ) -> None:
     fields: list[str] = ["state = %s"]
     args: list[Any] = [state]

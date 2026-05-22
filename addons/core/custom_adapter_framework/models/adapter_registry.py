@@ -9,6 +9,7 @@ def register_adapter(name: str):
         _ADAPTER_REGISTRY[name] = cls
         cls._adapter_name = name
         return cls
+
     return _wrap
 
 

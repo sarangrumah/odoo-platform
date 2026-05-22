@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Wizard: request unmasked view of records with an audited reason."""
 
-from odoo import api, fields, models
+from odoo import fields, models
 from odoo.exceptions import UserError
 
 
@@ -25,7 +25,10 @@ class PdpUnmaskWizard(models.TransientModel):
         if hasattr(Model, "_pdp_audit_write"):
             for rid in ids:
                 Model.browse(rid)._pdp_audit_write(
-                    "unmask", rid, {"reason": self.reason}, reason=self.reason,
+                    "unmask",
+                    rid,
+                    {"reason": self.reason},
+                    reason=self.reason,
                 )
         action = {
             "type": "ir.actions.act_window",

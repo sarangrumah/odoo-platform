@@ -44,6 +44,4 @@ class CustomFixedAssetLocation(models.Model):
     @api.constrains("parent_id")
     def _check_location_recursion(self):
         if not self._check_recursion():
-            raise ValidationError(self.env._(
-                "You cannot create recursive asset locations."
-            ))
+            raise ValidationError(self.env._("You cannot create recursive asset locations."))

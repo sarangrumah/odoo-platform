@@ -17,10 +17,16 @@ class TenantEnvironment(models.Model):
     _order = "tenant_registry_id, env_type"
 
     vps_id = fields.Many2one(
-        "tenant.vps", required=True, ondelete="restrict", index=True,
+        "tenant.vps",
+        required=True,
+        ondelete="restrict",
+        index=True,
     )
     tenant_registry_id = fields.Many2one(
-        "tenant.registry", required=True, ondelete="cascade", index=True,
+        "tenant.registry",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     env_type = fields.Selection(
         [("dev", "Dev"), ("staging", "Staging"), ("prod", "Production")],

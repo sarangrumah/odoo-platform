@@ -76,6 +76,7 @@ class DevCyclePr(models.Model):
             if pr.state == "merged" and pr.ci_status == "success":
                 # Only advance if cycle hasn't already passed `deployed`.
                 from .dev_cycle import STATE_SEQUENCE
+
                 try:
                     cur_idx = STATE_SEQUENCE.index(cycle.state)
                     target_idx = STATE_SEQUENCE.index("deployed")
@@ -90,17 +91,14 @@ class DevCyclePr(models.Model):
             elif pr.state == "open" and cycle.state == "in_dev":
                 cycle.write({"state": "code_review"})
                 cycle.message_post(
-                    body=_("Auto-transition: PR %s opened → code_review.")
-                    % (pr.pr_url or pr.pr_number or "")
+                    body=_("Auto-transition: PR %s opened → code_review.") % (pr.pr_url or pr.pr_number or "")
                 )
         return True
 
     @api.model
     def upsert_from_webhook(self, cycle, provider, pr_url, vals):
         """Upsert a PR row matched by (cycle_id, pr_url)."""
-        existing = self.search(
-            [("cycle_id", "=", cycle.id), ("pr_url", "=", pr_url)], limit=1
-        )
+        existing = self.search([("cycle_id", "=", cycle.id), ("pr_url", "=", pr_url)], limit=1)
         vals = dict(vals)
         vals["last_synced_at"] = fields.Datetime.now()
         if existing:

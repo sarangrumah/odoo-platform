@@ -11,7 +11,6 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "custom_hub_console_canary")
 class TestCanaryDeploy(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -19,35 +18,43 @@ class TestCanaryDeploy(TransactionCase):
         cls.Deployment = cls.env["custom.hub.module.deployment"]
         cls.Tenant = cls.env["tenant.registry"]
 
-        cls.tenant = cls.Tenant.sudo().create({
-            "slug": "canary-tenant",
-            "display_name": "Canary Tenant",
-            "db_name": "canary_tenant",
-            "state": "active",
-            "business_domain": "ppob",
-            "deployment_topology": "centralized",
-        })
+        cls.tenant = cls.Tenant.sudo().create(
+            {
+                "slug": "canary-tenant",
+                "display_name": "Canary Tenant",
+                "db_name": "canary_tenant",
+                "state": "active",
+                "business_domain": "ppob",
+                "deployment_topology": "centralized",
+            }
+        )
 
-        cls.mod_base = cls.Catalog.sudo().create({
-            "module_name": "mod_base_canary",
-            "category": "core",
-            "maturity": "production",
-        })
-        cls.mod_dep = cls.Catalog.sudo().create({
-            "module_name": "mod_dep_canary",
-            "category": "core",
-            "maturity": "production",
-            "depends_module_ids": [(6, 0, [cls.mod_base.id])],
-        })
+        cls.mod_base = cls.Catalog.sudo().create(
+            {
+                "module_name": "mod_base_canary",
+                "category": "core",
+                "maturity": "production",
+            }
+        )
+        cls.mod_dep = cls.Catalog.sudo().create(
+            {
+                "module_name": "mod_dep_canary",
+                "category": "core",
+                "maturity": "production",
+                "depends_module_ids": [(6, 0, [cls.mod_base.id])],
+            }
+        )
 
     # ------------------------------------------------------------------
     def _new_deployment(self, catalog):
-        return self.Deployment.sudo().create({
-            "catalog_id": catalog.id,
-            "tenant_id": self.tenant.id,
-            "deploy_mode": "install",
-            "state": "pending",
-        })
+        return self.Deployment.sudo().create(
+            {
+                "catalog_id": catalog.id,
+                "tenant_id": self.tenant.id,
+                "deploy_mode": "install",
+                "state": "pending",
+            }
+        )
 
     # ------------------------------------------------------------------
     def test_resolve_dependencies_topo_order(self):
@@ -96,14 +103,17 @@ class TestCanaryDeploy(TransactionCase):
         if snapshot exists, or just set rolled_back state otherwise."""
         dep = self._new_deployment(self.mod_base)
 
-        with patch.object(
-            type(self.env["custom.super.admin.orchestrator.client"]),
-            "_request",
-            return_value={},
-        ), patch.object(
-            type(self.env["custom.super.admin.orchestrator.client"]),
-            "run_backup",
-            return_value={"id": 1},
+        with (
+            patch.object(
+                type(self.env["custom.super.admin.orchestrator.client"]),
+                "_request",
+                return_value={},
+            ),
+            patch.object(
+                type(self.env["custom.super.admin.orchestrator.client"]),
+                "run_backup",
+                return_value={"id": 1},
+            ),
         ):
             dep._run_canary_sequence()
 

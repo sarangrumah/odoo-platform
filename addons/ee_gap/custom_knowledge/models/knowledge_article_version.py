@@ -4,7 +4,8 @@
 Restoring a version writes the snapshot back to the parent article, which
 in turn produces *another* snapshot — so the restore itself is reversible.
 """
-from odoo import _, api, fields, models
+
+from odoo import _, fields, models
 from odoo.exceptions import AccessError
 
 

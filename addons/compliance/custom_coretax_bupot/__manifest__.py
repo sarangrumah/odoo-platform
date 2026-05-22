@@ -2,7 +2,7 @@
 {
     "name": "Custom Coretax e-Bupot Unifikasi",
     "summary": "Bukti Potong PPh Unifikasi (PPh 22 / 23 / 4(2) / 15 / 26) "
-               "with XML export and DJP number upload per Coretax schema.",
+    "with XML export and DJP number upload per Coretax schema.",
     "description": """
 Custom Coretax e-Bupot Unifikasi
 ================================

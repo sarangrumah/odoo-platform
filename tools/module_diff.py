@@ -30,6 +30,7 @@ Notes:
   - "Maturity heuristic" = (model_count, view_count, test_count, controller_count)
     rolled into scaffold / partial / production label.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -166,7 +167,11 @@ def _extract_models_from_file(file_path: Path) -> list[ModelInfo]:
                         # Field heuristic: RHS is a Call to fields.<Type>
                         if isinstance(val, ast.Call):
                             fn = val.func
-                            if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name) and fn.value.id == "fields":
+                            if (
+                                isinstance(fn, ast.Attribute)
+                                and isinstance(fn.value, ast.Name)
+                                and fn.value.id == "fields"
+                            ):
                                 info.fields.append(tgt.id)
         if info.name or info.inherit:
             results.append(info)
@@ -235,9 +240,7 @@ def _scan_module(project: str, manifest_path: Path) -> ModuleInfo | None:
                 info.test_files += 1
             elif top == "models" and fname.endswith(".py") and fname != "__init__.py":
                 info.models_own.extend([m for m in _extract_models_from_file(fpath) if m.name])
-                info.models_inherit.extend(
-                    [m for m in _extract_models_from_file(fpath) if m.inherit and not m.name]
-                )
+                info.models_inherit.extend([m for m in _extract_models_from_file(fpath) if m.inherit and not m.name])
             elif top == "controllers" and fname.endswith(".py") and fname != "__init__.py":
                 info.controller_routes.extend(_extract_controller_routes(fpath))
     return info
@@ -261,6 +264,7 @@ def scan_root(project: str, root: Path) -> list[ModuleInfo]:
 
 # --- Report rendering ----------------------------------------------------
 
+
 def render_markdown(by_project: dict[str, list[ModuleInfo]], hub_project: str) -> str:
     out: list[str] = []
     out.append("# Module Diff Report — Hub vs Verticals\n")
@@ -273,7 +277,7 @@ def render_markdown(by_project: dict[str, list[ModuleInfo]], hub_project: str) -
         out.append("| Module | Version | Maturity | Own models | Inherit | Views | Tests | Routes | Depends |")
         out.append("|---|---|---|---:|---:|---:|---:|---:|---|")
         for m in sorted(mods, key=lambda x: x.module):
-            deps_str = ", ".join(m.depends[:4]) + (f", … +{len(m.depends)-4}" if len(m.depends) > 4 else "")
+            deps_str = ", ".join(m.depends[:4]) + (f", … +{len(m.depends) - 4}" if len(m.depends) > 4 else "")
             out.append(
                 f"| `{m.module}` | {m.version} | {m.maturity} "
                 f"| {len(m.models_own)} | {len(m.models_inherit)} "
@@ -294,7 +298,9 @@ def render_markdown(by_project: dict[str, list[ModuleInfo]], hub_project: str) -
                 hub_inherit_models[inh].add(m.module)
 
     out.append("\n## 2. Duplicate Model Coverage (Vertical defines what Hub already has)\n")
-    out.append("If a vertical module defines a `_name` that already exists as `_name` in the hub, that is hard duplication and needs renaming or merging.\n")
+    out.append(
+        "If a vertical module defines a `_name` that already exists as `_name` in the hub, that is hard duplication and needs renaming or merging.\n"
+    )
     out.append("\n| Vertical project | Vertical module | Duplicated `_name` | Already in Hub module |")
     out.append("|---|---|---|---|")
     any_dup = False
@@ -382,6 +388,7 @@ def render_markdown(by_project: dict[str, list[ModuleInfo]], hub_project: str) -
 
 # --- Main ----------------------------------------------------------------
 
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hub", required=True, help="Path to hub addons root")
@@ -421,7 +428,9 @@ def main(argv: Iterable[str] | None = None) -> int:
                     "maturity": m.maturity,
                     "depends": m.depends,
                     "models_own": [{"name": mo.name, "fields": mo.fields, "file": mo.file} for mo in m.models_own],
-                    "models_inherit": [{"inherit": mo.inherit, "fields": mo.fields, "file": mo.file} for mo in m.models_inherit],
+                    "models_inherit": [
+                        {"inherit": mo.inherit, "fields": mo.fields, "file": mo.file} for mo in m.models_inherit
+                    ],
                     "views": m.view_files,
                     "tests": m.test_files,
                     "routes": m.controller_routes,

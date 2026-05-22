@@ -13,14 +13,13 @@ being silently dropped — ops can either ``DELETE`` it (which archives) or
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
 import structlog
 
 from . import dbops, registry
-from .config import get_settings
 from .crypto import generate_tenant_dek, wrap_dek
 from .odoo_admin import OdooAdminClient, gen_initial_admin_password
 from .validators import assert_valid_slug
@@ -66,7 +65,11 @@ def provision(
     # Pre-flight: must not exist
     if registry.get_tenant(slug):
         registry.log_action(
-            slug, "provision", actor, {"reason": "slug exists"}, "failure",
+            slug,
+            "provision",
+            actor,
+            {"reason": "slug exists"},
+            "failure",
             error="Tenant with this slug already exists",
         )
         raise FileExistsError(f"Tenant '{slug}' already exists")
@@ -94,8 +97,11 @@ def provision(
         backup_schedule_cron=backup_schedule_cron,
     )
     registry.log_action(
-        slug, "provision_started", actor,
-        {"db_name": db_name, "plan_tier": plan_tier}, "success",
+        slug,
+        "provision_started",
+        actor,
+        {"db_name": db_name, "plan_tier": plan_tier},
+        "success",
     )
 
     # 4. Provision the actual DB via Odoo's create endpoint
@@ -108,17 +114,25 @@ def provision(
         odoo.install_modules(db=db_name, login="admin", password=admin_pwd_plain, module_names=modules)
 
         # 6. Mark active
-        registry.set_state(slug, "active", activated_at=datetime.now(timezone.utc))
+        registry.set_state(slug, "active", activated_at=datetime.now(UTC))
         registry.log_action(
-            slug, "provision_completed", actor,
-            {"modules": modules}, "success",
+            slug,
+            "provision_completed",
+            actor,
+            {"modules": modules},
+            "success",
         )
         log.info("tenant.provisioned", slug=slug, db=db_name)
     except Exception as e:
         log.exception("tenant.provision_failed", slug=slug)
         registry.set_state(slug, "failed")
         registry.log_action(
-            slug, "provision_failed", actor, {"error": str(e)}, "failure", error=str(e),
+            slug,
+            "provision_failed",
+            actor,
+            {"error": str(e)},
+            "failure",
+            error=str(e),
         )
         raise
     finally:
@@ -144,9 +158,13 @@ def suspend(slug: str, actor: str, reason: str | None = None) -> None:
     # The proxy itself reads tenant state (or we set a flag in Redis on this transition).
     dbops.terminate_connections(t["db_name"])
 
-    registry.set_state(slug, "suspended", suspended_at=datetime.now(timezone.utc))
+    registry.set_state(slug, "suspended", suspended_at=datetime.now(UTC))
     registry.log_action(
-        slug, "suspend", actor, {"reason": reason}, "success",
+        slug,
+        "suspend",
+        actor,
+        {"reason": reason},
+        "success",
     )
     log.info("tenant.suspended", slug=slug)
 
@@ -169,7 +187,7 @@ def archive(slug: str, actor: str, retention_days: int = 30) -> None:
     if not t:
         raise LookupError(slug)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     archived_db_name = f"_archived_{int(now.timestamp())}_{slug}"
     dbops.rename_database(t["db_name"], archived_db_name)
 
@@ -182,6 +200,7 @@ def archive(slug: str, actor: str, retention_days: int = 30) -> None:
     # Update db_name in registry so purge job can find it later
     # (registry.set_state doesn't currently update db_name; we use a direct UPDATE below)
     from .db import master_connection
+
     with master_connection() as conn, conn.cursor() as cur:
         cur.execute(
             "UPDATE tenant_registry.tenants SET db_name = %s WHERE slug = %s",
@@ -189,7 +208,9 @@ def archive(slug: str, actor: str, retention_days: int = 30) -> None:
         )
 
     registry.log_action(
-        slug, "archive", actor,
+        slug,
+        "archive",
+        actor,
         {"retention_days": retention_days, "renamed_to": archived_db_name},
         "success",
     )
@@ -199,7 +220,8 @@ def archive(slug: str, actor: str, retention_days: int = 30) -> None:
 def purge_due(actor: str = "scheduler") -> int:
     """Delete archived tenants whose purge_after has passed. Returns count purged."""
     from .db import master_connection
-    now = datetime.now(timezone.utc)
+
+    now = datetime.now(UTC)
     n = 0
     with master_connection() as conn, conn.cursor() as cur:
         cur.execute(
@@ -226,6 +248,5 @@ def purge_due(actor: str = "scheduler") -> int:
 def fingerprint_payload(payload: dict[str, Any]) -> str:
     """Stable sha256 over a JSON-canonical payload for idempotency keys (future)."""
     import json
-    return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()

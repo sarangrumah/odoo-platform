@@ -90,14 +90,10 @@ class CustomSpreadsheetWorkbook(models.Model):
 
     @api.depends("share_token")
     def _compute_share_url(self):
-        base = self.env["ir.config_parameter"].sudo().get_param(
-            "web.base.url", default=""
-        ).rstrip("/")
+        base = self.env["ir.config_parameter"].sudo().get_param("web.base.url", default="").rstrip("/")
         for rec in self:
             if rec.share_token:
-                rec.share_url = "%s/custom_spreadsheet/share/%s" % (
-                    base, quote(rec.share_token)
-                )
+                rec.share_url = "%s/custom_spreadsheet/share/%s" % (base, quote(rec.share_token))
             else:
                 rec.share_url = False
 
@@ -109,9 +105,7 @@ class CustomSpreadsheetWorkbook(models.Model):
     # ---------- CRUD overrides (versioning) ----------
 
     def write(self, vals):
-        track_data = "data_json" in vals and not self.env.context.get(
-            "spreadsheet_skip_versioning"
-        )
+        track_data = "data_json" in vals and not self.env.context.get("spreadsheet_skip_versioning")
         if track_data:
             for rec in self:
                 old = rec.data_json or ""
@@ -123,17 +117,17 @@ class CustomSpreadsheetWorkbook(models.Model):
     def _snapshot_version(self, data_json, note=None):
         self.ensure_one()
         Version = self.env["custom.spreadsheet.version"].sudo()
-        last = Version.search(
-            [("workbook_id", "=", self.id)], order="version_no desc", limit=1
-        )
+        last = Version.search([("workbook_id", "=", self.id)], order="version_no desc", limit=1)
         next_no = (last.version_no if last else 0) + 1
-        Version.create({
-            "workbook_id": self.id,
-            "version_no": next_no,
-            "data_json_snapshot": data_json or _DEFAULT_DATA_JSON,
-            "saved_by": self.env.user.id,
-            "note": note or "",
-        })
+        Version.create(
+            {
+                "workbook_id": self.id,
+                "version_no": next_no,
+                "data_json_snapshot": data_json or _DEFAULT_DATA_JSON,
+                "saved_by": self.env.user.id,
+                "note": note or "",
+            }
+        )
 
     # ---------- AI ----------
 
@@ -160,13 +154,15 @@ class CustomSpreadsheetWorkbook(models.Model):
                     except (ValueError, TypeError):
                         pass
                 sample.append({"cell": k, "value": v})
-            out.append({
-                "name": sheet.get("name") or "Sheet",
-                "row_count": len(rows),
-                "col_count": len(cols),
-                "cell_count": len(cells),
-                "sample": sample,
-            })
+            out.append(
+                {
+                    "name": sheet.get("name") or "Sheet",
+                    "row_count": len(rows),
+                    "col_count": len(cols),
+                    "cell_count": len(cells),
+                    "sample": sample,
+                }
+            )
         return {"sheets": out}
 
     def _custom_ai_payload(self, question, mode="ask", extra=None):
@@ -179,9 +175,7 @@ class CustomSpreadsheetWorkbook(models.Model):
             "mode": mode,
             "data_summary": self._data_summary(),
             "data_json_excerpt": (self.data_json or "")[:_AI_PAYLOAD_MAX_CHARS],
-            "data_json_truncated": bool(
-                self.data_json and len(self.data_json) > _AI_PAYLOAD_MAX_CHARS
-            ),
+            "data_json_truncated": bool(self.data_json and len(self.data_json) > _AI_PAYLOAD_MAX_CHARS),
         }
         if extra:
             payload.update(extra)
@@ -196,12 +190,7 @@ class CustomSpreadsheetWorkbook(models.Model):
         )
 
     def _extract_ai_text(self, result):
-        return (
-            result.get("response")
-            or result.get("text")
-            or result.get("summary")
-            or json.dumps(result)[:2000]
-        )
+        return result.get("response") or result.get("text") or result.get("summary") or json.dumps(result)[:2000]
 
     def action_ask_ai(self, question=None):
         self.ensure_one()
@@ -221,11 +210,8 @@ class CustomSpreadsheetWorkbook(models.Model):
         text = self._extract_ai_text(result)
         body_q = question or _("(no question)")
         self.message_post(
-            body=_(
-                "<b>Ask the spreadsheet</b><br/>"
-                "<i>Question:</i> %(q)s<br/>"
-                "<i>Answer:</i> %(a)s"
-            ) % {"q": body_q, "a": text},
+            body=_("<b>Ask the spreadsheet</b><br/><i>Question:</i> %(q)s<br/><i>Answer:</i> %(a)s")
+            % {"q": body_q, "a": text},
             subtype_xmlid="mail.mt_note",
         )
         return True
@@ -258,10 +244,8 @@ class CustomSpreadsheetWorkbook(models.Model):
         text = self._extract_ai_text(result)
         self.suggested_formulas = text
         self.message_post(
-            body=_(
-                "<b>AI formula suggestion</b> (cell <code>%(c)s</code>)<br/>"
-                "<pre>%(t)s</pre>"
-            ) % {"c": cell_ref or "?", "t": text},
+            body=_("<b>AI formula suggestion</b> (cell <code>%(c)s</code>)<br/><pre>%(t)s</pre>")
+            % {"c": cell_ref or "?", "t": text},
             subtype_xmlid="mail.mt_note",
         )
         return True
@@ -272,8 +256,7 @@ class CustomSpreadsheetWorkbook(models.Model):
             result = self._call_ai(
                 self._custom_ai_payload(
                     question=_(
-                        "Identify outliers, missing values, type "
-                        "inconsistencies, and duplicate rows in this data."
+                        "Identify outliers, missing values, type inconsistencies, and duplicate rows in this data."
                     ),
                     mode="clean",
                 )
@@ -292,9 +275,7 @@ class CustomSpreadsheetWorkbook(models.Model):
         text = self._extract_ai_text(result)
         self.ai_clean_report = text
         self.message_post(
-            body=_(
-                "<b>AI data cleaning report</b><br/><pre>%(t)s</pre>"
-            ) % {"t": text},
+            body=_("<b>AI data cleaning report</b><br/><pre>%(t)s</pre>") % {"t": text},
             subtype_xmlid="mail.mt_note",
         )
         return True
@@ -362,18 +343,18 @@ class CustomSpreadsheetWorkbook(models.Model):
 
         content = buf.getvalue().encode("utf-8")
         fname = "%s.csv" % (self.name or "workbook")
-        attachment = self.env["ir.attachment"].create({
-            "name": fname,
-            "type": "binary",
-            "datas": base64.b64encode(content),
-            "res_model": self._name,
-            "res_id": self.id,
-            "mimetype": "text/csv",
-        })
+        attachment = self.env["ir.attachment"].create(
+            {
+                "name": fname,
+                "type": "binary",
+                "datas": base64.b64encode(content),
+                "res_model": self._name,
+                "res_id": self.id,
+                "mimetype": "text/csv",
+            }
+        )
         self.message_post(
-            body=_("<b>CSV exported</b>: %s rows, %s columns") % (
-                max_row + 1, max_col + 1
-            ),
+            body=_("<b>CSV exported</b>: %s rows, %s columns") % (max_row + 1, max_col + 1),
             attachment_ids=[attachment.id],
             subtype_xmlid="mail.mt_note",
         )
@@ -387,9 +368,7 @@ class CustomSpreadsheetWorkbook(models.Model):
         """Replace the named sheet's cells with the provided 2D row list."""
         self.ensure_one()
         if len(rows) > _MAX_IMPORT_ROWS:
-            raise ValidationError(
-                _("CSV exceeds maximum of %s rows.") % _MAX_IMPORT_ROWS
-            )
+            raise ValidationError(_("CSV exceeds maximum of %s rows.") % _MAX_IMPORT_ROWS)
         cells = {}
         for r_idx, row in enumerate(rows):
             for c_idx, val in enumerate(row):
@@ -401,8 +380,7 @@ class CustomSpreadsheetWorkbook(models.Model):
 
     # ---------- Load from model ----------
 
-    def action_load_from_model(self, model_name, domain=None, fields_list=None,
-                               sheet_name="Data", append=False):
+    def action_load_from_model(self, model_name, domain=None, fields_list=None, sheet_name="Data", append=False):
         """Pull records from `model_name` into the workbook as a table."""
         self.ensure_one()
         if not model_name:
@@ -414,8 +392,7 @@ class CustomSpreadsheetWorkbook(models.Model):
         # Domain
         if isinstance(domain, str) and domain.strip():
             try:
-                domain_list = json.loads(domain) if domain.strip().startswith("[") \
-                    else self._eval_domain(domain)
+                domain_list = json.loads(domain) if domain.strip().startswith("[") else self._eval_domain(domain)
             except (ValueError, TypeError):
                 raise UserError(_("Invalid domain expression: %s") % domain)
         elif isinstance(domain, list):
@@ -435,9 +412,7 @@ class CustomSpreadsheetWorkbook(models.Model):
 
         records = Model.sudo().search(domain_list, limit=_MAX_LOAD_RECORDS + 1)
         if len(records) > _MAX_LOAD_RECORDS:
-            raise ValidationError(
-                _("Result set exceeds maximum of %s records.") % _MAX_LOAD_RECORDS
-            )
+            raise ValidationError(_("Result set exceeds maximum of %s records.") % _MAX_LOAD_RECORDS)
 
         # Build rows
         rows = [list(valid_fields)]
@@ -490,10 +465,8 @@ class CustomSpreadsheetWorkbook(models.Model):
 
         self._dump_data(data)
         self.message_post(
-            body=_(
-                "<b>Loaded from <code>%(m)s</code></b>: %(n)s record(s), "
-                "%(c)s column(s) → sheet <i>%(s)s</i>"
-            ) % {
+            body=_("<b>Loaded from <code>%(m)s</code></b>: %(n)s record(s), %(c)s column(s) → sheet <i>%(s)s</i>")
+            % {
                 "m": model_name,
                 "n": len(records),
                 "c": len(valid_fields),
@@ -508,6 +481,7 @@ class CustomSpreadsheetWorkbook(models.Model):
         """Very small safe domain evaluator (only literals + lists/tuples)."""
         try:
             import ast
+
             node = ast.literal_eval(expr)
             if isinstance(node, list):
                 return node

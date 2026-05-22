@@ -22,10 +22,17 @@ class PdpAuditedMixin(models.AbstractModel):
     def _pdp_audit_classification(self) -> str | None:
         """Top-level classification representing this record (best-effort)."""
         # Look at any field with x_pdp_classification_id set
-        codes = self.env["ir.model.fields"].sudo().search([
-            ("model", "=", self._name),
-            ("x_pdp_classification_id", "!=", False),
-        ]).mapped("x_pdp_classification_id.code")
+        codes = (
+            self.env["ir.model.fields"]
+            .sudo()
+            .search(
+                [
+                    ("model", "=", self._name),
+                    ("x_pdp_classification_id", "!=", False),
+                ]
+            )
+            .mapped("x_pdp_classification_id.code")
+        )
         if not codes:
             return None
         # Prefer most-sensitive code if available
@@ -77,8 +84,7 @@ class PdpAuditedMixin(models.AbstractModel):
                 ),
             )
         except Exception as e:  # pragma: no cover - never block business write
-            _logger.error("pdp.audit_log INSERT failed for %s/%s action=%s: %s",
-                          self._name, res_id, action, e)
+            _logger.error("pdp.audit_log INSERT failed for %s/%s action=%s: %s", self._name, res_id, action, e)
 
     # ---------- ORM overrides ----------
 

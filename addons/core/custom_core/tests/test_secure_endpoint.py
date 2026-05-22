@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from odoo.tests import TransactionCase, tagged
 
@@ -12,8 +12,7 @@ from ..controllers import secure_endpoint as se
 
 
 def _sign(secret: str, body: bytes, ts: str) -> str:
-    return hmac.new(secret.encode("utf-8"), ts.encode("utf-8") + body,
-                    hashlib.sha256).hexdigest()
+    return hmac.new(secret.encode("utf-8"), ts.encode("utf-8") + body, hashlib.sha256).hexdigest()
 
 
 class _FakeHttpReq:
@@ -41,7 +40,6 @@ class _FakeRequest:
 
 @tagged("post_install", "-at_install")
 class TestSecureEndpoint(TransactionCase):
-
     SCOPE = "unittest"
 
     @classmethod
@@ -50,8 +48,7 @@ class TestSecureEndpoint(TransactionCase):
         cls.secret = "s3cr3t-very-long-key"
         ICP = cls.env["ir.config_parameter"].sudo()
         ICP.set_param(f"custom_core.secure_endpoint.{cls.SCOPE}.secret", cls.secret)
-        ICP.set_param(f"custom_core.secure_endpoint.{cls.SCOPE}.allowed_cidrs",
-                      "10.0.0.0/24,127.0.0.1")
+        ICP.set_param(f"custom_core.secure_endpoint.{cls.SCOPE}.allowed_cidrs", "10.0.0.0/24,127.0.0.1")
 
     def setUp(self):
         super().setUp()
@@ -63,9 +60,7 @@ class TestSecureEndpoint(TransactionCase):
     def _invoke(self, body=b'{"a":1}', sig=None, ts=None, remote="10.0.0.5"):
         ts = ts if ts is not None else str(int(time.time()))
         sig = sig if sig is not None else _sign(self.secret, body, ts)
-        fake = _FakeRequest(self.env, body=body,
-                            headers={"X-Signature": sig, "X-Timestamp": ts},
-                            remote=remote)
+        fake = _FakeRequest(self.env, body=body, headers={"X-Signature": sig, "X-Timestamp": ts}, remote=remote)
 
         @se.secure_endpoint(self.SCOPE)
         def handler():

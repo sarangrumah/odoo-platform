@@ -6,7 +6,6 @@ from odoo.tests.common import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "custom_timesheet")
 class TestOvertimeWorkEntry(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -14,13 +13,15 @@ class TestOvertimeWorkEntry(TransactionCase):
         cls.project = cls.env["project.project"].create({"name": "OT Project"})
 
     def _validated_line(self, hours):
-        line = self.env["account.analytic.line"].create({
-            "name": "Overtime work",
-            "date": date.today(),
-            "unit_amount": hours,
-            "employee_id": self.employee.id,
-            "project_id": self.project.id,
-        })
+        line = self.env["account.analytic.line"].create(
+            {
+                "name": "Overtime work",
+                "date": date.today(),
+                "unit_amount": hours,
+                "employee_id": self.employee.id,
+                "project_id": self.project.id,
+            }
+        )
         line.action_submit_validation()
         if line.x_validation_state == "submitted":
             line.action_validate()

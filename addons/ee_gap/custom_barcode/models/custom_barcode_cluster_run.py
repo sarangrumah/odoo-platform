@@ -10,6 +10,7 @@ Strategy:
   * scans during the walk are recorded into `scan_line_ids`;
   * `action_apply()` calls into the standard scan-session apply per picking.
 """
+
 import json
 import logging
 from collections import defaultdict
@@ -69,10 +70,7 @@ class CustomBarcodeClusterRun(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals.get("name") == "New":
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code("custom.barcode.cluster.run")
-                    or _("Cluster Run")
-                )
+                vals["name"] = self.env["ir.sequence"].next_by_code("custom.barcode.cluster.run") or _("Cluster Run")
         return super().create(vals_list)
 
     # ---------- planning ----------
@@ -135,13 +133,9 @@ class CustomBarcodeClusterRun(models.Model):
         status = "ok"
 
         if gs1.get("gtin"):
-            product = self.env["product.product"].search(
-                [("barcode", "=", gs1["gtin"])], limit=1
-            )
+            product = self.env["product.product"].search([("barcode", "=", gs1["gtin"])], limit=1)
         if not product:
-            product = self.env["product.product"].search(
-                [("barcode", "=", barcode)], limit=1
-            )
+            product = self.env["product.product"].search([("barcode", "=", barcode)], limit=1)
         if gs1.get("lot") and product:
             lot = self.env["stock.lot"].search(
                 [("name", "=", gs1["lot"]), ("product_id", "=", product.id)],
@@ -154,8 +148,7 @@ class CustomBarcodeClusterRun(models.Model):
         picking_id = False
         if product:
             assignment = self.assignment_ids.filtered(
-                lambda a: a.product_id.id == product.id
-                and a.scanned_qty < a.expected_qty
+                lambda a: a.product_id.id == product.id and a.scanned_qty < a.expected_qty
             )[:1]
             if assignment:
                 take = min(
@@ -189,9 +182,7 @@ class CustomBarcodeClusterRun(models.Model):
 
         # Group lines by picking.
         by_picking = defaultdict(lambda: self.env["custom.barcode.scan.line"])
-        for line in self.scan_line_ids.filtered(
-            lambda l: l.status == "ok" and l.picking_id
-        ):
+        for line in self.scan_line_ids.filtered(lambda l: l.status == "ok" and l.picking_id):
             by_picking[line.picking_id.id] |= line
 
         applied = 0

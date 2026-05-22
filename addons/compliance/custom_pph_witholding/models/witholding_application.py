@@ -14,7 +14,8 @@ class CustomWitholdingApplication(models.Model):
     _order = "create_date desc, id desc"
 
     name = fields.Char(
-        compute="_compute_name", store=True,
+        compute="_compute_name",
+        store=True,
     )
     partner_id = fields.Many2one(
         comodel_name="res.partner",
@@ -72,11 +73,7 @@ class CustomWitholdingApplication(models.Model):
     @api.depends("partner_id", "pph_type", "withheld")
     def _compute_name(self):
         for rec in self:
-            rec.name = (
-                f"WH-{rec.pph_type or '?'}/"
-                f"{(rec.partner_id.name or '-')[:20]}/"
-                f"{rec.withheld:,.0f}"
-            )
+            rec.name = f"WH-{rec.pph_type or '?'}/{(rec.partner_id.name or '-')[:20]}/{rec.withheld:,.0f}"
 
     def action_mark_applied(self):
         for rec in self:

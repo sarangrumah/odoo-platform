@@ -9,7 +9,6 @@ class SurveyQuestion(models.Model):
         string="Score Weight",
         default=1.0,
         help=(
-            "Multiplier applied to this question's score when computing the "
-            "weighted total on the survey user input."
+            "Multiplier applied to this question's score when computing the weighted total on the survey user input."
         ),
     )

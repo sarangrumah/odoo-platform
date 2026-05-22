@@ -4,6 +4,7 @@
 A template is just a (category, html body) pair. Applying it overwrites
 ``knowledge.article.body`` with ``body_template``.
 """
+
 from odoo import fields, models
 
 

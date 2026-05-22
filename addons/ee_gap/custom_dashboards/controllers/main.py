@@ -10,7 +10,6 @@ from odoo.http import request
 
 
 class CustomDashboardShareController(http.Controller):
-
     @http.route(
         "/custom_dashboard/share/<string:token>",
         type="http",
@@ -32,14 +31,16 @@ class CustomDashboardShareController(http.Controller):
                 payload = json.loads(tile.cached_value or "{}")
             except (TypeError, ValueError):
                 payload = {}
-            tiles.append({
-                "id": tile.id,
-                "name": tile.name,
-                "tile_type": tile.tile_type,
-                "color": tile.color or "#1f77b4",
-                "cached_at": tile.cached_at and tile.cached_at.isoformat() or "",
-                "payload": payload,
-            })
+            tiles.append(
+                {
+                    "id": tile.id,
+                    "name": tile.name,
+                    "tile_type": tile.tile_type,
+                    "color": tile.color or "#1f77b4",
+                    "cached_at": tile.cached_at and tile.cached_at.isoformat() or "",
+                    "payload": payload,
+                }
+            )
         return request.render(
             "custom_dashboards.share_page",
             {

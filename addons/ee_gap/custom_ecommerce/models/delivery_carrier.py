@@ -103,7 +103,7 @@ class DeliveryCarrier(models.Model):
 
         # Weight in kg — fall back to 1 kg if products have no weight set.
         weight = 0.0
-        for line in (order.order_line if order else []):
+        for line in order.order_line if order else []:
             if line.product_id and not line.is_delivery:
                 weight += (line.product_id.weight or 0.0) * (line.product_uom_qty or 0.0)
         weight = max(weight, 1.0)

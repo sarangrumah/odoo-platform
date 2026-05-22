@@ -38,7 +38,11 @@ class CustomSmsAdapterZenziva(models.AbstractModel):
             fake_id = f"zenziva_sandbox_{uuid.uuid4().hex[:12]}"
             _logger.info(
                 "[custom_sms_id:zenziva:sandbox] sender=%s to=%s purpose=%s body=%s id=%s",
-                account.sender_id, to_phone, purpose, (body or "")[:160], fake_id,
+                account.sender_id,
+                to_phone,
+                purpose,
+                (body or "")[:160],
+                fake_id,
             )
             return {
                 "ok": True,
@@ -62,7 +66,10 @@ class CustomSmsAdapterZenziva(models.AbstractModel):
 
         try:
             resp = self.env["custom.sms.adapter.base"]._post(
-                endpoint, data=payload, timeout=30, account=account,
+                endpoint,
+                data=payload,
+                timeout=30,
+                account=account,
             )
         except Exception as e:
             _logger.warning("Zenziva send failed for %s: %s", to_phone, e)
@@ -92,10 +99,7 @@ class CustomSmsAdapterZenziva(models.AbstractModel):
 
         status = str(data.get("status", body_json.get("status", ""))).strip()
         message_id = (
-            data.get("messageId")
-            or data.get("messageid")
-            or body_json.get("messageId")
-            or body_json.get("messageid")
+            data.get("messageId") or data.get("messageid") or body_json.get("messageId") or body_json.get("messageid")
         )
         text = data.get("text") or body_json.get("text") or ""
 

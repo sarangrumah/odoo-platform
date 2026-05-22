@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 
 
 _PATTERN = re.compile(
@@ -55,10 +55,7 @@ class CustomPdpFieldDiscoveryWizard(models.TransientModel):
         self.ensure_one()
         self.suggestion_ids.unlink()
         Registry = self.env["custom.pdp.field.registry"].sudo()
-        existing = {
-            (r.model_name, r.field_name)
-            for r in Registry.search([])
-        }
+        existing = {(r.model_name, r.field_name) for r in Registry.search([])}
         Suggestion = self.env["custom.pdp.field.discovery.suggestion"]
         Fields = self.env["ir.model.fields"].sudo()
         # Only scan stored char/text/date fields on non-transient models.
@@ -117,9 +114,7 @@ class CustomPdpFieldDiscoveryWizard(models.TransientModel):
                 created += 1
             except Exception:
                 continue
-        self.report = (self.report or "") + (
-            "\n" + (_("Created %d registry entries.") % created)
-        )
+        self.report = (self.report or "") + ("\n" + (_("Created %d registry entries.") % created))
         return {
             "type": "ir.actions.act_window",
             "res_model": self._name,
@@ -134,16 +129,16 @@ class CustomPdpFieldDiscoverySuggestion(models.TransientModel):
     _description = "PDP Field Discovery Suggestion"
 
     wizard_id = fields.Many2one(
-        "custom.pdp.field.discovery.wizard", required=True, ondelete="cascade",
+        "custom.pdp.field.discovery.wizard",
+        required=True,
+        ondelete="cascade",
     )
     model_name = fields.Char(required=True)
     field_name = fields.Char(required=True)
     pii_category = fields.Selection(
-        selection=lambda self: self.env["custom.pdp.field.registry"]
-        ._fields["pii_category"].selection,
+        selection=lambda self: self.env["custom.pdp.field.registry"]._fields["pii_category"].selection,
     )
     mask_pattern = fields.Selection(
-        selection=lambda self: self.env["custom.pdp.field.registry"]
-        ._fields["mask_pattern"].selection,
+        selection=lambda self: self.env["custom.pdp.field.registry"]._fields["mask_pattern"].selection,
     )
     selected = fields.Boolean(default=False)

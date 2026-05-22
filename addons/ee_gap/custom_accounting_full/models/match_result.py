@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from odoo import _, api, fields, models
+from odoo import fields, models
 
 
 class MatchResult(models.Model):
@@ -13,7 +13,10 @@ class MatchResult(models.Model):
     _order = "computed_at desc"
 
     move_id = fields.Many2one(
-        "account.move", required=True, ondelete="cascade", index=True,
+        "account.move",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     overall_status = fields.Selection(
         [
@@ -32,7 +35,9 @@ class MatchResult(models.Model):
     )
     computed_at = fields.Datetime(default=fields.Datetime.now)
     line_results = fields.One2many(
-        "custom.match.line.result", "result_id", string="Line Results",
+        "custom.match.line.result",
+        "result_id",
+        string="Line Results",
     )
     notes = fields.Text()
 

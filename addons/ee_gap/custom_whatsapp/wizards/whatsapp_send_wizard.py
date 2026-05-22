@@ -49,15 +49,17 @@ class WhatsappSendWizard(models.TransientModel):
             raise UserError(_("Recipient phone is required."))
 
         Message = self.env["whatsapp.message"]
-        msg = Message.create({
-            "account_id": self.account_id.id,
-            "template_id": self.template_id.id if self.template_id else False,
-            "to_partner_id": self.partner_id.id if self.partner_id else False,
-            "to_phone": self.to_phone,
-            "body": self.body or "",
-            "direction": "outbound",
-            "state": "draft",
-        })
+        msg = Message.create(
+            {
+                "account_id": self.account_id.id,
+                "template_id": self.template_id.id if self.template_id else False,
+                "to_partner_id": self.partner_id.id if self.partner_id else False,
+                "to_phone": self.to_phone,
+                "body": self.body or "",
+                "direction": "outbound",
+                "state": "draft",
+            }
+        )
         msg.action_send()
 
         return {

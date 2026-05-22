@@ -6,6 +6,7 @@ column-index model requested in the spec (1-based, stored as integers).
 Header-name resolution is still supported when ``has_header`` is True
 and the index resolves to a header cell that exists.
 """
+
 from __future__ import annotations
 
 import base64
@@ -16,8 +17,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
-from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo import fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -29,24 +29,26 @@ class BankImportTemplate(models.Model):
 
     name = fields.Char(required=True, index=True)
     sequence = fields.Integer(default=10)
-    code = fields.Char(required=True, index=True,
-                       help="Stable identifier, e.g. 'bca_csv'.")
+    code = fields.Char(required=True, index=True, help="Stable identifier, e.g. 'bca_csv'.")
     bank_id = fields.Many2one("res.bank", string="Bank")
     company_id = fields.Many2one(
-        "res.company", string="Company",
-        default=lambda s: s.env.company, required=True,
+        "res.company",
+        string="Company",
+        default=lambda s: s.env.company,
+        required=True,
     )
     active = fields.Boolean(default=True)
 
     encoding = fields.Selection(
         [("utf-8", "UTF-8"), ("latin-1", "Latin-1")],
-        default="utf-8", required=True,
+        default="utf-8",
+        required=True,
     )
     delimiter = fields.Char(default=",", size=1, required=True)
-    has_header = fields.Boolean(default=True,
-                                help="Skip first row of file (column headers).")
+    has_header = fields.Boolean(default=True, help="Skip first row of file (column headers).")
     date_format = fields.Char(
-        default="%d/%m/%Y", required=True,
+        default="%d/%m/%Y",
+        required=True,
         help="Python strptime format. BCA: %d/%m/%Y, Mandiri: %d-%m-%Y.",
     )
 
@@ -59,8 +61,7 @@ class BankImportTemplate(models.Model):
     balance_column_index = fields.Integer(default=-1)
     signed_amount_column_index = fields.Integer(
         default=-1,
-        help="If set, this column holds a signed amount and overrides "
-             "amount_credit/amount_debit.",
+        help="If set, this column holds a signed amount and overrides amount_credit/amount_debit.",
     )
 
     sample_file = fields.Binary(string="Sample File", attachment=True)
@@ -70,8 +71,7 @@ class BankImportTemplate(models.Model):
     thousand_separator = fields.Char(default=",", size=1)
 
     _sql_constraints = [
-        ("code_uniq", "unique(code, company_id)",
-         "Template code must be unique per company."),
+        ("code_uniq", "unique(code, company_id)", "Template code must be unique per company."),
     ]
 
     # ------------------------------------------------------------------
@@ -115,8 +115,7 @@ class BankImportTemplate(models.Model):
 
     def _read_csv(self, file_bytes: bytes) -> list[list[str]]:
         text = file_bytes.decode(self.encoding or "utf-8", errors="replace")
-        reader = csv.reader(io.StringIO(text),
-                            delimiter=self.delimiter or ",")
+        reader = csv.reader(io.StringIO(text), delimiter=self.delimiter or ",")
         return list(reader)
 
     def parse_csv(self, file_b64: str) -> dict:
@@ -140,28 +139,27 @@ class BankImportTemplate(models.Model):
             if not d:
                 errors.append((n, f"Bad/missing date: {raw_date!r}"))
                 continue
-            ref = (self._safe_cell(row, self.ref_column_index) or "")
-            partner_hint = (self._safe_cell(row, self.partner_column_index) or "")
+            ref = self._safe_cell(row, self.ref_column_index) or ""
+            partner_hint = self._safe_cell(row, self.partner_column_index) or ""
             balance_raw = self._safe_cell(row, self.balance_column_index)
             balance = self._parse_amount(balance_raw) if balance_raw else None
             if self.signed_amount_column_index and self.signed_amount_column_index > 0:
-                amount = self._parse_amount(
-                    self._safe_cell(row, self.signed_amount_column_index))
+                amount = self._parse_amount(self._safe_cell(row, self.signed_amount_column_index))
             else:
-                credit = self._parse_amount(
-                    self._safe_cell(row, self.amount_credit_column_index))
-                debit = self._parse_amount(
-                    self._safe_cell(row, self.amount_debit_column_index))
+                credit = self._parse_amount(self._safe_cell(row, self.amount_credit_column_index))
+                debit = self._parse_amount(self._safe_cell(row, self.amount_debit_column_index))
                 amount = credit - debit
             if amount == Decimal("0"):
                 continue
-            lines.append({
-                "date": d,
-                "ref": str(ref).strip(),
-                "partner_hint": str(partner_hint).strip(),
-                "amount": amount,
-                "balance": balance,
-            })
+            lines.append(
+                {
+                    "date": d,
+                    "ref": str(ref).strip(),
+                    "partner_hint": str(partner_hint).strip(),
+                    "amount": amount,
+                    "balance": balance,
+                }
+            )
         return {
             "lines": lines,
             "errors": errors,

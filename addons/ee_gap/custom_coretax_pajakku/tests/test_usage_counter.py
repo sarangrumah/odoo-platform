@@ -12,10 +12,12 @@ class TestUsageCounter(PajakkuCommon):
     def test_get_current_creates_row_for_first_call(self):
         period = date.today().replace(day=1)
         # Clean slate
-        existing = self.Usage.search([
-            ("company_id", "=", self.config.company_id.id),
-            ("period", "=", period),
-        ])
+        existing = self.Usage.search(
+            [
+                ("company_id", "=", self.config.company_id.id),
+                ("period", "=", period),
+            ]
+        )
         existing.unlink()
         row = self.Usage._get_current(self.config.company_id)
         self.assertTrue(row.id)
@@ -39,8 +41,10 @@ class TestUsageCounter(PajakkuCommon):
     def test_one_row_per_company_per_month(self):
         self.Usage.increment("api_calls", company=self.config.company_id)
         self.Usage.increment("api_calls", company=self.config.company_id)
-        rows = self.Usage.search([
-            ("company_id", "=", self.config.company_id.id),
-            ("period", "=", date.today().replace(day=1)),
-        ])
+        rows = self.Usage.search(
+            [
+                ("company_id", "=", self.config.company_id.id),
+                ("period", "=", date.today().replace(day=1)),
+            ]
+        )
         self.assertEqual(len(rows), 1)

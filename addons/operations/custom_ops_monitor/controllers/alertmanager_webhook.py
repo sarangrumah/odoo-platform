@@ -10,6 +10,7 @@ secret lives in ``ir.config_parameter`` key
 Payload follows Alertmanager webhook v4 spec:
 https://prometheus.io/docs/alerting/latest/configuration/#webhook_config
 """
+
 from __future__ import annotations
 
 import json
@@ -20,6 +21,7 @@ from odoo.http import request
 
 try:
     from odoo.addons.custom_core.controllers.secure_endpoint import secure_endpoint
+
     _HAS_SECURE = True
 except ImportError:  # pragma: no cover
     _HAS_SECURE = False
@@ -27,13 +29,14 @@ except ImportError:  # pragma: no cover
     def secure_endpoint(scope):  # type: ignore
         def _wrap(func):
             return func
+
         return _wrap
+
 
 _logger = logging.getLogger(__name__)
 
 
 class AlertmanagerWebhookController(http.Controller):
-
     @http.route(
         "/api/ops/alert",
         type="http",
@@ -55,7 +58,8 @@ class AlertmanagerWebhookController(http.Controller):
 
         # Defensive validation: must be a dict with an "alerts" list.
         if not isinstance(payload, dict) or not isinstance(
-            payload.get("alerts"), list,
+            payload.get("alerts"),
+            list,
         ):
             return request.make_json_response(
                 {"ok": False, "error_code": "BAD_PAYLOAD"},

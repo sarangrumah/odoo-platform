@@ -19,8 +19,8 @@ import io
 import logging
 import os
 import shlex
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator
 
 try:
     import paramiko  # type: ignore
@@ -58,19 +58,19 @@ def resolve_ssh_key(ref: str) -> str:
     if not ref:
         raise SSHCredentialError("empty ssh_credential_ref")
     if ref.startswith("env://"):
-        var = ref[len("env://"):]
+        var = ref[len("env://") :]
         val = os.environ.get(var)
         if not val:
             raise SSHCredentialError(f"env var {var} not set")
         return val
     if ref.startswith("file://"):
-        path = ref[len("file://"):]
+        path = ref[len("file://") :]
         if path.startswith("/"):
             # file:///abs/path style
             path = "/" + path.lstrip("/")
         if not os.path.isfile(path):
             raise SSHCredentialError(f"key file not found: {path}")
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
     if ref.startswith("vault://"):
         return _resolve_vault_ref(ref)
@@ -88,8 +88,7 @@ def _resolve_vault_ref(ref: str) -> str:
     vault_addr = os.environ.get("VAULT_ADDR")
     if not vault_addr:
         log.warning(
-            "vault.skip: VAULT_ADDR not configured, skipping vault:// resolution "
-            "for ref=%s",
+            "vault.skip: VAULT_ADDR not configured, skipping vault:// resolution for ref=%s",
             ref,
         )
         raise SSHCredentialError(
@@ -98,15 +97,13 @@ def _resolve_vault_ref(ref: str) -> str:
         )
     vault_token = os.environ.get("VAULT_TOKEN")
     if not vault_token:
-        raise SSHCredentialError(
-            "VAULT_TOKEN not set — cannot authenticate to Vault"
-        )
+        raise SSHCredentialError("VAULT_TOKEN not set — cannot authenticate to Vault")
     try:
         import urllib.request  # local import: avoid runtime cost when unused
     except ImportError as e:  # pragma: no cover
         raise SSHCredentialError(f"urllib unavailable: {e}") from e
 
-    body = ref[len("vault://"):]
+    body = ref[len("vault://") :]
     # Allow optional ``#field`` suffix to pick a specific key from the secret.
     field = "private_key"
     if "#" in body:
@@ -116,15 +113,14 @@ def _resolve_vault_ref(ref: str) -> str:
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
             import json as _json
+
             payload = _json.loads(resp.read().decode("utf-8"))
     except Exception as e:  # noqa: BLE001
         raise SSHCredentialError(f"vault lookup failed: {e}") from e
     data = (payload.get("data") or {}).get("data") or payload.get("data") or {}
     val = data.get(field)
     if not val:
-        raise SSHCredentialError(
-            f"vault secret at {body} has no '{field}' key"
-        )
+        raise SSHCredentialError(f"vault secret at {body} has no '{field}' key")
     return val
 
 
@@ -139,13 +135,11 @@ class RemoteDockerExecutor:
 
     def __init__(self, target: VPSTarget):
         if paramiko is None:
-            raise RuntimeError(
-                "paramiko not installed — add 'paramiko' to tenant-orchestrator deps"
-            )
+            raise RuntimeError("paramiko not installed — add 'paramiko' to tenant-orchestrator deps")
         self.target = target
-        self._client: "paramiko.SSHClient | None" = None
+        self._client: paramiko.SSHClient | None = None
 
-    def __enter__(self) -> "RemoteDockerExecutor":
+    def __enter__(self) -> RemoteDockerExecutor:
         self.connect()
         return self
 

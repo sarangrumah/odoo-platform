@@ -83,13 +83,13 @@ class BrdDocument(models.Model):
     vertical_target = fields.Char(
         string="Vertical Target",
         help="Free-form code of the target vertical (e.g. retail, fnb, "
-             "healthcare). Kept as Char to avoid coupling to a fixed enum.",
+        "healthcare). Kept as Char to avoid coupling to a fixed enum.",
     )
     company_profile_json = fields.Text(
         string="Company Profile (JSON)",
         help='JSON: {"name": "...", "logo_url": "...", "npwp": "...", '
-             '"bank": {...}}. Captured during BRD intake for downstream tenant '
-             "provisioning.",
+        '"bank": {...}}. Captured during BRD intake for downstream tenant '
+        "provisioning.",
     )
 
     state = fields.Selection(
@@ -141,9 +141,7 @@ class BrdDocument(models.Model):
         help="Public share token for read-only access to the report.",
     )
 
-    owner_user_id = fields.Many2one(
-        "res.users", default=lambda self: self.env.user, tracking=True, string="Owner"
-    )
+    owner_user_id = fields.Many2one("res.users", default=lambda self: self.env.user, tracking=True, string="Owner")
 
     # Diagnostics — last raw AI response (truncated) + counts. Surfaced to UI
     # so BAs can see why an analyze yielded 0 recommendations.
@@ -270,13 +268,15 @@ class BrdDocument(models.Model):
         for rec in self:
             if rec.state == "draft":
                 raise UserError(_("Extract the BRD before running analysis."))
-            rec.write({
-                "state": "analyzing",
-                "last_ai_at": fields.Datetime.now(),
-                "last_ai_raw": False,
-                "last_ai_section_count": 0,
-                "last_ai_recommendation_count": 0,
-            })
+            rec.write(
+                {
+                    "state": "analyzing",
+                    "last_ai_at": fields.Datetime.now(),
+                    "last_ai_raw": False,
+                    "last_ai_section_count": 0,
+                    "last_ai_recommendation_count": 0,
+                }
+            )
             rec.message_post(body=_("BRD analyze dispatched to background worker."))
             # queue_job exposes ``with_delay`` on every recordset when the
             # module is installed. Detect by attribute presence so we don't
@@ -307,7 +307,8 @@ class BrdDocument(models.Model):
             # AI gateway unavailable / no API key / network down: degrade
             # gracefully so the UI does not show a 500 stack-trace during UAT.
             _logger.warning(
-                "BRD AI gateway unavailable, falling back to stub: %s", e,
+                "BRD AI gateway unavailable, falling back to stub: %s",
+                e,
             )
             self.write({"state": "analyzed"})
             self.message_post(
@@ -315,7 +316,8 @@ class BrdDocument(models.Model):
                     "AI analysis stub — configure "
                     "<code>ai_bridge.anthropic_api_key</code> in Settings to "
                     "enable real analysis. Underlying error: %s"
-                ) % e,
+                )
+                % e,
             )
 
     def action_request_review(self):

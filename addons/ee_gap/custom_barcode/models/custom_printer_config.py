@@ -10,29 +10,39 @@ _logger = logging.getLogger(__name__)
 
 class CustomPrinterConfig(models.Model):
     """Configured physical or virtual label printer."""
+
     _name = "custom.printer.config"
     _description = "Printer Configuration"
     _order = "name"
 
     name = fields.Char(required=True)
-    printer_type = fields.Selection([
-        ("zebra_network", "Zebra (network, raw 9100)"),
-        ("zebra_usb", "Zebra (USB via local agent)"),
-        ("escpos_network", "ESC/POS (network)"),
-        ("cups", "CUPS queue"),
-    ], default="zebra_network", required=True)
+    printer_type = fields.Selection(
+        [
+            ("zebra_network", "Zebra (network, raw 9100)"),
+            ("zebra_usb", "Zebra (USB via local agent)"),
+            ("escpos_network", "ESC/POS (network)"),
+            ("cups", "CUPS queue"),
+        ],
+        default="zebra_network",
+        required=True,
+    )
     host = fields.Char(help="Hostname or IP for network printers.")
     port = fields.Integer(default=9100)
     cups_queue = fields.Char(help="CUPS queue name when printer_type=cups.")
     label_template_id = fields.Many2one("custom.label.template")
-    status = fields.Selection([
-        ("active", "Active"),
-        ("disabled", "Disabled"),
-        ("error", "Error"),
-    ], default="active", required=True)
+    status = fields.Selection(
+        [
+            ("active", "Active"),
+            ("disabled", "Disabled"),
+            ("error", "Error"),
+        ],
+        default="active",
+        required=True,
+    )
     last_error = fields.Text(readonly=True)
     company_id = fields.Many2one(
-        "res.company", default=lambda s: s.env.company,
+        "res.company",
+        default=lambda s: s.env.company,
     )
 
     def send_raw(self, payload):
@@ -50,8 +60,7 @@ class CustomPrinterConfig(models.Model):
             return self._send_cups(payload)
         if self.printer_type == "zebra_usb":
             # Local agent (out of process). We can only stage to print queue.
-            raise UserError(_(
-                "USB printers require a local agent to consume the queue."))
+            raise UserError(_("USB printers require a local agent to consume the queue."))
         raise UserError(_("Unsupported printer type: %s") % self.printer_type)
 
     def _send_socket(self, payload):
@@ -61,15 +70,13 @@ class CustomPrinterConfig(models.Model):
         port = self.port or 9100
         try:
             with socket.create_connection((self.host, port), timeout=5.0) as sk:
-                sk.sendall(payload if isinstance(payload, (bytes, bytearray)) else
-                           payload.encode("utf-8"))
+                sk.sendall(payload if isinstance(payload, (bytes, bytearray)) else payload.encode("utf-8"))
             self.write({"status": "active", "last_error": False})
             return True
         except Exception as e:
             _logger.warning("Print send failed %s:%s -- %s", self.host, port, e)
             self.write({"status": "error", "last_error": str(e)})
-            raise UserError(_("Failed to send to %s:%s -- %s") % (
-                self.host, port, e))
+            raise UserError(_("Failed to send to %s:%s -- %s") % (self.host, port, e))
 
     def _send_cups(self, payload):
         self.ensure_one()
@@ -77,6 +84,5 @@ class CustomPrinterConfig(models.Model):
             raise UserError(_("Printer %s has no CUPS queue configured.") % self.name)
         # No-op stub. Production deployments typically use python-cups in a
         # local worker; we just record the staged payload size.
-        _logger.info("[cups stub] would print %d bytes to queue %s",
-                     len(payload), self.cups_queue)
+        _logger.info("[cups stub] would print %d bytes to queue %s", len(payload), self.cups_queue)
         return True

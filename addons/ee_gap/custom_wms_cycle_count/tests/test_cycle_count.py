@@ -14,38 +14,44 @@ class TestCycleCount(TransactionCase):
         super().setUpClass()
         cls.warehouse = cls.env.ref("stock.warehouse0")
         cls.stock_loc = cls.env.ref("stock.stock_location_stock")
-        cls.loc = cls.env["stock.location"].create({
-            "name": "BIN-CC",
-            "usage": "internal",
-            "location_id": cls.stock_loc.id,
-        })
-        cls.product = cls.env["product.product"].create({
-            "name": "CC Widget",
-            "type": "consu",
-            "is_storable": True,
-            "abc_class": "A",
-            "standard_price": 10.0,
-        })
+        cls.loc = cls.env["stock.location"].create(
+            {
+                "name": "BIN-CC",
+                "usage": "internal",
+                "location_id": cls.stock_loc.id,
+            }
+        )
+        cls.product = cls.env["product.product"].create(
+            {
+                "name": "CC Widget",
+                "type": "consu",
+                "is_storable": True,
+                "abc_class": "A",
+                "standard_price": 10.0,
+            }
+        )
         cls.env["stock.quant"]._update_available_quantity(cls.product, cls.loc, 20.0)
 
-        cls.plan = cls.env["custom.cycle.count.plan"].create({
-            "name": "Plan ABC",
-            "warehouse_id": cls.warehouse.id,
-            "frequency": "weekly",
-            "method": "abc_velocity",
-            "target_count_per_period": 5,
-        })
+        cls.plan = cls.env["custom.cycle.count.plan"].create(
+            {
+                "name": "Plan ABC",
+                "warehouse_id": cls.warehouse.id,
+                "frequency": "weekly",
+                "method": "abc_velocity",
+                "target_count_per_period": 5,
+            }
+        )
 
     def _start_session(self, method=None):
         if method:
             self.plan.method = method
-        wiz = self.env["custom.cycle.count.start.wizard"].create({
-            "plan_id": self.plan.id,
-        })
-        wiz.action_start()
-        return self.env["custom.cycle.count.session"].search(
-            [("plan_id", "=", self.plan.id)], limit=1, order="id desc"
+        wiz = self.env["custom.cycle.count.start.wizard"].create(
+            {
+                "plan_id": self.plan.id,
+            }
         )
+        wiz.action_start()
+        return self.env["custom.cycle.count.session"].search([("plan_id", "=", self.plan.id)], limit=1, order="id desc")
 
     def test_plan_generates_seed_lines(self):
         session = self._start_session()
@@ -55,9 +61,7 @@ class TestCycleCount(TransactionCase):
 
     def test_abc_velocity_seeding_prefers_a_class(self):
         session = self._start_session(method="abc_velocity")
-        a_products = session.line_ids.filtered(
-            lambda l: l.product_id.abc_class == "A"
-        )
+        a_products = session.line_ids.filtered(lambda l: l.product_id.abc_class == "A")
         self.assertTrue(a_products, "ABC velocity should pick at least one A-class product")
 
     def test_count_flow_computes_variance(self):
@@ -89,12 +93,14 @@ class TestCycleCount(TransactionCase):
 
     def test_new_item_flag_captures_name(self):
         session = self._start_session()
-        line = self.env["custom.cycle.count.line"].create({
-            "session_id": session.id,
-            "location_id": self.loc.id,
-            "is_new_item": True,
-            "new_item_product_temp_name": "MysteryBox-2099",
-            "counted_qty": 3.0,
-        })
+        line = self.env["custom.cycle.count.line"].create(
+            {
+                "session_id": session.id,
+                "location_id": self.loc.id,
+                "is_new_item": True,
+                "new_item_product_temp_name": "MysteryBox-2099",
+                "counted_qty": 3.0,
+            }
+        )
         self.assertTrue(line.is_new_item)
         self.assertEqual(line.new_item_product_temp_name, "MysteryBox-2099")

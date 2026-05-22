@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 from .prometheus_client import PrometheusClient, PrometheusError
 
@@ -18,10 +18,15 @@ class TenantHealth(models.Model):
     _rec_name = "tenant_id"
 
     tenant_id = fields.Many2one(
-        "tenant.registry", required=True, ondelete="cascade", index=True,
+        "tenant.registry",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     snapshot_at = fields.Datetime(
-        required=True, default=fields.Datetime.now, index=True,
+        required=True,
+        default=fields.Datetime.now,
+        index=True,
     )
     cpu_pct = fields.Float(default=0.0)
     memory_pct = fields.Float(default=0.0)
@@ -40,18 +45,24 @@ class TenantHealth(models.Model):
         default="ok",
     )
     health_score = fields.Integer(
-        compute="_compute_health", store=True,
+        compute="_compute_health",
+        store=True,
         help="0-100, higher is better.",
     )
     status = fields.Selection(
         [("green", "Green"), ("yellow", "Yellow"), ("red", "Red")],
-        compute="_compute_health", store=True, index=True,
+        compute="_compute_health",
+        store=True,
+        index=True,
     )
 
     # ------------------------------------------------------------------
 
     @api.depends(
-        "cpu_pct", "memory_pct", "disk_pct", "error_rate_pct",
+        "cpu_pct",
+        "memory_pct",
+        "disk_pct",
+        "error_rate_pct",
         "backup_status",
     )
     def _compute_health(self):
@@ -121,8 +132,7 @@ class TenantHealth(models.Model):
         if not last_backup_at:
             return "failed"
         age = datetime.now() - (
-            last_backup_at if isinstance(last_backup_at, datetime)
-            else datetime.fromisoformat(str(last_backup_at))
+            last_backup_at if isinstance(last_backup_at, datetime) else datetime.fromisoformat(str(last_backup_at))
         )
         if age > timedelta(hours=36):
             return "failed"
@@ -134,17 +144,17 @@ class TenantHealth(models.Model):
         """Run a fixed set of PromQL queries that return values labelled by
         ``db`` (tenant db name)."""
         queries = {
-            "cpu_pct": 'avg by (db) (rate(odoo_cpu_seconds_total[5m])) * 100',
-            "memory_pct": 'avg by (db) (odoo_memory_usage_ratio) * 100',
-            "memory_mb_used": 'avg by (db) (odoo_memory_used_bytes / 1024 / 1024)',
-            "memory_mb_total": 'avg by (db) (odoo_memory_total_bytes / 1024 / 1024)',
+            "cpu_pct": "avg by (db) (rate(odoo_cpu_seconds_total[5m])) * 100",
+            "memory_pct": "avg by (db) (odoo_memory_usage_ratio) * 100",
+            "memory_mb_used": "avg by (db) (odoo_memory_used_bytes / 1024 / 1024)",
+            "memory_mb_total": "avg by (db) (odoo_memory_total_bytes / 1024 / 1024)",
             "disk_pct": 'avg by (db) (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100',
             "disk_gb_used": 'avg by (db) ((node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_avail_bytes{mountpoint="/"}) / 1024 / 1024 / 1024)',
             "disk_gb_total": 'avg by (db) (node_filesystem_size_bytes{mountpoint="/"} / 1024 / 1024 / 1024)',
-            "request_rate_per_min": 'sum by (db) (rate(odoo_http_requests_total[1m])) * 60',
+            "request_rate_per_min": "sum by (db) (rate(odoo_http_requests_total[1m])) * 60",
             "error_rate_pct": 'sum by (db) (rate(odoo_http_requests_total{status=~"5.."}[5m])) / sum by (db) (rate(odoo_http_requests_total[5m])) * 100',
-            "db_size_mb": 'avg by (db) (pg_database_size_bytes / 1024 / 1024)',
-            "redis_hit_rate_pct": 'avg by (db) (redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total)) * 100',
+            "db_size_mb": "avg by (db) (pg_database_size_bytes / 1024 / 1024)",
+            "redis_hit_rate_pct": "avg by (db) (redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total)) * 100",
         }
         out: dict[str, dict] = {}
         for key, promql in queries.items():

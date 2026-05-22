@@ -9,6 +9,7 @@ The mixin itself is a plain AbstractModel; subclasses inherit it and
 override ``_book_journal_filter``. None of these are SQL views, so
 ``_auto`` stays True (default for AbstractModel).
 """
+
 from odoo import models
 
 
@@ -42,25 +43,29 @@ class CustomReportBookMixin(models.AbstractModel):
         lines = []
         total_debit = total_credit = 0.0
         for ml in move_lines:
-            lines.append({
-                "type": "entry",
-                "date": ml.date,
-                "journal_code": ml.journal_id.code,
-                "move_name": ml.move_id.name or ml.move_id.display_name,
-                "account_code": ml.account_id.code,
-                "partner": ml.partner_id.display_name or "",
-                "label": ml.name or "",
-                "debit": ml.debit,
-                "credit": ml.credit,
-            })
+            lines.append(
+                {
+                    "type": "entry",
+                    "date": ml.date,
+                    "journal_code": ml.journal_id.code,
+                    "move_name": ml.move_id.name or ml.move_id.display_name,
+                    "account_code": ml.account_id.code,
+                    "partner": ml.partner_id.display_name or "",
+                    "label": ml.name or "",
+                    "debit": ml.debit,
+                    "credit": ml.credit,
+                }
+            )
             total_debit += ml.debit
             total_credit += ml.credit
-        lines.append({
-            "type": "grand_total",
-            "label": "Grand Total",
-            "debit": total_debit,
-            "credit": total_credit,
-        })
+        lines.append(
+            {
+                "type": "grand_total",
+                "label": "Grand Total",
+                "debit": total_debit,
+                "credit": total_credit,
+            }
+        )
         return lines
 
 
@@ -117,21 +122,17 @@ class CustomReportJournalAudit(models.AbstractModel):
         moves = AccountMove.search(domain, order="date, journal_id, id")
         lines = []
         for move in moves:
-            lines.append({
-                "type": "move",
-                "date": move.date,
-                "journal_code": move.journal_id.code,
-                "move_name": move.name or move.display_name,
-                "reference": move.ref or "",
-                "state": move.state,
-                "posted_by": (
-                    move.create_uid.display_name
-                    if move.create_uid else ""
-                ),
-                "posted_on": (
-                    move.create_date.isoformat()
-                    if move.create_date else ""
-                ),
-                "amount_total": move.amount_total_signed,
-            })
+            lines.append(
+                {
+                    "type": "move",
+                    "date": move.date,
+                    "journal_code": move.journal_id.code,
+                    "move_name": move.name or move.display_name,
+                    "reference": move.ref or "",
+                    "state": move.state,
+                    "posted_by": (move.create_uid.display_name if move.create_uid else ""),
+                    "posted_on": (move.create_date.isoformat() if move.create_date else ""),
+                    "amount_total": move.amount_total_signed,
+                }
+            )
         return lines

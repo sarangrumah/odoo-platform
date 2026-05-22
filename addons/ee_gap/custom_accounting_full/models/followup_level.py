@@ -21,11 +21,14 @@ class FollowupLevel(models.Model):
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
     company_id = fields.Many2one(
-        "res.company", required=True,
+        "res.company",
+        required=True,
         default=lambda self: self.env.company,
     )
     delay_days = fields.Integer(
-        string="Days Past Due", required=True, default=15,
+        string="Days Past Due",
+        required=True,
+        default=15,
     )
     send_email = fields.Boolean(default=True)
     email_template_id = fields.Many2one(
@@ -38,17 +41,20 @@ class FollowupLevel(models.Model):
             ("escalation", "Escalation"),
             ("legal", "Legal / Pre-litigation"),
         ],
-        default="reminder", required=True,
+        default="reminder",
+        required=True,
     )
 
     @api.constrains("delay_days")
     def _check_delay_days(self):
         for level in self:
             if level.delay_days < 0:
-                raise ValidationError(_(
-                    "Level '%(n)s' delay must be zero or positive.",
-                    n=level.name,
-                ))
+                raise ValidationError(
+                    _(
+                        "Level '%(n)s' delay must be zero or positive.",
+                        n=level.name,
+                    )
+                )
 
     @api.model
     def _cron_run_followup(self):
@@ -91,12 +97,14 @@ class FollowupStatByPartner(models.Model):
     overdue_amount = fields.Float(readonly=True)
     open_invoice_count = fields.Integer(readonly=True)
     custom_followup_level_id = fields.Many2one(
-        "custom.followup.level", readonly=True,
+        "custom.followup.level",
+        readonly=True,
     )
     days_overdue = fields.Integer(readonly=True)
 
     def init(self):
         from odoo import tools
+
         # Skip view creation if the back-ref column on res_partner is not
         # yet materialised (happens on first install of this module, when
         # the SQL view init may run before the inherited field is created).
@@ -156,10 +164,12 @@ class ResPartnerFollowup(models.Model):
     custom_followup_level_id = fields.Many2one(
         "custom.followup.level",
         string="Current Follow-up Level",
-        copy=False, tracking=True,
+        copy=False,
+        tracking=True,
     )
     custom_followup_last_sent = fields.Datetime(
-        readonly=True, copy=False,
+        readonly=True,
+        copy=False,
     )
     custom_followup_next_date = fields.Date(
         copy=False,
@@ -173,13 +183,15 @@ class ResPartnerFollowup(models.Model):
         AML = self.env["account.move.line"]
         today = fields.Date.context_today(self)
         for partner in self:
-            lines = AML.search([
-                ("partner_id", "=", partner.id),
-                ("account_id.account_type", "=", "asset_receivable"),
-                ("parent_state", "=", "posted"),
-                ("reconciled", "=", False),
-                ("date_maturity", "<", today),
-            ])
+            lines = AML.search(
+                [
+                    ("partner_id", "=", partner.id),
+                    ("account_id.account_type", "=", "asset_receivable"),
+                    ("parent_state", "=", "posted"),
+                    ("reconciled", "=", False),
+                    ("date_maturity", "<", today),
+                ]
+            )
             max_days = 0
             for line in lines:
                 due = line.date_maturity or line.date
@@ -193,23 +205,20 @@ class ResPartnerFollowup(models.Model):
     def _custom_advance_followup_level(self):
         Level = self.env["custom.followup.level"]
         for partner in self:
-            company_id = (
-                partner.company_id.id
-                if partner.company_id else self.env.company.id
+            company_id = partner.company_id.id if partner.company_id else self.env.company.id
+            candidate = Level.search(
+                [
+                    ("active", "=", True),
+                    ("company_id", "=", company_id),
+                    ("delay_days", "<=", partner.custom_max_overdue_days),
+                ],
+                order="delay_days desc",
+                limit=1,
             )
-            candidate = Level.search([
-                ("active", "=", True),
-                ("company_id", "=", company_id),
-                ("delay_days", "<=", partner.custom_max_overdue_days),
-            ], order="delay_days desc", limit=1)
             if not candidate:
                 continue
             current = partner.custom_followup_level_id
-            if (
-                not current
-                or candidate.sequence > current.sequence
-                or candidate.delay_days > (current.delay_days or 0)
-            ):
+            if not current or candidate.sequence > current.sequence or candidate.delay_days > (current.delay_days or 0):
                 partner.custom_followup_level_id = candidate
 
     def _custom_send_followup_email_if_due(self):
@@ -218,14 +227,13 @@ class ResPartnerFollowup(models.Model):
             level = partner.custom_followup_level_id
             if not level or not level.send_email or not level.email_template_id:
                 continue
-            if (
-                partner.custom_followup_next_date
-                and partner.custom_followup_next_date > today
-            ):
+            if partner.custom_followup_next_date and partner.custom_followup_next_date > today:
                 continue
             try:
                 level.email_template_id.send_mail(
-                    partner.id, force_send=False, raise_exception=False,
+                    partner.id,
+                    force_send=False,
+                    raise_exception=False,
                 )
             except Exception as exc:  # noqa: BLE001
                 _logger.warning("followup email failed for %s: %s", partner.id, exc)

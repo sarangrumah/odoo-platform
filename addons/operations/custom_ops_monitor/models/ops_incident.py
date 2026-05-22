@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -17,34 +17,37 @@ class OpsIncident(models.Model):
 
     name = fields.Char(compute="_compute_name", store=True)
     tenant_id = fields.Many2one(
-        "tenant.registry", ondelete="set null", index=True, tracking=True,
+        "tenant.registry",
+        ondelete="set null",
+        index=True,
+        tracking=True,
     )
     alert_name = fields.Char(required=True, index=True, tracking=True)
     severity = fields.Selection(
-        [("info", "Info"), ("warning", "Warning"),
-         ("critical", "Critical"), ("page", "Page")],
-        default="warning", required=True, index=True, tracking=True,
+        [("info", "Info"), ("warning", "Warning"), ("critical", "Critical"), ("page", "Page")],
+        default="warning",
+        required=True,
+        index=True,
+        tracking=True,
     )
-    fired_at = fields.Datetime(required=True, default=fields.Datetime.now,
-                               index=True, tracking=True)
+    fired_at = fields.Datetime(required=True, default=fields.Datetime.now, index=True, tracking=True)
     resolved_at = fields.Datetime(tracking=True)
     summary = fields.Char(tracking=True)
     description = fields.Text()
     runbook_url = fields.Char()
     state = fields.Selection(
-        [("firing", "Firing"),
-         ("acknowledged", "Acknowledged"),
-         ("resolved", "Resolved")],
-        default="firing", required=True, index=True, tracking=True,
+        [("firing", "Firing"), ("acknowledged", "Acknowledged"), ("resolved", "Resolved")],
+        default="firing",
+        required=True,
+        index=True,
+        tracking=True,
     )
     assigned_user_id = fields.Many2one("res.users", tracking=True)
-    fingerprint = fields.Char(index=True,
-                              help="Alertmanager fingerprint, for upsert dedup.")
+    fingerprint = fields.Char(index=True, help="Alertmanager fingerprint, for upsert dedup.")
     raw_payload = fields.Text()
 
     _sql_constraints = [
-        ("fingerprint_uniq", "unique(fingerprint)",
-         "Alertmanager fingerprint must be unique."),
+        ("fingerprint_uniq", "unique(fingerprint)", "Alertmanager fingerprint must be unique."),
     ]
 
     @api.depends("alert_name", "tenant_id", "fired_at")
@@ -81,9 +84,16 @@ class OpsIncident(models.Model):
             severity = "warning"
         status = alert.get("status") or "firing"
         tenant_slug = labels.get("tenant") or labels.get("db")
-        tenant = self.env["tenant.registry"].sudo().search(
-            [("slug", "=", tenant_slug)], limit=1,
-        ) if tenant_slug else self.env["tenant.registry"].browse()
+        tenant = (
+            self.env["tenant.registry"]
+            .sudo()
+            .search(
+                [("slug", "=", tenant_slug)],
+                limit=1,
+            )
+            if tenant_slug
+            else self.env["tenant.registry"].browse()
+        )
 
         existing = self.sudo().search([("fingerprint", "=", fp)], limit=1) if fp else self.browse()
         vals = {
@@ -126,7 +136,8 @@ class OpsIncident(models.Model):
     def _schedule_ack_activity(self) -> None:
         self.ensure_one()
         ops_group = self.env.ref(
-            "custom_ops_monitor.group_ops_engineer", raise_if_not_found=False,
+            "custom_ops_monitor.group_ops_engineer",
+            raise_if_not_found=False,
         )
         if not ops_group or not ops_group.users:
             return

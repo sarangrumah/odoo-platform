@@ -4,6 +4,7 @@
 Kept SQL-only (no ORM) so it survives across registry rebuilds and stays
 out of the way of the standard ``write``/``create`` paths.
 """
+
 import logging
 
 _logger = logging.getLogger(__name__)

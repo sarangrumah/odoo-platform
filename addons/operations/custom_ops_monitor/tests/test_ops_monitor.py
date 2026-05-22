@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import json
 from unittest.mock import patch
 
 from odoo.tests import HttpCase, TransactionCase, tagged
@@ -17,17 +16,18 @@ def _fake_prom_result(label_db: str, value: float) -> list[dict]:
 
 @tagged("post_install", "-at_install")
 class TestOpsMonitorCron(TransactionCase):
-
     def setUp(self):
         super().setUp()
         self.Tenant = self.env["tenant.registry"]
         self.Health = self.env["custom.ops.tenant.health"]
-        self.tenant = self.Tenant.create({
-            "slug": "test-tenant-1",
-            "display_name": "Test Tenant",
-            "db_name": "tenant_test1",
-            "state": "active",
-        })
+        self.tenant = self.Tenant.create(
+            {
+                "slug": "test-tenant-1",
+                "display_name": "Test Tenant",
+                "db_name": "tenant_test1",
+                "state": "active",
+            }
+        )
 
     def test_cron_collect_creates_snapshot(self):
         def _fake_query(self_, promql):  # noqa: D401
@@ -61,7 +61,8 @@ class TestOpsMonitorCron(TransactionCase):
         self.assertEqual(after, before + 1)
         snap = self.Health.search(
             [("tenant_id", "=", self.tenant.id)],
-            order="snapshot_at desc", limit=1,
+            order="snapshot_at desc",
+            limit=1,
         )
         self.assertEqual(snap.cpu_pct, 42.0)
         self.assertEqual(snap.memory_pct, 71.0)
@@ -73,7 +74,7 @@ class TestOpsMonitorCron(TransactionCase):
         Incident = self.env["custom.ops.incident"]
         payload = {
             "version": "4",
-            "groupKey": "{}/{alertname=\"HighCPU\"}",
+            "groupKey": '{}/{alertname="HighCPU"}',
             "status": "firing",
             "alerts": [
                 {
@@ -114,7 +115,6 @@ class TestOpsMonitorCron(TransactionCase):
 
 @tagged("post_install", "-at_install")
 class TestAlertmanagerWebhook(HttpCase):
-
     def test_webhook_rejects_bad_json(self):
         # secure_endpoint will reject without HMAC; we still check at least
         # that the route exists and returns a 4xx (not a 404).

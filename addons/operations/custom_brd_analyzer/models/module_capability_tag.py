@@ -21,7 +21,7 @@ class CustomModuleCapabilityTag(models.Model):
         required=True,
         index=True,
         help="Stable machine-readable identifier (e.g. 'rental'). "
-             "This is what the AI will emit; do not rename casually.",
+        "This is what the AI will emit; do not rename casually.",
     )
     description = fields.Text()
     color = fields.Integer(default=0)

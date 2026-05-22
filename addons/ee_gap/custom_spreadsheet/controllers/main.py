@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Public read-only share endpoint for spreadsheet workbooks."""
+
 import json
 import logging
 
@@ -12,7 +13,6 @@ _logger = logging.getLogger(__name__)
 
 
 class CustomSpreadsheetShareController(http.Controller):
-
     @http.route(
         ["/custom_spreadsheet/share/<string:token>"],
         type="http",
@@ -24,8 +24,13 @@ class CustomSpreadsheetShareController(http.Controller):
     def share_render(self, token, **kw):
         if not token:
             return request.not_found()
-        wb = request.env["custom.spreadsheet.workbook"].sudo().search(
-            [("share_token", "=", token)], limit=1,
+        wb = (
+            request.env["custom.spreadsheet.workbook"]
+            .sudo()
+            .search(
+                [("share_token", "=", token)],
+                limit=1,
+            )
         )
         if not wb:
             return request.not_found()
@@ -61,13 +66,11 @@ class CustomSpreadsheetShareController(http.Controller):
                         if val is None:
                             val = ""
                         cells_html.append(
-                            "<td style='border:1px solid #ccc;padding:4px 8px;'>%s</td>"
-                            % escape(str(val))
+                            "<td style='border:1px solid #ccc;padding:4px 8px;'>%s</td>" % escape(str(val))
                         )
                     rows_html.append("<tr>%s</tr>" % "".join(cells_html))
             table = (
-                "<h3>%s</h3><table style='border-collapse:collapse;"
-                "font-family:sans-serif;font-size:13px;'>%s</table>"
+                "<h3>%s</h3><table style='border-collapse:collapse;font-family:sans-serif;font-size:13px;'>%s</table>"
             ) % (escape(name), "".join(rows_html) or "<tr><td><i>(empty)</i></td></tr>")
             sheets_html.append(table)
 

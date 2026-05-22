@@ -13,6 +13,7 @@ _logger = logging.getLogger(__name__)
 
 try:
     from croniter import croniter  # type: ignore
+
     _HAS_CRONITER = True
 except ImportError:  # pragma: no cover
     croniter = None  # type: ignore
@@ -45,8 +46,8 @@ class TenantBackup(models.Model):
     expires_at = fields.Datetime()
 
     _master_id_uniq = models.Constraint(
-        'unique(master_id)',
-        'Master backup id must be unique in mirror.',
+        "unique(master_id)",
+        "Master backup id must be unique in mirror.",
     )
 
     @api.depends("size_bytes")
@@ -67,9 +68,15 @@ class TenantBackup(models.Model):
 
     @api.model
     def _cron_sync_all(self) -> None:
-        for tenant in self.env["tenant.registry"].sudo().search([
-            ("state", "in", ("active", "suspended")),
-        ]):
+        for tenant in (
+            self.env["tenant.registry"]
+            .sudo()
+            .search(
+                [
+                    ("state", "in", ("active", "suspended")),
+                ]
+            )
+        ):
             self._cron_sync_for(tenant.slug)
 
     @api.model
@@ -126,10 +133,16 @@ class TenantBackup(models.Model):
         ``last_scheduled_backup_at`` and trigger the orchestrator if due.
         """
         now = fields.Datetime.now()
-        tenants = self.env["tenant.registry"].sudo().search([
-            ("state", "=", "active"),
-            ("backup_schedule", "!=", False),
-        ])
+        tenants = (
+            self.env["tenant.registry"]
+            .sudo()
+            .search(
+                [
+                    ("state", "=", "active"),
+                    ("backup_schedule", "!=", False),
+                ]
+            )
+        )
         client = self.env["custom.super.admin.orchestrator.client"].sudo()
         for tenant in tenants:
             schedule = (tenant.backup_schedule or "").strip()
@@ -141,7 +154,9 @@ class TenantBackup(models.Model):
             except Exception as e:  # bad cron expression — log on tenant and skip
                 _logger.warning(
                     "tenant.backup.cron_parse_failed slug=%s expr=%r err=%s",
-                    tenant.slug, schedule, e,
+                    tenant.slug,
+                    schedule,
+                    e,
                 )
                 tenant.message_post(
                     body=_("Invalid backup_schedule cron expression %r: %s") % (schedule, e),
@@ -155,7 +170,8 @@ class TenantBackup(models.Model):
                 self._cron_sync_for(tenant.slug)
                 _logger.info(
                     "tenant.backup.scheduled.ok slug=%s key=%s",
-                    tenant.slug, (result or {}).get("s3_key"),
+                    tenant.slug,
+                    (result or {}).get("s3_key"),
                 )
             except Exception as e:
                 _logger.exception("tenant.backup.scheduled.failed slug=%s", tenant.slug)
@@ -169,10 +185,16 @@ class TenantBackup(models.Model):
     @api.model
     def _cron_enforce_retention(self) -> None:
         """Ask the orchestrator to prune backups older than retention_days per tenant."""
-        tenants = self.env["tenant.registry"].sudo().search([
-            ("state", "in", ("active", "suspended")),
-            ("backup_retention_days", ">", 0),
-        ])
+        tenants = (
+            self.env["tenant.registry"]
+            .sudo()
+            .search(
+                [
+                    ("state", "in", ("active", "suspended")),
+                    ("backup_retention_days", ">", 0),
+                ]
+            )
+        )
         client = self.env["custom.super.admin.orchestrator.client"].sudo()
         for tenant in tenants:
             try:
@@ -180,7 +202,9 @@ class TenantBackup(models.Model):
                 self._cron_sync_for(tenant.slug)
             except Exception as e:
                 _logger.warning(
-                    "tenant.backup.retention.failed slug=%s err=%s", tenant.slug, e,
+                    "tenant.backup.retention.failed slug=%s err=%s",
+                    tenant.slug,
+                    e,
                 )
                 try:
                     tenant.message_post(

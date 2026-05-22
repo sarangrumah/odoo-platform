@@ -88,12 +88,11 @@ class BrdRecommendation(models.Model):
     cross_vertical_impact_json = fields.Text(
         string="Cross-Vertical Impact (JSON)",
         help='JSON map of {"module_name": ["vertical_a", "vertical_b"]} describing '
-             "which verticals consume each affected module.",
+        "which verticals consume each affected module.",
     )
     breaking_change = fields.Boolean(
         default=False,
-        help="True if this recommendation would break backward compatibility of "
-             "an existing hub module API/schema.",
+        help="True if this recommendation would break backward compatibility of an existing hub module API/schema.",
     )
     compat_strategy = fields.Selection(
         [
@@ -149,6 +148,7 @@ class BrdRecommendation(models.Model):
     @api.depends("breaking_change", "cross_vertical_impact_json")
     def _compute_impact_severity(self):
         import json as _json
+
         has_m2m = "affects_existing_module_ids" in self._fields
         for rec in self:
             verticals: set[str] = set()
@@ -187,7 +187,9 @@ class BrdRecommendation(models.Model):
     def _check_name_format(self):
         for rec in self:
             if rec.name and not rec.name.replace("_", "").isalnum():
-                raise UserError(_("Recommendation name must be snake_case (alphanumerics and underscore only): %s") % rec.name)
+                raise UserError(
+                    _("Recommendation name must be snake_case (alphanumerics and underscore only): %s") % rec.name
+                )
 
     # ------------------------------------------------------------------
     # State transitions

@@ -8,7 +8,6 @@ from .common import PayrollIDCommon
 
 
 class TestPPh21Brackets(PayrollIDCommon):
-
     def test_zero_income(self):
         self.assertEqual(_compute_pph21(0), 0.0)
 

@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -44,8 +43,8 @@ class PdpRetentionPolicy(models.Model):
     display_name = fields.Char(compute="_compute_display_name", store=True)
 
     _policy_unique = models.Constraint(
-        'unique(model_id, classification_id)',
-        'Only one policy per model+classification.',
+        "unique(model_id, classification_id)",
+        "Only one policy per model+classification.",
     )
 
     @api.depends("model_id", "classification_id")
@@ -148,10 +147,12 @@ class PdpRetentionPolicy(models.Model):
         """Overwrite PII fields of `recs` with hash placeholders. Does not unlink."""
         Model = recs._name
         Field = self.env["ir.model.fields"].sudo()
-        pii_fields = Field.search([
-            ("model", "=", Model),
-            ("x_pdp_classification_id", "=", self.classification_id.id),
-        ])
+        pii_fields = Field.search(
+            [
+                ("model", "=", Model),
+                ("x_pdp_classification_id", "=", self.classification_id.id),
+            ]
+        )
         if not pii_fields:
             return 0
         affected = 0

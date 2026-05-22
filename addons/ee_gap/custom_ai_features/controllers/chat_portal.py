@@ -6,7 +6,6 @@ from odoo.http import request
 
 
 class AiChatPortal(http.Controller):
-
     @http.route("/ai/chat", type="http", auth="user", website=True)
     def chat(self):
         session = request.env["ai.nlq.session"].sudo().open_or_create_for_user()
@@ -17,8 +16,7 @@ class AiChatPortal(http.Controller):
             {"session": session, "messages": messages},
         )
 
-    @http.route("/ai/chat/ask", type="http", auth="user", website=True,
-                methods=["POST"], csrf=True)
+    @http.route("/ai/chat/ask", type="http", auth="user", website=True, methods=["POST"], csrf=True)
     def ask(self, question: str = "", **post):
         question = (question or "").strip()
         if not question:

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class ResCompany(models.Model):
@@ -13,7 +13,7 @@ class ResCompany(models.Model):
         string="Intercompany Mirror Enabled",
         default=True,
         help="Globally enable / disable automatic intercompany mirroring for this "
-             "company. Useful as a kill-switch during migration.",
+        "company. Useful as a kill-switch during migration.",
     )
 
     @api.model
@@ -23,10 +23,12 @@ class ResCompany(models.Model):
             return self.browse()
         # All companies where there's a rule from/to current company
         Rule = self.env["account.intercompany.rule"].sudo()
-        rules = Rule.search([
-            ("active", "=", True),
-            "|",
-            ("company_from_id", "=", self.env.company.id),
-            ("company_to_id", "=", self.env.company.id),
-        ])
+        rules = Rule.search(
+            [
+                ("active", "=", True),
+                "|",
+                ("company_from_id", "=", self.env.company.id),
+                ("company_to_id", "=", self.env.company.id),
+            ]
+        )
         return (rules.mapped("company_from_id") | rules.mapped("company_to_id")) - self.env.company
