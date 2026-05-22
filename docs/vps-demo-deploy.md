@@ -49,7 +49,7 @@ ufw --force enable
 ## 2. Clone repo & siapkan `.env`
 
 ```bash
-git clone <repo-url> /opt/odoo-platform
+git clone https://github.com/sarangrumah/odoo-platform /opt/odoo-platform
 cd /opt/odoo-platform
 git checkout <tag-atau-branch>     # mis. v0.1.0-demo
 
@@ -62,16 +62,28 @@ Yang **wajib** diubah di `.env` (entrypoint Odoo fail-fast pada substring `chang
 ```ini
 # Secrets (generate semua, jangan dipakai apa adanya)
 POSTGRES_PASSWORD=<openssl rand -base64 24>
+sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -base64 24)|" .env
 ODOO_ADMIN_PASSWD=<openssl rand -base64 24>
+sed -i "s|^ODOO_ADMIN_PASSWD=.*|ODOO_ADMIN_PASSWD=$(openssl rand -base64 24)|" .env
 REDIS_PASSWORD=<openssl rand -base64 24>
+sed -i "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 24)|" .env
 GRAFANA_ADMIN_PASSWORD=<openssl rand -base64 16>
+sed -i "s|^GRAFANA_ADMIN_PASSWORD=.*|GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 16)|" .env
 PGADMIN_PASSWORD=<openssl rand -base64 16>
+sed -i "s|^PGADMIN_PASSWORD=.*|PGADMIN_PASSWORD=$(openssl rand -base64 16)|" .env
 GATEWAY_SHARED_SECRET=<openssl rand -hex 32>
+sed -i "s|^GATEWAY_SHARED_SECRET=.*|GATEWAY_SHARED_SECRET=$(openssl rand -hex 32)|" .env
 CORETAX_SERTEL_MASTER_KEY=<python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())">
+sed -i "s|^CORETAX_SERTEL_MASTER_KEY=.*|CORETAX_SERTEL_MASTER_KEY=$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')|" .env
+
 ORCHESTRATOR_SHARED_SECRET=<openssl rand -hex 32>
+sed -i "s|^ORCHESTRATOR_SHARED_SECRET=.*|ORCHESTRATOR_SHARED_SECRET=$(openssl rand -hex 32)|" .env
 PG_ORCHESTRATOR_PASSWORD=<openssl rand -base64 24>
+sed -i "s|^PG_ORCHESTRATOR_PASSWORD=.*|PG_ORCHESTRATOR_PASSWORD=$(openssl rand -base64 24)|" .env
 MASTER_WRAPPING_KEY=<python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())">
+sed -i "s|^MASTER_WRAPPING_KEY=.*|MASTER_WRAPPING_KEY=$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')|" .env
 MINIO_ROOT_PASSWORD=<openssl rand -base64 16>
+sed -i "s|^MINIO_ROOT_PASSWORD=.*|MINIO_ROOT_PASSWORD=$(openssl rand -base64 16)|" .env
 
 # Runtime: prod
 WORKERS=4
@@ -99,12 +111,15 @@ profile-gated, jadi nggak akan boot tanpa `--profile s3-backup`.
 # Buat folder data (di-bind mount oleh compose)
 mkdir -p data/{backups,odoo-filestore,nginx-cache,caddy/data,caddy/config}
 
+# Odoo container jalan sebagai uid 101 (user 'odoo' di base image).
+# Bind-mount filestore harus owned by uid 101 atau Odoo gagal write sessions/.
+chown -R 101:101 data/odoo-filestore
+
 # Start prod + TLS (Caddy ACME di depan nginx)
 make up-tls
 
 # Cek health
-docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-               -f docker-compose.tls-acme.yml ps
+docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls-acme.yml ps
 ```
 
 Tunggu sampai `nginx` dan `caddy` healthy (~30–60 detik), lalu `odoo` healthy
