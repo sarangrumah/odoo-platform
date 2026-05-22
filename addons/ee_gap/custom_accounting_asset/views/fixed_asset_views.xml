@@ -97,7 +97,7 @@
                     <notebook>
                         <page string="Depreciation Schedule">
                             <field name="depreciation_line_ids">
-                                <list editable="false" decoration-success="posted">
+                                <list decoration-success="posted">
                                     <field name="sequence"/>
                                     <field name="date"/>
                                     <field name="amount"/>

@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_ai_features
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.1.1
 ---
 
 # custom_ai_features
@@ -14,7 +14,7 @@ Surfaces the platform's ai-gateway capabilities (provided by `custom_ai_bridge`'
 Four feature surfaces are bundled: (1) per-record "Ask AI…" server actions bound to 9 key business models that open `custom.ai.recommend.wizard`; (2) nightly anomaly scan cron writing `ai.anomaly.finding` rows for triage; (3) `/ai/chat` internal portal with `ai.nlq.session` / `ai.nlq.message` history and read-only NLQ execution; (4) `document.document` create-hook that auto-suggests `pdp.classification` + tags from filename/content excerpt.
 
 ## Business Flow
-- **Ask AI cog menu:** XML data (`ask_ai_actions_data.xml`) declares one `ir.actions.server` per binding model (`account.move`, `purchase.order`, `sale.order`, `res.partner`, `helpdesk.ticket`, `hr.payslip`, `custom.coretax.transaction`, `field.service.order`, `document.document`). Each action context-launches `custom.ai.recommend.wizard` with `default_model_name` + `default_res_id`.
+- **Ask AI cog menu:** XML data (`ask_ai_actions_data.xml`) declares one `ir.actions.server` per binding model (`account.move`, `purchase.order`, `sale.order`, `res.partner`, `helpdesk.ticket`, `hr.payslip`, `custom.coretax.transaction`, `fsm.work.order`, `document.document`). Each action context-launches `custom.ai.recommend.wizard` with `default_model_name` + `default_res_id`.
 - **Anomaly scan cron:** `ai.anomaly.scan._cron_run()` creates a scan row, then iterates the `SCANNERS` registry (one config dict per model). Each `_scan_model(cfg)` pulls recent records, computes a metric history list, calls `custom.ai._detect_anomaly(...)` on the gateway, and if `is_anomaly=True && score>=0.5` creates an `ai.anomaly.finding` row (state `new`, severity from gateway).
 - **Finding triage:** Reviewer opens an `ai.anomaly.finding` (`new`→`triaged`→`resolved`, or `dismissed`). `action_open_source()` opens the underlying record via `res_model`/`res_id`. Each transition writes a `pdp.audited.mixin` audit row.
 - **NLQ chat:** User hits `/ai/chat`, controller calls `ai.nlq.session.open_or_create_for_user()` (one rolling session per user). On POST the controller calls `session.with_user(env.user).ask(question)`; `ask()` posts the user message, calls `custom.ai._nlq(question, schema_hint, locale, user_can_view_pii)`, then `_execute_plan(plan)` runs `Model.search_read(domain, fields, limit=min(plan.limit,100))` strictly read-only, whitelisted against `ALLOWED_SCHEMA`, with PII fields stripped when user lacks `custom_pdp_masking.group_view_pii`.
@@ -67,7 +67,8 @@ Four feature surfaces are bundled: (1) per-record "Ask AI…" server actions bou
 - **Anomaly scan ignores company / multi-tenant scoping** at the registry level: the scan record gets `company_id=env.company`, but `_scan_model` uses `Model.sudo().search` with no company domain. Each tenant DB scans its own data.
 - **Scan threshold is hardcoded:** `score < 0.5` drops the finding; not configurable.
 - **`/ai/chat/ask` is CSRF=True POST** — internal users only; not exposed to portal customers.
-- **AI ask-actions are defined as `binding_model_id` server actions** — they appear in the cog menu, NOT the chatter. Some bindings (`helpdesk_ticket`, `field_service_order`, `coretax_transaction`, `hr_payslip`) require their respective `custom_*` modules to be installed first or the data file load will fail.
+- **AI ask-actions are defined as `binding_model_id` server actions** — they appear in the cog menu, NOT the chatter. Some bindings (`helpdesk_ticket`, `fsm_work_order`, `coretax_transaction`, `hr_payslip`) require their respective `custom_*` modules to be installed first or the data file load will fail.
+- **AI groups are implied by `base.group_user`** (since 0.1.1): every internal user automatically gets `custom_ai_bridge.group_custom_ai_user` (gates the wizard) and `group_ai_user` (gates anomaly findings + NLQ sessions). Pattern matches Odoo's `purchase.group_send_reminder` implication. Operators can unlink per-user via UI; the noupdate=1 record preserves user overrides on upgrade. Pre-0.1.1 installs get this via `migrations/19.0.0.1.1/post-migrate.py` (idempotent backfill).
 - **`ai.nlq.message` model is defined in `ai_nlq_message.py` (18 lines)** — minimal pass-through; no security on the message rows themselves beyond the session ACL.
 
 ## Out of Scope

@@ -32,7 +32,21 @@ class PdpAuditLog(models.Model):
     hash_hex = fields.Char(string="Hash", readonly=True)
 
     def init(self):
-        # Map onto the existing pdp.audit_log_v view created in 02-pdp-schema.sql
+        # Ensure the `pdp` schema (tables, triggers, hash-chain functions,
+        # audit_log_v view) exists in this tenant DB. The bundled SQL is the
+        # same script that `postgres/init/02-pdp-schema.sql` runs at cluster
+        # init — but cluster-init only fires for DB `postgres` on first boot,
+        # so per-tenant DBs need this idempotent re-apply during module init.
+        import os as _os
+        _sql_path = _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+            "data", "pdp_schema.sql",
+        )
+        if _os.path.isfile(_sql_path):
+            with open(_sql_path, "r", encoding="utf-8") as _f:
+                self.env.cr.execute(_f.read())
+
+        # Map onto the pdp.audit_log_v view created above.
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute(
             f"""

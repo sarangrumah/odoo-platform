@@ -44,6 +44,8 @@ try:
                         slip.id, e,
                     )
 
-except (KeyError, ValueError):
-    # hr.payslip not in registry — module not installed. Skip silently.
+except (KeyError, ValueError, TypeError):
+    # hr.payslip not in registry — hr_payroll not installed (Enterprise-only
+    # module, or this is a deployment without payroll). Skip silently;
+    # the rest of the witholding module operates on account.move/payment.
     _hr_payslip_available = False

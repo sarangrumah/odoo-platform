@@ -31,7 +31,10 @@ services:
         condition: service_healthy
     environment:
       DOMAIN: ${DOMAIN:-localhost.localdomain}
-      ACME_EMAIL: ${ACME_EMAIL:-}
+      # Placeholder when unset/empty — Caddyfile `{$ACME_EMAIL:default}` only
+      # falls back when the var is unset (empty string is still a value).
+      # With `tls internal` this email is purely cosmetic.
+      ACME_EMAIL: ${ACME_EMAIL:-admin@localhost}
       ACME_CA_DIR: ${ACME_CA_DIR:-}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro

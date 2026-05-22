@@ -85,13 +85,13 @@ shell-ai: ## Bash into AI gateway container
 # ----- Odoo lifecycle -----
 .PHONY: init-db update install drop-db
 init-db: ## Initialize DB: make init-db DB=erp_dev
-	$(COMPOSE_DEV) exec odoo odoo -d $(DB) --without-demo=all --stop-after-init -i base
+	$(COMPOSE_DEV) exec odoo odoo -d $(DB) --without-demo=all --stop-after-init --no-http -i base
 
 install: ## Install module: make install MODULE=custom_core DB=erp_dev
-	$(COMPOSE_DEV) exec odoo odoo -d $(DB) -i $(MODULE) --stop-after-init
+	$(COMPOSE_DEV) exec odoo odoo -d $(DB) -i $(MODULE) --stop-after-init --no-http
 
 update: ## Update module: make update MODULE=custom_core DB=erp_dev
-	$(COMPOSE_DEV) exec odoo odoo -d $(DB) -u $(MODULE) --stop-after-init
+	$(COMPOSE_DEV) exec odoo odoo -d $(DB) -u $(MODULE) --stop-after-init --no-http
 
 drop-db: ## Drop DB (careful): make drop-db DB=erp_dev
 	$(COMPOSE_DEV) exec postgres dropdb -U $${POSTGRES_USER:-odoo} --if-exists $(DB)

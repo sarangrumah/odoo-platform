@@ -122,6 +122,17 @@ class RecurringJournalTemplate(models.Model):
         for tpl in self:
             tpl._generate_one()
 
+    def action_view_moves(self):
+        """Open generated journal entries (account.move) for this template."""
+        self.ensure_one()
+        return {
+            "name": "Generated Entries",
+            "type": "ir.actions.act_window",
+            "res_model": "account.move",
+            "view_mode": "list,form",
+            "domain": [("ref", "like", self.code or self.name)],
+        }
+
     def _generate_one(self):
         """Generate one journal entry from the template; advance next_date."""
         self.ensure_one()
