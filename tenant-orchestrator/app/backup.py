@@ -15,6 +15,7 @@ from botocore.client import Config as BotoConfig
 
 from . import dbops, registry
 from .config import get_settings
+from .validators import assert_valid_slug
 
 log = structlog.get_logger()
 
@@ -59,6 +60,11 @@ def _sha256_file(path: Path) -> str:
 
 
 def _pg_dump(db_name: str, out_path: Path) -> None:
+    # CodeQL py/command-line-injection: validate that db_name matches the
+    # tenant slug grammar before it flows into a subprocess argv. We never
+    # use shell=True (argv is a list), but pinning to [a-z][a-z0-9_]{1,62}$
+    # closes the static-analysis path and adds a real defensive boundary.
+    assert_valid_slug(db_name)
     s = get_settings()
     env = os.environ.copy()
     env["PGPASSWORD"] = s.pg_super_password
@@ -86,6 +92,8 @@ def _pg_dump(db_name: str, out_path: Path) -> None:
 
 
 def _pg_restore(db_name: str, in_path: Path) -> None:
+    # CodeQL py/command-line-injection: see _pg_dump rationale above.
+    assert_valid_slug(db_name)
     s = get_settings()
     env = os.environ.copy()
     env["PGPASSWORD"] = s.pg_super_password
@@ -133,6 +141,10 @@ def _compute_expiry(kind: str, started_at: datetime, tenant_row: dict) -> dateti
 
 def run_backup(slug: str, kind: str = "manual", actor: str = "system") -> dict:
     """Take a backup, upload it, record in registry."""
+    # CodeQL py/path-injection: slug is interpolated into tmp_dir / s3_key /
+    # registry lookups below. Pin to the tenant slug grammar at the boundary
+    # so a malicious ".." or absolute-path slug cannot escape backup_tmp_dir.
+    assert_valid_slug(slug)
     s = get_settings()
     t = registry.get_tenant(slug)
     if not t:
@@ -210,6 +222,12 @@ def restore_backup(
     actor: str = "system",
 ) -> str:
     """Download a backup and pg_restore into ``target_db`` (or ``<slug>_staging``)."""
+    # CodeQL py/path-injection: same slug-grammar pin as run_backup. If the
+    # caller passes a custom target_db, validate it the same way before it
+    # flows into _pg_restore subprocess argv.
+    assert_valid_slug(slug)
+    if target_db is not None:
+        assert_valid_slug(target_db)
     s = get_settings()
     t = registry.get_tenant(slug)
     if not t:

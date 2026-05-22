@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from urllib.parse import urlparse
 
 from odoo import _, api, models
 
@@ -52,9 +53,12 @@ class CustomSmsAdapterZenziva(models.AbstractModel):
 
         endpoint = (account.api_url or _ZENZIVA_PROD_URL).rstrip("/")
         # Allow operator to override only the base; if they supplied
-        # the bare base host, append the standard path.
+        # the bare base host, append the standard path. We parse the URL and
+        # compare the netloc exactly — a plain `"console.zenziva.net" in
+        # endpoint` would also accept e.g. `https://attacker.com/console.zenziva.net/`
+        # (CodeQL py/incomplete-url-substring-sanitization).
         if not endpoint.endswith("/sendsms"):
-            if "console.zenziva.net" in endpoint and "/reguler/api/sendsms" not in endpoint:
+            if urlparse(endpoint).netloc == "console.zenziva.net" and "/reguler/api/sendsms" not in endpoint:
                 endpoint = _ZENZIVA_PROD_URL
 
         payload = {

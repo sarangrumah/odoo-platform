@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -37,9 +38,27 @@ def _demo_mode() -> bool:
     )
 
 
+def _opaque_error(exc: BaseException, *, label: str) -> str:
+    """Log the full exception server-side and return a short opaque token
+    safe to expose in HTTP responses or SSE frames.
+
+    CodeQL py/stack-trace-exposure: bare `str(e)` flowing into a response can
+    leak internal paths / module names / parameter values. Replacing it with
+    a correlation id + a static category preserves the operator UX (the id
+    is grep-able in logs) without exposing exception internals.
+    """
+    err_id = uuid.uuid4().hex[:8]
+    log.exception("%s err_id=%s", label, err_id)
+    return f"{label} (err_id={err_id}) — see orchestrator logs"
+
+
 def _credential_skip_response(detail: str) -> JSONResponse:
     """Return 200 + body explaining that the action was skipped because
-    the SSH credential could not be resolved (typical in dev / UAT)."""
+    the SSH credential could not be resolved (typical in dev / UAT).
+
+    ``detail`` must already be a sanitised, human-friendly string (e.g.
+    ``SSHCredentialError`` messages, which we construct ourselves).
+    """
     return JSONResponse(
         status_code=200,
         content={
@@ -140,8 +159,7 @@ def register_vps(body: VPSRegisterRequest, request: Request) -> dict:
         log.info("vps.register.credential_skip host=%s err=%s", target.hostname, e)
         return _credential_skip_response(str(e))
     except Exception as e:  # noqa: BLE001
-        log.warning("vps.register.ssh_failed host=%s err=%s", target.hostname, e)
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"SSH connect failed: {e}") from e
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, _opaque_error(e, label="SSH connect failed")) from e
     log.info("vps.registered host=%s actor=%s", target.hostname, actor)
     return {
         "ok": True,
@@ -173,7 +191,7 @@ def bootstrap_vps(vps_id: int, body: BootstrapRequest, request: Request) -> Stre
         except SSHCredentialError as e:
             yield f"ERROR credential: {e}"
         except Exception as e:  # noqa: BLE001
-            yield f"ERROR bootstrap: {e}"
+            yield _opaque_error(e, label="ERROR bootstrap")
 
     return StreamingResponse(_sse(gen()), media_type="text/event-stream")
 
@@ -200,7 +218,7 @@ def deploy_stack(vps_id: int, body: DeployStackRequest, request: Request) -> Str
         except SSHCredentialError as e:
             yield f"ERROR credential: {e}"
         except Exception as e:  # noqa: BLE001
-            yield f"ERROR deploy_stack: {e}"
+            yield _opaque_error(e, label="ERROR deploy_stack")
 
     return StreamingResponse(_sse(gen()), media_type="text/event-stream")
 
@@ -231,7 +249,7 @@ echo "[sync_addons] DONE"
         except SSHCredentialError as e:
             yield f"ERROR credential: {e}"
         except Exception as e:  # noqa: BLE001
-            yield f"ERROR sync_addons: {e}"
+            yield _opaque_error(e, label="ERROR sync_addons")
 
     return StreamingResponse(_sse(gen()), media_type="text/event-stream")
 
@@ -270,7 +288,7 @@ def health(
             "reason": (f"ssh credential could not be resolved — configure vault:// or use file:// ref. detail: {e}"),
         }
     except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error": _opaque_error(e, label="health probe failed")}
 
 
 @router.post("/{vps_id}/decommission")
@@ -302,7 +320,7 @@ echo "[decommission] DONE"
         log.info("vps.decommission.credential_skip vps_id=%s err=%s", vps_id, e)
         return _credential_skip_response(str(e))
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, _opaque_error(e, label="decommission failed")) from e
     rc_line = next((l for l in lines if l.startswith("__EXIT__")), "__EXIT__ -1")
     rc = int(rc_line.split(" ", 1)[1])
     return {"ok": rc == 0, "vps_id": vps_id, "exit_code": rc, "log": "\n".join(lines)}

@@ -13,6 +13,7 @@ container restart loop.
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import string
 import subprocess
@@ -23,6 +24,12 @@ import structlog
 
 from . import dbops
 from .config import get_settings
+from .validators import assert_valid_slug
+
+# Odoo module technical names: lowercase letters/digits/underscore. Lock this
+# down so module names sourced from API callers can't smuggle shell-meta into
+# the `docker exec ... odoo --init=...` argv list.
+_MODULE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
 log = structlog.get_logger()
 
@@ -76,7 +83,15 @@ class OdooAdminClient:
         ``init_modules`` defaults to ``['base']`` — caller is expected to install
         the platform's custom module set via ``install_modules()`` afterwards.
         """
+        # CodeQL py/command-line-injection: db_name + mods flow into a
+        # `docker exec ... odoo -d <db> --init <mods>` argv. argv is a list
+        # (no shell=True), but pin both inputs to their grammar before the
+        # call to also satisfy static analysis.
+        assert_valid_slug(db_name)
         mods = init_modules or ["base"]
+        for m in mods:
+            if not _MODULE_NAME_RE.match(m):
+                raise ValueError(f"Invalid module name {m!r}: must match {_MODULE_NAME_RE.pattern}")
         # 1. Direct psycopg CREATE DATABASE
         if not dbops.db_exists(db_name):
             dbops.create_database(db_name=db_name, owner_role=self._tenant_owner)
