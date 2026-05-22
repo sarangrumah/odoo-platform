@@ -26,7 +26,11 @@ RUN apt-get update \
 
 # Python deps tambahan (HTTP client for AI gateway, encryption, XML validation)
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
+# --ignore-installed: base image ships some deps (cryptography, phonenumbers,
+# python-dateutil) via the Debian python3-* apt packages which lack pip RECORD
+# files. Without this flag, pip aborts when trying to uninstall them.
+RUN pip3 install --no-cache-dir --break-system-packages --ignore-installed \
+       -r /tmp/requirements.txt \
  && rm -f /tmp/requirements.txt
 
 # Strip SUID binaries (CIS hardening)
