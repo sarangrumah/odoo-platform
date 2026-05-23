@@ -10,12 +10,15 @@ reporting, and a branch (kantor cabang) analytic dimension.
 ### 1. Indonesian Chart of Accounts (PSAK-aligned)
 
 - `account.chart.template` "Indonesia (PSAK) — Custom Platform"
-- ~70 account templates covering Aset / Kewajiban / Ekuitas /
+- 53 account templates covering Aset / Kewajiban / Ekuitas /
   Pendapatan / HPP / Beban / Pajak (1xxxx – 8xxxx)
-- Tax templates: PPN 11% (and 12% placeholder), PPh 23 2% / 4%,
-  PPh 4(2) 10%, PPh 26 20%
-- 4 fiscal positions seeded for common scenarios (PKP, non-PKP,
-  no-NPWP, foreign vendor)
+- 12 hierarchical account groups for nested report display
+- PPN 11% (keluaran/masukan) — PMK 58/2022 current rate.
+  PPh withholding variants (23, 4(2) Final, 26) are intentionally
+  deferred; add via a separate module if your group needs them.
+- 6 journals (INV/BILL/CASH/BANK/MISC/EXCH) with Bahasa labels
+- 2 fiscal positions seeded: Ekspor (drops PPN), Pelanggan Bebas
+  Pajak (drops both sales + purchase PPN)
 
 ### 2. Intercompany Automation
 
