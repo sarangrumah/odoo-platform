@@ -1,1 +1,3 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_custom_repairs_warranty_matrix_user,custom.repairs.warranty.matrix user,model_custom_repairs_warranty_matrix,group_user,1,0,0,0
+access_custom_repairs_warranty_matrix_manager,custom.repairs.warranty.matrix manager,model_custom_repairs_warranty_matrix,group_manager,1,1,1,1
