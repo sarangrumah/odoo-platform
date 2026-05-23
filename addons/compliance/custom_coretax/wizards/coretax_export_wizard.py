@@ -230,9 +230,11 @@ class CoretaxExportWizard(models.TransientModel):
         xsd_path = os.path.join(module_path, "data", "xsd", f"{self.document_type}.xsd")
         if not os.path.isfile(xsd_path):
             msg = _(
-                "Official XSD for %s is not present at %s. XML generated but NOT "
-                "validated. Download the XSD from pajak.go.id and drop it into "
-                "data/xsd/ to enable validation."
+                "XSD for %s is not present at %s. XML generated but NOT "
+                "validated client-side. DJP does not publish Coretax XSDs "
+                "publicly; submission via the Coretax portal still triggers "
+                "authoritative server-side validation. See data/xsd/README.md "
+                "for client-side options (ASPP subscription required)."
             ) % (self.document_type, xsd_path)
             _logger.warning("coretax export: %s", msg)
             return msg
