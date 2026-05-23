@@ -31,9 +31,12 @@ Notes
 -----
 A public REST API for DJP Coretax B2B integration is not confirmed as of
 May 2026. The default workflow is XML upload via the official portal.
-XSD files are not bundled — operators must place official XSDs from
-`https://www.pajak.go.id/reformdjp/coretax/template-xml-dan-converter-excel-ke-xml`
-under `data/xsd/` post-install.
+XSD files are not bundled and not publicly available — DJP does not
+publish raw XSDs at pajak.go.id (only Excel templates + sample XMLs).
+Operators with XSDs from an ASPP subscription or direct B2B agreement
+may drop them under `data/xsd/<document_type>.xsd` for client-side
+validation; otherwise the wizard exports XML and DJP validates
+server-side on Coretax portal upload. See `data/xsd/README.md`.
 """,
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",

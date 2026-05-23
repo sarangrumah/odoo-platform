@@ -69,7 +69,7 @@ Every export, import, and sertel access emits an audit row to `pdp.audit_log` (`
 - **Cross-vertical:** generic Indonesian tax compliance.
 
 ## Gotchas
-- **XSDs are NOT bundled.** Operator must download official DJP XSDs from pajak.go.id and drop them under `data/xsd/<doc_type>.xsd` post-install. Until then, XML is generated but flagged with a `validation_warning`.
+- **XSDs are NOT bundled and not publicly available.** As of May 2026, DJP does not publish raw `.xsd` files at pajak.go.id — the converter page ships only Excel templates, sample XMLs (in ZIPs like `bpmp.zip`, `bp21.zip`), and a Windows converter binary. Operators with XSDs from a private channel (ASPP subscription, Pajakku partner contract, etc.) can drop them under `data/xsd/<document_type>.xsd` for client-side validation; without them the wizard exports XML and logs a `validation_warning` (DJP still validates server-side on portal upload). See `data/xsd/README.md` for filenames + obtaining channels.
 - **`NS_CORETAX = "urn:djp:coretax:v1"` is a placeholder.** Once official XSDs are placed, the operator may need to align the `targetNamespace`; mismatched namespaces will cause `xmlschema` validation failures.
 - **PMK131 tax + fiscal-position data is gated out of the default `data` list** (commented in `__manifest__.py`) because it requires `custom_accounting_full` to have provisioned PSAK account types first. Load manually with `-i custom_coretax --without-demo=False` after that module is set up.
 - **Sertel password is transient by design.** If the operator loses the password, the .p12 ciphertext is unrecoverable; re-upload required. There is no key-escrow.

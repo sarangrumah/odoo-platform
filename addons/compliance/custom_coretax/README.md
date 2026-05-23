@@ -31,13 +31,25 @@ ready for future H2H ASPP integration.
   `.p12`, encrypt at rest with Fernet via `custom.ir.config`. Master
   key from env `CORETAX_SERTEL_MASTER_KEY`.
 
-## XSD Validation
+## XSD Validation (Optional)
 
-XML payloads are validated against XSDs in `data/xsd/` before submission
-using the `xmlschema` Python library. **The XSDs are NOT bundled** —
-operators must download official files from
-<https://www.pajak.go.id/reformdjp/coretax/template-xml-dan-converter-excel-ke-xml>
-and place them in `data/xsd/` post-install. See `data/xsd/README.md`.
+XML payloads can be validated against XSDs at
+`data/xsd/<document_type>.xsd` before submission using the `xmlschema`
+Python library. **DJP does not publish Coretax XSDs publicly** —
+empirically confirmed (as of May 2026) that pajak.go.id ships Excel
+converter templates, sample XML payloads (in ZIPs), and a Windows
+converter binary, but no raw `.xsd` files. Client-side validation is
+therefore optional:
+
+- **Without XSDs (default):** the wizard logs a warning and exports
+  XML anyway. DJP performs authoritative server-side validation on
+  Coretax portal upload.
+- **With XSDs (advanced):** if your organisation has obtained XSDs
+  through an ASPP subscription (Pajakku, OnlinePajak, Klikpajak) or
+  a direct B2B agreement with DJP, drop them at
+  `data/xsd/<document_type>.xsd` to enable pre-submission validation.
+
+See `data/xsd/README.md` for expected filenames per document type.
 
 ## Document Types Covered
 
@@ -67,7 +79,9 @@ respectively.
 
 1. Set `CORETAX_SERTEL_MASTER_KEY` (32-byte Fernet key, base64) in
    `.env` before first boot.
-2. Place official DJP XSDs into `data/xsd/`.
+2. (Optional) If your organisation has DJP XSDs from a private
+   channel, place them under `data/xsd/<document_type>.xsd` — see
+   `data/xsd/README.md`. Skip otherwise; module works without.
 3. Install via Apps menu.
 4. Configure NPWP / KPP / Sertel under Settings → Custom Platform →
    Coretax.
