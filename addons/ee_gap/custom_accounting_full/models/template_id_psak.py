@@ -88,15 +88,35 @@ class AccountChartTemplate(models.AbstractModel):
         return {
             "account_group_id_psak_1": {"name": "Aset", "code_prefix_start": "1", "code_prefix_end": "1"},
             "account_group_id_psak_11": {"name": "Aset Lancar", "code_prefix_start": "11", "code_prefix_end": "11"},
-            "account_group_id_psak_12": {"name": "Aset Tidak Lancar", "code_prefix_start": "12", "code_prefix_end": "13"},
+            "account_group_id_psak_12": {
+                "name": "Aset Tidak Lancar",
+                "code_prefix_start": "12",
+                "code_prefix_end": "13",
+            },
             "account_group_id_psak_2": {"name": "Kewajiban", "code_prefix_start": "2", "code_prefix_end": "2"},
-            "account_group_id_psak_21": {"name": "Kewajiban Lancar", "code_prefix_start": "21", "code_prefix_end": "21"},
-            "account_group_id_psak_22": {"name": "Kewajiban Jangka Panjang", "code_prefix_start": "22", "code_prefix_end": "22"},
+            "account_group_id_psak_21": {
+                "name": "Kewajiban Lancar",
+                "code_prefix_start": "21",
+                "code_prefix_end": "21",
+            },
+            "account_group_id_psak_22": {
+                "name": "Kewajiban Jangka Panjang",
+                "code_prefix_start": "22",
+                "code_prefix_end": "22",
+            },
             "account_group_id_psak_3": {"name": "Ekuitas", "code_prefix_start": "3", "code_prefix_end": "3"},
             "account_group_id_psak_4": {"name": "Pendapatan", "code_prefix_start": "4", "code_prefix_end": "4"},
-            "account_group_id_psak_5": {"name": "Harga Pokok Penjualan", "code_prefix_start": "5", "code_prefix_end": "5"},
+            "account_group_id_psak_5": {
+                "name": "Harga Pokok Penjualan",
+                "code_prefix_start": "5",
+                "code_prefix_end": "5",
+            },
             "account_group_id_psak_6": {"name": "Beban Operasional", "code_prefix_start": "6", "code_prefix_end": "6"},
-            "account_group_id_psak_7": {"name": "Pendapatan / Beban Lain", "code_prefix_start": "7", "code_prefix_end": "7"},
+            "account_group_id_psak_7": {
+                "name": "Pendapatan / Beban Lain",
+                "code_prefix_start": "7",
+                "code_prefix_end": "7",
+            },
             "account_group_id_psak_8": {"name": "Pajak Penghasilan", "code_prefix_start": "8", "code_prefix_end": "8"},
         }
 
@@ -113,7 +133,11 @@ class AccountChartTemplate(models.AbstractModel):
             # 11xxx Aset Lancar
             "account_id_psak_11010": {"name": "Kas", "code": "11010", "account_type": "asset_cash"},
             "account_id_psak_11020": {"name": "Bank", "code": "11020", "account_type": "asset_cash"},
-            "account_id_psak_11030": {"name": "Kas/Bank dalam Perjalanan", "code": "11030", "account_type": "asset_current"},
+            "account_id_psak_11030": {
+                "name": "Kas/Bank dalam Perjalanan",
+                "code": "11030",
+                "account_type": "asset_current",
+            },
             "account_id_psak_11100": {
                 "name": "Piutang Usaha",
                 "code": "11100",
@@ -126,10 +150,26 @@ class AccountChartTemplate(models.AbstractModel):
                 "account_type": "asset_receivable",
                 "reconcile": True,
             },
-            "account_id_psak_11300": {"name": "Persediaan Barang Dagangan", "code": "11300", "account_type": "asset_current"},
-            "account_id_psak_11310": {"name": "Persediaan Bahan Baku", "code": "11310", "account_type": "asset_current"},
-            "account_id_psak_11320": {"name": "Persediaan Barang Jadi", "code": "11320", "account_type": "asset_current"},
-            "account_id_psak_11400": {"name": "Beban Dibayar Dimuka", "code": "11400", "account_type": "asset_prepayments"},
+            "account_id_psak_11300": {
+                "name": "Persediaan Barang Dagangan",
+                "code": "11300",
+                "account_type": "asset_current",
+            },
+            "account_id_psak_11310": {
+                "name": "Persediaan Bahan Baku",
+                "code": "11310",
+                "account_type": "asset_current",
+            },
+            "account_id_psak_11320": {
+                "name": "Persediaan Barang Jadi",
+                "code": "11320",
+                "account_type": "asset_current",
+            },
+            "account_id_psak_11400": {
+                "name": "Beban Dibayar Dimuka",
+                "code": "11400",
+                "account_type": "asset_prepayments",
+            },
             "account_id_psak_11500": {"name": "PPN Masukan", "code": "11500", "account_type": "asset_current"},
             # 12xxx Aset Tidak Lancar
             "account_id_psak_12100": {"name": "Tanah", "code": "12100", "account_type": "asset_fixed"},
@@ -138,8 +178,11 @@ class AccountChartTemplate(models.AbstractModel):
             "account_id_psak_12400": {"name": "Kendaraan", "code": "12400", "account_type": "asset_fixed"},
             "account_id_psak_12500": {"name": "Inventaris Kantor", "code": "12500", "account_type": "asset_fixed"},
             "account_id_psak_12900": {"name": "Akumulasi Penyusutan", "code": "12900", "account_type": "asset_fixed"},
-            "account_id_psak_13000": {"name": "Aset Tidak Berwujud", "code": "13000", "account_type": "asset_non_current"},
-
+            "account_id_psak_13000": {
+                "name": "Aset Tidak Berwujud",
+                "code": "13000",
+                "account_type": "asset_non_current",
+            },
             # ============================================================
             # 2xxxx — KEWAJIBAN (Liabilities)
             # ============================================================
@@ -157,21 +200,39 @@ class AccountChartTemplate(models.AbstractModel):
                 "reconcile": True,
             },
             "account_id_psak_21300": {"name": "Hutang Gaji", "code": "21300", "account_type": "liability_current"},
-            "account_id_psak_21400": {"name": "Hutang PPN Keluaran", "code": "21400", "account_type": "liability_current"},
+            "account_id_psak_21400": {
+                "name": "Hutang PPN Keluaran",
+                "code": "21400",
+                "account_type": "liability_current",
+            },
             "account_id_psak_21500": {"name": "Hutang PPh", "code": "21500", "account_type": "liability_current"},
-            "account_id_psak_21900": {"name": "Hutang Jangka Pendek Lainnya", "code": "21900", "account_type": "liability_current"},
+            "account_id_psak_21900": {
+                "name": "Hutang Jangka Pendek Lainnya",
+                "code": "21900",
+                "account_type": "liability_current",
+            },
             # 22xxx Kewajiban Jangka Panjang
-            "account_id_psak_22100": {"name": "Hutang Bank Jangka Panjang", "code": "22100", "account_type": "liability_non_current"},
-            "account_id_psak_22200": {"name": "Hutang Jangka Panjang Lainnya", "code": "22200", "account_type": "liability_non_current"},
-
+            "account_id_psak_22100": {
+                "name": "Hutang Bank Jangka Panjang",
+                "code": "22100",
+                "account_type": "liability_non_current",
+            },
+            "account_id_psak_22200": {
+                "name": "Hutang Jangka Panjang Lainnya",
+                "code": "22200",
+                "account_type": "liability_non_current",
+            },
             # ============================================================
             # 3xxxx — EKUITAS (Equity)
             # ============================================================
             "account_id_psak_31000": {"name": "Modal Disetor", "code": "31000", "account_type": "equity"},
             "account_id_psak_32000": {"name": "Laba Ditahan", "code": "32000", "account_type": "equity"},
-            "account_id_psak_33000": {"name": "Laba/Rugi Tahun Berjalan", "code": "33000", "account_type": "equity_unaffected"},
+            "account_id_psak_33000": {
+                "name": "Laba/Rugi Tahun Berjalan",
+                "code": "33000",
+                "account_type": "equity_unaffected",
+            },
             "account_id_psak_34000": {"name": "Prive / Pengambilan Pemilik", "code": "34000", "account_type": "equity"},
-
             # ============================================================
             # 4xxxx — PENDAPATAN (Revenue)
             # ============================================================
@@ -179,41 +240,57 @@ class AccountChartTemplate(models.AbstractModel):
             "account_id_psak_42000": {"name": "Pendapatan Jasa", "code": "42000", "account_type": "income"},
             "account_id_psak_43000": {"name": "Diskon Penjualan", "code": "43000", "account_type": "income"},
             "account_id_psak_44000": {"name": "Retur Penjualan", "code": "44000", "account_type": "income"},
-
             # ============================================================
             # 5xxxx — HARGA POKOK PENJUALAN (COGS)
             # ============================================================
-            "account_id_psak_51000": {"name": "HPP Barang Dagangan", "code": "51000", "account_type": "expense_direct_cost"},
+            "account_id_psak_51000": {
+                "name": "HPP Barang Dagangan",
+                "code": "51000",
+                "account_type": "expense_direct_cost",
+            },
             "account_id_psak_52000": {"name": "HPP Jasa", "code": "52000", "account_type": "expense_direct_cost"},
             "account_id_psak_53000": {"name": "HPP Bahan Baku", "code": "53000", "account_type": "expense_direct_cost"},
-
             # ============================================================
             # 6xxxx — BEBAN OPERASIONAL (Operating Expenses)
             # ============================================================
             "account_id_psak_61000": {"name": "Beban Gaji & Tunjangan", "code": "61000", "account_type": "expense"},
             "account_id_psak_62000": {"name": "Beban Sewa", "code": "62000", "account_type": "expense"},
-            "account_id_psak_63000": {"name": "Beban Utilitas (Listrik/Air/Telp)", "code": "63000", "account_type": "expense"},
+            "account_id_psak_63000": {
+                "name": "Beban Utilitas (Listrik/Air/Telp)",
+                "code": "63000",
+                "account_type": "expense",
+            },
             "account_id_psak_64000": {"name": "Beban Perlengkapan Kantor", "code": "64000", "account_type": "expense"},
             "account_id_psak_65000": {"name": "Beban Pemasaran & Promosi", "code": "65000", "account_type": "expense"},
-            "account_id_psak_66000": {"name": "Beban Penyusutan", "code": "66000", "account_type": "expense_depreciation"},
+            "account_id_psak_66000": {
+                "name": "Beban Penyusutan",
+                "code": "66000",
+                "account_type": "expense_depreciation",
+            },
             "account_id_psak_67000": {"name": "Beban Administrasi", "code": "67000", "account_type": "expense"},
             "account_id_psak_68000": {"name": "Beban Selisih Kas", "code": "68000", "account_type": "expense"},
             "account_id_psak_69000": {"name": "Beban Operasional Lainnya", "code": "69000", "account_type": "expense"},
-
             # ============================================================
             # 7xxxx — PENDAPATAN / BEBAN LAIN-LAIN (Other Income/Expense)
             # ============================================================
             "account_id_psak_71000": {"name": "Pendapatan Lain-lain", "code": "71000", "account_type": "income_other"},
-            "account_id_psak_71100": {"name": "Selisih Kurs - Keuntungan", "code": "71100", "account_type": "income_other"},
+            "account_id_psak_71100": {
+                "name": "Selisih Kurs - Keuntungan",
+                "code": "71100",
+                "account_type": "income_other",
+            },
             "account_id_psak_71200": {"name": "Pendapatan Bunga", "code": "71200", "account_type": "income_other"},
             "account_id_psak_72000": {"name": "Beban Lain-lain", "code": "72000", "account_type": "expense"},
             "account_id_psak_72100": {"name": "Selisih Kurs - Kerugian", "code": "72100", "account_type": "expense"},
             "account_id_psak_72200": {"name": "Beban Bunga", "code": "72200", "account_type": "expense"},
-
             # ============================================================
             # 8xxxx — PAJAK PENGHASILAN (Income Tax)
             # ============================================================
-            "account_id_psak_81000": {"name": "Beban Pajak Penghasilan Badan", "code": "81000", "account_type": "expense"},
+            "account_id_psak_81000": {
+                "name": "Beban Pajak Penghasilan Badan",
+                "code": "81000",
+                "account_type": "expense",
+            },
             "account_id_psak_82000": {"name": "Beban PPh Final", "code": "82000", "account_type": "expense"},
         }
 
@@ -233,19 +310,23 @@ class AccountChartTemplate(models.AbstractModel):
                 "tax_group_id": "account_id_psak_tax_group_ppn",
                 "invoice_repartition_line_ids": [
                     Command.create({"factor_percent": 100, "repartition_type": "base"}),
-                    Command.create({
-                        "factor_percent": 100,
-                        "repartition_type": "tax",
-                        "account_id": "account_id_psak_21400",
-                    }),
+                    Command.create(
+                        {
+                            "factor_percent": 100,
+                            "repartition_type": "tax",
+                            "account_id": "account_id_psak_21400",
+                        }
+                    ),
                 ],
                 "refund_repartition_line_ids": [
                     Command.create({"factor_percent": 100, "repartition_type": "base"}),
-                    Command.create({
-                        "factor_percent": 100,
-                        "repartition_type": "tax",
-                        "account_id": "account_id_psak_21400",
-                    }),
+                    Command.create(
+                        {
+                            "factor_percent": 100,
+                            "repartition_type": "tax",
+                            "account_id": "account_id_psak_21400",
+                        }
+                    ),
                 ],
             },
             "account_id_psak_tax_ppn_masukan_11": {
@@ -257,19 +338,23 @@ class AccountChartTemplate(models.AbstractModel):
                 "tax_group_id": "account_id_psak_tax_group_ppn",
                 "invoice_repartition_line_ids": [
                     Command.create({"factor_percent": 100, "repartition_type": "base"}),
-                    Command.create({
-                        "factor_percent": 100,
-                        "repartition_type": "tax",
-                        "account_id": "account_id_psak_11500",
-                    }),
+                    Command.create(
+                        {
+                            "factor_percent": 100,
+                            "repartition_type": "tax",
+                            "account_id": "account_id_psak_11500",
+                        }
+                    ),
                 ],
                 "refund_repartition_line_ids": [
                     Command.create({"factor_percent": 100, "repartition_type": "base"}),
-                    Command.create({
-                        "factor_percent": 100,
-                        "repartition_type": "tax",
-                        "account_id": "account_id_psak_11500",
-                    }),
+                    Command.create(
+                        {
+                            "factor_percent": 100,
+                            "repartition_type": "tax",
+                            "account_id": "account_id_psak_11500",
+                        }
+                    ),
                 ],
             },
         }
@@ -336,24 +421,30 @@ class AccountChartTemplate(models.AbstractModel):
                 "name": "Ekspor (Tanpa PPN)",
                 "auto_apply": False,
                 "tax_ids": [
-                    Command.create({
-                        "tax_src_id": "account_id_psak_tax_ppn_keluaran_11",
-                        "tax_dest_id": False,
-                    }),
+                    Command.create(
+                        {
+                            "tax_src_id": "account_id_psak_tax_ppn_keluaran_11",
+                            "tax_dest_id": False,
+                        }
+                    ),
                 ],
             },
             "account_id_psak_fpos_bebas_pajak": {
                 "name": "Pelanggan Bebas Pajak",
                 "auto_apply": False,
                 "tax_ids": [
-                    Command.create({
-                        "tax_src_id": "account_id_psak_tax_ppn_keluaran_11",
-                        "tax_dest_id": False,
-                    }),
-                    Command.create({
-                        "tax_src_id": "account_id_psak_tax_ppn_masukan_11",
-                        "tax_dest_id": False,
-                    }),
+                    Command.create(
+                        {
+                            "tax_src_id": "account_id_psak_tax_ppn_keluaran_11",
+                            "tax_dest_id": False,
+                        }
+                    ),
+                    Command.create(
+                        {
+                            "tax_src_id": "account_id_psak_tax_ppn_masukan_11",
+                            "tax_dest_id": False,
+                        }
+                    ),
                 ],
             },
         }
