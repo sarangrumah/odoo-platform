@@ -592,8 +592,16 @@ export class StudioOverlay extends Component {
                 .replace(/[^a-z0-9]+/g, "_")
                 .replace(/^_+|_+$/g, "")
                 .substring(0, 50);
-        const lastInView =
-            this.state.inViewFields[this.state.inViewFields.length - 1] || "";
+        // Place the new field next to the currently-selected field if
+        // any (the user clicked a field, then clicked Create — they
+        // expect the new field to land at that location). Otherwise
+        // append at the end of the view.
+        const anchor =
+            (this.state.selectedField &&
+                this.state.inViewFields.includes(this.state.selectedField) &&
+                this.state.selectedField) ||
+            this.state.inViewFields[this.state.inViewFields.length - 1] ||
+            "";
         this.state.saving = true;
         try {
             const result = await this.orm.call(
@@ -607,7 +615,8 @@ export class StudioOverlay extends Component {
                         field_type: this.state.newFieldType,
                     },
                     this.state.currentViewId,
-                    lastInView,
+                    anchor,
+                    "after",
                 ],
             );
             if (result.customization_state === "applied") {
@@ -771,6 +780,38 @@ export class StudioOverlay extends Component {
             { order: "sequence, id" },
         );
         this.state.operations = ops;
+    }
+
+    /** Emergency wipe: drop every studio.view.customization op for this
+     *  view and deactivate any materialised inheritance. The user
+     *  triggers this from the Ops tab when accumulated state has gotten
+     *  out of sync. */
+    async resetView() {
+        if (!this.state.currentViewId) return;
+        const ok = window.confirm(
+            _t("Reset ALL Studio edits on this view? This deactivates every inheritance and drops every queued operation."),
+        );
+        if (!ok) return;
+        this.state.saving = true;
+        try {
+            await this.orm.call("studio.custom.field", "studio_reset_view", [
+                this.state.currentViewId,
+            ]);
+            this.notification.add(_t("Studio edits reset — reloading view…"), {
+                type: "success",
+            });
+            await this._reloadAction();
+            this.state.selectedField = null;
+            this.state.tab = "add";
+            await this._initialize();
+        } catch (e) {
+            this.notification.add(_t("Reset failed: %s", e.message || String(e)), {
+                type: "danger",
+                sticky: true,
+            });
+        } finally {
+            this.state.saving = false;
+        }
     }
 
     async deleteOp(opId) {

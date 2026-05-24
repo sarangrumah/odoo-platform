@@ -49,6 +49,14 @@
                 <!-- ADD TAB -->
                 <div t-if="state.tab === 'add'" class="o_studio_overlay_panel">
                     <h4>Create new field</h4>
+                    <p class="o_studio_hint">
+                        <span t-if="state.selectedField">
+                            Will be placed after <code><t t-esc="state.selectedField"/></code>.
+                        </span>
+                        <span t-if="!state.selectedField">
+                            Click a field in the form first to place after it — otherwise lands at the end.
+                        </span>
+                    </p>
                     <div class="o_studio_overlay_newfield">
                         <input type="text"
                                placeholder="Label (e.g. Account Manager)"
@@ -194,8 +202,15 @@
                     <h4>Persisted operations</h4>
                     <p class="o_studio_hint">
                         Every drop / property change / move on this view adds an entry here.
-                        Delete any row to undo it.
+                        Delete any row to undo it, or use Reset to drop everything.
                     </p>
+                    <div class="o_studio_overlay_actions" style="margin-bottom: 8px;">
+                        <button class="btn btn-sm btn-danger"
+                                t-on-click="resetView"
+                                t-att-disabled="state.saving">
+                            <i class="fa fa-undo"/> Reset all edits on this view
+                        </button>
+                    </div>
                     <ul class="o_studio_overlay_field_list">
                         <li t-foreach="state.operations" t-as="op" t-key="op.id"
                             class="o_studio_overlay_op_row">

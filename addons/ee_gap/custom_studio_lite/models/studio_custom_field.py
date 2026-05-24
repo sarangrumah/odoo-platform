@@ -161,6 +161,9 @@ class StudioCustomField(models.Model):
         return self.unlink()
 
     def unlink(self):
+        Op = self.env["studio.view.operation"].sudo()
+        Cust = self.env["studio.view.customization"].sudo()
+        impacted_cust_ids = set()
         for rec in self:
             if rec.dependent_view_count and not self.env.context.get("force_cascade"):
                 raise UserError(
@@ -170,6 +173,21 @@ class StudioCustomField(models.Model):
                     )
                     % (rec.technical_name, rec.dependent_view_count)
                 )
+            # Sweep any studio.view.operation rows referencing this
+            # field by name (as the field being targeted OR as the
+            # anchor for someone else's op) — leaving them in place
+            # produces orphan inheritances that fail validation on the
+            # next apply, which is what was breaking the
+            # "delete-then-re-add same name" flow.
+            orphan_ops = Op.search(
+                [
+                    "|",
+                    ("field_name", "=", rec.technical_name),
+                    ("anchor_field", "=", rec.technical_name),
+                ]
+            )
+            impacted_cust_ids.update(orphan_ops.mapped("customization_id").ids)
+            orphan_ops.unlink()
             if rec.ir_model_fields_id:
                 # Drop the materialised ir.model.fields too — cascading there
                 # is what actually removes the DB column.
@@ -181,7 +199,12 @@ class StudioCustomField(models.Model):
                         rec.id,
                         e,
                     )
-        return super().unlink()
+        result = super().unlink()
+        # Re-apply impacted customizations so their inherit_view loses
+        # the dangling <field> reference too.
+        if impacted_cust_ids:
+            Cust.browse(list(impacted_cust_ids)).action_apply()
+        return result
 
     def _sql_rename_in_views(self, old_name: str, new_name: str, views):
         """Rewrite ``name="old"`` / ``name='old'`` to the new name via SQL.
@@ -292,7 +315,9 @@ class StudioCustomField(models.Model):
                 rec._pdp_audit_write("studio_field_apply_failed", rec.id, {"error": str(e)})
 
     @api.model
-    def studio_create_and_place(self, vals, target_view_id, anchor_field):
+    def studio_create_and_place(
+        self, vals, target_view_id, anchor_field, position="after"
+    ):
         """Atomic helper for the Studio overlay: create the custom field,
         materialise it via :meth:`action_apply`, then place it on the
         given view (creating/extending the per-view customization).
@@ -300,8 +325,11 @@ class StudioCustomField(models.Model):
         Doing all four steps in one transaction avoids the multi-RPC
         race where a second worker would try to validate the
         inheritance against a stale registry that hadn't yet picked up
-        the new field — manifesting as "Field x_studio_xxx does not
-        exist in model".
+        the new field.
+
+        ``position`` is honoured if the caller passed one (overlay
+        picks "after" the selected field, or "after" the last field).
+        Falls back to ``inside`` when no anchor is available.
         """
         rec = self.create([vals])
         rec.action_apply()
@@ -326,7 +354,7 @@ class StudioCustomField(models.Model):
                 "op_type": "add_field",
                 "field_name": rec.technical_name,
                 "anchor_field": anchor_field or "",
-                "position": "after" if anchor_field else "inside",
+                "position": position if anchor_field else "inside",
             }
         )
         cust.action_apply()
@@ -337,6 +365,20 @@ class StudioCustomField(models.Model):
             "customization_state": cust.state,
             "last_error": cust.last_error or "",
         }
+
+    @api.model
+    def studio_reset_view(self, target_view_id):
+        """Wipe every Studio operation + inheritance for the given view.
+        Escape hatch for the overlay so users can recover from
+        accumulated bad state without surgical op-by-op cleanup."""
+        Cust = self.env["studio.view.customization"].sudo()
+        custs = Cust.search([("target_view_id", "=", target_view_id)])
+        for c in custs:
+            # action_apply with empty ops deactivates + clears the
+            # inheritance, so empty out the op list first.
+            c.operation_ids.unlink()
+            c.action_apply()
+        return {"reset_count": len(custs)}
 
     def _build_field_vals(self) -> dict:
         self.ensure_one()
