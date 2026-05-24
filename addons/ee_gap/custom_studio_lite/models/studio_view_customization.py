@@ -99,7 +99,14 @@ class StudioViewCustomization(models.Model):
         for rec in self:
             try:
                 if not rec.operation_ids:
-                    raise UserError(_("Add at least one operation before applying."))
+                    # No operations left — deactivate any prior inheritance
+                    # so the view reverts to its base arch. This is the
+                    # path the overlay "Ops" tab takes when the user
+                    # deletes every op individually.
+                    if rec.inherit_view_id:
+                        rec.inherit_view_id.write({"active": False, "arch": "<data/>"})
+                    rec.write({"state": "draft", "last_error": False, "arch_inherit": False})
+                    continue
                 arch = rec._build_arch()
                 rec.arch_inherit = arch
                 vals = {

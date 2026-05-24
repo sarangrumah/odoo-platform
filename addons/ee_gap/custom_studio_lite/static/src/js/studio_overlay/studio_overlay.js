@@ -29,6 +29,7 @@ import { Component, useEffect, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
+import { rpcBus } from "@web/core/network/rpc";
 
 const FIELD_SELECTOR = ".o_field_widget[name]";
 
@@ -746,6 +747,11 @@ export class StudioOverlay extends Component {
     }
 
     async _reloadAction() {
+        // Bust the on-disk view cache. Odoo only auto-invalidates it when
+        // JS calls write/unlink on ir.ui.view directly; our edits go via
+        // ``studio.view.customization.action_apply`` (server-side python
+        // writes the inheritance), so we need to clear the cache by hand.
+        rpcBus.trigger("CLEAR-CACHES", "get_views");
         const ctrl = this.action.currentController;
         if (!ctrl || !ctrl.action) return;
         await this.action.doAction(ctrl.action, { clearBreadcrumbs: false });

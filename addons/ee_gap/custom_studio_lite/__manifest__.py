@@ -11,7 +11,7 @@ without forking a module.
 """,
     "author": "Custom Platform",
     "category": "Productivity/Studio",
-    "version": "19.0.0.6.0",
+    "version": "19.0.0.6.1",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
