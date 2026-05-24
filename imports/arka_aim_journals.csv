@@ -1,0 +1,10 @@
+ext_id,name,code,type,default_account_code,refund_sequence,description
+JRN-SALE,Penjualan,SAL,sale,,True,Customer invoices
+JRN-CN,Nota Kredit,CN,sale,,True,Credit notes / nota kredit (separate sequence)
+JRN-PUR,Pembelian,BILL,purchase,,True,Vendor bills
+JRN-CASH,Kas,CSH,cash,1102000001,False,Cash on hand IDR
+JRN-BCA-9595,BCA - 9595 Main Bank,BCA1,bank,1103019300,False,BCA 268.222.9595
+JRN-BCA-6268,BCA - 6268 Main Bank,BCA2,bank,1103019290,False,BCA 268.262.6268
+JRN-BCA-5777,BCA - 5777 Main Bank,BCA3,bank,1103019270,False,BCA 268.695.5777
+JRN-BCA-7878,BCA - 7878 Main Bank,BCA4,bank,1103019280,False,BCA 268.150.7878
+JRN-MISC,Jurnal Umum,MISC,general,,False,Miscellaneous operations
