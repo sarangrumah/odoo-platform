@@ -109,6 +109,14 @@ class Document(models.Model):
             rec.write({"share_token": False, "share_expires_at": False})
             rec._pdp_audit_write("document_share_revoked", rec.id, None)
 
+    def action_download(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_url",
+            "url": f"/web/content/{self.attachment_id.id}?download=true",
+            "target": "self",
+        }
+
     def action_upload_new_version(self, attachment_id: int, comment: str = ""):
         """Called after the user uploads a replacement file."""
         self.ensure_one()

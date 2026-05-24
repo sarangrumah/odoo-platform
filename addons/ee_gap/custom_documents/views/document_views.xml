@@ -22,7 +22,9 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_publish" string="Publish" type="object" class="btn-primary"
+                    <button name="action_download" string="Download" type="object" class="btn-primary"
+                            invisible="not attachment_id"/>
+                    <button name="action_publish" string="Publish" type="object"
                             invisible="state != 'draft'"/>
                     <button name="action_archive" string="Archive" type="object"
                             invisible="state == 'archived'"/>
