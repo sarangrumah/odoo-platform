@@ -45,7 +45,10 @@
                 <div class="o_studio_field_panel">
                     <h3>Fields in view (<t t-esc="state.fieldNodes.length"/>)</h3>
                     <ul class="o_studio_field_list">
-                        <li t-foreach="state.fieldNodes" t-as="node" t-key="node.name">
+                        <!-- Same field name can appear multiple times in a
+                             view (e.g. partner same_vat_partner_id), so key
+                             on position not name to avoid t-foreach clashes. -->
+                        <li t-foreach="state.fieldNodes" t-as="node" t-key="node_index">
                             <span class="o_studio_field_label"><t t-esc="node.string"/></span>
                             <code class="o_studio_field_name"><t t-esc="node.name"/></code>
                             <span class="o_studio_field_actions">
