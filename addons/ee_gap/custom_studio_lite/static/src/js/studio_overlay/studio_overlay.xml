@@ -37,7 +37,12 @@
                             t-att-disabled="!state.selectedField"
                             t-on-click="() => (state.tab = 'properties')">
                         <i class="fa fa-sliders"/> Properties
-                        <small t-if="state.selectedField"> (<t t-esc="state.selectedField"/>)</small>
+                    </button>
+                    <button class="o_studio_overlay_tab"
+                            t-att-class="state.tab === 'ops' ? 'o_active' : ''"
+                            t-on-click="() => (state.tab = 'ops')">
+                        <i class="fa fa-list"/> Ops
+                        <small> (<t t-esc="state.operations.length"/>)</small>
                     </button>
                 </div>
 
@@ -173,6 +178,35 @@
                             Only studio-created custom fields can be deleted. Native fields can only be hidden.
                         </p>
                     </div>
+                </div>
+
+                <!-- OPS TAB -->
+                <div t-if="state.tab === 'ops'" class="o_studio_overlay_panel">
+                    <h4>Persisted operations</h4>
+                    <p class="o_studio_hint">
+                        Every drop / property change / move on this view adds an entry here.
+                        Delete any row to undo it.
+                    </p>
+                    <ul class="o_studio_overlay_field_list">
+                        <li t-foreach="state.operations" t-as="op" t-key="op.id"
+                            class="o_studio_overlay_op_row">
+                            <div class="o_studio_overlay_field_meta">
+                                <span><strong><t t-esc="op.op_type"/></strong>
+                                    <t t-esc="op.field_name || op.attr_name"/>
+                                </span>
+                                <code t-if="op.anchor_field">→ <t t-esc="op.position"/> <t t-esc="op.anchor_field"/></code>
+                                <code t-if="op.attr_value">= <t t-esc="op.attr_value"/></code>
+                            </div>
+                            <button class="btn btn-xs btn-danger"
+                                    t-on-click="() => deleteOp(op.id)"
+                                    t-att-disabled="state.saving">
+                                <i class="fa fa-times"/>
+                            </button>
+                        </li>
+                        <li t-if="!state.operations.length" class="o_studio_overlay_empty">
+                            No operations on this view yet.
+                        </li>
+                    </ul>
                 </div>
 
                 <div t-if="state.saving" class="o_studio_overlay_saving">

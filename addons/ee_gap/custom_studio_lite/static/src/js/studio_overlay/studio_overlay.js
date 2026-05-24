@@ -58,8 +58,11 @@ export class StudioOverlay extends Component {
             filter: "",
             saving: false,
             selectedField: null,
+            // Persisted op listing (third tab for cleanup).
+            operations: [],
+            customizationId: null,
             // Properties panel state — populated when a field is clicked.
-            tab: "add", // 'add' | 'properties'
+            tab: "add", // 'add' | 'properties' | 'ops'
             fieldProps: {
                 label: "",
                 widget: "",
@@ -148,6 +151,8 @@ export class StudioOverlay extends Component {
         );
         const displayedSet = new Set(this.state.inViewFields);
         this.state.availableFields = all.filter((f) => !displayedSet.has(f.name));
+        // Also load the customization's ops so the Ops tab is in sync.
+        await this.loadOperations();
     }
 
     /** Pick out the view *type* from a controller. Odoo 19 standard view
@@ -338,9 +343,16 @@ export class StudioOverlay extends Component {
     // ----- Persist + apply -----
 
     async _queueAddField(fieldName, anchorName) {
+        // Dedup: skip if the field is already part of the view.
+        if (this.state.inViewFields.includes(fieldName)) {
+            this.notification.add(
+                _t("'%s' is already on this view — drag a different field.", fieldName),
+                { type: "info" },
+            );
+            return;
+        }
         // Re-resolve at drop-time in case the user dragged before
-        // _initialize() finished, OR the active controller changed
-        // (e.g. they navigated while studio was open).
+        // _initialize() finished, OR the active controller changed.
         if (!this.state.currentViewId) {
             const ctrl = this.action.currentController;
             if (ctrl && ctrl.props && ctrl.props.resModel) {
@@ -358,78 +370,14 @@ export class StudioOverlay extends Component {
             );
             return;
         }
-        this.state.saving = true;
-        try {
-            // Re-use any existing customization for this view so multiple
-            // drops accumulate into one inheritance instead of fanning out.
-            const existing = await this.orm.searchRead(
-                "studio.view.customization",
-                [["target_view_id", "=", this.state.currentViewId]],
-                ["id"],
-                { limit: 1, order: "id desc" },
-            );
-
-            const op = {
+        await this._appendOpsAndApply([
+            {
                 op_type: "add_field",
                 field_name: fieldName,
                 anchor_field: anchorName,
                 position: "after",
-            };
-
-            let custId;
-            if (existing.length) {
-                custId = existing[0].id;
-                await this.orm.write("studio.view.customization", [custId], {
-                    operation_ids: [[0, 0, op]],
-                });
-            } else {
-                custId = await this.orm.create("studio.view.customization", [
-                    {
-                        name: `Studio overlay edits — view ${this.state.currentViewId}`,
-                        target_view_id: this.state.currentViewId,
-                        operation_ids: [[0, 0, op]],
-                    },
-                ]);
-                custId = Array.isArray(custId) ? custId[0] : custId;
-            }
-
-            await this.orm.call("studio.view.customization", "action_apply", [
-                [custId],
-            ]);
-
-            const [persisted] = await this.orm.read(
-                "studio.view.customization",
-                [custId],
-                ["state", "last_error"],
-            );
-
-            if (persisted.state === "applied") {
-                this.notification.add(
-                    _t("Added %s after %s — reloading view…", fieldName, anchorName),
-                    { type: "success" },
-                );
-                // Reload the action so the form picks up the new arch.
-                // softReload would be ideal; restore() + the form's own
-                // load cycle is the cleanest cross-version option.
-                await this.action.doAction(
-                    this.action.currentController.action,
-                    { clearBreadcrumbs: false },
-                );
-                await this._initialize();
-            } else {
-                this.notification.add(
-                    _t("Apply failed: %s", persisted.last_error || "unknown"),
-                    { type: "danger", sticky: true },
-                );
-            }
-        } catch (e) {
-            this.notification.add(
-                _t("Drop failed: %s", e.message || String(e)),
-                { type: "danger", sticky: true },
-            );
-        } finally {
-            this.state.saving = false;
-        }
+            },
+        ]);
     }
 
     // ---------- Properties panel ----------
@@ -644,7 +592,12 @@ export class StudioOverlay extends Component {
     // ---------- Shared helpers ----------
 
     /** Persist a batch of operations onto the current view's
-     *  customization (creating one if needed) and then re-apply. */
+     *  customization (creating one if needed) and then re-apply.
+     *
+     *  If apply fails, automatically rolls back the freshly-added ops
+     *  so a broken edit never sticks in the DB — this is what kept
+     *  triggering the same error on every subsequent attempt before.
+     */
     async _appendOpsAndApply(ops) {
         if (!ops || !ops.length || !this.state.currentViewId) return;
         this.state.saving = true;
@@ -655,10 +608,20 @@ export class StudioOverlay extends Component {
                 ["id"],
                 { limit: 1, order: "id desc" },
             );
+
+            // Snapshot the existing operation ids so we can identify
+            // which ones we just added and remove only those on rollback.
             let custId;
+            let preExistingOpIds = [];
             const opTuples = ops.map((o) => [0, 0, o]);
             if (existing.length) {
                 custId = existing[0].id;
+                const before = await this.orm.searchRead(
+                    "studio.view.operation",
+                    [["customization_id", "=", custId]],
+                    ["id"],
+                );
+                preExistingOpIds = before.map((o) => o.id);
                 await this.orm.write("studio.view.customization", [custId], {
                     operation_ids: opTuples,
                 });
@@ -672,6 +635,7 @@ export class StudioOverlay extends Component {
                 ]);
                 custId = Array.isArray(custId) ? custId[0] : custId;
             }
+
             await this.orm.call("studio.view.customization", "action_apply", [
                 [custId],
             ]);
@@ -680,6 +644,7 @@ export class StudioOverlay extends Component {
                 [custId],
                 ["state", "last_error"],
             );
+
             if (persisted.state === "applied") {
                 this.notification.add(_t("Applied — reloading view…"), {
                     type: "success",
@@ -690,8 +655,37 @@ export class StudioOverlay extends Component {
                     await this._loadFieldProperties(this.state.selectedField);
                 }
             } else {
+                // Roll back: drop the ops we just added so the next
+                // apply runs against the previously-known-good op list.
+                const after = await this.orm.searchRead(
+                    "studio.view.operation",
+                    [["customization_id", "=", custId]],
+                    ["id"],
+                );
+                const newOpIds = after
+                    .map((o) => o.id)
+                    .filter((id) => !preExistingOpIds.includes(id));
+                if (newOpIds.length) {
+                    await this.orm.unlink("studio.view.operation", newOpIds);
+                }
+                // Re-apply on the pre-existing op set to clear the
+                // customization's error state.
+                if (preExistingOpIds.length) {
+                    try {
+                        await this.orm.call(
+                            "studio.view.customization",
+                            "action_apply",
+                            [[custId]],
+                        );
+                    } catch (e) {
+                        // ignore — even the prior state was bad.
+                    }
+                }
                 this.notification.add(
-                    _t("Apply failed: %s", persisted.last_error || "unknown"),
+                    _t(
+                        "Op rejected: %s (your change was rolled back)",
+                        persisted.last_error || "unknown",
+                    ),
                     { type: "danger", sticky: true },
                 );
             }
@@ -702,6 +696,52 @@ export class StudioOverlay extends Component {
             );
         } finally {
             this.state.saving = false;
+        }
+    }
+
+    /** Surface (and let the user prune) the operations currently stored
+     *  on this view's customization. Read-only listing — destructive
+     *  cleanup goes through deleteOp(). */
+    async loadOperations() {
+        if (!this.state.currentViewId) return;
+        const existing = await this.orm.searchRead(
+            "studio.view.customization",
+            [["target_view_id", "=", this.state.currentViewId]],
+            ["id"],
+            { limit: 1, order: "id desc" },
+        );
+        if (!existing.length) {
+            this.state.operations = [];
+            this.state.customizationId = null;
+            return;
+        }
+        this.state.customizationId = existing[0].id;
+        const ops = await this.orm.searchRead(
+            "studio.view.operation",
+            [["customization_id", "=", existing[0].id]],
+            ["id", "sequence", "op_type", "field_name", "anchor_field", "position", "attr_name", "attr_value"],
+            { order: "sequence, id" },
+        );
+        this.state.operations = ops;
+    }
+
+    async deleteOp(opId) {
+        try {
+            await this.orm.unlink("studio.view.operation", [opId]);
+            if (this.state.customizationId) {
+                await this.orm.call(
+                    "studio.view.customization",
+                    "action_apply",
+                    [[this.state.customizationId]],
+                );
+            }
+            await this._reloadAction();
+            await this._initialize();
+            await this.loadOperations();
+        } catch (e) {
+            this.notification.add(_t("Delete op failed: %s", e.message || String(e)), {
+                type: "danger",
+            });
         }
     }
 

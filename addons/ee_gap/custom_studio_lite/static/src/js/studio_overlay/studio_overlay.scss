@@ -251,6 +251,35 @@
         align-items: center;
     }
 
+    .o_studio_overlay_op_row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #1a1b27;
+        border: 1px solid #2c2e3d;
+        border-radius: 3px;
+        padding: 6px 8px;
+        margin-bottom: 4px;
+
+        .o_studio_overlay_field_meta {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.3;
+
+            strong {
+                color: #f0c674;
+                font-size: 11px;
+                text-transform: uppercase;
+                margin-right: 6px;
+            }
+            code {
+                color: #9095a8;
+                font-size: 11px;
+            }
+        }
+    }
+
     .o_studio_badge {
         background: #f0c674;
         color: #1e1f2c;
