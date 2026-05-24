@@ -54,6 +54,10 @@
             color: #ffd479;
             background: transparent;
             font-size: 12px;
+
+            &.o_studio_overlay_warning {
+                color: #ff7878;
+            }
         }
     }
 

@@ -19,6 +19,10 @@
                     <small>Model:</small>
                     <code><t t-esc="state.currentModel || '—'"/></code>
                     <small t-if="state.currentViewName"><t t-esc="state.currentViewName"/></small>
+                    <small>View id:</small>
+                    <code t-att-class="state.currentViewId ? '' : 'o_studio_overlay_warning'">
+                        <t t-esc="state.currentViewId || '(not detected)'"/>
+                    </code>
                 </div>
 
                 <div t-if="state.selectedField" class="o_studio_overlay_selected">

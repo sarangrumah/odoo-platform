@@ -236,9 +236,24 @@ export class StudioOverlay extends Component {
     // ----- Persist + apply -----
 
     async _queueAddField(fieldName, anchorName) {
+        // Re-resolve at drop-time in case the user dragged before
+        // _initialize() finished, OR the active controller changed
+        // (e.g. they navigated while studio was open).
+        if (!this.state.currentViewId) {
+            const ctrl = this.action.currentController;
+            if (ctrl && ctrl.props && ctrl.props.resModel) {
+                this.state.currentViewId = await this._resolveViewId(ctrl);
+            }
+        }
         if (!this.state.currentViewId) {
             this.notification.add(
-                _t("Cannot detect the current view id — open this view via a menu (not via search) and try again."),
+                _t(
+                    "Cannot detect the current view id. Model=%s, type=%s — please report.",
+                    this.state.currentModel || "?",
+                    (this.action.currentController &&
+                        this.action.currentController.props &&
+                        this.action.currentController.props.viewType) || "?",
+                ),
                 { type: "danger", sticky: true },
             );
             return;
