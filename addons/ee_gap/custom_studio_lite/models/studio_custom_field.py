@@ -291,6 +291,53 @@ class StudioCustomField(models.Model):
                 rec.write({"state": "error", "last_error": str(e)})
                 rec._pdp_audit_write("studio_field_apply_failed", rec.id, {"error": str(e)})
 
+    @api.model
+    def studio_create_and_place(self, vals, target_view_id, anchor_field):
+        """Atomic helper for the Studio overlay: create the custom field,
+        materialise it via :meth:`action_apply`, then place it on the
+        given view (creating/extending the per-view customization).
+
+        Doing all four steps in one transaction avoids the multi-RPC
+        race where a second worker would try to validate the
+        inheritance against a stale registry that hadn't yet picked up
+        the new field — manifesting as "Field x_studio_xxx does not
+        exist in model".
+        """
+        rec = self.create([vals])
+        rec.action_apply()
+        if rec.state != "applied":
+            raise UserError(_("Field create failed: %s") % rec.last_error)
+        # Flush + refresh so the view validator sees the new column.
+        rec.env.flush_all()
+        rec.env.registry.signal_changes()
+        Cust = self.env["studio.view.customization"].sudo()
+        Op = self.env["studio.view.operation"].sudo()
+        cust = Cust.search([("target_view_id", "=", target_view_id)], limit=1, order="id desc")
+        if not cust:
+            cust = Cust.create(
+                {
+                    "name": f"Studio overlay edits — view {target_view_id}",
+                    "target_view_id": target_view_id,
+                }
+            )
+        Op.create(
+            {
+                "customization_id": cust.id,
+                "op_type": "add_field",
+                "field_name": rec.technical_name,
+                "anchor_field": anchor_field or "",
+                "position": "after" if anchor_field else "inside",
+            }
+        )
+        cust.action_apply()
+        return {
+            "field_id": rec.id,
+            "field_name": rec.technical_name,
+            "customization_id": cust.id,
+            "customization_state": cust.state,
+            "last_error": cust.last_error or "",
+        }
+
     def _build_field_vals(self) -> dict:
         self.ensure_one()
         vals = {

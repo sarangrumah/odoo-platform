@@ -564,8 +564,12 @@ export class StudioOverlay extends Component {
         }
     }
 
-    /** Quick-create a studio.custom.field via the sidebar, then queue an
-     *  add_field op so it lands on the current view. */
+    /** Quick-create a studio.custom.field via the sidebar, then place it
+     *  on the current view. Uses the atomic server-side
+     *  ``studio_create_and_place`` helper so the registry refresh that
+     *  follows field creation is fully visible to the view validator
+     *  in the same transaction (single RPC, single worker, single
+     *  transaction). */
     async createNewField() {
         const label = (this.state.newFieldLabel || "").trim();
         if (!label) {
@@ -576,6 +580,10 @@ export class StudioOverlay extends Component {
             this.notification.add(_t("Model id not detected."), { type: "danger" });
             return;
         }
+        if (!this.state.currentViewId) {
+            this.notification.add(_t("View id not detected."), { type: "danger" });
+            return;
+        }
         // Auto-derive a snake_case x_studio_ name from the label.
         const tech =
             "x_studio_" +
@@ -584,28 +592,38 @@ export class StudioOverlay extends Component {
                 .replace(/[^a-z0-9]+/g, "_")
                 .replace(/^_+|_+$/g, "")
                 .substring(0, 50);
+        const lastInView =
+            this.state.inViewFields[this.state.inViewFields.length - 1] || "";
         this.state.saving = true;
         try {
-            let newId = await this.orm.create("studio.custom.field", [
-                {
-                    name: label,
-                    technical_name: tech,
-                    model_id: this.state.currentModelId,
-                    field_type: this.state.newFieldType,
-                },
-            ]);
-            newId = Array.isArray(newId) ? newId[0] : newId;
-            await this.orm.call("studio.custom.field", "action_apply", [[newId]]);
-            // Anchor at the last visible field; if none, the queue will
-            // surface a friendlier error.
-            const lastInView =
-                this.state.inViewFields[this.state.inViewFields.length - 1] || "";
-            if (lastInView) {
-                await this._queueAddField(tech, lastInView);
+            const result = await this.orm.call(
+                "studio.custom.field",
+                "studio_create_and_place",
+                [
+                    {
+                        name: label,
+                        technical_name: tech,
+                        model_id: this.state.currentModelId,
+                        field_type: this.state.newFieldType,
+                    },
+                    this.state.currentViewId,
+                    lastInView,
+                ],
+            );
+            if (result.customization_state === "applied") {
+                this.notification.add(
+                    _t("Field %s created and placed — reloading view…", result.field_name),
+                    { type: "success" },
+                );
+                await this._reloadAction();
+                await this._initialize();
             } else {
                 this.notification.add(
-                    _t("Field %s created — open the view editor to place it on the layout.", tech),
-                    { type: "success" },
+                    _t(
+                        "Field created but placement failed: %s",
+                        result.last_error || "unknown",
+                    ),
+                    { type: "danger", sticky: true },
                 );
             }
             this.state.newFieldLabel = "";
