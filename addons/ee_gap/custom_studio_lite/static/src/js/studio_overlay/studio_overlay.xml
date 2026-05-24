@@ -150,12 +150,12 @@
                     <h4 class="mt-3">Position</h4>
                     <div class="o_studio_overlay_actions">
                         <button class="btn btn-sm btn-secondary"
-                                t-on-click="() => moveSelectedField('up')"
+                                t-on-click="() => this.moveSelectedField('up')"
                                 t-att-disabled="state.saving">
                             <i class="fa fa-arrow-up"/> Move up
                         </button>
                         <button class="btn btn-sm btn-secondary"
-                                t-on-click="() => moveSelectedField('down')"
+                                t-on-click="() => this.moveSelectedField('down')"
                                 t-att-disabled="state.saving">
                             <i class="fa fa-arrow-down"/> Move down
                         </button>
@@ -198,7 +198,7 @@
                                 <code t-if="op.attr_value">= <t t-esc="op.attr_value"/></code>
                             </div>
                             <button class="btn btn-xs btn-danger"
-                                    t-on-click="() => deleteOp(op.id)"
+                                    t-on-click="() => this.deleteOp(op.id)"
                                     t-att-disabled="state.saving">
                                 <i class="fa fa-times"/>
                             </button>
