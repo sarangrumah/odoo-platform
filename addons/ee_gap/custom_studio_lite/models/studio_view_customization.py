@@ -217,8 +217,12 @@ class StudioViewOperation(models.Model):
             )
         if self.op_type == "hide_field":
             field = self.field_name or ""
+            # Match any named element — ``<field>`` and ``<widget>`` both
+            # honour the ``invisible`` attribute, so this lets Studio
+            # hide things like ``<widget name="web_ribbon" .../>`` or
+            # ``<button name="action_x"/>`` too.
             return (
-                f'  <xpath expr="//field[@name=\'{field}\']" position="attributes">'
+                f'  <xpath expr="//*[@name=\'{field}\']" position="attributes">'
                 f'<attribute name="invisible">1</attribute></xpath>'
             )
         if self.op_type == "move_field":

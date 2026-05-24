@@ -59,6 +59,12 @@ export class StudioOverlay extends Component {
             filter: "",
             saving: false,
             selectedField: null,
+            // True when the selected name only exists as a widget-rendered
+            // element (no <field> in arch) — properties UI hides edit
+            // affordances in that case, only Hide is offered.
+            selectedFieldIsWidgetOnly: false,
+            // Names rendered in the DOM but not present in arch as <field>.
+            renderedOnlyNames: [],
             // Persisted op listing (third tab for cleanup).
             operations: [],
             customizationId: null,
@@ -139,9 +145,18 @@ export class StudioOverlay extends Component {
         // ``apply_inheritance_specs`` with "cannot be located in parent
         // view". Falls back to a DOM scan if the arch read fails.
         const archFieldNames = await this._readArchFieldNames();
+        const renderedNames = this._readRenderedFieldNames();
         this.state.inViewFields = archFieldNames.length
             ? archFieldNames
-            : this._readRenderedFieldNames();
+            : renderedNames;
+        // Names that show up on screen but aren't real <field> nodes
+        // (widget-rendered, button targets, etc.). We can still HIDE
+        // these via hide_field (now uses //*[@name='X'] server-side),
+        // but cannot edit label/widget/etc. on them.
+        const archSet = new Set(archFieldNames);
+        this.state.renderedOnlyNames = renderedNames.filter(
+            (n) => !archSet.has(n),
+        );
 
         // All fields on the model, sourced from ir.model.fields.
         const all = await this.orm.searchRead(
@@ -291,7 +306,9 @@ export class StudioOverlay extends Component {
             }
         };
 
-        // Field click → mark as selected + open properties tab.
+        // Field click → mark as selected + open properties tab. The
+        // properties UI degrades gracefully for widget-rendered names:
+        // edit affordances are hidden, only Hide is offered.
         const onFieldClick = async (ev) => {
             const target = ev.target.closest(FIELD_SELECTOR);
             if (!target) return;
@@ -301,15 +318,12 @@ export class StudioOverlay extends Component {
             ev.preventDefault();
             ev.stopPropagation();
             const fieldName = target.getAttribute("name");
-            // Some rendered fields (e.g. ``active`` used inside a
-            // ``<widget name="web_ribbon" invisible="active"/>``) have no
-            // matching ``<field>`` in the arch, so XPath ops would fail.
-            if (!this.state.inViewFields.includes(fieldName)) {
+            const inArch = this.state.inViewFields.includes(fieldName);
+            const inRenderedOnly = this.state.renderedOnlyNames.includes(fieldName);
+            if (!inArch && !inRenderedOnly) {
+                // Truly unknown — shouldn't happen but degrade safely.
                 this.notification.add(
-                    _t(
-                        "Field '%s' isn't a direct <field> node in this view — only widget-rendered. Studio can't target it.",
-                        fieldName,
-                    ),
+                    _t("Field '%s' is not in this view's arch or DOM.", fieldName),
                     { type: "warning" },
                 );
                 return;
@@ -319,8 +333,23 @@ export class StudioOverlay extends Component {
                 .forEach((el) => el.classList.remove("o_studio_selected"));
             target.classList.add("o_studio_selected");
             this.state.selectedField = fieldName;
+            this.state.selectedFieldIsWidgetOnly = !inArch;
             this.state.tab = "properties";
-            await this._loadFieldProperties(fieldName);
+            if (inArch) {
+                await this._loadFieldProperties(fieldName);
+            } else {
+                // Widget-only: we cannot read attrs from a <field> node.
+                this.state.fieldProps = {
+                    label: "",
+                    widget: "",
+                    invisible: false,
+                    readonly: false,
+                    required: false,
+                };
+                this.state.fieldPropsOriginal = null;
+                this.state.isStudioField = false;
+                this.state.studioFieldId = null;
+            }
         };
 
         document.body.addEventListener("dragover", onOver);

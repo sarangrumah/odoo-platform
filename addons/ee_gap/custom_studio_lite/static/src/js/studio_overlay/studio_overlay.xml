@@ -100,46 +100,54 @@
                      class="o_studio_overlay_panel">
                     <h4>Properties
                         <small t-if="state.isStudioField" class="o_studio_badge">CUSTOM</small>
-                        <small t-if="!state.isStudioField" class="o_studio_badge o_studio_badge_native">NATIVE</small>
+                        <small t-if="!state.isStudioField and !state.selectedFieldIsWidgetOnly"
+                               class="o_studio_badge o_studio_badge_native">NATIVE</small>
+                        <small t-if="state.selectedFieldIsWidgetOnly"
+                               class="o_studio_badge o_studio_badge_widget">WIDGET</small>
                     </h4>
                     <div class="o_studio_overlay_props">
                         <label>Technical name</label>
                         <code><t t-esc="state.selectedField"/></code>
 
-                        <label>Label</label>
-                        <input type="text"
-                               t-att-value="state.fieldProps.label"
-                               t-on-input="(ev) => (state.fieldProps.label = ev.target.value)"/>
+                        <t t-if="!state.selectedFieldIsWidgetOnly">
+                            <label>Label</label>
+                            <input type="text"
+                                   t-att-value="state.fieldProps.label"
+                                   t-on-input="(ev) => (state.fieldProps.label = ev.target.value)"/>
 
-                        <label>Widget</label>
-                        <input type="text"
-                               placeholder="(default)"
-                               t-att-value="state.fieldProps.widget"
-                               t-on-input="(ev) => (state.fieldProps.widget = ev.target.value)"/>
+                            <label>Widget</label>
+                            <input type="text"
+                                   placeholder="(default)"
+                                   t-att-value="state.fieldProps.widget"
+                                   t-on-input="(ev) => (state.fieldProps.widget = ev.target.value)"/>
 
-                        <div class="o_studio_overlay_checks">
-                            <label>
-                                <input type="checkbox"
-                                       t-att-checked="state.fieldProps.invisible"
-                                       t-on-change="(ev) => (state.fieldProps.invisible = ev.target.checked)"/>
-                                Invisible
-                            </label>
-                            <label>
-                                <input type="checkbox"
-                                       t-att-checked="state.fieldProps.readonly"
-                                       t-on-change="(ev) => (state.fieldProps.readonly = ev.target.checked)"/>
-                                Readonly
-                            </label>
-                            <label>
-                                <input type="checkbox"
-                                       t-att-checked="state.fieldProps.required"
-                                       t-on-change="(ev) => (state.fieldProps.required = ev.target.checked)"/>
-                                Required
-                            </label>
-                        </div>
+                            <div class="o_studio_overlay_checks">
+                                <label>
+                                    <input type="checkbox"
+                                           t-att-checked="state.fieldProps.invisible"
+                                           t-on-change="(ev) => (state.fieldProps.invisible = ev.target.checked)"/>
+                                    Invisible
+                                </label>
+                                <label>
+                                    <input type="checkbox"
+                                           t-att-checked="state.fieldProps.readonly"
+                                           t-on-change="(ev) => (state.fieldProps.readonly = ev.target.checked)"/>
+                                    Readonly
+                                </label>
+                                <label>
+                                    <input type="checkbox"
+                                           t-att-checked="state.fieldProps.required"
+                                           t-on-change="(ev) => (state.fieldProps.required = ev.target.checked)"/>
+                                    Required
+                                </label>
+                            </div>
+                        </t>
+                        <p t-if="state.selectedFieldIsWidgetOnly" class="o_studio_hint">
+                            This element is rendered by a widget (e.g. ribbon, button, badge) — only Hide is available.
+                        </p>
                     </div>
 
-                    <div class="o_studio_overlay_actions">
+                    <div t-if="!state.selectedFieldIsWidgetOnly" class="o_studio_overlay_actions">
                         <button class="btn btn-primary"
                                 t-on-click="applyFieldProperties"
                                 t-att-disabled="state.saving">
@@ -147,8 +155,8 @@
                         </button>
                     </div>
 
-                    <h4 class="mt-3">Position</h4>
-                    <div class="o_studio_overlay_actions">
+                    <h4 t-if="!state.selectedFieldIsWidgetOnly" class="mt-3">Position</h4>
+                    <div t-if="!state.selectedFieldIsWidgetOnly" class="o_studio_overlay_actions">
                         <button class="btn btn-sm btn-secondary"
                                 t-on-click="() => this.moveSelectedField('up')"
                                 t-att-disabled="state.saving">
@@ -174,7 +182,8 @@
                                 t-att-disabled="state.saving">
                             <i class="fa fa-trash"/> Delete
                         </button>
-                        <p t-if="!state.isStudioField" class="o_studio_hint">
+                        <p t-if="!state.isStudioField and !state.selectedFieldIsWidgetOnly"
+                           class="o_studio_hint">
                             Only studio-created custom fields can be deleted. Native fields can only be hidden.
                         </p>
                     </div>
