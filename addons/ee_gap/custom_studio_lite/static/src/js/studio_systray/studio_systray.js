@@ -10,7 +10,7 @@
  * saves, navigates back via breadcrumb — the original page reloads
  * picking up the new inheritance.
  */
-import { Component } from "@odoo/owl";
+import { Component, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
@@ -23,6 +23,9 @@ export class StudioSystrayItem extends Component {
         this.action = useService("action");
         this.notification = useService("notification");
         this.overlay = useService("studio_overlay");
+        // Subscribe to the reactive service state — without useState the
+        // button's "active" highlight wouldn't re-render on toggle.
+        this.overlayState = useState(this.overlay.state);
     }
 
     /** When clicked over an editable view, toggle the inline overlay.
@@ -51,7 +54,7 @@ export class StudioSystrayItem extends Component {
 
     /** Visual feedback in the systray button when studio mode is on. */
     get active() {
-        return this.overlay.state.active;
+        return this.overlayState.active;
     }
 }
 

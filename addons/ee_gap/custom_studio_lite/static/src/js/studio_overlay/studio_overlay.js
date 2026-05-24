@@ -42,6 +42,12 @@ export class StudioOverlay extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
 
+        // OWL reactivity rule: a component only re-renders when it
+        // accesses the reactive via its OWN useState wrapper. Without
+        // this line, toggling overlayService.state.active would mutate
+        // the value but never trigger a re-render here.
+        this.overlayState = useState(this.overlayService.state);
+
         this.state = useState({
             currentModel: null,
             currentViewId: null,
@@ -73,7 +79,7 @@ export class StudioOverlay extends Component {
     }
 
     get isActive() {
-        return this.overlayService.state.active;
+        return this.overlayState.active;
     }
 
     /** Snapshot the current view + field lists when studio mode is enabled. */

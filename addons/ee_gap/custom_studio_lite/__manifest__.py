@@ -11,7 +11,7 @@ without forking a module.
 """,
     "author": "Custom Platform",
     "category": "Productivity/Studio",
-    "version": "19.0.0.5.0",
+    "version": "19.0.0.5.1",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -33,13 +33,15 @@ without forking a module.
     ],
     "assets": {
         "web.assets_backend": [
+            # Service first (registry consumer order doesn't matter for
+            # runtime, but explicit ordering keeps the bundle tidy).
+            "custom_studio_lite/static/src/js/studio_overlay/studio_overlay_service.js",
             "custom_studio_lite/static/src/js/studio_view_editor/studio_view_editor.js",
             "custom_studio_lite/static/src/js/studio_view_editor/studio_view_editor.xml",
             "custom_studio_lite/static/src/js/studio_view_editor/studio_view_editor.scss",
             "custom_studio_lite/static/src/js/studio_systray/studio_systray.js",
             "custom_studio_lite/static/src/js/studio_systray/studio_systray.xml",
             "custom_studio_lite/static/src/js/studio_systray/studio_systray.scss",
-            "custom_studio_lite/static/src/js/studio_overlay/studio_overlay_service.js",
             "custom_studio_lite/static/src/js/studio_overlay/studio_overlay.js",
             "custom_studio_lite/static/src/js/studio_overlay/studio_overlay.xml",
             "custom_studio_lite/static/src/js/studio_overlay/studio_overlay.scss",
