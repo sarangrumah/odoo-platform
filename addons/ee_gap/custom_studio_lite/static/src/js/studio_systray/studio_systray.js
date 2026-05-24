@@ -22,7 +22,6 @@ export class StudioSystrayItem extends Component {
     setup() {
         this.action = useService("action");
         this.notification = useService("notification");
-        this.user = useService("user");
     }
 
     /**

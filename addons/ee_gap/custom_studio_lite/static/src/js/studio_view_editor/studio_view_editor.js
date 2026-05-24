@@ -50,10 +50,7 @@ export class StudioViewEditor extends Component {
      * view dropdowns so the user lands directly on the field editor.
      */
     async _applyContextDefaults() {
-        const ctx =
-            (this.props.action && this.props.action.context) ||
-            (this.env.services.user && this.env.services.user.context) ||
-            {};
+        const ctx = (this.props.action && this.props.action.context) || {};
         const defaultModel = ctx.default_model;
         const defaultViewId = ctx.default_view_id;
         if (!defaultModel) return;
