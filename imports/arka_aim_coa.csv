@@ -12,30 +12,30 @@ __import__.coa_1105020001,1105020001,Time Deposit-IDR-PT Bank Central Asia Tbk,a
 __import__.coa_1105020007,1105020007,Time Deposit-IDR-PT Bank Rakyat Indonesia Tbk,asset_cash,False
 __import__.coa_1105020008,1105020008,Time Deposit-IDR-PT Bank Nasional Indonesia Tbk,asset_cash,False
 __import__.coa_1106000001,1106000001,Trade Receivables - Third Parties,asset_receivable,True
-__import__.coa_1106000097,1106000097,Vendor with debit balances - Trade third parties,asset_receivable,False
-__import__.coa_1106000099,1106000099,Customer for receivables adj-Trade third parties,asset_receivable,False
-__import__.coa_1107000001,1107000001,Trade Receivables - Related Parties,asset_receivable,False
-__import__.coa_1107000002,1107000002,Unbilled Trade Receivables  - Related Parties,asset_receivable,False
-__import__.coa_1107000999,1107000999,Trade Receivables - Related Parties (forex),asset_receivable,False
-__import__.coa_1108000001,1108000001,Allowance for impairment of trade rec-Third Party,asset_receivable,False
-__import__.coa_1108000002,1108000002,Allowance for impairment of trade rec-Relate Party,asset_receivable,False
-__import__.coa_1108000003,1108000003,Allowance for impairment of other rec-Third Party,asset_receivable,False
-__import__.coa_1108000004,1108000004,Allowance for impairment of other rec-Relate Party,asset_receivable,False
-__import__.coa_1109000001,1109000001,Employee Receivables,asset_receivable,False
-__import__.coa_1109000002,1109000002,Non Trade Receivables - cash advance,asset_receivable,False
-__import__.coa_1109000003,1109000003,Unbilled Non Trade Receivables  - Third Parties,asset_receivable,False
-__import__.coa_1109000004,1109000004,Unbilled Non Trade Receivables  - Third - Claim,asset_receivable,False
+__import__.coa_1106000097,1106000097,Vendor with debit balances - Trade third parties,asset_receivable,True
+__import__.coa_1106000099,1106000099,Customer for receivables adj-Trade third parties,asset_receivable,True
+__import__.coa_1107000001,1107000001,Trade Receivables - Related Parties,asset_receivable,True
+__import__.coa_1107000002,1107000002,Unbilled Trade Receivables  - Related Parties,asset_receivable,True
+__import__.coa_1107000999,1107000999,Trade Receivables - Related Parties (forex),asset_receivable,True
+__import__.coa_1108000001,1108000001,Allowance for impairment of trade rec-Third Party,asset_receivable,True
+__import__.coa_1108000002,1108000002,Allowance for impairment of trade rec-Relate Party,asset_receivable,True
+__import__.coa_1108000003,1108000003,Allowance for impairment of other rec-Third Party,asset_receivable,True
+__import__.coa_1108000004,1108000004,Allowance for impairment of other rec-Relate Party,asset_receivable,True
+__import__.coa_1109000001,1109000001,Employee Receivables,asset_receivable,True
+__import__.coa_1109000002,1109000002,Non Trade Receivables - cash advance,asset_receivable,True
+__import__.coa_1109000003,1109000003,Unbilled Non Trade Receivables  - Third Parties,asset_receivable,True
+__import__.coa_1109000004,1109000004,Unbilled Non Trade Receivables  - Third - Claim,asset_receivable,True
 __import__.coa_1109000006,1109000006,Non Trade Receivables - Third Parties,asset_receivable,True
 __import__.coa_1109000008,1109000008,Interest Receivables - Third Parties,asset_receivable,True
-__import__.coa_1109000009,1109000009,Other Non Trade Receivables - third parties,asset_receivable,False
-__import__.coa_1109000097,1109000097,Vendor with debit balances-Non Trade-Third parties,asset_receivable,False
-__import__.coa_1109000098,1109000098,BIC unsettled Receivable - Non Trade third parties,asset_receivable,False
-__import__.coa_1109000099,1109000099,Customer for receivable adj-Non Trade third party,asset_receivable,False
-__import__.coa_1109000999,1109000999,Non Trade Receivables - Third Parties (forex),asset_receivable,False
+__import__.coa_1109000009,1109000009,Other Non Trade Receivables - third parties,asset_receivable,True
+__import__.coa_1109000097,1109000097,Vendor with debit balances-Non Trade-Third parties,asset_receivable,True
+__import__.coa_1109000098,1109000098,BIC unsettled Receivable - Non Trade third parties,asset_receivable,True
+__import__.coa_1109000099,1109000099,Customer for receivable adj-Non Trade third party,asset_receivable,True
+__import__.coa_1109000999,1109000999,Non Trade Receivables - Third Parties (forex),asset_receivable,True
 __import__.coa_1110000001,1110000001,Non Trade Receivables - Related Parties,asset_receivable,True
 __import__.coa_1110000002,1110000002,Intercompany Interest Receivables - Related Party,asset_receivable,True
-__import__.coa_1110000003,1110000003,Unbilled Non Trade Receivables  - Related Parties,asset_receivable,False
-__import__.coa_1110000999,1110000999,Non Trade Receivables - Related Parties (forex),asset_receivable,False
+__import__.coa_1110000003,1110000003,Unbilled Non Trade Receivables  - Related Parties,asset_receivable,True
+__import__.coa_1110000999,1110000999,Non Trade Receivables - Related Parties (forex),asset_receivable,True
 __import__.coa_1111000001,1111000001,Intercompany loan Receivables,asset_receivable,True
 __import__.coa_1112000001,1112000001,Other current financial assets,asset_current,False
 __import__.coa_1112000002,1112000002,Convertible notes,asset_current,False
