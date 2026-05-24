@@ -1,4 +1,3 @@
-from . import template_id_psak
 from . import account_move_intercompany_rule
 from . import account_move_inherit
 from . import account_consolidation_config

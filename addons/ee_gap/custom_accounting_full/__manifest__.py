@@ -12,9 +12,10 @@ modules. Scoped to what an Indonesian SMB-mid group needs:
 
 Features
 --------
-- **Indonesian Chart of Accounts (PSAK-aligned)** — minimum-viable
-  set of ~70 accounts covering Aset / Kewajiban / Ekuitas / Pendapatan
-  / HPP / Beban / Pajak. Installable from ``data/account_chart_id.xml``.
+- **PSAK Chart of Accounts** — provisioned via the
+  ``l10n_id_psak_custom`` dependency (53 accounts, 2 PPN taxes, 6
+  journals, 2 fiscal positions, all under the ``id_psak`` template
+  code exposed in Settings → Accounting → Chart Template).
 - **Intercompany automation** — rule table maps a partner (linked to
   ``res.company.partner_id`` of another company) to an auto-mirror
   policy. When Company A posts a sales invoice to a partner that
@@ -54,6 +55,7 @@ elimination journal entry is written to ``pdp.audit_log`` via the
         "sale_management",
         "purchase",
         "mail",
+        "l10n_id_psak_custom",
     ],
     "capability_tags": ["accounting", "intercompany", "consolidation", "audit-trail", "approval-workflow"],
     "data": [
