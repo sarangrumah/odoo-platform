@@ -37,12 +37,16 @@ class TestViewCustomization(TransactionCase):
                 "name": "Partner: add manager note",
                 "target_view_id": self.partner_form.id,
                 "operation_ids": [
-                    (0, 0, {
-                        "op_type": "add_field",
-                        "field_name": self.field.technical_name,
-                        "anchor_field": "function",
-                        "position": "after",
-                    }),
+                    (
+                        0,
+                        0,
+                        {
+                            "op_type": "add_field",
+                            "field_name": self.field.technical_name,
+                            "anchor_field": "function",
+                            "position": "after",
+                        },
+                    ),
                 ],
             }
         )
@@ -59,10 +63,14 @@ class TestViewCustomization(TransactionCase):
                 "name": "Partner: hide website",
                 "target_view_id": self.partner_form.id,
                 "operation_ids": [
-                    (0, 0, {
-                        "op_type": "hide_field",
-                        "field_name": "website",
-                    }),
+                    (
+                        0,
+                        0,
+                        {
+                            "op_type": "hide_field",
+                            "field_name": "website",
+                        },
+                    ),
                 ],
             }
         )
@@ -87,12 +95,16 @@ class TestViewCustomization(TransactionCase):
                     "name": "Bad attr",
                     "target_view_id": self.partner_form.id,
                     "operation_ids": [
-                        (0, 0, {
-                            "op_type": "set_attr",
-                            "field_name": "website",
-                            "attr_name": "delete_my_database",
-                            "attr_value": "1",
-                        }),
+                        (
+                            0,
+                            0,
+                            {
+                                "op_type": "set_attr",
+                                "field_name": "website",
+                                "attr_name": "delete_my_database",
+                                "attr_value": "1",
+                            },
+                        ),
                     ],
                 }
             )
@@ -103,12 +115,16 @@ class TestViewCustomization(TransactionCase):
                 "name": "Partner: bad anchor",
                 "target_view_id": self.partner_form.id,
                 "operation_ids": [
-                    (0, 0, {
-                        "op_type": "add_field",
-                        "field_name": self.field.technical_name,
-                        "anchor_field": "this_field_does_not_exist_anywhere",
-                        "position": "after",
-                    }),
+                    (
+                        0,
+                        0,
+                        {
+                            "op_type": "add_field",
+                            "field_name": self.field.technical_name,
+                            "anchor_field": "this_field_does_not_exist_anywhere",
+                            "position": "after",
+                        },
+                    ),
                 ],
             }
         )

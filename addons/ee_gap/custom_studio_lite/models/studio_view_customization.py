@@ -11,6 +11,7 @@ Phase 1 deliberately ships only this form-driven model. The OWL
 drag-drop editor planned for Phase 2 will write the same operation
 list to this storage.
 """
+
 from __future__ import annotations
 
 import logging
@@ -160,9 +161,7 @@ class StudioViewOperation(models.Model):
     _description = "Studio View Operation"
     _order = "customization_id, sequence, id"
 
-    customization_id = fields.Many2one(
-        "studio.view.customization", required=True, ondelete="cascade", index=True
-    )
+    customization_id = fields.Many2one("studio.view.customization", required=True, ondelete="cascade", index=True)
     sequence = fields.Integer(default=10)
     op_type = fields.Selection(OP_TYPES, required=True, default="add_field")
     field_name = fields.Char(help="Name of the field this op targets (the field being added/hidden/moved/edited).")
@@ -207,8 +206,7 @@ class StudioViewOperation(models.Model):
             field = escape(self.field_name or "")
             pos = self.position or "after"
             return (
-                f'  <xpath expr="//field[@name=\'{anchor}\']" position={quoteattr(pos)}>'
-                f'<field name="{field}"/></xpath>'
+                f'  <xpath expr="//field[@name=\'{anchor}\']" position={quoteattr(pos)}><field name="{field}"/></xpath>'
             )
         if self.op_type == "hide_field":
             field = self.field_name or ""
@@ -221,7 +219,7 @@ class StudioViewOperation(models.Model):
             field = escape(self.field_name or "")
             pos = self.position or "after"
             return (
-                f'  <xpath expr="//field[@name=\'{anchor}\']" position={quoteattr(pos)}>'
+                f"  <xpath expr=\"//field[@name='{anchor}']\" position={quoteattr(pos)}>"
                 f'<field name="{field}" position="move"/></xpath>'
             )
         if self.op_type == "set_attr":

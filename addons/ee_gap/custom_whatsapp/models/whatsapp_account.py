@@ -327,9 +327,7 @@ class WhatsappAccount(models.Model):
         request_id = uuid.uuid4().hex[:8]
 
         if _circuit_open(self.id):
-            raise RuntimeError(
-                f"Baileys circuit breaker OPEN for account '{self.name}' (req={request_id})."
-            )
+            raise RuntimeError(f"Baileys circuit breaker OPEN for account '{self.name}' (req={request_id}).")
 
         url = self._baileys_url(path)
         headers = self._baileys_headers()
@@ -415,10 +413,14 @@ class WhatsappAccount(models.Model):
                 {"account_id": self.id, "hmac_secret": secret},
             )
             status = body.get("status") or "unknown"
-            self.write({
-                "baileys_status": status if status in {"qr_pending", "connecting", "connected", "disconnected", "error"} else "unknown",
-                "baileys_last_error": False,
-            })
+            self.write(
+                {
+                    "baileys_status": status
+                    if status in {"qr_pending", "connecting", "connected", "disconnected", "error"}
+                    else "unknown",
+                    "baileys_last_error": False,
+                }
+            )
             return self.action_baileys_refresh_qr()
         except Exception as e:
             self.write({"baileys_status": "error", "baileys_last_error": str(e)[:2000]})
@@ -460,11 +462,13 @@ class WhatsappAccount(models.Model):
             self._baileys_post(f"sessions/{self._baileys_session()}/logout")
         except Exception as e:
             _logger.warning("baileys logout error: %s", e)
-        self.write({
-            "baileys_status": "disconnected",
-            "baileys_last_qr": False,
-            "baileys_phone": False,
-        })
+        self.write(
+            {
+                "baileys_status": "disconnected",
+                "baileys_last_qr": False,
+                "baileys_phone": False,
+            }
+        )
         return True
 
     # ----- UI action: test connection -----

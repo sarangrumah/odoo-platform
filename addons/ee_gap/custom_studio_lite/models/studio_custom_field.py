@@ -101,13 +101,9 @@ class StudioCustomField(models.Model):
     def _check_relational(self):
         for rec in self:
             if rec.field_type in RELATIONAL_TYPES and not rec.relation_model_id:
-                raise ValidationError(
-                    _("Relational field %s requires a target model.") % rec.technical_name
-                )
+                raise ValidationError(_("Relational field %s requires a target model.") % rec.technical_name)
             if rec.field_type == "one2many" and not rec.relation_field_id:
-                raise ValidationError(
-                    _("One2many %s requires an inverse Many2one field.") % rec.technical_name
-                )
+                raise ValidationError(_("One2many %s requires an inverse Many2one field.") % rec.technical_name)
 
     # ---------- Impact analysis ----------
 
@@ -131,9 +127,7 @@ class StudioCustomField(models.Model):
                 f'name="{rec.technical_name}"',
                 f"name='{rec.technical_name}'",
             )
-            matching = candidates.filtered(
-                lambda v: any(n in (v.arch or "") for n in needles)
-            )
+            matching = candidates.filtered(lambda v: any(n in (v.arch or "") for n in needles))
             rec.dependent_view_ids = [(6, 0, matching.ids)]
             rec.dependent_view_count = len(matching)
 
@@ -251,9 +245,7 @@ class StudioCustomField(models.Model):
         if old_name == new_name or not old_name:
             return
         View = self.env["ir.ui.view"].sudo()
-        pattern = re.compile(
-            r"""(name=)(["'])""" + re.escape(old_name) + r"""(\2)"""
-        )
+        pattern = re.compile(r"""(name=)(["'])""" + re.escape(old_name) + r"""(\2)""")
         if views is None:
             views = self.dependent_view_ids
         for view in views:
@@ -267,9 +259,7 @@ class StudioCustomField(models.Model):
             except Exception as e:
                 _logger.error("Rename propagation failed on view %s: %s — rolling back", view.id, e)
                 view.write({"arch_db": original})
-                raise UserError(
-                    _("Rename rolled back: view %s would become invalid (%s).") % (view.name, e)
-                )
+                raise UserError(_("Rename rolled back: view %s would become invalid (%s).") % (view.name, e))
 
     # ---------- Apply ----------
 
@@ -330,8 +320,7 @@ class StudioCustomField(models.Model):
             if self.field_type == "many2many":
                 # Default link table name fits inside Postgres' 63-char identifier limit.
                 vals["relation_table"] = (
-                    self.relation_table
-                    or f"x_{self.model_name.replace('.', '_')}_{self.technical_name}_rel"
+                    self.relation_table or f"x_{self.model_name.replace('.', '_')}_{self.technical_name}_rel"
                 )[:63]
                 vals["column1"] = f"{self.model_name.replace('.', '_')}_id"[:63]
                 vals["column2"] = f"{self.relation_model_id.model.replace('.', '_')}_id"[:63]

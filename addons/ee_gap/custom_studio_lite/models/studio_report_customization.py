@@ -10,6 +10,7 @@ for the "Advanced" page where designers paste raw QWeb snippets — those
 are validated server-side against a restricted directive whitelist
 before being applied.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,20 +26,25 @@ _logger = logging.getLogger(__name__)
 # QWeb directives we allow in user-supplied snippets. Anything outside
 # this list is rejected to keep the surface area auditable.
 _QWEB_ALLOWED_DIRECTIVES = {
-    "t-if", "t-elif", "t-else",
-    "t-foreach", "t-as",
-    "t-esc", "t-out", "t-field",
+    "t-if",
+    "t-elif",
+    "t-else",
+    "t-foreach",
+    "t-as",
+    "t-esc",
+    "t-out",
+    "t-field",
     "t-options",
     "t-set",
-    "t-att", "t-att-class", "t-att-style",
+    "t-att",
+    "t-att-class",
+    "t-att-style",
 }
 
 
 # Catch any unsafe t-* directive — t-call could load arbitrary templates,
 # t-call-assets too, t-raw was removed but defensive.
-_QWEB_FORBIDDEN_PATTERN = re.compile(
-    r"\bt-(call|call-assets|raw|debug|js|signature)\b"
-)
+_QWEB_FORBIDDEN_PATTERN = re.compile(r"\bt-(call|call-assets|raw|debug|js|signature)\b")
 
 
 class StudioReportCustomization(models.Model):
@@ -71,26 +77,29 @@ class StudioReportCustomization(models.Model):
 
     header_text = fields.Text(help="Replaces or appends to the report header. Use \\n for line breaks.")
     header_mode = fields.Selection(
-        [("append", "Append after default header"),
-         ("replace", "Replace default header")],
+        [("append", "Append after default header"), ("replace", "Replace default header")],
         default="append",
     )
     footer_text = fields.Text()
     footer_mode = fields.Selection(
-        [("append", "Append after default footer"),
-         ("replace", "Replace default footer")],
+        [("append", "Append after default footer"), ("replace", "Replace default footer")],
         default="append",
     )
 
     # User-supplied QWeb XPath snippets (advanced). Each row is a single
     # <xpath ...>...</xpath> block. Validation happens in _check_qweb.
     custom_xpath_ids = fields.One2many(
-        "studio.report.xpath", "customization_id", string="QWeb XPath Snippets",
+        "studio.report.xpath",
+        "customization_id",
+        string="QWeb XPath Snippets",
     )
 
     inherit_view_id = fields.Many2one("ir.ui.view", readonly=True, copy=False, ondelete="set null")
     inherit_report_id = fields.Many2one(
-        "ir.actions.report", readonly=True, copy=False, ondelete="set null",
+        "ir.actions.report",
+        readonly=True,
+        copy=False,
+        ondelete="set null",
         help="When paper format is overridden, a clone of the base report is materialised.",
     )
     state = fields.Selection(
@@ -147,16 +156,20 @@ class StudioReportCustomization(models.Model):
                 # action and switch its paper format.
                 if rec.paper_format_id:
                     if not rec.inherit_report_id:
-                        cloned = rec.base_report_id.copy({
-                            "name": f"{rec.base_report_id.name} (Studio)",
-                            "paperformat_id": rec.paper_format_id.id,
-                        })
+                        cloned = rec.base_report_id.copy(
+                            {
+                                "name": f"{rec.base_report_id.name} (Studio)",
+                                "paperformat_id": rec.paper_format_id.id,
+                            }
+                        )
                         rec.inherit_report_id = cloned.id
                     else:
-                        rec.inherit_report_id.write({
-                            "paperformat_id": rec.paper_format_id.id,
-                            "active": rec.active,
-                        })
+                        rec.inherit_report_id.write(
+                            {
+                                "paperformat_id": rec.paper_format_id.id,
+                                "active": rec.active,
+                            }
+                        )
                 rec.write({"state": "applied", "last_error": False})
                 rec._pdp_audit_write(
                     "studio_report_applied",
@@ -180,14 +193,14 @@ class StudioReportCustomization(models.Model):
             mode = "replace" if self.header_mode == "replace" else "after"
             text = escape(self.header_text).replace("\n", "<br/>")
             parts.append(
-                f'  <xpath expr="//div[hasclass(\'header\')]" position={quoteattr(mode)}>'
+                f"  <xpath expr=\"//div[hasclass('header')]\" position={quoteattr(mode)}>"
                 f'<div class="o_studio_header_block">{text}</div></xpath>'
             )
         if self.footer_text:
             mode = "replace" if self.footer_mode == "replace" else "after"
             text = escape(self.footer_text).replace("\n", "<br/>")
             parts.append(
-                f'  <xpath expr="//div[hasclass(\'footer\')]" position={quoteattr(mode)}>'
+                f"  <xpath expr=\"//div[hasclass('footer')]\" position={quoteattr(mode)}>"
                 f'<div class="o_studio_footer_block">{text}</div></xpath>'
             )
         for xp in self.custom_xpath_ids.sorted("sequence"):
@@ -201,15 +214,13 @@ class StudioReportXpath(models.Model):
     _description = "Studio Report QWeb XPath"
     _order = "customization_id, sequence, id"
 
-    customization_id = fields.Many2one(
-        "studio.report.customization", required=True, ondelete="cascade", index=True
-    )
+    customization_id = fields.Many2one("studio.report.customization", required=True, ondelete="cascade", index=True)
     sequence = fields.Integer(default=10)
     label = fields.Char(help="Human-readable label for this snippet.")
     xpath_snippet = fields.Text(
         required=True,
         help="A single <xpath>...</xpath> block. Allowed QWeb directives: "
-             + ", ".join(sorted(_QWEB_ALLOWED_DIRECTIVES)),
+        + ", ".join(sorted(_QWEB_ALLOWED_DIRECTIVES)),
     )
 
     @api.constrains("xpath_snippet")
@@ -219,6 +230,4 @@ class StudioReportXpath(models.Model):
             if not snippet.strip().startswith("<xpath"):
                 raise ValidationError(_("Snippet must start with <xpath ...>."))
             if _QWEB_FORBIDDEN_PATTERN.search(snippet):
-                raise ValidationError(
-                    _("Snippet uses a forbidden QWeb directive (t-call / t-raw / etc).")
-                )
+                raise ValidationError(_("Snippet uses a forbidden QWeb directive (t-call / t-raw / etc)."))

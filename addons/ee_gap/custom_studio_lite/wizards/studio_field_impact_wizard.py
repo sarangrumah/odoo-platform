@@ -5,6 +5,7 @@ Listing the affected views and asking the user to confirm cascade is the
 safe alternative to silent destruction. Cascading rewrites the dependent
 views' arch_db (rename) or strips the field reference (delete).
 """
+
 from __future__ import annotations
 
 import re
@@ -17,9 +18,7 @@ class StudioFieldImpactWizard(models.TransientModel):
     _name = "studio.field.impact.wizard"
     _description = "Studio Field Impact Wizard"
 
-    custom_field_id = fields.Many2one(
-        "studio.custom.field", required=True, ondelete="cascade"
-    )
+    custom_field_id = fields.Many2one("studio.custom.field", required=True, ondelete="cascade")
     operation = fields.Selection(
         [("rename", "Rename"), ("delete", "Delete")],
         required=True,
@@ -35,8 +34,7 @@ class StudioFieldImpactWizard(models.TransientModel):
     )
     cascade = fields.Boolean(
         default=True,
-        help="When ticked, rewrite the dependent views automatically. "
-        "When unticked, the operation is blocked.",
+        help="When ticked, rewrite the dependent views automatically. When unticked, the operation is blocked.",
     )
     summary = fields.Text(compute="_compute_summary")
 
@@ -59,9 +57,7 @@ class StudioFieldImpactWizard(models.TransientModel):
     def action_confirm(self):
         self.ensure_one()
         if not self.cascade and self.view_ids:
-            raise UserError(
-                _("Cascade is disabled and there are dependent views — operation cancelled.")
-            )
+            raise UserError(_("Cascade is disabled and there are dependent views — operation cancelled."))
         if self.operation == "rename":
             return self._do_rename()
         return self._do_delete()

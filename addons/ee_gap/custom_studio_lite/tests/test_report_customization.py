@@ -69,6 +69,6 @@ class TestReportCustomization(TransactionCase):
             self.Xpath.create(
                 {
                     "customization_id": cust.id,
-                    "xpath_snippet": '<div>not xpath</div>',
+                    "xpath_snippet": "<div>not xpath</div>",
                 }
             )

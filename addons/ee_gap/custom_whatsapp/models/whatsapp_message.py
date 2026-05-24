@@ -196,9 +196,7 @@ class WhatsappMessage(models.Model):
         try:
             if account.provider == "baileys":
                 payload = self._build_baileys_payload()
-                response = account._baileys_post(
-                    f"sessions/{account._baileys_session()}/messages", payload
-                )
+                response = account._baileys_post(f"sessions/{account._baileys_session()}/messages", payload)
                 provider_id = response.get("id")
                 if not provider_id:
                     raise RuntimeError(f"Baileys response missing id: {response!r}")

@@ -185,9 +185,7 @@ class TestBaileysWebhookDispatch(HttpCase):
             },
         )
         self.assertEqual(resp.status_code, 200)
-        inbound = self.Message.search(
-            [("provider_message_id", "=", "baileys.IN1")], limit=1
-        )
+        inbound = self.Message.search([("provider_message_id", "=", "baileys.IN1")], limit=1)
         self.assertTrue(inbound)
         self.assertEqual(inbound.direction, "inbound")
         self.assertEqual(inbound.state, "received")

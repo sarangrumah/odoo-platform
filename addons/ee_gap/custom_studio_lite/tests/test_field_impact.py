@@ -36,12 +36,16 @@ class TestFieldImpact(TransactionCase):
                 "name": "Partner: impact placement",
                 "target_view_id": cls.partner_form.id,
                 "operation_ids": [
-                    (0, 0, {
-                        "op_type": "add_field",
-                        "field_name": cls.field.technical_name,
-                        "anchor_field": "function",
-                        "position": "after",
-                    }),
+                    (
+                        0,
+                        0,
+                        {
+                            "op_type": "add_field",
+                            "field_name": cls.field.technical_name,
+                            "anchor_field": "function",
+                            "position": "after",
+                        },
+                    ),
                 ],
             }
         )
@@ -93,4 +97,4 @@ class TestFieldImpact(TransactionCase):
         self.cust.inherit_view_id.invalidate_recordset()
         arch = self.cust.inherit_view_id.arch_db or ""
         self.assertIn(new_name, arch)
-        self.assertNotIn("x_studio_impact_field\"", arch)
+        self.assertNotIn('x_studio_impact_field"', arch)

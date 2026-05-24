@@ -201,9 +201,9 @@ class WhatsappWebhookController(http.Controller):
         if event_type == "connection":
             new_status = payload.get("status") or "unknown"
             vals = {
-                "baileys_status": new_status if new_status in {
-                    "qr_pending", "connecting", "connected", "disconnected", "error"
-                } else "unknown",
+                "baileys_status": new_status
+                if new_status in {"qr_pending", "connecting", "connected", "disconnected", "error"}
+                else "unknown",
             }
             if new_status == "connected":
                 vals["baileys_phone"] = payload.get("phone") or False

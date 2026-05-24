@@ -23,11 +23,15 @@ class TestAutomationRule(TransactionCase):
                 "model_id": self.partner_model.id,
                 "trigger": "on_create",
                 "action_ids": [
-                    (0, 0, {
-                        "name": "Greet",
-                        "template": "post_note",
-                        "body": "New partner created!",
-                    }),
+                    (
+                        0,
+                        0,
+                        {
+                            "name": "Greet",
+                            "template": "post_note",
+                            "body": "New partner created!",
+                        },
+                    ),
                 ],
             }
         )
@@ -50,12 +54,21 @@ class TestAutomationRule(TransactionCase):
                 "trigger": "on_create",
                 "action_ids": [
                     (0, 0, {"name": "Note", "template": "post_note", "body": "step 1"}),
-                    (0, 0, {"name": "Set", "template": "set_field",
-                            "target_field_id": self.env["ir.model.fields"].search(
+                    (
+                        0,
+                        0,
+                        {
+                            "name": "Set",
+                            "template": "set_field",
+                            "target_field_id": self.env["ir.model.fields"]
+                            .search(
                                 [("model", "=", "res.partner"), ("name", "=", "comment")],
                                 limit=1,
-                            ).id,
-                            "target_value": "auto"}),
+                            )
+                            .id,
+                            "target_value": "auto",
+                        },
+                    ),
                 ],
             }
         )

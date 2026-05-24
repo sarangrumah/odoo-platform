@@ -18,6 +18,7 @@ that:
 The native ``base.automation`` record remains the source of truth; this
 wrapper just makes it approachable.
 """
+
 from __future__ import annotations
 
 import logging
@@ -182,11 +183,13 @@ class StudioAutomationRule(models.Model):
         if self.trigger_field_ids:
             vals["trigger_field_ids"] = [(6, 0, self.trigger_field_ids.ids)]
         if self.trigger == "on_time":
-            vals.update({
-                "trg_date_id": self.trg_date_id.id,
-                "trg_date_range": self.delay_minutes or 0,
-                "trg_date_range_type": "minutes",
-            })
+            vals.update(
+                {
+                    "trg_date_id": self.trg_date_id.id,
+                    "trg_date_range": self.delay_minutes or 0,
+                    "trg_date_range_type": "minutes",
+                }
+            )
         if self.trigger == "on_state_set" and self.state_value:
             # Encode the state filter directly into the domain so it
             # fires only when state hits the target value.
@@ -231,8 +234,7 @@ class StudioAutomationAction(models.Model):
     )
     parent_path = fields.Char(index=True)
     branch_type = fields.Selection(
-        [("always", "Always run"), ("then", "If parent condition is true"),
-         ("else", "Otherwise (else branch)")],
+        [("always", "Always run"), ("then", "If parent condition is true"), ("else", "Otherwise (else branch)")],
         default="always",
         required=True,
         help="Used when this action has a parent_action_id — controls which branch it sits on.",
@@ -267,10 +269,7 @@ class StudioAutomationAction(models.Model):
     webhook_url = fields.Char(string="Webhook URL")
     python_code = fields.Text(
         string="Python Code",
-        help=(
-            "Standard server-action code. ``record``, ``records``, ``env``, "
-            "``model`` and ``log`` are available."
-        ),
+        help=("Standard server-action code. ``record``, ``records``, ``env``, ``model`` and ``log`` are available."),
     )
 
     def _build_server_action_vals(self, automation) -> dict:
