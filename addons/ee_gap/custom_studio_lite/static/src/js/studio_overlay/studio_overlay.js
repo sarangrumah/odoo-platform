@@ -94,7 +94,7 @@ export class StudioOverlay extends Component {
             return;
         }
         this.state.currentModel = ctrl.props.resModel;
-        this.state.currentViewId = ctrl.props.viewId || null;
+        this.state.currentViewId = await this._resolveViewId(ctrl);
         this.state.currentViewName =
             (ctrl.props.viewType ? `[${ctrl.props.viewType}] ` : "") +
             (ctrl.title || ctrl.displayName || "");
@@ -114,6 +114,41 @@ export class StudioOverlay extends Component {
         );
         const displayedSet = new Set(renderedFieldNames);
         this.state.availableFields = all.filter((f) => !displayedSet.has(f.name));
+    }
+
+    /** Resolve the view id of the currently-rendered view via three
+     *  fallbacks. Many actions don't set props.viewId directly (it's
+     *  derived from the action's ``views`` tuple list). When the action
+     *  itself is opaque (search/global filter results), fall back to
+     *  an ir.ui.view RPC matching model + type. */
+    async _resolveViewId(ctrl) {
+        if (ctrl.props.viewId) return ctrl.props.viewId;
+        const viewType = ctrl.props.viewType;
+        // ctrl.props.views shape: [[id, type], [id|false, type], ...]
+        const fromProps = (ctrl.props.views || []).find(
+            ([, type]) => type === viewType,
+        );
+        if (fromProps && fromProps[0]) return fromProps[0];
+        // ctrl.action.views same shape — fallback when ctrl.props lacks it
+        const fromAction =
+            ctrl.action && (ctrl.action.views || []).find(([, type]) => type === viewType);
+        if (fromAction && fromAction[0]) return fromAction[0];
+        // Last resort: RPC for the primary view of (model, type).
+        try {
+            const rows = await this.orm.searchRead(
+                "ir.ui.view",
+                [
+                    ["model", "=", ctrl.props.resModel],
+                    ["type", "=", viewType],
+                    ["inherit_id", "=", false],
+                ],
+                ["id"],
+                { limit: 1, order: "priority, id" },
+            );
+            return rows.length ? rows[0].id : null;
+        } catch (e) {
+            return null;
+        }
     }
 
     _readRenderedFieldNames() {
