@@ -128,11 +128,16 @@ export class StudioOverlay extends Component {
             this.state.currentModelId = null;
         }
 
-        // Fields displayed on the rendered view, harvested directly
-        // from the DOM. Falls back to empty if the view isn't fully
-        // mounted yet (rare race).
-        const renderedFieldNames = this._readRenderedFieldNames();
-        this.state.inViewFields = renderedFieldNames;
+        // Fields that exist as <field name="..."> in the combined arch.
+        // These are the only ones we can safely target with XPath ops —
+        // widget-rendered names (e.g. web_ribbon uses ``active`` in an
+        // invisible expression but emits no <field> node) would crash
+        // ``apply_inheritance_specs`` with "cannot be located in parent
+        // view". Falls back to a DOM scan if the arch read fails.
+        const archFieldNames = await this._readArchFieldNames();
+        this.state.inViewFields = archFieldNames.length
+            ? archFieldNames
+            : this._readRenderedFieldNames();
 
         // All fields on the model, sourced from ir.model.fields.
         const all = await this.orm.searchRead(
@@ -141,7 +146,7 @@ export class StudioOverlay extends Component {
             ["id", "name", "field_description", "ttype"],
             { order: "field_description", limit: 500 },
         );
-        const displayedSet = new Set(renderedFieldNames);
+        const displayedSet = new Set(this.state.inViewFields);
         this.state.availableFields = all.filter((f) => !displayedSet.has(f.name));
     }
 
@@ -202,6 +207,29 @@ export class StudioOverlay extends Component {
         return names;
     }
 
+    /** Parse the combined arch for actual ``<field name=...>`` nodes —
+     *  these are the only legal XPath anchors. Widget-rendered names
+     *  (web_ribbon, button targets, etc.) are intentionally excluded. */
+    async _readArchFieldNames() {
+        if (!this.state.currentViewId) return [];
+        try {
+            const arch = await this.orm.call(
+                "ir.ui.view",
+                "get_combined_arch",
+                [[this.state.currentViewId]],
+            );
+            const doc = new DOMParser().parseFromString(arch, "application/xml");
+            const out = [];
+            for (const el of doc.getElementsByTagName("field")) {
+                const n = el.getAttribute("name");
+                if (n && !out.includes(n)) out.push(n);
+            }
+            return out;
+        } catch (e) {
+            return [];
+        }
+    }
+
     // ----- Sidebar drag source -----
 
     onDragStart(fieldName, ev) {
@@ -241,6 +269,17 @@ export class StudioOverlay extends Component {
                 ev.dataTransfer.getData("application/x-studio-field") ||
                 ev.dataTransfer.getData("text/plain");
             const anchor = target.getAttribute("name");
+            // Same arch-vs-DOM caveat as the click handler.
+            if (anchor && !this.state.inViewFields.includes(anchor)) {
+                this.notification.add(
+                    _t(
+                        "Drop target '%s' isn't a real <field> node in the arch — pick a different anchor.",
+                        anchor,
+                    ),
+                    { type: "warning" },
+                );
+                return;
+            }
             if (newField && anchor) {
                 await this._queueAddField(newField, anchor);
             }
@@ -255,13 +294,27 @@ export class StudioOverlay extends Component {
             // links / triggering button onclicks.
             ev.preventDefault();
             ev.stopPropagation();
+            const fieldName = target.getAttribute("name");
+            // Some rendered fields (e.g. ``active`` used inside a
+            // ``<widget name="web_ribbon" invisible="active"/>``) have no
+            // matching ``<field>`` in the arch, so XPath ops would fail.
+            if (!this.state.inViewFields.includes(fieldName)) {
+                this.notification.add(
+                    _t(
+                        "Field '%s' isn't a direct <field> node in this view — only widget-rendered. Studio can't target it.",
+                        fieldName,
+                    ),
+                    { type: "warning" },
+                );
+                return;
+            }
             document
                 .querySelectorAll(".o_studio_selected")
                 .forEach((el) => el.classList.remove("o_studio_selected"));
             target.classList.add("o_studio_selected");
-            this.state.selectedField = target.getAttribute("name");
+            this.state.selectedField = fieldName;
             this.state.tab = "properties";
-            await this._loadFieldProperties(this.state.selectedField);
+            await this._loadFieldProperties(fieldName);
         };
 
         document.body.addEventListener("dragover", onOver);
