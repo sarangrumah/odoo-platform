@@ -95,8 +95,9 @@ export class StudioOverlay extends Component {
         }
         this.state.currentModel = ctrl.props.resModel;
         this.state.currentViewId = await this._resolveViewId(ctrl);
+        const viewType = this._viewType(ctrl);
         this.state.currentViewName =
-            (ctrl.props.viewType ? `[${ctrl.props.viewType}] ` : "") +
+            (viewType ? `[${viewType}] ` : "") +
             (ctrl.title || ctrl.displayName || "");
 
         // Fields displayed on the rendered view, harvested directly
@@ -116,24 +117,37 @@ export class StudioOverlay extends Component {
         this.state.availableFields = all.filter((f) => !displayedSet.has(f.name));
     }
 
-    /** Resolve the view id of the currently-rendered view via three
-     *  fallbacks. Many actions don't set props.viewId directly (it's
-     *  derived from the action's ``views`` tuple list). When the action
-     *  itself is opaque (search/global filter results), fall back to
-     *  an ir.ui.view RPC matching model + type. */
-    async _resolveViewId(ctrl) {
-        if (ctrl.props.viewId) return ctrl.props.viewId;
-        const viewType = ctrl.props.viewType;
-        // ctrl.props.views shape: [[id, type], [id|false, type], ...]
-        const fromProps = (ctrl.props.views || []).find(
-            ([, type]) => type === viewType,
+    /** Pick out the view *type* from a controller. Odoo 19 standard view
+     *  props expose this as ``props.type`` (NOT ``viewType``), and the
+     *  controller itself also carries a ``view`` object whose ``.type``
+     *  is canonical. */
+    _viewType(ctrl) {
+        return (
+            (ctrl.props && ctrl.props.type) ||
+            (ctrl.view && ctrl.view.type) ||
+            null
         );
-        if (fromProps && fromProps[0]) return fromProps[0];
-        // ctrl.action.views same shape — fallback when ctrl.props lacks it
+    }
+
+    /** Resolve the view id of the currently-rendered view. The Odoo 19
+     *  controller exposes the *resolved* view as ``ctrl.view`` (id +
+     *  type), which is the cleanest source. We also keep fallbacks for
+     *  edge cases (sub-action controllers, action.views matching, and
+     *  finally an ir.ui.view RPC by (model, type)). */
+    async _resolveViewId(ctrl) {
+        // 1. The resolved view attached to the controller.
+        if (ctrl.view && ctrl.view.id) return ctrl.view.id;
+        // 2. action.views as [[id, type], ...].
+        const viewType = this._viewType(ctrl);
         const fromAction =
             ctrl.action && (ctrl.action.views || []).find(([, type]) => type === viewType);
         if (fromAction && fromAction[0]) return fromAction[0];
-        // Last resort: RPC for the primary view of (model, type).
+        // 3. controller.views (an array of view objects).
+        const fromViews =
+            ctrl.views && ctrl.views.find((v) => v.type === viewType);
+        if (fromViews && fromViews.id) return fromViews.id;
+        // 4. Last resort: RPC for the primary view of (model, type).
+        if (!viewType) return null;
         try {
             const rows = await this.orm.searchRead(
                 "ir.ui.view",
@@ -250,9 +264,7 @@ export class StudioOverlay extends Component {
                 _t(
                     "Cannot detect the current view id. Model=%s, type=%s — please report.",
                     this.state.currentModel || "?",
-                    (this.action.currentController &&
-                        this.action.currentController.props &&
-                        this.action.currentController.props.viewType) || "?",
+                    this._viewType(this.action.currentController) || "?",
                 ),
                 { type: "danger", sticky: true },
             );
