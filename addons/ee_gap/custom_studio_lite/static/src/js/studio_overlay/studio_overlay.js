@@ -50,6 +50,7 @@ export class StudioOverlay extends Component {
 
         this.state = useState({
             currentModel: null,
+            currentModelId: null,
             currentViewId: null,
             currentViewName: "",
             availableFields: [],
@@ -57,6 +58,21 @@ export class StudioOverlay extends Component {
             filter: "",
             saving: false,
             selectedField: null,
+            // Properties panel state — populated when a field is clicked.
+            tab: "add", // 'add' | 'properties'
+            fieldProps: {
+                label: "",
+                widget: "",
+                invisible: false,
+                readonly: false,
+                required: false,
+            },
+            fieldPropsOriginal: null,
+            isStudioField: false,
+            studioFieldId: null,
+            // Inline new-field creator.
+            newFieldLabel: "",
+            newFieldType: "char",
         });
 
         // React to studio-mode toggle: initialise + install listeners
@@ -99,6 +115,18 @@ export class StudioOverlay extends Component {
         this.state.currentViewName =
             (viewType ? `[${viewType}] ` : "") +
             (ctrl.title || ctrl.displayName || "");
+        // Cache the ir.model id so the New Field creator can target it.
+        try {
+            const m = await this.orm.searchRead(
+                "ir.model",
+                [["model", "=", ctrl.props.resModel]],
+                ["id"],
+                { limit: 1 },
+            );
+            this.state.currentModelId = m.length ? m[0].id : null;
+        } catch (e) {
+            this.state.currentModelId = null;
+        }
 
         // Fields displayed on the rendered view, harvested directly
         // from the DOM. Falls back to empty if the view isn't fully
@@ -218,15 +246,22 @@ export class StudioOverlay extends Component {
             }
         };
 
-        // Field click → mark as selected (visual feedback only for now).
-        const onFieldClick = (ev) => {
+        // Field click → mark as selected + open properties tab.
+        const onFieldClick = async (ev) => {
             const target = ev.target.closest(FIELD_SELECTOR);
             if (!target) return;
+            // Block normal click behaviour while studio mode is active —
+            // we don't want the user accidentally opening relational
+            // links / triggering button onclicks.
+            ev.preventDefault();
+            ev.stopPropagation();
             document
                 .querySelectorAll(".o_studio_selected")
                 .forEach((el) => el.classList.remove("o_studio_selected"));
             target.classList.add("o_studio_selected");
             this.state.selectedField = target.getAttribute("name");
+            this.state.tab = "properties";
+            await this._loadFieldProperties(this.state.selectedField);
         };
 
         document.body.addEventListener("dragover", onOver);
@@ -342,6 +377,285 @@ export class StudioOverlay extends Component {
         } finally {
             this.state.saving = false;
         }
+    }
+
+    // ---------- Properties panel ----------
+
+    /** Fetch the current attrs of a field from the combined view arch,
+     *  plus whether it's a studio-created custom field. */
+    async _loadFieldProperties(fieldName) {
+        const blank = {
+            label: "",
+            widget: "",
+            invisible: false,
+            readonly: false,
+            required: false,
+        };
+        this.state.fieldProps = { ...blank };
+        this.state.fieldPropsOriginal = null;
+        this.state.isStudioField = false;
+        this.state.studioFieldId = null;
+        if (!fieldName || !this.state.currentViewId) return;
+        try {
+            const combined = await this.orm.call(
+                "ir.ui.view",
+                "get_combined_arch",
+                [[this.state.currentViewId]],
+            );
+            const doc = new DOMParser().parseFromString(combined, "application/xml");
+            // First <field name="X"> wins — same heuristic the editor list uses.
+            const fieldNode = doc.querySelector(
+                `field[name="${fieldName.replace(/"/g, '\\"')}"]`,
+            );
+            if (fieldNode) {
+                const truthy = (v) =>
+                    v === "1" || v === "True" || v === "true" || v === true;
+                this.state.fieldProps = {
+                    label: fieldNode.getAttribute("string") || "",
+                    widget: fieldNode.getAttribute("widget") || "",
+                    invisible: truthy(fieldNode.getAttribute("invisible")),
+                    readonly: truthy(fieldNode.getAttribute("readonly")),
+                    required: truthy(fieldNode.getAttribute("required")),
+                };
+                this.state.fieldPropsOriginal = { ...this.state.fieldProps };
+            }
+            // Check if this is a studio.custom.field (so we can offer Delete).
+            const custom = await this.orm.searchRead(
+                "studio.custom.field",
+                [
+                    ["technical_name", "=", fieldName],
+                    ["model_name", "=", this.state.currentModel],
+                ],
+                ["id"],
+                { limit: 1 },
+            );
+            if (custom.length) {
+                this.state.isStudioField = true;
+                this.state.studioFieldId = custom[0].id;
+            }
+        } catch (e) {
+            this.notification.add(
+                _t("Could not load field properties: %s", e.message || String(e)),
+                { type: "warning" },
+            );
+        }
+    }
+
+    /** Diff fieldProps vs original, persist each change as a set_attr op. */
+    async applyFieldProperties() {
+        if (!this.state.selectedField || !this.state.fieldPropsOriginal) return;
+        const ops = [];
+        const orig = this.state.fieldPropsOriginal;
+        const curr = this.state.fieldProps;
+        // String attrs.
+        for (const key of ["label", "widget"]) {
+            if ((curr[key] || "") !== (orig[key] || "")) {
+                const attr = key === "label" ? "string" : key;
+                ops.push({
+                    op_type: "set_attr",
+                    field_name: this.state.selectedField,
+                    attr_name: attr,
+                    attr_value: curr[key] || "",
+                });
+            }
+        }
+        // Boolean attrs — set_attr with "1" or "0". We always emit when
+        // the value differs from original so the inheritance encodes the
+        // explicit state.
+        for (const key of ["invisible", "readonly", "required"]) {
+            if (!!curr[key] !== !!orig[key]) {
+                ops.push({
+                    op_type: "set_attr",
+                    field_name: this.state.selectedField,
+                    attr_name: key,
+                    attr_value: curr[key] ? "1" : "0",
+                });
+            }
+        }
+        if (!ops.length) {
+            this.notification.add(_t("No changes to apply."), { type: "info" });
+            return;
+        }
+        await this._appendOpsAndApply(ops);
+    }
+
+    /** Move the selected field one slot up or down by emitting a
+     *  move_field op anchored at the adjacent field. */
+    async moveSelectedField(direction) {
+        const fieldName = this.state.selectedField;
+        if (!fieldName) return;
+        const idx = this.state.inViewFields.indexOf(fieldName);
+        if (idx < 0) return;
+        const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= this.state.inViewFields.length) return;
+        const anchor = this.state.inViewFields[targetIdx];
+        const position = direction === "up" ? "before" : "after";
+        await this._appendOpsAndApply([
+            {
+                op_type: "move_field",
+                field_name: fieldName,
+                anchor_field: anchor,
+                position,
+            },
+        ]);
+    }
+
+    /** Delete a studio.custom.field outright (force cascade — any
+     *  remaining view refs are stripped by the field's unlink hook). */
+    async deleteStudioField() {
+        if (!this.state.isStudioField || !this.state.studioFieldId) return;
+        const ok = window.confirm(
+            _t("Delete the custom field '%s'? This drops the DB column.", this.state.selectedField),
+        );
+        if (!ok) return;
+        this.state.saving = true;
+        try {
+            await this.orm.call(
+                "studio.custom.field",
+                "unlink",
+                [[this.state.studioFieldId]],
+                { context: { force_cascade: true } },
+            );
+            this.notification.add(_t("Field deleted — reloading view…"), {
+                type: "success",
+            });
+            await this._reloadAction();
+            this.state.selectedField = null;
+            this.state.tab = "add";
+            await this._initialize();
+        } catch (e) {
+            this.notification.add(_t("Delete failed: %s", e.message || String(e)), {
+                type: "danger",
+                sticky: true,
+            });
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    /** Quick-create a studio.custom.field via the sidebar, then queue an
+     *  add_field op so it lands on the current view. */
+    async createNewField() {
+        const label = (this.state.newFieldLabel || "").trim();
+        if (!label) {
+            this.notification.add(_t("Enter a label first."), { type: "warning" });
+            return;
+        }
+        if (!this.state.currentModelId) {
+            this.notification.add(_t("Model id not detected."), { type: "danger" });
+            return;
+        }
+        // Auto-derive a snake_case x_studio_ name from the label.
+        const tech =
+            "x_studio_" +
+            label
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_")
+                .replace(/^_+|_+$/g, "")
+                .substring(0, 50);
+        this.state.saving = true;
+        try {
+            let newId = await this.orm.create("studio.custom.field", [
+                {
+                    name: label,
+                    technical_name: tech,
+                    model_id: this.state.currentModelId,
+                    field_type: this.state.newFieldType,
+                },
+            ]);
+            newId = Array.isArray(newId) ? newId[0] : newId;
+            await this.orm.call("studio.custom.field", "action_apply", [[newId]]);
+            // Anchor at the last visible field; if none, the queue will
+            // surface a friendlier error.
+            const lastInView =
+                this.state.inViewFields[this.state.inViewFields.length - 1] || "";
+            if (lastInView) {
+                await this._queueAddField(tech, lastInView);
+            } else {
+                this.notification.add(
+                    _t("Field %s created — open the view editor to place it on the layout.", tech),
+                    { type: "success" },
+                );
+            }
+            this.state.newFieldLabel = "";
+        } catch (e) {
+            this.notification.add(
+                _t("Create failed: %s", e.message || String(e)),
+                { type: "danger", sticky: true },
+            );
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    // ---------- Shared helpers ----------
+
+    /** Persist a batch of operations onto the current view's
+     *  customization (creating one if needed) and then re-apply. */
+    async _appendOpsAndApply(ops) {
+        if (!ops || !ops.length || !this.state.currentViewId) return;
+        this.state.saving = true;
+        try {
+            const existing = await this.orm.searchRead(
+                "studio.view.customization",
+                [["target_view_id", "=", this.state.currentViewId]],
+                ["id"],
+                { limit: 1, order: "id desc" },
+            );
+            let custId;
+            const opTuples = ops.map((o) => [0, 0, o]);
+            if (existing.length) {
+                custId = existing[0].id;
+                await this.orm.write("studio.view.customization", [custId], {
+                    operation_ids: opTuples,
+                });
+            } else {
+                custId = await this.orm.create("studio.view.customization", [
+                    {
+                        name: `Studio overlay edits — view ${this.state.currentViewId}`,
+                        target_view_id: this.state.currentViewId,
+                        operation_ids: opTuples,
+                    },
+                ]);
+                custId = Array.isArray(custId) ? custId[0] : custId;
+            }
+            await this.orm.call("studio.view.customization", "action_apply", [
+                [custId],
+            ]);
+            const [persisted] = await this.orm.read(
+                "studio.view.customization",
+                [custId],
+                ["state", "last_error"],
+            );
+            if (persisted.state === "applied") {
+                this.notification.add(_t("Applied — reloading view…"), {
+                    type: "success",
+                });
+                await this._reloadAction();
+                await this._initialize();
+                if (this.state.selectedField) {
+                    await this._loadFieldProperties(this.state.selectedField);
+                }
+            } else {
+                this.notification.add(
+                    _t("Apply failed: %s", persisted.last_error || "unknown"),
+                    { type: "danger", sticky: true },
+                );
+            }
+        } catch (e) {
+            this.notification.add(
+                _t("Apply failed: %s", e.message || String(e)),
+                { type: "danger", sticky: true },
+            );
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    async _reloadAction() {
+        const ctrl = this.action.currentController;
+        if (!ctrl || !ctrl.action) return;
+        await this.action.doAction(ctrl.action, { clearBreadcrumbs: false });
     }
 
     async hideSelectedField() {
