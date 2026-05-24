@@ -50,12 +50,8 @@
                 <div t-if="state.tab === 'add'" class="o_studio_overlay_panel">
                     <h4>Create new field</h4>
                     <p class="o_studio_hint">
-                        <span t-if="state.selectedField">
-                            Will be placed after <code><t t-esc="state.selectedField"/></code>.
-                        </span>
-                        <span t-if="!state.selectedField">
-                            Click a field in the form first to place after it — otherwise lands at the end.
-                        </span>
+                        Will be placed after <code><t t-esc="plannedAnchor || '(no anchor)'"/></code>
+                        <small t-if="!state.selectedField"> — click a field first to override.</small>
                     </p>
                     <div class="o_studio_overlay_newfield">
                         <input type="text"

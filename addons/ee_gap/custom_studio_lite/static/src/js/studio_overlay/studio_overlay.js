@@ -65,6 +65,9 @@ export class StudioOverlay extends Component {
             selectedFieldIsWidgetOnly: false,
             // Names rendered in the DOM but not present in arch as <field>.
             renderedOnlyNames: [],
+            // Fields that sit inside a <group> — preferred default
+            // placement anchors so new fields render with proper labels.
+            groupFieldNames: [],
             // Persisted op listing (third tab for cleanup).
             operations: [],
             customizationId: null,
@@ -230,8 +233,13 @@ export class StudioOverlay extends Component {
 
     /** Parse the combined arch for actual ``<field name=...>`` nodes —
      *  these are the only legal XPath anchors. Widget-rendered names
-     *  (web_ribbon, button targets, etc.) are intentionally excluded. */
+     *  (web_ribbon, button targets, etc.) are intentionally excluded.
+     *  Also caches the names of fields rendered *inside a <group>* so
+     *  we can prefer them as default anchors — placing a new field after
+     *  a non-group field (like ``properties``) drops it into a flex
+     *  container that doesn't render normal form widgets properly. */
     async _readArchFieldNames() {
+        this.state.groupFieldNames = [];
         if (!this.state.currentViewId) return [];
         try {
             const arch = await this.orm.call(
@@ -245,6 +253,16 @@ export class StudioOverlay extends Component {
                 const n = el.getAttribute("name");
                 if (n && !out.includes(n)) out.push(n);
             }
+            // Walk groups specifically — the last <field> in the last
+            // <group> is the safest default insertion point.
+            const groupFields = [];
+            for (const grp of doc.getElementsByTagName("group")) {
+                for (const el of grp.getElementsByTagName("field")) {
+                    const n = el.getAttribute("name");
+                    if (n && !groupFields.includes(n)) groupFields.push(n);
+                }
+            }
+            this.state.groupFieldNames = groupFields;
             return out;
         } catch (e) {
             return [];
@@ -570,6 +588,19 @@ export class StudioOverlay extends Component {
      *  follows field creation is fully visible to the view validator
      *  in the same transaction (single RPC, single worker, single
      *  transaction). */
+    /** Resolved anchor that ``createNewField`` will use right now —
+     *  exposed as a getter so the sidebar hint can preview it. */
+    get plannedAnchor() {
+        return (
+            (this.state.selectedField &&
+                this.state.inViewFields.includes(this.state.selectedField) &&
+                this.state.selectedField) ||
+            this.state.groupFieldNames[this.state.groupFieldNames.length - 1] ||
+            this.state.inViewFields[this.state.inViewFields.length - 1] ||
+            ""
+        );
+    }
+
     async createNewField() {
         const label = (this.state.newFieldLabel || "").trim();
         if (!label) {
@@ -592,14 +623,18 @@ export class StudioOverlay extends Component {
                 .replace(/[^a-z0-9]+/g, "_")
                 .replace(/^_+|_+$/g, "")
                 .substring(0, 50);
-        // Place the new field next to the currently-selected field if
-        // any (the user clicked a field, then clicked Create — they
-        // expect the new field to land at that location). Otherwise
-        // append at the end of the view.
+        // Placement preference, in order:
+        //   1. The currently-selected field (user clicked it then Create).
+        //   2. The last <field> *inside a <group>* — these render as
+        //      properly-labelled inputs. Skipping non-group fields
+        //      avoids "after properties" which lands the new field in a
+        //      flex container that hides it.
+        //   3. The last <field> anywhere as a last resort.
         const anchor =
             (this.state.selectedField &&
                 this.state.inViewFields.includes(this.state.selectedField) &&
                 this.state.selectedField) ||
+            this.state.groupFieldNames[this.state.groupFieldNames.length - 1] ||
             this.state.inViewFields[this.state.inViewFields.length - 1] ||
             "";
         this.state.saving = true;
