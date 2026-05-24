@@ -22,50 +22,36 @@ export class StudioSystrayItem extends Component {
     setup() {
         this.action = useService("action");
         this.notification = useService("notification");
+        this.overlay = useService("studio_overlay");
     }
 
-    /**
-     * Look up the currently active controller and return the bits the
-     * editor needs to preselect (model + view id). Falls back to a
-     * generic editor if no view is identifiable.
+    /** When clicked over an editable view, toggle the inline overlay.
+     *  When no view is in the current controller, fall through to the
+     *  standalone editor so the user can still pick a target.
      */
-    _currentViewContext() {
+    onClick() {
         const ctrl = this.action.currentController;
-        if (!ctrl || !ctrl.props) {
-            return {};
+        const hasResModel = ctrl && ctrl.props && ctrl.props.resModel;
+        if (hasResModel) {
+            this.overlay.toggle();
+            return;
         }
-        const props = ctrl.props;
-        // resModel + viewType are reliable on every view controller.
-        // viewId is set when the controller picked a specific view
-        // (otherwise Odoo resolved it from defaults — we'd need an
-        // extra RPC to discover it, deferred to Phase 4b).
-        const ctx = {};
-        if (props.resModel) {
-            ctx.default_model = props.resModel;
-        }
-        if (props.viewId) {
-            ctx.default_view_id = props.viewId;
-        }
-        return ctx;
+        // Fallback — no current view, open the standalone editor menu.
+        this.notification.add(
+            _t("Open a list / form / kanban first to enter inline Studio mode. Opening the picker…"),
+            { type: "info" },
+        );
+        this.action.doAction({
+            type: "ir.actions.client",
+            tag: "custom_studio_lite.studio_view_editor",
+            name: _t("Studio — Visual View Editor"),
+            target: "main",
+        });
     }
 
-    onClick() {
-        const ctx = this._currentViewContext();
-        if (!ctx.default_model) {
-            this.notification.add(
-                _t("Open a record/list/form first, then click the Studio button."),
-                { type: "info" },
-            );
-        }
-        this.action.doAction(
-            {
-                type: "ir.actions.client",
-                tag: "custom_studio_lite.studio_view_editor",
-                name: _t("Studio — Visual View Editor"),
-                target: "main",
-            },
-            { additionalContext: ctx },
-        );
+    /** Visual feedback in the systray button when studio mode is on. */
+    get active() {
+        return this.overlay.state.active;
     }
 }
 

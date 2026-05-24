@@ -12,6 +12,11 @@
             background: rgba(255, 255, 255, 0.08);
         }
 
+        &.o_studio_systray_active {
+            color: #f0c674;
+            background: rgba(240, 198, 116, 0.12);
+        }
+
         i {
             font-size: 18px;
         }

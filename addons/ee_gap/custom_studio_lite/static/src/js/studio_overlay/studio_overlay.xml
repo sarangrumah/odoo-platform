@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_studio_lite.StudioOverlay">
+        <t t-if="isActive">
+            <div class="o_studio_overlay_sidebar">
+                <div class="o_studio_overlay_header">
+                    <div class="o_studio_overlay_title">
+                        <i class="fa fa-paint-brush"/>
+                        <strong>Studio Mode</strong>
+                    </div>
+                    <button class="btn btn-sm btn-link"
+                            t-on-click="close"
+                            title="Exit Studio mode">
+                        <i class="fa fa-times"/>
+                    </button>
+                </div>
+
+                <div class="o_studio_overlay_context">
+                    <small>Model:</small>
+                    <code><t t-esc="state.currentModel || '—'"/></code>
+                    <small t-if="state.currentViewName"><t t-esc="state.currentViewName"/></small>
+                </div>
+
+                <div t-if="state.selectedField" class="o_studio_overlay_selected">
+                    <small>Selected:</small>
+                    <code><t t-esc="state.selectedField"/></code>
+                    <button class="btn btn-sm btn-warning"
+                            t-on-click="hideSelectedField"
+                            t-att-disabled="state.saving">
+                        Hide this field
+                    </button>
+                </div>
+
+                <div class="o_studio_overlay_panel">
+                    <h4>New fields</h4>
+                    <p class="o_studio_hint">Drag onto any visible field in the form to insert after it.</p>
+                    <input type="text"
+                           placeholder="Filter…"
+                           t-att-value="state.filter"
+                           t-on-input="(ev) => state.filter = ev.target.value"/>
+                    <ul class="o_studio_overlay_field_list">
+                        <li t-foreach="filteredFields" t-as="f" t-key="f.id"
+                            class="o_studio_overlay_drag_source"
+                            draggable="true"
+                            t-on-dragstart="(ev) => this.onDragStart(f.name, ev)">
+                            <i class="fa fa-bars o_studio_drag_handle"/>
+                            <div class="o_studio_overlay_field_meta">
+                                <span><t t-esc="f.field_description"/></span>
+                                <code><t t-esc="f.name"/></code>
+                            </div>
+                            <span class="o_studio_field_type">[<t t-esc="f.ttype"/>]</span>
+                        </li>
+                        <li t-if="!filteredFields.length" class="o_studio_overlay_empty">
+                            All model fields are already on this view.
+                        </li>
+                    </ul>
+                </div>
+
+                <div t-if="state.saving" class="o_studio_overlay_saving">
+                    <i class="fa fa-circle-o-notch fa-spin"/> Applying…
+                </div>
+            </div>
+        </t>
+    </t>
+</templates>
