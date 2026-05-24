@@ -269,6 +269,68 @@ export class StudioViewEditor extends Component {
         ];
     }
 
+    // ----- Drag & drop -----
+    //
+    // The available-fields panel is a drag source; the in-view list is
+    // the drop target. Dropping on a specific row creates an add_field
+    // op anchored at that row (position=after). Dropping on the trailing
+    // sentinel appends at the end of the form.
+
+    onDragStartField(fieldName, ev) {
+        ev.dataTransfer.effectAllowed = "copy";
+        ev.dataTransfer.setData("application/x-studio-field", fieldName);
+        // Some browsers refuse the drop without a text/plain payload too.
+        ev.dataTransfer.setData("text/plain", fieldName);
+    }
+
+    onDragOverViewSlot(ev) {
+        // Allow the drop — without preventDefault, the drop event fires nowhere.
+        if (ev.dataTransfer.types.includes("application/x-studio-field")) {
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = "copy";
+        }
+    }
+
+    onDropOnViewSlot(anchorName, ev) {
+        ev.preventDefault();
+        const fieldName =
+            ev.dataTransfer.getData("application/x-studio-field") ||
+            ev.dataTransfer.getData("text/plain");
+        if (!fieldName) return;
+        const lastFieldName =
+            this.state.fieldNodes.length > 0
+                ? this.state.fieldNodes[this.state.fieldNodes.length - 1].name
+                : "";
+        this.state.operations = [
+            ...this.state.operations,
+            {
+                id: null,
+                draftId: `draft-${Date.now()}-${Math.random()}`,
+                sequence: (this.state.operations.length + 1) * 10,
+                op_type: "add_field",
+                field_name: fieldName,
+                anchor_field: anchorName || lastFieldName,
+                position: anchorName ? "after" : "inside",
+                attr_name: "",
+                attr_value: "",
+            },
+        ];
+        this.notification.add(
+            _t("Queued: add %s after %s", fieldName, anchorName || "(end of view)"),
+            { type: "info" },
+        );
+    }
+
+    /** Close the editor and return to the previous page via the action service. */
+    async cancel() {
+        // restore: same intent as breadcrumb "back" — uses Odoo's history.
+        const restored = this.action.restore();
+        if (!restored) {
+            // No previous action in the stack — fall back to home.
+            this.action.doAction({ type: "ir.actions.act_window_close" });
+        }
+    }
+
     async save() {
         if (!this.state.viewId || !this.state.operations.length) {
             this.notification.add(

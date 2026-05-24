@@ -128,4 +128,38 @@
         border: 1px solid #ccc;
         border-radius: 2px;
     }
+
+    .o_studio_back {
+        align-self: flex-start;
+    }
+
+    .o_studio_hint {
+        color: #6c757d;
+        font-size: 12px;
+        margin: 4px 0 8px 0;
+    }
+
+    .o_studio_drag_source {
+        cursor: grab;
+        user-select: none;
+
+        &:active { cursor: grabbing; }
+
+        .o_studio_drag_handle {
+            color: #adb5bd;
+            margin-right: 6px;
+        }
+    }
+
+    .o_studio_drop_target {
+        transition: background 0.1s ease;
+
+        &.o_studio_drop_end {
+            text-align: center;
+            padding: 12px;
+            border: 1px dashed #ced4da;
+            color: #6c757d;
+            margin-top: 8px;
+        }
+    }
 }

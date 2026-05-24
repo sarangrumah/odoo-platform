@@ -3,6 +3,9 @@
     <t t-name="custom_studio_lite.StudioViewEditor">
         <div class="o_studio_view_editor">
             <div class="o_studio_view_editor_topbar">
+                <button class="btn btn-secondary o_studio_back" t-on-click="cancel">
+                    <i class="fa fa-arrow-left"/> Back
+                </button>
                 <h2>Studio Visual View Editor</h2>
                 <div class="o_studio_picker">
                     <label>Model:</label>
@@ -44,11 +47,15 @@
             <div t-if="state.view" class="o_studio_view_editor_body">
                 <div class="o_studio_field_panel">
                     <h3>Fields in view (<t t-esc="state.fieldNodes.length"/>)</h3>
+                    <p class="o_studio_hint">Drop a field from the sidebar onto a row to insert it after that row.</p>
                     <ul class="o_studio_field_list">
                         <!-- Same field name can appear multiple times in a
                              view (e.g. partner same_vat_partner_id), so key
                              on position not name to avoid t-foreach clashes. -->
-                        <li t-foreach="state.fieldNodes" t-as="node" t-key="node_index">
+                        <li t-foreach="state.fieldNodes" t-as="node" t-key="node_index"
+                            class="o_studio_drop_target"
+                            t-on-dragover="onDragOverViewSlot"
+                            t-on-drop="(ev) => this.onDropOnViewSlot(node.name, ev)">
                             <span class="o_studio_field_label"><t t-esc="node.string"/></span>
                             <code class="o_studio_field_name"><t t-esc="node.name"/></code>
                             <span class="o_studio_field_actions">
@@ -57,16 +64,26 @@
                                         title="Add a hide_field op">Hide</button>
                             </span>
                         </li>
+                        <li class="o_studio_drop_target o_studio_drop_end"
+                            t-on-dragover="onDragOverViewSlot"
+                            t-on-drop="(ev) => this.onDropOnViewSlot('', ev)">
+                            <em>Drop here to append at the end of the view</em>
+                        </li>
                     </ul>
                 </div>
 
                 <div class="o_studio_available_panel">
                     <h3>Available fields (<t t-esc="state.availableFields.length"/>)</h3>
+                    <p class="o_studio_hint">Drag a field onto the left panel, or click Add.</p>
                     <input type="text"
                            placeholder="Filter fields…"
                            t-on-input="(ev) => state.filter = ev.target.value"/>
                     <ul class="o_studio_field_list">
-                        <li t-foreach="state.availableFields" t-as="f" t-key="f.id">
+                        <li t-foreach="state.availableFields" t-as="f" t-key="f.id"
+                            class="o_studio_drag_source"
+                            draggable="true"
+                            t-on-dragstart="(ev) => this.onDragStartField(f.name, ev)">
+                            <i class="fa fa-bars o_studio_drag_handle" title="Drag"/>
                             <span class="o_studio_field_label"><t t-esc="f.field_description"/></span>
                             <code class="o_studio_field_name"><t t-esc="f.name"/></code>
                             <span class="o_studio_field_type">[<t t-esc="f.ttype"/>]</span>
