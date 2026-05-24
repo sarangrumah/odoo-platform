@@ -40,7 +40,34 @@ export class StudioViewEditor extends Component {
 
         onWillStart(async () => {
             await this._loadModels();
+            await this._applyContextDefaults();
         });
+    }
+
+    /**
+     * If launched via the systray (or any caller passing default_model /
+     * default_view_id in the action context), pre-populate the model +
+     * view dropdowns so the user lands directly on the field editor.
+     */
+    async _applyContextDefaults() {
+        const ctx =
+            (this.props.action && this.props.action.context) ||
+            (this.env.services.user && this.env.services.user.context) ||
+            {};
+        const defaultModel = ctx.default_model;
+        const defaultViewId = ctx.default_view_id;
+        if (!defaultModel) return;
+        const model = this.state.models.find((m) => m.model === defaultModel);
+        if (!model) return;
+        await this.onModelChange({ target: { value: String(model.id) } });
+        if (defaultViewId && this.state.views.some((v) => v.id === defaultViewId)) {
+            await this.onViewChange({ target: { value: String(defaultViewId) } });
+        } else if (this.state.views.length) {
+            // Pick the first form view if no specific view was passed.
+            const form = this.state.views.find((v) => v.type === "form");
+            const candidate = form || this.state.views[0];
+            await this.onViewChange({ target: { value: String(candidate.id) } });
+        }
     }
 
     async _loadModels() {
