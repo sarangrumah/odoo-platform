@@ -1,0 +1,7 @@
+ext_id,name,description,type_tax_use,amount,tax_group,account_code,dpp_method,dpp_factor,dpp_category
+TAX-PPN-12-DPP,PPN 12% DPP Nilai Lain 11/12 (Keluaran),PPN 12% DPP 11/12 (efektif 11%),sale,12.0,PPN,2104300001,nilai_lain,0.916666667,ppn_efektif_11_12
+TAX-PPN-12-DPP-IN,PPN 12% DPP Nilai Lain 11/12 (Masukan),PPN 12% DPP 11/12 (efektif 11%),purchase,12.0,PPN,1117200001,nilai_lain,0.916666667,ppn_efektif_11_12
+TAX-PPN-12-FULL,PPN 12% Penuh (Keluaran),PPN 12%,sale,12.0,PPN,2104300001,regular,1.0,
+TAX-PPH23-2,PPh 23 Sewa Peralatan 2% (Potong),PPh 23 2%,purchase,-2.0,PPh 23,2104100005,regular,1.0,
+TAX-PPH22-IMPOR-25,PPh 22 Impor 2.5% (API),PPh 22 Impor 2.5%,purchase,-2.5,PPh 22 Impor,2104100004,regular,1.0,
+TAX-PPN-IMPORT-12,PPN Impor 12%,PPN Impor 12%,purchase,12.0,PPN Impor,1117200001,regular,1.0,
