@@ -307,6 +307,41 @@ services:
         limits:
           memory: 1g
 
+  baileys:
+    build:
+      context: ./services/baileys
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-baileys:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-baileys
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    environment:
+      PORT: 8088
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      BAILEYS_AUTH_DIR: /var/lib/baileys
+      BAILEYS_SHARED_SECRET: ${BAILEYS_SHARED_SECRET}
+      # Where Baileys posts inbound + delivery events. Defaults to the
+      # internal Odoo service URL; override in .env for multi-tenant
+      # routing (e.g. when each tenant has its own Odoo mgmt instance).
+      ODOO_WEBHOOK_BASE: ${BAILEYS_ODOO_WEBHOOK_BASE:-http://odoo:8069}
+    volumes:
+      - ./data/baileys:/var/lib/baileys
+    ports:
+      - "${BAILEYS_PORT:-18088}:8088"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8088/healthz"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
   hub-portal:
     build:
       context: ./hub-portal

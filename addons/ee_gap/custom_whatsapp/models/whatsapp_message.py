@@ -193,13 +193,22 @@ class WhatsappMessage(models.Model):
             )
             return
 
-        payload = self._build_payload()
         try:
-            response = account._post("messages", payload)
-            messages = response.get("messages") or []
-            provider_id = messages[0].get("id") if messages else None
-            if not provider_id:
-                raise RuntimeError(f"Meta response missing messages[0].id: {response!r}")
+            if account.provider == "baileys":
+                payload = self._build_baileys_payload()
+                response = account._baileys_post(
+                    f"sessions/{account._baileys_session()}/messages", payload
+                )
+                provider_id = response.get("id")
+                if not provider_id:
+                    raise RuntimeError(f"Baileys response missing id: {response!r}")
+            else:
+                payload = self._build_payload()
+                response = account._post("messages", payload)
+                messages = response.get("messages") or []
+                provider_id = messages[0].get("id") if messages else None
+                if not provider_id:
+                    raise RuntimeError(f"Meta response missing messages[0].id: {response!r}")
             self.write(
                 {
                     "state": "sent",
@@ -246,6 +255,25 @@ class WhatsappMessage(models.Model):
             "to": to,
             "type": "text",
             "text": {"body": self.body or ""},
+        }
+
+    def _build_baileys_payload(self) -> dict:
+        """Return a Baileys sidecar payload.
+
+        Baileys has no template approval workflow; even if a template
+        is attached we just send the resolved body text. Media (image /
+        document) is signalled by setting ``body`` to a URL-like string
+        is *not* the convention — instead the wizards should set the
+        ``attachment_url`` context to switch to ``type='document'``.
+        For now this method emits text-only payloads matching the
+        sidecar's ``POST /sessions/<id>/messages`` schema.
+        """
+        self.ensure_one()
+        to = (self.to_phone or "").lstrip("+").strip()
+        return {
+            "to": to,
+            "type": "text",
+            "text": self.body or "",
         }
 
     # ---------- webhook update entry-points (called from controller) ----------

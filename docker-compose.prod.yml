@@ -65,6 +65,17 @@ services:
           memory: 1g
           pids: 256
 
+  baileys:
+    # In production the sidecar stays on the internal docker network only.
+    ports: []
+    expose:
+      - "8088"
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          pids: 128
+
   nginx:
     image: nginx:1.27-alpine
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-nginx

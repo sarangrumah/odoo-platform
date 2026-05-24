@@ -71,6 +71,7 @@ class WhatsappAccount(models.Model):
         [
             ("meta_cloud", "Meta WhatsApp Cloud API"),
             ("twilio", "Twilio WhatsApp"),
+            ("baileys", "Baileys (WhatsApp Web sidecar)"),
         ],
         default="meta_cloud",
         required=True,
@@ -108,6 +109,40 @@ class WhatsappAccount(models.Model):
         required=True,
         index=True,
     )
+
+    # ----- Baileys sidecar fields (provider == 'baileys') -----
+    baileys_sidecar_url = fields.Char(
+        string="Baileys Sidecar URL",
+        help="Base URL of the Baileys Node.js sidecar, e.g. http://baileys:8088",
+    )
+    baileys_shared_secret = fields.Char(
+        string="Baileys Shared Secret",
+        groups="custom_whatsapp.group_manager",
+        help="Bearer token presented to the sidecar AND used to validate the HMAC on inbound webhooks.",
+    )
+    baileys_session_id = fields.Char(
+        string="Baileys Session ID",
+        help="Logical session name inside the sidecar (one socket per session).",
+    )
+    baileys_status = fields.Selection(
+        [
+            ("unknown", "Unknown"),
+            ("qr_pending", "QR Pairing Pending"),
+            ("connecting", "Connecting"),
+            ("connected", "Connected"),
+            ("disconnected", "Disconnected"),
+            ("error", "Error"),
+        ],
+        default="unknown",
+        readonly=True,
+    )
+    baileys_last_qr = fields.Binary(
+        string="Pairing QR",
+        readonly=True,
+        help="Latest QR PNG fetched from the sidecar — clear once paired.",
+    )
+    baileys_phone = fields.Char(readonly=True, help="MSISDN reported by the sidecar after pairing.")
+    baileys_last_error = fields.Text(readonly=True)
 
     # ----- API URL helpers -----
 
@@ -258,6 +293,179 @@ class WhatsappAccount(models.Model):
         """GET an arbitrary Graph URL (used for WABA template polling)."""
         self.ensure_one()
         return self._request("GET", url, params=params)
+
+    # ----- Baileys HTTP helpers -----
+
+    def _baileys_headers(self) -> dict[str, str]:
+        self.ensure_one()
+        secret = self.sudo().baileys_shared_secret or ""
+        if not secret:
+            raise UserError(_("Baileys shared secret is not configured for account '%s'.") % self.name)
+        return {
+            "Authorization": f"Bearer {secret}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+    def _baileys_url(self, path: str) -> str:
+        self.ensure_one()
+        base = (self.baileys_sidecar_url or "").rstrip("/")
+        if not base:
+            raise UserError(_("Baileys sidecar URL is not configured for account '%s'.") % self.name)
+        return f"{base}/{path.lstrip('/')}"
+
+    def _baileys_request(
+        self, method: str, path: str, *, json_body: dict | None = None, params: dict | None = None
+    ) -> dict[str, Any]:
+        """Sidecar HTTP call with retry + circuit breaker.
+
+        Re-uses the same circuit breaker namespace as Meta so a flaky
+        sidecar doesn't get drowned by retries. Sandbox short-circuit
+        is handled by the caller (see :meth:`whatsapp.message._do_send`).
+        """
+        self.ensure_one()
+        request_id = uuid.uuid4().hex[:8]
+
+        if _circuit_open(self.id):
+            raise RuntimeError(
+                f"Baileys circuit breaker OPEN for account '{self.name}' (req={request_id})."
+            )
+
+        url = self._baileys_url(path)
+        headers = self._baileys_headers()
+        attempt = 0
+        last_exc: Exception | None = None
+        t0 = time.monotonic()
+        while attempt < _MAX_RETRIES:
+            attempt += 1
+            try:
+                url_for_log = url.split("?", 1)[0]
+                _logger.info(
+                    "[baileys http] req=%s account=%s attempt=%s %s %s",
+                    request_id,
+                    self.name,
+                    attempt,
+                    method,
+                    url_for_log,
+                )
+                resp = requests.request(
+                    method,
+                    url,
+                    headers=headers,
+                    json=json_body,
+                    params=params,
+                    timeout=_HTTP_TIMEOUT,
+                )
+                latency_ms = int((time.monotonic() - t0) * 1000)
+                if resp.status_code >= 500 and attempt < _MAX_RETRIES:
+                    time.sleep(_BACKOFF_BASE * (2 ** (attempt - 1)))
+                    continue
+                if resp.status_code >= 400:
+                    raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:400]}")
+                _circuit_record_success(self.id)
+                _logger.info(
+                    "[baileys http] req=%s ok status=%s latency=%sms",
+                    request_id,
+                    resp.status_code,
+                    latency_ms,
+                )
+                try:
+                    return resp.json() if resp.content else {}
+                except ValueError:
+                    return {"raw": resp.text}
+            except requests.RequestException as e:
+                last_exc = e
+                if attempt < _MAX_RETRIES:
+                    time.sleep(_BACKOFF_BASE * (2 ** (attempt - 1)))
+                    continue
+                break
+
+        tripped = _circuit_record_failure(self.id)
+        if tripped:
+            _logger.error(
+                "[baileys http] req=%s circuit OPENED for account=%s",
+                request_id,
+                self.name,
+            )
+        raise RuntimeError(
+            f"Baileys request failed after {_MAX_RETRIES} attempts "
+            f"(req={request_id}): {last_exc or 'see prior log line'}"
+        )
+
+    def _baileys_post(self, path: str, payload: dict | None = None) -> dict[str, Any]:
+        self.ensure_one()
+        return self._baileys_request("POST", path, json_body=payload or {})
+
+    def _baileys_get(self, path: str, params: dict | None = None) -> dict[str, Any]:
+        self.ensure_one()
+        return self._baileys_request("GET", path, params=params)
+
+    # ----- Baileys UI actions -----
+
+    def _baileys_session(self) -> str:
+        self.ensure_one()
+        return self.baileys_session_id or f"acct-{self.id}"
+
+    def action_baileys_start_session(self):
+        self.ensure_one()
+        secret = self.sudo().baileys_shared_secret or ""
+        try:
+            body = self._baileys_post(
+                f"sessions/{self._baileys_session()}/start",
+                {"account_id": self.id, "hmac_secret": secret},
+            )
+            status = body.get("status") or "unknown"
+            self.write({
+                "baileys_status": status if status in {"qr_pending", "connecting", "connected", "disconnected", "error"} else "unknown",
+                "baileys_last_error": False,
+            })
+            return self.action_baileys_refresh_qr()
+        except Exception as e:
+            self.write({"baileys_status": "error", "baileys_last_error": str(e)[:2000]})
+            return {
+                "type": "ir.actions.client",
+                "tag": "display_notification",
+                "params": {"title": _("Baileys start failed"), "message": str(e), "type": "danger", "sticky": True},
+            }
+
+    def action_baileys_refresh_qr(self):
+        self.ensure_one()
+        try:
+            status = self._baileys_get(f"sessions/{self._baileys_session()}/status")
+        except Exception as e:
+            self.write({"baileys_status": "error", "baileys_last_error": str(e)[:2000]})
+            return False
+        vals = {
+            "baileys_status": status.get("status") or "unknown",
+            "baileys_phone": status.get("phone") or False,
+            "baileys_last_error": status.get("last_error") or False,
+        }
+        if status.get("has_qr"):
+            try:
+                qr = self._baileys_get(
+                    f"sessions/{self._baileys_session()}/qr",
+                    params={"format": "base64"},
+                )
+                vals["baileys_last_qr"] = qr.get("png_base64") or False
+            except Exception as e:
+                _logger.warning("baileys QR fetch failed: %s", e)
+        elif vals["baileys_status"] == "connected":
+            vals["baileys_last_qr"] = False
+        self.write(vals)
+        return True
+
+    def action_baileys_logout(self):
+        self.ensure_one()
+        try:
+            self._baileys_post(f"sessions/{self._baileys_session()}/logout")
+        except Exception as e:
+            _logger.warning("baileys logout error: %s", e)
+        self.write({
+            "baileys_status": "disconnected",
+            "baileys_last_qr": False,
+            "baileys_phone": False,
+        })
+        return True
 
     # ----- UI action: test connection -----
 

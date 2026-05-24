@@ -14,6 +14,8 @@ security boundary.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import logging
 
@@ -21,6 +23,20 @@ from odoo import http
 from odoo.http import request, Response
 
 _logger = logging.getLogger(__name__)
+
+
+def _baileys_signature_valid(secret: str, raw_body: bytes, header: str) -> bool:
+    """Constant-time HMAC-SHA256 check for ``X-Baileys-Signature: sha256=<hex>``."""
+    if not secret or not header:
+        return False
+    if not header.lower().startswith("sha256="):
+        return False
+    sent = header.split("=", 1)[1].strip()
+    expected = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+    try:
+        return hmac.compare_digest(sent.lower(), expected.lower())
+    except Exception:  # pragma: no cover — extremely defensive
+        return False
 
 
 class WhatsappWebhookController(http.Controller):
@@ -85,13 +101,37 @@ class WhatsappWebhookController(http.Controller):
             _logger.warning("[whatsapp webhook] event: unknown account_id=%s", account_id)
             return Response("account not found", status=404)
 
+        raw = request.httprequest.get_data() or b"{}"
+        baileys_signature = request.httprequest.headers.get("X-Baileys-Signature") or ""
+        baileys_event = request.httprequest.headers.get("X-Baileys-Event") or ""
+
         try:
-            raw = request.httprequest.get_data() or b"{}"
             payload = json.loads(raw.decode("utf-8") or "{}")
         except (ValueError, UnicodeDecodeError) as e:
             _logger.warning("[whatsapp webhook] bad json: %s", e)
             return Response("bad request", status=400)
 
+        # Baileys path — distinguished by the X-Baileys-Signature header.
+        if baileys_signature:
+            secret = account.sudo().baileys_shared_secret or ""
+            if not _baileys_signature_valid(secret, raw, baileys_signature):
+                _logger.warning(
+                    "[whatsapp webhook] baileys HMAC mismatch for account=%s event=%s",
+                    account.name,
+                    baileys_event,
+                )
+                return Response("forbidden", status=403)
+            try:
+                self._dispatch_baileys(account, baileys_event, payload)
+            except Exception:
+                _logger.exception(
+                    "[whatsapp webhook] baileys dispatch failed account=%s event=%s",
+                    account.name,
+                    baileys_event,
+                )
+            return Response("ok", status=200, content_type="text/plain")
+
+        # Meta path (default).
         try:
             self._dispatch_payload(account, payload)
         except Exception:
@@ -131,3 +171,72 @@ class WhatsappWebhookController(http.Controller):
                             "[whatsapp webhook] inbound record failed: %s",
                             msg,
                         )
+
+    def _dispatch_baileys(self, account, event_type: str, payload: dict):
+        """Apply a single Baileys sidecar event.
+
+        Event types (set via ``X-Baileys-Event`` header):
+
+        - ``connection`` — pairing or connection state changed.
+        - ``status``     — delivery status update for a previously sent msg.
+        - ``message``    — new inbound message from a contact.
+        """
+        Message = request.env["whatsapp.message"].sudo()
+        Account = request.env["whatsapp.account"].sudo()
+
+        if event_type == "status":
+            wamid = payload.get("id")
+            status = (payload.get("status") or "").lower()
+            if not wamid or status not in {"sent", "delivered", "read", "failed"}:
+                return
+            msg = Message.search([("provider_message_id", "=", wamid)], limit=1)
+            if not msg:
+                return
+            vals = {"state": status}
+            if status == "failed":
+                vals["error_message"] = (payload.get("error") or "baileys send failed")[:2000]
+            msg.write(vals)
+            return
+
+        if event_type == "connection":
+            new_status = payload.get("status") or "unknown"
+            vals = {
+                "baileys_status": new_status if new_status in {
+                    "qr_pending", "connecting", "connected", "disconnected", "error"
+                } else "unknown",
+            }
+            if new_status == "connected":
+                vals["baileys_phone"] = payload.get("phone") or False
+                vals["baileys_last_qr"] = False
+                vals["baileys_last_error"] = False
+            else:
+                err = payload.get("error")
+                if err:
+                    vals["baileys_last_error"] = str(err)[:2000]
+            Account.browse(account.id).write(vals)
+            return
+
+        if event_type == "message":
+            msg_payload = payload.get("message") or {}
+            from_phone = msg_payload.get("from") or ""
+            if not from_phone:
+                return
+            # Adapt Baileys shape to the existing inbound recorder.
+            text = msg_payload.get("text") or ""
+            msg_type = msg_payload.get("type") or "text"
+            meta_shape = {
+                "from": from_phone,
+                "id": msg_payload.get("id"),
+                "timestamp": msg_payload.get("timestamp"),
+                "type": msg_type,
+            }
+            if msg_type == "text":
+                meta_shape["text"] = {"body": text}
+            Message._record_inbound(account, meta_shape, None)
+            return
+
+        _logger.info(
+            "[whatsapp webhook] ignored baileys event_type=%r for account=%s",
+            event_type,
+            account.name,
+        )
