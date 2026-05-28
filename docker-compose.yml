@@ -136,6 +136,9 @@ services:
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
       # Coretax
       CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY}
+      # Baileys (custom_whatsapp pre-fill defaults on whatsapp.account)
+      BAILEYS_INTERNAL_URL: ${BAILEYS_INTERNAL_URL:-http://baileys:8088}
+      BAILEYS_SHARED_SECRET: ${BAILEYS_SHARED_SECRET:-}
     volumes:
       - ./addons:/mnt/extra-addons:ro
       - ./data/odoo-filestore:/var/lib/odoo

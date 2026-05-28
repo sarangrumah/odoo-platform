@@ -31,6 +31,15 @@ PG_USER="${PG_USER:-${POSTGRES_USER:-odoo}}"
 PG_MAINTENANCE_DB="${PG_MAINTENANCE_DB:-postgres}"
 SKIP_DBS="${SKIP_DBS:-postgres,odoo_mgmt,template0,template1}"
 ACCOUNT_NAME="${ACCOUNT_NAME:-Main Baileys}"
+
+# Source repo .env so PGPASSWORD / POSTGRES_PASSWORD / BAILEYS_SHARED_SECRET
+# / BAILEYS_INTERNAL_URL reach docker exec without needing manual export.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+if [[ -f "${REPO_ROOT}/.env" ]]; then
+  # shellcheck disable=SC1091
+  set -a; . "${REPO_ROOT}/.env"; set +a
+fi
+PGPASSWORD="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
 BAILEYS_INTERNAL_URL="${BAILEYS_INTERNAL_URL:-http://baileys:8088}"
 
 if [[ -z "${BAILEYS_SHARED_SECRET:-}" ]]; then
@@ -51,7 +60,7 @@ sql_skip_list() {
 }
 
 list_tenant_dbs() {
-  ${COMPOSE} exec -T "$DB_SERVICE" \
+  ${COMPOSE} exec -T -e PGPASSWORD="$PGPASSWORD" "$DB_SERVICE" \
     psql -U "$PG_USER" -d "$PG_MAINTENANCE_DB" -tAc \
     "SELECT datname FROM pg_database
      WHERE datistemplate = false
