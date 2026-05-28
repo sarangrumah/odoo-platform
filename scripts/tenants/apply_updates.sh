@@ -43,6 +43,7 @@ fi
 PGPASSWORD="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
 
 MODULES_TO_UPDATE=(
+  custom_core
   custom_coretax
   custom_pdp_masking
   custom_pdp_audit
