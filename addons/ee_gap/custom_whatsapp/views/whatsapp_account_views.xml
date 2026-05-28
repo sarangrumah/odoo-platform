@@ -58,10 +58,19 @@
                     </group>
                     <notebook invisible="provider != 'baileys'">
                         <page string="Baileys Sidecar">
+                            <div class="alert alert-info" role="alert">
+                                <p class="mb-1"><b>How to fill these fields:</b></p>
+                                <ul class="mb-0">
+                                    <li><b>Sidecar URL</b>: internal docker hostname, default <code>http://baileys:8088</code>. Auto-prefilled from <code>BAILEYS_INTERNAL_URL</code>.</li>
+                                    <li><b>Session ID</b>: leave blank to auto-assign <code>acct-{id}</code>, or set a stable name like <code>acct-1</code>.</li>
+                                    <li><b>Shared Secret</b>: must match <code>BAILEYS_SHARED_SECRET</code> on the baileys service. Auto-prefilled from env on create.</li>
+                                    <li><b>Status</b> and <b>Phone</b> are read-only — populated automatically after QR pairing.</li>
+                                </ul>
+                            </div>
                             <group>
                                 <group string="Connection">
                                     <field name="baileys_sidecar_url" placeholder="http://baileys:8088"/>
-                                    <field name="baileys_session_id" placeholder="acct-1"/>
+                                    <field name="baileys_session_id" placeholder="acct-1 (blank = auto)"/>
                                     <field name="baileys_shared_secret" password="True"
                                            groups="custom_whatsapp.group_manager"/>
                                 </group>
@@ -84,6 +93,20 @@
                             <group string="Last Error" invisible="not baileys_last_error">
                                 <field name="baileys_last_error" readonly="1" nolabel="1"/>
                             </group>
+                        </page>
+                        <page string="AI Prompt">
+                            <group>
+                                <field name="ai_auto_draft"/>
+                                <field name="ai_max_history"/>
+                            </group>
+                            <separator string="System Prompt"/>
+                            <field name="ai_system_prompt" nolabel="1"
+                                   placeholder="e.g. Kamu adalah customer service Sarang Rumah yang ramah. Jawab singkat dalam Bahasa Indonesia. Kalau pelanggan tanya produk, arahkan ke katalog. Jangan janjikan diskon tanpa konfirmasi tim sales."/>
+                            <p class="text-muted">
+                                When <b>Auto-Draft AI Reply</b> is on, every inbound WhatsApp message
+                                triggers an AI draft reply stored on the message. Nothing is sent
+                                automatically — an agent must review the draft and click <b>Send</b>.
+                            </p>
                         </page>
                     </notebook>
                 </sheet>

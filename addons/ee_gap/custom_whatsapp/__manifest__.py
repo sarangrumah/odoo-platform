@@ -43,6 +43,7 @@ What this module provides
     "license": "LGPL-3",
     "depends": [
         "custom_core",
+        "custom_ai_bridge",
         "custom_pdp_audit",
         "custom_pdp_consent",
         "custom_pdp_core",

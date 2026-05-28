@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import uuid
 
@@ -88,6 +90,21 @@ class WhatsappMessage(models.Model):
         help="Upstream wamid/message SID returned by the provider on accept.",
     )
     consent_verified = fields.Boolean(default=False, readonly=True)
+
+    # ----- AI draft reply (populated on inbound when account.ai_auto_draft) -----
+    ai_draft_text = fields.Text(string="AI Draft Reply", copy=False)
+    ai_draft_state = fields.Selection(
+        [
+            ("none", "No Draft"),
+            ("ready", "Draft Ready"),
+            ("sent", "Sent"),
+            ("dismissed", "Dismissed"),
+        ],
+        default="none",
+        copy=False,
+        index=True,
+    )
+    ai_payload_hash = fields.Char(readonly=True, copy=False)
 
     # ---------- public API ----------
 
@@ -353,4 +370,146 @@ class WhatsappMessage(models.Model):
             "provider_message_id": msg_id,
             "sent_at": fields.Datetime.now(),
         }
-        return self.sudo().create(vals)
+        msg = self.sudo().create(vals)
+
+        # Hybrid AI: auto-generate a draft reply on inbound (never auto-sent).
+        if account.ai_auto_draft and (account.ai_system_prompt or "").strip():
+            try:
+                msg.action_generate_ai_draft()
+            except Exception as e:
+                _logger.warning("whatsapp ai auto-draft failed for msg %s: %s", msg.id, e)
+
+        return msg
+
+    # ---------- AI draft reply ----------
+
+    def _custom_ai_payload(self) -> dict:
+        """Build the AI context payload for this inbound message.
+
+        Includes the account persona prompt and the recent message history
+        with the same contact (both directions) for conversational context.
+        """
+        self.ensure_one()
+        account = self.account_id
+        limit = max(1, account.ai_max_history or 10)
+        history_msgs = self.sudo().search(
+            [
+                ("account_id", "=", account.id),
+                ("to_phone", "=", self.to_phone),
+                ("id", "!=", self.id),
+            ],
+            order="create_date desc, id desc",
+            limit=limit,
+        )
+        history = []
+        for m in reversed(history_msgs):
+            history.append(
+                {
+                    "direction": m.direction,
+                    "date": fields.Datetime.to_string(m.create_date) if m.create_date else "",
+                    "body": (m.body or "")[:1000],
+                }
+            )
+        return {
+            "system_prompt": account.ai_system_prompt or "",
+            "contact_phone": self.to_phone,
+            "contact_name": self.to_partner_id.display_name or "",
+            "current_message": self.body or "",
+            "history": history,
+        }
+
+    def _custom_ai_payload_hash(self, payload: dict) -> str:
+        try:
+            blob = json.dumps(payload, sort_keys=True, default=str)
+        except Exception:
+            blob = str(payload)
+        return hashlib.sha1(blob.encode("utf-8"), usedforsecurity=False).hexdigest()  # nosemgrep
+
+    def action_generate_ai_draft(self):
+        """Call the AI gateway to produce a draft reply for this inbound message."""
+        self.ensure_one()
+        if self.direction != "inbound":
+            raise UserError(_("AI draft is only available on inbound messages."))
+        account = self.account_id
+        if not (account.ai_system_prompt or "").strip():
+            raise UserError(_("Set an AI System Prompt on the WhatsApp account first."))
+
+        payload = self._custom_ai_payload()
+        payload_hash = self._custom_ai_payload_hash(payload)
+        if self.ai_payload_hash == payload_hash and self.ai_draft_text and self.ai_draft_state == "ready":
+            return True  # cached — nothing changed
+
+        chat_messages = []
+        for entry in payload["history"]:
+            role = "assistant" if entry["direction"] == "outbound" else "user"
+            chat_messages.append({"role": role, "content": entry["body"]})
+        chat_messages.append({"role": "user", "content": payload["current_message"]})
+
+        result = self.env["custom.ai"]._chat(
+            messages=chat_messages,
+            system=account.ai_system_prompt,
+            quality="fast",
+            max_tokens=512,
+            temperature=0.7,
+        )
+        text = (
+            result.get("response")
+            or result.get("text")
+            or result.get("content")
+            or result.get("summary")
+            or ""
+        )
+        if not text:
+            raise UserError(_("AI gateway returned no text. Raw: %s") % json.dumps(result)[:300])
+
+        self.sudo().write(
+            {
+                "ai_draft_text": text,
+                "ai_draft_state": "ready",
+                "ai_payload_hash": payload_hash,
+            }
+        )
+        return True
+
+    def action_regenerate_ai_draft(self):
+        """Force a fresh AI call even if the payload hash matches."""
+        self.ensure_one()
+        self.sudo().write({"ai_payload_hash": False})
+        return self.action_generate_ai_draft()
+
+    def action_dismiss_ai_draft(self):
+        self.ensure_one()
+        self.sudo().write({"ai_draft_text": False, "ai_draft_state": "dismissed"})
+        return True
+
+    def action_send_ai_draft(self):
+        """Send the AI draft as an outbound reply on the same account."""
+        self.ensure_one()
+        if self.direction != "inbound":
+            raise UserError(_("AI draft send is only available on inbound messages."))
+        if not (self.ai_draft_text or "").strip():
+            raise UserError(_("No AI draft to send."))
+
+        outbound = self.sudo().create(
+            {
+                "account_id": self.account_id.id,
+                "to_phone": self.to_phone,
+                "to_partner_id": self.to_partner_id.id if self.to_partner_id else False,
+                "body": self.ai_draft_text,
+                "direction": "outbound",
+                "state": "draft",
+            }
+        )
+        try:
+            outbound.action_send()
+        except Exception:
+            self.sudo().write({"ai_draft_state": "ready"})  # rollback flag on failure
+            raise
+        self.sudo().write({"ai_draft_state": "sent"})
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "whatsapp.message",
+            "res_id": outbound.id,
+            "view_mode": "form",
+            "target": "current",
+        }

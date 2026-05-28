@@ -39,6 +39,7 @@ MODULES_TO_UPDATE=(
   custom_pdp_masking
   custom_pdp_audit
   custom_ai_bridge
+  custom_whatsapp
   custom_rental
   custom_rental_bom_explosion
   custom_rental_invoicing

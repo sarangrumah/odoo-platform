@@ -12,6 +12,7 @@ exercised without consuming Meta quota.
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from typing import Any
@@ -20,6 +21,14 @@ import requests
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
+
+
+def _env_default_baileys_url() -> str:
+    return os.environ.get("BAILEYS_INTERNAL_URL", "http://baileys:8088")
+
+
+def _env_default_baileys_secret() -> str:
+    return os.environ.get("BAILEYS_SHARED_SECRET", "")
 
 _logger = logging.getLogger(__name__)
 
@@ -113,16 +122,29 @@ class WhatsappAccount(models.Model):
     # ----- Baileys sidecar fields (provider == 'baileys') -----
     baileys_sidecar_url = fields.Char(
         string="Baileys Sidecar URL",
-        help="Base URL of the Baileys Node.js sidecar, e.g. http://baileys:8088",
+        default=lambda self: _env_default_baileys_url(),
+        help=(
+            "Base URL of the Baileys Node.js sidecar, default http://baileys:8088 "
+            "(internal docker network hostname). Auto-prefilled from the "
+            "BAILEYS_INTERNAL_URL environment variable when the record is created."
+        ),
     )
     baileys_shared_secret = fields.Char(
         string="Baileys Shared Secret",
+        default=lambda self: _env_default_baileys_secret(),
         groups="custom_whatsapp.group_manager",
-        help="Bearer token presented to the sidecar AND used to validate the HMAC on inbound webhooks.",
+        help=(
+            "Bearer token presented to the sidecar AND used to validate the HMAC on "
+            "inbound webhooks. Must match BAILEYS_SHARED_SECRET on the baileys "
+            "service exactly. Auto-prefilled from that env var on create."
+        ),
     )
     baileys_session_id = fields.Char(
         string="Baileys Session ID",
-        help="Logical session name inside the sidecar (one socket per session).",
+        help=(
+            "Logical session name inside the sidecar (one socket per session). "
+            "Leave blank to auto-assign acct-{id} on first Start Session."
+        ),
     )
     baileys_status = fields.Selection(
         [
@@ -143,6 +165,32 @@ class WhatsappAccount(models.Model):
     )
     baileys_phone = fields.Char(readonly=True, help="MSISDN reported by the sidecar after pairing.")
     baileys_last_error = fields.Text(readonly=True)
+
+    # ----- AI draft reply (per-account persona) -----
+    ai_system_prompt = fields.Text(
+        string="AI System Prompt",
+        help=(
+            "Persona and tone instructions for AI-generated draft replies on inbound "
+            "WhatsApp messages. Example: 'Kamu customer service Sarang Rumah yang "
+            "ramah, jawab singkat dalam Bahasa Indonesia, arahkan ke katalog kalau "
+            "pelanggan tanya produk.' Leave blank to disable AI drafts even when "
+            "Auto-Draft is on."
+        ),
+    )
+    ai_auto_draft = fields.Boolean(
+        string="Auto-Draft AI Reply",
+        default=False,
+        help=(
+            "When enabled, every inbound message triggers an AI draft reply stored on "
+            "the message. Nothing is sent automatically — the agent must review and "
+            "click Send. Requires ai_system_prompt to be set."
+        ),
+    )
+    ai_max_history = fields.Integer(
+        string="AI History Window",
+        default=10,
+        help="Number of recent messages with the same contact to send as context to the AI.",
+    )
 
     # ----- API URL helpers -----
 

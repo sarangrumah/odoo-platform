@@ -66,3 +66,66 @@ Inbound events are POSTed back to Odoo at
 - **Reachability**: bind the published port to localhost only in prod
   (`docker-compose.prod.yml` uses `expose` rather than `ports`). The
   shared secret is the only authn — do not expose to the public internet.
+
+## Pre-fill defaults on `whatsapp.account`
+
+`baileys_sidecar_url` and `baileys_shared_secret` auto-prefill from the
+Odoo container's environment when a `whatsapp.account` record is
+created:
+
+| Field | Env var | Fallback |
+|-------|---------|----------|
+| `baileys_sidecar_url` | `BAILEYS_INTERNAL_URL` | `http://baileys:8088` |
+| `baileys_shared_secret` | `BAILEYS_SHARED_SECRET` | empty |
+
+`baileys_session_id` stays blank by default and is resolved to
+`acct-{record_id}` the first time **Start Session** is clicked.
+
+To create the account record from the host (e.g. during tenant
+provisioning) instead of clicking through the UI, use:
+
+```bash
+BAILEYS_SHARED_SECRET=$(openssl rand -hex 32) \
+  bash scripts/tenants/setup_baileys_account.sh <db_name>
+```
+
+The script is idempotent — re-running it skips databases that already
+have a `whatsapp.account` with the same name. Pass no arg to provision
+every tenant DB at once.
+
+## AI Auto-Draft (Hybrid mode)
+
+The `whatsapp.account` form has an **AI Prompt** tab with three fields:
+
+- `ai_system_prompt` — persona/tone instructions for the AI gateway
+  (single string per account, in any language the model handles).
+- `ai_auto_draft` — when on, every inbound message is run through the AI
+  gateway and the response is stored as a draft on the message.
+- `ai_max_history` — number of recent messages with the same contact to
+  include as conversational context (default 10).
+
+The draft is **never sent automatically**. On an inbound message the
+agent sees:
+
+- `AI Draft Ready` badge in the list view.
+- A new **AI Draft** notebook page with the editable suggestion.
+- Header buttons: **Send AI Draft** (creates an outbound message and
+  fires `action_send`), **Regenerate** (re-call AI), **Dismiss Draft**.
+
+Manual generation is also available via **Generate AI Draft** on any
+inbound row even when `ai_auto_draft` is off.
+
+Example prompt (Bahasa Indonesia, sales/CS use case):
+
+```
+Kamu adalah customer service Sarang Rumah yang ramah dan to-the-point.
+Jawab dalam Bahasa Indonesia, maksimal 3 kalimat.
+- Kalau pelanggan tanya stok atau harga produk, arahkan ke katalog: katalog.sarangrumah.id
+- Kalau pelanggan butuh bantuan teknis, minta nomor order dan eskalasi ke tim support.
+- Jangan janjikan diskon, garansi, atau jadwal pengiriman tanpa konfirmasi.
+- Akhiri dengan menanyakan apakah ada yang masih bisa dibantu.
+```
+
+The AI call goes through `custom.ai._chat()` (defined in
+`addons/core/custom_ai_bridge`) so the same gateway, signing, and
+tenant-routing used by the rest of the platform applies.
