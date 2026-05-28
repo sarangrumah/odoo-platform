@@ -40,5 +40,5 @@ Bupot lines into Coretax.
     "countries": ["id"],
     "data": [],
     "installable": True,
-    "auto_install": False,
+    "auto_install": True,
 }
