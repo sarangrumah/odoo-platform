@@ -99,6 +99,9 @@ services:
       CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY:-}
       WORKERS: "0"
       MAX_CRON_THREADS: "1"
+      # queue_job runner thread requires server-wide load; without it, jobs
+      # are enqueued but never executed by the runner.
+      SERVER_WIDE_MODULES: "base,web,queue_job"
       # Management instance MUST expose the database manager + accept any DB.
       LIST_DB: "True"
       DBFILTER: "^.*$$"
@@ -112,6 +115,13 @@ services:
       # files in this directory — split mounts produce 404s on assets and the
       # "CSS error, using old style" fallback in the browser.
       - ./data/odoo-filestore:/var/lib/odoo
+    # wkhtmltopdf fetches PDF header/footer via callback to the URL stored in
+    # ir.config_parameter `report.url`, which must use the tenant DB name as
+    # hostname so it satisfies the public odoo's `dbfilter = ^%d$`. Resolve
+    # those hostnames to loopback inside this container so the callback hits
+    # this same Odoo (mgmt's `dbfilter = ^.*$` accepts any).
+    extra_hosts:
+      - "erp_dev_aimarka:127.0.0.1"
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8069/web/database/selector', timeout=3).status==200 else 1)"]
       interval: 30s

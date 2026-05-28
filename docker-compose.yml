@@ -139,6 +139,8 @@ services:
     volumes:
       - ./addons:/mnt/extra-addons:ro
       - ./data/odoo-filestore:/var/lib/odoo
+    extra_hosts:
+      - "erp_dev_aimarka:127.0.0.1"
     ports:
       - "${ODOO_HTTP_PORT:-18069}:8069"
       - "${ODOO_LONGPOLL_PORT:-18072}:8072"
