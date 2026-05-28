@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Erajaya VAS - Odoo Platform</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="data:text/css,body{font-family:Segoe UI,Arial,sans-serif;max-width:1100px;margin:2em auto;padding:0 2em;line-height:1.5;color:#0A0A0B}h1{color:#E30613;border-bottom:3px solid #E30613;padding-bottom:0.3em;page-break-before:always}h1:first-of-type{page-break-before:auto}h2{color:#B8050F;margin-top:1.5em}h3{color:#18181B}table{border-collapse:collapse;width:100%;margin:1em 0}th,td{border:1px solid #E7E5E2;padding:0.5em 0.8em;text-align:left;vertical-align:top}th{background:#FEE2E4;color:#B8050F}code{background:#F4F4F2;padding:0.1em 0.3em;border-radius:3px;font-size:0.9em}pre{background:#0A0A0B;color:#FAFAF9;padding:1em;border-radius:6px;overflow-x:auto;font-size:0.85em}blockquote{border-left:4px solid #E30613;padding-left:1em;color:#71717A}hr{border:none;border-top:2px solid #E7E5E2;margin:2em 0}" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Erajaya VAS - Odoo Platform</h1>
+</header>
+<h1 id="erajaya-value-added-services">Erajaya Value-Added Services</h1>
+<h2 id="odoo-19-multi-tenant-platform-business-presentation">Odoo 19
+Multi-Tenant Platform — Business Presentation</h2>
+<p><strong>Audience:</strong> Executive / Business Stakeholders
+<strong>Owner:</strong> Product Owner — Value-Added Services, Erajaya
+<strong>Status:</strong> Internal pitch deck (Mei 2026)</p>
+<hr />
+<h2 id="slide-1-executive-summary">Slide 1 — Executive Summary</h2>
+<p><strong>Apa yang kita bangun:</strong> Sebuah
+<strong>ERP-as-a-Service platform</strong> berbasis Odoo 19 Community
+Edition (CE) yang sudah ditambah <strong>82 custom module</strong>
+untuk:</p>
+<ol type="1">
+<li>Menutup gap fitur Odoo CE → Enterprise Edition (EE) — <strong>tanpa
+license fee Odoo EE</strong>.</li>
+<li>Memenuhi regulasi Indonesia (UU PDP 27/2022, Coretax DJP
+PER-11/PJ/2025, PSAK, BPJS, PPh, PPN, OJK ESG).</li>
+<li>Menyediakan <strong>AI Layer</strong> (Claude / OpenAI / Ollama)
+terintegrasi di seluruh ERP.</li>
+<li>Beroperasi sebagai <strong>multi-tenant SaaS</strong> untuk seluruh
+lini bisnis Erajaya &amp; afiliasi.</li>
+</ol>
+<p><strong>Posisi strategis VAS:</strong> Platform ini adalah
+<strong>product enabler</strong> untuk lini Value-Added Services Erajaya
+— kita tidak menjual ERP, kita menjual <strong>operational
+backbone</strong> untuk vertikal: F&amp;B, Active Lifestyle, Eraspace,
+Distribution, Service Center, Corporate Services.</p>
+<p><strong>Highlight angka:</strong> - 82 custom modules siap pakai - 5
+lapisan arsitektur (CE core + EE-gap + Compliance + AI + Observability)
+- 10 tenant Y1, target 99.5% SLA - DB-per-tenant isolation - Zero EE
+license cost (LGPL-3 compatible)</p>
+<hr />
+<h2 id="slide-2-problem-statement">Slide 2 — Problem Statement</h2>
+<p><strong>Kondisi industri ERP di Indonesia:</strong></p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Pain point</th>
+<th>Konsekuensi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Odoo EE license = ~USD 31/user/bulan × N user × N tenant</td>
+<td>Cost explosion saat skala</td>
+</tr>
+<tr>
+<td>SAP / Oracle = vendor lock-in + biaya implementasi miliaran</td>
+<td>Tidak feasible untuk SMB &amp; vertikal kecil</td>
+</tr>
+<tr>
+<td>Localization Indonesia tidak komprehensif (Coretax, PSAK, BPJS,
+PDP)</td>
+<td>Tim akunting/HR manual workaround di Excel</td>
+</tr>
+<tr>
+<td>Compliance UU PDP 27/2022 (efektif Okt 2024) jarang built-in</td>
+<td>Risiko denda 2% omzet tahunan</td>
+</tr>
+<tr>
+<td>Coretax DJP PER-11/PJ/2025 (NSFP 17 digit) belum di-cover ERP
+umum</td>
+<td>Faktur ditolak, AR macet</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Hipotesis VAS:</strong> Erajaya punya skala (50+ tenant
+calon, multi-vertikal) yang membenarkan investasi platform sendiri. ROI
+tercapai setelah ~tenant ke-15 dibandingkan license EE.</p>
+<hr />
+<h2 id="slide-3-solution-overview-5-layers">Slide 3 — Solution Overview
+(5 Layers)</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│  Layer 5: Operations &amp; Observability                        │
+│  Prometheus · Grafana · Loki · Alertmanager · Predictor     │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 4: AI Intelligence                                   │
+│  ai-gateway (FastAPI) → Claude / OpenAI / Ollama            │
+│  + custom-predictor (forecasting &amp; capacity)                │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 3: Indonesian Compliance                             │
+│  PDP (6 modules) · Coretax (3 modules) · PPh · PSAK · BPJS  │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 2: EE-Gap Modules (60 modules)                       │
+│  Accounting Full · HR Payroll · Marketing · Studio Lite ·   │
+│  Helpdesk · Field Service · Documents · Sign · WMS · MRP    │
+│  PLM · Quality · IoT · VoIP · Subscription · Rental         │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 1: Odoo 19 CE (vanilla, LGPL-3)                      │
+└─────────────────────────────────────────────────────────────┘
+       ┌──────────────────────────────────────────────┐
+       │  Multi-Tenant Control Plane                   │
+       │  Hub-Portal (React) · Super Admin · Tenant    │
+       │  Orchestrator · Onboarding Journey            │
+       └──────────────────────────────────────────────┘</code></pre>
+<hr />
+<h2 id="slide-4-module-map-82-modules">Slide 4 — Module Map (82
+modules)</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Kategori</th>
+<th>Jumlah</th>
+<th>Contoh</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Core / Platform</strong></td>
+<td>5</td>
+<td><code>custom_core</code>, <code>custom_ai_bridge</code>,
+<code>custom_adapter_framework</code>, <code>custom_bast</code>,
+<code>custom_hht_bridge</code></td>
+</tr>
+<tr>
+<td><strong>EE-Gap</strong></td>
+<td>60</td>
+<td>Lihat Slide 5</td>
+</tr>
+<tr>
+<td><strong>Compliance Indonesia</strong></td>
+<td>9</td>
+<td><code>custom_coretax</code>, <code>custom_coretax_bupot</code>,
+<code>custom_coretax_pajakku</code>, <code>custom_pdp_*</code> (6
+modul), <code>custom_pph_witholding</code></td>
+</tr>
+<tr>
+<td><strong>Operations / DevOps</strong></td>
+<td>3</td>
+<td><code>custom_ops_monitor</code>, <code>custom_dev_cycle</code>,
+<code>custom_brd_analyzer</code></td>
+</tr>
+<tr>
+<td><strong>Verticals &amp; Control Plane</strong></td>
+<td>5</td>
+<td><code>custom_super_admin</code>, <code>custom_tenant_infra</code>,
+<code>custom_hub_console</code>, <code>custom_onboarding_journey</code>,
+<code>_template</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="slide-5-capability-matrix-ee-gap-coverage">Slide 5 — Capability
+Matrix: EE-Gap Coverage</h2>
+<h3 id="accounting-finance">5.1 Accounting &amp; Finance</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Module</th>
+<th>EE Equivalent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Multi-company consolidation + eliminations</td>
+<td><code>custom_accounting_full</code></td>
+<td><code>account_consolidation</code></td>
+</tr>
+<tr>
+<td>Intercompany journal automation</td>
+<td><code>custom_accounting_full</code></td>
+<td><code>account_inter_company_rules</code></td>
+</tr>
+<tr>
+<td>Production P&amp;L / BS / GL / Cashflow reports</td>
+<td><code>custom_accounting_reports</code></td>
+<td><code>account_reports</code></td>
+</tr>
+<tr>
+<td>Fixed asset register + depreciation</td>
+<td><code>custom_accounting_asset</code></td>
+<td><code>account_asset</code></td>
+</tr>
+<tr>
+<td>Recurring journals &amp; payments</td>
+<td><code>custom_accounting_recurring</code></td>
+<td><code>account_recurring</code></td>
+</tr>
+<tr>
+<td>Bank statement import + H2H adapter</td>
+<td><code>custom_bank_import</code></td>
+<td><code>account_bank_statement_import_*</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="human-capital">5.2 Human Capital</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Payroll Indonesia (PPh 21 TER, BPJS, PTKP, THR, SPT 1721 A1)</td>
+<td><code>custom_hr_payroll_id</code></td>
+</tr>
+<tr>
+<td>Performance appraisal + 360 feedback</td>
+<td><code>custom_hr_appraisal</code></td>
+</tr>
+<tr>
+<td>Employee referral program + reward ledger</td>
+<td><code>custom_hr_referral</code></td>
+</tr>
+<tr>
+<td>Geofence attendance + kiosk + OT → payroll</td>
+<td><code>custom_attendance</code></td>
+</tr>
+<tr>
+<td>Cuti Indonesia (Cipta Kerja, cuti haid, public holidays)</td>
+<td><code>custom_hr_leave_id</code></td>
+</tr>
+<tr>
+<td>Recruitment + job-board webhook + PDP applicant retention</td>
+<td><code>custom_recruitment_id</code></td>
+</tr>
+<tr>
+<td>Expense OCR receipt + corporate cards + mileage</td>
+<td><code>custom_expenses</code></td>
+</tr>
+<tr>
+<td>Billable timesheet + OT → payroll</td>
+<td><code>custom_timesheet</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="sales-crm-marketing-e-commerce">5.3 Sales · CRM · Marketing ·
+E-commerce</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Predictive lead scoring, enrichment, web-form intake</td>
+<td><code>custom_crm</code></td>
+</tr>
+<tr>
+<td>Multi-step drip campaign + segmentation</td>
+<td><code>custom_marketing_automation</code></td>
+</tr>
+<tr>
+<td>Mass email + A/B test + UU PDP unsubscribe</td>
+<td><code>custom_email_marketing</code></td>
+</tr>
+<tr>
+<td>Indonesian couriers (JNE, JNT, SiCepat, AnterAja, Pos) +
+Midtrans/Xendit checkout</td>
+<td><code>custom_ecommerce</code> + <code>custom_payment_id</code></td>
+</tr>
+<tr>
+<td>Subscription billing + MRR/LTV + AI churn</td>
+<td><code>custom_subscription</code></td>
+</tr>
+<tr>
+<td>Asset rental w/ BAST + portal + late fees</td>
+<td><code>custom_rental</code></td>
+</tr>
+<tr>
+<td>Events w/ WhatsApp QR ticket + check-in</td>
+<td><code>custom_events</code></td>
+</tr>
+<tr>
+<td>Social media post scheduler</td>
+<td><code>custom_social</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="service-operations">5.4 Service Operations</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Helpdesk + SLA + escalation + portal</td>
+<td><code>custom_helpdesk</code></td>
+</tr>
+<tr>
+<td>Field Service: dispatch, signature, materials</td>
+<td><code>custom_field_service</code></td>
+</tr>
+<tr>
+<td>Repairs w/ warranty &amp; WhatsApp status</td>
+<td><code>custom_repairs</code></td>
+</tr>
+<tr>
+<td>Appointments (public booking + internal)</td>
+<td><code>custom_appointments</code></td>
+</tr>
+<tr>
+<td>Live Chat → helpdesk escalation, AI suggested reply</td>
+<td><code>custom_livechat</code></td>
+</tr>
+<tr>
+<td>Visitor management (frontdesk)</td>
+<td><code>custom_frontdesk</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations-manufacturing-wms">5.5 Operations · Manufacturing ·
+WMS</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MRP PLM (ECO workflow, BoM versioning, approval gates)</td>
+<td><code>custom_mrp_plm</code></td>
+</tr>
+<tr>
+<td>Quality points + NCR + CAPA + reusable templates</td>
+<td><code>custom_quality_full</code></td>
+</tr>
+<tr>
+<td>Maintenance: MTBF/MTTR + IoT alerts + predictive</td>
+<td><code>custom_maintenance</code></td>
+</tr>
+<tr>
+<td>WMS putaway engine (multi-tier)</td>
+<td><code>custom_wms_putaway</code></td>
+</tr>
+<tr>
+<td>WMS cycle count (variance approval)</td>
+<td><code>custom_wms_cycle_count</code></td>
+</tr>
+<tr>
+<td>Internal transfer orchestration (low-water mark, expiry)</td>
+<td><code>custom_wms_to_engine</code></td>
+</tr>
+<tr>
+<td>Mobile barcode scan-in/out (CE-friendly)</td>
+<td><code>custom_barcode</code></td>
+</tr>
+<tr>
+<td>Handheld Terminal bridge (Zebra/DataWedge PWA)</td>
+<td><code>custom_hht_bridge</code></td>
+</tr>
+<tr>
+<td>IoT sensor webhook ingestion</td>
+<td><code>custom_iot_bridge</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="indonesia-pos-fleet-esg">5.6 Indonesia POS, Fleet, ESG</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POS Indonesia: QRIS, rupiah rounding, WhatsApp e-receipt</td>
+<td><code>custom_pos_id</code></td>
+</tr>
+<tr>
+<td>Fleet: STNK &amp; KIR reminders, BBM tracking</td>
+<td><code>custom_fleet_id</code></td>
+</tr>
+<tr>
+<td>ESG metrics (OJK POJK 51/2017 sustainability)</td>
+<td><code>custom_esg</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="productivity">5.7 Productivity</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Documents w/ workspaces, versioning, PDP-aware access</td>
+<td><code>custom_documents</code></td>
+</tr>
+<tr>
+<td>E-signature multi-signer routing + token portal</td>
+<td><code>custom_sign</code></td>
+</tr>
+<tr>
+<td>Studio replacement: declarative fields + view inserts</td>
+<td><code>custom_studio_lite</code></td>
+</tr>
+<tr>
+<td>KPI tile dashboards + AI NLQ</td>
+<td><code>custom_dashboards</code></td>
+</tr>
+<tr>
+<td>Workbook layer (CSV, AI helpers, versioning)</td>
+<td><code>custom_spreadsheet</code></td>
+</tr>
+<tr>
+<td>Internal wiki / knowledge base</td>
+<td><code>custom_knowledge</code></td>
+</tr>
+<tr>
+<td>Personal To-Do (pomodoro, AI breakdown)</td>
+<td><code>custom_todo</code></td>
+</tr>
+<tr>
+<td>Survey: pulse, NPS, certification</td>
+<td><code>custom_survey</code></td>
+</tr>
+<tr>
+<td>Planning + shift scheduling</td>
+<td><code>custom_planning</code></td>
+</tr>
+<tr>
+<td>eLearning w/ cohort &amp; certificate</td>
+<td><code>custom_elearning</code></td>
+</tr>
+<tr>
+<td>Forum w/ AI moderation &amp; PDP masking</td>
+<td><code>custom_forum</code></td>
+</tr>
+<tr>
+<td>Lunch ordering</td>
+<td><code>custom_lunch</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="communication-channels-indonesia">5.8 Communication Channels
+(Indonesia)</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Meta WhatsApp Cloud API + template + PDP-gated outbound</td>
+<td><code>custom_whatsapp</code></td>
+</tr>
+<tr>
+<td>SMS: Zenziva (ID) + Twilio (global)</td>
+<td><code>custom_sms_id</code></td>
+</tr>
+<tr>
+<td>Click-to-call + SIP/PBX adapters</td>
+<td><code>custom_voip</code></td>
+</tr>
+<tr>
+<td>AI server-action “Ask AI”, anomaly inbox, NLQ chat</td>
+<td><code>custom_ai_features</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cross-cutting-engines">5.9 Cross-Cutting Engines</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Module</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generic multi-tier approval w/ delegation, OOO, SLA escalation</td>
+<td><code>custom_approval_engine</code></td>
+</tr>
+<tr>
+<td>Data cleaning + Indonesian normalization (phone, NIK)</td>
+<td><code>custom_data_cleaning</code></td>
+</tr>
+<tr>
+<td>Berita Acara Serah Terima (BAST) generic handover</td>
+<td><code>custom_bast</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="slide-6-indonesian-regulatory-compliance">Slide 6 — Indonesian
+Regulatory Compliance</h2>
+<h3 id="uu-pdp-272022-perlindungan-data-pribadi">6.1 UU PDP 27/2022
+(Perlindungan Data Pribadi)</h3>
+<p>Implementasi <strong>6 modul</strong> yang men-cover <strong>seluruh
+kewajiban operasional</strong> UU PDP:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Pasal UU PDP</th>
+<th>Implementasi Platform</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pasal 4 — Klasifikasi data umum vs spesifik</td>
+<td><code>custom_pdp_core</code> — registry <code>pdp.field.class</code>
+per ORM field</td>
+</tr>
+<tr>
+<td>Pasal 22 — Consent explicit, granular, revocable</td>
+<td><code>custom_pdp_consent</code> — <code>pdp.consent</code> w/
+purpose taxonomy + evidence blob</td>
+</tr>
+<tr>
+<td>Pasal 5 — Hak akses, koreksi, hapus, portabilitas</td>
+<td><code>custom_pdp_dsar</code> — endpoint
+<code>/pdp/dsar/request</code> + captcha + email verif</td>
+</tr>
+<tr>
+<td>Pasal 35 — Akuntabilitas pemrosesan</td>
+<td><code>custom_pdp_audit</code> — <strong>append-only hash-chained
+log</strong> + PG trigger blocks <code>UPDATE</code>/<code>DELETE</code>
++ nightly chain-verify cron</td>
+</tr>
+<tr>
+<td>Masking PII di view &amp; export</td>
+<td><code>custom_pdp_masking</code> — ORM read hook + jinja filter</td>
+</tr>
+<tr>
+<td>Retention &amp; auto-purge</td>
+<td><code>custom_pdp_retention</code> — kebijakan TTL + scheduler</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Differentiator:</strong> Audit log adalah <strong>immutable
+hash-chain</strong> (sha256 prev+payload) dengan trigger PostgreSQL
+<code>BEFORE UPDATE OR DELETE</code> yang
+<code>RAISE EXCEPTION 'audit log is append-only'</code>. Ini bukti hukum
+yang sulit dipertahankan dengan ERP off-the-shelf.</p>
+<h3 id="coretax-djp-per-11pj2025">6.2 Coretax DJP — PER-11/PJ/2025</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Kewajiban</th>
+<th>Implementasi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NSFP 17 digit (<code>KKSSYY</code> + 11 digit DJP)</td>
+<td><code>custom_coretax</code> — field
+<code>x_custom_coretax_nsfp</code> di <code>account.move</code>, state
+machine: draft → submitted → nsfp_assigned / rejected</td>
+</tr>
+<tr>
+<td>XML export 7 dokumen (e-Faktur Keluaran, Masukan, Bupot 21
+Tetap/Bukan Tetap, 23, 26, Unifikasi)</td>
+<td><code>custom_coretax</code> — wizard per template, validasi XSD
+lokal di <code>data/xsd/</code></td>
+</tr>
+<tr>
+<td>Bukti Potong PPh Unifikasi (22 / 23 / 4(2) / 15 / 26)</td>
+<td><code>custom_coretax_bupot</code></td>
+</tr>
+<tr>
+<td>Sertifikat Elektronik (.p12)</td>
+<td>Fernet-encrypted storage via <code>custom.ir.config</code>,
+env-keyed</td>
+</tr>
+<tr>
+<td>Host-to-host submission (ketika tersedia)</td>
+<td><code>custom_coretax_pajakku</code> — <strong>Pajakku ASPP
+adapter</strong> w/ OAuth2 token cache, exponential backoff, circuit
+breaker, per-tenant usage meter untuk billing</td>
+</tr>
+<tr>
+<td>Manual fallback</td>
+<td>Upload manual ke Coretax portal (jalur sah hari ini)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Strategic note:</strong> DJP belum membuka REST API B2B
+publik. Kita pakai <strong>adapter pattern</strong> — hari ini Pajakku
+ASPP, besok H2H langsung tinggal swap implementasi. Tenant tidak perlu
+mengganti workflow.</p>
+<h3 id="pph-ppn">6.3 PPh &amp; PPN</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Kewajiban</th>
+<th>Modul</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PPh 21 TER (PP 58/2023) + Annual progressive (UU HPP 2021)</td>
+<td><code>custom_hr_payroll_id</code></td>
+</tr>
+<tr>
+<td>PPh 23 / 4(2) / 26 withholding engine</td>
+<td><code>custom_tax_id</code></td>
+</tr>
+<tr>
+<td>PPN DPP Nilai Lain (PMK 131/2024)</td>
+<td><code>custom_tax_id</code></td>
+</tr>
+<tr>
+<td>Faktur Pengganti workflow</td>
+<td><code>custom_tax_id</code></td>
+</tr>
+<tr>
+<td>Generic PPh witholding (rates registry)</td>
+<td><code>custom_pph_witholding</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="psak-bpjs">6.4 PSAK &amp; BPJS</h3>
+<ul>
+<li><strong>PSAK CoA</strong> (5-digit, 53 accounts, 2 PPN taxes, 6
+journals, 2 fiscal positions) via <code>l10n_id_psak_custom</code>.</li>
+<li><strong>BPJS Kesehatan</strong> 1%/4% capped Rp 12M.</li>
+<li><strong>BPJS Ketenagakerjaan</strong>: JHT 2%/3.7%, JKK 0.24-1.74%,
+JKM 0.3%, JP 1%/2% capped Rp 10,042,300.</li>
+<li><strong>SPT 1721 A1</strong> generator (PDF + XML).</li>
+<li><strong>PTKP</strong> auto-compute.</li>
+<li><strong>THR</strong> wizard.</li>
+</ul>
+<h3 id="ojk-esg">6.5 OJK ESG</h3>
+<ul>
+<li><code>custom_esg</code> — metric collection untuk <strong>POJK
+51/2017</strong> sustainability report (emisi, sosial, governance).</li>
+</ul>
+<h3 id="uu-cipta-kerja">6.6 UU Cipta Kerja</h3>
+<ul>
+<li><code>custom_hr_leave_id</code> — cuti tahunan, cuti haid, cuti
+melahirkan, public holiday calendar Indonesia, carry-over rules.</li>
+</ul>
+<hr />
+<h2 id="slide-7-security-posture-devsecops-day-1">Slide 7 — Security
+Posture (DevSecOps Day-1)</h2>
+<h3 id="application-security">7.1 Application Security</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Control</th>
+<th>Implementasi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Append-only audit log</td>
+<td>PostgreSQL trigger + sha256 hash chain
+(<code>custom_pdp_audit</code>)</td>
+</tr>
+<tr>
+<td>PII masking at ORM read</td>
+<td><code>custom_pdp_masking</code></td>
+</tr>
+<tr>
+<td>Role-based access (RBAC)</td>
+<td>Odoo groups + record rules + <code>ir.model.access.csv</code> per
+modul</td>
+</tr>
+<tr>
+<td>Multi-tier approval w/ delegation &amp; OOO</td>
+<td><code>custom_approval_engine</code></td>
+</tr>
+<tr>
+<td>HMAC signed inter-service calls</td>
+<td>Odoo → ai-gateway:
+<code>X-Custom-Signature = HMAC_SHA256(secret, ts+body)</code>, drift
+≤300s</td>
+</tr>
+<tr>
+<td>Tenant allow-list per request</td>
+<td><code>X-Era-Tenant</code> header validated di ai-gateway</td>
+</tr>
+<tr>
+<td>Sertel encryption at rest</td>
+<td>Fernet (env-keyed) for <code>.p12</code> files</td>
+</tr>
+<tr>
+<td>Secrets management</td>
+<td><strong>SOPS-encrypted</strong> in repo, decrypted at runtime</td>
+</tr>
+</tbody>
+</table>
+<h3 id="infrastructure-security">7.2 Infrastructure Security</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Control</th>
+<th>Implementasi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CIS-hardened containers</td>
+<td>Distroless / non-root user, read-only FS</td>
+</tr>
+<tr>
+<td>AppArmor / seccomp profiles</td>
+<td><code>security/apparmor/</code>, <code>security/seccomp/</code></td>
+</tr>
+<tr>
+<td>TLS termination</td>
+<td>Caddy / nginx, HSTS, redirect 80→443</td>
+</tr>
+<tr>
+<td>Database isolation</td>
+<td><strong>DB-per-tenant</strong> (bukan schema-per-tenant)</td>
+</tr>
+<tr>
+<td>Network ACL</td>
+<td>Postgres via <code>pg_hba.conf</code>, Prometheus/Grafana
+di-belakang VPN</td>
+</tr>
+<tr>
+<td>Backup</td>
+<td><code>pg_dumpall</code> nightly, off-site rotation</td>
+</tr>
+<tr>
+<td>Disaster Recovery runbook</td>
+<td><code>docs/runbooks/disaster-recovery.md</code></td>
+</tr>
+<tr>
+<td>Production drill</td>
+<td>Q1 2026 drill:
+<code>docs/runbooks/production-drill-2026-05-16.md</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="devsecops-pipeline">7.3 DevSecOps Pipeline</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pre-commit</td>
+<td>gitleaks, ruff, bandit, hadolint</td>
+</tr>
+<tr>
+<td>CI/CD (GitHub Actions)</td>
+<td>Semgrep (SAST), pip-audit (dep scan), Trivy (image), cosign
+(signing)</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td>Prometheus alerts: <code>audit_chain_broken</code>,
+<code>pajakku_circuit_open</code>, OOM, slow query</td>
+</tr>
+<tr>
+<td>Secret rotation</td>
+<td>Documented runbook:
+<code>docs/runbooks/secret-rotation.md</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="soc2-readiness">7.4 SOC2 Readiness</h3>
+<ul>
+<li>Control mapping: <code>docs/compliance/soc2-controls.md</code></li>
+<li>Audit evidence: append-only log + signed JSONL exports.</li>
+</ul>
+<hr />
+<h2 id="slide-8-multi-tenant-architecture">Slide 8 — Multi-Tenant
+Architecture</h2>
+<pre><code>   Hub-Portal (Vite+React, port 18000)
+   ┌─────────────────────────────────────┐
+   │ Onboarding · Admin · Landing · Login│
+   └──────────────┬──────────────────────┘
+                  │
+        ┌─────────▼──────────┐
+        │ Tenant Orchestrator│   ← bootstraps tenant DB, modules,
+        │ (FastAPI)          │     Caddy route, mail config
+        └─────────┬──────────┘
+                  │ provision
+   ┌──────────────┼──────────────┐
+   │              │              │
+┌──▼────┐    ┌────▼───┐     ┌────▼───┐
+│tenant1│    │tenant2 │ ... │tenantN │     ← separate Odoo DB per tenant
+│ DB    │    │ DB     │     │ DB     │
+└───────┘    └────────┘     └────────┘
+
+   Shared services:
+   • ai-gateway (HMAC, tenant allow-list)
+   • Postgres cluster
+   • Redis
+   • Object storage (filestore, sertel)
+   • Observability stack</code></pre>
+<p><strong>Decisions</strong> (lihat memory
+<code>platform_multitenant_decisions.md</code>): -
+<strong>DB-per-tenant</strong> — isolasi data legal &amp; backup per
+tenant. - <strong>Pajakku ASPP</strong> — single integration partner
+untuk semua tenant. - <strong>Generic approval engine</strong> — bukan
+per-vertikal duplication. - <strong>Ops-driven</strong> — Super Admin
+only provision; tenant tidak self-serve infra. - <strong>Target 10
+tenant Y1, 99.5% SLA</strong>.</p>
+<hr />
+<h2 id="slide-9-ai-layer">Slide 9 — AI Layer</h2>
+<h3 id="ai-gateway-fastapi-sidecar">9.1 ai-gateway (FastAPI
+sidecar)</h3>
+<ul>
+<li><strong>Provider abstraction</strong>: Claude / OpenAI / Ollama
+(local LLM) via env switch.</li>
+<li><strong>HMAC-validated</strong> Odoo → gateway calls.</li>
+<li><strong>Prompt caching</strong> untuk cost efficiency.</li>
+<li><strong>Per-tenant rate limit &amp; quota</strong>.</li>
+</ul>
+<h3 id="custom-predictor">9.2 custom-predictor</h3>
+<ul>
+<li><strong>Tabular ML sidecar</strong>: capacity forecasting dari
+7-hari metric trends.</li>
+<li><strong>Hardware upgrade recommendations</strong> — proactive
+scaling untuk multi-tenant ops.</li>
+<li><strong>/predict</strong> + <strong>/metrics</strong> endpoints,
+scraped by Prometheus.</li>
+</ul>
+<h3 id="ai-features-di-erp-via-custom_ai_features">9.3 AI Features di
+ERP (via <code>custom_ai_features</code>)</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Lokasi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ask AI</strong> server-action</td>
+<td>Cog menu 9 model bisnis utama (invoice, payslip, picking, dll)</td>
+</tr>
+<tr>
+<td><strong>Anomaly Inbox</strong></td>
+<td>Nightly scan <code>account.move</code>, <code>hr.payslip</code>,
+<code>custom.coretax.transaction</code> → severity + suggested
+action</td>
+</tr>
+<tr>
+<td><strong>NLQ Chat</strong></td>
+<td><code>/ai/chat</code> — “tampilkan faktur &gt; Rp 100 juta posted
+bulan ini”, PII masking honoured</td>
+</tr>
+<tr>
+<td><strong>Document Auto-Classify</strong></td>
+<td><code>document.document</code> create → AI menyarankan
+<code>pdp.classification</code> + tag</td>
+</tr>
+<tr>
+<td><strong>AI churn prediction</strong></td>
+<td><code>custom_subscription</code></td>
+</tr>
+<tr>
+<td><strong>AI suggested reply</strong></td>
+<td><code>custom_livechat</code></td>
+</tr>
+<tr>
+<td><strong>AI moderation</strong></td>
+<td><code>custom_forum</code></td>
+</tr>
+<tr>
+<td><strong>AI task breakdown</strong></td>
+<td><code>custom_todo</code></td>
+</tr>
+<tr>
+<td><strong>AI OCR receipt</strong></td>
+<td><code>custom_expenses</code></td>
+</tr>
+<tr>
+<td><strong>Predictive scoring</strong></td>
+<td><code>custom_crm</code></td>
+</tr>
+<tr>
+<td><strong>AI helpers</strong></td>
+<td><code>custom_spreadsheet</code></td>
+</tr>
+<tr>
+<td><strong>BRD gap analyzer</strong></td>
+<td><code>custom_brd_analyzer</code> (ops side)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="slide-10-operations-observability">Slide 10 — Operations &amp;
+Observability</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Tool</th>
+<th>Tujuan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Metrics</td>
+<td>Prometheus</td>
+<td>Scrape 15s: Odoo, ai-gateway, custom-predictor, Postgres
+exporter</td>
+</tr>
+<tr>
+<td>Dashboards</td>
+<td>Grafana (port 13000)</td>
+<td>Per-tenant utilization, AI cost, audit chain health</td>
+</tr>
+<tr>
+<td>Logs</td>
+<td>Loki + Promtail</td>
+<td>Centralized log aggregation</td>
+</tr>
+<tr>
+<td>Alerts</td>
+<td>Alertmanager</td>
+<td><code>audit_chain_broken</code>, <code>pajakku_circuit_open</code>,
+OOM, slow query, TLS expiry</td>
+</tr>
+<tr>
+<td>Predictor</td>
+<td><code>custom-predictor</code></td>
+<td>Capacity forecast + hardware upgrade suggestion</td>
+</tr>
+<tr>
+<td>Backup</td>
+<td><code>make backup</code></td>
+<td><code>pg_dumpall</code> nightly + filestore rsync</td>
+</tr>
+<tr>
+<td>Runbooks</td>
+<td><code>docs/runbooks/</code></td>
+<td>DR, backup-restore, OOM, postgres-down, TLS renewal, pajakku-down,
+tenant-data-recovery</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Operational maturity:</strong> Q2 2026 production drill
+executed (<code>production-drill-2026-05-16.md</code>).</p>
+<hr />
+<h2 id="slide-11-lifecycle-from-lead-to-live-tenant">Slide 11 —
+Lifecycle: From Lead to Live Tenant</h2>
+<pre><code>   1. Intake (BRD)             ← custom_brd_analyzer (AI gap analysis)
+        ↓
+   2. Go / No-Go review        ← custom_onboarding_journey
+        ↓
+   3. Provisioning             ← custom_super_admin + custom_tenant_infra
+      • VPS SSH bootstrap                                (Docker + Caddy + Odoo stack)
+      • DB create, module install, Coretax/PDP config
+      • Pajakku ASPP onboarding
+        ↓
+   4. Configuration            ← Hub-Portal admin UI
+      • CoA, fiscal positions, BPJS rates, sertel upload
+      • User import, RBAC, approval matrix
+        ↓
+   5. UAT &amp; Handover           ← custom_dev_cycle (PR/CI tracking)
+        ↓
+   6. Live + Ongoing Ops       ← custom_ops_monitor + observability stack</code></pre>
+<p>Bi-directional sync dengan Odoo Project; tiap stage adalah project
+task + activity.</p>
+<hr />
+<h2 id="slide-12-vas-productization-opportunities">Slide 12 — VAS
+Productization Opportunities</h2>
+<p>Sebagai Product Owner VAS, platform ini membuka <strong>5 product
+line</strong> yang bisa di-monetize ke ekosistem Erajaya &amp;
+eksternal:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>VAS Product</th>
+<th>Modul Penopang</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ERP-as-a-Service Multi-Tenant</strong></td>
+<td>Seluruh stack + super_admin + tenant_infra</td>
+<td>Internal tenants &amp; afiliasi Erajaya</td>
+</tr>
+<tr>
+<td><strong>Coretax Compliance-as-a-Service</strong></td>
+<td><code>custom_coretax*</code> + Pajakku adapter</td>
+<td>UMKM ekosistem Erajaya (Eraspace partners, F&amp;B franchisee)</td>
+</tr>
+<tr>
+<td><strong>PDP Compliance Toolkit</strong></td>
+<td>6 modul <code>custom_pdp_*</code> + audit signed export</td>
+<td>Anak usaha, mitra strategis</td>
+</tr>
+<tr>
+<td><strong>AI Operations Layer</strong></td>
+<td>ai-gateway + <code>custom_ai_features</code> + custom-predictor</td>
+<td>Bundled di setiap tenant; opt-in advanced features</td>
+</tr>
+<tr>
+<td><strong>HHT / Field Ops Bridge</strong></td>
+<td><code>custom_hht_bridge</code> (Zebra PWA) +
+<code>custom_field_service</code></td>
+<td>Service Center, distribution, warehouse vertical</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pricing model usulan</strong> (untuk diskusi): - Tenant
+subscription: per-user/bulan (di bawah harga Odoo EE). - Per-document
+fee untuk Coretax submission (passthrough ASPP). - Premium add-on: AI
+quota tier.</p>
+<hr />
+<h2 id="slide-13-differentiation-vs-alternatif">Slide 13 —
+Differentiation vs Alternatif</h2>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Aspek</th>
+<th>Odoo EE</th>
+<th>SAP B1</th>
+<th>NetSuite</th>
+<th><strong>Platform Erajaya VAS</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>License cost / user</td>
+<td>~USD 31/bln</td>
+<td>~USD 100/bln</td>
+<td>~USD 99/bln</td>
+<td><strong>0</strong> (LGPL-3)</td>
+</tr>
+<tr>
+<td>Coretax-ready (PER-11/2025)</td>
+<td>❌ via partner</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅ built-in + Pajakku H2H</td>
+</tr>
+<tr>
+<td>UU PDP 27/2022 hash-chain audit</td>
+<td>❌</td>
+<td>partial</td>
+<td>partial</td>
+<td>✅ append-only + PG trigger</td>
+</tr>
+<tr>
+<td>PPh 21 TER + BPJS lengkap</td>
+<td>partial localization</td>
+<td>needs add-on</td>
+<td>needs add-on</td>
+<td>✅ built-in</td>
+</tr>
+<tr>
+<td>AI layer built-in</td>
+<td>partial</td>
+<td>❌</td>
+<td>partial</td>
+<td>✅ multi-provider</td>
+</tr>
+<tr>
+<td>Multi-tenant DB isolation</td>
+<td>❌ (per-instance)</td>
+<td>❌</td>
+<td>hosted SaaS</td>
+<td>✅ DB-per-tenant</td>
+</tr>
+<tr>
+<td>WhatsApp Cloud API w/ PDP gate</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Vendor lock-in</td>
+<td>sedang</td>
+<td>tinggi</td>
+<td>tinggi</td>
+<td><strong>rendah</strong> (kode owned)</td>
+</tr>
+<tr>
+<td>Time-to-add-vertical</td>
+<td>high</td>
+<td>very high</td>
+<td>very high</td>
+<td>low (template fork)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="slide-14-roadmap">Slide 14 — Roadmap</h2>
+<h3 id="q2-2026-done-in-progress">Q2 2026 (Done / In Progress)</h3>
+<ul>
+<li>✅ 82 modul base modules</li>
+<li>✅ Multi-tenant orchestrator</li>
+<li>✅ Pajakku ASPP adapter</li>
+<li>✅ Hub-Portal UI (Vite+React)</li>
+<li>✅ Production drill #1</li>
+<li>🟡 Tenant orchestrator dbfilter/LIST_DB refactor</li>
+</ul>
+<h3 id="q3-2026">Q3 2026</h3>
+<ul>
+<li>Onboard 3 internal vertical (F&amp;B, Service Center, Corporate
+Services)</li>
+<li>SOC2 Type 1 readiness assessment</li>
+<li>HHT rollout untuk service vertical</li>
+<li>AI cost optimization (prompt cache hit-rate target 60%)</li>
+</ul>
+<h3 id="q4-2026">Q4 2026</h3>
+<ul>
+<li>Onboard tenant 4–10 (target Y1)</li>
+<li>ESG report otomatis (POJK 51/2017)</li>
+<li>DJP H2H direct (jika tersedia)</li>
+<li>Marketplace add-on (3rd party vertical modules)</li>
+</ul>
+<h3 id="section">2027</h3>
+<ul>
+<li>Tenant 11–25 (post-ROI threshold)</li>
+<li>Open partner program (ASPP, integrator)</li>
+<li>Coretax CaaS sebagai standalone product</li>
+</ul>
+<hr />
+<h2 id="slide-15-risks-mitigations">Slide 15 — Risks &amp;
+Mitigations</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Odoo 19 upstream upgrade breaks customs</td>
+<td><code>custom_studio_lite</code> declarative; modul mengikuti
+versioning <code>19.0.x.y</code>; CI di-pin per release</td>
+</tr>
+<tr>
+<td>Pajakku API down</td>
+<td>Circuit breaker + manual fallback Coretax portal + alert ke ops</td>
+</tr>
+<tr>
+<td>PDP audit chain broken</td>
+<td>Nightly verifier + Prometheus alert + immutable trigger di
+Postgres</td>
+</tr>
+<tr>
+<td>Tenant data leakage</td>
+<td>DB-per-tenant + HMAC + tenant allow-list di ai-gateway</td>
+</tr>
+<tr>
+<td>AI cost explosion</td>
+<td>Per-tenant quota, prompt cache, local Ollama fallback</td>
+</tr>
+<tr>
+<td>Talent dependency</td>
+<td>All custom modules under <code>addons/</code>, LGPL-3,
+terdokumentasi</td>
+</tr>
+<tr>
+<td>Regulasi berubah (Coretax / PDP)</td>
+<td>Adapter pattern + compliance docs di-versioning per regulasi</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="slide-16-ask-call-to-action">Slide 16 — Ask / Call to
+Action</h2>
+<p><strong>Untuk decision maker Erajaya:</strong></p>
+<ol type="1">
+<li><strong>Endorsement</strong> platform sebagai backbone VAS Erajaya
+Group.</li>
+<li><strong>Pilot funding</strong> untuk 3 vertikal pertama (F&amp;B,
+Service Center, Corporate Services) — Q3 2026.</li>
+<li><strong>GTM coordination</strong> dengan tim Eraspace untuk
+distribusi Coretax CaaS ke ekosistem partner.</li>
+<li><strong>Hiring runway</strong>: 2 senior backend, 1 SRE, 1
+compliance analyst untuk scale Y1→Y2.</li>
+<li><strong>Compliance sign-off</strong> dari Legal &amp; DPO atas
+implementasi UU PDP.</li>
+</ol>
+<hr />
+<h2 id="appendix-a-tech-stack-reference">Appendix A — Tech Stack
+Reference</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Component</th>
+<th>Tech</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ERP Core</td>
+<td>Odoo 19 CE (LGPL-3)</td>
+</tr>
+<tr>
+<td>Backend custom</td>
+<td>Python 3.11, Odoo ORM</td>
+</tr>
+<tr>
+<td>AI Gateway</td>
+<td>FastAPI, async httpx</td>
+</tr>
+<tr>
+<td>Hub-Portal</td>
+<td>Vite + React 18 + TypeScript</td>
+</tr>
+<tr>
+<td>Tenant Orchestrator</td>
+<td>FastAPI + Paramiko (SSH bootstrap)</td>
+</tr>
+<tr>
+<td>DB</td>
+<td>PostgreSQL 15+</td>
+</tr>
+<tr>
+<td>Cache / Queue</td>
+<td>Redis</td>
+</tr>
+<tr>
+<td>Reverse proxy</td>
+<td>Caddy (TLS-ACME) / nginx (prod)</td>
+</tr>
+<tr>
+<td>Container</td>
+<td>Docker Compose (multi-file: dev, prod, multitenant, observability,
+local-llm)</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>Prometheus, Grafana, Loki, Promtail, Alertmanager</td>
+</tr>
+<tr>
+<td>Local LLM</td>
+<td>Ollama</td>
+</tr>
+<tr>
+<td>Secrets</td>
+<td>SOPS</td>
+</tr>
+<tr>
+<td>CI/CD</td>
+<td>GitHub Actions (Semgrep, Trivy, pip-audit, cosign)</td>
+</tr>
+<tr>
+<td>Pre-commit</td>
+<td>gitleaks, ruff, bandit, hadolint</td>
+</tr>
+</tbody>
+</table>
+<h2 id="appendix-b-repository-layout">Appendix B — Repository
+Layout</h2>
+<pre><code>addons/
+  core/           — 5 modules (custom_core, ai_bridge, adapter_framework, bast, hht_bridge)
+  ee_gap/         — 60 modules (CE→EE gap fulfillment)
+  compliance/    — 9 modules (PDP × 6, Coretax × 3, PPh × 1 — overlap by category)
+  operations/    — 3 modules (ops_monitor, dev_cycle, brd_analyzer)
+  verticals/     — 5 modules (super_admin, tenant_infra, hub_console, onboarding, _template)
+services/        — baileys (WhatsApp), [future: more sidecars]
+ai-gateway/      — FastAPI app
+tenant-orchestrator/ — FastAPI + bootstrap_templates
+hub-portal/      — Vite+React control plane UI
+custom-predictor/— ML forecasting sidecar
+caddy/, nginx/   — reverse proxies
+observability/   — Prometheus, Grafana, Loki configs
+security/        — AppArmor, seccomp, policies
+docs/            — architecture, compliance, runbooks, deploy checklists</code></pre>
+<h2 id="appendix-c-key-documentation">Appendix C — Key
+Documentation</h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Architecture overview</td>
+<td><code>docs/architecture.md</code></td>
+</tr>
+<tr>
+<td>UU PDP mapping</td>
+<td><code>docs/pdp-compliance.md</code></td>
+</tr>
+<tr>
+<td>Coretax integration</td>
+<td><code>docs/coretax.md</code></td>
+</tr>
+<tr>
+<td>Adding a vertical</td>
+<td><code>docs/adding-vertical.md</code></td>
+</tr>
+<tr>
+<td>AI activation</td>
+<td><code>docs/ai-activation.md</code></td>
+</tr>
+<tr>
+<td>CI/CD activation</td>
+<td><code>docs/cicd-activation.md</code></td>
+</tr>
+<tr>
+<td>Studio-lite quickstart</td>
+<td><code>docs/studio-lite-quickstart.md</code></td>
+</tr>
+<tr>
+<td>Prod deploy checklist</td>
+<td><code>docs/prod-deploy-checklist.md</code></td>
+</tr>
+<tr>
+<td>VPS demo deploy</td>
+<td><code>docs/vps-demo-deploy.md</code></td>
+</tr>
+<tr>
+<td>SOC2 control map</td>
+<td><code>docs/compliance/soc2-controls.md</code></td>
+</tr>
+<tr>
+<td>Runbooks (DR, OOM, TLS, Pajakku down, etc.)</td>
+<td><code>docs/runbooks/</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>End of deck — Versi 1.0 · Mei 2026 · Internal Erajaya
+VAS</em></p>
+</body>
+</html>

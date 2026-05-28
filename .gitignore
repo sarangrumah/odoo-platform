@@ -50,6 +50,7 @@ next-env.d.ts
 *.swo
 .DS_Store
 Thumbs.db
+~$*
 
 # ----- Build / dist -----
 dist/
