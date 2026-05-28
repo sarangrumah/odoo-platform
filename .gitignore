@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+.secrets/
+.claude/
 *.pem
 *.key
 !nginx/certs/.gitkeep
