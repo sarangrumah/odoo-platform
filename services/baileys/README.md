@@ -61,6 +61,15 @@ Inbound events are POSTed back to Odoo at
 - **Auth state**: deleting `${BAILEYS_AUTH_DIR}/<session_id>/` forces a
   re-pair. Volume is mounted at `./data/baileys` by default — include it
   in your backup policy.
+- **Volume ownership** (first-time setup): the container runs as
+  `uid=10104(baileys)`, but a bind-mounted host directory inherits
+  whatever ownership it had on the host (typically `root:root`). If
+  Start Session returns `EACCES: permission denied, mkdir ...`, fix
+  ownership once on the host:
+  ```bash
+  sudo chown -R 10104:10104 ./data/baileys
+  ```
+  The setting persists across restarts and recreations.
 - **Restart safety**: on container restart, sessions auto-resume from the
   persisted auth state. No re-pair needed.
 - **Reachability**: bind the published port to localhost only in prod
