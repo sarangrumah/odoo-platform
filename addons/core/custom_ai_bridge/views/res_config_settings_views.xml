@@ -13,8 +13,15 @@
                     <setting string="Default Quality">
                         <field name="custom_ai_default_quality"/>
                     </setting>
-                    <setting string="Provider Override">
+                    <setting string="Provider Override"
+                             help="Pilih provider AI untuk tenant ini. Banner di bawah menjelaskan dampak biaya, latensi, dan data residency.">
                         <field name="custom_ai_provider_override"/>
+                        <field name="custom_ai_provider_tradeoff_html" nolabel="1" readonly="1"/>
+                    </setting>
+                    <setting string="Ollama Model"
+                             help="Override nama model Ollama. Hanya relevan saat Provider = Local Ollama."
+                             invisible="custom_ai_provider_override != 'ollama'">
+                        <field name="custom_ai_ollama_model" placeholder="qwen2.5:7b"/>
                     </setting>
                 </block>
             </xpath>
