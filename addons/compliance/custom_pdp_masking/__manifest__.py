@@ -24,9 +24,15 @@
         "wizards/pdp_unmask_wizard_views.xml",
         "wizards/pdp_field_discovery_wizard_views.xml",
         "views/pdp_field_registry_views.xml",
+        "views/res_partner_views.xml",
         "views/menu_views.xml",
         "data/pdp_field_registry_seed.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "custom_pdp_masking/static/src/**/*",
+        ],
+    },
     "installable": True,
     "application": False,
     "auto_install": False,

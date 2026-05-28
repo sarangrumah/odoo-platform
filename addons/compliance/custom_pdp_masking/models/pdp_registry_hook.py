@@ -27,6 +27,8 @@ class BaseMaskingHook(models.AbstractModel):
 
     def read(self, fields=None, load="_classic_read"):
         rows = super().read(fields=fields, load=load)
+        if self.env.context.get("__pdp_skip_masking"):
+            return rows
         try:
             Reg = self.env["custom.pdp.field.registry"].sudo()
             rules = Reg._registry_for(self._name)
@@ -34,10 +36,17 @@ class BaseMaskingHook(models.AbstractModel):
             return rows
         if not rules:
             return rows
-        # Filter rules to those whose field is in the row + user lacks bypass.
+        unmasked_ids = set(self.env.context.get("pdp_unmasked_ids") or [])
+        # Filter rules to those whose field is in the row, the user lacks
+        # bypass, and the field is text-like (masking integer IDs of m2o /
+        # boolean / date fields corrupts downstream web_read batching).
+        _MASKABLE_TYPES = {"char", "text", "html"}
         applicable = []
         for r in rules:
             if Reg._user_bypasses(r["groups"]):
+                continue
+            f = self._fields.get(r["field"])
+            if f is None or f.type not in _MASKABLE_TYPES:
                 continue
             applicable.append(r)
         if not applicable:
@@ -45,6 +54,8 @@ class BaseMaskingHook(models.AbstractModel):
         # Apply masking and audit-log once per (model, field) batch.
         masked_field_summary = {}
         for row in rows:
+            if row.get("id") in unmasked_ids:
+                continue
             for r in applicable:
                 fname = r["field"]
                 if fname in row and row[fname] not in (None, False, ""):
@@ -53,6 +64,71 @@ class BaseMaskingHook(models.AbstractModel):
         if masked_field_summary:
             _log_mask_event(self, masked_field_summary)
         return rows
+
+    def get_view(self, view_id=None, view_type="form", **options):
+        """Post-process the final arch so PII fields get the eye-toggle
+        widget regardless of what other modules' ``_get_view`` overrides
+        set. Runs after ``_get_view`` + access-rights post-processing, so
+        widgets set by autocomplete/email/phone modules are replaced.
+        """
+        result = super().get_view(view_id=view_id, view_type=view_type, **options)
+        try:
+            Reg = self.env["custom.pdp.field.registry"].sudo()
+            rules = Reg._registry_for(self._name)
+        except Exception:
+            return result
+        if not rules:
+            return result
+        masked_names = {
+            r["field"]
+            for r in rules
+            if not Reg._user_bypasses(r["groups"])
+            and self._fields.get(r["field"]) is not None
+            and self._fields[r["field"]].type in {"char", "text", "html"}
+        }
+        if not masked_names:
+            return result
+        arch = result.get("arch")
+        if not arch:
+            return result
+        try:
+            from lxml import etree
+            tree = etree.fromstring(arch)
+        except Exception:
+            return result
+        # Skip <field> nodes living inside these containers — they are
+        # view metadata / search controls, not render targets, and forcing
+        # a widget on them confuses the web client.
+        _SKIP_ANCESTOR_TAGS = {"header", "searchpanel", "search", "groupby", "filter"}
+
+        def _in_skip_context(node) -> bool:
+            p = node.getparent()
+            while p is not None:
+                if p.tag in _SKIP_ANCESTOR_TAGS:
+                    return True
+                p = p.getparent()
+            return False
+
+        changed = False
+        if view_type == "form":
+            for node in tree.iter("field"):
+                if node.get("name") in masked_names and not _in_skip_context(node):
+                    # Force-overwrite: PII reveal must win over autocomplete.
+                    node.set("widget", "pdp_masked_field")
+                    changed = True
+        elif view_type in ("list", "tree"):
+            for node in tree.iter("field"):
+                if node.get("name") in masked_names and not _in_skip_context(node):
+                    node.set("column_invisible", "1")
+                    changed = True
+        elif view_type == "kanban":
+            for node in tree.iter("field"):
+                if node.get("name") in masked_names and not _in_skip_context(node):
+                    node.set("invisible", "1")
+                    changed = True
+        if changed:
+            result["arch"] = etree.tostring(tree, encoding="unicode")
+        return result
 
 
 def _log_mask_event(records, summary: dict):

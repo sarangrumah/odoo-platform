@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import re
 
-from odoo import api, models
+from odoo import _, api, models
+from odoo.exceptions import AccessError, UserError
 
 
 REDACTED = "[REDACTED]"
@@ -100,3 +101,64 @@ class PdpMaskingService(models.AbstractModel):
     def _user_can_view_pii(self, user=None) -> bool:
         user = user or self.env.user
         return user.has_group("custom_pdp_masking.group_view_pii")
+
+    # ------------------------------------------------------------------
+    # Per-field reveal (used by the `pdp_masked_field` OWL widget)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _reveal_field(self, model_name: str, res_id: int, field_name: str, reason: str | None = None):
+        """Return the clear value of one field for one record, with audit.
+
+        Server-enforced: validates that the field is actually registered as
+        masked, that the user is allowed to reveal under the active policy,
+        and writes a ``pii_unmask`` audit row before returning.
+        """
+        if not model_name or not res_id or not field_name:
+            raise UserError(_("Missing parameters for reveal."))
+        if model_name not in self.env:
+            raise UserError(_("Unknown model %s") % model_name)
+        Reg = self.env["custom.pdp.field.registry"].sudo()
+        rules = Reg._registry_for(model_name)
+        rule = next((r for r in rules if r["field"] == field_name), None)
+        if not rule:
+            raise UserError(_("Field %s is not registered as masked.") % field_name)
+
+        policy = self._policy()
+        if policy == "always_mask":
+            raise AccessError(_("Reveal is disabled by policy (always_mask)."))
+        if policy == "unmask_with_reason":
+            if not (reason and reason.strip()):
+                raise UserError(_("A reason is required to reveal this field."))
+            if not self._user_can_view_pii():
+                raise AccessError(_("You are not allowed to reveal PII fields."))
+
+        Model = self.env[model_name]
+        rec = Model.browse(int(res_id)).exists()
+        if not rec:
+            raise UserError(_("Record not found."))
+        rec.check_access("read")
+
+        clear_value = rec.with_context(__pdp_skip_masking=True).read([field_name])[0].get(field_name)
+
+        # Audit (best-effort). Use the audited mixin if the model has it,
+        # else fall back to direct insert via the registry's own helper.
+        try:
+            if hasattr(rec, "_pdp_audit_write"):
+                rec._pdp_audit_write(
+                    "pii_unmask",
+                    rec.id,
+                    {field_name: rule["pattern"]},
+                    reason=reason or None,
+                )
+            else:
+                Reg._pdp_audit_write(
+                    "pii_unmask",
+                    rec.id,
+                    {"model": model_name, "field": field_name},
+                    reason=reason or None,
+                )
+        except Exception:
+            pass
+
+        return clear_value

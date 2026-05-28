@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Force the PDP masked-field widget on every res.partner PII field.
+         Static inheritance is more reliable than dynamic get_view injection
+         because it bypasses cache/post-processing ordering issues with
+         other modules that overwrite the widget attribute. -->
+    <record id="view_partner_form_pdp_masked" model="ir.ui.view">
+        <field name="name">res.partner.form.pdp.masked</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='email']" position="attributes">
+                <attribute name="widget">pdp_masked_field</attribute>
+            </xpath>
+            <xpath expr="//field[@name='phone']" position="attributes">
+                <attribute name="widget">pdp_masked_field</attribute>
+            </xpath>
+            <xpath expr="//field[@name='street']" position="attributes">
+                <attribute name="widget">pdp_masked_field</attribute>
+            </xpath>
+            <xpath expr="//field[@name='street2']" position="attributes">
+                <attribute name="widget">pdp_masked_field</attribute>
+            </xpath>
+            <xpath expr="//field[@name='city']" position="attributes">
+                <attribute name="widget">pdp_masked_field</attribute>
+            </xpath>
+            <xpath expr="//field[@name='zip']" position="attributes">
+                <attribute name="widget">pdp_masked_field</attribute>
+            </xpath>
+            <xpath expr="//field[@name='vat']" position="attributes">
+                <attribute name="widget">pdp_masked_field</attribute>
+            </xpath>
+            <xpath expr="//field[@name='website']" position="attributes">
+                <attribute name="widget">pdp_masked_field</attribute>
+            </xpath>
+            <xpath expr="//field[@name='function']" position="attributes">
+                <attribute name="widget">pdp_masked_field</attribute>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

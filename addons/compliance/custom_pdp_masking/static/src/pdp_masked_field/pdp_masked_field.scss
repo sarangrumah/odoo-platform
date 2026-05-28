@@ -1,0 +1,13 @@
+.o_field_pdp_masked {
+    .o_field_pdp_masked_value {
+        font-family: var(--bs-font-monospace, monospace);
+        letter-spacing: 0.02em;
+    }
+    .o_field_pdp_masked_toggle {
+        line-height: 1;
+        color: var(--bs-secondary, #6c757d);
+        &:hover {
+            color: var(--bs-primary, #714B67);
+        }
+    }
+}

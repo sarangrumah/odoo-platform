@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <t t-name="custom_pdp_masking.PdpMaskedField">
+        <span class="o_field_pdp_masked d-inline-flex align-items-center gap-1">
+            <span class="o_field_pdp_masked_value" t-esc="displayValue"/>
+            <button type="button"
+                    class="btn btn-link btn-sm p-0 ms-1 o_field_pdp_masked_toggle"
+                    t-att-disabled="state.loading"
+                    t-on-click.stop.prevent="onToggle"
+                    t-att-title="state.revealed ? 'Hide (re-mask)' : 'Reveal (audited)'">
+                <i t-if="state.loading" class="fa fa-spinner fa-spin"/>
+                <i t-elif="state.revealed" class="fa fa-eye-slash"/>
+                <i t-else="1" class="fa fa-eye"/>
+            </button>
+        </span>
+    </t>
+
+</templates>

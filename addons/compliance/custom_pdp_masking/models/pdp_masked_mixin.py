@@ -62,10 +62,18 @@ class PdpMaskedMixin(models.AbstractModel):
             allow_clear = can_view
         if allow_clear and not unmasked_ids:
             return rows
+        # Only mask text-like fields. Mangling an integer m2o id into a
+        # string breaks Odoo's web_read m2o batch lookup (KeyError on the
+        # masked value).
+        _MASKABLE_TYPES = {"char", "text", "html"}
         for row in rows:
             if row.get("id") in unmasked_ids:
                 continue
             for fname, code in classmap.items():
-                if fname in row:
-                    row[fname] = Masking._mask(row[fname], code, self.env.user, field_name=fname)
+                if fname not in row:
+                    continue
+                f = self._fields.get(fname)
+                if f is None or f.type not in _MASKABLE_TYPES:
+                    continue
+                row[fname] = Masking._mask(row[fname], code, self.env.user, field_name=fname)
         return rows
