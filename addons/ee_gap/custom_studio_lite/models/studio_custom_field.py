@@ -348,13 +348,43 @@ class StudioCustomField(models.Model):
                     "target_view_id": target_view_id,
                 }
             )
+        # The op model requires anchor_field for add_field (see
+        # studio.view.operation._check_op). When the overlay couldn't
+        # detect a sensible anchor (empty form, drop outside any group)
+        # we resolve one here from the combined arch: prefer the last
+        # <field> nested inside a <group>, fall back to the last <field>
+        # anywhere. If neither exists the view has no usable insertion
+        # point and we surface a clear error instead of a ValidationError.
+        resolved_anchor = anchor_field or ""
+        resolved_position = position or "after"
+        if not resolved_anchor:
+            try:
+                view = self.env["ir.ui.view"].sudo().browse(target_view_id)
+                arch = view.get_combined_arch()
+                from lxml import etree as _et
+                root = _et.fromstring(arch.encode("utf-8") if isinstance(arch, str) else arch)
+                group_fields = root.xpath("//group//field[@name]")
+                if group_fields:
+                    resolved_anchor = group_fields[-1].get("name") or ""
+                else:
+                    any_fields = root.xpath("//field[@name]")
+                    if any_fields:
+                        resolved_anchor = any_fields[-1].get("name") or ""
+            except Exception:
+                _logger.exception("studio_create_and_place: anchor auto-resolve failed for view %s", target_view_id)
+        if not resolved_anchor:
+            raise UserError(_(
+                "Cannot place field '%s' — the target view has no existing field "
+                "to anchor against. Add a field manually first, or open a form "
+                "with at least one group."
+            ) % rec.technical_name)
         Op.create(
             {
                 "customization_id": cust.id,
                 "op_type": "add_field",
                 "field_name": rec.technical_name,
-                "anchor_field": anchor_field or "",
-                "position": position if anchor_field else "inside",
+                "anchor_field": resolved_anchor,
+                "position": resolved_position,
             }
         )
         cust.action_apply()

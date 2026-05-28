@@ -418,11 +418,32 @@ export class StudioOverlay extends Component {
             );
             return;
         }
+        // Anchor sanitation: a drop target outside any <group> (e.g. the
+        // built-in ``properties`` flex container, status bars, button
+        // boxes) yields a placement that the form renderer hides or
+        // shoves into a flex row — looks like a silent failure to the
+        // user. Re-route to the last field inside a real <group>.
+        let safeAnchor = anchorName;
+        if (anchorName && !this.state.groupFieldNames.includes(anchorName)) {
+            const fallback =
+                this.state.groupFieldNames[this.state.groupFieldNames.length - 1];
+            if (fallback) {
+                safeAnchor = fallback;
+                this.notification.add(
+                    _t(
+                        "'%s' is not inside a group — placing after '%s' instead.",
+                        anchorName,
+                        fallback,
+                    ),
+                    { type: "info" },
+                );
+            }
+        }
         await this._appendOpsAndApply([
             {
                 op_type: "add_field",
                 field_name: fieldName,
-                anchor_field: anchorName,
+                anchor_field: safeAnchor,
                 position: "after",
             },
         ]);
@@ -877,7 +898,33 @@ export class StudioOverlay extends Component {
         rpcBus.trigger("CLEAR-CACHES", "get_views");
         const ctrl = this.action.currentController;
         if (!ctrl || !ctrl.action) return;
-        await this.action.doAction(ctrl.action, { clearBreadcrumbs: false });
+        const a = ctrl.action;
+        // Re-doing the *same* action object instance does NOT force
+        // action_service to refetch views — it keeps the resolved
+        // _views/_originalAction cache stamped on the action. To get
+        // a fresh load_views call (and therefore a fresh arch after
+        // server-side inheritance writes) we have to either pass the
+        // action id (server re-resolves) or strip the cached fields.
+        const opts = {
+            clearBreadcrumbs: false,
+            additionalContext: (ctrl.props && ctrl.props.context) || {},
+        };
+        if (ctrl.view && ctrl.view.type) {
+            opts.viewType = ctrl.view.type;
+        }
+        if (ctrl.props && ctrl.props.resId) {
+            opts.resId = ctrl.props.resId;
+        }
+        if (a.id) {
+            await this.action.doAction(a.id, opts);
+        } else {
+            // Inline / window actions without an id: shallow-clone and
+            // drop the cached resolved-views array so doAction reloads.
+            const fresh = Object.assign({}, a);
+            delete fresh._views;
+            delete fresh._originalAction;
+            await this.action.doAction(fresh, opts);
+        }
     }
 
     async hideSelectedField() {
@@ -920,11 +967,11 @@ export class StudioOverlay extends Component {
                 _t("Hid %s — reloading view…", this.state.selectedField),
                 { type: "success" },
             );
-            await this.action.doAction(
-                this.action.currentController.action,
-                { clearBreadcrumbs: false },
-            );
             this.state.selectedField = null;
+            // Use the same forced-refetch path as _appendOpsAndApply,
+            // otherwise the action service serves the cached arch and
+            // the hidden field stays visible until a hard refresh.
+            await this._reloadAction();
             await this._initialize();
         } catch (e) {
             this.notification.add(_t("Hide failed: %s", e.message || String(e)), {
