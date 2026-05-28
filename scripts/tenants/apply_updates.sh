@@ -5,6 +5,10 @@
 #   1. For schema/data managed by Odoo modules → odoo -u <modules> -d <db>.
 #   2. For raw SQL seeds (e.g. custom_pdp_audit) → psql -f, idempotent.
 #
+# Runs psql + odoo INSIDE the compose containers — host doesn't need
+# psql installed. Postgres is reached via `docker compose exec postgres
+# psql` and Odoo via `docker compose exec odoo odoo`.
+#
 # Run AFTER `git pull` AND AFTER restarting the Odoo container
 # (Python re-import doesn't happen on `make update` alone — see
 # memory: feedback_odoo_module_deploy).
@@ -13,17 +17,23 @@
 #   bash scripts/tenants/apply_updates.sh              # all tenant DBs
 #   bash scripts/tenants/apply_updates.sh era_busana_retailindo  # one
 #
-# Requires: docker compose stack up; psql reachable as ${PG_USER}@${PG_HOST}.
+# Env overrides:
+#   COMPOSE          (default "docker compose")
+#   ODOO_SERVICE     (default "odoo")
+#   DB_SERVICE       (default "postgres")
+#   PG_USER          (default $POSTGRES_USER or "odoo")
+#   PG_MAINTENANCE_DB (default "postgres" — used to list DBs)
+#   SKIP_DBS         (comma-separated, default "postgres,odoo_mgmt,template0,template1")
 
 set -euo pipefail
 
-PG_HOST="${PG_HOST:-localhost}"
-PG_PORT="${PG_PORT:-5432}"
-PG_USER="${PG_USER:-odoo}"
-ODOO_SERVICE="${ODOO_SERVICE:-odoo}"
 COMPOSE="${COMPOSE:-docker compose}"
+ODOO_SERVICE="${ODOO_SERVICE:-odoo}"
+DB_SERVICE="${DB_SERVICE:-postgres}"
+PG_USER="${PG_USER:-${POSTGRES_USER:-odoo}}"
+PG_MAINTENANCE_DB="${PG_MAINTENANCE_DB:-postgres}"
+SKIP_DBS="${SKIP_DBS:-postgres,odoo_mgmt,template0,template1}"
 
-# Modules whose -u should be re-run on every tenant after this batch of commits.
 MODULES_TO_UPDATE=(
   custom_coretax
   custom_pdp_masking
@@ -48,16 +58,31 @@ MODULES_TO_UPDATE=(
   l10n_id_psak_custom
 )
 
-# Raw SQL seeds (idempotent — safe to re-apply).
+# Raw SQL seeds (idempotent — safe to re-apply). Paths INSIDE the
+# odoo container under /mnt/extra-addons (default). Override
+# CONTAINER_REPO_ROOT if your mount path differs.
+CONTAINER_REPO_ROOT="${CONTAINER_REPO_ROOT:-/mnt/extra-addons}"
 SQL_SEEDS=(
   "addons/compliance/custom_pdp_audit/data/02-pdp-schema.sql"
 )
 
+# Convert SKIP_DBS into a SQL NOT IN list.
+sql_skip_list() {
+  local IFS=','
+  local out=""
+  for d in $SKIP_DBS; do
+    [[ -n "$out" ]] && out+=","
+    out+="'$d'"
+  done
+  echo "$out"
+}
+
 list_tenant_dbs() {
-  PGPASSWORD="${PGPASSWORD:-}" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -tAc \
+  ${COMPOSE} exec -T "$DB_SERVICE" \
+    psql -U "$PG_USER" -d "$PG_MAINTENANCE_DB" -tAc \
     "SELECT datname FROM pg_database
      WHERE datistemplate = false
-       AND datname NOT IN ('postgres','odoo_mgmt');"
+       AND datname NOT IN ($(sql_skip_list));"
 }
 
 apply_to_db() {
@@ -71,26 +96,31 @@ apply_to_db() {
 
   echo "=== [$db] applying raw SQL seeds ==="
   for sql in "${SQL_SEEDS[@]}"; do
+    # Pipe host-side file into the postgres container — works even
+    # if the repo isn't mounted into the db service.
     if [[ -f "$sql" ]]; then
-      PGPASSWORD="${PGPASSWORD:-}" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$db" -v ON_ERROR_STOP=1 -f "$sql"
+      ${COMPOSE} exec -T "$DB_SERVICE" \
+        psql -U "$PG_USER" -d "$db" -v ON_ERROR_STOP=1 < "$sql"
     else
-      echo "WARN: $sql not found, skipping"
+      echo "WARN: $sql not found on host, skipping"
     fi
   done
 }
 
 main() {
+  local dbs=()
   if [[ $# -gt 0 ]]; then
     dbs=("$@")
   else
-    mapfile -t dbs < <(list_tenant_dbs)
+    mapfile -t dbs < <(list_tenant_dbs | sed '/^$/d')
   fi
 
   if [[ ${#dbs[@]} -eq 0 ]]; then
-    echo "No tenant DBs found."
+    echo "No tenant DBs found (skip list: $SKIP_DBS)."
     exit 0
   fi
 
+  echo "Will apply updates to: ${dbs[*]}"
   for db in "${dbs[@]}"; do
     apply_to_db "$db"
   done
