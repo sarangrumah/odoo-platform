@@ -25,6 +25,9 @@
             <pivot string="AI Usage">
                 <field name="tenant_id" type="row"/>
                 <field name="date" interval="month" type="col"/>
+                <field name="request_count" type="measure"/>
+                <field name="input_tokens" type="measure"/>
+                <field name="output_tokens" type="measure"/>
                 <field name="cost_usd" type="measure"/>
                 <field name="cache_hit_rate_pct" type="measure"/>
             </pivot>
@@ -35,9 +38,9 @@
         <field name="name">custom.hub.ai.usage.graph</field>
         <field name="model">custom.hub.ai.usage</field>
         <field name="arch" type="xml">
-            <graph string="AI Cost Over Time" type="line">
+            <graph string="AI Usage Over Time" type="line">
                 <field name="date" interval="day"/>
-                <field name="cost_usd" type="measure"/>
+                <field name="request_count" type="measure"/>
             </graph>
         </field>
     </record>

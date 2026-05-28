@@ -2,7 +2,7 @@
 <odoo>
     <!-- Top-level app menu -->
     <menuitem id="menu_dashboards_root"
-              name="Dashboards"
+              name="KPI Dashboards"
               sequence="58"
               web_icon="custom_dashboards,static/description/icon.png"
               groups="custom_dashboards.group_user"/>
