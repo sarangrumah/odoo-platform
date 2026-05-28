@@ -6,7 +6,7 @@
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                <app data-string="Custom Platform" string="Custom Platform" name="custom_platform"
+                <app data-string="Custom Platform" string="Custom Platform" name="custom_core"
                      groups="custom_core.group_custom_admin">
                     <block title="Overview">
                         <setting>
