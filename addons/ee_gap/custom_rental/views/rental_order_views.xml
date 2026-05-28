@@ -8,6 +8,9 @@
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="asset_id"/>
+                <field name="product_id"/>
+                <field name="qty"/>
+                <field name="loan_qty"/>
                 <field name="pickup_dt"/>
                 <field name="return_dt_expected"/>
                 <field name="total_due"/>
@@ -36,6 +39,10 @@
                     <button name="action_generate_bast_return" type="object"
                             string="Generate BAST Return"
                             invisible="state != 'returned' or bast_return_id"/>
+                    <button name="action_validate_loan_return" type="object"
+                            string="Validate Loan Return"
+                            invisible="loan_qty == 0 or state != 'returned'"
+                            help="Check that all loan/cadangan units have come back in the return picking."/>
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
@@ -43,7 +50,10 @@
                     <group>
                         <group>
                             <field name="partner_id"/>
-                            <field name="asset_id"/>
+                            <field name="asset_id" invisible="product_id"/>
+                            <field name="product_id" invisible="asset_id"/>
+                            <field name="qty" readonly="asset_id"/>
+                            <field name="loan_qty"/>
                             <field name="daily_rate"/>
                             <field name="deposit_amount"/>
                         </group>
@@ -55,7 +65,7 @@
                             <field name="days_actual" readonly="1"/>
                         </group>
                     </group>
-                    <group string="Settlement">
+                    <group name="settlement" string="Settlement">
                         <field name="rental_fee" readonly="1"/>
                         <field name="late_penalty" readonly="1"/>
                         <field name="late_fee_rate"/>
@@ -66,7 +76,7 @@
                         <page string="Notes">
                             <field name="notes"/>
                         </page>
-                        <page string="BAST">
+                        <page name="bast" string="BAST">
                             <group>
                                 <field name="bast_pickup_id"/>
                                 <field name="bast_return_id"/>

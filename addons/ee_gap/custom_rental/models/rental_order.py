@@ -20,7 +20,14 @@ class RentalOrder(models.Model):
 
     name = fields.Char(default="New", readonly=True, copy=False)
     partner_id = fields.Many2one("res.partner", required=True, tracking=True)
-    asset_id = fields.Many2one("rental.asset", required=True, tracking=True, domain="[('state', '!=', 'retired')]")
+    asset_id = fields.Many2one("rental.asset", tracking=True, domain="[('state', '!=', 'retired')]",
+        help="Single-serial rental mode. Leave empty and set Product for bulk-by-qty rentals.")
+    product_id = fields.Many2one("product.product", tracking=True,
+        help="Bulk-by-qty rental mode. Leave empty when using Asset (single-serial mode).")
+    qty = fields.Integer(default=1, required=True, tracking=True,
+        help="Main rental quantity (used to scale fees). Must be 1 in serial mode.")
+    loan_qty = fields.Integer(default=0, tracking=True,
+        help="Spare/loan quantity shipped alongside the order. Not invoiced; must be returned in full.")
 
     pickup_dt = fields.Datetime(required=True, tracking=True)
     return_dt_expected = fields.Datetime(required=True, tracking=True)
@@ -104,14 +111,16 @@ class RentalOrder(models.Model):
             else:
                 rec.days_actual = 0.0
 
-    @api.depends("daily_rate", "days_planned", "days_actual")
+    @api.depends("daily_rate", "days_planned", "days_actual", "qty")
     def _compute_fees(self):
         for rec in self:
-            rec.rental_fee = rec.daily_rate * (rec.days_actual or rec.days_planned)
+            billable_qty = rec.qty or 1
+            rec.rental_fee = rec.daily_rate * billable_qty * (rec.days_actual or rec.days_planned)
             late_days = max(0.0, (rec.days_actual or 0) - (rec.days_planned or 0))
             # 50% surcharge on late days (legacy compute, distinct from
             # cron-driven late_fee_total which represents post-due accrual).
-            rec.late_penalty = rec.daily_rate * late_days * 0.5
+            # loan_qty is intentionally excluded from billing.
+            rec.late_penalty = rec.daily_rate * billable_qty * late_days * 0.5
             rec.total_due = rec.rental_fee + rec.late_penalty + (rec.late_fee_total or 0.0)
 
     @api.model_create_multi
@@ -126,12 +135,30 @@ class RentalOrder(models.Model):
                     vals["deposit_amount"] = asset.deposit_amount
         return super().create(vals_list)
 
+    @api.constrains("asset_id", "product_id", "qty", "loan_qty")
+    def _check_rental_mode(self):
+        for rec in self:
+            if not rec.asset_id and not rec.product_id:
+                raise ValidationError(_("Specify either Asset (serial mode) or Product (bulk mode)."))
+            if rec.asset_id and rec.product_id:
+                raise ValidationError(_("Set Asset OR Product, not both."))
+            if rec.asset_id and rec.qty != 1:
+                raise ValidationError(_("Serial mode (Asset) requires qty=1. Use Product for bulk."))
+            if rec.qty < 1:
+                raise ValidationError(_("qty must be at least 1."))
+            if rec.loan_qty < 0:
+                raise ValidationError(_("loan_qty cannot be negative."))
+
     @api.constrains("pickup_dt", "return_dt_expected", "asset_id", "state")
     def _check_overlap(self):
         for rec in self:
             if rec.pickup_dt and rec.return_dt_expected and rec.pickup_dt >= rec.return_dt_expected:
                 raise ValidationError(_("Expected return must be after pickup."))
             if rec.state in ("cancelled", "returned"):
+                continue
+            # Overlap check only applies to single-serial asset bookings.
+            # Bulk-by-qty (product_id) rentals rely on standard stock availability.
+            if not rec.asset_id:
                 continue
             overlap = self.sudo().search(
                 [
@@ -202,12 +229,26 @@ class RentalOrder(models.Model):
             True,
         )
 
+    def _resolve_rental_product(self):
+        """Return the product.product backing this rental, regardless of mode."""
+        self.ensure_one()
+        if self.product_id:
+            return self.product_id
+        if self.asset_id and self.asset_id.product_id:
+            return self.asset_id.product_id
+        return self.env["product.product"]
+
     def _create_stock_picking(self, direction):
-        """direction: 'outgoing' (confirm) or 'incoming' (return)."""
+        """direction: 'outgoing' (confirm) or 'incoming' (return).
+
+        Creates one stock.move for the main rental qty, plus a second move
+        flagged is_loan=True when loan_qty > 0. Loan moves move the same
+        product through the same locations as the main move."""
         self.ensure_one()
         if not self._stock_integration_enabled():
             return False
-        if not self.asset_id.product_id:
+        product = self._resolve_rental_product()
+        if not product:
             return False
         Picking = self.env["stock.picking"]
         # Pick the first matching picking type in this company.
@@ -224,7 +265,26 @@ class RentalOrder(models.Model):
         loc_dst = ptype.default_location_dest_id
         if not (loc_src and loc_dst):
             return False
-        product = self.asset_id.product_id
+
+        def _move(qty, is_loan):
+            name = product.display_name
+            if is_loan:
+                name = "[LOAN] " + name
+            return (0, 0, {
+                "name": name,
+                "product_id": product.id,
+                "product_uom_qty": float(qty),
+                "product_uom": product.uom_id.id,
+                "location_id": loc_src.id,
+                "location_dest_id": loc_dst.id,
+                "company_id": self.company_id.id,
+                "is_loan": is_loan,
+            })
+
+        moves = [_move(self.qty or 1, False)]
+        if self.loan_qty and self.loan_qty > 0:
+            moves.append(_move(self.loan_qty, True))
+
         vals = {
             "picking_type_id": ptype.id,
             "partner_id": self.partner_id.id,
@@ -232,21 +292,7 @@ class RentalOrder(models.Model):
             "location_dest_id": loc_dst.id,
             "origin": self.name,
             "company_id": self.company_id.id,
-            "move_ids": [
-                (
-                    0,
-                    0,
-                    {
-                        "name": product.display_name,
-                        "product_id": product.id,
-                        "product_uom_qty": 1.0,
-                        "product_uom": product.uom_id.id,
-                        "location_id": loc_src.id,
-                        "location_dest_id": loc_dst.id,
-                        "company_id": self.company_id.id,
-                    },
-                )
-            ],
+            "move_ids": moves,
         }
         picking = Picking.sudo().create(vals)
         if direction == "outgoing":
@@ -255,12 +301,56 @@ class RentalOrder(models.Model):
             self.return_picking_id = picking.id
         return picking
 
+    def action_validate_loan_return(self):
+        """Operator confirms that the loan quantity has come back in the return
+        picking. Raises if quantity_done on loan moves is short."""
+        for rec in self:
+            if not rec.loan_qty:
+                continue
+            picking = rec.return_picking_id
+            if not picking:
+                raise UserError(_("No return picking on order %s.") % rec.name)
+            loan_moves = picking.move_ids.filtered("is_loan")
+            done = sum(loan_moves.mapped("quantity"))
+            if done < rec.loan_qty:
+                raise UserError(_(
+                    "Loan unit shortage on %(name)s: %(done)s returned of %(expected)s expected. "
+                    "Resolve via inventory adjustment or pursue claim before closing the order.",
+                    name=rec.name, done=done, expected=rec.loan_qty,
+                ))
+        return True
+
     # ------------------------------------------------------------------
     # BAST generation
     # ------------------------------------------------------------------
     def _ensure_bast_module(self):
         if "custom.bast.document" not in self.env:
             raise UserError(_("Module 'custom_bast' is not installed. Install it before generating BAST documents."))
+
+    def _bast_lines_vals(self):
+        """Build BAST line vals from main + loan quantities. Same product, two
+        lines when loan_qty > 0 so the loan unit is explicit on the handover."""
+        self.ensure_one()
+        product = self._resolve_rental_product()
+        if not product:
+            return []
+        lines = [{
+            "item_description": product.display_name,
+            "product_id": product.id,
+            "qty": float(self.qty or 1),
+            "uom_id": product.uom_id.id,
+            "is_loan": False,
+        }]
+        if self.loan_qty and self.loan_qty > 0:
+            lines.append({
+                "item_description": "[LOAN] " + product.display_name,
+                "product_id": product.id,
+                "qty": float(self.loan_qty),
+                "uom_id": product.uom_id.id,
+                "is_loan": True,
+                "note": "Cadangan / loan unit — must be returned in full.",
+            })
+        return [(0, 0, v) for v in lines]
 
     def action_generate_bast_pickup(self):
         for rec in self:
@@ -279,6 +369,7 @@ class RentalOrder(models.Model):
                         "origin": rec.name,
                         "origin_model": "rental.order",
                         "origin_res_id": rec.id,
+                        "line_ids": rec._bast_lines_vals(),
                     }
                 )
             )
@@ -302,6 +393,7 @@ class RentalOrder(models.Model):
                         "origin": rec.name,
                         "origin_model": "rental.order",
                         "origin_res_id": rec.id,
+                        "line_ids": rec._bast_lines_vals(),
                     }
                 )
             )
