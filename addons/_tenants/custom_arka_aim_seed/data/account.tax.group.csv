@@ -1,0 +1,3 @@
+"id","name","sequence","country_id/id"
+"arka_tax_group_vat","PPN",10,"base.id"
+"arka_tax_group_pph","PPh (Withholding)",20,"base.id"
