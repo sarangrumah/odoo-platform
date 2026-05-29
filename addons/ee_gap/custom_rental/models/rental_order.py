@@ -362,13 +362,13 @@ class RentalOrder(models.Model):
                 .sudo()
                 .create(
                     {
-                        "name": "BAST-PICKUP/%s" % rec.name,
+                        # name assigned by the custom.bast.document sequence
                         "kind": "pickup",
-                        "partner_id": rec.partner_id.id,
+                        # pickup = company hands the unit over to the customer
+                        "party_from_id": rec.company_id.partner_id.id,
+                        "party_to_id": rec.partner_id.id,
                         "company_id": rec.company_id.id,
-                        "origin": rec.name,
-                        "origin_model": "rental.order",
-                        "origin_res_id": rec.id,
+                        "reference": "rental.order,%d" % rec.id,
                         "line_ids": rec._bast_lines_vals(),
                     }
                 )
@@ -386,13 +386,13 @@ class RentalOrder(models.Model):
                 .sudo()
                 .create(
                     {
-                        "name": "BAST-RETURN/%s" % rec.name,
+                        # name assigned by the custom.bast.document sequence
                         "kind": "return",
-                        "partner_id": rec.partner_id.id,
+                        # return = customer hands the unit back to the company
+                        "party_from_id": rec.partner_id.id,
+                        "party_to_id": rec.company_id.partner_id.id,
                         "company_id": rec.company_id.id,
-                        "origin": rec.name,
-                        "origin_model": "rental.order",
-                        "origin_res_id": rec.id,
+                        "reference": "rental.order,%d" % rec.id,
                         "line_ids": rec._bast_lines_vals(),
                     }
                 )
