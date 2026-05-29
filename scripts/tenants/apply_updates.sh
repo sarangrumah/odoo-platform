@@ -44,6 +44,8 @@ PGPASSWORD="${PGPASSWORD:-${POSTGRES_PASSWORD:-}}"
 
 MODULES_TO_UPDATE=(
   custom_core
+  custom_bast
+  custom_sale_bast
   custom_coretax
   custom_pdp_masking
   custom_pdp_audit
