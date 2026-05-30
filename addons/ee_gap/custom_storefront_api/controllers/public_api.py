@@ -254,3 +254,60 @@ class StorefrontPublicController(http.Controller):
             order.partner_shipping_id = partner  # zip heuristic uses partner_shipping_id.zip
         quotes = Order._storefront_shipping_quotes(order)
         return ok(quotes)
+
+    # ---------------- Payment methods ----------------
+
+    @http.route(
+        "/storefront/api/payment/methods",
+        type="http",
+        auth="public",
+        methods=["GET"],
+        csrf=False,
+        save_session=False,
+    )
+    def payment_methods(self, **kw):
+        """List the payment providers published to the storefront.
+
+        Visibility is driven by the stock ``payment.provider.is_published``
+        flag plus the per-tenant master switch
+        ``custom_storefront_api.payments_enabled``. The default provider code
+        comes from ``custom_storefront_api.default_provider`` (falling back to
+        the first published provider). Manual bank transfer is the native
+        ``payment_custom`` wire-transfer provider (code ``custom``); its bank
+        instructions live in ``pending_msg``.
+        """
+        icp = request.env["ir.config_parameter"].sudo()
+        if str(icp.get_param("custom_storefront_api.payments_enabled", "True")).strip().lower() in (
+            "false",
+            "0",
+            "",
+        ):
+            return ok({"default": "", "methods": []})
+
+        lang = _odoo_lang(kw)
+        Provider = request.env["payment.provider"].sudo()
+        if lang:
+            Provider = Provider.with_context(lang=lang)
+        providers = Provider.search(
+            [("state", "in", ("enabled", "test")), ("is_published", "=", True)],
+            order="sequence, id",
+        )
+        methods = []
+        for p in providers:
+            is_manual = p.code == "custom"
+            methods.append(
+                {
+                    "id": p.id,
+                    "code": p.code,
+                    "custom_mode": (p.custom_mode if "custom_mode" in p._fields else None) or None,
+                    "label": p.name,
+                    "type": "manual" if is_manual else "redirect",
+                    "logo": f"/web/image/payment.provider/{p.id}/image_128" if p.image_128 else None,
+                    "instructions": (p.pending_msg or "") if is_manual else "",
+                    "sandbox": p.state == "test",
+                }
+            )
+        default = icp.get_param("custom_storefront_api.default_provider", "") or (
+            methods[0]["code"] if methods else ""
+        )
+        return ok({"default": default, "methods": methods})

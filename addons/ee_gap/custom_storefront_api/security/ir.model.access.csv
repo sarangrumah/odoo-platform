@@ -8,3 +8,6 @@ access_storefront_content_user,custom.storefront.content user,model_custom_store
 access_storefront_content_mgr,custom.storefront.content manager,model_custom_storefront_content,base.group_system,1,1,1,1
 access_storefront_subscriber_mgr,custom.storefront.subscriber manager,model_custom_storefront_subscriber,base.group_system,1,1,1,1
 access_storefront_subscriber_user,custom.storefront.subscriber user,model_custom_storefront_subscriber,base.group_user,1,0,0,0
+access_storefront_payment_proof_mgr,custom.storefront.payment.proof manager,model_custom_storefront_payment_proof,custom_payment_id.group_manager,1,1,1,1
+access_storefront_payment_proof_sys,custom.storefront.payment.proof system,model_custom_storefront_payment_proof,base.group_system,1,1,1,1
+access_storefront_payment_proof_user,custom.storefront.payment.proof user,model_custom_storefront_payment_proof,base.group_user,1,0,0,0

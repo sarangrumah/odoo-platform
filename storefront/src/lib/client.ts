@@ -4,6 +4,9 @@ import type {
   Cart,
   Customer,
   CustomerAddress,
+  PaymentMethods,
+  PaymentProofInput,
+  PayResult,
   Product,
   ProductCategory,
   ProductPage,
@@ -238,15 +241,31 @@ export async function checkout(payload: {
   );
 }
 
-export async function payOrder(
-  orderId: number,
-  provider_code = "eraspace",
-): Promise<{ redirect_url: string; reference: string; state: string }> {
+/** Payment methods published to the storefront (manual transfer + gateways). */
+export async function fetchPaymentMethods(): Promise<PaymentMethods> {
+  return unwrap(await fetch(`${BASE}/payment/methods?lang=${lang()}`, { cache: "no-store" }));
+}
+
+export async function payOrder(orderId: number, provider_code?: string): Promise<PayResult> {
   return unwrap(
     await fetch(`${BASE}/checkout/${orderId}/pay`, {
       method: "POST",
       headers: JSON_HEADERS,
-      body: JSON.stringify({ provider_code }),
+      body: JSON.stringify(provider_code ? { provider_code } : {}),
+    }),
+  );
+}
+
+/** Submit a manual bank-transfer proof for an order (wire transfer). */
+export async function submitPaymentProof(
+  orderId: number,
+  input: PaymentProofInput,
+): Promise<{ proof_id: number; state: string; reference: string }> {
+  return unwrap(
+    await fetch(`${BASE}/checkout/${orderId}/payment-proof`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(input),
     }),
   );
 }

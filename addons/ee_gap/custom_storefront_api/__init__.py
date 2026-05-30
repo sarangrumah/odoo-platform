@@ -28,3 +28,13 @@ def _post_init_storefront(env):
 
     if not icp.get_param("custom_storefront_api.access_ttl"):
         icp.set_param("custom_storefront_api.access_ttl", "900")
+
+    # Enable + publish the native wire-transfer provider so manual bank
+    # transfer is available at storefront checkout out of the box (it needs
+    # no credentials). Redirect gateways stay disabled until an admin adds
+    # their keys. Idempotent: only flips a still-disabled transfer provider.
+    transfer = env.ref("payment.payment_provider_transfer", raise_if_not_found=False)
+    if transfer and transfer.state == "disabled":
+        # write() triggers payment.provider._activate_default_pms(), which
+        # activates the linked wire-transfer payment.method (shipped inactive).
+        transfer.write({"state": "enabled", "is_published": True})

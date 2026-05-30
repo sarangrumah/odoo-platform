@@ -186,3 +186,33 @@ export interface ApiResult<T> {
   error_code?: string;
   message?: string;
 }
+
+export interface PaymentMethod {
+  id: number;
+  code: string;
+  custom_mode: string | null;
+  label: string;
+  type: "manual" | "redirect";
+  logo: string | null;
+  instructions: string;
+  sandbox: boolean;
+}
+
+export interface PaymentMethods {
+  default: string;
+  methods: PaymentMethod[];
+}
+
+export type PayResult =
+  | { type: "redirect"; redirect_url: string; reference: string; state: string }
+  | { type: "manual"; reference: string; state: string; provider: string; instructions: string };
+
+export interface PaymentProofInput {
+  amount?: number;
+  bank_reference?: string;
+  sender_name?: string;
+  paid_date?: string;
+  note?: string;
+  image?: string;
+  filename?: string;
+}

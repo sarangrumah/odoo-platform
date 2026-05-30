@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 
 from odoo import http
@@ -498,20 +500,35 @@ class StorefrontCustomerController(http.Controller):
     def pay(self, order_id, **kw):
         partner = _current_partner()
         body = json_body()
-        provider_code = body.get("provider_code") or "eraspace"
+        icp = request.env["ir.config_parameter"].sudo()
         order = request.env["sale.order"].sudo().browse(order_id)
         if not order.exists() or order.partner_id.id != partner.id:
             return err("NOT_FOUND", "Order not found", status=404)
-        provider = request.env["payment.provider"].sudo().search(
-            [("code", "=", provider_code), ("state", "in", ("enabled", "test"))], limit=1
+
+        # Only providers published to the storefront are payable here. The
+        # requested code (or the configured default) must resolve to one.
+        domain = [("state", "in", ("enabled", "test")), ("is_published", "=", True)]
+        provider_code = (body.get("provider_code") or "").strip() or icp.get_param(
+            "custom_storefront_api.default_provider", ""
         )
+        provider = request.env["payment.provider"]
+        if provider_code:
+            provider = request.env["payment.provider"].sudo().search(
+                domain + [("code", "=", provider_code)], limit=1
+            )
         if not provider:
-            return err("NO_PROVIDER", f"No active provider for '{provider_code}'")
+            # Fall back to the first published provider (sequence order).
+            provider = request.env["payment.provider"].sudo().search(
+                domain, order="sequence, id", limit=1
+            )
+        if not provider:
+            return err("NO_PROVIDER", f"No published provider for '{provider_code or 'default'}'")
+
         payment_method = provider.payment_method_ids[:1]
         if not payment_method:
             return err(
                 "NO_PAYMENT_METHOD",
-                f"Provider '{provider_code}' has no enabled payment method.",
+                f"Provider '{provider.code}' has no enabled payment method.",
             )
         Tx = request.env["payment.transaction"].sudo()
         tx = Tx.create(
@@ -525,11 +542,36 @@ class StorefrontCustomerController(http.Controller):
                 "sale_order_ids": [(6, 0, [order.id])],
             }
         )
+        # Manual bank transfer (native payment_custom wire transfer): no
+        # outbound API call. Move the transaction to pending and hand the
+        # customer the bank instructions; an admin verifies the proof later.
+        if provider.code == "custom":
+            try:
+                tx._set_pending()
+            except (UserError, ValidationError) as e:
+                return err("PAYMENT_INIT_FAILED", str(e))
+            return ok(
+                {
+                    "type": "manual",
+                    "reference": tx.reference,
+                    "state": tx.state,
+                    "provider": provider.name,
+                    "instructions": provider.pending_msg or "",
+                }
+            )
+        # Redirect gateways (Midtrans/Xendit/DOKU/Eraspace) via adapters.
         try:
             tx._send_payment_request()
         except (UserError, ValidationError) as e:
             return err("PAYMENT_INIT_FAILED", str(e))
-        return ok({"redirect_url": tx.x_id_redirect_url, "reference": tx.reference, "state": tx.state})
+        return ok(
+            {
+                "type": "redirect",
+                "redirect_url": tx.x_id_redirect_url,
+                "reference": tx.reference,
+                "state": tx.state,
+            }
+        )
 
     @http.route(
         "/storefront/api/orders",
@@ -569,3 +611,64 @@ class StorefrontCustomerController(http.Controller):
         )
         data["payment"] = {"state": tx.state, "reference": tx.reference} if tx else None
         return ok(data)
+
+    @http.route(
+        "/storefront/api/checkout/<int:order_id>/payment-proof",
+        type="http", auth="jwt_storefront", methods=["POST"], csrf=False, save_session=False,
+    )
+    def payment_proof(self, order_id, **kw):
+        """Submit a manual bank-transfer proof for an order (wire transfer).
+
+        Captured against the order's latest pending ``custom`` (wire transfer)
+        transaction; a payments manager verifies it in the backend, which
+        settles the transaction.
+        """
+        partner = _current_partner()
+        body = json_body()
+        order = request.env["sale.order"].sudo().browse(order_id)
+        if not order.exists() or order.partner_id.id != partner.id:
+            return err("NOT_FOUND", "Order not found", status=404)
+
+        tx = request.env["payment.transaction"].sudo().search(
+            [("sale_order_ids", "in", order.id), ("provider_code", "=", "custom")],
+            order="id desc", limit=1,
+        )
+
+        image_b64 = (body.get("image") or "").strip()
+        if image_b64.lower().startswith("data:") and "," in image_b64:
+            image_b64 = image_b64.split(",", 1)[1]
+        image_val = False
+        if image_b64:
+            try:
+                base64.b64decode(image_b64, validate=True)
+            except (binascii.Error, ValueError):
+                return err("BAD_IMAGE", "image must be valid base64")
+            image_val = image_b64
+
+        try:
+            amount = float(body.get("amount") or order.amount_total)
+        except (TypeError, ValueError):
+            amount = order.amount_total
+
+        proof = request.env["custom.storefront.payment.proof"].sudo().create(
+            {
+                "transaction_id": tx.id if tx else False,
+                "sale_order_id": order.id,
+                "partner_id": partner.id,
+                "currency_id": order.currency_id.id,
+                "amount": amount,
+                "bank_reference": (body.get("bank_reference") or "")[:128],
+                "sender_name": (body.get("sender_name") or "")[:128],
+                "paid_date": body.get("paid_date") or False,
+                "note": (body.get("note") or "")[:1000],
+                "proof_image": image_val,
+                "proof_filename": (body.get("filename") or "")[:128],
+            }
+        )
+        order.message_post(
+            body=(
+                f"Customer submitted manual transfer proof {proof.name} "
+                f"(ref: {proof.bank_reference or '-'}, amount: {proof.amount})."
+            )
+        )
+        return ok({"proof_id": proof.id, "state": proof.state, "reference": proof.name})
