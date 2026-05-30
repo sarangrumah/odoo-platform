@@ -25,7 +25,7 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
-_ID_CODES = ("midtrans", "xendit", "doku")
+_ID_CODES = ("midtrans", "xendit", "doku", "eraspace")
 
 
 class PaymentTransaction(models.Model):
@@ -54,7 +54,9 @@ class PaymentTransaction(models.Model):
             super(PaymentTransaction, other)._send_payment_request()
         for tx in id_txs:
             adapter = tx.provider_id._get_id_adapter()
-            if not adapter:
+            # _get_id_adapter returns False for non-ID providers, else an
+            # AbstractModel recordset (which is falsy — so check identity).
+            if adapter is False:
                 raise UserError(_("Provider '%s' has no Indonesia adapter.") % tx.provider_id.name)
             result = adapter.create_checkout(tx.provider_id, tx)
             tx.write(

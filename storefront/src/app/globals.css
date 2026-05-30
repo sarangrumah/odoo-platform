@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Web-safe stacks so the Docker build never needs to fetch web fonts. */
+  --font-serif: "Times New Roman", Georgia, "Noto Serif", serif;
+  --font-sans: "Helvetica Neue", Arial, system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bone, #f5f1ea);
+  color: #1a1714;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-editorial {
+  font-family: var(--font-serif);
+}
+
+/* Thin uppercase label used across the editorial layout */
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.7rem;
+  color: #8a6f52;
+}
+
+::selection {
+  background: #1a1714;
+  color: #f5f1ea;
+}

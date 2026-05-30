@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Allowed CORS origin for the storefront. Override per tenant. -->
+        <record id="icp_storefront_cors_origin" model="ir.config_parameter">
+            <field name="key">custom_storefront_api.cors_origin</field>
+            <field name="value">https://shop.gentle-woman.platform.localhost</field>
+        </record>
+    </data>
+</odoo>

@@ -88,3 +88,27 @@
 		level INFO
 	}
 }
+
+# ============================================================
+# Gentle Woman headless storefront — dedicated HTTPS port 8443.
+# Served over the same trusted IP/DOMAIN cert as :443 so it works under
+# HSTS (browser forces HTTPS on the host; the storefront container itself
+# only speaks plain HTTP on :8080). Reach it at https://<DOMAIN>:8443/.
+# ============================================================
+{$DOMAIN:localhost.localdomain}:8443 {
+	encode zstd gzip
+	tls internal
+
+	reverse_proxy storefront:8080 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}

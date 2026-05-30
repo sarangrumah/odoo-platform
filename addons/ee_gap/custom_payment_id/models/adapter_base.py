@@ -97,6 +97,7 @@ class IdPaymentAdapter(models.AbstractModel):
             "midtrans": "custom.payment.id.adapter.midtrans",
             "xendit": "custom.payment.id.adapter.xendit",
             "doku": "custom.payment.id.adapter.doku",
+            "eraspace": "custom.payment.id.adapter.eraspace",
         }
         model_name = mapping.get(code)
         if not model_name:

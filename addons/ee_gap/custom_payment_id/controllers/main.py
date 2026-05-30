@@ -30,6 +30,7 @@ from odoo.http import request
 from ..models.adapter_midtrans import MidtransAdapter
 from ..models.adapter_xendit import XenditAdapter
 from ..models.adapter_doku import DokuAdapter
+from ..models.adapter_eraspace import EraspaceAdapter
 
 _logger = logging.getLogger(__name__)
 
@@ -67,6 +68,18 @@ _DOKU_STATE_MAP = {
     "FAILED": "error",
     "EXPIRED": "cancel",
     "CANCELED": "cancel",
+}
+
+# Eraspace notification status → Odoo state (placeholder mapping)
+_ERASPACE_STATE_MAP = {
+    "PAID": "done",
+    "SETTLED": "done",
+    "SUCCESS": "done",
+    "PENDING": "pending",
+    "EXPIRED": "cancel",
+    "CANCELLED": "cancel",
+    "CANCELED": "cancel",
+    "FAILED": "error",
 }
 
 
@@ -111,14 +124,18 @@ def _reconcile_transaction(tx, new_state: str, raw_payload: dict) -> bool:
             return False
     except Exception as e:  # noqa: BLE001 — surface in log, don't 500
         _logger.exception("Webhook reconcile failed for %s: %s", tx.reference, e)
-        sudo_tx.message_post(body=f"Webhook reconcile error: {e}")
+        # payment.transaction does not inherit mail.thread in this build —
+        # guard message_post so the audit note never turns a hook into a 500.
+        if hasattr(sudo_tx, "message_post"):
+            sudo_tx.message_post(body=f"Webhook reconcile error: {e}")
         return False
-    sudo_tx.message_post(
-        body=(
-            f"Gateway webhook reconciled state → <b>{new_state}</b>.<br/>"
-            f"<pre>{json.dumps(raw_payload, indent=2, default=str)[:2000]}</pre>"
+    if hasattr(sudo_tx, "message_post"):
+        sudo_tx.message_post(
+            body=(
+                f"Gateway webhook reconciled state → <b>{new_state}</b>.<br/>"
+                f"<pre>{json.dumps(raw_payload, indent=2, default=str)[:2000]}</pre>"
+            )
         )
-    )
     return True
 
 
@@ -245,5 +262,44 @@ class IdPaymentWebhookController(http.Controller):
             return request.make_response("bad signature", status=400)
 
         new_state = _DOKU_STATE_MAP.get(status, "pending")
+        _reconcile_transaction(tx, new_state, body)
+        return request.make_response("ok", status=200)
+
+    # ---------------- Eraspace ----------------
+
+    @http.route(
+        "/custom_payment_id/webhook/eraspace",
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+        save_session=False,
+    )
+    def eraspace_webhook(self, **_kw):
+        raw_bytes = request.httprequest.get_data() or b""
+        body = _json_body()
+        # Eraspace shape (placeholder): {"order_id": "...", "status": "PAID"}
+        reference = (body.get("order_id") or body.get("reference") or "").strip()
+        status = (body.get("status") or "").strip().upper()
+
+        tx = _find_transaction(reference)
+        if not tx:
+            _logger.warning("Eraspace webhook: unknown order_id=%s", reference)
+            return request.make_response("not found", status=404)
+
+        provider = tx.provider_id.sudo()
+        if provider.code != "eraspace":
+            return request.make_response("provider mismatch", status=400)
+
+        provided = request.httprequest.headers.get("X-Eraspace-Signature", "")
+        if not EraspaceAdapter.verify_notification_signature(
+            raw_body=raw_bytes,
+            provided_signature=provided,
+            webhook_secret=provider.x_id_webhook_secret or "",
+        ):
+            _logger.warning("Eraspace webhook: signature mismatch for %s", reference)
+            return request.make_response("bad signature", status=400)
+
+        new_state = _ERASPACE_STATE_MAP.get(status, "pending")
         _reconcile_transaction(tx, new_state, body)
         return request.make_response("ok", status=200)
