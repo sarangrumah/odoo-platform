@@ -39,6 +39,7 @@ custom_payment_id webhooks), with explicit CORS handling.
         "security/ir.model.access.csv",
         "data/auth_jwt_validator.xml",
         "data/ir_config_parameter.xml",
+        "data/headless_disable_website_editor.xml",
         "views/storefront_views.xml",
         "views/payment_proof_views.xml",
         "views/res_config_settings_views.xml",
