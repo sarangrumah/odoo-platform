@@ -98,7 +98,17 @@ services:
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
       CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY:-}
       WORKERS: "0"
-      MAX_CRON_THREADS: "1"
+      # MUST be 0: this private management instance shares the Postgres cluster
+      # with the public `odoo` instance. With its own cron thread it autonomously
+      # loads EVERY tenant DB's registry every few minutes (running Payment/etc.
+      # crons), and the two instances then cross-invalidate each other's registry
+      # + asset signaling on the shared DB — causing ~2-min registry-reload churn
+      # that intermittently serves an incomplete registry (RPC 404 KeyError on
+      # custom_* models) and stale asset bundles (AssetsLoadingError) in the
+      # public backoffice. The public `odoo` instance (max_cron_threads=2) runs
+      # all tenant crons; the orchestrator uses its own APScheduler + the odoo
+      # CLI for provisioning, so it has NO dependency on odoo-mgmt cron.
+      MAX_CRON_THREADS: "0"
       # queue_job runner thread requires server-wide load; without it, jobs
       # are enqueued but never executed by the runner.
       SERVER_WIDE_MODULES: "base,web,queue_job"
