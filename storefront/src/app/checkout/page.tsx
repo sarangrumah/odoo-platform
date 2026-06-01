@@ -588,7 +588,17 @@ export default function CheckoutPage() {
             <span>{formatPrice(l.price_subtotal, cart?.currency)}</span>
           </div>
         ))}
-        <div className="mt-4 flex justify-between border-t border-ink/10 pt-4 text-base">
+        <div className="mt-4 space-y-1 border-t border-ink/10 pt-4 text-sm">
+          <div className="flex justify-between">
+            <span className="text-ink/60">Subtotal</span>
+            <span>{formatPrice(cart?.amount_untaxed ?? 0, cart?.currency)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink/60">Tax</span>
+            <span>{formatPrice(cart?.amount_tax ?? 0, cart?.currency)}</span>
+          </div>
+        </div>
+        <div className="mt-3 flex justify-between border-t border-ink/10 pt-3 text-base">
           <span>Total</span>
           <span>{formatPrice(cart?.amount_total ?? 0, cart?.currency)}</span>
         </div>
