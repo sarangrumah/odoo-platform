@@ -42,10 +42,36 @@ function lang(): string {
   }
 }
 
+/** Thrown for any non-OK / non-JSON response; carries the HTTP status so
+ *  callers can react (e.g. clear a dead session on 401). */
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function unwrap<T>(res: Response): Promise<T> {
-  const json = (await res.json()) as ApiResult<T>;
-  if (!res.ok || !json.ok) {
-    throw new Error(json.message || json.error_code || `HTTP ${res.status}`);
+  // Read as text first: an upstream 401/5xx may return an HTML error page, and
+  // calling res.json() on that throws an opaque "Unexpected token '<'" syntax
+  // error that escapes as an unhandled rejection.
+  const text = await res.text();
+  let json: ApiResult<T> | null = null;
+  try {
+    json = text ? (JSON.parse(text) as ApiResult<T>) : null;
+  } catch {
+    /* non-JSON body — handled by the !json branch below */
+  }
+  if (!res.ok || !json || json.ok === false) {
+    throw new ApiError(
+      json?.message || json?.error_code || `HTTP ${res.status}`,
+      res.status,
+      json?.error_code,
+    );
   }
   return json.data as T;
 }

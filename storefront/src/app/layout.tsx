@@ -8,6 +8,7 @@ import { CartDrawer } from "@/components/cart/CartDrawer";
 import { CookieConsent } from "@/components/layout/CookieConsent";
 import { AffiliateCapture } from "@/components/AffiliateCapture";
 import { LocaleSync } from "@/components/LocaleSync";
+import { StoreHydrator } from "@/components/StoreHydrator";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "Gentle Woman";
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://192.168.3.140:8443").replace(/\/$/, "");
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CookieConsent />
         <AffiliateCapture />
         <LocaleSync />
+        <StoreHydrator />
       </body>
     </html>
   );

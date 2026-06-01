@@ -37,6 +37,13 @@ export const useWishlist = create<WishlistState>()((set, get) => ({
     try {
       const items = await api.fetchWishlist();
       set({ items, ids: items.map((i) => i.id) });
+    } catch (e) {
+      // Background refresh — never surface as an unhandled rejection. A 401
+      // means the persisted customer outlived its HttpOnly session cookie
+      // (e.g. after a server reset): clear the dead session so the UI drops to
+      // logged-out and we stop hammering /wishlist with 401s.
+      set({ items: [], ids: [] });
+      if ((e as { status?: number })?.status === 401) useAuth.getState().clear();
     } finally {
       set({ loading: false });
     }

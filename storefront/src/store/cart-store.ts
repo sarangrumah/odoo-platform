@@ -40,6 +40,12 @@ export const useCart = create<CartState>()((set) => ({
     set({ loading: true });
     try {
       set({ cart: await api.getCart() });
+    } catch (e) {
+      // Same as the wishlist: a 401 here means the persisted customer outlived
+      // its session cookie. Drop the stale cart + dead session instead of
+      // leaking an unhandled rejection.
+      set({ cart: null });
+      if ((e as { status?: number })?.status === 401) useAuth.getState().clear();
     } finally {
       set({ loading: false });
     }

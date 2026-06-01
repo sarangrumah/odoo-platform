@@ -24,6 +24,9 @@ export const useAuth = create<AuthState>()(
       setSession: (s) => set({ customer: s.customer, isGuest: !!s.is_guest }),
       clear: () => set({ customer: null, isGuest: false }),
     }),
-    { name: "gw-auth" },
+    // skipHydration: the server and the first client render both start from
+    // these defaults, so there is no SSR/client divergence. `StoreHydrator`
+    // pulls the persisted profile from localStorage once mounted.
+    { name: "gw-auth", skipHydration: true },
   ),
 );

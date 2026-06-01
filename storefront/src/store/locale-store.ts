@@ -22,6 +22,9 @@ export const useLocale = create<LocaleState>()(
       setLocale: (l) => set({ locale: l }),
       t: (key) => translate(get().locale, key),
     }),
-    { name: "gw-locale" },
+    // skipHydration: avoid a server/client render mismatch on UI strings and
+    // the locale toggle. `StoreHydrator` rehydrates after mount; `LocaleSync`
+    // then re-affirms from the URL prefix.
+    { name: "gw-locale", skipHydration: true },
   ),
 );
