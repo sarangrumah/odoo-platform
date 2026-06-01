@@ -170,6 +170,12 @@ export async function register(payload: {
   );
 }
 
+/** Authoritative session check (always 200): reconciles persisted client state
+ *  against the server-side HttpOnly cookies. See the /auth/session route. */
+export async function fetchSession(): Promise<{ authenticated: boolean; customer?: Customer }> {
+  return unwrap(await fetch(`${BASE}/auth/session`, { cache: "no-store" }));
+}
+
 export async function login(email: string, password: string): Promise<AuthResult> {
   return unwrap(
     await fetch(`${BASE}/auth/login`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ email, password }) }),

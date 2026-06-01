@@ -12,10 +12,11 @@ import { formatPrice } from "@/lib/format";
 export function CartDrawer() {
   const { cart, drawerOpen, setDrawer, refresh, setQty, remove } = useCart();
   const customer = useAuth((s) => s.customer);
+  const authReady = useAuth((s) => s.ready);
 
   useEffect(() => {
-    if (drawerOpen && customer) refresh();
-  }, [drawerOpen, customer, refresh]);
+    if (authReady && drawerOpen && customer) refresh();
+  }, [authReady, drawerOpen, customer, refresh]);
 
   const lines = (cart?.lines ?? []).filter((l) => !l.is_delivery);
 

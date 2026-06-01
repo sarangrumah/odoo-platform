@@ -23,6 +23,7 @@ export function Header() {
   const count = lines.filter((l) => !l.is_delivery).reduce((n, l) => n + l.qty, 0);
   const setDrawer = useCart((s) => s.setDrawer);
   const customer = useAuth((s) => s.customer);
+  const authReady = useAuth((s) => s.ready);
   const locale = useLocale((s) => s.locale);
   const setLocale = useLocale((s) => s.setLocale);
   const t = useLocale((s) => s.t);
@@ -44,9 +45,10 @@ export function Header() {
   const clearWishlist = useWishlist((s) => s.clearLocal);
   const wishCount = useWishlist((s) => s.ids.length);
   useEffect(() => {
+    if (!authReady) return; // wait for the server session probe to confirm auth
     if (customer) refreshWishlist();
     else clearWishlist();
-  }, [customer, refreshWishlist, clearWishlist]);
+  }, [authReady, customer, refreshWishlist, clearWishlist]);
 
   return (
     <motion.header
