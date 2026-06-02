@@ -38,12 +38,18 @@ class SaleOrder(models.Model):
         for line in self.order_line:
             if line.display_type:
                 continue
-            vals.append((0, 0, {
-                "item_description": line.name or line.product_id.display_name or "-",
-                "product_id": line.product_id.id or False,
-                "qty": line.product_uom_qty,
-                "uom_id": line.product_uom_id.id or False,
-            }))
+            vals.append(
+                (
+                    0,
+                    0,
+                    {
+                        "item_description": line.name or line.product_id.display_name or "-",
+                        "product_id": line.product_id.id or False,
+                        "qty": line.product_uom_qty,
+                        "uom_id": line.product_uom_id.id or False,
+                    },
+                )
+            )
         return vals
 
     def action_generate_bast(self):
@@ -51,15 +57,21 @@ class SaleOrder(models.Model):
         self._ensure_bast_module()
         if not self.partner_id:
             raise UserError(_("Set a customer before generating a BAST."))
-        doc = self.env["custom.bast.document"].sudo().create({
-            "kind": "delivery",
-            # delivery = company hands the goods over to the customer
-            "party_from_id": self.company_id.partner_id.id,
-            "party_to_id": self.partner_id.id,
-            "company_id": self.company_id.id,
-            "reference": self._bast_reference(),
-            "line_ids": self._bast_lines_vals(),
-        })
+        doc = (
+            self.env["custom.bast.document"]
+            .sudo()
+            .create(
+                {
+                    "kind": "delivery",
+                    # delivery = company hands the goods over to the customer
+                    "party_from_id": self.company_id.partner_id.id,
+                    "party_to_id": self.partner_id.id,
+                    "company_id": self.company_id.id,
+                    "reference": self._bast_reference(),
+                    "line_ids": self._bast_lines_vals(),
+                }
+            )
+        )
         return {
             "type": "ir.actions.act_window",
             "name": _("BAST"),
