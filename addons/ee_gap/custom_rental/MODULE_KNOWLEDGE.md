@@ -24,7 +24,7 @@ It is the canonical rental module in the platform — anything related to rentin
 - `action_return()` moves `picked_up`→`returned`, stamps `return_dt_actual = now()`, flips asset back to `available`, recomputes `days_actual` / `rental_fee` / `late_penalty` (50% surcharge on overrun days, distinct from cron `late_fee_total`), and creates an inbound `stock.picking`.
 - `action_cancel()` is allowed from any state except `returned`; releases asset if it was `on_rent`.
 - The portal lets the customer view `/my/rentals`, download the rental contract PDF (`custom_rental.action_report_rental_contract`), and POST a base64 signature to `/my/rentals/<id>/sign` which writes `customer_signature`, `customer_signed_by`, `customer_signed_at`.
-- BAST documents are attached via `bast_pickup_id` / `bast_return_id` (provided by `custom_bast`).
+- BAST documents are attached via `bast_pickup_id` / `bast_return_id` (provided by `custom_bast`). They are created with directional parties — pickup: `party_from_id = company`, `party_to_id = customer`; return: reversed — and `reference = "rental.order,<id>"`; the document `name` is auto-assigned by the `custom.bast.document` ir.sequence (not set manually here).
 - `custom.rental.schedule` exposes a read-only SQL view for calendar/Gantt UIs, computing a derived `late` pseudo-state when `picked_up` runs past `return_dt_expected`.
 
 ## Key Models
