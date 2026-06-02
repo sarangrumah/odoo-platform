@@ -10,65 +10,75 @@ class TestLoanUnitFlow(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.env["ir.config_parameter"].sudo().set_param(
-            "custom_rental.config_stock_integration", "True"
-        )
+        cls.env["ir.config_parameter"].sudo().set_param("custom_rental.config_stock_integration", "True")
         cls.partner = cls.env["res.partner"].create({"name": "Drone Renter"})
-        cls.product = cls.env["product.product"].create({
-            "name": "Drone X",
-            "type": "consu",
-            "is_storable": True,
-        })
-        cls.asset = cls.env["rental.asset"].create({
-            "name": "Drone Asset Serial 1",
-            "code": "DRN-S1",
-            "daily_rate": 100.0,
-            "product_id": cls.product.id,
-        })
+        cls.product = cls.env["product.product"].create(
+            {
+                "name": "Drone X",
+                "type": "consu",
+                "is_storable": True,
+            }
+        )
+        cls.asset = cls.env["rental.asset"].create(
+            {
+                "name": "Drone Asset Serial 1",
+                "code": "DRN-S1",
+                "daily_rate": 100.0,
+                "product_id": cls.product.id,
+            }
+        )
         cls.now = datetime(2026, 6, 1, 9, 0)
 
     def _make_bulk(self, qty=400, loan_qty=100, days=7):
-        return self.env["rental.order"].create({
-            "partner_id": self.partner.id,
-            "product_id": self.product.id,
-            "qty": qty,
-            "loan_qty": loan_qty,
-            "pickup_dt": self.now,
-            "return_dt_expected": self.now + timedelta(days=days),
-            "daily_rate": 100.0,
-        })
+        return self.env["rental.order"].create(
+            {
+                "partner_id": self.partner.id,
+                "product_id": self.product.id,
+                "qty": qty,
+                "loan_qty": loan_qty,
+                "pickup_dt": self.now,
+                "return_dt_expected": self.now + timedelta(days=days),
+                "daily_rate": 100.0,
+            }
+        )
 
     def _make_serial(self, days=2):
-        return self.env["rental.order"].create({
-            "partner_id": self.partner.id,
-            "asset_id": self.asset.id,
-            "pickup_dt": self.now,
-            "return_dt_expected": self.now + timedelta(days=days),
-            "daily_rate": 100.0,
-        })
+        return self.env["rental.order"].create(
+            {
+                "partner_id": self.partner.id,
+                "asset_id": self.asset.id,
+                "pickup_dt": self.now,
+                "return_dt_expected": self.now + timedelta(days=days),
+                "daily_rate": 100.0,
+            }
+        )
 
     # ------------------------------------------------------------------
     # Constraints
     # ------------------------------------------------------------------
     def test_constraint_mode_required(self):
         with self.assertRaises(ValidationError):
-            self.env["rental.order"].create({
-                "partner_id": self.partner.id,
-                "pickup_dt": self.now,
-                "return_dt_expected": self.now + timedelta(days=1),
-                "daily_rate": 100.0,
-            })
+            self.env["rental.order"].create(
+                {
+                    "partner_id": self.partner.id,
+                    "pickup_dt": self.now,
+                    "return_dt_expected": self.now + timedelta(days=1),
+                    "daily_rate": 100.0,
+                }
+            )
 
     def test_constraint_serial_qty_must_be_one(self):
         with self.assertRaises(ValidationError):
-            self.env["rental.order"].create({
-                "partner_id": self.partner.id,
-                "asset_id": self.asset.id,
-                "qty": 5,
-                "pickup_dt": self.now,
-                "return_dt_expected": self.now + timedelta(days=1),
-                "daily_rate": 100.0,
-            })
+            self.env["rental.order"].create(
+                {
+                    "partner_id": self.partner.id,
+                    "asset_id": self.asset.id,
+                    "qty": 5,
+                    "pickup_dt": self.now,
+                    "return_dt_expected": self.now + timedelta(days=1),
+                    "daily_rate": 100.0,
+                }
+            )
 
     def test_constraint_loan_qty_non_negative(self):
         order = self._make_bulk(qty=10, loan_qty=0)

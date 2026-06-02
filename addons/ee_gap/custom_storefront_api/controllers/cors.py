@@ -23,9 +23,7 @@ _DEFAULT_ORIGIN = "*"
 
 def _origin() -> str:
     return (
-        request.env["ir.config_parameter"]
-        .sudo()
-        .get_param("custom_storefront_api.cors_origin", _DEFAULT_ORIGIN)
+        request.env["ir.config_parameter"].sudo().get_param("custom_storefront_api.cors_origin", _DEFAULT_ORIGIN)
         or _DEFAULT_ORIGIN
     )
 
@@ -63,9 +61,7 @@ def ok(data=None, status: int = 200, **extra):
 
 
 def err(error_code: str, message: str = "", status: int = 400):
-    return json_response(
-        {"ok": False, "error_code": error_code, "message": message}, status=status
-    )
+    return json_response({"ok": False, "error_code": error_code, "message": message}, status=status)
 
 
 def json_body() -> dict:

@@ -9,7 +9,7 @@ manifest_version: 19.0.0.1.0
 # custom_payment_id
 
 ## Purpose
-Indonesia payment gateway integration on top of Odoo 19's `payment` framework. Registers Midtrans, Xendit, and DOKU as additional `payment.provider.code` values, ships an HTTP adapter base with retry / exponential backoff / per-(db,provider) circuit breaker / outbound call log, and wires three webhook endpoints that verify signatures and transition `payment.transaction` state via documented helpers (`_set_done`/`_set_pending`/`_set_canceled`/`_set_error`).
+Indonesia payment gateway integration on top of Odoo 19's `payment` framework. Registers Midtrans, Xendit, DOKU, and **Eraspace** as additional `payment.provider.code` values (`_ID_CODES = ("midtrans", "xendit", "doku", "eraspace")`), ships an HTTP adapter base with retry / exponential backoff / per-(db,provider) circuit breaker / outbound call log, and wires four webhook endpoints that verify signatures and transition `payment.transaction` state via documented helpers (`_set_done`/`_set_pending`/`_set_canceled`/`_set_error`).
 
 This is the canonical Indonesia payment-acquirer module. Any BRD requirement involving "Midtrans Snap", "Xendit invoice", "DOKU checkout", "Indonesia payment gateway", or "QRIS / Virtual Account collection" maps here. Cleanly extensible to additional providers by adding `custom.payment.id.adapter.<name>` AbstractModel + provider selection_add.
 
@@ -32,7 +32,7 @@ This is the canonical Indonesia payment-acquirer module. Any BRD requirement inv
 - `payment.transaction` (inherited) — `x_id_redirect_url`, `x_id_raw_response`; override `_send_payment_request`, `_get_specific_rendering_values`, `action_create_refund`.
 - `payment.token` (inherited) — stub `x_id_saved_token_id` for Midtrans Snap saved-card; no live flow yet.
 - `custom.payment.id.adapter.base` (AbstractModel) — HTTP machinery (`send`, retry, breaker, log). Subclass override hooks `_base_url`, `_endpoint`, `_auth_headers`, `create_checkout`, `test_connection`.
-- `custom.payment.id.adapter.midtrans` / `custom.payment.id.adapter.xendit` / `custom.payment.id.adapter.doku` — concrete AbstractModels (stubs in current revision; log payloads only — live API plumbing deferred per manifest).
+- `custom.payment.id.adapter.midtrans` / `custom.payment.id.adapter.xendit` / `custom.payment.id.adapter.doku` / `custom.payment.id.adapter.eraspace` — concrete AbstractModels (stubs in current revision; log payloads only — live API plumbing deferred per manifest). Eraspace overrides `_base_url` (`sandbox.payment.eraspace.com` / `payment.eraspace.com`), `_endpoint` (`/v1/checkout`), `_auth_headers` (`X-Eraspace-Key`/`X-Eraspace-Client`); `create_checkout` returns a placeholder redirect while `x_id_sandbox` is set; webhook signature placeholder is `HMAC-SHA256(webhook_secret, raw_body)` hex in `X-Eraspace-Signature`.
 - `custom.payment.id.log` — outbound call audit row. Inherits `mail.thread`, tracking on `state`.
 - `IdPaymentWebhookController` — three `http.Controller` routes for inbound notifications.
 
@@ -64,7 +64,7 @@ This is the canonical Indonesia payment-acquirer module. Any BRD requirement inv
 - `custom.payment.id.adapter.base.create_checkout(provider, transaction)` — subclass-implemented; returns `{redirect_url, reference, raw}`.
 - `custom.payment.id.adapter.base.test_connection(provider)` — default = ping POST.
 - `custom.payment.id.adapter.base._base_url(provider)` / `_endpoint(provider, payload)` / `_auth_headers(provider, body_bytes=None)` — subclass override hooks.
-- `IdPaymentWebhookController.midtrans_webhook()` / `xendit_webhook()` / `doku_webhook()` — `@http.route(csrf=False, auth='public', methods=['POST'])`.
+- `IdPaymentWebhookController.midtrans_webhook()` / `xendit_webhook()` / `doku_webhook()` / `eraspace_webhook()` — `@http.route(csrf=False, auth='public', methods=['POST'])`. Eraspace posts to `/custom_payment_id/webhook/eraspace` and maps status via `_ERASPACE_STATE_MAP` (placeholder shape `{"order_id": "...", "status": "PAID"}`).
 - Module helpers: `_circuit_open(env, provider)`, `_circuit_record_success`, `_circuit_record_failure`, `_circuit_reset` (test/ops button).
 - `MidtransAdapter.verify_notification_signature(order_id, status_code, gross_amount, server_key, signature_key)`, `XenditAdapter.verify_callback_token(provided, expected)`, `DokuAdapter.verify_notification_signature(client_id, request_id, timestamp, path, body, secret, provided_signature)` — static signature verifiers used by webhooks.
 

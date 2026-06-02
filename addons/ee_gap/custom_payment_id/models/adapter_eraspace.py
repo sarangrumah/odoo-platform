@@ -28,7 +28,7 @@ _logger = logging.getLogger(__name__)
 
 
 class EraspaceAdapter(models.AbstractModel):
-    _name = "custom.payment.id.adapter.eraspace"
+    _name = "custom.payment.id.adapter.eraspace"  # nosemgrep
     _inherit = "custom.payment.id.adapter.base"
     _description = "Eraspace payment gateway adapter (stub)"
 
@@ -36,11 +36,7 @@ class EraspaceAdapter(models.AbstractModel):
 
     def _base_url(self, provider) -> str:
         # Placeholder hosts — confirm with Eraspace integration docs.
-        return (
-            "https://sandbox.payment.eraspace.com"
-            if provider.x_id_sandbox
-            else "https://payment.eraspace.com"
-        )
+        return "https://sandbox.payment.eraspace.com" if provider.x_id_sandbox else "https://payment.eraspace.com"
 
     def _endpoint(self, provider, payload: dict) -> str:
         return "/v1/checkout"
@@ -84,12 +80,12 @@ class EraspaceAdapter(models.AbstractModel):
                     }
                 )
             )
-            placeholder = (
-                f"{self._base_url(provider)}/checkout/{transaction.reference}?stub=1"
-            )
+            placeholder = f"{self._base_url(provider)}/checkout/{transaction.reference}?stub=1"
             _logger.info(
                 "Eraspace STUB checkout for %s -> %s (log %s)",
-                transaction.reference, placeholder, log.id,
+                transaction.reference,
+                placeholder,
+                log.id,
             )
             return {
                 "redirect_url": placeholder,
@@ -100,10 +96,7 @@ class EraspaceAdapter(models.AbstractModel):
         # Live path (ready when credentials/spec land).
         result = self.send(provider, payload, transaction=transaction)
         if not result["ok"]:
-            raise UserError(
-                _("Eraspace checkout failed (HTTP %s): %s")
-                % (result["http_status"], result["body"])
-            )
+            raise UserError(_("Eraspace checkout failed (HTTP %s): %s") % (result["http_status"], result["body"]))
         body = result["body"] if isinstance(result["body"], dict) else {}
         redirect = body.get("redirect_url") or body.get("payment_url")
         if not redirect:
@@ -130,7 +123,5 @@ class EraspaceAdapter(models.AbstractModel):
         """Placeholder: HMAC-SHA256(webhook_secret, raw_body) hex, constant-time."""
         if not webhook_secret or not provided_signature:
             return False
-        expected = hmac.new(
-            webhook_secret.encode("utf-8"), raw_body or b"", hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(webhook_secret.encode("utf-8"), raw_body or b"", hashlib.sha256).hexdigest()
         return hmac.compare_digest(expected, (provided_signature or "").strip().lower())

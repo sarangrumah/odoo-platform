@@ -315,9 +315,7 @@ class StudioCustomField(models.Model):
                 rec._pdp_audit_write("studio_field_apply_failed", rec.id, {"error": str(e)})
 
     @api.model
-    def studio_create_and_place(
-        self, vals, target_view_id, anchor_field, position="after"
-    ):
+    def studio_create_and_place(self, vals, target_view_id, anchor_field, position="after"):
         """Atomic helper for the Studio overlay: create the custom field,
         materialise it via :meth:`action_apply`, then place it on the
         given view (creating/extending the per-view customization).
@@ -362,6 +360,7 @@ class StudioCustomField(models.Model):
                 view = self.env["ir.ui.view"].sudo().browse(target_view_id)
                 arch = view.get_combined_arch()
                 from lxml import etree as _et
+
                 root = _et.fromstring(arch.encode("utf-8") if isinstance(arch, str) else arch)
                 group_fields = root.xpath("//group//field[@name]")
                 if group_fields:
@@ -373,11 +372,14 @@ class StudioCustomField(models.Model):
             except Exception:
                 _logger.exception("studio_create_and_place: anchor auto-resolve failed for view %s", target_view_id)
         if not resolved_anchor:
-            raise UserError(_(
-                "Cannot place field '%s' — the target view has no existing field "
-                "to anchor against. Add a field manually first, or open a form "
-                "with at least one group."
-            ) % rec.technical_name)
+            raise UserError(
+                _(
+                    "Cannot place field '%s' — the target view has no existing field "
+                    "to anchor against. Add a field manually first, or open a form "
+                    "with at least one group."
+                )
+                % rec.technical_name
+            )
         Op.create(
             {
                 "customization_id": cust.id,

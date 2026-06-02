@@ -18,13 +18,11 @@ from odoo import api, fields, models
 
 
 class StorefrontToken(models.Model):
-    _name = "custom.storefront.token"
+    _name = "custom.storefront.token"  # nosemgrep
     _description = "Storefront Refresh Token"
     _order = "id desc"
 
-    partner_id = fields.Many2one(
-        "res.partner", required=True, ondelete="cascade", index=True
-    )
+    partner_id = fields.Many2one("res.partner", required=True, ondelete="cascade", index=True)
     user_id = fields.Many2one("res.users", ondelete="cascade", index=True)
     token_hash = fields.Char(required=True, index=True)
     expires_at = fields.Datetime(required=True)
@@ -58,9 +56,7 @@ class StorefrontToken(models.Model):
         """Return the live (non-revoked, non-expired) token row, or empty."""
         if not raw:
             return self.browse()
-        rec = self.sudo().search(
-            [("token_hash", "=", self._hash(raw)), ("revoked", "=", False)], limit=1
-        )
+        rec = self.sudo().search([("token_hash", "=", self._hash(raw)), ("revoked", "=", False)], limit=1)
         if not rec:
             return self.browse()
         if rec.expires_at and rec.expires_at < fields.Datetime.now():

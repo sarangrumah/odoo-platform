@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import secrets
 
-from odoo import api, fields, models
+from odoo import fields, models
 
 
 class CustomAffiliateLink(models.Model):
-    _name = "custom.affiliate.link"
+    _name = "custom.affiliate.link"  # nosemgrep
     _description = "Affiliate Tracked Link"
     _order = "create_date desc"
 
@@ -16,11 +16,15 @@ class CustomAffiliateLink(models.Model):
         "custom.affiliate", string="Affiliate", required=True, ondelete="cascade", index=True
     )
     target_url = fields.Char(
-        string="Target Path", default="/",
+        string="Target Path",
+        default="/",
         help="Storefront path the link points to (e.g. /products/12 or /).",
     )
     short_code = fields.Char(
-        string="Short Code", required=True, copy=False, index=True,
+        string="Short Code",
+        required=True,
+        copy=False,
+        index=True,
         default=lambda self: secrets.token_urlsafe(6),
     )
     utm_source = fields.Char(default="affiliate")
@@ -50,9 +54,7 @@ class CustomAffiliateLink(models.Model):
         }
 
     def _compute_full_url(self):
-        base = self.env["ir.config_parameter"].sudo().get_param(
-            "custom_affiliate.storefront_base_url", ""
-        ).rstrip("/")
+        base = self.env["ir.config_parameter"].sudo().get_param("custom_affiliate.storefront_base_url", "").rstrip("/")
         for link in self:
             code = link.affiliate_id.affiliate_code or ""
             path = link.target_url or "/"

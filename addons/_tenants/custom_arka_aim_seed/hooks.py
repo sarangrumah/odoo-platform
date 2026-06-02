@@ -15,17 +15,17 @@ _logger = logging.getLogger(__name__)
 
 # Role -> external_id (this module's namespace)
 ACCOUNT_REFS = {
-    "default_receivable":   "custom_arka_aim_seed.account_arka_1106000001",
-    "default_payable":      "custom_arka_aim_seed.account_arka_2103100001",
-    "default_income":       "custom_arka_aim_seed.account_arka_5199000000",
-    "default_expense":      "custom_arka_aim_seed.account_arka_6199000000",
-    "stock_input":          "custom_arka_aim_seed.account_arka_2103109199",
-    "stock_output":         "custom_arka_aim_seed.account_arka_2103109199",
-    "stock_valuation":      "custom_arka_aim_seed.account_arka_1113100099",
-    "forex_gain":           "custom_arka_aim_seed.account_arka_7607000000",
-    "forex_loss":           "custom_arka_aim_seed.account_arka_7704000000",
-    "default_cash":         "custom_arka_aim_seed.account_arka_1102000001",
-    "default_bank":         "custom_arka_aim_seed.account_arka_1103019300",
+    "default_receivable": "custom_arka_aim_seed.account_arka_1106000001",
+    "default_payable": "custom_arka_aim_seed.account_arka_2103100001",
+    "default_income": "custom_arka_aim_seed.account_arka_5199000000",
+    "default_expense": "custom_arka_aim_seed.account_arka_6199000000",
+    "stock_input": "custom_arka_aim_seed.account_arka_2103109199",
+    "stock_output": "custom_arka_aim_seed.account_arka_2103109199",
+    "stock_valuation": "custom_arka_aim_seed.account_arka_1113100099",
+    "forex_gain": "custom_arka_aim_seed.account_arka_7607000000",
+    "forex_loss": "custom_arka_aim_seed.account_arka_7704000000",
+    "default_cash": "custom_arka_aim_seed.account_arka_1102000001",
+    "default_bank": "custom_arka_aim_seed.account_arka_1103019300",
 }
 
 
@@ -67,11 +67,13 @@ def post_init_hook(env):
     # 2. Default partner receivable/payable via ir.default (covers company_dependent fields)
     IrDefault = env["ir.default"].sudo()
     if accounts["default_receivable"]:
-        IrDefault.set("res.partner", "property_account_receivable_id",
-                      accounts["default_receivable"].id, company_id=company.id)
+        IrDefault.set(
+            "res.partner", "property_account_receivable_id", accounts["default_receivable"].id, company_id=company.id
+        )
     if accounts["default_payable"]:
-        IrDefault.set("res.partner", "property_account_payable_id",
-                      accounts["default_payable"].id, company_id=company.id)
+        IrDefault.set(
+            "res.partner", "property_account_payable_id", accounts["default_payable"].id, company_id=company.id
+        )
 
     # 3. Default product.category accounts on the root "All" category
     Category = env["product.category"]
@@ -104,16 +106,20 @@ def post_init_hook(env):
     # 4. Default Cash/Bank journal accounts for existing journals lacking one
     Journal = env["account.journal"]
     if accounts["default_cash"]:
-        Journal.search([
-            ("company_id", "=", company.id),
-            ("type", "=", "cash"),
-            ("default_account_id", "=", False),
-        ]).write({"default_account_id": accounts["default_cash"].id})
+        Journal.search(
+            [
+                ("company_id", "=", company.id),
+                ("type", "=", "cash"),
+                ("default_account_id", "=", False),
+            ]
+        ).write({"default_account_id": accounts["default_cash"].id})
     if accounts["default_bank"]:
-        Journal.search([
-            ("company_id", "=", company.id),
-            ("type", "=", "bank"),
-            ("default_account_id", "=", False),
-        ]).write({"default_account_id": accounts["default_bank"].id})
+        Journal.search(
+            [
+                ("company_id", "=", company.id),
+                ("type", "=", "bank"),
+                ("default_account_id", "=", False),
+            ]
+        ).write({"default_account_id": accounts["default_bank"].id})
 
     _logger.info("ARKA seed: post_init_hook done")

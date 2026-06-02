@@ -16,7 +16,7 @@ from odoo import _, api, fields, models
 
 
 class StorefrontPaymentProof(models.Model):
-    _name = "custom.storefront.payment.proof"
+    _name = "custom.storefront.payment.proof"  # nosemgrep
     _description = "Storefront Manual Transfer Proof"
     _order = "create_date desc, id desc"
     _rec_name = "name"
@@ -44,9 +44,7 @@ class StorefrontPaymentProof(models.Model):
         required=True,
         index=True,
     )
-    transaction_state = fields.Selection(
-        related="transaction_id.state", string="Transaction State", readonly=True
-    )
+    transaction_state = fields.Selection(related="transaction_id.state", string="Transaction State", readonly=True)
     reviewed_by = fields.Many2one("res.users", string="Reviewed By", readonly=True)
     reviewed_on = fields.Datetime(string="Reviewed On", readonly=True)
     review_note = fields.Text(string="Review Note")

@@ -71,7 +71,7 @@ class CustomIrConfig(models.AbstractModel):
             return None
         f = Fernet(_get_master_key())
         try:
-            return f.decrypt(token[len(_PREFIX):].encode()).decode()
+            return f.decrypt(token[len(_PREFIX) :].encode()).decode()
         except InvalidToken:
             _logger.error("custom.ir.config: decrypt_value failed")
             return None

@@ -8,7 +8,6 @@ lands via ``?aff=CODE``. The storefront owns the first-party ``aff_ref`` cookie
 
 from __future__ import annotations
 
-import json
 import logging
 
 from odoo import http
@@ -19,11 +18,11 @@ _logger = logging.getLogger(__name__)
 
 def _cors_origin():
     return (
-        request.env["ir.config_parameter"].sudo().get_param(
+        request.env["ir.config_parameter"]
+        .sudo()
+        .get_param(
             "custom_affiliate.cors_origin",
-            request.env["ir.config_parameter"].sudo().get_param(
-                "custom_storefront_api.cors_origin", "*"
-            ),
+            request.env["ir.config_parameter"].sudo().get_param("custom_storefront_api.cors_origin", "*"),
         )
         or "*"
     )
@@ -42,10 +41,13 @@ def _resp(payload, status=200):
 
 
 class AffiliateController(http.Controller):
-
     @http.route(
         "/affiliate/track",
-        type="http", auth="public", methods=["GET", "OPTIONS"], csrf=False, save_session=False,
+        type="http",
+        auth="public",
+        methods=["GET", "OPTIONS"],
+        csrf=False,
+        save_session=False,
     )
     def track(self, code=None, landing=None, ref=None, session=None, link=None, **kw):
         if request.httprequest.method == "OPTIONS":
@@ -56,8 +58,10 @@ class AffiliateController(http.Controller):
             return _resp({"ok": True, "valid": False})
         link_rec = request.env["custom.affiliate.link"].browse()
         if link:
-            link_rec = request.env["custom.affiliate.link"].sudo().search(
-                [("short_code", "=", link), ("affiliate_id", "=", affiliate.id)], limit=1
+            link_rec = (
+                request.env["custom.affiliate.link"]
+                .sudo()
+                .search([("short_code", "=", link), ("affiliate_id", "=", affiliate.id)], limit=1)
             )
         httpreq = request.httprequest
         ip = (httpreq.environ.get("HTTP_X_FORWARDED_FOR") or httpreq.remote_addr or "").split(",")[0].strip()

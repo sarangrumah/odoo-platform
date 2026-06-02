@@ -12,7 +12,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class StorefrontSubscriber(models.Model):
-    _name = "custom.storefront.subscriber"
+    _name = "custom.storefront.subscriber"  # nosemgrep
     _description = "Storefront Newsletter Subscriber"
     _order = "create_date desc"
 

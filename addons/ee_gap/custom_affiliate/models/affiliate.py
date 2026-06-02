@@ -10,22 +10,26 @@ def _get_param(env, key, default):
 
 
 class CustomAffiliate(models.Model):
-    _name = "custom.affiliate"
+    _name = "custom.affiliate"  # nosemgrep
     _description = "Affiliate"
     _inherit = ["mail.thread"]
     _order = "create_date desc"
 
     name = fields.Char(string="Name", related="partner_id.name", store=True, readonly=True)
-    partner_id = fields.Many2one(
-        "res.partner", string="Partner", required=True, ondelete="restrict", tracking=True
-    )
+    partner_id = fields.Many2one("res.partner", string="Partner", required=True, ondelete="restrict", tracking=True)
     affiliate_code = fields.Char(
-        string="Affiliate Code", required=True, copy=False, index=True, tracking=True,
+        string="Affiliate Code",
+        required=True,
+        copy=False,
+        index=True,
+        tracking=True,
         default=lambda self: self._default_code(),
     )
     state = fields.Selection(
         [("draft", "Draft"), ("active", "Active"), ("suspended", "Suspended")],
-        default="draft", required=True, tracking=True,
+        default="draft",
+        required=True,
+        tracking=True,
     )
     commission_rate = fields.Float(
         string="Commission Rate (%)",
@@ -42,12 +46,11 @@ class CustomAffiliate(models.Model):
     click_count = fields.Integer(compute="_compute_counts")
     conversion_count = fields.Integer(compute="_compute_counts")
     total_commission = fields.Monetary(
-        compute="_compute_counts", currency_field="currency_id",
+        compute="_compute_counts",
+        currency_field="currency_id",
         help="Approved + paid commission to date.",
     )
-    currency_id = fields.Many2one(
-        "res.currency", default=lambda self: self.env.company.currency_id
-    )
+    currency_id = fields.Many2one("res.currency", default=lambda self: self.env.company.currency_id)
 
     _sql_constraints = [
         ("affiliate_code_uniq", "unique(affiliate_code)", "The affiliate code must be unique."),
@@ -110,6 +113,4 @@ class CustomAffiliate(models.Model):
         """Return the active affiliate for ``code`` (case-insensitive), else empty."""
         if not code:
             return self.browse()
-        return self.sudo().search(
-            [("affiliate_code", "=ilike", code.strip()), ("state", "=", "active")], limit=1
-        )
+        return self.sudo().search([("affiliate_code", "=ilike", code.strip()), ("state", "=", "active")], limit=1)

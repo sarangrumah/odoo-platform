@@ -10,12 +10,13 @@ export const dynamic = "force-dynamic";
  * unauthenticated request, and we additionally require an application/pdf
  * response, so this can't relay arbitrary content (anti-SSRF).
  */
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  if (!/^\d+$/.test(params.id)) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!/^\d+$/.test(id)) {
     return NextResponse.json({ ok: false, error: "Bad id" }, { status: 400 });
   }
   try {
-    const upstream = await odooRawFetch(`web/content/${params.id}`, "download=true");
+    const upstream = await odooRawFetch(`web/content/${id}`, "download=true");
     const ct = upstream.headers.get("content-type") || "";
     if (!upstream.ok || !ct.includes("application/pdf")) {
       return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });

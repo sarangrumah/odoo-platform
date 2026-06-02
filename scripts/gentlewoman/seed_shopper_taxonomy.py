@@ -119,9 +119,7 @@ def main():
         color_attr = Attribute.create({"name": "Color", "display_type": "color"})
         print(f"  + attribute Color (id={color_attr.id})")
     for value in COLOR_ATTRIBUTE_VALUES:
-        if not AttrValue.search(
-            [("name", "=", value), ("attribute_id", "=", color_attr.id)], limit=1
-        ):
+        if not AttrValue.search([("name", "=", value), ("attribute_id", "=", color_attr.id)], limit=1):
             AttrValue.create({"name": value, "attribute_id": color_attr.id})
             print(f"  + Color value {value!r}")
 
@@ -137,9 +135,7 @@ def main():
         return re.search(r"\b" + re.escape(synonym) + r"\b", haystack) is not None
 
     for p in products:
-        haystack = " ".join(
-            filter(None, [p.name or "", p.description_sale or "", p.website_description or ""])
-        ).lower()
+        haystack = " ".join(filter(None, [p.name or "", p.description_sale or "", p.website_description or ""])).lower()
         matched_tags = env["product.tag"]
         detected_material = None
         for concept, values in TAXONOMY.items():

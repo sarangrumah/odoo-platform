@@ -10,6 +10,7 @@ Lines built:
   5. (Optional, if custom_rental_bom_explosion installed) memo lines
      listing exploded BOM components (qty 0, price 0) for transparency
 """
+
 from __future__ import annotations
 
 from odoo import _, fields, models
@@ -49,12 +50,16 @@ class RentalOrder(models.Model):
             acc = product.property_account_income_id or product.categ_id.property_account_income_categ_id
             if acc:
                 return acc
-        return self.env["account.account"].sudo().search(
-            [
-                ("account_type", "=", "income"),
-                ("company_ids", "in", self.company_id.id),
-            ],
-            limit=1,
+        return (
+            self.env["account.account"]
+            .sudo()
+            .search(
+                [
+                    ("account_type", "=", "income"),
+                    ("company_ids", "in", self.company_id.id),
+                ],
+                limit=1,
+            )
         )
 
     def _build_invoice_line_vals(self):
@@ -63,7 +68,9 @@ class RentalOrder(models.Model):
         product = self.asset_id.product_id
         income_acc = self._resolve_income_account()
         if not income_acc:
-            raise UserError(_("No income account configured for product/company; cannot invoice rental %s.") % self.name)
+            raise UserError(
+                _("No income account configured for product/company; cannot invoice rental %s.") % self.name
+            )
 
         lines = []
         days = self.days_actual or self.days_planned or 1.0
@@ -75,7 +82,8 @@ class RentalOrder(models.Model):
                 0,
                 0,
                 {
-                    "name": _("Rental fee: %(asset)s — %(days).1f day(s) × %(rate)s") % {
+                    "name": _("Rental fee: %(asset)s — %(days).1f day(s) × %(rate)s")
+                    % {
                         "asset": self.asset_id.display_name,
                         "days": days,
                         "rate": self.daily_rate,
@@ -132,7 +140,8 @@ class RentalOrder(models.Model):
                         0,
                         0,
                         {
-                            "name": _("Damage: %(item)s [%(cond)s]") % {
+                            "name": _("Damage: %(item)s [%(cond)s]")
+                            % {
                                 "item": bl.item_description,
                                 "cond": dict(bl._fields["condition"].selection).get(bl.condition),
                             },
@@ -170,7 +179,8 @@ class RentalOrder(models.Model):
                             0,
                             {
                                 "display_type": "line_note",
-                                "name": _("• %(qty)s × %(name)s") % {
+                                "name": _("• %(qty)s × %(name)s")
+                                % {
                                     "qty": comp["qty"],
                                     "name": comp["product"].display_name,
                                 },

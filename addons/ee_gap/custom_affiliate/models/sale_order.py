@@ -12,12 +12,11 @@ class SaleOrder(models.Model):
     _inherit = "sale.order"
 
     custom_affiliate_code = fields.Char(
-        string="Affiliate Code", copy=False,
+        string="Affiliate Code",
+        copy=False,
         help="Affiliate identifier captured from the storefront cookie at checkout.",
     )
-    custom_affiliate_id = fields.Many2one(
-        "custom.affiliate", string="Affiliate", copy=False, readonly=True
-    )
+    custom_affiliate_id = fields.Many2one("custom.affiliate", string="Affiliate", copy=False, readonly=True)
 
     def action_confirm(self):
         res = super().action_confirm()
@@ -46,11 +45,13 @@ class SaleOrder(models.Model):
         base = self.amount_untaxed  # commission on goods value, excl tax/shipping
         rate = affiliate.commission_rate
         self.custom_affiliate_id = affiliate.id
-        Conversion.create({
-            "affiliate_id": affiliate.id,
-            "sale_order_id": self.id,
-            "order_value": base,
-            "commission_rate": rate,
-            "commission_amount": base * rate / 100.0,
-            "state": "pending",
-        })
+        Conversion.create(
+            {
+                "affiliate_id": affiliate.id,
+                "sale_order_id": self.id,
+                "order_value": base,
+                "commission_rate": rate,
+                "commission_amount": base * rate / 100.0,
+                "state": "pending",
+            }
+        )

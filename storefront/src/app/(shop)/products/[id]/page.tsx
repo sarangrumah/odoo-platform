@@ -11,16 +11,17 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://192.168.3.140:844
  * (incl. affiliate `?aff=` links) render a rich preview card. The interactive
  * UI stays in the client component below.
  */
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const locale = headers().get("x-locale") || "id";
-  const product = await getProductServer(params.id, locale);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const locale = (await headers()).get("x-locale") || "id";
+  const product = await getProductServer(id, locale);
   if (!product) {
     return { title: `${SITE} — Considered Essentials` };
   }
   const title = `${product.name} — ${SITE}`;
   const description = (product.summary || product.name || "").toString().slice(0, 200);
-  const url = `${SITE_URL}/products/${params.id}`;
-  const image = `${SITE_URL}/api/img/web/image/product.template/${params.id}/image_1024`;
+  const url = `${SITE_URL}/products/${id}`;
+  const image = `${SITE_URL}/api/img/web/image/product.template/${id}/image_1024`;
   return {
     title,
     description,

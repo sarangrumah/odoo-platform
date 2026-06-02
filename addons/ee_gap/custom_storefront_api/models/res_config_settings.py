@@ -79,6 +79,4 @@ class ResConfigSettings(models.TransientModel):
 
     def action_open_transfer_proofs(self):
         self.ensure_one()
-        return self.env["ir.actions.actions"]._for_xml_id(
-            "custom_storefront_api.action_payment_proof"
-        )
+        return self.env["ir.actions.actions"]._for_xml_id("custom_storefront_api.action_payment_proof")

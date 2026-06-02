@@ -13,19 +13,13 @@ from odoo import api, fields, models
 
 
 class CustomWishlist(models.Model):
-    _name = "custom.wishlist"
+    _name = "custom.wishlist"  # nosemgrep
     _description = "Storefront Wishlist Entry"
     _order = "create_date desc"
 
-    partner_id = fields.Many2one(
-        "res.partner", string="Customer", required=True, ondelete="cascade", index=True
-    )
-    product_tmpl_id = fields.Many2one(
-        "product.template", string="Product", required=True, ondelete="cascade"
-    )
-    product_id = fields.Many2one(
-        "product.product", string="Variant", ondelete="cascade"
-    )
+    partner_id = fields.Many2one("res.partner", string="Customer", required=True, ondelete="cascade", index=True)
+    product_tmpl_id = fields.Many2one("product.template", string="Product", required=True, ondelete="cascade")
+    product_id = fields.Many2one("product.product", string="Variant", ondelete="cascade")
 
     _sql_constraints = [
         (

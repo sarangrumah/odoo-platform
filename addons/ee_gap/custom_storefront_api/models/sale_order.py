@@ -55,9 +55,7 @@ class SaleOrder(models.Model):
     def _storefront_ctx(self):
         """Context website_sale's cart helpers expect."""
         self.ensure_one()
-        return self.sudo().with_context(
-            website_id=self.website_id.id if self.website_id else None
-        )
+        return self.sudo().with_context(website_id=self.website_id.id if self.website_id else None)
 
     # -------- Cart mutations (delegate to website_sale) --------
 
@@ -80,9 +78,7 @@ class SaleOrder(models.Model):
         line = self.order_line.filtered(lambda l: l.id == int(line_id))
         if not line:
             raise ValidationError(_("Cart line %s not found.") % line_id)
-        self._storefront_ctx()._cart_update_line_quantity(
-            line_id=line.id, quantity=max(qty, 0.0)
-        )
+        self._storefront_ctx()._cart_update_line_quantity(line_id=line.id, quantity=max(qty, 0.0))
         return self
 
     def _storefront_remove_line(self, line_id):
@@ -100,10 +96,12 @@ class SaleOrder(models.Model):
             raise UserError(rate.get("error_message") or _("Shipping quote failed."))
         # Switching to home delivery cancels any in-store pickup selection.
         if self.custom_is_pickup:
-            self.sudo().write({
-                "custom_is_pickup": False,
-                "warehouse_id": self._storefront_default_warehouse().id,
-            })
+            self.sudo().write(
+                {
+                    "custom_is_pickup": False,
+                    "warehouse_id": self._storefront_default_warehouse().id,
+                }
+            )
         self.sudo().set_delivery_line(carrier, rate["price"])
         return self
 
@@ -113,9 +111,8 @@ class SaleOrder(models.Model):
     def _storefront_default_warehouse(self):
         """The fulfilment warehouse for home delivery (a non-store warehouse)."""
         WH = self.env["stock.warehouse"].sudo()
-        return (
-            WH.search([("custom_storefront_published", "=", False)], order="id", limit=1)
-            or WH.search([], order="id", limit=1)
+        return WH.search([("custom_storefront_published", "=", False)], order="id", limit=1) or WH.search(
+            [], order="id", limit=1
         )
 
     def _storefront_set_pickup(self, warehouse_id):
@@ -126,11 +123,13 @@ class SaleOrder(models.Model):
             raise ValidationError(_("Unknown or non-published store %s.") % warehouse_id)
         # Drop any home-delivery line + carrier (no shipping fee for pickup).
         self.order_line.filtered("is_delivery").sudo().unlink()
-        self.sudo().write({
-            "custom_is_pickup": True,
-            "warehouse_id": wh.id,
-            "carrier_id": False,
-        })
+        self.sudo().write(
+            {
+                "custom_is_pickup": True,
+                "warehouse_id": wh.id,
+                "carrier_id": False,
+            }
+        )
         return self
 
     def _storefront_set_shipping_address(self, addr):
@@ -163,9 +162,7 @@ class SaleOrder(models.Model):
             "country_id": country.id if country else False,
         }
         Partner = self.env["res.partner"].sudo()
-        child = Partner.search(
-            [("parent_id", "=", parent.id), ("type", "=", "delivery")], limit=1
-        )
+        child = Partner.search([("parent_id", "=", parent.id), ("type", "=", "delivery")], limit=1)
         if child:
             child.write(vals)
         else:
@@ -176,9 +173,7 @@ class SaleOrder(models.Model):
     @api.model
     def _storefront_shipping_quotes(self, order):
         """Return [{carrier_id, name, price, cod_supported, etd}] for all ID carriers."""
-        carriers = self.env["delivery.carrier"].sudo().search(
-            [("x_id_courier_id", "!=", False)]
-        )
+        carriers = self.env["delivery.carrier"].sudo().search([("x_id_courier_id", "!=", False)])
         quotes = []
         for carrier in carriers:
             try:
@@ -220,8 +215,14 @@ class SaleOrder(models.Model):
             raise ValidationError(_("Address %s is not yours.") % address_id)
         return addr
 
-    def _storefront_checkout(self, shipping_address_id=None, billing_address_id=None,
-                             carrier_id=None, pickup_warehouse_id=None, shipping_address=None):
+    def _storefront_checkout(
+        self,
+        shipping_address_id=None,
+        billing_address_id=None,
+        carrier_id=None,
+        pickup_warehouse_id=None,
+        shipping_address=None,
+    ):
         self.ensure_one()
         if not self.order_line.filtered(lambda l: not l.display_type and not l.is_delivery):
             raise UserError(_("Cart is empty."))
@@ -286,7 +287,8 @@ class SaleOrder(models.Model):
                     "zip": self.partner_shipping_id.zip or "",
                     "phone": self.partner_shipping_id.phone or "",
                 }
-                if self.partner_shipping_id and self.partner_shipping_id.street
+                if self.partner_shipping_id
+                and self.partner_shipping_id.street
                 and self.partner_shipping_id != self.partner_id
                 else None
             ),

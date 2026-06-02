@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
  * the tenant X-Odoo-Database header. Lets <img> tags load product imagery from
  * the storefront's own origin — no hosts entry / CA trust on the client needed.
  */
-export async function GET(req: NextRequest, { params }: { params: { path: string[] } }) {
-  const path = params.path.join("/");
+export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  const path = (await params).path.join("/");
   // Lock the proxy to Odoo's public image endpoint only — never relay arbitrary
   // Odoo paths (SSRF / open-proxy), and reject path traversal.
   if (!/^web\/image\//.test(path) || path.includes("..")) {

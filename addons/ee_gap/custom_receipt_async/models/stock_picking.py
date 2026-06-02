@@ -46,9 +46,7 @@ class StockPicking(models.Model):
         if self.state in ("done", "cancel"):
             raise UserError(_("Picking %s is already %s.") % (self.name, self.state))
         if self.async_validate_job_uuid:
-            existing = self.env["queue.job"].search(
-                [("uuid", "=", self.async_validate_job_uuid)], limit=1
-            )
+            existing = self.env["queue.job"].search([("uuid", "=", self.async_validate_job_uuid)], limit=1)
             if existing and existing.state in ("pending", "enqueued", "started"):
                 raise UserError(
                     _("A background validate job is already %s for %s (uuid=%s).")
@@ -65,7 +63,8 @@ class StockPicking(models.Model):
             body=_(
                 "Background validate enqueued (job uuid: <code>%s</code>). "
                 "You will be notified in the chatter when it finishes."
-            ) % delayed.uuid,
+            )
+            % delayed.uuid,
         )
         return {
             "type": "ir.actions.client",
@@ -98,24 +97,24 @@ class StockPicking(models.Model):
             elapsed = time.time() - t0
             _logger.exception(
                 "custom_receipt_async: button_validate failed for %s after %.1fs",
-                self.name, elapsed,
+                self.name,
+                elapsed,
             )
             # Re-raise so queue_job marks the job as failed (retryable per its config).
             # Also post to chatter so the user sees the failure without opening queue jobs.
             self.message_post(
-                body=_(
-                    "Background validate FAILED after %.1fs: <code>%s</code>"
-                ) % (elapsed, e),
+                body=_("Background validate FAILED after %.1fs: <code>%s</code>") % (elapsed, e),
             )
             raise
 
         elapsed = time.time() - t0
         self.message_post(
-            body=_("Background validate completed in %.1fs. State: %s.")
-            % (elapsed, self.state),
+            body=_("Background validate completed in %.1fs. State: %s.") % (elapsed, self.state),
         )
         _logger.info(
             "custom_receipt_async: validated %s in %.1fs (%d move lines)",
-            self.name, elapsed, self.move_line_count,
+            self.name,
+            elapsed,
+            self.move_line_count,
         )
         return result

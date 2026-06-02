@@ -36,11 +36,7 @@ class ProductTemplate(models.Model):
     )
 
     def _storefront_new_window_days(self) -> int:
-        val = (
-            self.env["ir.config_parameter"]
-            .sudo()
-            .get_param("custom_storefront_api.new_window_days", "30")
-        )
+        val = self.env["ir.config_parameter"].sudo().get_param("custom_storefront_api.new_window_days", "30")
         try:
             return int(val)
         except (TypeError, ValueError):
@@ -48,13 +44,9 @@ class ProductTemplate(models.Model):
 
     @api.depends("custom_drop_date", "create_date")
     def _compute_custom_is_new(self):
-        cutoff = fields.Date.context_today(self) - timedelta(
-            days=self._storefront_new_window_days()
-        )
+        cutoff = fields.Date.context_today(self) - timedelta(days=self._storefront_new_window_days())
         for product in self:
-            effective = product.custom_drop_date or (
-                product.create_date.date() if product.create_date else False
-            )
+            effective = product.custom_drop_date or (product.create_date.date() if product.create_date else False)
             product.custom_is_new = bool(effective and effective >= cutoff)
 
     def _storefront_image_urls(self) -> dict:
@@ -88,16 +80,12 @@ class ProductTemplate(models.Model):
         self.ensure_one()
         variant = self.product_variant_id
         warehouses = (
-            self.env["stock.warehouse"]
-            .sudo()
-            .search([("custom_storefront_published", "=", True)], order="name")
+            self.env["stock.warehouse"].sudo().search([("custom_storefront_published", "=", True)], order="name")
         )
         rows = []
         for wh in warehouses:
             qty = (
-                variant.with_context(location=wh.lot_stock_id.id).qty_available
-                if variant and wh.lot_stock_id
-                else 0.0
+                variant.with_context(location=wh.lot_stock_id.id).qty_available if variant and wh.lot_stock_id else 0.0
             )
             rows.append(
                 {
@@ -124,9 +112,7 @@ class ProductTemplate(models.Model):
         price = list_price
         if pricelist:
             try:
-                price = pricelist._get_product_price(
-                    self.product_variant_id or self, 1.0
-                )
+                price = pricelist._get_product_price(self.product_variant_id or self, 1.0)
             except Exception:  # pricing edge cases — fall back to catalog price
                 price = list_price
         discounted = bool(list_price) and price < (list_price - 0.01)
@@ -154,12 +140,8 @@ class ProductTemplate(models.Model):
             "image": imgs["medium"],
             "ref": self.default_code or "",
             "is_new": self.custom_is_new,
-            "categories": [
-                {"id": c.id, "name": c.name} for c in self.public_categ_ids
-            ],
-            "tags": [
-                {"id": t.id, "name": t.name} for t in self._storefront_tags()
-            ],
+            "categories": [{"id": c.id, "name": c.name} for c in self.public_categ_ids],
+            "tags": [{"id": t.id, "name": t.name} for t in self._storefront_tags()],
             "in_stock": self._storefront_in_stock(),
         }
         if detail:

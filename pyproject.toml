@@ -41,3 +41,8 @@ ignore = [
 
 # Migration scripts inherently import then call symbols dynamically.
 "**/migrations/**" = ["F401", "F811"]
+
+# Run inside `odoo shell`, where `env` (and other globals) are injected into
+# the script namespace by Odoo — ruff cannot see that binding.
+"scripts/gentlewoman/seed_shopper_taxonomy.py" = ["F821"]
+"scripts/tenants/era_busana_retailindo/02_import_to_odoo.py" = ["F821"]

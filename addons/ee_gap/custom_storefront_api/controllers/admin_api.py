@@ -22,10 +22,13 @@ _logger = logging.getLogger(__name__)
 
 
 class StorefrontAdminController(http.Controller):
-
     @http.route(
         "/storefront/api/admin/health",
-        type="http", auth="public", methods=["POST"], csrf=False, save_session=False,
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+        save_session=False,
     )
     @secure_endpoint("storefront")
     def health(self, **kw):
@@ -33,7 +36,11 @@ class StorefrontAdminController(http.Controller):
 
     @http.route(
         "/storefront/api/admin/sync/products",
-        type="http", auth="public", methods=["POST"], csrf=False, save_session=False,
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+        save_session=False,
     )
     @secure_endpoint("storefront")
     def sync_products(self, **kw):
@@ -52,15 +59,21 @@ class StorefrontAdminController(http.Controller):
 
     @http.route(
         "/storefront/api/admin/orders/<int:order_id>/status",
-        type="http", auth="public", methods=["POST"], csrf=False, save_session=False,
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+        save_session=False,
     )
     @secure_endpoint("storefront")
     def order_status(self, order_id, **kw):
         order = request.env["sale.order"].sudo().browse(order_id)
         if not order.exists():
             return json_response({"ok": False, "error_code": "NOT_FOUND"}, status=404)
-        tx = request.env["payment.transaction"].sudo().search(
-            [("sale_order_ids", "in", order.id)], order="id desc", limit=1
+        tx = (
+            request.env["payment.transaction"]
+            .sudo()
+            .search([("sale_order_ids", "in", order.id)], order="id desc", limit=1)
         )
         return json_response(
             {

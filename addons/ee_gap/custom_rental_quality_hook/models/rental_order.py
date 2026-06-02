@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Auto-spawn quality.check on rental return + quick maintenance.request shortcut."""
+
 from __future__ import annotations
 
 from odoo import _, fields, models
@@ -95,8 +96,7 @@ class RentalOrder(models.Model):
                     "equipment_id": equipment.id,
                     "maintenance_type": "corrective",
                     "description": _(
-                        "Reported during rental return.\n"
-                        "Rental: %(rental)s\nCustomer: %(cust)s\nReturn date: %(date)s"
+                        "Reported during rental return.\nRental: %(rental)s\nCustomer: %(cust)s\nReturn date: %(date)s"
                     )
                     % {
                         "rental": self.name,

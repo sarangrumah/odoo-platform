@@ -74,8 +74,13 @@ class ResPartner(models.Model):
 
     @api.model
     def _storefront_register(
-        self, email, password, name, phone=None,
-        consent_data=False, consent_marketing=False,
+        self,
+        email,
+        password,
+        name,
+        phone=None,
+        consent_data=False,
+        consent_marketing=False,
     ):
         """Create a portal user + partner. Returns the partner."""
         email = (email or "").strip().lower()
@@ -103,13 +108,15 @@ class ResPartner(models.Model):
                 "group_ids": [(6, 0, [portal_group.id])],
             }
         )
-        user.partner_id.write({
-            # customer_rank > 0 → the account shows up under Odoo Sales ▸ Customers.
-            "customer_rank": 1,
-            "custom_consent_data": bool(consent_data),
-            "custom_consent_marketing": bool(consent_marketing),
-            "custom_consent_date": fields.Datetime.now(),
-        })
+        user.partner_id.write(
+            {
+                # customer_rank > 0 → the account shows up under Odoo Sales ▸ Customers.
+                "customer_rank": 1,
+                "custom_consent_data": bool(consent_data),
+                "custom_consent_marketing": bool(consent_marketing),
+                "custom_consent_date": fields.Datetime.now(),
+            }
+        )
         return user.partner_id
 
     @api.model
@@ -150,9 +157,11 @@ class ResPartner(models.Model):
                 vals["name"] = name
             partner.write(vals)
             return partner
-        return self.sudo().create({
-            "name": name or email.split("@")[0],
-            "email": email,
-            "customer_rank": 1,
-            **vals,
-        })
+        return self.sudo().create(
+            {
+                "name": name or email.split("@")[0],
+                "email": email,
+                "customer_rank": 1,
+                **vals,
+            }
+        )

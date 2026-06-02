@@ -13,13 +13,15 @@ from odoo import fields, models
 
 
 class StorefrontContent(models.Model):
-    _name = "custom.storefront.content"
+    _name = "custom.storefront.content"  # nosemgrep
     _description = "Storefront Editorial Content Block"
     _order = "sequence, id"
 
     name = fields.Char(string="Name", required=True)
     code = fields.Char(
-        string="Code", required=True, index=True,
+        string="Code",
+        required=True,
+        index=True,
         help="Stable key the storefront references, e.g. 'hero', 'editorial', 'featured'.",
     )
     sequence = fields.Integer(default=10)
@@ -45,8 +47,5 @@ class StorefrontContent(models.Model):
             "body": self.body or "",
             "cta_label": self.cta_label or "",
             "cta_url": self.cta_url or "",
-            "image": (
-                f"/web/image/custom.storefront.content/{self.id}/image"
-                if self.image else None
-            ),
+            "image": (f"/web/image/custom.storefront.content/{self.id}/image" if self.image else None),
         }

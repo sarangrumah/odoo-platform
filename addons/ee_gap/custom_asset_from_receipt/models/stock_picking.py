@@ -38,9 +38,11 @@ class StockPicking(models.Model):
             raise UserError(_("Receipt must be validated before converting to assets."))
         if self.picking_type_id.code != "incoming":
             raise UserError(_("Asset conversion is only available on incoming receipts."))
-        wizard = self.env["custom.asset.conversion.wizard"].create({
-            "picking_id": self.id,
-        })
+        wizard = self.env["custom.asset.conversion.wizard"].create(
+            {
+                "picking_id": self.id,
+            }
+        )
         wizard._populate_lines()
         return {
             "type": "ir.actions.act_window",

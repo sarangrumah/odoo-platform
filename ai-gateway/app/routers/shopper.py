@@ -31,16 +31,32 @@ _PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 _EXTRACT_PROMPT = (_PROMPTS / "shopper_extract.md").read_text(encoding="utf-8")
 _REPLY_PROMPT = (_PROMPTS / "shopper_reply.md").read_text(encoding="utf-8")
 
-_MAX_HISTORY = 8          # turns of context sent to the model
-_MAX_PRODUCTS = 6         # candidates retrieved + grounding set ceiling
+_MAX_HISTORY = 8  # turns of context sent to the model
+_MAX_PRODUCTS = 6  # candidates retrieved + grounding set ceiling
 _REPLY_MAX_TOKENS = 500
 _EXTRACT_MAX_TOKENS = 300
 
 # CS / complaint / returns → hand off to a human (spec §3.6 escalation).
 _ESCALATE_KEYWORDS = (
-    "komplain", "keluhan", "retur", "refund", "kembalikan", "pengembalian",
-    "rusak", "cacat", "tukar", "lapor", "admin", "customer service", "cs ",
-    "manusia", "complaint", "return", "broken", "defect", "human",
+    "komplain",
+    "keluhan",
+    "retur",
+    "refund",
+    "kembalikan",
+    "pengembalian",
+    "rusak",
+    "cacat",
+    "tukar",
+    "lapor",
+    "admin",
+    "customer service",
+    "cs ",
+    "manusia",
+    "complaint",
+    "return",
+    "broken",
+    "defect",
+    "human",
 )
 
 
@@ -139,8 +155,7 @@ async def shopper(body: ShopperIn) -> ShopperOut:
             attempts.append({k: base[k] for k in ("q", "price_min", "price_max", "limit")})
 
         def _has_filter(p: dict) -> bool:
-            return bool(p.get("category") or p.get("tag") or p.get("q")
-                        or p.get("price_min") or p.get("price_max"))
+            return bool(p.get("category") or p.get("tag") or p.get("q") or p.get("price_min") or p.get("price_max"))
 
         items: list[dict] = []
         for params in (p for p in attempts if _has_filter(p)):

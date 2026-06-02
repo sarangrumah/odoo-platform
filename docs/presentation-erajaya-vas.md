@@ -1,8 +1,8 @@
 # Erajaya Value-Added Services
 ## Odoo Hub — Centralized ERP Platform for Erajaya Group
 
-**Audience:** Executive / Business Stakeholders  
-**Owner:** Product Owner — Value-Added Services, Erajaya  
+**Audience:** Executive / Business Stakeholders
+**Owner:** Product Owner — Value-Added Services, Erajaya
 **Status:** Internal pitch deck (Mei 2026)
 
 ---

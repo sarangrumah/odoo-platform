@@ -34,7 +34,6 @@ def _odoo_lang(kw):
 
 
 class StorefrontPublicController(http.Controller):
-
     def _model(self, name, kw):
         """sudo model in the requested storefront language (for translations)."""
         model = request.env[name].sudo()
@@ -131,10 +130,15 @@ class StorefrontPublicController(http.Controller):
         records = Product.search(full_domain, limit=limit, offset=(page - 1) * limit, order=order)
         items = [p._storefront_serialize(detail=False, pricelist=pricelist) for p in records]
         pages = (total + limit - 1) // limit if limit else 1
-        return ok({
-            "items": items, "total": total, "page": page, "pages": pages,
-            "price_bounds": price_bounds,
-        })
+        return ok(
+            {
+                "items": items,
+                "total": total,
+                "page": page,
+                "pages": pages,
+                "price_bounds": price_bounds,
+            }
+        )
 
     @http.route(
         "/storefront/api/tags",
@@ -224,9 +228,7 @@ class StorefrontPublicController(http.Controller):
     def stores(self, **kw):
         """Physical store locator, sourced from published ``stock.warehouse``."""
         warehouses = (
-            request.env["stock.warehouse"]
-            .sudo()
-            .search([("custom_storefront_published", "=", True)], order="name")
+            request.env["stock.warehouse"].sudo().search([("custom_storefront_published", "=", True)], order="name")
         )
         return ok([w._storefront_serialize() for w in warehouses])
 
@@ -313,7 +315,5 @@ class StorefrontPublicController(http.Controller):
                     "sandbox": p.state == "test",
                 }
             )
-        default = icp.get_param("custom_storefront_api.default_provider", "") or (
-            methods[0]["code"] if methods else ""
-        )
+        default = icp.get_param("custom_storefront_api.default_provider", "") or (methods[0]["code"] if methods else "")
         return ok({"default": default, "methods": methods})

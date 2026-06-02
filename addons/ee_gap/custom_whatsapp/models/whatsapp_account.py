@@ -30,6 +30,7 @@ def _env_default_baileys_url() -> str:
 def _env_default_baileys_secret() -> str:
     return os.environ.get("BAILEYS_SHARED_SECRET", "")
 
+
 _logger = logging.getLogger(__name__)
 
 
