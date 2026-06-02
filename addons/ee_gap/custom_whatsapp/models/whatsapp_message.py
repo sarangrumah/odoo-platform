@@ -452,13 +452,7 @@ class WhatsappMessage(models.Model):
             max_tokens=512,
             temperature=0.7,
         )
-        text = (
-            result.get("response")
-            or result.get("text")
-            or result.get("content")
-            or result.get("summary")
-            or ""
-        )
+        text = result.get("response") or result.get("text") or result.get("content") or result.get("summary") or ""
         if not text:
             raise UserError(_("AI gateway returned no text. Raw: %s") % json.dumps(result)[:300])
 

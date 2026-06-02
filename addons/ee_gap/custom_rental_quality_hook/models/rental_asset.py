@@ -5,6 +5,7 @@ Exposes failure-history aggregates (computed by custom_maintenance) on
 the rental.asset record so rental managers can see drone condition at
 a glance without leaving the asset form.
 """
+
 from __future__ import annotations
 
 from odoo import api, fields, models

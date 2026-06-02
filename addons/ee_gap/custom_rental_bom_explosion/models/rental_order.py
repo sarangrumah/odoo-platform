@@ -6,6 +6,7 @@ empty BAST. After super(), if the asset has a usable BOM, we add one
 ``custom.bast.line`` per exploded component (description, product, qty,
 uom, default condition=good).
 """
+
 from __future__ import annotations
 
 from odoo import models

@@ -45,23 +45,27 @@ class AssetConversionWizard(models.TransientModel):
                 continue
             po_line = ml.move_id.purchase_line_id
             existing = Asset.search([("lot_id", "=", ml.lot_id.id)], limit=1)
-            vals_list.append({
-                "wizard_id": self.id,
-                "move_line_id": ml.id,
-                "product_id": product.id,
-                "lot_id": ml.lot_id.id,
-                "purchase_line_id": po_line.id if po_line else False,
-                "unit_cost": po_line.price_unit if po_line else 0.0,
-                "selected": not existing,
-                "create_rental_asset": product.auto_create_rental_asset,
-                "existing_asset_id": existing.id if existing else False,
-            })
+            vals_list.append(
+                {
+                    "wizard_id": self.id,
+                    "move_line_id": ml.id,
+                    "product_id": product.id,
+                    "lot_id": ml.lot_id.id,
+                    "purchase_line_id": po_line.id if po_line else False,
+                    "unit_cost": po_line.price_unit if po_line else 0.0,
+                    "selected": not existing,
+                    "create_rental_asset": product.auto_create_rental_asset,
+                    "existing_asset_id": existing.id if existing else False,
+                }
+            )
         self.env["custom.asset.conversion.line"].create(vals_list)
         if not vals_list:
-            raise UserError(_(
-                "No serial-tracked rental-asset lines found in this receipt. "
-                "Ensure products are flagged 'Is Rental Asset' and have serial numbers assigned."
-            ))
+            raise UserError(
+                _(
+                    "No serial-tracked rental-asset lines found in this receipt. "
+                    "Ensure products are flagged 'Is Rental Asset' and have serial numbers assigned."
+                )
+            )
         if self.picking_id.date_done:
             self.acquisition_date = fields.Date.to_date(self.picking_id.date_done)
 
@@ -102,10 +106,10 @@ class AssetConversionWizard(models.TransientModel):
         for line in lines:
             group = self.asset_group_id or line.product_id.product_tmpl_id.asset_group_id
             if not group:
-                raise UserError(_(
-                    'Product "%s" has no Asset Group. Set one on the product or '
-                    'in the wizard override.'
-                ) % line.product_id.display_name)
+                raise UserError(
+                    _('Product "%s" has no Asset Group. Set one on the product or in the wizard override.')
+                    % line.product_id.display_name
+                )
             asset_vals = {
                 "name": "%s / %s" % (line.product_id.display_name, line.lot_id.name),
                 "product_id": line.product_id.id,
@@ -125,13 +129,15 @@ class AssetConversionWizard(models.TransientModel):
             created |= asset
 
             if line.create_rental_asset:
-                rental = Rental.create({
-                    "name": "%s %s" % (line.product_id.display_name, line.lot_id.name),
-                    "code": "RA/%s" % line.lot_id.name,
-                    "product_id": line.product_id.id,
-                    "serial_number": line.lot_id.name,
-                    "fixed_asset_id": asset.id,
-                })
+                rental = Rental.create(
+                    {
+                        "name": "%s %s" % (line.product_id.display_name, line.lot_id.name),
+                        "code": "RA/%s" % line.lot_id.name,
+                        "product_id": line.product_id.id,
+                        "serial_number": line.lot_id.name,
+                        "fixed_asset_id": asset.id,
+                    }
+                )
                 rentals |= rental
 
         # Return action showing created assets

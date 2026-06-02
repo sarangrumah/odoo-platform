@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     ollama_model_default: str = "llama3.2:3b"
     ollama_model_quality: str = "qwen2.5:7b"
 
+    # Personal shopper (retrieval-controlled, runs on the local Ollama provider).
+    # `odoo_storefront_url` is the internal base for the public catalog API the
+    # shopper reads from; the per-request `tenant` selects the Odoo DB.
+    odoo_storefront_url: str = "http://odoo:8069"
+    ai_model_shopper: str = "qwen2.5:7b"
+
     # Redis (rate limit + cache)
     redis_url: str = "redis://redis:6379/0"
 

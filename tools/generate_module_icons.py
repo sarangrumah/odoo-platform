@@ -54,102 +54,154 @@ STYLE = (
 # suggested per group to give the launcher visual rhythm.
 PROMPTS: list[tuple[str, str]] = [
     # --- core / platform plumbing -------------------------------------
-    ("custom_core", "Stylized hexagonal platform foundation icon with "
-                    "subtle layered base. Purple accent background "
-                    "(#714B67). Conveys 'core foundation'."),
-    ("custom_adapter_framework", "Two interlocking puzzle pieces forming "
-                                 "one shape, connected with a plug. Teal "
-                                 "background. Conveys 'integration adapter'."),
-    ("custom_ai_bridge", "A stylized brain silhouette connected to a "
-                         "bridge arch with glowing dots. Indigo "
-                         "background. Conveys 'AI gateway bridge'."),
-    ("custom_ai_features", "A magic wand with three sparkle stars. "
-                           "Gradient violet background. Conveys 'AI "
-                           "powered features'."),
-    ("custom_bast", "A formal handover document with a glossy "
-                    "signature ribbon and check seal. Maroon background. "
-                    "Represents 'official handover record'."),
-    ("custom_hht_bridge", "A modern handheld barcode scanner gun with a "
-                          "small wifi signal arc. Slate gray background. "
-                          "Conveys 'handheld terminal integration'."),
-    ("custom_home_console", "A house silhouette with a spotlight beam "
-                            "and a small sparkle. Warm coral background. "
-                            "Conveys 'home launcher'."),
-
+    (
+        "custom_core",
+        "Stylized hexagonal platform foundation icon with "
+        "subtle layered base. Purple accent background "
+        "(#714B67). Conveys 'core foundation'.",
+    ),
+    (
+        "custom_adapter_framework",
+        "Two interlocking puzzle pieces forming "
+        "one shape, connected with a plug. Teal "
+        "background. Conveys 'integration adapter'.",
+    ),
+    (
+        "custom_ai_bridge",
+        "A stylized brain silhouette connected to a "
+        "bridge arch with glowing dots. Indigo "
+        "background. Conveys 'AI gateway bridge'.",
+    ),
+    (
+        "custom_ai_features",
+        "A magic wand with three sparkle stars. Gradient violet background. Conveys 'AI powered features'.",
+    ),
+    (
+        "custom_bast",
+        "A formal handover document with a glossy "
+        "signature ribbon and check seal. Maroon background. "
+        "Represents 'official handover record'.",
+    ),
+    (
+        "custom_hht_bridge",
+        "A modern handheld barcode scanner gun with a "
+        "small wifi signal arc. Slate gray background. "
+        "Conveys 'handheld terminal integration'.",
+    ),
+    (
+        "custom_home_console",
+        "A house silhouette with a spotlight beam and a small sparkle. Warm coral background. Conveys 'home launcher'.",
+    ),
     # --- hub / orchestration ------------------------------------------
-    ("custom_hub_console", "A central node with radial spokes and small "
-                           "satellite circles. Deep blue background. "
-                           "Conveys 'control hub'."),
-    ("custom_super_admin", "A minimal shield with a small crown emblem "
-                           "on top. Royal purple background. Conveys "
-                           "'super administrator'."),
-    ("custom_tenant_infra", "Three small skyscraper buildings of "
-                            "different heights with a cloud above. Sky "
-                            "blue background. Conveys 'multi-tenant "
-                            "infrastructure'."),
-    ("custom_onboarding_journey", "A winding path with a flag at the "
-                                  "end and three checkpoint dots. Fresh "
-                                  "green background. Conveys 'onboarding "
-                                  "journey'."),
-
+    (
+        "custom_hub_console",
+        "A central node with radial spokes and small satellite circles. Deep blue background. Conveys 'control hub'.",
+    ),
+    (
+        "custom_super_admin",
+        "A minimal shield with a small crown emblem on top. Royal purple background. Conveys 'super administrator'.",
+    ),
+    (
+        "custom_tenant_infra",
+        "Three small skyscraper buildings of "
+        "different heights with a cloud above. Sky "
+        "blue background. Conveys 'multi-tenant "
+        "infrastructure'.",
+    ),
+    (
+        "custom_onboarding_journey",
+        "A winding path with a flag at the "
+        "end and three checkpoint dots. Fresh "
+        "green background. Conveys 'onboarding "
+        "journey'.",
+    ),
     # --- ops / dev ----------------------------------------------------
-    ("custom_ops_monitor", "A heart-rate ECG line on a dashboard "
-                           "rectangle with one peak. Crimson background. "
-                           "Conveys 'operations monitoring'."),
-    ("custom_dev_cycle", "Two curved arrows forming an infinite loop "
-                         "with a small code bracket inside. Dark indigo "
-                         "background. Conveys 'continuous development "
-                         "cycle'."),
-    ("custom_brd_analyzer", "A document page with a large magnifying "
-                            "glass overlapping it. Mustard yellow "
-                            "background. Conveys 'document analysis'."),
-
+    (
+        "custom_ops_monitor",
+        "A heart-rate ECG line on a dashboard "
+        "rectangle with one peak. Crimson background. "
+        "Conveys 'operations monitoring'.",
+    ),
+    (
+        "custom_dev_cycle",
+        "Two curved arrows forming an infinite loop "
+        "with a small code bracket inside. Dark indigo "
+        "background. Conveys 'continuous development "
+        "cycle'.",
+    ),
+    (
+        "custom_brd_analyzer",
+        "A document page with a large magnifying "
+        "glass overlapping it. Mustard yellow "
+        "background. Conveys 'document analysis'.",
+    ),
     # --- compliance / Indonesian tax & privacy ------------------------
-    ("custom_coretax", "An official Indonesian tax form shape with a "
-                       "red seal stamp in the corner. Crimson background. "
-                       "Conveys 'tax core authority'."),
-    ("custom_coretax_bupot", "A small receipt slip with a checkmark "
-                             "stamp. Burgundy background. Conveys 'tax "
-                             "withholding receipt slip'."),
-    ("custom_coretax_pajakku", "A gear connected to a small tax form "
-                               "with a connection arrow. Crimson "
-                               "background. Conveys 'tax service "
-                               "integration'."),
-    ("custom_pph_witholding", "A coin stack with an arrow being clipped "
-                              "by scissors above. Amber background. "
-                              "Conveys 'income withholding tax'."),
-    ("custom_pdp_core", "A solid shield with a subtle padlock keyhole. "
-                        "Forest green background. Conveys 'data "
-                        "protection core'."),
-    ("custom_pdp_consent", "Two hands meeting in a handshake with a "
-                           "small lock above. Teal background. Conveys "
-                           "'consent management'."),
-    ("custom_pdp_audit", "A shield with a magnifier overlaid and a "
-                        "small checkmark. Olive background. Conveys "
-                        "'privacy audit'."),
-    ("custom_pdp_dsar", "A small key with a person silhouette outline. "
-                        "Slate background. Conveys 'data subject access "
-                        "request'."),
-    ("custom_pdp_masking", "An eye outline with a diagonal slash and "
-                           "small asterisk dots. Charcoal background. "
-                           "Conveys 'data masking'."),
-    ("custom_pdp_retention", "An hourglass with a small archive box "
-                             "below. Bronze background. Conveys 'data "
-                             "retention schedule'."),
-
+    (
+        "custom_coretax",
+        "An official Indonesian tax form shape with a "
+        "red seal stamp in the corner. Crimson background. "
+        "Conveys 'tax core authority'.",
+    ),
+    (
+        "custom_coretax_bupot",
+        "A small receipt slip with a checkmark stamp. Burgundy background. Conveys 'tax withholding receipt slip'.",
+    ),
+    (
+        "custom_coretax_pajakku",
+        "A gear connected to a small tax form "
+        "with a connection arrow. Crimson "
+        "background. Conveys 'tax service "
+        "integration'.",
+    ),
+    (
+        "custom_pph_witholding",
+        "A coin stack with an arrow being clipped "
+        "by scissors above. Amber background. "
+        "Conveys 'income withholding tax'.",
+    ),
+    (
+        "custom_pdp_core",
+        "A solid shield with a subtle padlock keyhole. Forest green background. Conveys 'data protection core'.",
+    ),
+    (
+        "custom_pdp_consent",
+        "Two hands meeting in a handshake with a small lock above. Teal background. Conveys 'consent management'.",
+    ),
+    (
+        "custom_pdp_audit",
+        "A shield with a magnifier overlaid and a small checkmark. Olive background. Conveys 'privacy audit'.",
+    ),
+    (
+        "custom_pdp_dsar",
+        "A small key with a person silhouette outline. Slate background. Conveys 'data subject access request'.",
+    ),
+    (
+        "custom_pdp_masking",
+        "An eye outline with a diagonal slash and small asterisk dots. Charcoal background. Conveys 'data masking'.",
+    ),
+    (
+        "custom_pdp_retention",
+        "An hourglass with a small archive box below. Bronze background. Conveys 'data retention schedule'.",
+    ),
     # --- ee_gap niche --------------------------------------------------
-    ("custom_esg", "A leaf wrapped around a small globe outline. "
-                   "Emerald green background. Conveys 'ESG "
-                   "sustainability'."),
-    ("custom_wms_cycle_count", "A storage box with two curved refresh "
-                               "arrows around it. Steel blue background. "
-                               "Conveys 'inventory cycle count'."),
-    ("custom_wms_putaway", "A storage box with a downward arrow into "
-                           "a shelf slot. Navy background. Conveys "
-                           "'warehouse putaway'."),
-    ("custom_wms_to_engine", "A warehouse outline with an embedded gear. "
-                             "Charcoal background. Conveys 'warehouse "
-                             "engine'."),
+    (
+        "custom_esg",
+        "A leaf wrapped around a small globe outline. Emerald green background. Conveys 'ESG sustainability'.",
+    ),
+    (
+        "custom_wms_cycle_count",
+        "A storage box with two curved refresh "
+        "arrows around it. Steel blue background. "
+        "Conveys 'inventory cycle count'.",
+    ),
+    (
+        "custom_wms_putaway",
+        "A storage box with a downward arrow into a shelf slot. Navy background. Conveys 'warehouse putaway'.",
+    ),
+    (
+        "custom_wms_to_engine",
+        "A warehouse outline with an embedded gear. Charcoal background. Conveys 'warehouse engine'.",
+    ),
 ]
 
 
@@ -196,14 +248,10 @@ def downscale(raw: bytes, size: int = 256) -> bytes:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--only", action="append", default=[],
-                        help="Restrict to one or more module names")
-    parser.add_argument("--model", default="gpt-image-1",
-                        choices=["gpt-image-1", "dall-e-3"])
-    parser.add_argument("--size", type=int, default=256,
-                        help="Output icon side length (default 256)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Print prompts; do not call the API")
+    parser.add_argument("--only", action="append", default=[], help="Restrict to one or more module names")
+    parser.add_argument("--model", default="gpt-image-1", choices=["gpt-image-1", "dall-e-3"])
+    parser.add_argument("--size", type=int, default=256, help="Output icon side length (default 256)")
+    parser.add_argument("--dry-run", action="store_true", help="Print prompts; do not call the API")
     args = parser.parse_args()
 
     api_key = os.environ.get("OPENAI_API_KEY")

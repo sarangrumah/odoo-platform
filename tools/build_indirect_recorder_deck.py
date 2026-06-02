@@ -6,6 +6,7 @@ kinds, just a different SLIDES list and footer.
 Run:  python tools/build_indirect_recorder_deck.py
 Out:  docs/presentation-odoo-indirect-recorder.pptx
 """
+
 from __future__ import annotations
 
 import sys
@@ -27,7 +28,6 @@ SLIDES = [
         "subtitle": "Principal-Led Operations  ·  FTP-fed FICO & Procurement Hub",
         "footer": "Internal Pitch Deck  ·  Product Owner VAS  ·  Mei 2026",
     },
-
     # 2. Executive Summary
     {
         "kind": "bullets",
@@ -47,7 +47,6 @@ SLIDES = [
             ("~27 md", "Per Principal"),
         ],
     },
-
     # 3. Boundary Matrix
     {
         "kind": "table",
@@ -55,22 +54,21 @@ SLIDES = [
         "intro": "Prinsip: principal = system of record operasional · Odoo = system of record finance + procurement upstream.",
         "headers": ["Proses / Modul", "Principal App", "Odoo"],
         "rows": [
-            ["Sales Order, Customer ops, POS",                      "✓", "—"],
-            ["Goods Receipt (eksekusi fisik di gudang)",            "✓", "—"],
-            ["Inventory movement, stock balance",                   "✓", "—"],
-            ["Customer Invoice (issuance ke pelanggan)",            "✓", "—"],
-            ["Purchase Order (RFQ → release ke vendor)",            "—", "✓"],
-            ["Vendor master, Vendor Bill (AP)",                     "—", "✓"],
-            ["General Ledger, Bank/Cash, Rekonsiliasi",             "—", "✓"],
-            ["AR posting (revenue dari principal feed)",            "—", "✓"],
-            ["Tax: e-Faktur Coretax, Bupot, SPT",                   "—", "✓"],
-            ["Fixed Asset, Konsolidasi, Reporting",                 "—", "✓"],
-            ["Master: Customer, Product",        "✓ (authoritative)", "mirror"],
-            ["Master: Vendor, CoA, Tax Code",                "mirror", "✓ (authoritative)"],
+            ["Sales Order, Customer ops, POS", "✓", "—"],
+            ["Goods Receipt (eksekusi fisik di gudang)", "✓", "—"],
+            ["Inventory movement, stock balance", "✓", "—"],
+            ["Customer Invoice (issuance ke pelanggan)", "✓", "—"],
+            ["Purchase Order (RFQ → release ke vendor)", "—", "✓"],
+            ["Vendor master, Vendor Bill (AP)", "—", "✓"],
+            ["General Ledger, Bank/Cash, Rekonsiliasi", "—", "✓"],
+            ["AR posting (revenue dari principal feed)", "—", "✓"],
+            ["Tax: e-Faktur Coretax, Bupot, SPT", "—", "✓"],
+            ["Fixed Asset, Konsolidasi, Reporting", "—", "✓"],
+            ["Master: Customer, Product", "✓ (authoritative)", "mirror"],
+            ["Master: Vendor, CoA, Tax Code", "mirror", "✓ (authoritative)"],
         ],
         "col_widths": [4.5, 2.4, 2.1],
     },
-
     # 4. System Landscape
     {
         "kind": "diagram",
@@ -99,7 +97,6 @@ SLIDES = [
             "Zero coupling: principal app tidak tahu Odoo ada di hilirnya",
         ],
     },
-
     # 5. Data Contract
     {
         "kind": "diagram",
@@ -136,7 +133,6 @@ SLIDES = [
             "Schema versioning lewat field schema_version di header",
         ],
     },
-
     # 6. Ingestion Flow
     {
         "kind": "diagram",
@@ -173,7 +169,6 @@ SLIDES = [
             "Retry: exponential backoff 3 attempts untuk SFTP error",
         ],
     },
-
     # 7. PO ↔ GR Cross-System Flow
     {
         "kind": "diagram",
@@ -209,7 +204,6 @@ SLIDES = [
             "PO release dikirim ke principal juga (referensi GR expected)",
         ],
     },
-
     # 8. Sales → Revenue Recognition Flow
     {
         "kind": "diagram",
@@ -241,7 +235,6 @@ SLIDES = [
             "Customer mapping via external_id (= customer_code principal)",
         ],
     },
-
     # 9. Master Data Sync Strategy
     {
         "kind": "two_col",
@@ -266,7 +259,6 @@ SLIDES = [
         ],
         "footnote": "Mapping kode antar sistem via external_id. Sync history disimpan di model ftp.master.sync (audit per snapshot).",
     },
-
     # 10. Reconciliation & Control
     {
         "kind": "table",
@@ -275,16 +267,15 @@ SLIDES = [
         "headers": ["Check", "Source A (Principal)", "Source B (Odoo)", "Threshold / Action"],
         "rows": [
             ["Revenue match per tgl", "sum(invoice CSV)", "sum(account.move AR)", "Alert > 0.5%"],
-            ["GR match per PO",       "sum(gr CSV)",     "sum(stock.picking done)", "Alert mismatch any"],
-            ["Stock balance",         "stock_balance.csv","stock.quant",        "Audit-only report"],
-            ["Tax match",             "invoice tax CSV", "account.tax line",    "Alert mismatch any"],
-            ["Feed liveness",         "last file ts",    "now()",               "Alert if > 24h silent"],
-            ["Vendor Bill aging",     "—",               "account.move AP open","Alert if > 30 hari"],
+            ["GR match per PO", "sum(gr CSV)", "sum(stock.picking done)", "Alert mismatch any"],
+            ["Stock balance", "stock_balance.csv", "stock.quant", "Audit-only report"],
+            ["Tax match", "invoice tax CSV", "account.tax line", "Alert mismatch any"],
+            ["Feed liveness", "last file ts", "now()", "Alert if > 24h silent"],
+            ["Vendor Bill aging", "—", "account.move AP open", "Alert if > 30 hari"],
         ],
         "col_widths": [2.4, 2.6, 2.6, 2.4],
         "footnote": "Variance > threshold → ticket otomatis via custom_approval_engine → review finance lead → resolve via correcting entry atau request resend principal.",
     },
-
     # 11. Error Handling & Replay
     {
         "kind": "table",
@@ -292,16 +283,19 @@ SLIDES = [
         "intro": "Klasifikasi error & jalur recovery. Semua error tercatat di model ftp.ingest.error untuk audit.",
         "headers": ["Error Class", "Detection", "Recovery"],
         "rows": [
-            ["Schema invalid (header / type)",       "Validator stage step 4",            "Quarantine + alert → manual fix → replay"],
-            ["Reference miss (PO/customer/product)", "base_import resolution error",       "Retry 3× (1h interval) → manual queue"],
-            ["Duplicate (external_id exists)",       "Unique constraint ftp.ingest.row",   "Skip + log info (idempotent)"],
-            ["Partial commit failure",               "Savepoint rollback per file",        "File tagged .err → replay setelah fix"],
-            ["Feed stalled (no file > 24h)",         "Daily liveness check 09:00",         "Alert ops channel → eskalasi SPOC"],
-            ["SFTP connection failure",              "Connection exception step 1",        "Exponential backoff 3× → alert if fail"],
+            ["Schema invalid (header / type)", "Validator stage step 4", "Quarantine + alert → manual fix → replay"],
+            [
+                "Reference miss (PO/customer/product)",
+                "base_import resolution error",
+                "Retry 3× (1h interval) → manual queue",
+            ],
+            ["Duplicate (external_id exists)", "Unique constraint ftp.ingest.row", "Skip + log info (idempotent)"],
+            ["Partial commit failure", "Savepoint rollback per file", "File tagged .err → replay setelah fix"],
+            ["Feed stalled (no file > 24h)", "Daily liveness check 09:00", "Alert ops channel → eskalasi SPOC"],
+            ["SFTP connection failure", "Connection exception step 1", "Exponential backoff 3× → alert if fail"],
         ],
         "col_widths": [3.2, 3.0, 3.8],
     },
-
     # 12. Security & Compliance
     {
         "kind": "two_col",
@@ -324,7 +318,6 @@ SLIDES = [
             "custom_ftp_ingest pinned 19.0.x.y · CI per release",
         ],
     },
-
     # 13. Modules / Components
     {
         "kind": "table",
@@ -332,18 +325,21 @@ SLIDES = [
         "intro": "Build effort terkonsentrasi di 1 modul baru (custom_ftp_ingest). Sisanya re-use library Hub yang sudah ready.",
         "headers": ["Komponen", "Asal", "Peran"],
         "rows": [
-            ["purchase",                       "Odoo CE",       "PO, RFQ, Vendor Bill, 3-way match"],
-            ["account, account_asset",         "Odoo CE",       "GL, AR/AP, Bank, Fixed Asset"],
-            ["base_import",                    "Odoo CE",       "load() API untuk CSV import"],
-            ["custom_accounting_full",         "Hub repo",      "PSAK 5-digit CoA, Intercompany, Konsolidasi"],
-            ["custom_coretax + coretax_bupot", "Hub repo",      "e-Faktur, Bupot, NSFP, Pajakku ASPP"],
-            ["custom_approval_engine",         "Hub repo",      "Variance review workflow + escalation"],
-            ["custom_pdp_audit",               "Hub repo",      "Append-only hash-chained audit log"],
-            ["custom_ftp_ingest  (NEW)",       "Hub repo (build)", "SFTP poller, schema map registry, dispatcher, ack writer"],
+            ["purchase", "Odoo CE", "PO, RFQ, Vendor Bill, 3-way match"],
+            ["account, account_asset", "Odoo CE", "GL, AR/AP, Bank, Fixed Asset"],
+            ["base_import", "Odoo CE", "load() API untuk CSV import"],
+            ["custom_accounting_full", "Hub repo", "PSAK 5-digit CoA, Intercompany, Konsolidasi"],
+            ["custom_coretax + coretax_bupot", "Hub repo", "e-Faktur, Bupot, NSFP, Pajakku ASPP"],
+            ["custom_approval_engine", "Hub repo", "Variance review workflow + escalation"],
+            ["custom_pdp_audit", "Hub repo", "Append-only hash-chained audit log"],
+            [
+                "custom_ftp_ingest  (NEW)",
+                "Hub repo (build)",
+                "SFTP poller, schema map registry, dispatcher, ack writer",
+            ],
         ],
         "col_widths": [3.0, 2.0, 4.5],
     },
-
     # 14. Alternative — tanpa FTP adapter, hanya import bawaan Odoo
     {
         "kind": "table",
@@ -351,21 +347,20 @@ SLIDES = [
         "intro": "Skenario 'lite': tidak build custom_ftp_ingest. Principal kirim CSV via email/share drive, ops Odoo upload manual lewat Settings → Technical → Import (base_import.load() di balik layar — API yang sama).",
         "headers": ["Aspek", "FTP Adapter (custom_ftp_ingest)", "Manual Import Mode"],
         "rows": [
-            ["Build effort",     "~27 md (1 modul baru)",                "~15 md (template + SOP + UAT)"],
-            ["Go-live time",     "~8 minggu",                            "~4–5 minggu"],
-            ["Infra",            "SFTP server + credential exchange",    "Tidak ada"],
-            ["Recurring ops",    "Cron otomatis + monitoring",           "~1–2 jam/hari upload manual"],
-            ["Human error risk", "Rendah (otomatis, idempotent)",        "Tinggi (salah file, missed upload)"],
-            ["Liveness alert",   "Otomatis >24h alert",                  "Tidak ada — telat ketahuan"],
-            ["Idempotency",      "Built-in via external_id constraint",  "Tergantung disiplin ops"],
-            ["Reconciliation",   "Otomatis daily 07:00",                 "Manual run oleh finance"],
-            ["Audit trail",      "Hash-chained custom_pdp_audit",        "ir.attachment + login log standar"],
-            ["Cocok untuk",      "Volume harian, lifetime panjang",      "Pilot / PoC / volume rendah"],
+            ["Build effort", "~27 md (1 modul baru)", "~15 md (template + SOP + UAT)"],
+            ["Go-live time", "~8 minggu", "~4–5 minggu"],
+            ["Infra", "SFTP server + credential exchange", "Tidak ada"],
+            ["Recurring ops", "Cron otomatis + monitoring", "~1–2 jam/hari upload manual"],
+            ["Human error risk", "Rendah (otomatis, idempotent)", "Tinggi (salah file, missed upload)"],
+            ["Liveness alert", "Otomatis >24h alert", "Tidak ada — telat ketahuan"],
+            ["Idempotency", "Built-in via external_id constraint", "Tergantung disiplin ops"],
+            ["Reconciliation", "Otomatis daily 07:00", "Manual run oleh finance"],
+            ["Audit trail", "Hash-chained custom_pdp_audit", "ir.attachment + login log standar"],
+            ["Cocok untuk", "Volume harian, lifetime panjang", "Pilot / PoC / volume rendah"],
         ],
         "col_widths": [2.0, 3.6, 3.4],
         "footnote": "ROI: selisih 12 md di-recover dalam ~3 bulan operasional — ops menghabiskan ~10 jam/minggu (~65 md/tahun) untuk manual upload. Manual mode layak sebagai bridge sementara, atau untuk principal volume < 50 file/bulan.",
     },
-
     # 15. Mandays — breakdown per role
     {
         "kind": "table",
@@ -373,90 +368,107 @@ SLIDES = [
         "intro": "Estimasi go-live 1 principal dipecah per role: ITBP (PMO), IT Business Analyst, Developer, QA. Total 27 md.",
         "headers": ["Phase", "Activity", "ITBP (PMO)", "IT BA", "Developer", "QA", "Total"],
         "rows": [
-            ["Setup",      "SFTP infra + credential exchange",            "1", "1", "1", "—", "3"],
-            ["Build",      "Modul custom_ftp_ingest (poller + dispatcher)", "1", "1", "5", "1", "8"],
+            ["Setup", "SFTP infra + credential exchange", "1", "1", "1", "—", "3"],
+            ["Build", "Modul custom_ftp_ingest (poller + dispatcher)", "1", "1", "5", "1", "8"],
             ["Schema Map", "7 entitas (customer, product, vendor, SO, invoice, GR, stock)", "—", "2", "3", "1", "6"],
-            ["Reconcile",  "Daily variance engine + dashboard",           "1", "1", "2", "—", "4"],
-            ["UAT",        "Cross-system end-to-end (principal ↔ Odoo)",  "1", "1", "1", "3", "6"],
-            ["Subtotal per Role", "",                                    "4", "6", "12", "5", "27"],
+            ["Reconcile", "Daily variance engine + dashboard", "1", "1", "2", "—", "4"],
+            ["UAT", "Cross-system end-to-end (principal ↔ Odoo)", "1", "1", "1", "3", "6"],
+            ["Subtotal per Role", "", "4", "6", "12", "5", "27"],
         ],
         "col_widths": [1.3, 4.0, 1.0, 0.8, 1.0, 0.7, 0.8],
         "footnote": "ITBP = governance, koordinasi, sign-off · IT BA = schema contract, mapping, UAT scenario · Developer = build modul + integrasi · QA = test plan + e2e + regression. Komparasi middleware tradisional ~80–120 md (saving ~70% lewat re-use base_import + library Hub).",
     },
-
     # 15. Roadmap (4 phases, 8 minggu)
     {
         "kind": "roadmap",
         "title": "Roadmap & Phasing — 8 Minggu",
         "quarters": [
-            ("Phase 1 — Wk 1–2 · Foundation", [
-                "SFTP handshake dengan principal",
-                "Build custom_ftp_ingest skeleton",
-                "Master data sync: customer, product, vendor",
-                "Schema contract sign-off",
-            ]),
-            ("Phase 2 — Wk 3–4 · Procurement", [
-                "PO export Odoo → principal (PDF/EDI)",
-                "GR ingestion + 3-way match",
-                "Vendor Bill draft → approval → posted",
-                "AP outstanding visibility",
-            ]),
-            ("Phase 3 — Wk 5–6 · Revenue", [
-                "Sales/Invoice CSV ingestion",
-                "AR posting + tax line + Coretax queue",
-                "Reconciliation engine variance check",
-                "Dashboard variance daily",
-            ]),
-            ("Phase 4 — Wk 7–8 · Go-Live", [
-                "UAT cross-system + bug-fix",
-                "Hypercare ops + runbook handover",
-                "Cutover plan eksekusi",
-                "Sign-off & transition ke BAU",
-            ]),
+            (
+                "Phase 1 — Wk 1–2 · Foundation",
+                [
+                    "SFTP handshake dengan principal",
+                    "Build custom_ftp_ingest skeleton",
+                    "Master data sync: customer, product, vendor",
+                    "Schema contract sign-off",
+                ],
+            ),
+            (
+                "Phase 2 — Wk 3–4 · Procurement",
+                [
+                    "PO export Odoo → principal (PDF/EDI)",
+                    "GR ingestion + 3-way match",
+                    "Vendor Bill draft → approval → posted",
+                    "AP outstanding visibility",
+                ],
+            ),
+            (
+                "Phase 3 — Wk 5–6 · Revenue",
+                [
+                    "Sales/Invoice CSV ingestion",
+                    "AR posting + tax line + Coretax queue",
+                    "Reconciliation engine variance check",
+                    "Dashboard variance daily",
+                ],
+            ),
+            (
+                "Phase 4 — Wk 7–8 · Go-Live",
+                [
+                    "UAT cross-system + bug-fix",
+                    "Hypercare ops + runbook handover",
+                    "Cutover plan eksekusi",
+                    "Sign-off & transition ke BAU",
+                ],
+            ),
         ],
     },
-
     # 16. Risks
     {
         "kind": "table",
         "title": "Risks & Mitigations",
         "headers": ["Risk", "Mitigation"],
         "rows": [
-            ["Principal schema drift (kolom berubah tanpa notice)",
-             "Schema contract + schema_version di header · validator strict · alert deviasi"],
-            ["Feed stalled (principal down / delay)",
-             "Daily liveness + heartbeat file · eskalasi SPOC · runbook fallback"],
-            ["Reconciliation gap karena timing cut-off beda",
-             "Cut-off contract: principal H-1 23:59 WIB, Odoo proses 07:00 H+0"],
-            ["Duplicate posting (re-send principal)",
-             "Idempotency via external_id unique constraint"],
-            ["Tax submission gagal (Coretax/Pajakku)",
-             "Circuit breaker + manual portal fallback + ops alert"],
-            ["SFTP credential rotation berisiko outage",
-             "Quarterly rotation runbook · dual-key window · zero-downtime"],
+            [
+                "Principal schema drift (kolom berubah tanpa notice)",
+                "Schema contract + schema_version di header · validator strict · alert deviasi",
+            ],
+            [
+                "Feed stalled (principal down / delay)",
+                "Daily liveness + heartbeat file · eskalasi SPOC · runbook fallback",
+            ],
+            [
+                "Reconciliation gap karena timing cut-off beda",
+                "Cut-off contract: principal H-1 23:59 WIB, Odoo proses 07:00 H+0",
+            ],
+            ["Duplicate posting (re-send principal)", "Idempotency via external_id unique constraint"],
+            ["Tax submission gagal (Coretax/Pajakku)", "Circuit breaker + manual portal fallback + ops alert"],
+            [
+                "SFTP credential rotation berisiko outage",
+                "Quarterly rotation runbook · dual-key window · zero-downtime",
+            ],
         ],
         "col_widths": [3.8, 5.2],
     },
-
     # 17. Call to Action
     {
         "kind": "cta",
         "title": "Call to Action",
         "intro": "Approval & resource untuk pilot 1 principal — pola ini reusable untuk principal berikutnya tanpa rebuild.",
         "items": [
-            ("1", "Endorsement",
-             "Approve pola indirect recording sebagai blueprint integrasi dengan aplikasi principal"),
-            ("2", "Pilot Funding",
-             "Allocate untuk 1 principal pertama — lead candidate disepakati sebelum kick-off"),
-            ("3", "SFTP Infrastructure",
-             "Provision SFTP server + credential exchange dengan principal SPOC di Wk-0"),
-            ("4", "Resource Lock",
-             "1 backend Odoo + 1 finance SME + 1 PO untuk durasi 8 minggu"),
-            ("5", "Data Contract Sign-off",
-             "Tanda-tangan schema contract & cut-off timing dgn principal sebelum build start"),
+            (
+                "1",
+                "Endorsement",
+                "Approve pola indirect recording sebagai blueprint integrasi dengan aplikasi principal",
+            ),
+            ("2", "Pilot Funding", "Allocate untuk 1 principal pertama — lead candidate disepakati sebelum kick-off"),
+            ("3", "SFTP Infrastructure", "Provision SFTP server + credential exchange dengan principal SPOC di Wk-0"),
+            ("4", "Resource Lock", "1 backend Odoo + 1 finance SME + 1 PO untuk durasi 8 minggu"),
+            (
+                "5",
+                "Data Contract Sign-off",
+                "Tanda-tangan schema contract & cut-off timing dgn principal sebelum build start",
+            ),
         ],
     },
-
     # 18. Closing
     {
         "kind": "closing",

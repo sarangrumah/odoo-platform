@@ -4,9 +4,10 @@
 If empty, the model falls back to ``product_id.bom_ids`` (first
 matching phantom/kit BOM) at explosion time.
 """
+
 from __future__ import annotations
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class RentalAsset(models.Model):

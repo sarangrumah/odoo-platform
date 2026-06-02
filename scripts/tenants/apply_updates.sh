@@ -66,6 +66,9 @@ MODULES_TO_UPDATE=(
   custom_wms_cycle_count
   custom_wms_putaway
   l10n_id_psak_custom
+  custom_payment_id
+  custom_ecommerce
+  custom_storefront_api
 )
 
 # Raw SQL seeds (idempotent — safe to re-apply). Paths INSIDE the

@@ -20,14 +20,28 @@ class RentalOrder(models.Model):
 
     name = fields.Char(default="New", readonly=True, copy=False)
     partner_id = fields.Many2one("res.partner", required=True, tracking=True)
-    asset_id = fields.Many2one("rental.asset", tracking=True, domain="[('state', '!=', 'retired')]",
-        help="Single-serial rental mode. Leave empty and set Product for bulk-by-qty rentals.")
-    product_id = fields.Many2one("product.product", tracking=True,
-        help="Bulk-by-qty rental mode. Leave empty when using Asset (single-serial mode).")
-    qty = fields.Integer(default=1, required=True, tracking=True,
-        help="Main rental quantity (used to scale fees). Must be 1 in serial mode.")
-    loan_qty = fields.Integer(default=0, tracking=True,
-        help="Spare/loan quantity shipped alongside the order. Not invoiced; must be returned in full.")
+    asset_id = fields.Many2one(
+        "rental.asset",
+        tracking=True,
+        domain="[('state', '!=', 'retired')]",
+        help="Single-serial rental mode. Leave empty and set Product for bulk-by-qty rentals.",
+    )
+    product_id = fields.Many2one(
+        "product.product",
+        tracking=True,
+        help="Bulk-by-qty rental mode. Leave empty when using Asset (single-serial mode).",
+    )
+    qty = fields.Integer(
+        default=1,
+        required=True,
+        tracking=True,
+        help="Main rental quantity (used to scale fees). Must be 1 in serial mode.",
+    )
+    loan_qty = fields.Integer(
+        default=0,
+        tracking=True,
+        help="Spare/loan quantity shipped alongside the order. Not invoiced; must be returned in full.",
+    )
 
     pickup_dt = fields.Datetime(required=True, tracking=True)
     return_dt_expected = fields.Datetime(required=True, tracking=True)
@@ -270,16 +284,20 @@ class RentalOrder(models.Model):
             name = product.display_name
             if is_loan:
                 name = "[LOAN] " + name
-            return (0, 0, {
-                "name": name,
-                "product_id": product.id,
-                "product_uom_qty": float(qty),
-                "product_uom": product.uom_id.id,
-                "location_id": loc_src.id,
-                "location_dest_id": loc_dst.id,
-                "company_id": self.company_id.id,
-                "is_loan": is_loan,
-            })
+            return (
+                0,
+                0,
+                {
+                    "name": name,
+                    "product_id": product.id,
+                    "product_uom_qty": float(qty),
+                    "product_uom": product.uom_id.id,
+                    "location_id": loc_src.id,
+                    "location_dest_id": loc_dst.id,
+                    "company_id": self.company_id.id,
+                    "is_loan": is_loan,
+                },
+            )
 
         moves = [_move(self.qty or 1, False)]
         if self.loan_qty and self.loan_qty > 0:
@@ -313,11 +331,15 @@ class RentalOrder(models.Model):
             loan_moves = picking.move_ids.filtered("is_loan")
             done = sum(loan_moves.mapped("quantity"))
             if done < rec.loan_qty:
-                raise UserError(_(
-                    "Loan unit shortage on %(name)s: %(done)s returned of %(expected)s expected. "
-                    "Resolve via inventory adjustment or pursue claim before closing the order.",
-                    name=rec.name, done=done, expected=rec.loan_qty,
-                ))
+                raise UserError(
+                    _(
+                        "Loan unit shortage on %(name)s: %(done)s returned of %(expected)s expected. "
+                        "Resolve via inventory adjustment or pursue claim before closing the order.",
+                        name=rec.name,
+                        done=done,
+                        expected=rec.loan_qty,
+                    )
+                )
         return True
 
     # ------------------------------------------------------------------
@@ -334,22 +356,26 @@ class RentalOrder(models.Model):
         product = self._resolve_rental_product()
         if not product:
             return []
-        lines = [{
-            "item_description": product.display_name,
-            "product_id": product.id,
-            "qty": float(self.qty or 1),
-            "uom_id": product.uom_id.id,
-            "is_loan": False,
-        }]
-        if self.loan_qty and self.loan_qty > 0:
-            lines.append({
-                "item_description": "[LOAN] " + product.display_name,
+        lines = [
+            {
+                "item_description": product.display_name,
                 "product_id": product.id,
-                "qty": float(self.loan_qty),
+                "qty": float(self.qty or 1),
                 "uom_id": product.uom_id.id,
-                "is_loan": True,
-                "note": "Cadangan / loan unit — must be returned in full.",
-            })
+                "is_loan": False,
+            }
+        ]
+        if self.loan_qty and self.loan_qty > 0:
+            lines.append(
+                {
+                    "item_description": "[LOAN] " + product.display_name,
+                    "product_id": product.id,
+                    "qty": float(self.loan_qty),
+                    "uom_id": product.uom_id.id,
+                    "is_loan": True,
+                    "note": "Cadangan / loan unit — must be returned in full.",
+                }
+            )
         return [(0, 0, v) for v in lines]
 
     def action_generate_bast_pickup(self):

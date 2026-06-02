@@ -29,11 +29,13 @@ class PaymentProvider(models.Model):
             ("midtrans", "Midtrans"),
             ("xendit", "Xendit"),
             ("doku", "DOKU"),
+            ("eraspace", "Eraspace"),
         ],
         ondelete={
             "midtrans": "set default",
             "xendit": "set default",
             "doku": "set default",
+            "eraspace": "set default",
         },
     )
 
@@ -71,7 +73,7 @@ class PaymentProvider(models.Model):
     def _get_id_adapter(self):
         """Return the concrete Indonesia adapter model for ``self``."""
         self.ensure_one()
-        if self.code not in ("midtrans", "xendit", "doku"):
+        if self.code not in ("midtrans", "xendit", "doku", "eraspace"):
             return False
         return self.env["custom.payment.id.adapter.base"]._get_for_provider(self)
 
@@ -79,7 +81,7 @@ class PaymentProvider(models.Model):
         """UI button — round-trip a ping request through the adapter."""
         self.ensure_one()
         adapter = self._get_id_adapter()
-        if not adapter:
+        if adapter is False:
             raise UserError(_("Provider '%s' is not an Indonesia gateway.") % self.name)
         # Use the sudo-protected server key field requires manager group;
         # surface a friendly error when missing rather than failing later.

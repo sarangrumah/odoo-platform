@@ -5,6 +5,7 @@ receiving sister company.
 Triggered on ``_action_done`` (i.e. after the picking is validated and
 moves are processed). Idempotent via ``x_custom_ic_mirror_picking_id``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -106,12 +107,16 @@ class StockPicking(models.Model):
         )
         if not warehouse:
             raise ValueError(_("No warehouse in receiving company '%s'.") % target_company.name)
-        ptype = self.env["stock.picking.type"].sudo().search(
-            [
-                ("code", "=", "incoming"),
-                ("warehouse_id", "=", warehouse.id),
-            ],
-            limit=1,
+        ptype = (
+            self.env["stock.picking.type"]
+            .sudo()
+            .search(
+                [
+                    ("code", "=", "incoming"),
+                    ("warehouse_id", "=", warehouse.id),
+                ],
+                limit=1,
+            )
         )
         if not ptype:
             raise ValueError(_("No incoming picking type for warehouse '%s'.") % warehouse.name)

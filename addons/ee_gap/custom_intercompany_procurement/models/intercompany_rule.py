@@ -11,6 +11,7 @@ mirroring. Here we add:
 Both default OFF for safety. Receiving-side journals/warehouses must
 exist; if not, mirror fails gracefully and posts a chatter note.
 """
+
 from __future__ import annotations
 
 from odoo import fields, models
@@ -44,6 +45,5 @@ class IntercompanyRule(models.Model):
         "account.journal",
         string="Receiving SO Source",
         domain="[('company_id', '=', company_to_id), ('type', '=', 'sale')]",
-        help="(Reserved) Future: journal used when receiving company "
-        "invoices the mirrored SO.",
+        help="(Reserved) Future: journal used when receiving company invoices the mirrored SO.",
     )

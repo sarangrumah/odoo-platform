@@ -13,7 +13,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
 from .config import get_settings
-from .routers import anomaly, chat, classify, embed, nlq, predict, workflow
+from .routers import anomaly, chat, classify, embed, nlq, predict, shopper, workflow
 from .security import HMACMiddleware
 
 
@@ -68,6 +68,7 @@ app.include_router(predict.router)
 app.include_router(anomaly.router)
 app.include_router(classify.router)
 app.include_router(nlq.router)
+app.include_router(shopper.router)
 
 
 @app.get("/health", tags=["meta"])

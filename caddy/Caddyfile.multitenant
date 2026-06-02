@@ -76,6 +76,29 @@ admin.platform.localhost {
 	}
 }
 
+# ----- Gentle Woman storefront (Next.js headless) -----
+# Customer-facing storefront. Declared BEFORE the *.platform.localhost
+# wildcard so this exact host wins; the hyphen in the label also keeps it
+# out of the tenant dbfilter regex. The Odoo backoffice for this tenant
+# stays at https://gentle_woman.platform.localhost (matched by the wildcard).
+shop.gentle-woman.platform.localhost {
+	encode zstd gzip
+	tls internal
+
+	reverse_proxy storefront:8080 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
 # ----- Tenant subdomains: *.platform.localhost -----
 # Catches every other subdomain. Odoo's `dbfilter=^%d$` will look up the
 # database whose name equals the first label.

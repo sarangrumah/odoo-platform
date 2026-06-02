@@ -11,8 +11,7 @@ class ResUsers(models.Model):
         column1="user_id",
         column2="action_id",
         string="Pinned Shortcuts",
-        help="Actions pinned by the user on the Home Console. "
-        "Shown above the regular app cards.",
+        help="Actions pinned by the user on the Home Console. Shown above the regular app cards.",
     )
     home_console_density = fields.Selection(
         selection=[("comfort", "Comfortable"), ("compact", "Compact")],
@@ -56,9 +55,7 @@ class ResUsers(models.Model):
                         "summary": act.summary or act.activity_type_id.name or "",
                         "res_model": act.res_model,
                         "res_id": act.res_id,
-                        "date_deadline": act.date_deadline
-                        and act.date_deadline.isoformat()
-                        or None,
+                        "date_deadline": act.date_deadline and act.date_deadline.isoformat() or None,
                     }
                 )
 
@@ -76,9 +73,7 @@ class ResUsers(models.Model):
                 "accent": company.brand_accent_color or "#714B67",
                 "has_home_logo": bool(company.brand_logo_home),
                 "has_logo": bool(company.logo),
-                "announcement_html": company.home_announcement_active
-                and company.home_announcement_html
-                or "",
+                "announcement_html": company.home_announcement_active and company.home_announcement_html or "",
             },
             "pinned": pinned,
             "recent_activities": recent_activities,
@@ -109,11 +104,7 @@ class ResUsers(models.Model):
                 {
                     "key": "has_employee",
                     "label": "Add at least one employee",
-                    "done": bool(
-                        Employee.sudo().search_count(
-                            [("company_id", "=", company.id)], limit=1
-                        )
-                    ),
+                    "done": bool(Employee.sudo().search_count([("company_id", "=", company.id)], limit=1)),
                 }
             )
 

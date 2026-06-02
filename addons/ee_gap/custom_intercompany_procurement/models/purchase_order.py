@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Mirror PO confirmation as a draft SO in the receiving sister company."""
+
 from __future__ import annotations
 
 import logging

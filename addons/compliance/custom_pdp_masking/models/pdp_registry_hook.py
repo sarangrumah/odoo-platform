@@ -93,6 +93,7 @@ class BaseMaskingHook(models.AbstractModel):
             return result
         try:
             from lxml import etree
+
             tree = etree.fromstring(arch)
         except Exception:
             return result

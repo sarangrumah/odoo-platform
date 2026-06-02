@@ -14,6 +14,7 @@ Strategy:
   4. product.product — match auto-generated variants by (template, size, inseam)
      and update default_code + barcode from our SKU table.
 """
+
 import csv
 import logging
 import os
@@ -30,6 +31,7 @@ if not _logger.handlers:
 CSV_DIR = "/tmp/era"
 
 # `env` is provided by odoo shell
+
 
 def log(msg):
     _logger.info(msg)
@@ -97,9 +99,7 @@ attr_value_id = {}  # (attr_name, value) -> product.attribute.value id
 with open(os.path.join(CSV_DIR, "out_attributes.csv"), encoding="utf-8") as f:
     for r in csv.DictReader(f):
         attr = attr_by_name[r["attribute"]]
-        v = env["product.attribute.value"].search(
-            [("attribute_id", "=", attr.id), ("name", "=", r["value"])], limit=1
-        )
+        v = env["product.attribute.value"].search([("attribute_id", "=", attr.id), ("name", "=", r["value"])], limit=1)
         if not v:
             v = env["product.attribute.value"].create({"attribute_id": attr.id, "name": r["value"]})
         attr_value_id[(r["attribute"], r["value"])] = v.id
@@ -258,11 +258,11 @@ for batch_start in range(0, len(tmpl_keys), 100):
             processed += 1
     commit()
     if processed % 10000 < 100:
-        log(f"  variants matched: {matched}, unmatched: {unmatched} ({processed}/{len(var_rows)}, {time.time() - t0:.1f}s)")
+        log(
+            f"  variants matched: {matched}, unmatched: {unmatched} ({processed}/{len(var_rows)}, {time.time() - t0:.1f}s)"
+        )
 
-log(
-    f"Variants done: matched={matched}, unmatched={unmatched}, total_processed={processed} in {time.time() - t0:.1f}s"
-)
+log(f"Variants done: matched={matched}, unmatched={unmatched}, total_processed={processed} in {time.time() - t0:.1f}s")
 
 log("=== IMPORT COMPLETE ===")
 log(

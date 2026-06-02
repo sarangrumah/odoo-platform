@@ -17,9 +17,9 @@ Outputs (CSV files in same directory):
   out_variants.csv           (~159,658 variants) -> product.product mapping with barcode + sku
   out_categories.csv         (CATEGORY/CLASS/SUBCLASS 3-level tree)
 """
+
 import csv
 import os
-import sys
 from collections import defaultdict
 from datetime import datetime
 
@@ -146,13 +146,7 @@ def main():
         return f"cat_l2_{safe}"
 
     def sub_xid(cat, cls, sub):
-        safe = (
-            (cat + "_" + cls + "_" + sub)
-            .replace(" ", "_")
-            .replace("/", "_")
-            .replace("-", "_")
-            .upper()
-        )
+        safe = (cat + "_" + cls + "_" + sub).replace(" ", "_").replace("/", "_").replace("-", "_").upper()
         return f"cat_l3_{safe}"
 
     with open(os.path.join(HERE, "out_categories.csv"), "w", newline="", encoding="utf-8") as f:
@@ -188,9 +182,7 @@ def main():
             w.writerow([tmpl_xid, pc, m["name"], f"{m['retail']:.2f}", categ_xid])
 
     # ---- Write template-attribute lines (which attributes each template uses) ----
-    with open(
-        os.path.join(HERE, "out_template_attrlines.csv"), "w", newline="", encoding="utf-8"
-    ) as f:
+    with open(os.path.join(HERE, "out_template_attrlines.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["tmpl_xid", "attribute", "value"])
         for pc, vset in sorted(tmpl_variants.items()):

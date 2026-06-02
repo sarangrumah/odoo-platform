@@ -32,6 +32,8 @@ None — all three custom models are `AbstractModel`. Only `res.config.settings.
 - `custom.security._gateway_secret()` / `_orchestrator_secret()` — env reads that raise `RuntimeError` if `"changeme"` substring is detected.
 - `custom.ir.config.set_encrypted(key, plaintext)` — Fernet-encrypt + persist with `ENC::` prefix.
 - `custom.ir.config.get_encrypted(key, default=None)` — auto-decrypt if value starts with `ENC::`, else passthrough.
+- `custom.ir.config.encrypt_value(plaintext)` (`@api.model`) — Fernet-encrypt an arbitrary string → `ENC::<token>` using the same master key; reusable field-level crypto (e.g. PII at rest), not tied to `ir.config_parameter`. Returns `False` for empty input; raises `UserError` if the `cryptography` lib is absent.
+- `custom.ir.config.decrypt_value(token)` (`@api.model`) — reverse of `encrypt_value`; pass-through for empty / non-`ENC::` values (so un-migrated plaintext still reads), returns `None` on tamper/`InvalidToken`/key failure (fail-closed, logged).
 - `custom.mixin.platform._custom_validate_field_prefix(field_name)` — boolean check `field_name.startswith("x_custom_")`.
 - `controllers.secure_endpoint.secure_endpoint(scope_name)` — controller-route decorator; not on a model, imported as `from odoo.addons.custom_core.controllers.secure_endpoint import secure_endpoint`.
 

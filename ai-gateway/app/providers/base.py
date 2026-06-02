@@ -23,6 +23,9 @@ class ChatRequest:
     temperature: float = 0.7
     quality: Literal["fast", "high"] = "fast"
     cache_system: bool = True
+    # Request a constrained output format. Currently only "json" is honoured
+    # (Ollama's native JSON mode). Providers that don't support it ignore it.
+    format: Literal["json"] | None = None
 
 
 @dataclass(slots=True)

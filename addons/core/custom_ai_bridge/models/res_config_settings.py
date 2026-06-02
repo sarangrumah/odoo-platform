@@ -76,8 +76,8 @@ class ResConfigSettings(models.TransientModel):
         string="Ollama Model",
         config_parameter="custom_ai.ollama_model",
         help="Nama model Ollama (mis. 'qwen2.5:7b', 'llama3.1:8b'). "
-             "Pastikan sudah di-pull di container Ollama. "
-             "Untuk workflow JSON-structured (anomaly, classify), gunakan model >= 7B.",
+        "Pastikan sudah di-pull di container Ollama. "
+        "Untuk workflow JSON-structured (anomaly, classify), gunakan model >= 7B.",
     )
     custom_ai_provider_tradeoff_html = fields.Html(
         string="Provider Tradeoff",
@@ -89,6 +89,4 @@ class ResConfigSettings(models.TransientModel):
     def _compute_custom_ai_provider_tradeoff_html(self):
         for rec in self:
             key = rec.custom_ai_provider_override or ""
-            rec.custom_ai_provider_tradeoff_html = PROVIDER_TRADEOFF_HTML.get(
-                key, PROVIDER_TRADEOFF_HTML[""]
-            )
+            rec.custom_ai_provider_tradeoff_html = PROVIDER_TRADEOFF_HTML.get(key, PROVIDER_TRADEOFF_HTML[""])
