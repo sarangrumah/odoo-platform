@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FadeIn } from "@/components/motion/FadeIn";
 import { FeaturedGrid } from "@/components/product/FeaturedGrid";
+import { CategoryTiles } from "@/components/home/CategoryTiles";
 import { HeroCanvas } from "@/components/three/HeroCanvas";
 import { Newsletter } from "@/components/home/Newsletter";
 import { fetchContent, imageUrl } from "@/lib/client";
@@ -96,6 +97,27 @@ export function HomeSections() {
         </div>
       </section>
 
+      {/* Featured products — front-loaded so the catalog leads the page */}
+      <section className="mx-auto max-w-7xl px-6 pb-6 pt-16">
+        <FadeIn>
+          <div className="mb-10 flex items-end justify-between">
+            <h2 className="font-editorial text-3xl md:text-4xl">{featured.headline || t("home.newIn")}</h2>
+            <Link href={featured.cta_url || "/products?sort=newest"} className="text-xs uppercase tracking-[0.2em] text-accent">
+              {featured.cta_label || t("home.viewAll")}
+            </Link>
+          </div>
+        </FadeIn>
+        <FeaturedGrid limit={8} sort="newest" />
+      </section>
+
+      {/* Shop by category — product-led entry points into the PLP */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <FadeIn>
+          <h2 className="mb-10 font-editorial text-3xl md:text-4xl">{t("home.shopByCategory")}</h2>
+        </FadeIn>
+        <CategoryTiles />
+      </section>
+
       {/* Editorial split — CMS image + copy */}
       <EditorialSplit block={editorial} />
 
@@ -126,19 +148,6 @@ export function HomeSections() {
           </FadeIn>
         </section>
       )}
-
-      {/* Featured grid (products from Odoo) with CMS heading */}
-      <section className="mx-auto max-w-7xl px-6 pb-10 pt-16">
-        <FadeIn>
-          <div className="mb-10 flex items-end justify-between">
-            <h2 className="font-editorial text-3xl">{featured.headline}</h2>
-            <Link href={featured.cta_url || "/products"} className="text-xs uppercase tracking-[0.2em] text-accent">
-              {featured.cta_label || "View all"}
-            </Link>
-          </div>
-        </FadeIn>
-        <FeaturedGrid />
-      </section>
 
       {/* Collections trio — CMS image tiles */}
       {collections.length > 0 && (

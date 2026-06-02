@@ -1,12 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Instagram, Music2, Facebook, MessageCircle } from "lucide-react";
 import { fetchContent } from "@/lib/client";
 import { useLocale } from "@/store/locale-store";
 import type { ContentBlock } from "@/lib/types";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "Gentle Woman";
+const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "Gentlewoman";
+
+const QUICK_LINKS: { title: string; links: { label: string; href: string }[] }[] = [
+  {
+    title: "Shop",
+    links: [
+      { label: "New Arrivals", href: "/products?sort=newest" },
+      { label: "Shop All", href: "/products" },
+      { label: "Stores", href: "/stores" },
+    ],
+  },
+  {
+    title: "Client Care",
+    links: [
+      { label: "My Orders", href: "/account/orders" },
+      { label: "Wishlist", href: "/account/wishlist" },
+      { label: "Affiliate", href: "/account/affiliate" },
+    ],
+  },
+];
 const DEFAULT_TAGLINE =
   "Considered essentials, made to last. Powered by Odoo commerce, delivered through a headless Next.js storefront.";
 
@@ -48,22 +68,20 @@ export function Footer() {
             ))}
           </div>
         </div>
-        <div className="text-sm">
-          <p className="eyebrow mb-4">Shop</p>
-          <ul className="space-y-2 text-ink/70">
-            <li>New Arrivals</li>
-            <li>Ready to Wear</li>
-            <li>Accessories</li>
-          </ul>
-        </div>
-        <div className="text-sm">
-          <p className="eyebrow mb-4">Client Care</p>
-          <ul className="space-y-2 text-ink/70">
-            <li>Shipping &amp; Returns</li>
-            <li>Track Order</li>
-            <li>Contact</li>
-          </ul>
-        </div>
+        {QUICK_LINKS.map((col) => (
+          <div key={col.title} className="text-sm">
+            <p className="eyebrow mb-4">{col.title}</p>
+            <ul className="space-y-2 text-ink/70">
+              {col.links.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="transition-colors hover:text-accent">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
       <div className="border-t border-ink/10 px-6 py-6 text-center text-[11px] uppercase tracking-[0.2em] text-ink/40">
         © {SITE} — demo storefront

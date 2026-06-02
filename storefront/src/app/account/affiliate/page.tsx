@@ -10,7 +10,7 @@ import type { AffiliateDashboard, AffiliateLink } from "@/lib/types";
 
 function ShareRow({ url, label }: { url: string; label: string }) {
   const [copied, setCopied] = useState(false);
-  const text = encodeURIComponent(`${label} — Gentle Woman`);
+  const text = encodeURIComponent(`${label} — Gentlewoman`);
   const u = encodeURIComponent(url);
   const targets = [
     { key: "WhatsApp", href: `https://wa.me/?text=${text}%20${u}` },
@@ -102,7 +102,7 @@ export default function AffiliatePage() {
       <div className="mx-auto max-w-md px-6 py-24 text-center">
         <h1 className="mb-4 font-editorial text-4xl">Jadi Affiliate</h1>
         <p className="mb-8 text-sm text-ink/60">
-          Bagikan produk Gentle Woman dan dapatkan komisi dari setiap pembelian melalui tautan Anda.
+          Bagikan produk Gentlewoman dan dapatkan komisi dari setiap pembelian melalui tautan Anda.
         </p>
         <button onClick={apply} disabled={busy}
           className="inline-block bg-ink px-10 py-4 text-xs uppercase tracking-[0.2em] text-bone hover:opacity-90 disabled:opacity-50">

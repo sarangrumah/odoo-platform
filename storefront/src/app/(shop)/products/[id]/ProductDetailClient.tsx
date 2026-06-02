@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { Heart, MapPin, Share2 } from "lucide-react";
+import { Expand, Heart, MapPin, Ruler, Share2 } from "lucide-react";
 import { fetchProduct, fetchAvailability, imageUrl } from "@/lib/client";
 import { formatPrice } from "@/lib/format";
 import { safeHtml } from "@/lib/sanitize";
@@ -12,6 +12,8 @@ import { useCart } from "@/store/cart-store";
 import { useAuth } from "@/store/auth-store";
 import { useWishlist } from "@/store/wishlist-store";
 import { useLocale } from "@/store/locale-store";
+import { ImageLightbox } from "@/components/product/ImageLightbox";
+import { SizeGuide } from "@/components/product/SizeGuide";
 import type { Product, StoreAvailability } from "@/lib/types";
 
 const ProductViewer = dynamic(() => import("@/components/three/ProductViewer"), { ssr: false });
@@ -23,6 +25,9 @@ export default function ProductDetailClient() {
   const [availability, setAvailability] = useState<StoreAvailability[]>([]);
   const [active, setActive] = useState(0);
   const [view3d, setView3d] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const add = useCart((s) => s.add);
   const customer = useAuth((s) => s.customer);
@@ -32,6 +37,8 @@ export default function ProductDetailClient() {
   const t = useLocale((s) => s.t);
 
   useEffect(() => {
+    setSelectedVariant(null);
+    setActive(0);
     fetchProduct(id).then(setProduct).catch(() => setProduct(null));
     fetchAvailability(id).then(setAvailability).catch(() => setAvailability([]));
   }, [id, locale]);
@@ -56,17 +63,29 @@ export default function ProductDetailClient() {
 
   const gallery = product.images?.length ? product.images : [product.image];
   const wished = wishedIds.includes(product.id);
+  const sizes = product.variants && product.variants.length > 1 ? product.variants : [];
+  const hasSizes = sizes.length > 0;
+  const chosen = hasSizes ? sizes.find((v) => v.id === selectedVariant) ?? null : null;
+  // What "Add to cart" acts on: the chosen size variant, else the product itself.
+  const buyable = hasSizes ? !!chosen && chosen.in_stock : product.in_stock;
 
   async function handleAdd() {
     if (!customer) return router.push("/account/login");
+    if (hasSizes && !chosen) return; // must pick a size first
     setBusy(true);
     try {
-      await add(product!.id, 1);
+      await add(hasSizes ? chosen!.id : product!.id, 1);
     } catch {
       router.push("/account/login");
     } finally {
       setBusy(false);
     }
+  }
+
+  function addLabel() {
+    if (hasSizes && !chosen) return t("pdp.selectSize");
+    if (!buyable) return t("pdp.soldOut");
+    return busy ? t("pdp.adding") : t("pdp.addToCart");
   }
 
   async function handleWishlist() {
@@ -79,10 +98,10 @@ export default function ProductDetailClient() {
   }
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-12 px-6 py-10 md:grid-cols-2">
+    <div className="mx-auto grid max-w-[1440px] gap-10 px-6 py-10 md:grid-cols-[1.4fr_1fr] md:items-start lg:gap-16">
       {/* Gallery / 3D */}
       <div>
-        <div className="relative aspect-[3/4] overflow-hidden bg-sand">
+        <div className="group relative aspect-[3/4] overflow-hidden bg-sand">
           {view3d ? (
             <ProductViewer image={imageUrl(gallery[active])} />
           ) : (
@@ -91,11 +110,21 @@ export default function ProductDetailClient() {
               key={active}
               src={imageUrl(gallery[active])}
               alt={product.name}
-              className="h-full w-full object-cover"
+              onClick={() => setLightbox(true)}
+              className="h-full w-full cursor-zoom-in object-cover"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
             />
+          )}
+          {!view3d && (
+            <button
+              onClick={() => setLightbox(true)}
+              aria-label={t("pdp.zoom")}
+              className="absolute left-4 top-4 flex items-center gap-2 bg-bone/80 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-ink opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              <Expand className="h-3.5 w-3.5" strokeWidth={1.5} /> {t("pdp.zoom")}
+            </button>
           )}
           <button
             onClick={() => setView3d((v) => !v)}
@@ -105,12 +134,15 @@ export default function ProductDetailClient() {
           </button>
         </div>
         {!view3d && gallery.length > 1 && (
-          <div className="mt-4 flex gap-3">
+          <div className="mt-4 grid grid-cols-5 gap-3">
             {gallery.map((g, i) => (
               <button
                 key={i}
                 onClick={() => setActive(i)}
-                className={`h-20 w-16 overflow-hidden bg-sand ${i === active ? "ring-1 ring-ink" : ""}`}
+                onDoubleClick={() => setLightbox(true)}
+                className={`aspect-[3/4] overflow-hidden bg-sand transition-opacity hover:opacity-90 ${
+                  i === active ? "ring-1 ring-ink ring-offset-2 ring-offset-bone" : "opacity-70"
+                }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={imageUrl(g)} alt="" className="h-full w-full object-cover" />
@@ -120,8 +152,17 @@ export default function ProductDetailClient() {
         )}
       </div>
 
+      <ImageLightbox
+        images={gallery}
+        index={active}
+        open={lightbox}
+        alt={product.name}
+        onClose={() => setLightbox(false)}
+        onIndexChange={setActive}
+      />
+
       {/* Detail */}
-      <div className="md:pt-8">
+      <div className="md:sticky md:top-28 md:self-start md:pt-4">
         <p className="eyebrow mb-4">
           {product.categories.map((c) => c.name).join(" / ") || "Ready to Wear"}
         </p>
@@ -177,12 +218,49 @@ export default function ProductDetailClient() {
           </div>
         )}
 
+        {/* Size selector — pick a size before adding to cart */}
+        {hasSizes && (
+          <div className="mt-8">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="eyebrow">{t("pdp.selectSize")}</p>
+              <button
+                onClick={() => setSizeGuideOpen(true)}
+                className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-ink/50 underline-offset-4 hover:text-accent hover:underline"
+              >
+                <Ruler className="h-3.5 w-3.5" strokeWidth={1.5} /> {t("pdp.sizeGuide")}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {sizes.map((v) => {
+                const label = v.attributes.map((a) => a.value).join(" · ") || `#${v.id}`;
+                const isSel = v.id === selectedVariant;
+                return (
+                  <button
+                    key={v.id}
+                    onClick={() => setSelectedVariant(v.id)}
+                    title={v.in_stock ? formatPrice(v.price, product.currency) : t("pdp.soldOut")}
+                    className={`min-w-[3.25rem] border px-4 py-2.5 text-center text-sm transition-colors ${
+                      isSel
+                        ? "border-ink bg-ink text-bone"
+                        : v.in_stock
+                          ? "border-ink/30 text-ink hover:border-ink"
+                          : "border-ink/10 text-ink/30 line-through"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <button
           onClick={handleAdd}
-          disabled={busy || !product.in_stock}
+          disabled={busy || !buyable}
           className="mt-10 w-full bg-ink py-5 text-xs uppercase tracking-[0.25em] text-bone transition-opacity hover:opacity-90 disabled:opacity-40"
         >
-          {!product.in_stock ? t("pdp.soldOut") : busy ? t("pdp.adding") : t("pdp.addToCart")}
+          {addLabel()}
         </button>
 
         <button
@@ -214,7 +292,7 @@ export default function ProductDetailClient() {
               {availability.map((s) => (
                 <li key={s.store_id} className="flex items-center justify-between gap-3">
                   <span className="text-ink/70">
-                    {s.store_name.replace(/^Gentle Woman — /, "")}
+                    {s.store_name.replace(/^Gentle\s?woman\s*—\s*/i, "")}
                     <span className="text-ink/40"> · {s.city}</span>
                   </span>
                   <span
@@ -235,35 +313,9 @@ export default function ProductDetailClient() {
           </div>
         )}
 
-        {product.variants && product.variants.length > 1 && (
-          <div className="mt-8">
-            <p className="eyebrow mb-3">{t("pdp.size")}</p>
-            <div className="flex flex-wrap gap-2">
-              {product.variants.map((v) => {
-                const label =
-                  v.attributes.map((a) => a.value).join(" · ") || `#${v.id}`;
-                return (
-                  <span
-                    key={v.id}
-                    title={
-                      v.in_stock
-                        ? formatPrice(v.price, product.currency)
-                        : "Sold out"
-                    }
-                    className={`min-w-[3rem] border px-4 py-2 text-center text-sm ${
-                      v.in_stock
-                        ? "border-ink/30 text-ink"
-                        : "border-ink/10 text-ink/30 line-through"
-                    }`}
-                  >
-                    {label}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
+
+      <SizeGuide open={sizeGuideOpen} onClose={() => setSizeGuideOpen(false)} />
     </div>
   );
 }

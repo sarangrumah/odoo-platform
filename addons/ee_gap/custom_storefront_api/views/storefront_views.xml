@@ -74,7 +74,53 @@
         <field name="view_mode">list</field>
     </record>
 
+    <!-- ===== Stores (physical store locator, projection of stock.warehouse) ===== -->
+    <record id="view_storefront_store_list" model="ir.ui.view">
+        <field name="name">stock.warehouse.list.storefront</field>
+        <field name="model">stock.warehouse</field>
+        <field name="arch" type="xml">
+            <list string="Stores" editable="bottom">
+                <field name="custom_storefront_published" widget="boolean_toggle" string="Published"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="partner_id" string="Address"/>
+                <field name="custom_store_hours" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_storefront_store_search" model="ir.ui.view">
+        <field name="name">stock.warehouse.search.storefront</field>
+        <field name="model">stock.warehouse</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="code"/>
+                <filter name="published" string="Published in Storefront"
+                        domain="[('custom_storefront_published', '=', True)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_storefront_stores" model="ir.actions.act_window">
+        <field name="name">Stores</field>
+        <field name="res_model">stock.warehouse</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_storefront_store_list"/>
+        <field name="search_view_id" ref="view_storefront_store_search"/>
+        <field name="context">{'search_default_published': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Publish a warehouse as a storefront store</p>
+            <p>Stores shown on the headless storefront's store locator and in-store
+               availability are warehouses with <b>Show in Storefront</b> enabled.
+               Toggle <b>Published</b> here, then open a store to set its address,
+               geo-coordinates, opening hours and photo.</p>
+        </field>
+    </record>
+
     <menuitem id="menu_storefront_root" name="Storefront" sequence="96"/>
+    <menuitem id="menu_storefront_stores" name="Stores"
+              parent="menu_storefront_root" action="action_storefront_stores" sequence="5"/>
     <menuitem id="menu_storefront_content" name="Site Content"
               parent="menu_storefront_root" action="action_storefront_content" sequence="10"/>
     <menuitem id="menu_storefront_subscriber" name="Newsletter Subscribers"
@@ -122,6 +168,20 @@
                     <field name="custom_drop_date"/>
                     <field name="custom_is_new" readonly="1"/>
                 </div>
+                <!-- Storefront merchandising: surface the eCommerce category &
+                     tag fields directly on the Sales product form. On a headless
+                     tenant the Website app/editor is hidden, so the native
+                     website_sale "eCommerce" tab that normally hosts these is out
+                     of reach — these drive the storefront PLP facets, category
+                     breadcrumbs and the product-detail tag chips. -->
+                <field name="public_categ_ids" widget="many2many_tags"
+                       string="Storefront Categories"
+                       options="{'no_quick_create': False}"
+                       placeholder="Ready to Wear, Accessories…"/>
+                <field name="product_tag_ids" widget="many2many_tags"
+                       string="Storefront Tags"
+                       options="{'color_field': 'color', 'no_quick_create': False}"
+                       placeholder="New Arrival, Bestseller, Sustainable…"/>
             </xpath>
         </field>
     </record>

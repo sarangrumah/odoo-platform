@@ -18,6 +18,12 @@ _logger = logging.getLogger(__name__)
 _MAX_LIMIT = 60
 _DEFAULT_LIMIT = 24
 
+# A product reaches the storefront only when it is BOTH sellable (`sale_ok`)
+# and Published (`is_published`, the standard website_sale visibility toggle).
+# Honouring `is_published` lets merchandisers hide a product from the headless
+# storefront straight from the product form, exactly like Odoo's own website.
+_PUBLISHED_DOMAIN = [("sale_ok", "=", True), ("is_published", "=", True)]
+
 # Storefront locale (?lang=id|en) → Odoo language code for translatable fields.
 _LANG_MAP = {"id": "id_ID", "en": "en_US"}
 
@@ -65,7 +71,7 @@ class StorefrontPublicController(http.Controller):
         save_session=False,
     )
     def products(self, **kw):
-        domain = [("sale_ok", "=", True)]
+        domain = list(_PUBLISHED_DOMAIN)
         category = kw.get("category")
         if category:
             try:
@@ -139,8 +145,8 @@ class StorefrontPublicController(http.Controller):
         save_session=False,
     )
     def tags(self, **kw):
-        """Tags actually used on sellable products — drives PLP facet filtering."""
-        products = self._model("product.template", kw).search([("sale_ok", "=", True)])
+        """Tags actually used on published products — drives PLP facet filtering."""
+        products = self._model("product.template", kw).search(_PUBLISHED_DOMAIN)
         used = products.product_tag_ids if "product_tag_ids" in products._fields else products.browse()
         data = [{"id": t.id, "name": t.name} for t in used.sorted("name")]
         return ok(data)
@@ -155,7 +161,7 @@ class StorefrontPublicController(http.Controller):
     )
     def product_detail(self, product_id, **kw):
         product = self._model("product.template", kw).browse(product_id)
-        if not product.exists() or not product.sale_ok:
+        if not product.exists() or not product.sale_ok or not product.is_published:
             return err("NOT_FOUND", "Product not found", status=404)
         pricelist = product._storefront_pricelist()
         return ok(product._storefront_serialize(detail=True, pricelist=pricelist))
@@ -171,7 +177,7 @@ class StorefrontPublicController(http.Controller):
     def product_availability(self, product_id, **kw):
         """In-store stock per published store (spec F11)."""
         product = request.env["product.template"].sudo().browse(product_id)
-        if not product.exists() or not product.sale_ok:
+        if not product.exists() or not product.sale_ok or not product.is_published:
             return err("NOT_FOUND", "Product not found", status=404)
         return ok(product._storefront_store_availability())
 

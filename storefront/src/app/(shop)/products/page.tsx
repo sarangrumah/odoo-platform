@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { X } from "lucide-react";
 import { ProductCard } from "@/components/product/ProductCard";
 import { fetchProducts, fetchCategories, fetchTags, fetchContent, imageUrl } from "@/lib/client";
 import { useLocale } from "@/store/locale-store";
@@ -14,7 +16,12 @@ const SORTS = [
   { key: "name", label: "A–Z" },
 ];
 
-export default function ProductsPage() {
+function ProductsPageInner() {
+  const router = useRouter();
+  // `q` is driven by the URL (set by the header search overlay) so re-searching
+  // while already on this page reactively reloads the grid.
+  const searchParams = useSearchParams();
+  const query = searchParams.get("q") ?? "";
   const [items, setItems] = useState<Product[]>([]);
   const [cats, setCats] = useState<ProductCategory[]>([]);
   const [page, setPage] = useState(1);
@@ -77,6 +84,7 @@ export default function ProductsPage() {
       try {
         const p = reset ? 1 : page;
         const params: Record<string, string | number> = { page: p, limit: 12, sort };
+        if (query) params.q = query;
         if (category) params.category = category;
         if (selectedTags.length) params.tag = selectedTags.join(",");
         if (priceMin) params.price_min = priceMin;
@@ -90,13 +98,13 @@ export default function ProductsPage() {
         setLoading(false);
       }
     },
-    [page, sort, category, selectedTags, priceMin, priceMax, locale],
+    [page, sort, query, category, selectedTags, priceMin, priceMax, locale],
   );
 
   useEffect(() => {
     load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sort, category, selectedTags, priceMin, priceMax, locale]);
+  }, [sort, query, category, selectedTags, priceMin, priceMax, locale]);
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
@@ -119,6 +127,19 @@ export default function ProductsPage() {
               </Link>
             )}
           </div>
+        </div>
+      )}
+
+      {query && (
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <span className="text-sm text-ink/50">{t("plp.resultsFor")}</span>
+          <span className="font-editorial text-2xl">“{query}”</span>
+          <button
+            onClick={() => router.push("/products")}
+            className="flex items-center gap-1 text-[11px] uppercase tracking-[0.16em] text-ink/40 underline hover:text-accent"
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={1.6} /> {t("plp.clearSearch")}
+          </button>
         </div>
       )}
 
@@ -242,5 +263,14 @@ export default function ProductsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  // useSearchParams() requires a Suspense boundary at the route level.
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-7xl px-6 py-20 text-center text-ink/40" />}>
+      <ProductsPageInner />
+    </Suspense>
   );
 }

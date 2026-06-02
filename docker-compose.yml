@@ -184,6 +184,10 @@ services:
       OPENAI_MODEL_DEFAULT: ${OPENAI_MODEL_DEFAULT:-gpt-4o}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OLLAMA_MODEL_DEFAULT: ${OLLAMA_MODEL_DEFAULT:-llama3.2}
+      OLLAMA_MODEL_QUALITY: ${OLLAMA_MODEL_QUALITY:-qwen2.5:7b}
+      # Personal shopper (retrieval-controlled, runs on local Ollama)
+      AI_MODEL_SHOPPER: ${AI_MODEL_SHOPPER:-qwen2.5:7b}
+      ODOO_STOREFRONT_URL: ${ODOO_STOREFRONT_URL:-http://odoo:8069}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -423,9 +427,13 @@ services:
       ODOO_TENANT_DB: ${STOREFRONT_TENANT_DB:-gentle_woman}
       ODOO_TENANT_HOST: ${STOREFRONT_TENANT_HOST:-gentle_woman.platform.localhost}
       STOREFRONT_HMAC_SECRET: ${STOREFRONT_HMAC_SECRET}
+      # AI personal shopper BFF → ai-gateway (HMAC-signed; secret stays server-side)
+      AI_GATEWAY_URL: ${AI_GATEWAY_URL:-http://ai-gateway:8080}
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
       NEXT_PUBLIC_ODOO_PUBLIC_URL: ${STOREFRONT_PUBLIC_ODOO_URL:-https://gentle_woman.platform.localhost}
-      NEXT_PUBLIC_SITE_NAME: ${STOREFRONT_SITE_NAME:-Gentle Woman}
+      NEXT_PUBLIC_SITE_NAME: ${STOREFRONT_SITE_NAME:-Gentlewoman}
       NEXT_PUBLIC_CURRENCY: ${STOREFRONT_CURRENCY:-IDR}
+      NEXT_PUBLIC_SOCIAL_WHATSAPP: ${STOREFRONT_SOCIAL_WHATSAPP:-}
     ports:
       - "${STOREFRONT_PORT:-18100}:8080"
     healthcheck:

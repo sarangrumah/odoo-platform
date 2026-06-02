@@ -9,8 +9,9 @@ import { CookieConsent } from "@/components/layout/CookieConsent";
 import { AffiliateCapture } from "@/components/AffiliateCapture";
 import { LocaleSync } from "@/components/LocaleSync";
 import { StoreHydrator } from "@/components/StoreHydrator";
+import { ShopperWidget } from "@/components/shopper";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "Gentle Woman";
+const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "Gentlewoman";
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://192.168.3.140:8443").replace(/\/$/, "");
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <MainShell>{children}</MainShell>
         <Footer />
         <CookieConsent />
+        <ShopperWidget />
         <AffiliateCapture />
         <LocaleSync />
         <StoreHydrator />

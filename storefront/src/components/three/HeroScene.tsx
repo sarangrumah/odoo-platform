@@ -42,7 +42,7 @@ function makeWeaveBump(): THREE.CanvasTexture {
 }
 
 /**
- * Editorial hero accent for Gentle Woman — a long, wide length of silk strung
+ * Editorial hero accent for Gentlewoman — a long, wide length of silk strung
  * horizontally that ripples like fabric caught in the wind. Travelling sine
  * waves run along X (amplitude eased toward the free right edge) with a gentle
  * vertical sway, woven micro-texture (bump) and feathered soft ends, finished

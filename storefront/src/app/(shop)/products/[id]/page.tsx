@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { getProductServer } from "@/lib/odoo";
 import ProductDetailClient from "./ProductDetailClient";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "Gentle Woman";
+const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "Gentlewoman";
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://192.168.3.140:8443").replace(/\/$/, "");
 
 /**

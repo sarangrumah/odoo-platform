@@ -1,18 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { Heart, ShoppingBag, User } from "lucide-react";
+import { Heart, Search, ShoppingBag, User } from "lucide-react";
 import { useCart } from "@/store/cart-store";
 import { useAuth } from "@/store/auth-store";
 import { useWishlist } from "@/store/wishlist-store";
 import { useLocale } from "@/store/locale-store";
 import { useUI } from "@/store/ui-store";
 import { LOCALES } from "@/lib/i18n";
+import { SearchOverlay } from "./SearchOverlay";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "Gentle Woman";
+const SITE = process.env.NEXT_PUBLIC_SITE_NAME || "Gentlewoman";
 
 export function Header() {
   const { scrollY } = useScroll();
@@ -29,6 +30,7 @@ export function Header() {
   const t = useLocale((s) => s.t);
   const announcement = useUI((s) => s.announcement);
   const router = useRouter();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   function switchLocale(l: (typeof LOCALES)[number]) {
     setLocale(l); // snappy UI; LocaleSync re-affirms from the URL
@@ -72,6 +74,9 @@ export function Header() {
         </Link>
 
         <div className="flex items-center gap-6">
+          <button onClick={() => setSearchOpen(true)} aria-label={t("nav.search")} className="hover:text-accent transition-colors">
+            <Search className="h-5 w-5" strokeWidth={1.4} />
+          </button>
           <div className="flex items-center gap-1 text-[11px] uppercase tracking-[0.16em]">
             {LOCALES.map((l, i) => (
               <span key={l} className="flex items-center">
@@ -107,6 +112,7 @@ export function Header() {
           </button>
         </div>
       </nav>
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
     </motion.header>
   );
 }

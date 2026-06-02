@@ -29,12 +29,18 @@ class OllamaProvider(LLMProvider):
             messages.append({"role": "system", "content": req.system})
         messages.extend({"role": m.role, "content": m.content} for m in req.messages)
 
-        body = {
+        body: dict = {
             "model": model,
             "messages": messages,
             "stream": False,
             "options": {"temperature": req.temperature, "num_predict": req.max_tokens},
         }
+        # Native JSON mode — Ollama constrains the decoder to emit valid JSON.
+        # The shopper's intent-extraction step relies on this for a parseable
+        # response from a small local model. (tool-calling is intentionally NOT
+        # used; the shopper does retrieval in code, see app/shopper/.)
+        if req.format == "json":
+            body["format"] = "json"
         r = await self._client.post(f"{self._base_url}/api/chat", json=body)
         r.raise_for_status()
         data = r.json()

@@ -216,3 +216,18 @@ export interface PaymentProofInput {
   image?: string;
   filename?: string;
 }
+
+export interface ShopperMessage {
+  role: "user" | "assistant";
+  content: string;
+  products?: Product[];
+}
+
+export interface ShopperResponse {
+  reply: string;
+  products: Product[];
+  product_ids: number[];
+  clarify: boolean;
+  escalate: boolean;
+  no_results: boolean;
+}

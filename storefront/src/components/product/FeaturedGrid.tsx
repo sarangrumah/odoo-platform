@@ -5,15 +5,25 @@ import { ProductCard } from "./ProductCard";
 import { fetchProducts } from "@/lib/client";
 import type { Product } from "@/lib/types";
 
-export function FeaturedGrid() {
+export function FeaturedGrid({
+  limit = 8,
+  sort = "newest",
+  category,
+}: {
+  limit?: number;
+  sort?: string;
+  category?: number | string;
+} = {}) {
   const [items, setItems] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProducts({ limit: 8, sort: "newest" })
+    const params: Record<string, string | number> = { limit, sort };
+    if (category) params.category = category;
+    fetchProducts(params)
       .then((page) => setItems(page.items))
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [limit, sort, category]);
 
   if (error) {
     return <p className="py-10 text-center text-sm text-ink/40">Catalog unavailable. {error}</p>;

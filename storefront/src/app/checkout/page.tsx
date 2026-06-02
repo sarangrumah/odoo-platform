@@ -521,7 +521,7 @@ export default function CheckoutPage() {
                         onChange={() => choosePickupStore(s.id)}
                       />
                       <span>
-                        <span className="block">{s.name.replace(/^Gentle Woman — /, "")}</span>
+                        <span className="block">{s.name.replace(/^Gentle\s?woman\s*—\s*/i, "")}</span>
                         <span className="block text-xs text-ink/50">{s.address}</span>
                       </span>
                     </label>
