@@ -128,7 +128,7 @@ _SEED_PACK_MODULES = {
 
 class CustomHubIndustryPack(models.Model):
     # access defined in security/ir.model.access.csv (viewer/csm/admin/super)
-    _name = "custom.hub.industry.pack"  # nosemgrep: odoo-missing-access-csv
+    _name = "custom.hub.industry.pack"  # nosemgrep
     _description = "Industry Pack (curated module bundle)"
     _order = "sequence, name"
     _rec_name = "name"
