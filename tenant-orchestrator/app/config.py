@@ -54,6 +54,15 @@ class Settings(BaseSettings):
     log_level: str = "info"
     enable_backup_scheduler: bool = True
 
+    # ---- Alerting (WhatsApp via baileys sidecar) ----
+    # Best-effort failure alerts. When enabled, run_backup failures POST a
+    # text message to the baileys sidecar. Send errors are logged, never raised.
+    alert_whatsapp_enabled: bool = False
+    baileys_url: str = "http://baileys:8088"
+    baileys_shared_secret: str = ""
+    alert_whatsapp_session: str = "acct-2"
+    alert_whatsapp_to: str = ""  # recipient MSISDN, digits only (e.g. 62812...)
+
 
 _settings: Settings | None = None
 

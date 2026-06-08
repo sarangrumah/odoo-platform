@@ -13,7 +13,7 @@ import boto3
 import structlog
 from botocore.client import Config as BotoConfig
 
-from . import dbops, registry
+from . import dbops, notify, registry
 from .config import get_settings
 from .validators import assert_valid_slug
 
@@ -209,6 +209,7 @@ def run_backup(slug: str, kind: str = "manual", actor: str = "system") -> dict:
         log.exception("backup.failed", slug=slug)
         registry.record_backup_failed(bid, str(e))
         registry.log_action(slug, "backup", actor, {"kind": kind}, "failure", error=str(e))
+        notify.send_backup_failure_alert(slug, kind, str(e))
         raise
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

@@ -218,6 +218,8 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS:-platform-backups}
       MINIO_BROWSER_REDIRECT_URL: http://localhost:${MINIO_CONSOLE_PORT:-19001}
+      # Enables SSE-S3 (AES256) requested by the orchestrator backup uploads.
+      MINIO_KMS_SECRET_KEY: ${MINIO_KMS_SECRET_KEY}
     command:
       - "server"
       - "/data"
@@ -292,6 +294,12 @@ services:
       # --- Operational ---
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENABLE_BACKUP_SCHEDULER: ${ENABLE_BACKUP_SCHEDULER:-true}
+      # --- Alerting: WhatsApp via baileys on backup failure ---
+      ALERT_WHATSAPP_ENABLED: ${ALERT_WHATSAPP_ENABLED:-false}
+      BAILEYS_URL: ${BAILEYS_URL:-http://baileys:8088}
+      BAILEYS_SHARED_SECRET: ${BAILEYS_SHARED_SECRET:-}
+      ALERT_WHATSAPP_SESSION: ${ALERT_WHATSAPP_SESSION:-acct-2}
+      ALERT_WHATSAPP_TO: ${ALERT_WHATSAPP_TO:-}
       # --- Demo / UAT friendliness ---
       # When true, SSH-dependent VPS actions return a stub success response
       # instead of attempting a real connection. Leave false in prod.

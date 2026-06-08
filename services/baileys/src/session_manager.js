@@ -188,6 +188,42 @@ export async function startSession({ sessionId, accountId, hmacSecret }) {
   return { status: record.status, phone: record.phone };
 }
 
+// Resume every already-paired session on boot so sends work without a manual
+// /start call. A session is resumable when its creds.json carries a paired
+// account (`me.id`); persisted creds reconnect without a QR scan.
+export async function autoStartPersistedSessions() {
+  let entries;
+  try {
+    entries = await fs.readdir(AUTH_ROOT, { withFileTypes: true });
+  } catch (err) {
+    logger.warn({ err: err.message, dir: AUTH_ROOT }, 'auto-start: cannot read auth root');
+    return;
+  }
+  const hmacSecret = process.env.BAILEYS_SHARED_SECRET || '';
+  for (const ent of entries) {
+    if (!ent.isDirectory()) continue;
+    const sessionId = ent.name;
+    let paired = false;
+    try {
+      const raw = await fs.readFile(path.join(AUTH_ROOT, sessionId, 'creds.json'), 'utf8');
+      paired = !!JSON.parse(raw)?.me?.id;
+    } catch {
+      continue; // no/invalid creds.json -> nothing to resume
+    }
+    if (!paired) continue;
+    // Convention: session id "acct-<n>" carries account id <n>, used for
+    // inbound-message webhook routing back to Odoo.
+    const m = sessionId.match(/^acct-(\d+)$/);
+    const accountId = m ? Number(m[1]) : undefined;
+    try {
+      const out = await startSession({ sessionId, accountId, hmacSecret });
+      logger.info({ sessionId, accountId, status: out.status }, 'auto-started persisted session');
+    } catch (err) {
+      logger.error({ sessionId, err: err.message }, 'auto-start failed');
+    }
+  }
+}
+
 export async function logoutSession(sessionId) {
   const record = sessions.get(sessionId);
   if (record?.sock) {

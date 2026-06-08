@@ -3,6 +3,7 @@ import { logger } from './logger.js';
 import { requireBearer } from './auth.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { messagesRouter } from './routes/messages.js';
+import { autoStartPersistedSessions } from './session_manager.js';
 
 const PORT = Number(process.env.PORT || 8088);
 
@@ -21,4 +22,5 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, 'baileys sidecar listening');
+  void autoStartPersistedSessions();
 });
