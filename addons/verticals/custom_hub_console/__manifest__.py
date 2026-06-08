@@ -59,6 +59,7 @@ tenant containing only ``custom_core`` + ``custom_super_admin`` +
         "views/hub_dashboard_action.xml",
         # wizards
         "wizards/deploy_module_wizard_views.xml",
+        "wizards/tenant_provision_wizard_views.xml",
         # menus (must come AFTER actions they reference)
         "views/menu_views.xml",
         # genesis audit event — runs last so create() can compute hash

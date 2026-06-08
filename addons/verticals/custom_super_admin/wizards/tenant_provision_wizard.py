@@ -33,12 +33,6 @@ class TenantProvisionWizard(models.TransientModel):
     backup_schedule_cron = fields.Char(default="0 2 * * *", help="Standard 5-field cron expression.")
     feature_pajakku = fields.Boolean(string="Enable Pajakku Coretax adapter", default=False)
     feature_marketplace = fields.Boolean(string="Enable marketplace vertical", default=False)
-    pack_id = fields.Many2one(
-        "custom.hub.industry.pack",
-        string="Industry Pack",
-        help="Curated module bundle for a business vertical. Its modules are "
-        "merged into the install set; the orchestrator resolves Odoo deps.",
-    )
     install_modules_extra = fields.Char(
         string="Additional modules",
         help="Comma-separated list of extra module names to install beyond the default set.",
@@ -57,6 +51,12 @@ class TenantProvisionWizard(models.TransientModel):
                     _("Slug must match %s (lowercase letters/digits/underscore, start with a letter, length 2-63).")
                     % SLUG_RE.pattern
                 )
+
+    def _merge_install_modules(self, modules, payload):
+        """Hook for downstream modules to merge extra module sets into the
+        provisioning install list. ``custom_hub_console`` overrides this to add
+        the selected industry pack's modules. Base implementation is a no-op."""
+        return modules
 
     def action_provision(self):
         self.ensure_one()
@@ -89,13 +89,14 @@ class TenantProvisionWizard(models.TransientModel):
             "custom_coretax",
         ]
         modules = list(from_defaults)
-        if self.pack_id:
-            modules += self.pack_id.resolve_module_names()
-            payload["features"]["industry_pack"] = self.pack_id.code
+        # Hook: custom_hub_console merges industry-pack modules here. Kept as a
+        # hook so super_admin carries no dependency on custom_hub_console (which
+        # depends on super_admin — the reverse would break registry load order).
+        modules = self._merge_install_modules(modules, payload)
         extra = (self.install_modules_extra or "").strip()
         if extra:
             modules += [m.strip() for m in extra.split(",") if m.strip()]
-        if self.pack_id or extra:
+        if len(modules) > len(from_defaults):
             # De-dup, order-preserving (defaults first, then pack deps-first, then extras).
             seen = set()
             payload["install_modules"] = [m for m in modules if not (m in seen or seen.add(m))]
