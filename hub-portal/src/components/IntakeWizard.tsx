@@ -4,7 +4,7 @@ import { Badge, Button, Card, Input, Modal, Select, Textarea, Toast } from './ui
 import { colors, radii, spacing, verticals, moduleCatalog } from '../tokens';
 
 type VerticalValue = string;
-import { IntakePayload, submitIntake } from '../api';
+import { IndustryPack, IntakePayload, listPacks, submitIntake } from '../api';
 
 interface Props {
   open: boolean;
@@ -35,6 +35,9 @@ export default function IntakeWizard({ open, onClose, onSuccess }: Props) {
   // Step 3
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [wishDraft, setWishDraft] = useState('');
+
+  // Industry packs (vertical -> curated modules), loaded from Odoo via /api/packs.
+  const [packs, setPacks] = useState<IndustryPack[]>([]);
 
   // Step 4
   const [narrative, setNarrative] = useState('');
@@ -74,6 +77,33 @@ export default function IntakeWizard({ open, onClose, onSuccess }: Props) {
     s.onload = () => setTurnstileReady(true);
     document.head.appendChild(s);
   }, [TURNSTILE_SITE_KEY]);
+
+  // Load industry packs when the wizard opens.
+  useEffect(() => {
+    if (!open) return;
+    listPacks()
+      .then((p) => setPacks(Array.isArray(p) ? p : []))
+      .catch(() => setPacks([]));
+  }, [open]);
+
+  // Pre-check the current vertical's pack modules once packs arrive, but only
+  // when the wishlist is still empty so we never clobber manual edits.
+  useEffect(() => {
+    if (packs.length && wishlist.length === 0) applyPackModules(vertical);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packs]);
+
+  function applyPackModules(code: VerticalValue) {
+    const pack = packs.find((p) => p.code === code);
+    if (pack && pack.module_codes?.length) setWishlist(pack.module_codes);
+  }
+
+  // Selecting a vertical (re)seeds the module wishlist from its pack; the user
+  // can still tick/untick afterwards on the Modules step.
+  function onVerticalChange(code: VerticalValue) {
+    setVertical(code);
+    applyPackModules(code);
+  }
 
   function reset() {
     setStep(0);
@@ -272,7 +302,7 @@ export default function IntakeWizard({ open, onClose, onSuccess }: Props) {
 
         {step === 1 && (
           <Field label="Vertical target *">
-            <Select value={vertical} onChange={(e) => setVertical(e.target.value as VerticalValue)}>
+            <Select value={vertical} onChange={(e) => onVerticalChange(e.target.value as VerticalValue)}>
               {verticals.map((v) => (
                 <option key={v.value} value={v.value}>
                   {v.label}
@@ -280,7 +310,9 @@ export default function IntakeWizard({ open, onClose, onSuccess }: Props) {
               ))}
             </Select>
             <p style={{ color: colors.textMuted, fontSize: 12, marginTop: spacing.sm }}>
-              Choose the primary vertical that best fits the new tenant. Cross-vertical extensions can be enabled later.
+              Choose the primary vertical that best fits the new tenant. Its industry pack pre-selects a
+              curated set of modules on the next step — you can still adjust them. Cross-vertical extensions
+              can be enabled later.
             </p>
           </Field>
         )}

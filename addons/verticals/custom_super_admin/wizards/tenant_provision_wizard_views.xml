@@ -24,6 +24,7 @@
                         </group>
                         <group string="Operations">
                             <field name="backup_schedule_cron"/>
+                            <field name="pack_id" options="{'no_create': True}"/>
                             <field name="install_modules_extra" placeholder="custom_marketplace, custom_field_service"/>
                         </group>
                         <group string="Feature flags">

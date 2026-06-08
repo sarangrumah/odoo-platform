@@ -4,10 +4,10 @@ import { Badge, Button, Card, Input, Modal, Section, Select, Table } from '../..
 import EmptyState from '../../components/EmptyState';
 import ConfigRequiredBanner from '../../components/ConfigRequiredBanner';
 import { colors, spacing } from '../../tokens';
-import { createDeployment, listDeployments, listModuleCatalog, listTenants } from '../../api';
+import { createDeployment, deployPack, listDeployments, listIndustryPacks, listModuleCatalog, listTenants } from '../../api';
 
 const PAGE_SIZE = 20;
-const CATEGORIES = ['core', 'compliance', 'ee_gap', 'operations', 'vertical'];
+const CATEGORIES = ['core', 'compliance', 'ee_gap', 'operations', 'vertical', 'odoo'];
 const MATURITIES = ['scaffold', 'partial', 'production'];
 
 export default function ModuleDeployPage() {
@@ -27,6 +27,16 @@ export default function ModuleDeployPage() {
   const [loaded, setLoaded] = useState(false);
   const [apiError, setApiError] = useState<{ message: string; configRequired: boolean } | null>(null);
 
+  // Industry packs (batch deploy)
+  const [packs, setPacks] = useState<any[]>([]);
+  const [openPack, setOpenPack] = useState<any | null>(null);
+  const [packTenantId, setPackTenantId] = useState('');
+  const [packMode, setPackMode] = useState<'install' | 'upgrade' | 'uninstall'>('install');
+  const [packCanary, setPackCanary] = useState(false);
+  const [packSkip, setPackSkip] = useState(true);
+  const [packSubmitting, setPackSubmitting] = useState(false);
+  const [packError, setPackError] = useState<string | null>(null);
+
   const refreshDeployments = () =>
     listDeployments().then((d) => Array.isArray(d) && setDeployments(d)).catch(() => null);
 
@@ -41,13 +51,18 @@ export default function ModuleDeployPage() {
       }),
       listDeployments().catch(() => null),
       listTenants().catch(() => null),
-    ]).then(([c, d, t]) => {
+      listIndustryPacks().catch(() => null),
+    ]).then(([c, d, t, p]) => {
       if (Array.isArray(c)) setCatalog(c);
       if (Array.isArray(d)) setDeployments(d);
       if (Array.isArray(t)) {
         setTenants(t);
-        if (t.length > 0) setTenantId(String(t[0].id));
+        if (t.length > 0) {
+          setTenantId(String(t[0].id));
+          setPackTenantId(String(t[0].id));
+        }
       }
+      if (Array.isArray(p)) setPacks(p);
       setLoaded(true);
     });
   }, []);
@@ -69,6 +84,21 @@ export default function ModuleDeployPage() {
       setSubmitError(e?.detail || e?.message || String(e));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function runDeployPack() {
+    if (!openPack || !packTenantId) return;
+    setPackSubmitting(true);
+    setPackError(null);
+    try {
+      await deployPack(openPack.id, Number(packTenantId), packMode, packCanary, packSkip);
+      await refreshDeployments();
+      setOpenPack(null);
+    } catch (e: any) {
+      setPackError(e?.detail || e?.message || String(e));
+    } finally {
+      setPackSubmitting(false);
     }
   }
 
@@ -98,6 +128,40 @@ export default function ModuleDeployPage() {
       {apiError?.configRequired && (
         <ConfigRequiredBanner feature="Module deploy" hint={apiError.message} />
       )}
+
+      <Section title="Industry Packs" description="Curated module bundles — deploy a whole business pack to a tenant in one action">
+        {loaded && packs.length === 0 ? (
+          <EmptyState
+            icon={<Package size={48} />}
+            title="No industry packs"
+            description="Seed packs are linked on module install/upgrade. Define or edit packs in Hub → Industry Packs."
+          />
+        ) : (
+          <Table
+            columns={[
+              { key: 'name', label: 'Pack', render: (r) => <strong>{r.icon ? `${r.icon} ` : ''}{r.name}</strong> },
+              { key: 'vertical', label: 'Vertical', render: (r) => <Badge tone="info">{r.vertical || r.code}</Badge> },
+              { key: 'module_count', label: 'Modules' },
+              {
+                key: 'description',
+                label: 'Description',
+                render: (r) => <span style={{ color: colors.textMuted, fontSize: 12 }}>{r.description || '—'}</span>,
+              },
+              {
+                key: 'actions',
+                label: '',
+                render: (r) => (
+                  <Button size="sm" onClick={() => { setOpenPack(r); setPackError(null); }}>
+                    <Rocket size={12} /> Deploy Pack
+                  </Button>
+                ),
+              },
+            ]}
+            data={packs}
+          />
+        )}
+      </Section>
+
       <Section title="Module Catalog" description="Custom modules available for deployment">
         {showCatalogEmpty ? (
           <EmptyState
@@ -225,6 +289,54 @@ export default function ModuleDeployPage() {
             </Button>
             <Button onClick={deploy} disabled={submitting || !tenantId}>
               <Rocket size={14} /> {submitting ? 'Deploying…' : 'Deploy'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!openPack} onClose={() => setOpenPack(null)} title={openPack ? `Deploy Pack: ${openPack.name}` : ''}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+          <div style={{ fontSize: 12, color: colors.textMuted }}>
+            {openPack?.module_count ?? 0} module(s) deployed in dependency order.
+          </div>
+          <label style={{ fontSize: 12, color: colors.textMuted }}>
+            Tenant
+            <Select value={packTenantId} onChange={(e) => setPackTenantId(e.target.value)} style={{ marginTop: 4 }} disabled={tenants.length === 0}>
+              {tenants.length === 0 && <option value="">No tenants registered</option>}
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.display_name || t.slug} ({t.slug})
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label style={{ fontSize: 12, color: colors.textMuted }}>
+            Mode
+            <Select value={packMode} onChange={(e) => setPackMode(e.target.value as any)} style={{ marginTop: 4 }}>
+              <option value="install">install</option>
+              <option value="upgrade">upgrade</option>
+              <option value="uninstall">uninstall</option>
+            </Select>
+          </label>
+          <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={packCanary} onChange={(e) => setPackCanary(e.target.checked)} />
+            Canary rollout per module (10% → 50% → 100%)
+          </label>
+          <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={packSkip} onChange={(e) => setPackSkip(e.target.checked)} />
+            Skip modules already installed
+          </label>
+          {packError && (
+            <div style={{ fontSize: 12, color: '#b91c1c', padding: '8px 12px', background: '#fef2f2', borderRadius: 6 }}>
+              {packError}
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: spacing.sm }}>
+            <Button variant="ghost" onClick={() => setOpenPack(null)} disabled={packSubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={runDeployPack} disabled={packSubmitting || !packTenantId}>
+              <Rocket size={14} /> {packSubmitting ? 'Deploying…' : 'Deploy Pack'}
             </Button>
           </div>
         </div>

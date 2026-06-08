@@ -24,6 +24,10 @@
               parent="menu_hub_root"
               action="action_module_deployment" sequence="21"/>
 
+    <menuitem id="menu_hub_industry_packs" name="Industry Packs"
+              parent="menu_hub_root"
+              action="action_industry_pack" sequence="22"/>
+
     <menuitem id="menu_hub_catalog_rescan" name="Rescan Catalog"
               parent="menu_hub_catalog"
               action="action_rescan_catalog_wizard" sequence="99"

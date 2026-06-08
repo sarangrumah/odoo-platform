@@ -33,6 +33,12 @@ class TenantProvisionWizard(models.TransientModel):
     backup_schedule_cron = fields.Char(default="0 2 * * *", help="Standard 5-field cron expression.")
     feature_pajakku = fields.Boolean(string="Enable Pajakku Coretax adapter", default=False)
     feature_marketplace = fields.Boolean(string="Enable marketplace vertical", default=False)
+    pack_id = fields.Many2one(
+        "custom.hub.industry.pack",
+        string="Industry Pack",
+        help="Curated module bundle for a business vertical. Its modules are "
+        "merged into the install set; the orchestrator resolves Odoo deps.",
+    )
     install_modules_extra = fields.Char(
         string="Additional modules",
         help="Comma-separated list of extra module names to install beyond the default set.",
@@ -67,20 +73,32 @@ class TenantProvisionWizard(models.TransientModel):
             },
             "backup_schedule_cron": self.backup_schedule_cron or None,
         }
+
+        # Default platform module set (mirrors DEFAULT_TENANT_MODULES on the
+        # orchestrator). We only override install_modules when a pack or extra
+        # modules are chosen; otherwise the orchestrator applies its defaults.
+        from_defaults = [
+            "custom_core",
+            "custom_ai_bridge",
+            "custom_pdp_core",
+            "custom_pdp_audit",
+            "custom_pdp_consent",
+            "custom_pdp_dsar",
+            "custom_pdp_masking",
+            "custom_pdp_retention",
+            "custom_coretax",
+        ]
+        modules = list(from_defaults)
+        if self.pack_id:
+            modules += self.pack_id.resolve_module_names()
+            payload["features"]["industry_pack"] = self.pack_id.code
         extra = (self.install_modules_extra or "").strip()
         if extra:
-            from_defaults = [
-                "custom_core",
-                "custom_ai_bridge",
-                "custom_pdp_core",
-                "custom_pdp_audit",
-                "custom_pdp_consent",
-                "custom_pdp_dsar",
-                "custom_pdp_masking",
-                "custom_pdp_retention",
-                "custom_coretax",
-            ]
-            payload["install_modules"] = from_defaults + [m.strip() for m in extra.split(",") if m.strip()]
+            modules += [m.strip() for m in extra.split(",") if m.strip()]
+        if self.pack_id or extra:
+            # De-dup, order-preserving (defaults first, then pack deps-first, then extras).
+            seen = set()
+            payload["install_modules"] = [m for m in modules if not (m in seen or seen.add(m))]
 
         client = self.env["custom.super.admin.orchestrator.client"].sudo()
         try:
