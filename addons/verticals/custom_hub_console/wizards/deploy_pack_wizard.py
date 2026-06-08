@@ -85,10 +85,12 @@ class CustomHubDeployPackWizard(models.TransientModel):
             skip_installed=self.skip_installed,
         )
         if not rows:
-            raise UserError(_(
-                "Nothing to deploy — every pack module is already installed on "
-                "the selected tenant(s). Untick 'Skip Already-Installed' to force."
-            ))
+            raise UserError(
+                _(
+                    "Nothing to deploy — every pack module is already installed on "
+                    "the selected tenant(s). Untick 'Skip Already-Installed' to force."
+                )
+            )
 
         return {
             "type": "ir.actions.act_window",

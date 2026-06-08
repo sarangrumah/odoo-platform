@@ -409,9 +409,7 @@ class OnboardingJourney(models.Model):
 
         ctx = dict(self.env.context)
         display_name = (
-            profile.get("company_name")
-            or profile.get("name")
-            or (self.partner_id.name if self.partner_id else "")
+            profile.get("company_name") or profile.get("name") or (self.partner_id.name if self.partner_id else "")
         )
         if display_name:
             ctx["default_display_name"] = display_name
@@ -425,9 +423,7 @@ class OnboardingJourney(models.Model):
         # dependency via tenant_infra, but guard defensively all the same).
         vertical = profile.get("vertical_target") or profile.get("vertical")
         if vertical and "custom.hub.industry.pack" in self.env:
-            pack = self.env["custom.hub.industry.pack"].sudo().search(
-                [("code", "=", vertical)], limit=1
-            )
+            pack = self.env["custom.hub.industry.pack"].sudo().search([("code", "=", vertical)], limit=1)
             if pack:
                 ctx["default_pack_id"] = pack.id
 

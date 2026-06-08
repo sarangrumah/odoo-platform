@@ -33,51 +33,102 @@ _logger = logging.getLogger(__name__)
 # from the catalog (e.g. Enterprise-only apps on a CE install) are skipped.
 _SEED_PACK_MODULES = {
     "retail": [
-        "custom_accounting_full", "custom_coretax", "custom_coretax_bupot",
-        "custom_pos_id", "custom_retail_pos_offline", "custom_wms_putaway",
-        "custom_wms_cycle_count", "custom_approval_engine",
-        "point_of_sale", "stock", "sale_management", "crm", "website_sale",
+        "custom_accounting_full",
+        "custom_coretax",
+        "custom_coretax_bupot",
+        "custom_pos_id",
+        "custom_retail_pos_offline",
+        "custom_wms_putaway",
+        "custom_wms_cycle_count",
+        "custom_approval_engine",
+        "point_of_sale",
+        "stock",
+        "sale_management",
+        "crm",
+        "website_sale",
     ],
     "fnb": [
-        "custom_accounting_full", "custom_coretax", "custom_pos_id",
-        "custom_retail_pos_offline", "custom_subscription", "custom_appointments",
-        "point_of_sale", "stock", "crm",
+        "custom_accounting_full",
+        "custom_coretax",
+        "custom_pos_id",
+        "custom_retail_pos_offline",
+        "custom_subscription",
+        "custom_appointments",
+        "point_of_sale",
+        "stock",
+        "crm",
     ],
     "drone_services": [
-        "custom_accounting_full", "custom_coretax", "custom_drone_show",
-        "custom_pilot_procurement", "custom_flight_permission",
-        "custom_drone_fleet", "custom_approval_engine",
-        "project", "crm", "sale_management",
+        "custom_accounting_full",
+        "custom_coretax",
+        "custom_drone_show",
+        "custom_pilot_procurement",
+        "custom_flight_permission",
+        "custom_drone_fleet",
+        "custom_approval_engine",
+        "project",
+        "crm",
+        "sale_management",
     ],
     "drone_rental": [
-        "custom_accounting_full", "custom_coretax", "custom_rental",
-        "custom_rental_drone", "custom_damage_claim", "custom_drone_repair",
-        "custom_drone_kit", "custom_drone_fleet",
-        "sale_management", "stock", "maintenance",
+        "custom_accounting_full",
+        "custom_coretax",
+        "custom_rental",
+        "custom_rental_drone",
+        "custom_damage_claim",
+        "custom_drone_repair",
+        "custom_drone_kit",
+        "custom_drone_fleet",
+        "sale_management",
+        "stock",
+        "maintenance",
     ],
     "distrib": [
-        "custom_accounting_full", "custom_coretax", "custom_3way_match",
-        "custom_wms_putaway", "custom_wms_cycle_count", "custom_wms_to_engine",
-        "custom_hht_bridge", "custom_drone_dropship",
-        "stock", "purchase", "sale_management",
+        "custom_accounting_full",
+        "custom_coretax",
+        "custom_3way_match",
+        "custom_wms_putaway",
+        "custom_wms_cycle_count",
+        "custom_wms_to_engine",
+        "custom_hht_bridge",
+        "custom_drone_dropship",
+        "stock",
+        "purchase",
+        "sale_management",
     ],
     "manufacturing": [
-        "custom_accounting_full", "custom_accounting_asset", "custom_coretax",
-        "custom_3way_match", "custom_wms_putaway", "custom_wms_to_engine",
+        "custom_accounting_full",
+        "custom_accounting_asset",
+        "custom_coretax",
+        "custom_3way_match",
+        "custom_wms_putaway",
+        "custom_wms_to_engine",
         "custom_planning",
-        "mrp", "stock", "purchase", "maintenance",
+        "mrp",
+        "stock",
+        "purchase",
+        "maintenance",
     ],
     "services": [
-        "custom_accounting_full", "custom_accounting_recurring", "custom_coretax",
-        "custom_coretax_bupot", "custom_approval_engine", "custom_appointments",
-        "custom_documents", "custom_subscription", "custom_helpdesk",
-        "project", "hr_timesheet", "sale_management",
+        "custom_accounting_full",
+        "custom_accounting_recurring",
+        "custom_coretax",
+        "custom_coretax_bupot",
+        "custom_approval_engine",
+        "custom_appointments",
+        "custom_documents",
+        "custom_subscription",
+        "custom_helpdesk",
+        "project",
+        "hr_timesheet",
+        "sale_management",
     ],
 }
 
 
 class CustomHubIndustryPack(models.Model):
-    _name = "custom.hub.industry.pack"
+    # access defined in security/ir.model.access.csv (viewer/csm/admin/super)
+    _name = "custom.hub.industry.pack"  # nosemgrep: odoo-missing-access-csv
     _description = "Industry Pack (curated module bundle)"
     _order = "sequence, name"
     _rec_name = "name"
@@ -153,19 +204,23 @@ class CustomHubIndustryPack(models.Model):
                 if not cat:
                     continue
                 if skip_installed and deploy_mode == "install":
-                    already = Deployment.search_count([
-                        ("catalog_id", "=", cat.id),
-                        ("tenant_id", "=", tenant.id),
-                        ("state", "=", "installed"),
-                    ])
+                    already = Deployment.search_count(
+                        [
+                            ("catalog_id", "=", cat.id),
+                            ("tenant_id", "=", tenant.id),
+                            ("state", "=", "installed"),
+                        ]
+                    )
                     if already:
                         continue
-                created |= Deployment.create({
-                    "catalog_id": cat.id,
-                    "tenant_id": tenant.id,
-                    "deploy_mode": deploy_mode,
-                    "state": "pending",
-                })
+                created |= Deployment.create(
+                    {
+                        "catalog_id": cat.id,
+                        "tenant_id": tenant.id,
+                        "deploy_mode": deploy_mode,
+                        "state": "pending",
+                    }
+                )
 
         if created:
             # ``created`` preserves creation (deps-first) order.
