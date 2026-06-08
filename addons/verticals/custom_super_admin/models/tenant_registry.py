@@ -30,7 +30,12 @@ class TenantRegistry(models.Model):
     _order = "state, slug"
 
     slug = fields.Char(required=True, index=True, copy=False)
-    display_name = fields.Char(required=True)
+    # `display_name` is a reserved magic field on models.Model (computed,
+    # non-stored). A bare override inherits compute/store=False, so the column
+    # is never created and search_read order='display_name' fails in SQL.
+    # Force a real stored column — required for the CSM list sort/filter and
+    # the hub-portal BFF (/api/tenants orders by display_name).
+    display_name = fields.Char(required=True, store=True, compute=False)
     db_name = fields.Char(required=True)
     state = fields.Selection(
         [

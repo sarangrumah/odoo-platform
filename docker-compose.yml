@@ -134,6 +134,8 @@ services:
       # AI gateway
       AI_GATEWAY_URL: http://ai-gateway:8080
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
+      # Tenant orchestrator (custom_super_admin client signs /v1/* with this)
+      ORCHESTRATOR_SHARED_SECRET: ${ORCHESTRATOR_SHARED_SECRET}
       # Coretax
       CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY}
       # Baileys (custom_whatsapp pre-fill defaults on whatsapp.account)
