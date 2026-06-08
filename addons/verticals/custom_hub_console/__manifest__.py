@@ -48,15 +48,18 @@ tenant containing only ``custom_core`` + ``custom_super_admin`` +
         # data / seeds / crons
         "data/ir_config_parameter_seed.xml",
         "data/cron.xml",
+        "data/industry_pack_seed.xml",
         # views
         "views/module_catalog_views.xml",
         "views/module_deployment_views.xml",
+        "views/industry_pack_views.xml",
         "views/audit_event_views.xml",
         "views/ai_usage_views.xml",
         "views/vertical_tenant_extension_views.xml",
         "views/hub_dashboard_action.xml",
         # wizards
         "wizards/deploy_module_wizard_views.xml",
+        "wizards/tenant_provision_wizard_views.xml",
         # menus (must come AFTER actions they reference)
         "views/menu_views.xml",
         # genesis audit event — runs last so create() can compute hash

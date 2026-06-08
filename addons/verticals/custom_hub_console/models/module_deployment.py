@@ -160,32 +160,15 @@ class CustomHubModuleDeployment(models.Model):
         for rec in self:
             order: list[str] = []
             missing: list[str] = []
-            visited: set[int] = set()
-            temp: set[int] = set()
-
-            def visit(node):
-                if node.id in visited:
-                    return
-                if node.id in temp:
-                    # cycle: stop recursing, but still output this node
-                    return
-                temp.add(node.id)
-                for dep in node.depends_module_ids:
-                    visit(dep)
-                temp.discard(node.id)
-                visited.add(node.id)
-                order.append(node.module_name)
-
             root = rec.catalog_id
             if root:
-                visit(root)
-                # Detect names referenced by the catalog that aren't catalog
-                # rows themselves (rare — catalog stores M2M to itself, but
-                # if a module manifest depended on something un-scanned this
-                # would let us flag it).
-                referenced = {name for d in root.depends_module_ids for name in [d.module_name]}
-                present = set(order)
-                missing = sorted(referenced - present)
+                # Shared deps-first toposort (also used by industry packs).
+                order = Catalog._toposort_module_names(root)
+                # Direct deps that aren't catalog rows themselves would be
+                # flagged here; since depends_module_ids only holds catalog
+                # rows this is normally empty (kept for forward-compat).
+                referenced = {d.module_name for d in root.depends_module_ids}
+                missing = sorted(referenced - set(order))
             payload = {"order": order, "missing": missing}
             rec.dep_graph_resolved_json = json.dumps(payload, sort_keys=True)
             self._log_audit(

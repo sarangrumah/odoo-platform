@@ -52,6 +52,12 @@ class TenantProvisionWizard(models.TransientModel):
                     % SLUG_RE.pattern
                 )
 
+    def _merge_install_modules(self, modules, payload):
+        """Hook for downstream modules to merge extra module sets into the
+        provisioning install list. ``custom_hub_console`` overrides this to add
+        the selected industry pack's modules. Base implementation is a no-op."""
+        return modules
+
     def action_provision(self):
         self.ensure_one()
         payload = {
@@ -67,20 +73,33 @@ class TenantProvisionWizard(models.TransientModel):
             },
             "backup_schedule_cron": self.backup_schedule_cron or None,
         }
+
+        # Default platform module set (mirrors DEFAULT_TENANT_MODULES on the
+        # orchestrator). We only override install_modules when a pack or extra
+        # modules are chosen; otherwise the orchestrator applies its defaults.
+        from_defaults = [
+            "custom_core",
+            "custom_ai_bridge",
+            "custom_pdp_core",
+            "custom_pdp_audit",
+            "custom_pdp_consent",
+            "custom_pdp_dsar",
+            "custom_pdp_masking",
+            "custom_pdp_retention",
+            "custom_coretax",
+        ]
+        modules = list(from_defaults)
+        # Hook: custom_hub_console merges industry-pack modules here. Kept as a
+        # hook so super_admin carries no dependency on custom_hub_console (which
+        # depends on super_admin — the reverse would break registry load order).
+        modules = self._merge_install_modules(modules, payload)
         extra = (self.install_modules_extra or "").strip()
         if extra:
-            from_defaults = [
-                "custom_core",
-                "custom_ai_bridge",
-                "custom_pdp_core",
-                "custom_pdp_audit",
-                "custom_pdp_consent",
-                "custom_pdp_dsar",
-                "custom_pdp_masking",
-                "custom_pdp_retention",
-                "custom_coretax",
-            ]
-            payload["install_modules"] = from_defaults + [m.strip() for m in extra.split(",") if m.strip()]
+            modules += [m.strip() for m in extra.split(",") if m.strip()]
+        if len(modules) > len(from_defaults):
+            # De-dup, order-preserving (defaults first, then pack deps-first, then extras).
+            seen = set()
+            payload["install_modules"] = [m for m in modules if not (m in seen or seen.add(m))]
 
         client = self.env["custom.super.admin.orchestrator.client"].sudo()
         try:

@@ -45,6 +45,7 @@ class CustomHubModuleCatalog(models.Model):
             ("ee_gap", "EE-Gap"),
             ("operations", "Operations"),
             ("vertical", "Vertical"),
+            ("odoo", "Odoo Standard"),
         ],
         index=True,
     )
@@ -110,18 +111,54 @@ class CustomHubModuleCatalog(models.Model):
 
     @api.model
     def _action_scan_all(self):
-        """Scan ``addons/`` and upsert catalog rows.
+        """Scan custom ``addons/`` buckets + index Odoo standard apps.
+
+        Phases (all idempotent, never delete rows):
+          1. Filesystem scan of platform buckets (custom modules).
+          2. Index Odoo ``application=True`` modules (category ``odoo``).
+          3. Link ``depends_module_ids`` for every row from the module
+             registry's declared dependencies.
+          4. Link seed industry packs to their catalog rows (only fills
+             empty ``module_ids`` — never clobbers operator edits).
 
         Returns dict ``{'created': n, 'updated': m, 'total': k}``.
-        Safe to call repeatedly; never deletes existing rows.
         """
+        Modules = self.env["ir.module.module"].sudo()
+        created, updated, total = self._scan_platform_buckets(Modules)
+
+        # Phase 2: Odoo standard application modules.
+        c2, u2 = self._scan_odoo_apps(Modules)
+        created += c2
+        updated += u2
+        total += c2 + u2
+
+        # Phase 3: dependency graph (needs all rows present first).
+        self._link_dependencies(Modules)
+
+        # Phase 4: seed packs -> catalog rows (same addon; defined on the
+        # pack model). Guarded so a scan never fails if the pack model is
+        # somehow unavailable.
+        try:
+            self.env["custom.hub.industry.pack"].sudo()._link_seed_modules()
+        except Exception as exc:  # pragma: no cover - defensive
+            _logger.debug("[hub_catalog] seed pack link skipped: %s", exc)
+
+        _logger.info(
+            "[hub_catalog] scan complete: created=%s updated=%s total=%s",
+            created,
+            updated,
+            total,
+        )
+        return {"created": created, "updated": updated, "total": total}
+
+    @api.model
+    def _scan_platform_buckets(self, Modules):
+        """Phase 1: scan the platform ``addons/`` buckets (custom modules)."""
         root = self._addons_root()
         created, updated, total = 0, 0, 0
         if not os.path.isdir(root):
             _logger.warning("[hub_catalog] addons root not found: %s", root)
-            return {"created": 0, "updated": 0, "total": 0}
-
-        Modules = self.env["ir.module.module"].sudo()
+            return created, updated, total
 
         for bucket, category in _PLATFORM_BUCKETS.items():
             bucket_path = os.path.join(root, bucket)
@@ -164,13 +201,92 @@ class CustomHubModuleCatalog(models.Model):
                     self.create(vals)
                     created += 1
                 total += 1
-        _logger.info(
-            "[hub_catalog] scan complete: created=%s updated=%s total=%s",
-            created,
-            updated,
-            total,
-        )
-        return {"created": created, "updated": updated, "total": total}
+        return created, updated, total
+
+    @api.model
+    def _scan_odoo_apps(self, Modules):
+        """Phase 2: index Odoo standard *application* modules.
+
+        Only ``application=True`` modules are indexed (the ~40-60 headline
+        apps: Sales, Purchase, Inventory, Accounting, POS, CRM, HR, …) so
+        the catalog stays readable rather than listing every technical
+        module. Custom modules already classified by Phase 1 keep their
+        platform category and are never reclassified to ``odoo``.
+        """
+        created, updated = 0, 0
+        apps = Modules.search([("application", "=", True)])
+        for mod in apps:
+            existing = self.search([("module_name", "=", mod.name)], limit=1)
+            # Leave our own platform modules under their bucket category.
+            if existing and existing.category and existing.category != "odoo":
+                continue
+            vals = {
+                "module_name": mod.name,
+                "version": mod.installed_version or mod.latest_version or "",
+                "category": "odoo",
+                "maturity": "production",
+                "summary": (mod.shortdesc or mod.summary or "")[:500],
+                "last_scanned": fields.Datetime.now(),
+                "source_module_id": mod.id,
+            }
+            if existing:
+                existing.write(vals)
+                updated += 1
+            else:
+                self.create(vals)
+                created += 1
+        return created, updated
+
+    @api.model
+    def _link_dependencies(self, Modules):
+        """Phase 3: populate ``depends_module_ids`` (direct deps) for all rows.
+
+        Declared dependencies are read uniformly from the module registry
+        (``ir.module.module.dependencies_id``), covering both custom and
+        Odoo-standard modules. Only deps that themselves have a catalog
+        row are linked; technical deps without a row (``base``, ``mail``,
+        ``analytic``, …) are skipped — Odoo resolves those at install time.
+        """
+        rows = self.search([])
+        name_to_cat = {c.module_name: c.id for c in rows}
+        for cat in rows:
+            mod = Modules.search([("name", "=", cat.module_name)], limit=1)
+            if not mod:
+                continue
+            dep_ids = []
+            for dep in mod.dependencies_id:
+                cid = name_to_cat.get(dep.name)
+                if cid and cid != cat.id:
+                    dep_ids.append(cid)
+            cat.depends_module_ids = [(6, 0, dep_ids)]
+        return True
+
+    @api.model
+    def _toposort_module_names(self, roots):
+        """Deps-first topological order of ``roots`` + transitive
+        ``depends_module_ids`` → list of ``module_name`` (de-duped,
+        cycle-safe). Shared by the deployment resolver and industry packs.
+        """
+        order = []
+        visited = set()
+        temp = set()
+
+        def visit(node):
+            if node.id in visited:
+                return
+            if node.id in temp:
+                # cycle: stop recursing but still emit this node
+                return
+            temp.add(node.id)
+            for dep in node.depends_module_ids:
+                visit(dep)
+            temp.discard(node.id)
+            visited.add(node.id)
+            order.append(node.module_name)
+
+        for root in roots:
+            visit(root)
+        return order
 
     @api.model
     def _parse_manifest(self, path: str) -> dict | None:

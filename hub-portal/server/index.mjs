@@ -142,6 +142,51 @@ app.get('/api/intake/status/:token', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Industry packs — narrow read-only feed for the PUBLIC intake form.
+// Resolves each pack's module_ids to technical module names so the intake
+// wizard can pre-check the wishlist when a vertical is picked. This is a
+// scoped endpoint (packs only) rather than exposing the generic Odoo RPC
+// bridge to anonymous callers.
+// ---------------------------------------------------------------------------
+app.get('/api/packs', async (_req, res) => {
+  try {
+    const pr = await odooCall('custom.hub.industry.pack', 'search_read', [[['active', '=', true]]], {
+      fields: ['id', 'name', 'code', 'vertical', 'description', 'icon', 'module_ids'],
+      limit: 200,
+      order: 'sequence, name',
+    });
+    const packsParsed = JSON.parse(await pr.text());
+    if (packsParsed?.error) {
+      return res.status(500).json({ detail: packsParsed.error?.data?.message || 'Odoo error' });
+    }
+    const packs = packsParsed.result ?? [];
+
+    // Resolve all referenced catalog ids -> module_name in a single read.
+    const allIds = [...new Set(packs.flatMap((p) => p.module_ids || []))];
+    const idToName = {};
+    if (allIds.length) {
+      const cr = await odooCall('custom.hub.module.catalog', 'read', [allIds], { fields: ['module_name'] });
+      const catParsed = JSON.parse(await cr.text());
+      if (!catParsed?.error) {
+        for (const row of catParsed.result ?? []) idToName[row.id] = row.module_name;
+      }
+    }
+
+    res.json(packs.map((p) => ({
+      id: p.id,
+      name: p.name,
+      code: p.code,
+      vertical: p.vertical || '',
+      description: p.description || '',
+      icon: p.icon || '',
+      module_codes: (p.module_ids || []).map((id) => idToName[id]).filter(Boolean),
+    })));
+  } catch (e) {
+    res.status(500).json({ detail: String(e?.message || e) });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // VPS (orchestrator passthrough)
 // ---------------------------------------------------------------------------
 app.get('/api/vps', async (_req, res) => {

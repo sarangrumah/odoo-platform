@@ -67,4 +67,44 @@
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
+
+    <record id="view_deploy_pack_wizard_form" model="ir.ui.view">
+        <field name="name">custom.hub.deploy.pack.wizard.form</field>
+        <field name="model">custom.hub.deploy.pack.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Deploy Industry Pack">
+                <sheet>
+                    <group>
+                        <field name="pack_id" options="{'no_create': True}"/>
+                        <field name="deploy_mode"/>
+                    </group>
+                    <group string="Targets">
+                        <field name="tenant_ids" widget="many2many_tags"
+                               options="{'no_create': True}"/>
+                    </group>
+                    <group string="Options">
+                        <field name="enable_canary"/>
+                        <field name="skip_installed"/>
+                        <field name="confirmed"/>
+                    </group>
+                    <group string="Modules (resolved, deps-first)">
+                        <field name="module_preview" nolabel="1" readonly="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Deploy Pack" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_deploy_pack_wizard" model="ir.actions.act_window">
+        <field name="name">Deploy Pack</field>
+        <field name="res_model">custom.hub.deploy.pack.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
 </odoo>

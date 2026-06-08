@@ -13,6 +13,9 @@
                     <button name="action_launch_go_no_go" type="object"
                             string="Go / No-Go" class="btn-primary"
                             invisible="stage not in ('recommendations_ready','go_no_go')"/>
+                    <button name="action_launch_provision" type="object"
+                            string="Provision Tenant" class="btn-primary"
+                            invisible="stage not in ('go_no_go','provisioning_requested')"/>
                     <field name="stage" widget="statusbar"
                            statusbar_visible="intake,brd_uploaded,brd_analyzed,recommendations_ready,go_no_go,provisioning_in_progress,tenant_live,handover,closed"/>
                 </header>

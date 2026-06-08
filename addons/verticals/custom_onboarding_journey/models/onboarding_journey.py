@@ -13,6 +13,7 @@ Stages (linear with two terminal branches):
 
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 
@@ -392,4 +393,45 @@ class OnboardingJourney(models.Model):
             "view_mode": "form",
             "target": "new",
             "context": {"default_journey_id": self.id},
+        }
+
+    def action_launch_provision(self):
+        """Open the tenant provision wizard, pre-filling the industry pack from
+        the intake vertical and identity from the captured profile. Everything
+        remains editable — human-in-the-loop is preserved."""
+        self.ensure_one()
+        profile = {}
+        if self.company_profile_json:
+            try:
+                profile = json.loads(self.company_profile_json) or {}
+            except (ValueError, TypeError):
+                profile = {}
+
+        ctx = dict(self.env.context)
+        display_name = (
+            profile.get("company_name") or profile.get("name") or (self.partner_id.name if self.partner_id else "")
+        )
+        if display_name:
+            ctx["default_display_name"] = display_name
+        email = profile.get("contact_email") or (self.partner_id.email if self.partner_id else "")
+        if email:
+            ctx["default_contact_email"] = email
+        if profile.get("contact_phone"):
+            ctx["default_contact_phone"] = profile["contact_phone"]
+
+        # Industry pack from the intake vertical (hub_console is a transitive
+        # dependency via tenant_infra, but guard defensively all the same).
+        vertical = profile.get("vertical_target") or profile.get("vertical")
+        if vertical and "custom.hub.industry.pack" in self.env:
+            pack = self.env["custom.hub.industry.pack"].sudo().search([("code", "=", vertical)], limit=1)
+            if pack:
+                ctx["default_pack_id"] = pack.id
+
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Provision Tenant"),
+            "res_model": "tenant.provision.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": ctx,
         }

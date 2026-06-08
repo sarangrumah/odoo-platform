@@ -8,9 +8,14 @@
     "license": "LGPL-3",
     "depends": ["stock"],
     "data": [
-        "views/report_deliveryslip_inherit.xml",
+        # Obsolete: Odoo 19's stock.stock_report_delivery_has_serial_move_line
+        # already reads move_line.move_id.packaging_uom_id, so this patch's
+        # xpath no longer matches and breaks any fresh DB install. Retired
+        # (installable/auto_install = False); re-enable only if upstream
+        # regresses. See views/report_deliveryslip_inherit.xml.
+        # "views/report_deliveryslip_inherit.xml",
     ],
-    "installable": True,
+    "installable": False,
     "application": False,
-    "auto_install": True,
+    "auto_install": False,
 }

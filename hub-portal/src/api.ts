@@ -303,6 +303,41 @@ export const createDeployment = (payload: any) =>
   jsonrpc<number>('custom.hub.module.deployment', 'create', [payload]);
 
 // ---------------------------------------------------------------------------
+// Industry packs — curated module bundles (admin batch-deploy surface).
+// ---------------------------------------------------------------------------
+export const listIndustryPacks = () =>
+  jsonrpc<any[]>('custom.hub.industry.pack', 'search_read', [[]], {
+    fields: ['id', 'name', 'code', 'vertical', 'description',
+             'module_count', 'icon', 'color', 'module_ids'],
+    limit: 200,
+    order: 'sequence, name',
+  });
+
+// deploy_to_tenant is an @api.model method: args are positional after self.
+export const deployPack = (
+  packId: number,
+  tenantId: number,
+  deployMode: 'install' | 'upgrade' | 'uninstall',
+  enableCanary: boolean,
+  skipInstalled = true,
+) =>
+  jsonrpc<number[]>('custom.hub.industry.pack', 'deploy_to_tenant',
+    [packId, tenantId, deployMode, enableCanary, skipInstalled]);
+
+// Public intake reads packs through a narrow read-only proxy (no Odoo auth).
+export interface IndustryPack {
+  id: number;
+  name: string;
+  code: string;
+  vertical?: string;
+  description?: string;
+  icon?: string;
+  module_codes: string[];
+}
+
+export const listPacks = () => http<IndustryPack[]>('GET', '/api/packs');
+
+// ---------------------------------------------------------------------------
 // Dev cycles (Track H)
 // ---------------------------------------------------------------------------
 export const listDevCycles = (filters: { state?: string; assignee_id?: number } = {}) => {
@@ -395,6 +430,9 @@ export const api = {
   listModuleCatalog,
   listDeployments,
   createDeployment,
+  listIndustryPacks,
+  deployPack,
+  listPacks,
   listDevCycles,
   createDevCycle,
   listDevCyclePrs,
