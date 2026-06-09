@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_invoice_document">
+        <t t-set="company" t-value="o.company_id"/>
+        <t t-set="accent" t-value="company.brand_accent_color or '#714B67'"/>
+        <t t-set="currency" t-value="o.currency_id"/>
+        <div t-attf-class="page o_company_#{company.id}_layout" style="font-size: 11px;">
+
+            <!-- Header: logo + address (left), INVOICE + meta table (right) -->
+            <t t-call="custom_report_templates.brand_header">
+                <t t-set="doc_title" t-value="{'out_invoice': 'INVOICE', 'out_refund': 'CREDIT NOTE', 'in_invoice': 'VENDOR BILL', 'in_refund': 'VENDOR CREDIT NOTE'}.get(o.move_type, 'INVOICE')"/>
+                <tr>
+                    <td class="fw-bold" style="width: 45%; background-color: #f3f3f3;">DATE</td>
+                    <td class="text-end">
+                        <span t-if="o.invoice_date" t-out="o.invoice_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="fw-bold" style="background-color: #f3f3f3;">INVOICE #</td>
+                    <td class="text-end" t-out="o.name or 'Draft'"/>
+                </tr>
+                <tr t-if="o.ref or o.invoice_origin">
+                    <td class="fw-bold" style="background-color: #f3f3f3;">CUSTOMER REF</td>
+                    <td class="text-end" t-out="o.ref or o.invoice_origin"/>
+                </tr>
+                <tr>
+                    <td class="fw-bold" style="background-color: #f3f3f3;">DUE DATE</td>
+                    <td class="text-end" style="background-color: #e8edf5;">
+                        <span t-if="o.invoice_date_due" t-out="o.invoice_date_due" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                    </td>
+                </tr>
+            </t>
+
+            <!-- Bill to -->
+            <t t-call="custom_report_templates.party_band">
+                <t t-set="band_label">BILL TO</t>
+                <t t-set="partner" t-value="o.partner_id"/>
+            </t>
+
+            <!-- Items -->
+            <t t-call="custom_report_templates.items_table">
+                <t t-set="lines" t-value="o.invoice_line_ids"/>
+                <t t-set="qty_field" t-value="'quantity'"/>
+            </t>
+
+            <!-- Comments + totals -->
+            <div class="row">
+                <div class="col-6">
+                    <t t-call="custom_report_templates.comments_box">
+                        <span t-if="company.report_bank_details" t-out="company.report_bank_details"/>
+                        <div t-if="o.narration" class="mt-1" t-out="o.narration"/>
+                    </t>
+                </div>
+                <div class="col-6">
+                    <t t-call="custom_report_templates.totals_block">
+                        <t t-set="vat_pct" t-value="'{:.1f}'.format(o.amount_tax / o.amount_untaxed * 100 if o.amount_untaxed else 0.0)"/>
+                        <t t-set="show_balance" t-value="True"/>
+                    </t>
+                </div>
+            </div>
+
+            <!-- Signature + footer -->
+            <t t-call="custom_report_templates.signature_block">
+                <t t-set="signer" t-value="o.invoice_user_id.name"/>
+                <t t-set="doc_noun">invoice</t>
+            </t>
+        </div>
+    </template>
+
+    <template id="report_invoice">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="custom_report_templates.report_invoice_document" t-lang="o.partner_id.lang"/>
+            </t>
+        </t>
+    </template>
+</odoo>
