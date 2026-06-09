@@ -55,7 +55,7 @@ Every withholding line creation + Faktur Pengganti relink writes to
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Localizations",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -64,6 +64,7 @@ Every withholding line creation + Faktur Pengganti relink writes to
         "custom_coretax",
         "custom_accounting_full",
         "account",
+        "base_vat",
         "purchase",
         "product",
     ],
