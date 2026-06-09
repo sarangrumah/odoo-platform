@@ -17,7 +17,7 @@ Provides:
     "category": "Custom Platform/Operations",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
-    "depends": ["custom_core", "custom_pdp_audit", "mail", "stock"],
+    "depends": ["custom_core", "custom_pdp_audit", "mail", "stock", "sale"],
     "capability_tags": ["audit-trail", "field-service", "wms"],
     "data": [
         "security/security.xml",
