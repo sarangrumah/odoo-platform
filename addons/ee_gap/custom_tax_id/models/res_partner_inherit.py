@@ -79,3 +79,16 @@ class ResPartner(models.Model):
         for rec in self:
             if rec.x_custom_nik and not NIK_RE.match(rec.x_custom_nik):
                 raise ValidationError(_("NIK harus 16 digit angka."))
+
+    def check_vat_id(self, vat):
+        """Relaxed Indonesian NPWP validation for the standard ``vat`` field.
+
+        Core ``base_vat.check_vat_id`` requires a Luhn checksum on legacy
+        15-digit NPWPs (and special-cases a leading ``0``), which rejects
+        otherwise-valid numbers such as ``015556667008000``. Per business
+        requirement we accept any 15- or 16-digit NPWP (legacy 15-digit or
+        NIK-based 16-digit, post-2024), ignoring ``.``/``-``/space
+        separators, and drop the checksum / leading-zero rules.
+        """
+        digits = re.sub(r"[ .\-]", "", vat or "")
+        return bool(NPWP_15_RE.match(digits) or NPWP_16_RE.match(digits))
