@@ -1,12 +1,16 @@
 # syntax=docker/dockerfile:1.7
 # ============================================================
 # Hardened Odoo 19 image
-# - Pinned to verified latest tag from Docker Hub (May 2026)
+# - Pinned to a specific digest (build 19.0-20260528) so the rolling
+#   `odoo:19.0` tag cannot silently swap the base under a running DB,
+#   which previously caused a stale-registry settings crash
+#   ("res.config.settings"."email_primary_color" field is undefined).
+#   To bump: `docker pull odoo:19.0`, verify, then update the digest below.
 # - Adds xmlsec for XAdES sertel signing (Coretax)
 # - Strips SUID, runs as non-root odoo user (already in base)
 # ============================================================
 
-FROM odoo:19.0
+FROM odoo:19.0@sha256:b81c76750665681327f0193afcc8a54ed0348e8cac3bdaef1b7f4abea5471eed
 
 USER root
 
