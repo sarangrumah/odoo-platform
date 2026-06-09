@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_saleorder_document">
+        <t t-set="company" t-value="o.company_id"/>
+        <t t-set="accent" t-value="company.brand_accent_color or '#714B67'"/>
+        <t t-set="currency" t-value="o.currency_id"/>
+        <t t-set="is_quote" t-value="o.state in ('draft', 'sent')"/>
+        <div t-attf-class="page o_company_#{company.id}_layout" style="font-size: 11px;">
+
+            <!-- Header -->
+            <t t-call="custom_report_templates.brand_header">
+                <t t-set="doc_title" t-value="'SALES QUOTE' if is_quote else 'SALES ORDER'"/>
+                <tr>
+                    <td class="fw-bold" style="width: 45%; background-color: #f3f3f3;">DATE</td>
+                    <td class="text-end">
+                        <span t-if="o.date_order" t-out="o.date_order" t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy'}"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="fw-bold" style="background-color: #f3f3f3;">
+                        <t t-out="'QUOTE #' if is_quote else 'ORDER #'"/>
+                    </td>
+                    <td class="text-end" t-out="o.name"/>
+                </tr>
+                <tr t-if="is_quote and o.validity_date">
+                    <td class="fw-bold" style="background-color: #f3f3f3;">EXPIRED DATE</td>
+                    <td class="text-end" style="background-color: #e8edf5;">
+                        <span t-out="o.validity_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                    </td>
+                </tr>
+            </t>
+
+            <!-- Bill to -->
+            <t t-call="custom_report_templates.party_band">
+                <t t-set="band_label">BILL TO</t>
+                <t t-set="partner" t-value="o.partner_id"/>
+            </t>
+
+            <!-- Items -->
+            <t t-call="custom_report_templates.items_table">
+                <t t-set="lines" t-value="o.order_line"/>
+                <t t-set="qty_field" t-value="'product_uom_qty'"/>
+            </t>
+
+            <!-- Comments + totals -->
+            <div class="row">
+                <div class="col-6">
+                    <t t-call="custom_report_templates.comments_box">
+                        <span t-if="o.note" t-out="o.note"/>
+                    </t>
+                </div>
+                <div class="col-6">
+                    <t t-call="custom_report_templates.totals_block">
+                        <t t-set="vat_pct" t-value="'{:.1f}'.format(o.amount_tax / o.amount_untaxed * 100 if o.amount_untaxed else 0.0)"/>
+                        <t t-set="show_balance" t-value="False"/>
+                    </t>
+                </div>
+            </div>
+
+            <!-- Signature + footer -->
+            <t t-call="custom_report_templates.signature_block">
+                <t t-set="signer" t-value="o.user_id.name"/>
+                <t t-set="doc_noun" t-value="'quotation' if is_quote else 'order'"/>
+            </t>
+        </div>
+    </template>
+
+    <template id="report_saleorder">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="custom_report_templates.report_saleorder_document" t-lang="o.partner_id.lang"/>
+            </t>
+        </t>
+    </template>
+</odoo>
