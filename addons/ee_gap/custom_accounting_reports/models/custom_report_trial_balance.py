@@ -14,6 +14,18 @@ class CustomReportTrialBalance(models.AbstractModel):
     _report_code = "trial_balance"
     _report_title = "Trial Balance"
 
+    def _xlsx_columns(self):
+        return [
+            {"header": "Code", "field": "account_code", "kind": "text", "width": 14},
+            {"header": "Account", "field": "account_name", "kind": "text", "width": 42},
+            {"header": "Opening Debit", "field": "opening_debit", "kind": "number", "width": 16},
+            {"header": "Opening Credit", "field": "opening_credit", "kind": "number", "width": 16},
+            {"header": "Movement Debit", "field": "movement_debit", "kind": "number", "width": 16},
+            {"header": "Movement Credit", "field": "movement_credit", "kind": "number", "width": 16},
+            {"header": "Closing Debit", "field": "closing_debit", "kind": "number", "width": 16},
+            {"header": "Closing Credit", "field": "closing_credit", "kind": "number", "width": 16},
+        ]
+
     def _build_lines(self, filters):
         # Opening: everything before date_from.
         opening_filters = dict(

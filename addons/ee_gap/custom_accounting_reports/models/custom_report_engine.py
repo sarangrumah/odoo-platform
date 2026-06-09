@@ -272,14 +272,10 @@ class CustomReportEngine(models.AbstractModel):
         ]
         sql = """
             SELECT aml.account_id,
-                   acc.code AS account_code,
-                   acc.name AS account_name,
-                   acc.account_type AS account_type,
                    COALESCE(SUM(aml.debit), 0.0) AS debit,
                    COALESCE(SUM(aml.credit), 0.0) AS credit,
                    COALESCE(SUM(aml.balance), 0.0) AS balance
               FROM account_move_line aml
-              JOIN account_account acc ON acc.id = aml.account_id
              WHERE aml.date >= %s
                AND aml.date <= %s
                AND aml.company_id IN %s
@@ -309,17 +305,30 @@ class CustomReportEngine(models.AbstractModel):
             params.append(tuple(account_ids))
 
         sql += """
-            GROUP BY aml.account_id, acc.code, acc.name, acc.account_type
-            ORDER BY acc.code
+            GROUP BY aml.account_id
         """
         self.env.cr.execute(sql, tuple(params))
+        rows = self.env.cr.dictfetchall()
+        # ``code``/``name`` are no longer physical columns on
+        # ``account_account`` (Odoo 19: ``code`` is a per-company computed
+        # field backed by ``account.code.mapping``; ``name`` is translatable
+        # JSONB). Resolve them through the ORM so per-company codes and the
+        # active language are honoured -- mirroring how the rest of this
+        # module reads ``account_id.code``.
+        accounts = {
+            acc.id: acc
+            for acc in self.env["account.account"].browse(
+                [row["account_id"] for row in rows]
+            )
+        }
         result = {}
-        for row in self.env.cr.dictfetchall():
+        for row in rows:
+            acc = accounts.get(row["account_id"])
             result[row["account_id"]] = {
                 "account_id": row["account_id"],
-                "account_code": row["account_code"],
-                "account_name": row["account_name"],
-                "account_type": row["account_type"],
+                "account_code": acc.code if acc else "",
+                "account_name": acc.name if acc else "",
+                "account_type": acc.account_type if acc else "",
                 "debit": row["debit"] or 0.0,
                 "credit": row["credit"] or 0.0,
                 "balance": row["balance"] or 0.0,
@@ -416,6 +425,120 @@ class CustomReportEngine(models.AbstractModel):
             "date_from_id": self._format_date_id(filters["date_from"]),
             "date_to_id": self._format_date_id(filters["date_to"]),
         }
+
+    # ------------------------------------------------------------------
+    # XLSX export
+    # ------------------------------------------------------------------
+    def _xlsx_columns(self):
+        """Column spec driving the generic XLSX exporter.
+
+        Return a list of dicts, one per column::
+
+            {"header": "Code", "field": "account_code",
+             "kind": "text"|"number", "width": 14}
+
+        ``field`` is read from each line dict produced by
+        :py:meth:`_build_lines`. Subclasses that support Excel export
+        must override this.
+        """
+        raise NotImplementedError(
+            _(
+                "Report %(code)s does not support XLSX export "
+                "(override _xlsx_columns()).",
+                code=self._report_code or self._name,
+            )
+        )
+
+    def _xlsx_export(self, filters=None):
+        """Compute the report and render it to XLSX. Returns raw bytes.
+
+        Generic, driven by :py:meth:`_xlsx_columns`. Lines whose ``type``
+        is ``coverage`` are skipped; ``grand_total`` / ``total`` /
+        ``subtotal`` rows are rendered bold, with any ``label`` falling
+        into the first text column.
+        """
+        import io
+        import xlsxwriter
+
+        ctx = self._compute(filters)
+        columns = self._xlsx_columns()
+        last_col = len(columns) - 1
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {"in_memory": True})
+        sheet = workbook.add_worksheet((self._report_title or "Report")[:31])
+
+        title_fmt = workbook.add_format(
+            {"bold": True, "font_size": 14, "align": "center"}
+        )
+        meta_fmt = workbook.add_format({"align": "center", "font_size": 10})
+        header_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "border": 1,
+                "bg_color": "#D9E1F2",
+                "align": "center",
+                "valign": "vcenter",
+                "text_wrap": True,
+            }
+        )
+        text_fmt = workbook.add_format({"border": 1})
+        num_fmt = workbook.add_format({"border": 1, "num_format": "#,##0.00"})
+        total_text_fmt = workbook.add_format(
+            {"border": 1, "bold": True, "bg_color": "#F2F2F2"}
+        )
+        total_num_fmt = workbook.add_format(
+            {
+                "border": 1,
+                "bold": True,
+                "bg_color": "#F2F2F2",
+                "num_format": "#,##0.00",
+            }
+        )
+
+        first_text_col = next(
+            (i for i, c in enumerate(columns) if c.get("kind") != "number"),
+            0,
+        )
+
+        row = 0
+        sheet.merge_range(row, 0, row, last_col, ctx.get("report_title", ""), title_fmt)
+        row += 1
+        if ctx.get("company_names"):
+            sheet.merge_range(row, 0, row, last_col, ctx["company_names"], meta_fmt)
+            row += 1
+        period = "%s s/d %s" % (
+            ctx.get("date_from_id") or "",
+            ctx.get("date_to_id") or "",
+        )
+        sheet.merge_range(row, 0, row, last_col, period, meta_fmt)
+        row += 2
+
+        for col_idx, col in enumerate(columns):
+            sheet.set_column(col_idx, col_idx, col.get("width", 16))
+            sheet.write(row, col_idx, col.get("header", ""), header_fmt)
+        sheet.freeze_panes(row + 1, 0)
+        row += 1
+
+        for line in ctx.get("lines", []):
+            if line.get("type") == "coverage":
+                continue
+            is_total = line.get("type") in ("grand_total", "total", "subtotal")
+            for col_idx, col in enumerate(columns):
+                is_number = col.get("kind") == "number"
+                value = line.get(col["field"])
+                if not is_number and not value and col_idx == first_text_col:
+                    value = line.get("label") or ""
+                if is_number:
+                    fmt = total_num_fmt if is_total else num_fmt
+                    sheet.write_number(row, col_idx, float(value or 0.0), fmt)
+                else:
+                    fmt = total_text_fmt if is_total else text_fmt
+                    sheet.write(row, col_idx, value or "", fmt)
+            row += 1
+
+        workbook.close()
+        return output.getvalue()
 
     # ------------------------------------------------------------------
     # PDP audit hook — record every report run

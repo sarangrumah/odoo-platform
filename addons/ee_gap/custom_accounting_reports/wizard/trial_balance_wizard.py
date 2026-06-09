@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import base64
 from datetime import date
 
 from odoo import fields, models
@@ -50,3 +51,31 @@ class TrialBalanceWizard(models.TransientModel):
             },
         }
         return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)
+
+    def action_export_xlsx(self):
+        self.ensure_one()
+        options = {
+            **self._build_filters(),
+            "date_from": self.date_from.isoformat(),
+            "date_to": self.date_to.isoformat(),
+        }
+        content = self.env["custom.report.trial.balance"]._xlsx_export(options)
+        filename = "Trial_Balance_%s_%s.xlsx" % (self.date_from, self.date_to)
+        attachment = self.env["ir.attachment"].create(
+            {
+                "name": filename,
+                "type": "binary",
+                "datas": base64.b64encode(content),
+                "mimetype": (
+                    "application/vnd.openxmlformats-officedocument"
+                    ".spreadsheetml.sheet"
+                ),
+                "res_model": self._name,
+                "res_id": self.id,
+            }
+        )
+        return {
+            "type": "ir.actions.act_url",
+            "url": "/web/content/%s?download=true" % attachment.id,
+            "target": "self",
+        }
