@@ -71,6 +71,7 @@ MODULES_TO_UPDATE=(
   custom_payment_id
   custom_ecommerce
   custom_storefront_api
+  custom_tax_id
 )
 
 # Raw SQL seeds (idempotent — safe to re-apply). Paths INSIDE the
