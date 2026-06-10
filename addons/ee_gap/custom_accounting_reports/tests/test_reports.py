@@ -84,6 +84,15 @@ class TestCustomReports(TransactionCase):
             }
         )
 
+        cls.j_sale = cls.Journal.create(
+            {
+                "name": "Sales",
+                "code": "SAL",
+                "type": "sale",
+                "company_id": cls.company.id,
+            }
+        )
+
         cls.partner_a = cls.Partner.create({"name": "Customer A"})
         cls.partner_b = cls.Partner.create({"name": "Customer B"})
 
@@ -471,3 +480,178 @@ class TestCustomReports(TransactionCase):
             places=2,
             msg="Category subtotals must sum to grand tax_amount.",
         )
+
+    # ------------------------------------------------------------------
+    # 6) General Ledger flat layout: one row per line, account as a column,
+    #    column picker honoured.
+    # ------------------------------------------------------------------
+    def test_general_ledger_flat_layout(self):
+        today = date.today()
+        self._post_move(
+            [(self.acc_recv, 1000.0, 0.0), (self.acc_revenue, 0.0, 1000.0)],
+            dt=today,
+            partner=self.partner_a,
+            ref="F1",
+        )
+
+        gl_all = self.env["custom.report.general.ledger"].with_context(gl_layout="flat")
+        lines = gl_all._build_lines(self._filters())
+        detail = [l for l in lines if l.get("type") != "grand_total"]
+        self.assertTrue(detail, "Flat GL must emit per-line rows.")
+        self.assertTrue(
+            all("account_code" in l for l in detail),
+            "Flat GL rows must carry the account as a field/column.",
+        )
+        self.assertEqual(lines[-1].get("type"), "grand_total")
+
+        # No optional columns selected -> 9 core columns only.
+        gl_core = self.env["custom.report.general.ledger"].with_context(
+            gl_layout="flat", gl_columns=[]
+        )
+        self.assertEqual(len(gl_core._xlsx_columns()), 9)
+        # All optional columns selected -> 9 core + 10 optional = 19.
+        gl_full = self.env["custom.report.general.ledger"].with_context(
+            gl_layout="flat",
+            gl_columns=[
+                "doc_no", "reference", "tax", "clearing", "cost_center",
+                "profit_center", "currency", "amount_currency", "due_date", "user",
+            ],
+        )
+        self.assertEqual(len(gl_full._xlsx_columns()), 19)
+        # Grouped layout keeps the legacy 7-column spec.
+        gl_grouped = self.env["custom.report.general.ledger"]
+        self.assertEqual(len(gl_grouped._xlsx_columns()), 7)
+
+    # ------------------------------------------------------------------
+    # 7) Aged receivable detail: one row per open document, grouped by
+    #    partner.
+    # ------------------------------------------------------------------
+    def test_aged_receivable_detail(self):
+        today = date.today()
+        partner = self.Partner.create({"name": "DetailP"})
+        due = today - timedelta(days=10)
+        move = self.Move.create(
+            {
+                "journal_id": self.j_misc.id,
+                "date": today - timedelta(days=10),
+                "invoice_date_due": due,
+                "company_id": self.company.id,
+                "partner_id": partner.id,
+                "line_ids": [
+                    Command.create(
+                        {
+                            "account_id": self.acc_recv.id,
+                            "name": "detail aging",
+                            "debit": 250.0,
+                            "credit": 0.0,
+                            "partner_id": partner.id,
+                            "date_maturity": due,
+                        }
+                    ),
+                    Command.create(
+                        {
+                            "account_id": self.acc_revenue.id,
+                            "name": "detail aging",
+                            "debit": 0.0,
+                            "credit": 250.0,
+                            "partner_id": partner.id,
+                        }
+                    ),
+                ],
+            }
+        )
+        move.action_post()
+
+        ar = self.env["custom.report.aged.receivable"].with_context(aging_detail=True)
+        result = ar._build_lines(self._filters())
+        self.assertEqual(result.get("type"), "aging_detail")
+        grp = next(g for g in result["partners"] if g["partner_name"] == "DetailP")
+        self.assertEqual(len(grp["rows"]), 1, "One open document expected.")
+        row = grp["rows"][0]
+        self.assertEqual(row["doc_no"], move.name)
+        self.assertAlmostEqual(row["d_0_30"], 250.0, places=2)
+        self.assertAlmostEqual(grp["subtotal"]["total"], 250.0, places=2)
+
+    # ------------------------------------------------------------------
+    # 8) Kartu Utang / Kartu Piutang: side-restricted partner cards.
+    # ------------------------------------------------------------------
+    def test_partner_cards(self):
+        today = date.today()
+        self._post_move(
+            [(self.acc_recv, 700.0, 0.0), (self.acc_revenue, 0.0, 700.0)],
+            dt=today,
+            partner=self.partner_a,
+            ref="AR1",
+        )
+        self._post_move(
+            [(self.acc_expense, 400.0, 0.0), (self.acc_pay, 0.0, 400.0)],
+            dt=today,
+            partner=self.partner_b,
+            ref="AP1",
+        )
+
+        rc = self.env["custom.report.receivable.card"]
+        r_lines = rc._build_lines(self._filters())
+        r_grand = next(l for l in r_lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(r_grand["total_debit"], 700.0, places=2)
+
+        pc = self.env["custom.report.payable.card"]
+        p_lines = pc._build_lines(self._filters())
+        p_grand = next(l for l in p_lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(p_grand["total_credit"], 400.0, places=2)
+
+    # ------------------------------------------------------------------
+    # 9) Uang Muka ledger: auto-detects advance accounts by name.
+    # ------------------------------------------------------------------
+    def test_advance_report(self):
+        today = date.today()
+        adv = self._mk_account("11910", "Uang Muka Pembelian", "asset_current")
+        self._post_move(
+            [(adv, 150.0, 0.0), (self.acc_cash, 0.0, 150.0)],
+            dt=today,
+            partner=self.partner_a,
+            ref="ADV1",
+        )
+
+        rep = self.env["custom.report.advance"]
+        lines = rep._build_lines(self._filters())  # empty account_ids -> auto-detect
+        acct = next(
+            (l for l in lines if l.get("type") == "account" and l.get("account_code") == "11910"),
+            None,
+        )
+        self.assertIsNotNone(acct, "Advance account must be auto-detected by name.")
+        self.assertAlmostEqual(acct["total_debit"], 150.0, places=2)
+
+    # ------------------------------------------------------------------
+    # 10) Sales register: one row per invoice line, totals net of refunds.
+    # ------------------------------------------------------------------
+    def test_sales_report(self):
+        today = date.today()
+        inv = self.Move.create(
+            {
+                "move_type": "out_invoice",
+                "journal_id": self.j_sale.id,
+                "partner_id": self.partner_a.id,
+                "invoice_date": today,
+                "date": today,
+                "company_id": self.company.id,
+                "invoice_line_ids": [
+                    Command.create(
+                        {
+                            "name": "Service line",
+                            "quantity": 2.0,
+                            "price_unit": 300.0,
+                            "account_id": self.acc_revenue.id,
+                            "tax_ids": [],
+                        }
+                    )
+                ],
+            }
+        )
+        inv.action_post()
+
+        rep = self.env["custom.report.sales"]
+        lines = rep._build_lines(self._filters())
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(grand["untaxed"], 600.0, places=2)
+        self.assertAlmostEqual(grand["quantity"], 2.0, places=2)

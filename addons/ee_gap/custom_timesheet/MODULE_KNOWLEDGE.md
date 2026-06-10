@@ -15,8 +15,8 @@ EE-equivalent extensions on top of CE `hr_timesheet` + `project` + `sale_timeshe
 - Employee logs hours by creating `account.analytic.line` (CE timesheet entry) with `unit_amount` (hours), `project_id`, `task_id`. New fields default: `x_billable=False`, `x_validation_state='draft'`.
 - `_compute_overtime_hours` derives `x_overtime_hours = max(0, unit_amount - 8.0)` (constant `STANDARD_DAILY_HOURS=8.0`).
 - Validation workflow on the line:
-  - `action_submit_validation()` — draft → submitted; calls `action_request_approval()` from `approval.mixin`. If no approval matrix matches (UserError), auto-validates → `validated`.
-  - `action_validate()` — gates via `_approval_check_required()` (engine-side); on pass → `validated`.
+  - `action_submit_validation()` — draft → submitted; calls `_approval_request_or_proceed()` from `approval.mixin`. When a matrix matches it auto-creates + submits the approval (line stays `submitted`, Waiting Approval); when none matches the helper returns True → auto-validates → `validated`.
+  - `action_validate()` — gates via `_approval_check_required()` (engine-side); on pass → `validated`. The engine calls this automatically (`_approval_on_granted`) once all tiers approve.
   - `action_reset_to_draft()` — back to draft; **blocks if `x_billed_invoice_line_id` is set** (already invoiced).
 - OT → payroll: `action_create_overtime_work_entry()` on a validated line with `x_overtime_hours > 0`:
   - Ensures `hr.work.entry.type` code='OT' exists (creates `display_code='OT'` too).
@@ -75,7 +75,7 @@ EE-equivalent extensions on top of CE `hr_timesheet` + `project` + `sale_timeshe
 - **Invoice wizard uses `zip(analytic_lines, inv_lines)`** to link back — relies on ordering being preserved through `account.move.create`. Risky if Odoo re-orders.
 - **`partner_id` filter in wizard domain** uses `aal.partner_id OR aal.so_line.order_partner_id` (OR'd via prefix domain operator) — analytic lines without either field set won't match by partner.
 - **Cross-line OT work entry has no awareness of attendance** — if both `custom_attendance` and this module create OT work entries for the same day, duplicates can result.
-- **`approval.mixin._approval_check_required()` raises UserError** if the matrix gates it; `action_validate` re-raises (intentional). Operators must clear approval before forced validation.
+- **`approval.mixin._approval_check_required()` raises UserError** if the matrix gates it; `action_validate` re-raises (intentional). Operators must clear approval before forced validation. `action_submit_validation` now uses the non-raising `_approval_request_or_proceed()` and the engine auto-validates via `_approval_on_granted` once approved.
 - **Currency on the analytic line is `x_billing_currency_id`** but the company's currency is used for the invoice; FX conversion is not handled.
 - **Weekly summary payload truncated at 200 lines** (`lines[:200]`) — long-running projects with > 200 entries/week get partial input to AI.
 - **`summary_html` is wrapped in a div but otherwise raw** — relies on the AI returning safe HTML; field is `sanitize=True` so most tags get stripped.

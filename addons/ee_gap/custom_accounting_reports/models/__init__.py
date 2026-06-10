@@ -9,6 +9,9 @@ from . import custom_report_cash_flow
 from . import custom_report_aged_receivable
 from . import custom_report_aged_payable
 from . import custom_report_partner_ledger
+from . import custom_report_partner_card
+from . import custom_report_advance
+from . import custom_report_sales
 from . import custom_report_tax
 from . import custom_report_books
 from . import custom_report_dispatch

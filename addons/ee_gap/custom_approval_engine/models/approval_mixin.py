@@ -124,3 +124,51 @@ class ApprovalMixin(models.AbstractModel):
         if req.state == "cancelled":
             raise UserError(_("Previous approval was cancelled. Start a new approval request."))
         return False
+
+    # --------------------------------------------------------------
+    # Auto-submit gate — confirm/post/submit actions call this instead of
+    # the raising _approval_check_required. It creates + submits the request
+    # when approval is required and returns False so the caller skips the
+    # protected operation; the document is left "Waiting Approval".
+    # --------------------------------------------------------------
+
+    def _approval_request_or_proceed(self) -> bool:
+        """Return True only when the protected action may proceed now.
+
+        Side effect: when a matrix matches and the record is not yet
+        approved, auto-create + submit an ``approval.request`` and return
+        False (the caller MUST NOT proceed — the record now waits for
+        approval). This must never raise on the "needs approval" path, or
+        the freshly created request would be rolled back with the
+        transaction.
+        """
+        self.ensure_one()
+        matrix = self.env["approval.matrix"].sudo()._resolve_for(self)
+        if not matrix:
+            return True
+        req = self.x_custom_approval_request_id
+        if req and req.state == "approved":
+            return True
+        if req and req.state in ("draft", "pending"):
+            # Already waiting — idempotent, do not submit a second request.
+            return False
+        # No active request (none / rejected / cancelled) → start a fresh cycle.
+        new_req = self.env["approval.request"].sudo()._create_for_record(self, matrix=matrix)
+        if not new_req:
+            return True
+        if new_req.state == "draft":
+            new_req.action_submit()
+        self.x_custom_approval_request_id = new_req.id
+        return False
+
+    def _approval_on_granted(self):
+        """Hook: re-run the gated action after final approval. Default no-op.
+
+        Overridden per model (sale → action_confirm, purchase →
+        button_confirm, account.move → action_post, ...). Called by
+        ``approval.request`` once all tiers are approved, running as the
+        original requester. Re-entrancy is safe: the gated action calls
+        ``_approval_request_or_proceed`` which sees the approved request and
+        returns True, so the action proceeds exactly once.
+        """
+        return True

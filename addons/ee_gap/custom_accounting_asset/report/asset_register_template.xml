@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_asset_register">
+        <t t-call="web.html_container">
+            <t t-call="web.internal_layout">
+                <div class="page">
+                    <div class="mb-3">
+                        <h3 class="mb-1" t-esc="report_title"/>
+                        <div class="text-muted">
+                            <span>Company:</span>
+                            <strong t-esc="company_names"/>
+                            <span class="ms-3">Period:</span>
+                            <strong t-esc="date_from_str"/> &#8594;
+                            <strong t-esc="date_to_str"/>
+                        </div>
+                    </div>
+                    <table class="table table-sm table-bordered" style="font-size: 0.75em;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>No</th>
+                                <th>Code</th>
+                                <th>Asset Name</th>
+                                <th>Acq. Date</th>
+                                <th class="text-end">Acquisition Value</th>
+                                <th class="text-end">Accum. Opening</th>
+                                <th class="text-end">YTD</th>
+                                <th class="text-end">Accum. End</th>
+                                <th class="text-end">Book Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="lines" t-as="line"
+                                t-att-class="'fw-bold table-secondary' if line.get('type') == 'grand_total' else ''">
+                                <td t-esc="line.get('no')"/>
+                                <td t-esc="line.get('code')"/>
+                                <td t-esc="line.get('name')"/>
+                                <td t-esc="line.get('acq_date')"/>
+                                <td class="text-end">
+                                    <span t-esc="line.get('acq_value')"
+                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="line.get('opening')"
+                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="line.get('ytd')"
+                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="line.get('accum_end')"
+                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="line.get('book')"
+                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

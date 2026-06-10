@@ -79,12 +79,10 @@ class AccountAnalyticLine(models.Model):
             if line.x_validation_state != "draft":
                 raise UserError(_("Only draft timesheet lines can be submitted."))
             line.x_validation_state = "submitted"
-            # Request approval via approval engine mixin (no-op if no matrix
-            # matches; downstream button still works).
-            try:
-                line.action_request_approval()
-            except UserError:
-                # No matrix configured -> auto-validate.
+            # Auto-submit approval when a matrix matches (line stays "submitted"
+            # until the engine grants it, then _approval_on_granted validates).
+            # When no matrix matches the helper returns True → validate now.
+            if line._approval_request_or_proceed():
                 line.x_validation_state = "validated"
         return True
 
@@ -99,6 +97,10 @@ class AccountAnalyticLine(models.Model):
                 raise
             line.x_validation_state = "validated"
         return True
+
+    def _approval_on_granted(self):
+        """Engine hook: validate the line once all tiers approve."""
+        return self.action_validate()
 
     def action_reset_to_draft(self):
         for line in self:

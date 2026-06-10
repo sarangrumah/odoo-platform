@@ -1156,7 +1156,11 @@ def build_pptx(out_path: Path, slides=None, footer_text: str = DEFAULT_FOOTER):
 # ======================================================================
 
 
-def build_pdf(out_path: Path):
+def build_pdf(out_path: Path, slides=None, footer_text: str = None, doc_title: str = "Erajaya VAS — Odoo Platform"):
+    if slides is None:
+        slides = SLIDES
+    if footer_text is None:
+        footer_text = "Erajaya VAS  ·  Odoo 19 Platform  ·  Mei 2026"
     PAGE = landscape(A4)
     PW, PH = PAGE
 
@@ -1241,7 +1245,7 @@ def build_pdf(out_path: Path):
         canvas.rect(0, 0, PW, 0.6 * cm, fill=1, stroke=0)
         canvas.setFillColor(RL_MUTED)
         canvas.setFont("Helvetica", 8)
-        canvas.drawString(margin_l, 0.2 * cm, "Erajaya VAS  ·  Odoo 19 Platform  ·  Mei 2026")
+        canvas.drawString(margin_l, 0.2 * cm, footer_text)
         canvas.drawRightString(PW - margin_r, 0.2 * cm, f"Confidential — Internal  ·  {doc.page}")
         canvas.restoreState()
 
@@ -1333,8 +1337,8 @@ def build_pdf(out_path: Path):
     # First page = title with custom canvas; remaining pages use page_decoration.
     # ReportLab limitation: onFirstPage / onLaterPages — we need different handler.
 
-    title_slide = SLIDES[0]
-    rest = SLIDES[1:]
+    title_slide = slides[0]
+    rest = slides[1:]
 
     avail_w = PW - margin_l - margin_r
     avail_h = PH - margin_t - margin_b
@@ -1715,7 +1719,7 @@ def build_pdf(out_path: Path):
         rightMargin=margin_r,
         topMargin=margin_t,
         bottomMargin=margin_b,
-        title="Erajaya VAS — Odoo Platform",
+        title=doc_title,
     )
     doc.build(flowables, onFirstPage=on_first, onLaterPages=on_later)
 

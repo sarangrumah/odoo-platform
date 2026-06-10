@@ -13,12 +13,6 @@
                         string="AI Extract Receipt"
                         icon="fa-magic"
                         groups="custom_expenses.group_user"/>
-                <button name="action_request_approval_expense"
-                        type="object"
-                        string="Request Approval"
-                        class="oe_highlight"
-                        groups="custom_expenses.group_user"
-                        invisible="x_custom_approval_state in ('pending','approved')"/>
                 <button name="action_open_approval_request"
                         type="object"
                         string="View Approval"

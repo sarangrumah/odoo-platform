@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Journal Voucher — a per-move printout (header + numbered GL lines with
+      debit/credit, total, amount in words, Input/Approved By). Works for any
+      account.move; vendor bills additionally show vendor / due-date / tax
+      number in the header. Bound to the account.move Print menu.
+
+      Follows the wkhtmltopdf-safe rules of report_common_templates.xml:
+      inline styles + <table> layout only, money via the NBSP-free partial.
+    -->
+    <template id="report_journal_voucher_document">
+        <t t-set="company" t-value="o.company_id"/>
+        <t t-set="accent" t-value="company.brand_accent_color or '#714B67'"/>
+        <t t-set="currency" t-value="o.currency_id"/>
+        <t t-set="comp_currency" t-value="company.currency_id"/>
+        <t t-set="is_bill" t-value="o.move_type in ('in_invoice', 'in_refund')"/>
+        <t t-set="posting_lines" t-value="o.line_ids.filtered(lambda l: l.display_type not in ('line_section', 'line_note'))"/>
+        <t t-set="total_debit" t-value="sum(posting_lines.mapped('debit'))"/>
+        <t t-set="total_credit" t-value="sum(posting_lines.mapped('credit'))"/>
+        <div t-attf-class="page o_company_#{company.id}_layout" style="font-size: 11px;">
+
+            <!-- Header -->
+            <t t-call="custom_report_templates.brand_header">
+                <t t-set="doc_title">JOURNAL VOUCHER</t>
+                <tr>
+                    <td style="width: 45%; font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">Document No</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="o.name or 'Draft'"/>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">Posting Date</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">
+                        <span t-if="o.date" t-out="o.date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">Document Type</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="o.journal_id.name"/>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">Period</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">
+                        <span t-if="o.date" t-out="o.date" t-options="{'widget': 'date', 'format': 'MM.yyyy'}"/>
+                    </td>
+                </tr>
+                <tr t-if="o.ref">
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">Reference</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="o.ref"/>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">Currency</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="currency.name"/>
+                </tr>
+                <tr t-if="is_bill and o.invoice_date_due">
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">Due Date</td>
+                    <td style="text-align: right; background-color: #e8edf5; border: 1px solid #b0b0b0; padding: 3px 5px;">
+                        <span t-out="o.invoice_date_due" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                    </td>
+                </tr>
+            </t>
+
+            <!-- Vendor band (bills only) -->
+            <t t-if="is_bill and o.partner_id" t-call="custom_report_templates.party_band">
+                <t t-set="band_label">VENDOR</t>
+                <t t-set="partner" t-value="o.partner_id"/>
+            </t>
+
+            <!-- GL lines -->
+            <table style="width: 100%; font-size: 10px; border-collapse: collapse; margin-bottom: 12px;">
+                <thead>
+                    <tr t-attf-style="background-color: {{accent}}; color: #ffffff;">
+                        <th style="width: 4%; text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;">No</th>
+                        <th style="width: 14%; text-align: left; border: 1px solid #b0b0b0; padding: 3px 5px;">GL Account</th>
+                        <th style="width: 32%; text-align: left; border: 1px solid #b0b0b0; padding: 3px 5px;">Description</th>
+                        <th style="width: 16%; text-align: left; border: 1px solid #b0b0b0; padding: 3px 5px;">Partner</th>
+                        <th style="width: 17%; text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">Debit</th>
+                        <th style="width: 17%; text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">Credit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="posting_lines" t-as="line">
+                        <td style="text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line_index + 1"/>
+                        <td style="border: 1px solid #b0b0b0; padding: 3px 5px;">
+                            <span t-out="line.account_id.code"/>
+                            <span t-out="line.account_id.name"/>
+                        </td>
+                        <td style="white-space: pre-line; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line.name"/>
+                        <td style="border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line.partner_id.name or ''"/>
+                        <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">
+                            <t t-if="line.debit"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="line.debit"/><t t-set="currency" t-value="comp_currency"/></t></t>
+                        </td>
+                        <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">
+                            <t t-if="line.credit"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="line.credit"/><t t-set="currency" t-value="comp_currency"/></t></t>
+                        </td>
+                    </tr>
+                    <tr style="font-weight: bold; background-color: #f3f3f3;">
+                        <td colspan="4" style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">Total</td>
+                        <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="total_debit"/><t t-set="currency" t-value="comp_currency"/></t></td>
+                        <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="total_credit"/><t t-set="currency" t-value="comp_currency"/></t></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Amount in words -->
+            <div style="font-size: 10px; margin-bottom: 12px; font-style: italic;">
+                In Words: <t t-out="comp_currency.amount_to_text(total_debit)"/>
+            </div>
+
+            <!-- Input By / Approved By -->
+            <table style="width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 10px;">
+                <tr>
+                    <td style="width: 50%; text-align: center; vertical-align: top;">
+                        <div>Input By</div>
+                        <div style="height: 60px;"></div>
+                        <div style="border-top: 1px solid #000; padding-top: 4px;" t-out="o.create_uid.name or ''"/>
+                    </td>
+                    <td style="width: 50%; text-align: center; vertical-align: top;">
+                        <div>Approved By</div>
+                        <div style="height: 60px;"></div>
+                        <div style="border-top: 1px solid #000; padding-top: 4px;">&#160;</div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </template>
+
+    <template id="report_journal_voucher">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="custom_report_templates.report_journal_voucher_document"/>
+            </t>
+        </t>
+    </template>
+
+    <record id="action_report_journal_voucher" model="ir.actions.report">
+        <field name="name">Journal Voucher</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_report_templates.report_journal_voucher</field>
+        <field name="report_file">custom_report_templates.report_journal_voucher</field>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="custom_report_templates.paperformat_branded_a4"/>
+        <field name="print_report_name">'Journal Voucher - %s' % (object.name or '').replace('/', '-')</field>
+    </record>
+</odoo>

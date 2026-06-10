@@ -193,6 +193,33 @@ class TestCustomFixedAsset(TransactionCase):
         # Two assets, 2 months due each -> 4 lines posted.
         self.assertEqual(count, 4)
 
+    def test_06_asset_register_report(self):
+        # 12000 over 12 months from 2025-01-01 -> 1000/month, first line
+        # 2025-02-01. So 11 monthly lines (Feb..Dec) fall in 2025.
+        asset = self._make_asset()
+        asset.action_confirm()
+
+        rep = self.env["custom.report.asset.register"]
+        filters = {
+            "date_from": date(2025, 1, 1),
+            "date_to": date(2025, 12, 31),
+            "company_ids": [self.company.id],
+            "year": 2025,
+        }
+        lines = rep._build_lines(filters)
+        row = next(l for l in lines if l.get("code") == asset.code)
+        self.assertAlmostEqual(row["acq_value"], 12000.0, places=2)
+        self.assertAlmostEqual(row["opening"], 0.0, places=2)
+        self.assertAlmostEqual(row["ytd"], 11000.0, places=2)
+        self.assertAlmostEqual(row["accum_end"], 11000.0, places=2)
+        self.assertAlmostEqual(row["book"], 1000.0, places=2)
+        # Monthly columns: Jan (m0) = 0, Feb (m1) = 1000.
+        self.assertAlmostEqual(row["m0"], 0.0, places=2)
+        self.assertAlmostEqual(row["m1"], 1000.0, places=2)
+
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(grand["ytd"], 11000.0, places=2)
+
     def _mock_today(self, today):
         """Lightweight context manager that monkey-patches
         fields.Date.context_today for the duration of the with-block.

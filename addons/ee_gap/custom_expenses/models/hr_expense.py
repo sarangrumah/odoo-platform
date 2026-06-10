@@ -347,14 +347,27 @@ class HrExpense(models.Model):
         return True
 
     def action_submit_expenses(self):
-        """Gate the standard submit on approval engine state."""
+        """Submit gated on the approval engine.
+
+        Clicking Submit auto-submits the approval request (when a matrix
+        matches) and leaves the expense in Waiting Approval; only expenses
+        needing no approval or already approved are actually submitted. The
+        engine re-runs this via ``_approval_on_granted`` after final approval.
+        """
+        proceed = self.browse()
         for expense in self:
-            expense._approval_check_required()
+            if expense._approval_request_or_proceed():
+                proceed |= expense
+        for expense in proceed:
             expense._pdp_audit_expense_event("submit")
-        parent = getattr(super(), "action_submit_expenses", None)
-        if callable(parent):
-            return parent()
+        if proceed:
+            parent = getattr(super(HrExpense, proceed), "action_submit_expenses", None)
+            if callable(parent):
+                return parent()
         return True
+
+    def _approval_on_granted(self):
+        return self.action_submit_expenses()
 
     # ------------------------------------------------------------------
     # Reimbursement payment flow

@@ -9,5 +9,9 @@ access_cf_wizard_user,cf wizard user,model_custom_report_cash_flow_wizard,group_
 access_ar_wizard_user,ar wizard user,model_custom_report_aged_receivable_wizard,group_report_user,1,1,1,1
 access_ap_wizard_user,ap wizard user,model_custom_report_aged_payable_wizard,group_report_user,1,1,1,1
 access_pl2_wizard_user,partner ledger wizard user,model_custom_report_partner_ledger_wizard,group_report_user,1,1,1,1
+access_apcard_wizard_user,kartu utang wizard user,model_custom_report_payable_card_wizard,group_report_user,1,1,1,1
+access_arcard_wizard_user,kartu piutang wizard user,model_custom_report_receivable_card_wizard,group_report_user,1,1,1,1
+access_advance_wizard_user,advance wizard user,model_custom_report_advance_wizard,group_report_user,1,1,1,1
+access_sales_wizard_user,sales wizard user,model_custom_report_sales_wizard,group_report_user,1,1,1,1
 access_tax_wizard_user,tax wizard user,model_custom_report_tax_wizard,group_report_user,1,1,1,1
 access_db_wizard_user,day book wizard user,model_custom_report_day_book_wizard,group_report_user,1,1,1,1

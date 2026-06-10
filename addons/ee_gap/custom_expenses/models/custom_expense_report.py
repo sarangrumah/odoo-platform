@@ -116,20 +116,22 @@ class CustomExpenseReport(models.Model):
     # Workflow actions
     # ------------------------------------------------------------------
     def action_submit_for_approval(self):
-        """Move to submitted + request approval via the generic matrix."""
+        """Move to submitted + auto-submit approval via the generic matrix."""
         for rep in self:
             if rep.state != "draft":
                 raise UserError(_("Only draft reports can be submitted."))
             if not rep.expense_ids:
                 raise UserError(_("Add at least one expense before submitting."))
             rep.state = "submitted"
-            # Route through approval.mixin (no-op if no matrix matches)
-            try:
-                rep.action_request_approval()
-            except UserError:
-                # No matrix → still treat as submitted (manual approval path)
-                pass
+            # Auto-create + submit the approval request when a matrix matches
+            # (no-op when none). The report stays "submitted" until the engine
+            # grants approval, which then calls _approval_on_granted below.
+            rep._approval_request_or_proceed()
         return True
+
+    def _approval_on_granted(self):
+        """Engine hook: advance the report to approved once all tiers pass."""
+        return self.action_approve()
 
     def action_approve(self):
         """Mark approved — gated by the matrix when one matches."""

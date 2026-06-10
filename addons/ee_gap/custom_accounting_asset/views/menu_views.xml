@@ -9,6 +9,10 @@
               parent="menu_assets_root" sequence="10"
               action="action_fixed_asset"/>
 
+    <menuitem id="menu_assets_register_report" name="Asset Register"
+              parent="menu_assets_root" sequence="20"
+              action="action_asset_register_wizard"/>
+
     <menuitem id="menu_assets_config" name="Configuration"
               parent="menu_assets_root" sequence="90"
               groups="group_asset_manager"/>

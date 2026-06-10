@@ -18,6 +18,17 @@ class AgedReceivableWizard(models.TransientModel):
         default=lambda self: self.env.companies,
     )
     partner_ids = fields.Many2many("res.partner")
+    detail_mode = fields.Selection(
+        [
+            ("summary", "Summary (per partner)"),
+            ("detail", "Detail (per document)"),
+        ],
+        string="Excel Detail",
+        default="summary",
+        required=True,
+        help="Detail = one row per open document (the PDF always prints the "
+        "per-partner summary).",
+    )
 
     def _build_filters(self):
         self.ensure_one()
@@ -50,4 +61,7 @@ class AgedReceivableWizard(models.TransientModel):
             "date_to": self.date_to.isoformat(),
         }
         filename = "Aged_Receivable_%s.xlsx" % self.date_to
-        return self.env["custom.report.aged.receivable"]._xlsx_action(options, filename)
+        report = self.env["custom.report.aged.receivable"].with_context(
+            aging_detail=self.detail_mode == "detail",
+        )
+        return report._xlsx_action(options, filename)

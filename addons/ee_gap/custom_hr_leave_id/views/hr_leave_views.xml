@@ -26,11 +26,6 @@
                 </div>
             </xpath>
             <xpath expr="//header" position="inside">
-                <button name="action_request_approval"
-                        type="object"
-                        string="Request Approval"
-                        class="oe_highlight"
-                        invisible="x_custom_approval_state in ('pending','approved')"/>
                 <button name="action_open_approval_request"
                         type="object"
                         string="View Approval"

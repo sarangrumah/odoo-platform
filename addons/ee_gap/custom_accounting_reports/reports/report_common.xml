@@ -31,6 +31,15 @@
                         <t t-elif="report_code == 'partner_ledger'">
                             <t t-call="custom_accounting_reports.report_partner_ledger"/>
                         </t>
+                        <t t-elif="report_code == 'payable_card' or report_code == 'receivable_card'">
+                            <t t-call="custom_accounting_reports.report_partner_card"/>
+                        </t>
+                        <t t-elif="report_code == 'advance'">
+                            <t t-call="custom_accounting_reports.report_advance"/>
+                        </t>
+                        <t t-elif="report_code == 'sales'">
+                            <t t-call="custom_accounting_reports.report_sales"/>
+                        </t>
                         <t t-elif="report_code == 'tax'">
                             <t t-call="custom_accounting_reports.report_tax"/>
                         </t>
