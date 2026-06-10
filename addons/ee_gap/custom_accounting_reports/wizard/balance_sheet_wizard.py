@@ -42,3 +42,15 @@ class BalanceSheetWizard(models.TransientModel):
             },
         }
         return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)
+
+    def action_export_xlsx(self):
+        self.ensure_one()
+        options = {
+            **self._build_filters(),
+            "date_to": self.date_to.isoformat(),
+            "comparison_date_to": (
+                self.comparison_date_to.isoformat() if self.comparison_date_to else None
+            ),
+        }
+        filename = "Balance_Sheet_%s.xlsx" % self.date_to
+        return self.env["custom.report.balance.sheet"]._xlsx_action(options, filename)

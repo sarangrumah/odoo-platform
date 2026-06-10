@@ -449,74 +449,109 @@ class CustomReportEngine(models.AbstractModel):
             )
         )
 
+    def _xlsx_formats(self, workbook):
+        """Reusable cell formats shared by every report's XLSX body."""
+        return {
+            "title": workbook.add_format(
+                {"bold": True, "font_size": 14, "align": "center"}
+            ),
+            "meta": workbook.add_format({"align": "center", "font_size": 10}),
+            "header": workbook.add_format(
+                {
+                    "bold": True,
+                    "border": 1,
+                    "bg_color": "#D9E1F2",
+                    "align": "center",
+                    "valign": "vcenter",
+                    "text_wrap": True,
+                }
+            ),
+            "text": workbook.add_format({"border": 1}),
+            "num": workbook.add_format({"border": 1, "num_format": "#,##0.00"}),
+            "total_text": workbook.add_format(
+                {"border": 1, "bold": True, "bg_color": "#F2F2F2"}
+            ),
+            "total_num": workbook.add_format(
+                {
+                    "border": 1,
+                    "bold": True,
+                    "bg_color": "#F2F2F2",
+                    "num_format": "#,##0.00",
+                }
+            ),
+            # Hierarchical reports (GL group headers, BS section headers).
+            "group_text": workbook.add_format(
+                {"border": 1, "bold": True, "bg_color": "#EDEDED"}
+            ),
+            "group_num": workbook.add_format(
+                {
+                    "border": 1,
+                    "bold": True,
+                    "bg_color": "#EDEDED",
+                    "num_format": "#,##0.00",
+                }
+            ),
+            "section": workbook.add_format(
+                {"bold": True, "font_size": 11, "bg_color": "#FCE4D6"}
+            ),
+        }
+
     def _xlsx_export(self, filters=None):
         """Compute the report and render it to XLSX. Returns raw bytes.
 
-        Generic, driven by :py:meth:`_xlsx_columns`. Lines whose ``type``
-        is ``coverage`` are skipped; ``grand_total`` / ``total`` /
-        ``subtotal`` rows are rendered bold, with any ``label`` falling
-        into the first text column.
+        Writes the common title/company/period banner, then delegates the
+        data rows to :py:meth:`_xlsx_body` (default = flat table driven by
+        :py:meth:`_xlsx_columns`). Reports with hierarchical lines override
+        ``_xlsx_body``.
         """
         import io
         import xlsxwriter
 
         ctx = self._compute(filters)
         columns = self._xlsx_columns()
-        last_col = len(columns) - 1
+        last_col = max(len(columns) - 1, 0)
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output, {"in_memory": True})
         sheet = workbook.add_worksheet((self._report_title or "Report")[:31])
+        fmts = self._xlsx_formats(workbook)
 
-        title_fmt = workbook.add_format(
-            {"bold": True, "font_size": 14, "align": "center"}
-        )
-        meta_fmt = workbook.add_format({"align": "center", "font_size": 10})
-        header_fmt = workbook.add_format(
-            {
-                "bold": True,
-                "border": 1,
-                "bg_color": "#D9E1F2",
-                "align": "center",
-                "valign": "vcenter",
-                "text_wrap": True,
-            }
-        )
-        text_fmt = workbook.add_format({"border": 1})
-        num_fmt = workbook.add_format({"border": 1, "num_format": "#,##0.00"})
-        total_text_fmt = workbook.add_format(
-            {"border": 1, "bold": True, "bg_color": "#F2F2F2"}
-        )
-        total_num_fmt = workbook.add_format(
-            {
-                "border": 1,
-                "bold": True,
-                "bg_color": "#F2F2F2",
-                "num_format": "#,##0.00",
-            }
-        )
-
-        first_text_col = next(
-            (i for i, c in enumerate(columns) if c.get("kind") != "number"),
-            0,
-        )
+        for col_idx, col in enumerate(columns):
+            sheet.set_column(col_idx, col_idx, col.get("width", 16))
 
         row = 0
-        sheet.merge_range(row, 0, row, last_col, ctx.get("report_title", ""), title_fmt)
+        sheet.merge_range(row, 0, row, last_col, ctx.get("report_title", ""), fmts["title"])
         row += 1
         if ctx.get("company_names"):
-            sheet.merge_range(row, 0, row, last_col, ctx["company_names"], meta_fmt)
+            sheet.merge_range(row, 0, row, last_col, ctx["company_names"], fmts["meta"])
             row += 1
         period = "%s s/d %s" % (
             ctx.get("date_from_id") or "",
             ctx.get("date_to_id") or "",
         )
-        sheet.merge_range(row, 0, row, last_col, period, meta_fmt)
+        sheet.merge_range(row, 0, row, last_col, period, fmts["meta"])
         row += 2
 
+        self._xlsx_body(sheet, ctx, columns, fmts, row)
+
+        workbook.close()
+        return output.getvalue()
+
+    def _xlsx_body(self, sheet, ctx, columns, fmts, start_row):
+        """Render the data rows. Returns the next free row.
+
+        Default implementation = flat table driven by ``columns``. Lines
+        whose ``type`` is ``coverage`` are skipped; ``grand_total`` /
+        ``total`` / ``subtotal`` rows are bold, with any ``label`` falling
+        into the first text column.
+        """
+        first_text_col = next(
+            (i for i, c in enumerate(columns) if c.get("kind") != "number"),
+            0,
+        )
+        row = start_row
         for col_idx, col in enumerate(columns):
-            sheet.set_column(col_idx, col_idx, col.get("width", 16))
-            sheet.write(row, col_idx, col.get("header", ""), header_fmt)
+            sheet.write(row, col_idx, col.get("header", ""), fmts["header"])
         sheet.freeze_panes(row + 1, 0)
         row += 1
 
@@ -530,15 +565,36 @@ class CustomReportEngine(models.AbstractModel):
                 if not is_number and not value and col_idx == first_text_col:
                     value = line.get("label") or ""
                 if is_number:
-                    fmt = total_num_fmt if is_total else num_fmt
+                    fmt = fmts["total_num"] if is_total else fmts["num"]
                     sheet.write_number(row, col_idx, float(value or 0.0), fmt)
                 else:
-                    fmt = total_text_fmt if is_total else text_fmt
+                    fmt = fmts["total_text"] if is_total else fmts["text"]
                     sheet.write(row, col_idx, value or "", fmt)
             row += 1
+        return row
 
-        workbook.close()
-        return output.getvalue()
+    def _xlsx_action(self, filters, filename):
+        """Build the XLSX, stash it as an ``ir.attachment`` and return an
+        ``act_url`` download action. Convenience wrapper for wizards."""
+        import base64
+
+        content = self._xlsx_export(filters)
+        attachment = self.env["ir.attachment"].create(
+            {
+                "name": filename,
+                "type": "binary",
+                "datas": base64.b64encode(content),
+                "mimetype": (
+                    "application/vnd.openxmlformats-officedocument"
+                    ".spreadsheetml.sheet"
+                ),
+            }
+        )
+        return {
+            "type": "ir.actions.act_url",
+            "url": "/web/content/%s?download=true" % attachment.id,
+            "target": "self",
+        }
 
     # ------------------------------------------------------------------
     # PDP audit hook — record every report run

@@ -39,6 +39,53 @@ class CustomReportBalanceSheet(models.AbstractModel):
     _report_code = "balance_sheet"
     _report_title = "Balance Sheet"
 
+    def _xlsx_columns(self):
+        return [
+            {"header": "Code", "field": "account_code", "kind": "text", "width": 16},
+            {"header": "Account", "field": "account_name", "kind": "text", "width": 46},
+            {"header": "Balance", "field": "signed_balance", "kind": "number", "width": 20},
+        ]
+
+    def _xlsx_body(self, sheet, ctx, columns, fmts, start_row):
+        lines = ctx.get("lines", [])
+        has_comp = any(line.get("comparison") is not None for line in lines)
+        last_col = 3 if has_comp else 2
+        row = start_row
+
+        sheet.write(row, 0, "Code", fmts["header"])
+        sheet.write(row, 1, "Account", fmts["header"])
+        sheet.write(row, 2, "Balance", fmts["header"])
+        if has_comp:
+            sheet.set_column(3, 3, 20)
+            sheet.write(row, 3, "Prior Period", fmts["header"])
+        sheet.freeze_panes(row + 1, 0)
+        row += 1
+
+        for line in lines:
+            ltype = line.get("type")
+            if ltype == "header":
+                sheet.merge_range(row, 0, row, last_col, line.get("label") or "", fmts["section"])
+                row += 1
+            elif ltype == "section":
+                for acc in line.get("accounts", []):
+                    sheet.write(row, 0, acc.get("account_code") or "", fmts["text"])
+                    sheet.write(row, 1, acc.get("account_name") or "", fmts["text"])
+                    sheet.write_number(row, 2, float(acc.get("signed_balance") or 0.0), fmts["num"])
+                    if has_comp:
+                        sheet.write(row, 3, "", fmts["text"])
+                    row += 1
+            elif ltype in ("total", "grand_total", "check"):
+                sheet.merge_range(row, 0, row, 1, line.get("label") or "", fmts["total_text"])
+                sheet.write_number(row, 2, float(line.get("signed_balance") or 0.0), fmts["total_num"])
+                if has_comp:
+                    comp = line.get("comparison")
+                    if comp is None:
+                        sheet.write(row, 3, "", fmts["total_text"])
+                    else:
+                        sheet.write_number(row, 3, float(comp), fmts["total_num"])
+                row += 1
+        return row
+
     def _default_filters(self):
         filters = super()._default_filters()
         # Balance Sheet is cumulative — pin date_from far back.
