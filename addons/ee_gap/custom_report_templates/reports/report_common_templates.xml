@@ -9,7 +9,16 @@
         accent   - hex accent colour (company.brand_accent_color or fallback)
         currency - o.currency_id (for the monetary widget)
       Partials with a body slot render it via <t t-out="0"/>.
-      Styling is inline / Bootstrap-grid only (wkhtmltopdf-safe — no flexbox).
+
+      LAYOUT RULES (wkhtmltopdf 0.12.6.1 / Qt-WebKit):
+        * NEVER use Bootstrap grid (`row`/`col-*`/`offset-*`) — those rely on
+          `display:flex`, which this engine collapses to full-width stacked
+          blocks. Use <table> with explicit % widths for side-by-side columns.
+        * Style everything INLINE (text-align, font-weight, borders, padding,
+          width). The Bootstrap stylesheet is loaded over an external callback
+          (`report.url`) that intermittently fails on this platform, so do not
+          depend on utility classes (text-end/fw-bold/table-bordered/…) for any
+          layout-critical rendering. Inline styles always survive.
     -->
 
     <!-- ============ Money (NBSP-free) ============ -->
@@ -29,41 +38,46 @@
     </template>
 
     <!-- ============ Branded header: logo + address (left), title + meta (right) ============ -->
+    <!-- Two columns via a table (60% / 40%) so they stay side-by-side. The
+         caller's meta rows (<tr>…</tr>) are injected into the right-hand
+         table via <t t-out="0"/>. -->
     <template id="brand_header">
-        <div class="row mb-2">
-            <div class="col-7">
-                <img t-if="company.logo"
-                     t-att-src="image_data_uri(company.logo)"
-                     style="max-height: 60px; max-width: 240px;" alt="Logo"/>
-                <div class="mt-2" style="font-size: 9px; line-height: 1.3;">
-                    <div t-if="company.street" t-out="company.street"/>
-                    <div t-if="company.street2" t-out="company.street2"/>
-                    <div>
-                        <span t-if="company.city" t-out="company.city"/><span t-if="company.state_id">, <t t-out="company.state_id.name"/></span><span t-if="company.zip"> <t t-out="company.zip"/></span>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+            <tr>
+                <td style="width: 60%; vertical-align: top; padding: 0;">
+                    <img t-if="company.logo"
+                         t-att-src="image_data_uri(company.logo)"
+                         style="max-height: 60px; max-width: 240px;" alt="Logo"/>
+                    <div style="margin-top: 6px; font-size: 9px; line-height: 1.3;">
+                        <div t-if="company.street" t-out="company.street"/>
+                        <div t-if="company.street2" t-out="company.street2"/>
+                        <div>
+                            <span t-if="company.city" t-out="company.city"/><span t-if="company.state_id">, <t t-out="company.state_id.name"/></span><span t-if="company.zip"> <t t-out="company.zip"/></span>
+                        </div>
+                        <div t-if="company.phone">Phone: <t t-out="company.phone"/></div>
+                        <div t-if="company.email">Email: <t t-out="company.email"/></div>
+                        <div t-if="company.website">Website: <t t-out="company.website"/></div>
                     </div>
-                    <div t-if="company.phone">Phone: <t t-out="company.phone"/></div>
-                    <div t-if="company.email">Email: <t t-out="company.email"/></div>
-                    <div t-if="company.website">Website: <t t-out="company.website"/></div>
-                </div>
-            </div>
-            <div class="col-5">
-                <h2 class="text-end fw-bold mb-3" t-attf-style="color: {{accent}};">
-                    <t t-out="doc_title"/>
-                </h2>
-                <table class="table table-sm table-bordered mb-0" style="width: 100%; font-size: 10px;">
-                    <t t-out="0"/>
-                </table>
-            </div>
-        </div>
+                </td>
+                <td style="width: 40%; vertical-align: top; padding: 0;">
+                    <div t-attf-style="text-align: right; font-weight: bold; font-size: 22px; margin-bottom: 10px; color: {{accent}};">
+                        <t t-out="doc_title"/>
+                    </div>
+                    <table style="width: 100%; font-size: 10px; border-collapse: collapse;">
+                        <t t-out="0"/>
+                    </table>
+                </td>
+            </tr>
+        </table>
     </template>
 
     <!-- ============ FOR / BILL TO band ============ -->
     <template id="party_band">
-        <div class="fw-bold px-2 py-1 mb-1" t-attf-style="background-color: {{accent}}; color: #ffffff;">
+        <div t-attf-style="font-weight: bold; padding: 4px 8px; margin-bottom: 4px; background-color: {{accent}}; color: #ffffff;">
             <t t-out="band_label"/>
         </div>
-        <div class="px-2 mb-3" style="font-size: 10px; line-height: 1.3;">
-            <div class="fw-bold" t-out="partner.name"/>
+        <div style="padding: 0 8px; margin-bottom: 12px; font-size: 10px; line-height: 1.3;">
+            <div style="font-weight: bold;" t-out="partner.name"/>
             <div t-if="partner.parent_id and partner.parent_id != partner" t-out="partner.parent_id.name"/>
             <div t-if="partner.street" t-out="partner.street"/>
             <div t-if="partner.street2" t-out="partner.street2"/>
@@ -78,37 +92,37 @@
     <!-- Caller sets: lines (recordset), qty_field (string field name). All
          three line models use the unified `tax_ids` field in Odoo 19. -->
     <template id="items_table">
-        <table class="table table-bordered table-sm mb-3" style="font-size: 10px;">
+        <table style="width: 100%; font-size: 10px; border-collapse: collapse; margin-bottom: 12px;">
             <thead>
                 <tr t-attf-style="background-color: {{accent}}; color: #ffffff;">
-                    <th style="width: 38%;">DESCRIPTION</th>
-                    <th class="text-end" style="width: 16%;">UNIT PRICE (Rp.)</th>
-                    <th class="text-center" style="width: 7%;">QTY</th>
-                    <th class="text-center" style="width: 11%;">DISCOUNT</th>
-                    <th class="text-center" style="width: 8%;">TAXED</th>
-                    <th class="text-end" style="width: 20%;">AMOUNT (Rp.)</th>
+                    <th style="width: 38%; text-align: left; border: 1px solid #b0b0b0; padding: 3px 5px;">DESCRIPTION</th>
+                    <th style="width: 16%; text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">UNIT PRICE (Rp.)</th>
+                    <th style="width: 7%; text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;">QTY</th>
+                    <th style="width: 11%; text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;">DISCOUNT</th>
+                    <th style="width: 8%; text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;">TAXED</th>
+                    <th style="width: 20%; text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">AMOUNT (Rp.)</th>
                 </tr>
             </thead>
             <tbody>
                 <t t-foreach="lines" t-as="line">
                     <t t-if="line.display_type == 'line_section'">
                         <tr>
-                            <td colspan="6" class="fw-bold" style="background-color: #f3f3f3;" t-out="line.name"/>
+                            <td colspan="6" style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line.name"/>
                         </tr>
                     </t>
                     <t t-elif="line.display_type == 'line_note'">
                         <tr>
-                            <td colspan="6" class="fst-italic" t-out="line.name"/>
+                            <td colspan="6" style="font-style: italic; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line.name"/>
                         </tr>
                     </t>
                     <t t-else="">
                         <tr>
-                            <td style="white-space: pre-line;" t-out="line.name"/>
-                            <td class="text-end"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="line.price_unit"/></t></td>
-                            <td class="text-center" t-out="line[qty_field]"/>
-                            <td class="text-center"><t t-out="'{:.1f}'.format(line.discount)"/>%</td>
-                            <td class="text-center" t-out="'X' if line.tax_ids else ''"/>
-                            <td class="text-end"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="line.price_subtotal"/></t></td>
+                            <td style="white-space: pre-line; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line.name"/>
+                            <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="line.price_unit"/></t></td>
+                            <td style="text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line[qty_field]"/>
+                            <td style="text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;"><t t-out="'{:.1f}'.format(line.discount)"/>%</td>
+                            <td style="text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="'X' if line.tax_ids else ''"/>
+                            <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="line.price_subtotal"/></t></td>
                         </tr>
                     </t>
                 </t>
@@ -118,11 +132,11 @@
 
     <!-- ============ OTHER COMMENTS box (body slot) ============ -->
     <template id="comments_box">
-        <div class="border" style="font-size: 10px;">
-            <div class="fw-bold px-2 py-1" t-attf-style="background-color: {{accent}}; color: #ffffff;">
+        <div style="border: 1px solid #b0b0b0; font-size: 10px;">
+            <div t-attf-style="font-weight: bold; padding: 4px 8px; background-color: {{accent}}; color: #ffffff;">
                 OTHER COMMENTS
             </div>
-            <div class="px-2 py-2" style="white-space: pre-line;">
+            <div style="padding: 8px; white-space: pre-line;">
                 <t t-out="0"/>
             </div>
         </div>
@@ -131,43 +145,47 @@
     <!-- ============ Totals block ============ -->
     <!-- Caller sets: vat_pct (string, e.g. '11.0'), show_balance (bool). -->
     <template id="totals_block">
-        <table class="table table-sm mb-0" style="font-size: 11px;">
+        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
             <tr>
-                <td class="text-end">Subtotal</td>
-                <td class="text-end" style="width: 45%;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_untaxed"/></t></td>
+                <td style="text-align: right; padding: 2px 5px;">Subtotal</td>
+                <td style="text-align: right; padding: 2px 5px; width: 45%;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_untaxed"/></t></td>
             </tr>
             <tr>
-                <td class="text-end">VAT <t t-out="vat_pct"/>%</td>
-                <td class="text-end"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_tax"/></t></td>
+                <td style="text-align: right; padding: 2px 5px;">VAT <t t-out="vat_pct"/>%</td>
+                <td style="text-align: right; padding: 2px 5px;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_tax"/></t></td>
             </tr>
-            <tr style="border-top: 2px solid #000;">
-                <td class="text-end fw-bold">TOTAL</td>
-                <td class="text-end fw-bold"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_total"/></t></td>
+            <tr>
+                <td style="text-align: right; padding: 2px 5px; font-weight: bold; border-top: 2px solid #000;">TOTAL</td>
+                <td style="text-align: right; padding: 2px 5px; font-weight: bold; border-top: 2px solid #000;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_total"/></t></td>
             </tr>
-            <tr t-if="show_balance" t-attf-style="background-color: #e8edf5;">
-                <td class="text-end fw-bold">BALANCE DUE</td>
-                <td class="text-end fw-bold"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_residual"/></t></td>
+            <tr t-if="show_balance">
+                <td style="text-align: right; padding: 2px 5px; font-weight: bold; background-color: #e8edf5;">BALANCE DUE</td>
+                <td style="text-align: right; padding: 2px 5px; font-weight: bold; background-color: #e8edf5;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_residual"/></t></td>
             </tr>
         </table>
     </template>
 
     <!-- ============ Signature + footer note ============ -->
-    <!-- Caller sets: signer (name or False), doc_noun (e.g. 'order' / 'invoice'). -->
+    <!-- Caller sets: signer (name or False), doc_noun (e.g. 'order' / 'invoice').
+         Right-aligned signature column via a 2-cell table (empty left half). -->
     <template id="signature_block">
-        <div class="row mt-4">
-            <div class="col-6 offset-6 text-center" style="font-size: 10px;">
-                <p class="mb-1">Yours Faithfully,</p>
-                <p class="fw-bold mb-0" t-out="company.name"/>
-                <div style="height: 80px;"/>
-                <p class="mb-0" t-out="signer or ''"/>
-            </div>
-        </div>
-        <div class="text-center mt-4" style="font-size: 10px;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+            <tr>
+                <td style="width: 50%;"></td>
+                <td style="width: 50%; text-align: center; font-size: 10px;">
+                    <div style="margin-bottom: 4px;">Yours Faithfully,</div>
+                    <div style="font-weight: bold;" t-out="company.name"/>
+                    <div style="height: 80px;"></div>
+                    <div t-out="signer or ''"/>
+                </td>
+            </tr>
+        </table>
+        <div style="text-align: center; margin-top: 16px; font-size: 10px;">
             <div>If you have any questions about this <t t-out="doc_noun"/>, please contact</div>
-            <div class="fw-bold">
+            <div style="font-weight: bold;">
                 <t t-out="company.name"/><span t-if="company.phone"> at <t t-out="company.phone"/></span>
             </div>
-            <div class="fw-bold mt-1" t-out="company.report_footer_note or 'Thank You For Your Business'"/>
+            <div style="font-weight: bold; margin-top: 4px;" t-out="company.report_footer_note or 'Thank You For Your Business'"/>
         </div>
     </template>
 

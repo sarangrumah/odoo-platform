@@ -10,22 +10,22 @@
             <t t-call="custom_report_templates.brand_header">
                 <t t-set="doc_title" t-value="{'out_invoice': 'INVOICE', 'out_refund': 'CREDIT NOTE', 'in_invoice': 'VENDOR BILL', 'in_refund': 'VENDOR CREDIT NOTE'}.get(o.move_type, 'INVOICE')"/>
                 <tr>
-                    <td class="fw-bold" style="width: 45%; background-color: #f3f3f3;">DATE</td>
-                    <td class="text-end">
+                    <td style="width: 45%; font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">DATE</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">
                         <span t-if="o.invoice_date" t-out="o.invoice_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
                     </td>
                 </tr>
                 <tr>
-                    <td class="fw-bold" style="background-color: #f3f3f3;">INVOICE #</td>
-                    <td class="text-end" t-out="o.name or 'Draft'"/>
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">INVOICE #</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="o.name or 'Draft'"/>
                 </tr>
                 <tr t-if="o.ref or o.invoice_origin">
-                    <td class="fw-bold" style="background-color: #f3f3f3;">CUSTOMER REF</td>
-                    <td class="text-end" t-out="o.ref or o.invoice_origin"/>
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">CUSTOMER REF</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="o.ref or o.invoice_origin"/>
                 </tr>
                 <tr>
-                    <td class="fw-bold" style="background-color: #f3f3f3;">DUE DATE</td>
-                    <td class="text-end" style="background-color: #e8edf5;">
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">DUE DATE</td>
+                    <td style="text-align: right; background-color: #e8edf5; border: 1px solid #b0b0b0; padding: 3px 5px;">
                         <span t-if="o.invoice_date_due" t-out="o.invoice_date_due" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
                     </td>
                 </tr>
@@ -43,21 +43,23 @@
                 <t t-set="qty_field" t-value="'quantity'"/>
             </t>
 
-            <!-- Comments + totals -->
-            <div class="row">
-                <div class="col-6">
-                    <t t-call="custom_report_templates.comments_box">
-                        <span t-if="company.report_bank_details" t-out="company.report_bank_details"/>
-                        <div t-if="o.narration" class="mt-1" t-out="o.narration"/>
-                    </t>
-                </div>
-                <div class="col-6">
-                    <t t-call="custom_report_templates.totals_block">
-                        <t t-set="vat_pct" t-value="'{:.1f}'.format(o.amount_tax / o.amount_untaxed * 100 if o.amount_untaxed else 0.0)"/>
-                        <t t-set="show_balance" t-value="True"/>
-                    </t>
-                </div>
-            </div>
+            <!-- Comments + totals (side-by-side via table, not Bootstrap grid) -->
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 55%; vertical-align: top; padding-right: 10px;">
+                        <t t-call="custom_report_templates.comments_box">
+                            <span t-if="company.report_bank_details" t-out="company.report_bank_details"/>
+                            <div t-if="o.narration" style="margin-top: 4px;" t-out="o.narration"/>
+                        </t>
+                    </td>
+                    <td style="width: 45%; vertical-align: top;">
+                        <t t-call="custom_report_templates.totals_block">
+                            <t t-set="vat_pct" t-value="'{:.1f}'.format(o.amount_tax / o.amount_untaxed * 100 if o.amount_untaxed else 0.0)"/>
+                            <t t-set="show_balance" t-value="True"/>
+                        </t>
+                    </td>
+                </tr>
+            </table>
 
             <!-- Signature + footer -->
             <t t-call="custom_report_templates.signature_block">

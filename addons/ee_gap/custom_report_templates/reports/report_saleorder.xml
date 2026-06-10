@@ -11,20 +11,20 @@
             <t t-call="custom_report_templates.brand_header">
                 <t t-set="doc_title" t-value="'SALES QUOTE' if is_quote else 'SALES ORDER'"/>
                 <tr>
-                    <td class="fw-bold" style="width: 45%; background-color: #f3f3f3;">DATE</td>
-                    <td class="text-end">
+                    <td style="width: 45%; font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">DATE</td>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">
                         <span t-if="o.date_order" t-out="o.date_order" t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy'}"/>
                     </td>
                 </tr>
                 <tr>
-                    <td class="fw-bold" style="background-color: #f3f3f3;">
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">
                         <t t-out="'QUOTE #' if is_quote else 'ORDER #'"/>
                     </td>
-                    <td class="text-end" t-out="o.name"/>
+                    <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="o.name"/>
                 </tr>
                 <tr t-if="is_quote and o.validity_date">
-                    <td class="fw-bold" style="background-color: #f3f3f3;">EXPIRED DATE</td>
-                    <td class="text-end" style="background-color: #e8edf5;">
+                    <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">EXPIRED DATE</td>
+                    <td style="text-align: right; background-color: #e8edf5; border: 1px solid #b0b0b0; padding: 3px 5px;">
                         <span t-out="o.validity_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
                     </td>
                 </tr>
@@ -42,20 +42,22 @@
                 <t t-set="qty_field" t-value="'product_uom_qty'"/>
             </t>
 
-            <!-- Comments + totals -->
-            <div class="row">
-                <div class="col-6">
-                    <t t-call="custom_report_templates.comments_box">
-                        <span t-if="o.note" t-out="o.note"/>
-                    </t>
-                </div>
-                <div class="col-6">
-                    <t t-call="custom_report_templates.totals_block">
-                        <t t-set="vat_pct" t-value="'{:.1f}'.format(o.amount_tax / o.amount_untaxed * 100 if o.amount_untaxed else 0.0)"/>
-                        <t t-set="show_balance" t-value="False"/>
-                    </t>
-                </div>
-            </div>
+            <!-- Comments + totals (side-by-side via table, not Bootstrap grid) -->
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 55%; vertical-align: top; padding-right: 10px;">
+                        <t t-call="custom_report_templates.comments_box">
+                            <span t-if="o.note" t-out="o.note"/>
+                        </t>
+                    </td>
+                    <td style="width: 45%; vertical-align: top;">
+                        <t t-call="custom_report_templates.totals_block">
+                            <t t-set="vat_pct" t-value="'{:.1f}'.format(o.amount_tax / o.amount_untaxed * 100 if o.amount_untaxed else 0.0)"/>
+                            <t t-set="show_balance" t-value="False"/>
+                        </t>
+                    </td>
+                </tr>
+            </table>
 
             <!-- Signature + footer -->
             <t t-call="custom_report_templates.signature_block">

@@ -92,36 +92,39 @@
                             <p t-out="doc.note"/>
                         </div>
 
-                        <div class="row mt-5">
-                            <div class="col-6 text-center">
-                                <p class="mb-0"><strong>Yang Menyerahkan</strong></p>
-                                <p class="text-muted"><t t-out="doc.party_from_id.display_name"/></p>
-                                <div style="height: 110px;">
-                                    <img t-if="doc.party_from_signature"
-                                         t-att-src="image_data_uri(doc.party_from_signature)"
-                                         style="max-height: 100px; max-width: 220px;"/>
-                                </div>
-                                <hr class="mt-0"/>
-                                <p class="mb-0">(<t t-out="doc.party_from_signed_by or '_______________'"/>)</p>
-                                <p class="text-muted small" t-if="doc.party_from_signed_at">
-                                    <span t-out="doc.party_from_signed_at" t-options='{"widget":"datetime"}'/>
-                                </p>
-                            </div>
-                            <div class="col-6 text-center">
-                                <p class="mb-0"><strong>Yang Menerima</strong></p>
-                                <p class="text-muted"><t t-out="doc.party_to_id.display_name"/></p>
-                                <div style="height: 110px;">
-                                    <img t-if="doc.party_to_signature"
-                                         t-att-src="image_data_uri(doc.party_to_signature)"
-                                         style="max-height: 100px; max-width: 220px;"/>
-                                </div>
-                                <hr class="mt-0"/>
-                                <p class="mb-0">(<t t-out="doc.party_to_signed_by or '_______________'"/>)</p>
-                                <p class="text-muted small" t-if="doc.party_to_signed_at">
-                                    <span t-out="doc.party_to_signed_at" t-options='{"widget":"datetime"}'/>
-                                </p>
-                            </div>
-                        </div>
+                        <!-- Two signature columns via table (wkhtmltopdf-safe; Bootstrap grid stacks) -->
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 48px;">
+                            <tr>
+                                <td style="width: 50%; text-align: center; vertical-align: top;">
+                                    <p class="mb-0"><strong>Yang Menyerahkan</strong></p>
+                                    <p class="text-muted"><t t-out="doc.party_from_id.display_name"/></p>
+                                    <div style="height: 110px;">
+                                        <img t-if="doc.party_from_signature"
+                                             t-att-src="image_data_uri(doc.party_from_signature)"
+                                             style="max-height: 100px; max-width: 220px;"/>
+                                    </div>
+                                    <hr class="mt-0"/>
+                                    <p class="mb-0">(<t t-out="doc.party_from_signed_by or '_______________'"/>)</p>
+                                    <p class="text-muted small" t-if="doc.party_from_signed_at">
+                                        <span t-out="doc.party_from_signed_at" t-options='{"widget":"datetime"}'/>
+                                    </p>
+                                </td>
+                                <td style="width: 50%; text-align: center; vertical-align: top;">
+                                    <p class="mb-0"><strong>Yang Menerima</strong></p>
+                                    <p class="text-muted"><t t-out="doc.party_to_id.display_name"/></p>
+                                    <div style="height: 110px;">
+                                        <img t-if="doc.party_to_signature"
+                                             t-att-src="image_data_uri(doc.party_to_signature)"
+                                             style="max-height: 100px; max-width: 220px;"/>
+                                    </div>
+                                    <hr class="mt-0"/>
+                                    <p class="mb-0">(<t t-out="doc.party_to_signed_by or '_______________'"/>)</p>
+                                    <p class="text-muted small" t-if="doc.party_to_signed_at">
+                                        <span t-out="doc.party_to_signed_at" t-options='{"widget":"datetime"}'/>
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
                 </t>
             </t>
