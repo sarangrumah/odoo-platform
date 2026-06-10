@@ -163,7 +163,7 @@ class CustomReportPartnerCardBase(models.AbstractModel):
                     "running_balance": running,
                     "amount_currency": ml.amount_currency or 0.0,
                     "currency": ml.currency_id.name or "",
-                    "clearing": ml.full_reconcile_id.name or "",
+                    "clearing": ml.matching_number or "",
                     "due_date": ml.date_maturity,
                     "user": ml.create_uid.name or "",
                 }

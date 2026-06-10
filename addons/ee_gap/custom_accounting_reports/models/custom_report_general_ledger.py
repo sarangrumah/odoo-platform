@@ -334,6 +334,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
              WHERE aml.date >= %s
                AND aml.date <= %s
                AND aml.company_id IN %s
+               AND aml.account_id IS NOT NULL
         """
         if filters.get("posted_only", True):
             query += " AND aml.parent_state = %s"
