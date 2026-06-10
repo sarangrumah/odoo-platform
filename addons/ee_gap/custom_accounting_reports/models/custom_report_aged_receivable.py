@@ -23,6 +23,39 @@ class CustomReportAgedReceivable(models.AbstractModel):
     _report_code = "aged_receivable"
     _report_title = "Aged Receivable"
 
+    def _xlsx_columns(self):
+        cols = [{"header": "Partner", "field": "partner_name", "kind": "text", "width": 36}]
+        for code, label, _lower, _upper in BUCKETS:
+            cols.append({"header": label, "field": code, "kind": "number", "width": 13})
+        cols.append({"header": "Total", "field": "total", "kind": "number", "width": 16})
+        return cols
+
+    def _xlsx_body(self, sheet, ctx, columns, fmts, start_row):
+        data = ctx.get("lines") or {}
+        rows = data.get("rows", [])
+        buckets = data.get("buckets", [])
+        grand = data.get("grand_total", {})
+        ncol = len(buckets) + 2  # partner + buckets + total
+        row = start_row
+
+        for col_idx, col in enumerate(columns):
+            sheet.write(row, col_idx, col["header"], fmts["header"])
+        sheet.freeze_panes(row + 1, 1)
+        row += 1
+
+        for r in rows:
+            sheet.write(row, 0, r.get("partner_name") or "", fmts["text"])
+            for i, b in enumerate(buckets):
+                sheet.write_number(row, 1 + i, float(r.get(b["code"]) or 0.0), fmts["num"])
+            sheet.write_number(row, ncol - 1, float(r.get("total") or 0.0), fmts["num"])
+            row += 1
+
+        sheet.write(row, 0, "Grand Total", fmts["total_text"])
+        for i, b in enumerate(buckets):
+            sheet.write_number(row, 1 + i, float(grand.get(b["code"]) or 0.0), fmts["total_num"])
+        sheet.write_number(row, ncol - 1, float(grand.get("total") or 0.0), fmts["total_num"])
+        return row + 1
+
     def _account_type(self):
         return "asset_receivable"
 

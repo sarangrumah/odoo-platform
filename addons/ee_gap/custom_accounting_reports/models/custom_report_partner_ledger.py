@@ -14,6 +14,60 @@ class CustomReportPartnerLedger(models.AbstractModel):
     _report_code = "partner_ledger"
     _report_title = "Partner Ledger"
 
+    def _xlsx_columns(self):
+        return [
+            {"header": "Date", "field": "date", "kind": "text", "width": 12},
+            {"header": "Entry", "field": "move_name", "kind": "text", "width": 18},
+            {"header": "Account", "field": "account_code", "kind": "text", "width": 14},
+            {"header": "Label", "field": "label", "kind": "text", "width": 34},
+            {"header": "Debit", "field": "debit", "kind": "number", "width": 16},
+            {"header": "Credit", "field": "credit", "kind": "number", "width": 16},
+            {"header": "Balance", "field": "running_balance", "kind": "number", "width": 16},
+        ]
+
+    def _xlsx_body(self, sheet, ctx, columns, fmts, start_row):
+        ncol = len(columns)
+        row = start_row
+        for col_idx, col in enumerate(columns):
+            sheet.write(row, col_idx, col["header"], fmts["header"])
+        sheet.freeze_panes(row + 1, 0)
+        row += 1
+
+        for line in ctx.get("lines", []):
+            ltype = line.get("type")
+            if ltype == "partner":
+                sheet.merge_range(
+                    row, 0, row, ncol - 2,
+                    line.get("partner_name") or "", fmts["group_text"],
+                )
+                sheet.write_number(
+                    row, ncol - 1, float(line.get("opening") or 0.0), fmts["group_num"]
+                )
+                row += 1
+                for ml in line.get("lines", []):
+                    sheet.write(row, 0, self._format_date_id(ml.get("date")), fmts["text"])
+                    sheet.write(row, 1, ml.get("move_name") or "", fmts["text"])
+                    sheet.write(row, 2, ml.get("account_code") or "", fmts["text"])
+                    sheet.write(row, 3, ml.get("label") or "", fmts["text"])
+                    sheet.write_number(row, 4, float(ml.get("debit") or 0.0), fmts["num"])
+                    sheet.write_number(row, 5, float(ml.get("credit") or 0.0), fmts["num"])
+                    sheet.write_number(row, 6, float(ml.get("running_balance") or 0.0), fmts["num"])
+                    row += 1
+                sheet.merge_range(row, 0, row, 3, "Total", fmts["total_text"])
+                sheet.write_number(row, 4, float(line.get("total_debit") or 0.0), fmts["total_num"])
+                sheet.write_number(row, 5, float(line.get("total_credit") or 0.0), fmts["total_num"])
+                sheet.write_number(row, 6, float(line.get("closing") or 0.0), fmts["total_num"])
+                row += 1
+            elif ltype == "grand_total":
+                sheet.merge_range(
+                    row, 0, row, 3, line.get("label") or "Grand Total", fmts["total_text"]
+                )
+                sheet.write_number(row, 4, float(line.get("total_debit") or 0.0), fmts["total_num"])
+                sheet.write_number(row, 5, float(line.get("total_credit") or 0.0), fmts["total_num"])
+                sheet.write_number(row, 6, float(line.get("closing") or 0.0), fmts["total_num"])
+                row += 1
+        return row
+
     def _account_types(self, kind):
         if kind == "receivable":
             return ("asset_receivable",)

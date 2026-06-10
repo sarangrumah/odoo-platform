@@ -15,6 +15,59 @@ class CustomReportTax(models.AbstractModel):
     _report_code = "tax"
     _report_title = "Tax Report"
 
+    def _xlsx_columns(self):
+        return [
+            {"header": "Tax", "field": "tax_name", "kind": "text", "width": 34},
+            {"header": "Rate", "field": "tax_rate", "kind": "number", "width": 10},
+            {"header": "Type", "field": "tax_use", "kind": "text", "width": 12},
+            {"header": "Fiscal Position", "field": "fiscal_position", "kind": "text", "width": 24},
+            {"header": "Base", "field": "base_amount", "kind": "number", "width": 18},
+            {"header": "Tax", "field": "tax_amount", "kind": "number", "width": 18},
+        ]
+
+    def _xlsx_body(self, sheet, ctx, columns, fmts, start_row):
+        row = start_row
+        for col_idx, col in enumerate(columns):
+            sheet.write(row, col_idx, col["header"], fmts["header"])
+        sheet.freeze_panes(row + 1, 0)
+        row += 1
+
+        for line in ctx.get("lines", []):
+            ltype = line.get("type")
+            if ltype == "category":
+                sheet.merge_range(row, 0, row, 5, line.get("label") or "", fmts["section"])
+                row += 1
+                for t in line.get("taxes", []):
+                    sheet.write(row, 0, t.get("tax_name") or "", fmts["text"])
+                    sheet.write_number(row, 1, float(t.get("tax_rate") or 0.0), fmts["num"])
+                    sheet.write(row, 2, t.get("tax_use") or "", fmts["text"])
+                    sheet.write(row, 3, t.get("fiscal_position") or "", fmts["text"])
+                    sheet.write_number(row, 4, float(t.get("base_amount") or 0.0), fmts["num"])
+                    sheet.write_number(row, 5, float(t.get("tax_amount") or 0.0), fmts["num"])
+                    row += 1
+                sheet.merge_range(row, 0, row, 3, "Subtotal", fmts["total_text"])
+                sheet.write_number(row, 4, float(line.get("base_subtotal") or 0.0), fmts["total_num"])
+                sheet.write_number(row, 5, float(line.get("tax_subtotal") or 0.0), fmts["total_num"])
+                row += 1
+            elif ltype == "fp_breakdown":
+                sheet.merge_range(row, 0, row, 5, line.get("label") or "", fmts["section"])
+                row += 1
+                for r in line.get("rows", []):
+                    sheet.merge_range(row, 0, row, 3, r.get("fiscal_position") or "", fmts["text"])
+                    sheet.write_number(row, 4, float(r.get("base_subtotal") or 0.0), fmts["num"])
+                    sheet.write_number(row, 5, float(r.get("tax_subtotal") or 0.0), fmts["num"])
+                    row += 1
+            elif ltype == "total":
+                sheet.merge_range(row, 0, row, 4, line.get("label") or "", fmts["total_text"])
+                sheet.write_number(row, 5, float(line.get("tax_amount") or 0.0), fmts["total_num"])
+                row += 1
+            elif ltype == "grand_total":
+                sheet.merge_range(row, 0, row, 3, line.get("label") or "Grand Total", fmts["total_text"])
+                sheet.write_number(row, 4, float(line.get("base_amount") or 0.0), fmts["total_num"])
+                sheet.write_number(row, 5, float(line.get("tax_amount") or 0.0), fmts["total_num"])
+                row += 1
+        return row
+
     def _classify(self, tax):
         """Bucket a tax into output / input / withholding."""
         # Convention: ``type_tax_use=='sale'`` is output VAT; ``purchase``

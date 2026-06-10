@@ -60,3 +60,25 @@ class DayBookWizard(models.TransientModel):
             },
         }
         return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)
+
+    _BOOK_MODEL = {
+        "day_book": "custom.report.day.book",
+        "cash_book": "custom.report.cash.book",
+        "bank_book": "custom.report.bank.book",
+        "journal_audit": "custom.report.journal.audit",
+    }
+
+    def action_export_xlsx(self):
+        self.ensure_one()
+        options = {
+            **self._build_filters(),
+            "date_from": self.date_from.isoformat(),
+            "date_to": self.date_to.isoformat(),
+        }
+        model = self._BOOK_MODEL[self.book_type]
+        filename = "%s_%s_%s.xlsx" % (
+            self.book_type.title().replace("_", ""),
+            self.date_from,
+            self.date_to,
+        )
+        return self.env[model]._xlsx_action(options, filename)

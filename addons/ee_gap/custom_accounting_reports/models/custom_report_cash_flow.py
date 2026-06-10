@@ -43,6 +43,19 @@ class CustomReportCashFlow(models.AbstractModel):
     _report_code = "cash_flow"
     _report_title = "Cash Flow Statement"
 
+    def _xlsx_columns(self):
+        return [
+            {"header": "Code", "field": "account_code", "kind": "text", "width": 16},
+            {"header": "Account", "field": "account_name", "kind": "text", "width": 46},
+            {"header": "Amount", "field": "signed_balance", "kind": "number", "width": 20},
+        ]
+
+    def _xlsx_body(self, sheet, ctx, columns, fmts, start_row):
+        return self._xlsx_sectioned_body(
+            sheet, ctx, fmts, start_row,
+            amount_header="Amount", secondary=None, section_heading=True,
+        )
+
     def _bucket(self, label, code, type_codes, balances, sign=-1):
         """Compute one activity bucket.
 

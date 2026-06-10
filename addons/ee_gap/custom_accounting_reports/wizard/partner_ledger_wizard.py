@@ -55,3 +55,13 @@ class PartnerLedgerWizard(models.TransientModel):
             },
         }
         return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)
+
+    def action_export_xlsx(self):
+        self.ensure_one()
+        options = {
+            **self._build_filters(),
+            "date_from": self.date_from.isoformat(),
+            "date_to": self.date_to.isoformat(),
+        }
+        filename = "Partner_Ledger_%s_%s.xlsx" % (self.date_from, self.date_to)
+        return self.env["custom.report.partner.ledger"]._xlsx_action(options, filename)

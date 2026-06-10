@@ -23,6 +23,18 @@ class CustomReportBookMixin(models.AbstractModel):
     # Override per subclass: 'cash', 'bank', or None for all.
     _book_journal_filter = None
 
+    def _xlsx_columns(self):
+        return [
+            {"header": "Date", "field": "date", "kind": "date", "width": 12},
+            {"header": "Journal", "field": "journal_code", "kind": "text", "width": 12},
+            {"header": "Entry", "field": "move_name", "kind": "text", "width": 18},
+            {"header": "Account", "field": "account_code", "kind": "text", "width": 14},
+            {"header": "Partner", "field": "partner", "kind": "text", "width": 28},
+            {"header": "Label", "field": "label", "kind": "text", "width": 34},
+            {"header": "Debit", "field": "debit", "kind": "number", "width": 16},
+            {"header": "Credit", "field": "credit", "kind": "number", "width": 16},
+        ]
+
     def _get_journal_lines(self, filters):
         """Return raw move-lines respecting the book's journal scope."""
         Journal = self.env["account.journal"]
@@ -104,6 +116,18 @@ class CustomReportJournalAudit(models.AbstractModel):
     _description = "Custom Journal Audit"
     _report_code = "journal_audit"
     _report_title = "Journal Audit"
+
+    def _xlsx_columns(self):
+        return [
+            {"header": "Date", "field": "date", "kind": "date", "width": 12},
+            {"header": "Journal", "field": "journal_code", "kind": "text", "width": 12},
+            {"header": "Entry", "field": "move_name", "kind": "text", "width": 18},
+            {"header": "Reference", "field": "reference", "kind": "text", "width": 22},
+            {"header": "State", "field": "state", "kind": "text", "width": 12},
+            {"header": "Posted By", "field": "posted_by", "kind": "text", "width": 22},
+            {"header": "Posted On", "field": "posted_on", "kind": "text", "width": 22},
+            {"header": "Amount", "field": "amount_total", "kind": "number", "width": 18},
+        ]
 
     def _build_lines(self, filters):
         AccountMove = self.env["account.move"]

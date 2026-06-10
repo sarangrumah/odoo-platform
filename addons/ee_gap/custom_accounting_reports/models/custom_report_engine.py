@@ -546,7 +546,7 @@ class CustomReportEngine(models.AbstractModel):
         into the first text column.
         """
         first_text_col = next(
-            (i for i, c in enumerate(columns) if c.get("kind") != "number"),
+            (i for i, c in enumerate(columns) if c.get("kind") not in ("number", "date")),
             0,
         )
         row = start_row
@@ -560,17 +560,75 @@ class CustomReportEngine(models.AbstractModel):
                 continue
             is_total = line.get("type") in ("grand_total", "total", "subtotal")
             for col_idx, col in enumerate(columns):
-                is_number = col.get("kind") == "number"
+                kind = col.get("kind")
                 value = line.get(col["field"])
-                if not is_number and not value and col_idx == first_text_col:
-                    value = line.get("label") or ""
-                if is_number:
+                if kind == "number":
                     fmt = fmts["total_num"] if is_total else fmts["num"]
                     sheet.write_number(row, col_idx, float(value or 0.0), fmt)
-                else:
-                    fmt = fmts["total_text"] if is_total else fmts["text"]
-                    sheet.write(row, col_idx, value or "", fmt)
+                    continue
+                fmt = fmts["total_text"] if is_total else fmts["text"]
+                if kind == "date":
+                    value = self._format_date_id(value)
+                elif not value and col_idx == first_text_col:
+                    value = line.get("label") or ""
+                sheet.write(row, col_idx, value or "", fmt)
             row += 1
+        return row
+
+    def _xlsx_sectioned_body(
+        self, sheet, ctx, fmts, start_row,
+        amount_header="Amount", secondary=None, section_heading=False,
+    ):
+        """Render reports whose lines are header/section/total rows
+        (Balance Sheet, P&L, Cash Flow).
+
+        Columns: ``Code | Account | <amount_header> [| secondary[0]]``.
+        ``secondary`` = ``(header_text, line_key)`` adds a 4th column read
+        from total-type lines; ``None`` = three columns.
+        ``section_heading`` = emit a heading row for each section's own
+        ``label`` (P&L/CF) instead of relying on explicit ``header`` lines
+        (Balance Sheet).
+        """
+        lines = ctx.get("lines", [])
+        has_secondary = secondary is not None
+        last_col = 3 if has_secondary else 2
+        row = start_row
+
+        sheet.write(row, 0, "Code", fmts["header"])
+        sheet.write(row, 1, "Account", fmts["header"])
+        sheet.write(row, 2, amount_header, fmts["header"])
+        if has_secondary:
+            sheet.set_column(3, 3, 20)
+            sheet.write(row, 3, secondary[0], fmts["header"])
+        sheet.freeze_panes(row + 1, 0)
+        row += 1
+
+        for line in lines:
+            ltype = line.get("type")
+            if ltype == "header":
+                sheet.merge_range(row, 0, row, last_col, line.get("label") or "", fmts["section"])
+                row += 1
+            elif ltype == "section":
+                if section_heading and line.get("label"):
+                    sheet.merge_range(row, 0, row, last_col, line["label"], fmts["group_text"])
+                    row += 1
+                for acc in line.get("accounts", []):
+                    sheet.write(row, 0, acc.get("account_code") or "", fmts["text"])
+                    sheet.write(row, 1, acc.get("account_name") or "", fmts["text"])
+                    sheet.write_number(row, 2, float(acc.get("signed_balance") or 0.0), fmts["num"])
+                    if has_secondary:
+                        sheet.write(row, 3, "", fmts["text"])
+                    row += 1
+            elif ltype in ("total", "subtotal", "grand_total", "check"):
+                sheet.merge_range(row, 0, row, 1, line.get("label") or "", fmts["total_text"])
+                sheet.write_number(row, 2, float(line.get("signed_balance") or 0.0), fmts["total_num"])
+                if has_secondary:
+                    val = line.get(secondary[1])
+                    if val is None:
+                        sheet.write(row, 3, "", fmts["total_text"])
+                    else:
+                        sheet.write_number(row, 3, float(val), fmts["total_num"])
+                row += 1
         return row
 
     def _xlsx_action(self, filters, filename):
