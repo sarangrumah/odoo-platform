@@ -4,7 +4,7 @@
         <t t-set="company" t-value="o.company_id"/>
         <t t-set="accent" t-value="company.brand_accent_color or '#714B67'"/>
         <t t-set="currency" t-value="o.currency_id"/>
-        <div t-attf-class="page o_company_#{company.id}_layout" style="font-size: 11px;">
+        <div t-attf-class="page o_company_#{company.id}_layout" style="font-size: 12px;">
 
             <!-- Header: logo + address (left), INVOICE + meta table (right) -->
             <t t-call="custom_report_templates.brand_header">

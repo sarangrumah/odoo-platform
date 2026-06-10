@@ -5,7 +5,7 @@
         <t t-set="accent" t-value="company.brand_accent_color or '#714B67'"/>
         <t t-set="currency" t-value="o.currency_id"/>
         <t t-set="is_quote" t-value="o.state in ('draft', 'sent')"/>
-        <div t-attf-class="page o_company_#{company.id}_layout" style="font-size: 11px;">
+        <div t-attf-class="page o_company_#{company.id}_layout" style="font-size: 12px;">
 
             <!-- Header -->
             <t t-call="custom_report_templates.brand_header">

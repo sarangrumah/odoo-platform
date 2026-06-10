@@ -6,7 +6,7 @@
         <t t-set="currency" t-value="o.currency_id"/>
         <t t-set="is_rfq" t-value="o.state in ('draft', 'sent')"/>
         <t t-set="due_date" t-value="o.date_planned if 'date_planned' in o._fields else False"/>
-        <div t-attf-class="page o_company_#{company.id}_layout" style="font-size: 11px;">
+        <div t-attf-class="page o_company_#{company.id}_layout" style="font-size: 12px;">
 
             <!-- Header -->
             <t t-call="custom_report_templates.brand_header">
