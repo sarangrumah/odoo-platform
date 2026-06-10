@@ -224,11 +224,22 @@ class CoretaxImportWizard(models.TransientModel):
                 continue
 
             vals = {"x_custom_coretax_status": "approved" if nsfp else "submitted"}
-            if nsfp and len(nsfp) == 17:
+            if nsfp:
+                # No hard 17-digit gate — real Coretax faktur numbers vary; the
+                # model constraint (_check_nsfp) does the permissive validation.
                 vals["x_custom_nsfp"] = nsfp
+                vals["x_custom_has_faktur_pajak"] = True
             status_code = _text("StatusCode")
             if status_code and status_code.isdigit() and len(status_code) <= 2:
                 vals["x_custom_coretax_status_code"] = status_code.zfill(2)
+            # Tanggal Faktur Pajak, when carried by the response XML.
+            tgl_raw = _text("TanggalFaktur") or _text("InvoiceDate")
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+                try:
+                    vals["x_custom_tanggal_faktur_pajak"] = datetime.strptime(tgl_raw, fmt).date()
+                    break
+                except ValueError:
+                    continue
             move.write(vals)
             updated += 1
             lines.append("OK: %s -> NSFP=%s" % (inv_num, nsfp or "(none)"))

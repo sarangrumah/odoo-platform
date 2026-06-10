@@ -57,3 +57,25 @@ class HrLeave(models.Model):
                 ) % len(holidays)
             else:
                 rec.x_overlapping_holidays_warning = False
+
+    # ------------------------------------------------------------------
+    # Approval engine integration
+    # ------------------------------------------------------------------
+    # Gate the employee submit (Confirm Request) on the approval engine.
+    # When a leave matrix matches, clicking Confirm auto-submits the approval
+    # request and leaves the request in Waiting Approval; only leaves needing
+    # no approval (no matrix) or already approved proceed into Odoo's native
+    # manager-approval queue. After the final tier approves, the engine
+    # re-runs action_confirm via _approval_on_granted. Leaves are opt-in: with
+    # no configured matrix the engine is a no-op and native behaviour stands.
+    def action_confirm(self):
+        proceed = self.browse()
+        for leave in self:
+            if leave._approval_request_or_proceed():
+                proceed |= leave
+        if proceed:
+            return super(HrLeave, proceed).action_confirm()
+        return True
+
+    def _approval_on_granted(self):
+        return self.action_confirm()

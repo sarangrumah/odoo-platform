@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 
 STATES = [
     ("draft", "Draft"),
-    ("pending", "Pending"),
+    ("pending", "Waiting Approval"),
     ("approved", "Approved"),
     ("rejected", "Rejected"),
     ("cancelled", "Cancelled"),
@@ -125,6 +125,10 @@ class ApprovalRequest(models.Model):
                 "matrix_id": matrix.id,
                 "res_model": record._name,
                 "res_id": record.id,
+                # Capture the real acting user (record's env), not the superuser
+                # introduced by the sudo() create — used for audit attribution
+                # and to run the post-approval auto-proceed with proper ACLs.
+                "requested_by_id": record.env.user.id,
                 "company_id": (
                     record.company_id.id if hasattr(record, "company_id") and record.company_id else self.env.company.id
                 ),
@@ -230,6 +234,16 @@ class ApprovalRequest(models.Model):
             except Exception:
                 _logger.exception("approval %s: message_post failed (non-fatal)", self.id)
             self._pdp_audit_write("approval_complete", self.id, None)
+            # Auto-proceed the gated action (confirm / post / submit) now that
+            # approval is complete, running as the original requester. Best
+            # effort: a failure here (e.g. missing order lines) must not roll
+            # back the already-persisted approval decision.
+            try:
+                record = self._record()
+                if record and record.exists() and hasattr(record, "_approval_on_granted"):
+                    record.with_user(self.requested_by_id)._approval_on_granted()
+            except Exception:
+                _logger.exception("approval %s: auto-proceed on grant failed (non-fatal)", self.id)
             return
         next_tier = tiers[idx + 1]
         self.write(

@@ -2,8 +2,17 @@
 
 Generic multi-tier approval workflow — model-agnostic via the
 `approval.mixin` mixin. Ships ready-wired gates for `account.move`,
-`purchase.order`, and `sale.order`. Add the mixin to any custom model
-to extend.
+`purchase.order`, `sale.order`, `hr.expense`, `custom.expense.report`,
+`account.analytic.line` (timesheet) and `hr.leave`. Add the mixin to any
+custom model to extend.
+
+**No manual "Request Approval" step.** Performing a document's native
+confirm action (Confirm / Post / Submit / Validate) auto-submits the
+approval when a matrix matches: the document shows **Waiting Approval** and
+lands in the Approvals inbox. After the final tier approves, the document
+**auto-proceeds** (auto-confirms) — no second click. The standalone
+"Request Approval" button has been removed from the built-in documents
+(the `action_request_approval` API is retained for custom models).
 
 ## Models
 
@@ -14,23 +23,38 @@ to extend.
   `sla_hours` and an `on_overdue` strategy.
 - `approval.request` — one per `(record × matrix)`. Walks tiers in
   sequence. State machine: `draft → pending → approved | rejected |
-  cancelled`. Audit-logged to `pdp.audit_log`.
+  cancelled` (the `pending` state is labelled **Waiting Approval** in the
+  UI). Audit-logged to `pdp.audit_log`.
 - `approval.request.line` — immutable history; cannot be edited or
   unlinked.
 - `approval.delegation` — manual stand-in for a date window, optionally
   scoped to specific models.
 - `approval.ooo` — auto-created from approved `hr.leave`. Auto-delegates
   pending approvals to the leave taker's manager (or explicit fallback).
-- `approval.mixin` — attach to any model:
+- `approval.mixin` — attach to any model. Auto-submit pattern (preferred):
   ```python
   class MyModel(models.Model):
       _name = "my.model"
       _inherit = ["my.model", "approval.mixin"]
 
       def my_critical_action(self):
-          self._approval_check_required()
-          return super().my_critical_action()
+          # Auto-submit approval (when a matrix matches) and only run the
+          # action for records that need no approval or are already approved.
+          proceed = self.browse()
+          for rec in self:
+              if rec._approval_request_or_proceed():
+                  proceed |= rec
+          if proceed:
+              return super(MyModel, proceed).my_critical_action()
+          return True
+
+      def _approval_on_granted(self):
+          # Engine re-runs this as the requester once all tiers approve.
+          return self.my_critical_action()
   ```
+  The older raising gate `self._approval_check_required()` (raises
+  `UserError` until approved) is still available for flows that prefer a
+  hard block over auto-submit.
 
 ## SLA Escalation
 
@@ -54,13 +78,31 @@ When `_refresh_pending_approvers()` runs for a tier:
 
 ## Integration Gates
 
-- `account.move._post()` — blocks posting until approved (if any matrix
-  matches).
-- `purchase.order.button_confirm()` — same gate.
-- `sale.order.action_confirm()` — same gate.
+Each built-in document auto-submits approval on its native action and
+auto-proceeds after grant (via `_approval_request_or_proceed` +
+`_approval_on_granted`):
 
-The gate is implemented in `_approval_check_required()` on the mixin —
-copy the pattern into any custom model that needs it.
+- `sale.order.action_confirm()`
+- `purchase.order.button_confirm()`
+- `account.move.action_post()` — auto-submit lives on the Post button;
+  the low-level `_post()` keeps a raising `_approval_check_required()`
+  safety-net so any *programmatic* post of an unapproved, matrix-matched
+  move still blocks.
+- `hr.expense.action_submit_expenses()`
+- `custom.expense.report.action_submit_for_approval()` (grant advances the
+  report to `approved`).
+- `account.analytic.line.action_submit_validation()` (no matrix → validates
+  immediately; grant validates the line).
+- `hr.leave.action_confirm()` — engine runs as a pre-approval before the
+  native manager-approval queue; opt-in per matrix.
+
+Notes:
+- Re-confirming after a **rejection** starts a fresh approval cycle.
+- Auto-proceed runs as the original **requester** (`requested_by_id`) and is
+  best-effort — a failed re-run leaves the document `approved` for a manual
+  retry, never rolling back the approval decision.
+- The raising `_approval_check_required()` remains on the mixin for custom
+  models that prefer a hard block.
 
 ## Security Groups
 

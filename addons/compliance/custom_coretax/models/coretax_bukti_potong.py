@@ -99,7 +99,23 @@ class CoretaxBuktiPotong(models.Model):
             if not (2000 <= rec.period_year <= 2100):
                 raise ValidationError(_("Period year must be a 4-digit year."))
 
+    # --- Sync the simple bukti-potong fields back onto the linked move ------
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records.account_move_id._sync_simple_bupot_from_records()
+        return records
+
+    def write(self, vals):
+        # Capture the previously-linked moves so an unlink/relink re-syncs both.
+        previous_moves = self.account_move_id
+        res = super().write(vals)
+        if {"account_move_id", "state", "no_bupot", "tanggal_bupot"} & set(vals):
+            (previous_moves | self.account_move_id)._sync_simple_bupot_from_records()
+        return res
+
     def action_confirm(self):
+        # write() triggers _sync_simple_bupot_from_records via the 'state' key.
         self.write({"state": "confirmed"})
 
     def action_cancel(self):
