@@ -12,6 +12,12 @@
         <field name="binding_type">report</field>
     </record>
 
+    <!-- Indonesian long date, e.g. "9 Juni 2026" (accepts date or datetime in `d`). -->
+    <template id="id_date">
+        <t t-set="_bulan" t-value="['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']"/>
+        <t t-if="d"><t t-out="d.day"/> <t t-out="_bulan[d.month]"/> <t t-out="d.year"/></t>
+    </template>
+
     <template id="report_bast_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="doc">
@@ -26,7 +32,7 @@
                         <table class="table table-borderless table-sm">
                             <tr>
                                 <td style="width: 25%"><strong>Tanggal</strong></td>
-                                <td>: <span t-out="doc.date_handover" t-options='{"widget":"datetime"}'/></td>
+                                <td>: <t t-call="custom_bast.id_date"><t t-set="d" t-value="doc.date_handover"/></t></td>
                             </tr>
                             <tr>
                                 <td><strong>Lokasi</strong></td>
@@ -106,7 +112,7 @@
                                     <hr class="mt-0"/>
                                     <p class="mb-0">(<t t-out="doc.party_from_signed_by or '_______________'"/>)</p>
                                     <p class="text-muted small" t-if="doc.party_from_signed_at">
-                                        <span t-out="doc.party_from_signed_at" t-options='{"widget":"datetime"}'/>
+                                        <t t-call="custom_bast.id_date"><t t-set="d" t-value="doc.party_from_signed_at"/></t>
                                     </p>
                                 </td>
                                 <td style="width: 50%; text-align: center; vertical-align: top;">
@@ -120,7 +126,7 @@
                                     <hr class="mt-0"/>
                                     <p class="mb-0">(<t t-out="doc.party_to_signed_by or '_______________'"/>)</p>
                                     <p class="text-muted small" t-if="doc.party_to_signed_at">
-                                        <span t-out="doc.party_to_signed_at" t-options='{"widget":"datetime"}'/>
+                                        <t t-call="custom_bast.id_date"><t t-set="d" t-value="doc.party_to_signed_at"/></t>
                                     </p>
                                 </td>
                             </tr>

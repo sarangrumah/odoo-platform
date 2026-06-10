@@ -12,7 +12,7 @@
                 <tr>
                     <td style="width: 45%; font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">DATE</td>
                     <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">
-                        <span t-if="o.invoice_date" t-out="o.invoice_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                        <t t-call="custom_report_templates.id_date"><t t-set="d" t-value="o.invoice_date"/></t>
                     </td>
                 </tr>
                 <tr>
@@ -26,7 +26,7 @@
                 <tr>
                     <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">DUE DATE</td>
                     <td style="text-align: right; background-color: #e8edf5; border: 1px solid #b0b0b0; padding: 3px 5px;">
-                        <span t-if="o.invoice_date_due" t-out="o.invoice_date_due" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                        <t t-call="custom_report_templates.id_date"><t t-set="d" t-value="o.invoice_date_due"/></t>
                     </td>
                 </tr>
             </t>

@@ -21,6 +21,18 @@
           layout-critical rendering. Inline styles always survive.
     -->
 
+    <!-- ============ Indonesian long date ============ -->
+    <!-- Outputs an unambiguous Indonesian date e.g. "9 Juni 2026" for a date
+         OR datetime value. Caller sets `d`. We build the month name from a map
+         instead of babel/format_date because: (a) format_date & context_timestamp
+         are NOT exposed in this QWeb sandbox, and (b) the id_ID locale is not
+         active, so the date widget / format_date would fall back to English
+         ("June"). The literal dd/MM vs MM/dd ambiguity is removed entirely. -->
+    <template id="id_date">
+        <t t-set="_bulan" t-value="['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']"/>
+        <t t-if="d"><t t-out="d.day"/> <t t-out="_bulan[d.month]"/> <t t-out="d.year"/></t>
+    </template>
+
     <!-- ============ Money (NBSP-free) ============ -->
     <!-- Odoo's monetary widget separates symbol/amount with a non-breaking
          space (U+00A0) which wkhtmltopdf renders as a stray "Â". We format

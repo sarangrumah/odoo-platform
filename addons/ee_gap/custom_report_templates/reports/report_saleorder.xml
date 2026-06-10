@@ -13,7 +13,7 @@
                 <tr>
                     <td style="width: 45%; font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">DATE</td>
                     <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;">
-                        <span t-if="o.date_order" t-out="o.date_order" t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy'}"/>
+                        <t t-call="custom_report_templates.id_date"><t t-set="d" t-value="o.date_order"/></t>
                     </td>
                 </tr>
                 <tr>
@@ -25,7 +25,7 @@
                 <tr t-if="is_quote and o.validity_date">
                     <td style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">EXPIRED DATE</td>
                     <td style="text-align: right; background-color: #e8edf5; border: 1px solid #b0b0b0; padding: 3px 5px;">
-                        <span t-out="o.validity_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                        <t t-call="custom_report_templates.id_date"><t t-set="d" t-value="o.validity_date"/></t>
                     </td>
                 </tr>
             </t>
