@@ -16,8 +16,16 @@ class AssetRegisterWizard(models.TransientModel):
         "res.company",
         default=lambda self: self.env.companies,
     )
-    group_ids = fields.Many2many("custom.fixed.asset.group", string="Groups")
-    location_ids = fields.Many2many("custom.fixed.asset.location", string="Locations")
+    group_ids = fields.Many2many(
+        "custom.fixed.asset.group",
+        relation="asset_reg_wiz_group_rel",
+        string="Groups",
+    )
+    location_ids = fields.Many2many(
+        "custom.fixed.asset.location",
+        relation="asset_reg_wiz_location_rel",
+        string="Locations",
+    )
     asset_states = fields.Selection(
         [
             ("running", "Running only"),
