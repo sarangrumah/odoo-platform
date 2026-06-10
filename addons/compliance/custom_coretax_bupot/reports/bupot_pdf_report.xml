@@ -62,20 +62,22 @@
                     </tbody>
                 </table>
 
-                <div style="margin-top: 4em;" class="row">
-                    <div class="col-6">
-                        <p>Pihak Dipotong</p>
-                        <br/><br/><br/>
-                        <p>______________________</p>
-                        <span t-field="doc.cuttee_name"/>
-                    </div>
-                    <div class="col-6 text-end">
-                        <p>Pemotong</p>
-                        <br/><br/><br/>
-                        <p>______________________</p>
-                        <span t-field="doc.company_id.name"/>
-                    </div>
-                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 4em;">
+                    <tr>
+                        <td style="width: 50%; vertical-align: top;">
+                            <p>Pihak Dipotong</p>
+                            <br/><br/><br/>
+                            <p>______________________</p>
+                            <span t-field="doc.cuttee_name"/>
+                        </td>
+                        <td style="width: 50%; vertical-align: top; text-align: right;">
+                            <p>Pemotong</p>
+                            <br/><br/><br/>
+                            <p>______________________</p>
+                            <span t-field="doc.company_id.name"/>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </t>
     </template>
