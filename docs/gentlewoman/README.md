@@ -31,3 +31,39 @@ Attachments` → filter name "Gentle Woman" → download. (Or `/web/content/<id>
 > The `/api/docs/<id>` proxy serves only **public PDF** attachments from Odoo
 > (non-public ids return 404), so it cannot relay arbitrary content.
 > Attachment ids are stable for the current pilot; regenerating the PDFs reissues them.
+
+---
+
+## Release 1.0 — Business Package (Storefront × Odoo)
+
+A versioned, sign-off-ready package focused on the **Storefront↔Odoo integration**, with
+mandays by role (PMO / IT BA / IT Developer / QA) and a mandays-derived timeline. Bilingual
+(Bahasa Indonesia + English). Authored by **Product Owner — Value-Added Services (Erajaya)**.
+
+| # | Document | Source (markdown) | Rendered artifact |
+|---|---|---|---|
+| GW-PRES-001 | Business Presentation | *(built by script)* | [PPTX](GentleWoman-Business-Presentation-v1.0.pptx) · [PDF](GentleWoman-Business-Presentation-v1.0.pdf) |
+| GW-TSD-001 | Technical Specification (TSD) | [11-TSD-v1.0.md](11-TSD-v1.0.md) | [PDF](GentleWoman-TSD-v1.0.pdf) |
+| GW-BP-001 | Solution Blueprint | [12-Blueprint-v1.0.md](12-Blueprint-v1.0.md) | [PDF](GentleWoman-Blueprint-v1.0.pdf) |
+| GW-FSD-001 | Functional Specification (FSD) | [13-FSD-v1.0.md](13-FSD-v1.0.md) | [PDF](GentleWoman-FSD-v1.0.pdf) |
+
+**Rebuild the artifacts**
+
+```bash
+python tools/build_gentlewoman_deck.py    # -> Business-Presentation .pptx + .pdf
+python tools/build_gentlewoman_docs.py     # -> TSD / Blueprint / FSD .pdf (pandoc + Chrome)
+```
+
+**Make them downloadable in Odoo** (requires the platform up — Docker running):
+
+```bash
+python tools/publish_gentlewoman_docs.py            # XML-RPC upload to db `gentlewoman`
+# or, when XML-RPC isn't reachable:
+python tools/publish_gentlewoman_docs.py --print-shell   # paste into `odoo shell -d gentlewoman`
+```
+
+The publish step uploads each PDF as a **public `ir.attachment`** (PPTX too) and prints, per
+document, both `/web/content/<id>?download=true` (native) and `/api/docs/<id>` (public PDF
+proxy) links, writing the id map to `_release-1.0-attachments.json`. Update this table with the
+emitted ids after the first publish. In Odoo you can also fetch them via
+`Settings ▸ Technical ▸ Attachments` → filter name "GentleWoman".
