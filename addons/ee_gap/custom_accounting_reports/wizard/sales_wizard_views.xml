@@ -1,18 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_aged_receivable_wizard_form" model="ir.ui.view">
-        <field name="name">custom.report.aged.receivable.wizard.form</field>
-        <field name="model">custom.report.aged.receivable.wizard</field>
+    <record id="view_sales_wizard_form" model="ir.ui.view">
+        <field name="name">custom.report.sales.wizard.form</field>
+        <field name="model">custom.report.sales.wizard</field>
         <field name="arch" type="xml">
-            <form string="Aged Receivable">
+            <form string="Sales Report">
                 <group>
                     <group>
+                        <field name="date_from"/>
                         <field name="date_to"/>
+                        <field name="group_by"/>
+                        <field name="posted_only"/>
                     </group>
                     <group>
                         <field name="company_ids" widget="many2many_tags"/>
                         <field name="partner_ids" widget="many2many_tags"/>
-                        <field name="detail_mode"/>
                     </group>
                 </group>
                 <footer>
@@ -27,9 +29,9 @@
         </field>
     </record>
 
-    <record id="action_aged_receivable_wizard" model="ir.actions.act_window">
-        <field name="name">Aged Receivable</field>
-        <field name="res_model">custom.report.aged.receivable.wizard</field>
+    <record id="action_sales_wizard" model="ir.actions.act_window">
+        <field name="name">Sales Report</field>
+        <field name="res_model">custom.report.sales.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>

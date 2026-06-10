@@ -7,5 +7,8 @@ from . import cash_flow_wizard
 from . import aged_receivable_wizard
 from . import aged_payable_wizard
 from . import partner_ledger_wizard
+from . import partner_card_wizard
+from . import advance_wizard
+from . import sales_wizard
 from . import tax_report_wizard
 from . import day_book_wizard

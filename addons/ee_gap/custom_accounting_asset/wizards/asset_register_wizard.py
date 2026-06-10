@@ -1,0 +1,65 @@
+# -*- coding: utf-8 -*-
+from datetime import date
+
+from odoo import fields, models
+
+
+class AssetRegisterWizard(models.TransientModel):
+    _name = "custom.report.asset.register.wizard"
+    _description = "Asset Register Wizard"
+
+    year = fields.Integer(
+        required=True,
+        default=lambda self: fields.Date.context_today(self).year,
+    )
+    company_ids = fields.Many2many(
+        "res.company",
+        default=lambda self: self.env.companies,
+    )
+    group_ids = fields.Many2many("custom.fixed.asset.group", string="Groups")
+    location_ids = fields.Many2many("custom.fixed.asset.location", string="Locations")
+    asset_states = fields.Selection(
+        [
+            ("running", "Running only"),
+            ("all", "All (incl. draft/disposed)"),
+        ],
+        string="Assets",
+        default="running",
+        required=True,
+    )
+
+    def _build_filters(self):
+        self.ensure_one()
+        states = ["running"] if self.asset_states == "running" else []
+        return {
+            "date_from": date(self.year, 1, 1),
+            "date_to": date(self.year, 12, 31),
+            "company_ids": self.company_ids.ids or self.env.companies.ids,
+            "group_ids": self.group_ids.ids,
+            "location_ids": self.location_ids.ids,
+            "asset_states": states,
+            "year": self.year,
+        }
+
+    def _options(self):
+        filters = self._build_filters()
+        return {
+            **filters,
+            "date_from": filters["date_from"].isoformat(),
+            "date_to": filters["date_to"].isoformat(),
+        }
+
+    def action_print(self):
+        self.ensure_one()
+        data = {
+            "doc_model": self._name,
+            "options": self._options(),
+        }
+        return self.env.ref(
+            "custom_accounting_asset.action_report_asset_register"
+        ).report_action(self, data=data)
+
+    def action_export_xlsx(self):
+        self.ensure_one()
+        filename = "Asset_Register_%s.xlsx" % self.year
+        return self.env["custom.report.asset.register"]._xlsx_action(self._options(), filename)

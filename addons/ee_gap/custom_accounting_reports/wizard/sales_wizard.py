@@ -4,12 +4,15 @@ from datetime import date
 from odoo import fields, models
 
 
-class AgedReceivableWizard(models.TransientModel):
-    _name = "custom.report.aged.receivable.wizard"
-    _description = "Aged Receivable Wizard"
+class SalesWizard(models.TransientModel):
+    _name = "custom.report.sales.wizard"
+    _description = "Sales Report Wizard"
 
+    date_from = fields.Date(
+        required=True,
+        default=lambda self: date.today().replace(month=1, day=1),
+    )
     date_to = fields.Date(
-        string="As Of",
         required=True,
         default=lambda self: date.today(),
     )
@@ -17,37 +20,39 @@ class AgedReceivableWizard(models.TransientModel):
         "res.company",
         default=lambda self: self.env.companies,
     )
-    partner_ids = fields.Many2many("res.partner")
-    detail_mode = fields.Selection(
+    partner_ids = fields.Many2many("res.partner", string="Customers")
+    group_by = fields.Selection(
         [
-            ("summary", "Summary (per partner)"),
-            ("detail", "Detail (per document)"),
+            ("none", "No grouping"),
+            ("customer", "By Customer"),
+            ("product", "By Product"),
+            ("month", "By Month"),
         ],
-        string="Excel Detail",
-        default="summary",
+        string="Group By",
+        default="none",
         required=True,
-        help="Detail = one row per open document (the PDF always prints the "
-        "per-partner summary).",
     )
+    posted_only = fields.Boolean(default=True)
 
     def _build_filters(self):
         self.ensure_one()
         return {
+            "date_from": self.date_from,
             "date_to": self.date_to,
-            "date_from": date(1970, 1, 1),
             "company_ids": self.company_ids.ids or self.env.companies.ids,
             "partner_ids": self.partner_ids.ids,
-            "posted_only": True,
+            "group_by": self.group_by,
+            "posted_only": self.posted_only,
         }
 
     def action_print(self):
         self.ensure_one()
         data = {
-            "report_code": "aged_receivable",
+            "report_code": "sales",
             "doc_model": self._name,
             "options": {
                 **self._build_filters(),
-                "date_from": date(1970, 1, 1).isoformat(),
+                "date_from": self.date_from.isoformat(),
                 "date_to": self.date_to.isoformat(),
             },
         }
@@ -57,11 +62,8 @@ class AgedReceivableWizard(models.TransientModel):
         self.ensure_one()
         options = {
             **self._build_filters(),
-            "date_from": date(1970, 1, 1).isoformat(),
+            "date_from": self.date_from.isoformat(),
             "date_to": self.date_to.isoformat(),
         }
-        filename = "Aged_Receivable_%s.xlsx" % self.date_to
-        report = self.env["custom.report.aged.receivable"].with_context(
-            aging_detail=self.detail_mode == "detail",
-        )
-        return report._xlsx_action(options, filename)
+        filename = "Sales_Report_%s_%s.xlsx" % (self.date_from, self.date_to)
+        return self.env["custom.report.sales"]._xlsx_action(options, filename)

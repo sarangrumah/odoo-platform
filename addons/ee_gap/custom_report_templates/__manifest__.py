@@ -28,6 +28,7 @@ ad-hoc header/footer/XPath tweaks on top.
         "reports/report_invoice.xml",
         "reports/report_saleorder.xml",
         "reports/report_purchaseorder.xml",
+        "reports/report_journal_voucher.xml",
         "reports/report_actions.xml",
         "views/res_company_views.xml",
     ],

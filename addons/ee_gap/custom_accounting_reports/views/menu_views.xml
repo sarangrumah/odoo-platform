@@ -54,6 +54,30 @@
               action="action_partner_ledger_wizard"
               sequence="80"/>
 
+    <menuitem id="menu_custom_reports_payable_card"
+              name="Kartu Utang"
+              parent="menu_custom_reports_root"
+              action="action_payable_card_wizard"
+              sequence="82"/>
+
+    <menuitem id="menu_custom_reports_receivable_card"
+              name="Kartu Piutang"
+              parent="menu_custom_reports_root"
+              action="action_receivable_card_wizard"
+              sequence="84"/>
+
+    <menuitem id="menu_custom_reports_advance"
+              name="Uang Muka / DP"
+              parent="menu_custom_reports_root"
+              action="action_advance_wizard"
+              sequence="86"/>
+
+    <menuitem id="menu_custom_reports_sales"
+              name="Sales Report"
+              parent="menu_custom_reports_root"
+              action="action_sales_wizard"
+              sequence="88"/>
+
     <menuitem id="menu_custom_reports_tax"
               name="Tax Report"
               parent="menu_custom_reports_root"
