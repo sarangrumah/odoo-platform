@@ -334,10 +334,12 @@ class RetailImportExecutor(models.AbstractModel):
         IMD = self.env["ir.model.data"]
         for start in range(0, len(items), BATCH):
             batch_vals, batch_txids = [], []
+            seen_in_batch = set()
             for pc, m in items[start:start + BATCH]:
                 txid = self._safe_xid("tmpl_", pc)
-                if txid in tmpl_xid_to_id:
+                if txid in tmpl_xid_to_id or txid in seen_in_batch:
                     continue
+                seen_in_batch.add(txid)
                 vset = tmpl_variants[pc]
                 t_sizes = sorted({s for s, _ in vset if s})
                 t_inseams = sorted({i for _, i in vset if i})
@@ -372,19 +374,33 @@ class RetailImportExecutor(models.AbstractModel):
                 batch_vals.append(vals)
                 batch_txids.append(txid)
             if batch_vals:
-                # One multi-create per batch (variant generation + INSERTs batched),
-                # then one bulk ir.model.data insert for the external IDs.
-                tmpls = Template.create(batch_vals)
-                imd_vals = []
-                for txid, tmpl in zip(batch_txids, tmpls):
-                    tmpl_xid_to_id[txid] = tmpl.id
-                    created_txids.add(txid)
-                    imd_vals.append({
-                        "module": ns, "name": txid, "model": "product.template",
-                        "res_id": tmpl.id, "noupdate": True,
-                    })
-                IMD.create(imd_vals)
-                created += len(tmpls)
+                # Idempotency / concurrency guard: skip any external id already in the
+                # DB right now (created by a prior partial run or a parallel worker),
+                # not just the start-of-run snapshot. Prevents the unique-constraint
+                # crash on re-runs and lets an interrupted import resume cleanly.
+                existing = set(IMD.search([
+                    ("module", "=", ns), ("model", "=", "product.template"),
+                    ("name", "in", batch_txids),
+                ]).mapped("name"))
+                if existing:
+                    for ext in IMD.search([
+                        ("module", "=", ns), ("model", "=", "product.template"),
+                        ("name", "in", list(existing)),
+                    ]):
+                        tmpl_xid_to_id[ext.name] = ext.res_id
+                new = [(t, v) for t, v in zip(batch_txids, batch_vals) if t not in existing]
+                if new:
+                    tmpls = Template.create([v for _, v in new])
+                    imd_vals = []
+                    for (txid, _v), tmpl in zip(new, tmpls):
+                        tmpl_xid_to_id[txid] = tmpl.id
+                        created_txids.add(txid)
+                        imd_vals.append({
+                            "module": ns, "name": txid, "model": "product.template",
+                            "res_id": tmpl.id, "noupdate": True,
+                        })
+                    IMD.create(imd_vals)
+                    created += len(tmpls)
             self._tick(log, int(log.line_count * 0.5 * min(1.0, (start + BATCH) / n_items)))
             buf.flush()
             self._checkpoint()
