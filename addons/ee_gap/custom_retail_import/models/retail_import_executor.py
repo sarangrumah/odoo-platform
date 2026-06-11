@@ -26,6 +26,8 @@ import json
 import logging
 from collections import defaultdict
 
+from psycopg2.extras import execute_values
+
 from odoo import _, fields, models
 from odoo.exceptions import UserError
 
@@ -428,9 +430,16 @@ class RetailImportExecutor(models.AbstractModel):
                 continue
             variants = self.env["product.product"].search([("product_tmpl_id", "in", tmpl_ids)])
             var_index = {}
+            cur_code, cur_bc = {}, {}
             for vp in variants:
                 combo = frozenset(vp.product_template_variant_value_ids.product_attribute_value_id.ids)
-                var_index[(vp.product_tmpl_id.id, combo)] = vp
+                var_index[(vp.product_tmpl_id.id, combo)] = vp.id
+                cur_code[vp.id] = vp.default_code
+                cur_bc[vp.id] = vp.barcode
+            # Collect SKU/barcode assignments and apply them with ONE bulk SQL UPDATE
+            # per batch instead of ~160k per-variant ORM writes. Keyed by variant id
+            # (last write wins, matching the old per-row behavior).
+            var_updates = {}
             for txid in batch_xids:
                 tid = tmpl_xid_to_id.get(txid)
                 is_new = txid in created_txids
@@ -446,27 +455,33 @@ class RetailImportExecutor(models.AbstractModel):
                         wanted.add(size_val_id[v["size"]])
                     if v["inseam"] and inseam_val_id.get(v["inseam"]):
                         wanted.add(inseam_val_id[v["inseam"]])
-                    vp = var_index.get((tid, frozenset(wanted)))
-                    if not vp:
+                    vid = var_index.get((tid, frozenset(wanted)))
+                    if not vid:
                         unmatched += 1
                         buf.add("skipped", row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
                                 message=f"No variant for size={v['size']!r} inseam={v['inseam']!r}")
                         continue
-                    updates = {}
-                    if vp.default_code != v["sku"]:
-                        updates["default_code"] = v["sku"]
-                    if v["gtin"] and vp.barcode != v["gtin"]:
-                        updates["barcode"] = v["gtin"]
-                    if updates:
-                        try:
-                            vp.write(updates)
-                        except Exception:
-                            if "barcode" in updates:
-                                vp.write({k: x for k, x in updates.items() if k != "barcode"})
+                    bc = (v["gtin"] or None)
+                    code_change = cur_code.get(vid) != v["sku"]
+                    bc_change = bool(bc) and cur_bc.get(vid) != bc
+                    if code_change or bc_change:
+                        var_updates[vid] = (v["sku"], bc if bc_change else None)
                     matched += 1
                     buf.add("created" if is_new else "updated",
                             row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
-                            model_name="product.product", res_id=vp.id)
+                            model_name="product.product", res_id=vid)
+            if var_updates:
+                # barcode has no DB unique constraint (Python-only check); SQL is safe.
+                # COALESCE keeps the existing barcode when the new one is NULL.
+                execute_values(
+                    self.env.cr,
+                    "UPDATE product_product AS p SET "
+                    "default_code = d.code::varchar, "
+                    "barcode = COALESCE(d.barcode::varchar, p.barcode) "
+                    "FROM (VALUES %s) AS d(id, code, barcode) WHERE p.id = d.id::integer",
+                    [(vid, code, bc) for vid, (code, bc) in var_updates.items()],
+                )
+                self.env["product.product"].invalidate_model(["default_code", "barcode", "display_name"])
             self._tick(log, int(log.line_count * (0.5 + 0.5 * min(1.0, (start + 100) / n_tkeys))))
             buf.flush()
             self._checkpoint()
