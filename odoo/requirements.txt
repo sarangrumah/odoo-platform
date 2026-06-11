@@ -22,3 +22,7 @@ python-pptx==1.0.2            # PPTX section extraction
 
 # --- custom_super_admin scheduled backup parser ---
 croniter==6.2.2               # cron-expression evaluator for backup schedule
+
+# --- custom_retail_import (Excel/CSV ingestion + SFTP feed) ---
+openpyxl==3.1.5               # read .xlsx master/transaction files in-container (xlsxwriter is write-only)
+paramiko==3.5.1               # SFTP pull for direct customer-FTP ingestion (preferred over unmaintained pysftp)

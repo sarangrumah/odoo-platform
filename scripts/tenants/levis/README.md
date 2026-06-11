@@ -1,0 +1,83 @@
+# Levi's (PT Sinar Eka Selaras) — data onboarding runbook
+
+Tenant DB: `levis`. Source files: `docs/levis/`. This folder is **Track A** (ops
+scripts for fast go-live). The durable, reusable adapter is the **Track B** module
+`addons/ee_gap/custom_retail_import` (Excel/CSV upload wizard + SFTP feed).
+
+## ⚠️ Data reality check (verified 2026-06-11)
+The X-prefix transaction files currently delivered are **single-store SAMPLES** —
+they only contain store **14694 "OLS SCU - TUNJUNGAN PLAZA 3"**:
+- `X20` on-hand, `X24DN` sales, `X70D` tenders → all 1 store only.
+- `X101` products (159,658 SKUs) and `CoA EBR` are **full** and ready.
+- `Store Master` lists all **24 stores** (1 DC + 23 OLS) **by name, no store codes**.
+
+**Blocking gaps to raise with the customer:**
+1. Full multi-store extracts of X20/X24/X70D (or the live SFTP feed) — today only 1 of 24 stores has transactional/on-hand data.
+2. A store master **with SAP/store codes for all 24 stores** — needed for the store-code→warehouse crosswalk that every X-file joins on. Currently only store 14694's code is known.
+
+Until then: products + CoA + company + warehouses (by name) can load fully; opening
+stock and sales load only for store 14694.
+
+## Prereqs
+- Tenant `levis` provisioned with the `retail` industry pack (Phase 0).
+- Container name below assumed `odoo19-platform-odoo-mgmt`; create `/tmp/levis` in it:
+  `docker exec odoo19-platform-odoo-mgmt mkdir -p /tmp/levis`
+
+## Go-live sequence
+
+### 1. Company (SES) + Chart of Accounts
+- **CoA** `CoA EBR.xlsx` is already clean (`code,name,account_type` with Odoo enums)
+  → import via **Accounting ▸ Chart of Accounts ▸ Import**, or the Track B wizard
+  (profile `levis_coa`).
+- **Company** → set on the provisioned company (1 record), or Track B wizard
+  (profile `levis_company`).
+
+### 2. Products (X101) — Track A, proven (~30 min)
+```
+python scripts/tenants/levis/01_extract_x101.py          # HOST (openpyxl). -> out_*.csv
+docker cp scripts/tenants/levis/out_categories.csv        odoo19-platform-odoo-mgmt:/tmp/levis/
+docker cp scripts/tenants/levis/out_attributes.csv        odoo19-platform-odoo-mgmt:/tmp/levis/
+docker cp scripts/tenants/levis/out_templates.csv         odoo19-platform-odoo-mgmt:/tmp/levis/
+docker cp scripts/tenants/levis/out_template_attrlines.csv odoo19-platform-odoo-mgmt:/tmp/levis/
+docker cp scripts/tenants/levis/out_variants.csv          odoo19-platform-odoo-mgmt:/tmp/levis/
+docker exec -i odoo19-platform-odoo-mgmt odoo shell -d levis --no-http < scripts/tenants/levis/02_import_to_odoo.py
+```
+Expected: 14,885 templates · 159,658 SKUs · 170 categories · Size(89)/Inseam(24).
+
+### 3. Stores → Warehouses (all 24)
+```
+python scripts/tenants/levis/03_extract_stores.py        # HOST. -> out_stores.csv (24 stores)
+docker cp scripts/tenants/levis/out_stores.csv           odoo19-platform-odoo-mgmt:/tmp/levis/
+docker exec -i odoo19-platform-odoo-mgmt odoo shell -d levis --no-http < scripts/tenants/levis/04_load_stores.py
+```
+Creates 24 warehouses keyed by name; adds `wh_<CODE>` aliases where codes are known.
+**Re-run `04` after the customer supplies the missing 23 store codes** (idempotent — just adds aliases).
+
+### 4. Opening stock (X20) — store 14694 only, until full data arrives
+```
+docker cp "docs/levis/X20_Current_Onhand_Inventory_Report- For current inventory.csv" odoo19-platform-odoo-mgmt:/tmp/levis/X20.csv
+docker exec -i odoo19-platform-odoo-mgmt odoo shell -d levis --no-http < scripts/tenants/levis/05_load_x20.py
+```
+ONE-SHOT (guarded by `ir.config_parameter` marker `levis.x20_opening_stock_applied`).
+Prereq: steps 2 + 3 done.
+
+## Track B (module) — Excel/CSV wizard + SFTP feed
+After adding `openpyxl`+`paramiko` to `odoo/requirements.txt` and rebuilding the
+image, install `custom_retail_import` on `levis`. Then:
+- **Retail Import ▸ Import Data**: pick a profile (seeded for Levi's: `levis_x101`,
+  `levis_coa`, `levis_company`, `levis_x20`, `levis_x24`, `levis_x70d`), upload the
+  file, **Preview (dry-run)**, then **Import**. Big files run async via queue_job.
+- **Configuration ▸ SFTP Feeds**: configure host/credentials + glob per file type;
+  enable the `cron_poll_retail_feeds` cron for daily auto-pull (X20/X24).
+- **X24 sales / X70D tenders are Phase-5 decision-gated** (POS representation, history
+  depth, tax mapping) — the executor parses + groups them but refuses to post until enabled.
+
+## Verification (in `odoo shell -d levis`)
+```python
+env['product.template'].search_count([])                         # ~14885
+env['product.product'].search_count([('default_code','!=',False)])  # ~159658
+env['account.account'].search_count([])                          # == CoA rows
+env['stock.warehouse'].search_count([])                          # 24
+sum(env['stock.quant'].search([]).mapped('quantity'))            # == X20 (store 14694) total
+```
+"""

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+      Seed import profiles for Levi's (PT Sinar Eka Selaras). namespace="levis"
+      isolates the external IDs per tenant. Column indices are 1-based (A=1) and
+      match the headers observed in docs/levis/. Adjust per-tenant by editing
+      these records (data, not code).
+    -->
+
+    <!-- X101 — Material Master (products). Header row 2, data row 3. -->
+    <record id="profile_levis_x101" model="retail.import.profile">
+        <field name="name">Levi's — X101 Material Master</field>
+        <field name="code">levis_x101</field>
+        <field name="file_type">x101</field>
+        <field name="namespace">levis</field>
+        <field name="file_format">xlsx</field>
+        <field name="data_start_row">3</field>
+        <field name="date_format">%Y-%m-%d %H:%M:%S</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="column_map_json">{"product_code": 2, "description": 3, "brand": 4, "category": 5, "klass": 6, "subclass": 7, "sku": 10, "size": 11, "inseam": 12, "gtin": 13, "retail_price": 15, "price_eff": 16}</field>
+    </record>
+
+    <!-- CoA EBR — already clean (code,name,account_type). Header row 2, data row 3. -->
+    <record id="profile_levis_coa" model="retail.import.profile">
+        <field name="name">Levi's — Chart of Accounts (EBR)</field>
+        <field name="code">levis_coa</field>
+        <field name="file_type">coa</field>
+        <field name="namespace">levis</field>
+        <field name="file_format">xlsx</field>
+        <field name="data_start_row">3</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="column_map_json">{"code": 1, "account_name": 2, "account_type": 3}</field>
+    </record>
+
+    <!-- Company / legal entity (SES). Key:Value layout in a single column. -->
+    <record id="profile_levis_company" model="retail.import.profile">
+        <field name="name">Levi's — Company (SES)</field>
+        <field name="code">levis_company</field>
+        <field name="file_type">company</field>
+        <field name="namespace">levis</field>
+        <field name="file_format">xlsx</field>
+        <field name="data_start_row">4</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="column_map_json">{"field": 2, "value": 3}</field>
+    </record>
+
+    <!-- X20 — Current on-hand inventory (CSV, SSRS export). Data from row 2. -->
+    <record id="profile_levis_x20" model="retail.import.profile">
+        <field name="name">Levi's — X20 On-hand Inventory</field>
+        <field name="code">levis_x20</field>
+        <field name="file_type">x20</field>
+        <field name="namespace">levis</field>
+        <field name="file_format">csv</field>
+        <field name="encoding">utf-8-sig</field>
+        <field name="data_start_row">2</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="column_map_json">{"store_code": 16, "sap_store_code": 17, "store_name": 18, "item_id": 19, "ean": 23, "onhand_qty": 29}</field>
+    </record>
+
+    <!-- X24DN — Retail Sales Detail (POS). Header row 1, data row 2. Phase-5 gated. -->
+    <record id="profile_levis_x24" model="retail.import.profile">
+        <field name="name">Levi's — X24DN Retail Sales</field>
+        <field name="code">levis_x24</field>
+        <field name="file_type">x24</field>
+        <field name="namespace">levis</field>
+        <field name="file_format">xlsx</field>
+        <field name="data_start_row">2</field>
+        <field name="date_format">%Y-%m-%d</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "item_code": 14, "waist": 15, "inseam": 16, "item_description": 17, "ean": 22, "retail_price": 23, "gross_price": 24, "net_qty": 25, "net_discount": 26, "net_amount": 27, "tax_rate": 28, "tax_amount": 29, "total_amount": 30}</field>
+    </record>
+
+    <!-- X70D — Tender Detail (payments). Header row 1, data row 2. Phase-5 gated. -->
+    <record id="profile_levis_x70d" model="retail.import.profile">
+        <field name="name">Levi's — X70D Tender Detail</field>
+        <field name="code">levis_x70d</field>
+        <field name="file_type">x70d</field>
+        <field name="namespace">levis</field>
+        <field name="file_format">xlsx</field>
+        <field name="data_start_row">2</field>
+        <field name="date_format">%Y-%m-%d</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "tender_type": 9, "tender_amount": 10, "auth": 11, "voucher": 12}</field>
+    </record>
+</odoo>
