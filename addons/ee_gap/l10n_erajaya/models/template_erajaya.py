@@ -16,7 +16,8 @@ class AccountChartTemplate(models.AbstractModel):
     @template("erajaya")
     def _get_erajaya_template_data(self):
         return {
-            "name": "Indonesia - Erajaya",
+            "name": "Erajaya",
+            "country": "id",
             "code_digits": "10",
             "country_id": "base.id",
             "use_storno_accounting": False,
