@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- website_slides.website_slides_menu_root xmlid not verifiable in this
-         workspace (website_slides is a CE core module not vendored locally).
-         Per conventions: when unsure, SKIP. Mount under custom_core only. -->
+    <!-- Top-level eLearning app menu -->
     <menuitem id="menu_elearning_in_custom"
               name="eLearning"
-              parent="custom_core.menu_custom_root"
               sequence="50"
+              web_icon="custom_elearning,static/description/icon.png"
               groups="custom_elearning.group_user"/>
 
     <menuitem id="menu_elearning_cohorts"

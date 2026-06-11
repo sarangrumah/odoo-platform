@@ -18,11 +18,4 @@
               action="action_subscription_plan"
               sequence="20"
               groups="custom_subscription.group_manager"/>
-
-    <menuitem id="menu_subscription_in_custom"
-              name="Subscriptions"
-              parent="custom_core.menu_custom_root"
-              action="action_subscription_contract"
-              sequence="60"
-              groups="custom_subscription.group_user"/>
 </odoo>

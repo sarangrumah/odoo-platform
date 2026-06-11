@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Mount Forum Moderation under the Custom root menu -->
+    <!-- Top-level Forum Moderation app menu -->
     <menuitem id="menu_custom_forum_root"
               name="Forum Moderation"
-              parent="custom_core.menu_custom_root"
               sequence="50"
+              web_icon="custom_forum,static/description/icon.png"
               groups="custom_forum.group_user"/>
 
     <menuitem id="menu_custom_forum_posts"

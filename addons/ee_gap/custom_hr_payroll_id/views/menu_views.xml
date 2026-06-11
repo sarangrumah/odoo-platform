@@ -43,12 +43,4 @@
               parent="menu_payroll_id_config"
               action="action_hr_payroll_ter_bracket"
               sequence="20"/>
-
-    <!-- Also expose under Custom root -->
-    <menuitem id="menu_payroll_id_in_custom"
-              name="Payroll ID"
-              parent="custom_core.menu_custom_root"
-              action="action_hr_payslip"
-              sequence="50"
-              groups="custom_hr_payroll_id.group_user"/>
 </odoo>

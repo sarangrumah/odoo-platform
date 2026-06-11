@@ -21,12 +21,4 @@
               action="action_custom_livechat_chatbot_script"
               sequence="80"
               groups="custom_livechat.group_user"/>
-
-    <!-- Also mount canned responses under Custom root for quick access -->
-    <menuitem id="menu_livechat_canned_in_custom"
-              name="Live Chat Canned Responses"
-              parent="custom_core.menu_custom_root"
-              action="action_custom_livechat_canned_response"
-              sequence="45"
-              groups="custom_livechat.group_user"/>
 </odoo>

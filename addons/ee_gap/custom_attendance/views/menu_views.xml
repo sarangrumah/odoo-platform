@@ -23,12 +23,4 @@
               parent="menu_attendance_ext_config"
               action="action_custom_attendance_overtime_rule"
               sequence="20"/>
-
-    <!-- Also mount under Custom root -->
-    <menuitem id="menu_attendance_geofences_in_custom"
-              name="Attendance Geofences"
-              parent="custom_core.menu_custom_root"
-              action="action_attendance_geofence"
-              sequence="45"
-              groups="custom_attendance.group_user"/>
 </odoo>

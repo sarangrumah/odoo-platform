@@ -2,7 +2,7 @@
 <odoo>
     <menuitem id="menu_maintenance_in_custom"
               name="Maintenance"
-              parent="custom_core.menu_custom_root"
+              parent="maintenance.menu_maintenance_title"
               action="maintenance.hr_equipment_action"
               sequence="60"
               groups="custom_maintenance.group_user"/>

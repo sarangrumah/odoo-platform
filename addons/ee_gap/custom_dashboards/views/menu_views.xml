@@ -30,12 +30,4 @@
               parent="menu_dashboards_config"
               action="action_custom_dashboard_tile"
               sequence="10"/>
-
-    <!-- Also mount under Custom root -->
-    <menuitem id="menu_dashboards_in_custom"
-              name="Dashboards"
-              parent="custom_core.menu_custom_root"
-              action="action_custom_dashboard"
-              sequence="45"
-              groups="custom_dashboards.group_user"/>
 </odoo>

@@ -3,7 +3,7 @@
 
     <menuitem id="menu_coretax_root"
               name="Coretax"
-              parent="custom_core.menu_custom_root"
+              parent="account.menu_finance"
               sequence="20"
               groups="custom_coretax.group_user"/>
 

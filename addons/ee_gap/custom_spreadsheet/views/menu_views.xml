@@ -31,12 +31,4 @@
               parent="menu_spreadsheet_config"
               action="action_custom_spreadsheet_tag"
               sequence="10"/>
-
-    <!-- Also mount under Custom root -->
-    <menuitem id="menu_spreadsheet_in_custom"
-              name="Spreadsheets"
-              parent="custom_core.menu_custom_root"
-              action="action_custom_spreadsheet_workbook"
-              sequence="45"
-              groups="custom_spreadsheet.group_user"/>
 </odoo>

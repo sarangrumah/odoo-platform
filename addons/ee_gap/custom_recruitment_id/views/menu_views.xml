@@ -14,12 +14,4 @@
               action="action_hr_applicant_pdp_expiring"
               sequence="85"
               groups="custom_recruitment_id.group_manager"/>
-
-    <!-- Also mount under Custom root -->
-    <menuitem id="menu_recruitment_id_in_custom"
-              name="Recruitment ID"
-              parent="custom_core.menu_custom_root"
-              action="action_recruitment_webhook_log"
-              sequence="45"
-              groups="custom_recruitment_id.group_user"/>
 </odoo>
