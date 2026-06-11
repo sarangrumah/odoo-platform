@@ -209,8 +209,10 @@ class RetailImportExecutor(models.AbstractModel):
         buf = self._line_buffer(log, len(records))
 
         # ---- aggregate (mirror of 01_extract_x101.py) ----
-        sku_best = {}  # sku -> (eff, dict)
+        sku_best = {}  # sku -> (eff, dict)  (primary = latest by price_eff)
         sku_first_row = {}  # sku -> source row of its first occurrence
+        sku_gtins = defaultdict(set)  # sku -> {all distinct GTINs seen for it}
+        seen_sku_gtin = set()  # (sku, gtin) pairs, for precise duplicate detection
         tmpl_meta = {}  # code -> dict
         sizes, inseams = set(), set()
         tmpl_variants = defaultdict(set)
@@ -221,16 +223,23 @@ class RetailImportExecutor(models.AbstractModel):
                 buf.add("skipped", row=r.get("_row"), ref_key=sku or pc,
                         message="Missing product_code or sku")
                 continue
-            if sku in sku_first_row:
-                # Same SKU appears again in this file -> data-quality duplicate.
-                buf.add("duplicate", row=r.get("_row"), ref_key=sku,
-                        message=f"Duplicate of row {sku_first_row[sku]}", raw=r)
-            else:
-                sku_first_row[sku] = r.get("_row")
             size = (r.get("size") or "").strip()
             inseam_raw = r.get("inseam")
             inseam = (str(inseam_raw).strip() if inseam_raw not in (None, "-", "") else "")
             gtin = str(r.get("gtin") or "").strip()
+            if sku not in sku_first_row:
+                sku_first_row[sku] = r.get("_row")
+            if gtin:
+                sku_gtins[sku].add(gtin)
+            # A row is a TRUE duplicate only when the same (SKU, GTIN) repeats. Same
+            # SKU with a DIFFERENT GTIN is an alternate barcode of the same variant,
+            # not a duplicate -> kept and stored as product.barcode below.
+            sg = (sku, gtin)
+            if sg in seen_sku_gtin:
+                buf.add("duplicate", row=r.get("_row"), ref_key=sku,
+                        message=f"Duplicate (same SKU+GTIN) of row {sku_first_row[sku]}", raw=r)
+            else:
+                seen_sku_gtin.add(sg)
             retail = float(profile._parse_amount(r.get("retail_price")))
             eff = profile._parse_date(r.get("price_eff")) or None
 
@@ -416,6 +425,8 @@ class RetailImportExecutor(models.AbstractModel):
         for _eff, v in sku_best.values():
             by_tmpl[self._safe_xid("tmpl_", v["tmpl_code"])].append(v)
         matched = unmatched = 0
+        alt_total = 0
+        uid = self.env.uid
         tkeys = list(by_tmpl.keys())
         n_tkeys = max(1, len(tkeys))
         for start in range(0, len(tkeys), 100):
@@ -440,6 +451,7 @@ class RetailImportExecutor(models.AbstractModel):
             # per batch instead of ~160k per-variant ORM writes. Keyed by variant id
             # (last write wins, matching the old per-row behavior).
             var_updates = {}
+            alt_rows = set()  # {(variant_id, alt_gtin)} -> product.barcode upsert
             for txid in batch_xids:
                 tid = tmpl_xid_to_id.get(txid)
                 is_new = txid in created_txids
@@ -470,6 +482,11 @@ class RetailImportExecutor(models.AbstractModel):
                     buf.add("created" if is_new else "updated",
                             row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
                             model_name="product.product", res_id=vid)
+                    # Extra GTINs of this SKU become scannable alternate barcodes on
+                    # the SAME variant (one shared inventory; see X32P analysis).
+                    for alt in sku_gtins.get(v["sku"], ()):
+                        if alt and alt != v["gtin"]:
+                            alt_rows.add((vid, alt))
             if var_updates:
                 # barcode has no DB unique constraint (Python-only check); SQL is safe.
                 # COALESCE keeps the existing barcode when the new one is NULL.
@@ -482,6 +499,18 @@ class RetailImportExecutor(models.AbstractModel):
                     [(vid, code, bc) for vid, (code, bc) in var_updates.items()],
                 )
                 self.env["product.product"].invalidate_model(["default_code", "barcode", "display_name"])
+            if alt_rows:
+                # Idempotent via the (product_id, barcode) unique index: re-imports
+                # don't duplicate. Set audit columns explicitly (raw INSERT).
+                execute_values(
+                    self.env.cr,
+                    "INSERT INTO product_barcode "
+                    "(product_id, barcode, active, create_uid, create_date, write_uid, write_date) "
+                    "VALUES %s ON CONFLICT (product_id, barcode) DO NOTHING",
+                    [(vid, alt, uid, uid) for (vid, alt) in alt_rows],
+                    template="(%s, %s, true, %s, now(), %s, now())",
+                )
+                alt_total += len(alt_rows)
             self._tick(log, int(log.line_count * (0.5 + 0.5 * min(1.0, (start + 100) / n_tkeys))))
             buf.flush()
             self._checkpoint()
@@ -495,10 +524,14 @@ class RetailImportExecutor(models.AbstractModel):
         log.records_skipped = unmatched
         log.duplicate_count = buf.counts.get("duplicate", 0)
         log.processed_count = log.line_count
+        if alt_total:
+            self.env["product.barcode"].invalidate_model()
         self._checkpoint()
-        _logger.info("x101 done: templates=%s created=%s updated=%s unmatched=%s dup=%s",
-                     created, buf.counts.get("created", 0), buf.counts.get("updated", 0),
-                     unmatched, buf.counts.get("duplicate", 0))
+        _logger.info(
+            "x101 done: templates=%s created=%s updated=%s unmatched=%s dup=%s alt_barcodes=%s",
+            created, buf.counts.get("created", 0), buf.counts.get("updated", 0),
+            unmatched, buf.counts.get("duplicate", 0), alt_total,
+        )
 
     # ==================================================================
     # CoA — account.account

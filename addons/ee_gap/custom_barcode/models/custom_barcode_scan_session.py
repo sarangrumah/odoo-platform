@@ -219,7 +219,7 @@ class CustomBarcodeScanSession(models.Model):
 
         # GS1 path first.
         if gs1.get("gtin"):
-            product = self.env["product.product"].search([("barcode", "=", gs1["gtin"])], limit=1)
+            product = self.env["product.product"]._resolve_barcode(gs1["gtin"])
         if gs1.get("lot") and product:
             lot = self.env["stock.lot"].search(
                 [("name", "=", gs1["lot"]), ("product_id", "=", product.id)],
@@ -228,7 +228,7 @@ class CustomBarcodeScanSession(models.Model):
 
         # Plain lookup fallback.
         if not product:
-            product = self.env["product.product"].search([("barcode", "=", barcode)], limit=1)
+            product = self.env["product.product"]._resolve_barcode(barcode)
         if not lot:
             lot = self.env["stock.lot"].search([("name", "=", barcode)], limit=1)
         if not product and lot:

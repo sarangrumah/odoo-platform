@@ -40,6 +40,7 @@ Pieces
     "license": "LGPL-3",
     "depends": [
         "custom_core",
+        "custom_product_barcode",
         "queue_job",
         "product",
         "stock",
