@@ -12,6 +12,5 @@
     <record id="group_retail_import_manager" model="res.groups">
         <field name="name">Retail Import / Manager</field>
         <field name="implied_ids" eval="[Command.link(ref('group_retail_import_user'))]"/>
-        <field name="users" eval="[Command.link(ref('base.user_admin'))]"/>
     </record>
 </odoo>
