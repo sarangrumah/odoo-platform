@@ -26,6 +26,7 @@ the resolver so alternate barcodes scan to the same product.
     "capability_tags": ["retail", "barcode"],
     "data": [
         "security/ir.model.access.csv",
+        "views/product_views.xml",
     ],
     "installable": True,
     "application": False,
