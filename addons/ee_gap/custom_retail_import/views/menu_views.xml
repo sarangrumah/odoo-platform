@@ -3,17 +3,19 @@
     <menuitem id="menu_retail_import_root" name="Retail Import"
               groups="group_retail_import_user" sequence="95"/>
 
+    <!-- Imports list is the FIRST child so clicking the "Retail Import" app lands
+         on the list page, not the Upload File dialog (target=new). -->
+    <menuitem id="menu_retail_import_logs" name="Imports"
+              parent="menu_retail_import_root"
+              action="action_retail_import_log" sequence="1"/>
+
     <menuitem id="menu_retail_import_run" name="Upload File"
               parent="menu_retail_import_root"
-              action="action_retail_import_wizard" sequence="5"/>
+              action="action_retail_import_wizard" sequence="10"/>
 
     <menuitem id="menu_retail_import_sync" name="Sync from FTP"
               parent="menu_retail_import_root"
-              action="action_server_sync_feeds" sequence="7"/>
-
-    <menuitem id="menu_retail_import_logs" name="Imports"
-              parent="menu_retail_import_root"
-              action="action_retail_import_log" sequence="10"/>
+              action="action_server_sync_feeds" sequence="20"/>
 
     <menuitem id="menu_retail_import_lines" name="Row Results"
               parent="menu_retail_import_root"
