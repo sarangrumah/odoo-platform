@@ -7,6 +7,7 @@
             <list string="Imports" decoration-success="state=='imported'" decoration-warning="state=='partial'" decoration-danger="state=='failed'" decoration-muted="state in ('queued','running')">
                 <header>
                     <button name="action_open_wizard" type="object" string="Upload File" class="btn-primary"/>
+                    <button name="action_sync_feeds" type="object" string="Sync from FTP" icon="fa-cloud-download"/>
                 </header>
                 <field name="name"/>
                 <field name="profile_id"/>

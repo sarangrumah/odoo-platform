@@ -208,6 +208,41 @@ class RetailImportLog(models.Model):
             "target": "new",
         }
 
+    @api.model
+    def action_sync_feeds(self):
+        """Poll every active FTP/SFTP feed once (one-click 'Sync from FTP')."""
+        feeds = self.env["retail.import.feed"].search([("active", "=", True)])
+        if not feeds:
+            return {
+                "type": "ir.actions.client",
+                "tag": "display_notification",
+                "params": {
+                    "title": _("No feeds"),
+                    "message": _("No active feeds. Add one under Configuration → Feeds."),
+                    "type": "warning",
+                    "sticky": False,
+                },
+            }
+        total = sum((feed._run_feed() or 0) for feed in feeds)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Sync complete"),
+                "message": _("%(n)s new file(s) imported from %(m)s feed(s).")
+                % {"n": total, "m": len(feeds)},
+                "type": "success",
+                "sticky": False,
+                "next": {
+                    "type": "ir.actions.act_window",
+                    "res_model": "retail.import.log",
+                    "view_mode": "list,form,pivot,graph",
+                    "target": "current",
+                    "name": _("Imports"),
+                },
+            },
+        }
+
     def _action_view_lines(self, status, name):
         self.ensure_one()
         domain = [("log_id", "=", self.id)]

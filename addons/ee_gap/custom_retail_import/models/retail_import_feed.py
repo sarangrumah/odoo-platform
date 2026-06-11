@@ -80,6 +80,24 @@ class RetailImportFeed(models.Model):
     run_async = fields.Boolean(
         string="Process asynchronously", default=True, help="Hand each file to queue_job."
     )
+    post_action = fields.Selection(
+        [
+            ("move", "Move to archive folder"),
+            ("delete", "Delete from server"),
+            ("keep", "Keep (rely on dedup)"),
+        ],
+        string="After Import",
+        default="move",
+        required=True,
+        help="What to do with each remote file once it has been captured into Odoo. "
+             "The source file is always stored in Odoo (re-processable), so moving or "
+             "deleting it on the server is safe and prevents re-listing.",
+    )
+    archive_dir = fields.Char(
+        string="Archive Subfolder",
+        default="archive",
+        help="Subfolder (relative to the remote directory) to move processed files into.",
+    )
 
     last_run = fields.Datetime(readonly=True)
     last_status = fields.Selection(
@@ -156,6 +174,23 @@ class RetailImportFeed(models.Model):
             sftp.close()
             transport.close()
 
+    def _sftp_archive(self, name, action):
+        sftp, transport = self._open_sftp()
+        try:
+            src = self.remote_dir.rstrip("/") + "/" + name
+            if action == "delete":
+                sftp.remove(src)
+            else:  # move
+                ddir = self.remote_dir.rstrip("/") + "/" + (self.archive_dir or "archive").strip("/")
+                try:
+                    sftp.stat(ddir)
+                except IOError:
+                    sftp.mkdir(ddir)
+                sftp.rename(src, ddir + "/" + name)
+        finally:
+            sftp.close()
+            transport.close()
+
     # ------------------------------------------------------------------
     # FTP / FTPS backend
     # ------------------------------------------------------------------
@@ -200,6 +235,25 @@ class RetailImportFeed(models.Model):
             except Exception:
                 ftp.close()
 
+    def _ftp_archive(self, name, action):
+        ftp = self._open_ftp()
+        try:
+            src = self.remote_dir.rstrip("/") + "/" + name
+            if action == "delete":
+                ftp.delete(src)
+            else:  # move
+                ddir = self.remote_dir.rstrip("/") + "/" + (self.archive_dir or "archive").strip("/")
+                try:
+                    ftp.mkd(ddir)
+                except ftplib.error_perm:
+                    pass  # already exists
+                ftp.rename(src, ddir + "/" + name)
+        finally:
+            try:
+                ftp.quit()
+            except Exception:
+                ftp.close()
+
     # ------------------------------------------------------------------
     # Protocol-neutral interface
     # ------------------------------------------------------------------
@@ -214,6 +268,16 @@ class RetailImportFeed(models.Model):
         if self.protocol == "sftp":
             return self._sftp_download(name)
         return self._ftp_download(name)
+
+    def _archive_remote(self, name):
+        """Move/delete a processed remote file per ``post_action`` (best-effort)."""
+        self.ensure_one()
+        if self.post_action == "keep":
+            return
+        if self.protocol == "sftp":
+            self._sftp_archive(name, self.post_action)
+        else:
+            self._ftp_archive(name, self.post_action)
 
     def action_test_connection(self):
         self.ensure_one()
@@ -266,6 +330,18 @@ class RetailImportFeed(models.Model):
             else:
                 Executor.run(log)
             imported += 1
+            # Post-process the remote file. The source is already stored in Odoo
+            # (re-processable), so this is safe. For synchronous runs we only
+            # archive a file that actually imported; for async we archive once
+            # captured (dedup still prevents re-import). Best-effort: a failure
+            # here must not break the feed.
+            try:
+                if self.post_action != "keep" and (self.run_async or log.state in ("imported", "partial")):
+                    self._archive_remote(name)
+            except Exception:
+                _logger.exception(
+                    "Feed %s: post-import %s failed for %s", self.name, self.post_action, name
+                )
         return imported
 
     def action_poll_now(self):
@@ -285,6 +361,7 @@ class RetailImportFeed(models.Model):
                     "files_imported": self.files_imported + n,
                 }
             )
+            return n
         except Exception as e:
             _logger.exception("Feed %s poll failed", self.name)
             self.write(
@@ -294,6 +371,7 @@ class RetailImportFeed(models.Model):
                     "last_message": str(e),
                 }
             )
+            return 0
 
     def _cron_poll_feeds(self):
         """ir.cron entry point: poll every active feed."""

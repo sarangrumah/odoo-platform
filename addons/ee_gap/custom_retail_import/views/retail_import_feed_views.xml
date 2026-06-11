@@ -36,6 +36,8 @@
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="active"/>
                             <field name="run_async"/>
+                            <field name="post_action"/>
+                            <field name="archive_dir" invisible="post_action != 'move'"/>
                         </group>
                         <group string="Connection">
                             <field name="protocol"/>
