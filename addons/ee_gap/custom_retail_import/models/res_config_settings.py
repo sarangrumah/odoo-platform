@@ -20,6 +20,14 @@ class ResConfigSettings(models.TransientModel):
         help="Cap on stored per-row log lines for one import. Counters stay exact "
              "even when lines are truncated.",
     )
+    retail_import_line_detail_threshold = fields.Integer(
+        string="Full Row Detail Up To (rows)",
+        config_parameter="retail_import.line_detail_threshold",
+        default=20000,
+        help="Imports with more rows than this store only exception rows "
+             "(errors/duplicates/skipped/archived), not created/updated, for speed. "
+             "Headline counters stay exact. Set 0 to always store every row.",
+    )
     retail_import_alert_on_failure = fields.Boolean(
         string="Alert on Import Failure",
         config_parameter="retail_import.alert_on_failure",

@@ -15,6 +15,10 @@
                                  help="Cap on stored per-row log lines for one import. Counters stay exact even when truncated.">
                             <field name="retail_import_max_log_lines"/>
                         </setting>
+                        <setting string="Full Row Detail Up To (rows)"
+                                 help="Above this row count, store only exception rows (errors/duplicates) for speed; counters stay exact. 0 = always store all.">
+                            <field name="retail_import_line_detail_threshold"/>
+                        </setting>
                         <setting string="Alert on Import Failure"
                                  help="Fire a best-effort alert when an import fails.">
                             <field name="retail_import_alert_on_failure"/>

@@ -44,14 +44,19 @@ class _LineBuffer:
     ``raw_json`` is kept only for error/duplicate rows to bound storage.
     """
 
-    def __init__(self, log, flush_every=2000):
+    def __init__(self, log, flush_every=2000, keep_statuses=None):
         self.log = log
         self.flush_every = flush_every
         self.pending = []
         self.counts = defaultdict(int)
+        # None -> store every row; a set -> store only those statuses (counts stay
+        # exact regardless). Used to skip created/updated rows on huge imports.
+        self.keep = keep_statuses
 
     def add(self, status, row=0, ref_key=None, message=None, model_name=None, res_id=None, raw=None):
         self.counts[status] += 1
+        if self.keep is not None and status not in self.keep:
+            return
         vals = {"status": status, "row": int(row or 0)}
         if ref_key:
             vals["ref_key"] = str(ref_key)[:255]
@@ -129,6 +134,28 @@ class RetailImportExecutor(models.AbstractModel):
         """Update the live row-progress counter (committed by the caller's commit)."""
         log.processed_count = processed
 
+    # Statuses always worth storing as detail rows, even on huge imports.
+    _EXCEPTION_STATUSES = {"error", "duplicate", "skipped", "archived"}
+
+    def _line_buffer(self, log, n_rows):
+        """Build a line buffer; on large imports keep only exception rows.
+
+        Above ``retail_import.line_detail_threshold`` (default 20000) we stop
+        storing created/updated detail rows — they are the bulk of a master-data
+        file — and keep only errors/duplicates/skipped/archived. Headline counters
+        (records_created/updated/...) stay exact either way. Set the threshold to 0
+        to always store every row.
+        """
+        thr = self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.line_detail_threshold", "20000"
+        )
+        try:
+            thr = int(thr)
+        except (TypeError, ValueError):
+            thr = 20000
+        keep = None if (thr <= 0 or n_rows <= thr) else set(self._EXCEPTION_STATUSES)
+        return _LineBuffer(log, keep_statuses=keep)
+
     def _checkpoint(self):
         """Commit if allowed; inside a queue job (commits forbidden) flush instead.
 
@@ -167,10 +194,17 @@ class RetailImportExecutor(models.AbstractModel):
     # ==================================================================
     def _load_x101(self, profile, file_b64, log):
         ns = profile.namespace
+        # Skip chatter/tracking/recompute overhead for the bulk product writes.
+        self = self.with_context(
+            tracking_disable=True,
+            mail_create_nolog=True,
+            mail_create_nosubscribe=True,
+            mail_notrack=True,
+        )
         data = profile.read_records(file_b64)
         records = data["records"]
         log.line_count = len(records)
-        buf = _LineBuffer(log)
+        buf = self._line_buffer(log, len(records))
 
         # ---- aggregate (mirror of 01_extract_x101.py) ----
         sku_best = {}  # sku -> (eff, dict)
@@ -296,7 +330,10 @@ class RetailImportExecutor(models.AbstractModel):
         created_txids = set()
         items = sorted(tmpl_meta.items())
         n_items = max(1, len(items))
+        Template = self.env["product.template"]
+        IMD = self.env["ir.model.data"]
         for start in range(0, len(items), BATCH):
+            batch_vals, batch_txids = [], []
             for pc, m in items[start:start + BATCH]:
                 txid = self._safe_xid("tmpl_", pc)
                 if txid in tmpl_xid_to_id:
@@ -332,11 +369,22 @@ class RetailImportExecutor(models.AbstractModel):
                     vals["categ_id"] = categ_id
                 if attr_lines:
                     vals["attribute_line_ids"] = attr_lines
-                tmpl = self.env["product.template"].create(vals)
-                self._xid_set(ns, txid, "product.template", tmpl.id)
-                tmpl_xid_to_id[txid] = tmpl.id
-                created_txids.add(txid)
-                created += 1
+                batch_vals.append(vals)
+                batch_txids.append(txid)
+            if batch_vals:
+                # One multi-create per batch (variant generation + INSERTs batched),
+                # then one bulk ir.model.data insert for the external IDs.
+                tmpls = Template.create(batch_vals)
+                imd_vals = []
+                for txid, tmpl in zip(batch_txids, tmpls):
+                    tmpl_xid_to_id[txid] = tmpl.id
+                    created_txids.add(txid)
+                    imd_vals.append({
+                        "module": ns, "name": txid, "model": "product.template",
+                        "res_id": tmpl.id, "noupdate": True,
+                    })
+                IMD.create(imd_vals)
+                created += len(tmpls)
             self._tick(log, int(log.line_count * 0.5 * min(1.0, (start + BATCH) / n_items)))
             buf.flush()
             self._checkpoint()
@@ -434,7 +482,7 @@ class RetailImportExecutor(models.AbstractModel):
         created = skipped = 0
         errors = []
         seen_codes = {}
-        buf = _LineBuffer(log)
+        buf = self._line_buffer(log, len(records))
         Account = self.env["account.account"]
         for i, r in enumerate(records):
             code = str(r.get("code") or "").strip()
@@ -565,7 +613,7 @@ class RetailImportExecutor(models.AbstractModel):
         prod_by_barcode = {}
         prod_by_code = {}
         applied = skipped = error_count = 0
-        buf = _LineBuffer(log)
+        buf = self._line_buffer(log, len(records))
         quant_vals = []  # (prod, loc, qty, row, key)
         for r in records:
             store = r.get("store_code")
@@ -682,7 +730,7 @@ class RetailImportExecutor(models.AbstractModel):
         log.line_count = len(records)
         log.records_skipped = len(records)
         log.error_message = note
-        buf = _LineBuffer(log)
+        buf = self._line_buffer(log, len(records))
         for r in records:
             buf.add("skipped", row=r.get("_row"), message="Staged (no model writes)")
         buf.flush()
