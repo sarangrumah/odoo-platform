@@ -2,9 +2,41 @@
 <templates id="template" xml:space="preserve">
 
     <t t-name="custom_pdp_masking.PdpMaskedField">
-        <span class="o_field_pdp_masked d-inline-flex align-items-center gap-1">
+        <!-- READONLY view mode: masked span + eye toggle -->
+        <span t-if="props.readonly"
+              class="o_field_pdp_masked d-inline-flex align-items-center gap-1">
             <span class="o_field_pdp_masked_value" t-esc="displayValue"/>
             <button type="button"
+                    class="btn btn-link btn-sm p-0 ms-1 o_field_pdp_masked_toggle"
+                    t-att-disabled="state.loading"
+                    t-on-click.stop.prevent="onToggle"
+                    t-att-title="state.revealed ? 'Hide (re-mask)' : 'Reveal (audited)'">
+                <i t-if="state.loading" class="fa fa-spinner fa-spin"/>
+                <i t-elif="state.revealed" class="fa fa-eye-slash"/>
+                <i t-else="1" class="fa fa-eye"/>
+            </button>
+        </span>
+
+        <!-- EDIT / CREATE mode: editable input or textarea + eye toggle -->
+        <span t-else=""
+              class="o_field_pdp_masked o_field_pdp_masked_edit d-inline-flex align-items-center gap-1 w-100">
+            <textarea t-if="isTextarea"
+                      class="o_input o_field_pdp_masked_input"
+                      t-att-id="props.id"
+                      t-att-placeholder="inputPlaceholder"
+                      t-att-value="inputValue"
+                      t-on-input="onInput"
+                      t-on-change="onChange"/>
+            <input t-else=""
+                   type="text"
+                   class="o_input o_field_pdp_masked_input"
+                   t-att-id="props.id"
+                   t-att-placeholder="inputPlaceholder"
+                   t-att-value="inputValue"
+                   t-on-input="onInput"
+                   t-on-change="onChange"/>
+            <button t-if="!isCreate"
+                    type="button"
                     class="btn btn-link btn-sm p-0 ms-1 o_field_pdp_masked_toggle"
                     t-att-disabled="state.loading"
                     t-on-click.stop.prevent="onToggle"
