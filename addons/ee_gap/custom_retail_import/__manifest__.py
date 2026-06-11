@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Retail Import",
-    "summary": "Excel/CSV + SFTP ingestion adapter for retail master & transaction data",
+    "summary": "Excel/CSV + SFTP/FTP/FTPS ingestion adapter for retail master & transaction data",
     "description": """
 Custom Retail Import
 ====================
@@ -26,9 +26,12 @@ Pieces
 * ``retail.import.executor`` — per-file-type loaders with ``ir.model.data``
   external IDs for idempotency. X101/CoA/company/X20 are full; X24/X70 are
   Phase-5 decision-gated; X70T/X31/X32P/store-master are staged.
-* ``retail.import.log`` — audit trail, keeps the source file in ir.attachment.
-* ``retail.import.feed`` — SFTP poller (paramiko) that pulls new files into the
-  same executor on an ``ir.cron`` schedule.
+* ``retail.import.log`` — audit trail (who/when + live progress), keeps the source
+  file in ir.attachment, with per-row ``retail.import.log.line`` results
+  (created/updated/archived/skipped/duplicate/error) browsable as a table, plus
+  re-process and error-report-CSV actions.
+* ``retail.import.feed`` — SFTP/FTP/FTPS poller that pulls new files into the same
+  executor on an ``ir.cron`` schedule.
 """,
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
@@ -43,15 +46,17 @@ Pieces
         "account",
     ],
     "external_dependencies": {"python": ["openpyxl"]},
-    "capability_tags": ["data-import", "retail", "excel", "sftp", "audit-trail"],
+    "capability_tags": ["data-import", "retail", "excel", "sftp", "ftp", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/cron.xml",
         "data/retail_import_profiles.xml",
         "views/retail_import_profile_views.xml",
+        "views/retail_import_log_line_views.xml",
         "views/retail_import_log_views.xml",
         "views/retail_import_feed_views.xml",
+        "views/res_config_settings_views.xml",
         "wizard/retail_import_wizard_views.xml",
         "views/menu_views.xml",
     ],

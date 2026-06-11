@@ -1,29 +1,36 @@
 # -*- coding: utf-8 -*-
-"""Retail import feed — recurring SFTP pull of source files into the importer.
+"""Retail import feed — recurring SFTP/FTP/FTPS pull of source files into the importer.
 
 Phase 6 of the Levi's onboarding plan: answers "can Odoo read directly from the
-customer FTP?". A feed binds an SFTP location + glob to a ``retail.import.profile``.
-An ``ir.cron`` polls active feeds; each new file (deduplicated by SHA256 against
-``retail.import.log``) is stored in ir.attachment and handed to the same
-``retail.import.executor`` used by the manual wizard.
+customer file server?". A feed binds a remote location + glob to a
+``retail.import.profile``. An ``ir.cron`` polls active feeds; each new file
+(deduplicated by SHA256 against ``retail.import.log``) is stored in ir.attachment
+and handed to the same ``retail.import.executor`` used by the manual wizard.
 
-Credentials: the SFTP secret lives in ``ir.config_parameter`` under the key named
-in ``password_param`` (or a private-key file path). NOTE: the platform does not yet
-expose an at-rest decryptor for config params, so the value is stored raw — restrict
-read access to the parameter and prefer key-based auth where possible.
+Protocols: ``sftp`` (paramiko, password or private key), ``ftp`` (stdlib ftplib),
+``ftps`` (ftplib FTP_TLS, encrypted data channel). FTP/FTPS need no extra Python
+dependency; SFTP needs paramiko (already an image dep).
 
-Networking: SFTP egress goes out from the Odoo container on ``odoo-net``; no new
-docker volume is needed (downloads land in the shared filestore via ir.attachment).
+Credentials: the secret can be typed directly into ``password`` (masked,
+manager-only) or, for shared secrets, kept in ``ir.config_parameter`` under the key
+named in ``password_param``. NOTE: the platform does not yet expose an at-rest
+decryptor, so a typed password is stored raw in the DB — restrict access and prefer
+key-based auth for SFTP where possible.
+
+Networking: egress goes out from the Odoo container on ``odoo-net``; no new docker
+volume is needed (downloads land in the shared filestore via ir.attachment).
 """
 
 from __future__ import annotations
 
 import base64
 import fnmatch
+import ftplib
 import io
 import logging
+import os
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -31,7 +38,7 @@ _logger = logging.getLogger(__name__)
 
 class RetailImportFeed(models.Model):
     _name = "retail.import.feed"
-    _description = "Retail Import SFTP Feed"
+    _description = "Retail Import Feed"
     _order = "name"
     _inherit = ["mail.thread"]
 
@@ -40,17 +47,33 @@ class RetailImportFeed(models.Model):
     profile_id = fields.Many2one("retail.import.profile", required=True, ondelete="restrict")
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company, required=True)
 
+    protocol = fields.Selection(
+        [("sftp", "SFTP"), ("ftp", "FTP"), ("ftps", "FTP over TLS")],
+        default="sftp",
+        required=True,
+    )
     host = fields.Char(required=True)
     port = fields.Integer(default=22, required=True)
     username = fields.Char(required=True)
     auth_type = fields.Selection(
-        [("password", "Password"), ("key", "Private key file")], default="password", required=True
+        [("password", "Password"), ("key", "Private key file")],
+        default="password",
+        required=True,
+        help="Private-key auth applies to SFTP only.",
+    )
+    password = fields.Char(
+        groups="custom_retail_import.group_retail_import_manager",
+        help="Connection password. Stored unencrypted in the DB — restrict access.",
     )
     password_param = fields.Char(
         string="Password ir.config_parameter Key",
-        help="Key in ir.config_parameter that holds the SFTP password.",
+        help="Fallback: key in ir.config_parameter that holds the password (used when "
+             "the Password field is empty).",
     )
-    private_key_path = fields.Char(help="Path (inside the container) to the SFTP private key file.")
+    private_key_path = fields.Char(help="SFTP only: path (inside the container) to the private key file.")
+    passive = fields.Boolean(
+        default=True, help="FTP/FTPS passive mode (recommended behind NAT/firewalls)."
+    )
 
     remote_dir = fields.Char(default="/", required=True)
     file_glob = fields.Char(default="*", required=True, help="e.g. 'X20_*.csv' or 'X24DN_*.xlsx'.")
@@ -65,13 +88,32 @@ class RetailImportFeed(models.Model):
     last_message = fields.Text(readonly=True)
     files_imported = fields.Integer(default=0, readonly=True)
 
+    @api.onchange("protocol")
+    def _onchange_protocol(self):
+        for feed in self:
+            feed.port = 22 if feed.protocol == "sftp" else 21
+            if feed.protocol != "sftp":
+                feed.auth_type = "password"
+
+    # ------------------------------------------------------------------
+    # Credentials
     # ------------------------------------------------------------------
     def _secret(self):
         self.ensure_one()
-        if not self.password_param:
-            return ""
-        return self.env["ir.config_parameter"].sudo().get_param(self.password_param, "") or ""
+        if self.password:
+            return self.password
+        if self.password_param:
+            return self.env["ir.config_parameter"].sudo().get_param(self.password_param, "") or ""
+        return ""
 
+    def _queue_channel(self):
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.queue_channel", "root.retail_import"
+        )
+
+    # ------------------------------------------------------------------
+    # SFTP backend
+    # ------------------------------------------------------------------
     def _open_sftp(self):
         self.ensure_one()
         try:
@@ -94,15 +136,88 @@ class RetailImportFeed(models.Model):
             raise
         return paramiko.SFTPClient.from_transport(transport), transport
 
-    def action_test_connection(self):
-        self.ensure_one()
+    def _sftp_list(self):
         sftp, transport = self._open_sftp()
         try:
             names = sftp.listdir(self.remote_dir)
         finally:
             sftp.close()
             transport.close()
-        matched = [n for n in names if fnmatch.fnmatch(n, self.file_glob)]
+        return [os.path.basename(n) for n in names if fnmatch.fnmatch(os.path.basename(n), self.file_glob)]
+
+    def _sftp_download(self, name):
+        sftp, transport = self._open_sftp()
+        try:
+            remote_path = self.remote_dir.rstrip("/") + "/" + name
+            buf = io.BytesIO()
+            sftp.getfo(remote_path, buf)
+            return buf.getvalue()
+        finally:
+            sftp.close()
+            transport.close()
+
+    # ------------------------------------------------------------------
+    # FTP / FTPS backend
+    # ------------------------------------------------------------------
+    def _open_ftp(self):
+        self.ensure_one()
+        cls = ftplib.FTP_TLS if self.protocol == "ftps" else ftplib.FTP
+        ftp = cls()
+        ftp.connect(self.host, self.port or 21, timeout=30)
+        ftp.login(self.username or "", self._secret())
+        if self.protocol == "ftps":
+            ftp.prot_p()  # encrypt the data channel
+        ftp.set_pasv(bool(self.passive))
+        return ftp
+
+    def _ftp_list(self):
+        ftp = self._open_ftp()
+        try:
+            try:
+                names = ftp.nlst(self.remote_dir)
+            except ftplib.error_perm as e:
+                # "550 No files found" / empty directory -> treat as empty, not error.
+                if str(e).startswith("550"):
+                    return []
+                raise
+        finally:
+            try:
+                ftp.quit()
+            except Exception:
+                ftp.close()
+        return [os.path.basename(n) for n in names if fnmatch.fnmatch(os.path.basename(n), self.file_glob)]
+
+    def _ftp_download(self, name):
+        ftp = self._open_ftp()
+        try:
+            remote_path = self.remote_dir.rstrip("/") + "/" + name
+            buf = io.BytesIO()
+            ftp.retrbinary(f"RETR {remote_path}", buf.write)
+            return buf.getvalue()
+        finally:
+            try:
+                ftp.quit()
+            except Exception:
+                ftp.close()
+
+    # ------------------------------------------------------------------
+    # Protocol-neutral interface
+    # ------------------------------------------------------------------
+    def _list_remote(self):
+        self.ensure_one()
+        if self.protocol == "sftp":
+            return sorted(self._sftp_list())
+        return sorted(self._ftp_list())
+
+    def _download_remote(self, name):
+        self.ensure_one()
+        if self.protocol == "sftp":
+            return self._sftp_download(name)
+        return self._ftp_download(name)
+
+    def action_test_connection(self):
+        self.ensure_one()
+        matched = self._list_remote()
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -120,45 +235,37 @@ class RetailImportFeed(models.Model):
         self.ensure_one()
         Log = self.env["retail.import.log"].sudo()
         Executor = self.env["retail.import.executor"]
-        sftp, transport = self._open_sftp()
+        channel = self._queue_channel()
         imported = 0
-        try:
-            names = [n for n in sftp.listdir(self.remote_dir) if fnmatch.fnmatch(n, self.file_glob)]
-            for name in sorted(names):
-                remote_path = self.remote_dir.rstrip("/") + "/" + name
-                buf = io.BytesIO()
-                sftp.getfo(remote_path, buf)
-                raw = buf.getvalue()
-                if not raw:
-                    continue
-                file_hash = Log.compute_hash(raw)
-                if Log.find_duplicate(file_hash):
-                    continue  # already seen this exact file
-                file_b64 = base64.b64encode(raw).decode("ascii")
-                log = Log.create(
-                    {
-                        "profile_id": self.profile_id.id,
-                        "filename": name,
-                        "file_hash": file_hash,
-                        "state": "queued",
-                    }
-                )
-                log.store_source(file_b64, name)
-                if self.run_async:
-                    try:
-                        job = Executor.with_delay(
-                            channel="root.retail_import",
-                            description=f"Feed {self.name}: {name}",
-                        ).run(log)
-                        log.job_uuid = getattr(job, "uuid", False)
-                    except Exception:
-                        Executor.run(log)
-                else:
+        for name in self._list_remote():
+            raw = self._download_remote(name)
+            if not raw:
+                continue
+            file_hash = Log.compute_hash(raw)
+            if Log.find_duplicate(file_hash):
+                continue  # already seen this exact file
+            file_b64 = base64.b64encode(raw).decode("ascii")
+            log = Log.create(
+                {
+                    "profile_id": self.profile_id.id,
+                    "filename": name,
+                    "file_hash": file_hash,
+                    "state": "queued",
+                }
+            )
+            log.store_source(file_b64, name)
+            if self.run_async:
+                try:
+                    job = Executor.with_delay(
+                        channel=channel,
+                        description=f"Feed {self.name}: {name}",
+                    ).run(log)
+                    log.job_uuid = getattr(job, "uuid", False)
+                except Exception:
                     Executor.run(log)
-                imported += 1
-        finally:
-            sftp.close()
-            transport.close()
+            else:
+                Executor.run(log)
+            imported += 1
         return imported
 
     def action_poll_now(self):

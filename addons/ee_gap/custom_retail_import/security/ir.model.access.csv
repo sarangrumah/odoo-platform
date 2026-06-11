@@ -3,6 +3,8 @@ access_retail_profile_user,profile user read,model_retail_import_profile,group_r
 access_retail_profile_manager,profile manager all,model_retail_import_profile,group_retail_import_manager,1,1,1,1
 access_retail_log_user,log user,model_retail_import_log,group_retail_import_user,1,0,0,0
 access_retail_log_manager,log manager,model_retail_import_log,group_retail_import_manager,1,1,1,1
+access_retail_log_line_user,log line user,model_retail_import_log_line,group_retail_import_user,1,0,0,0
+access_retail_log_line_manager,log line manager,model_retail_import_log_line,group_retail_import_manager,1,1,1,1
 access_retail_feed_user,feed user read,model_retail_import_feed,group_retail_import_user,1,0,0,0
 access_retail_feed_manager,feed manager all,model_retail_import_feed,group_retail_import_manager,1,1,1,1
 access_retail_wizard_user,wizard user,model_retail_import_wizard,group_retail_import_user,1,1,1,1

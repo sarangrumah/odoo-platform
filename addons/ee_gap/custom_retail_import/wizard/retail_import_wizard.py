@@ -89,9 +89,12 @@ class RetailImportWizard(models.TransientModel):
         log.store_source(self.file, self.filename)
         Executor = self.env["retail.import.executor"]
         if self.profile_id.file_type in ASYNC_TYPES:
+            channel = self.env["ir.config_parameter"].sudo().get_param(
+                "retail_import.queue_channel", "root.retail_import"
+            )
             try:
                 job = Executor.with_delay(
-                    channel="root.retail_import",
+                    channel=channel,
                     description=f"Retail import {self.profile_id.code} ({self.filename})",
                 ).run(log)
                 log.job_uuid = getattr(job, "uuid", False)

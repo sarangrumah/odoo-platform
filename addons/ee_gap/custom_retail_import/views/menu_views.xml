@@ -3,13 +3,13 @@
     <menuitem id="menu_retail_import_root" name="Retail Import"
               groups="group_retail_import_user" sequence="95"/>
 
-    <menuitem id="menu_retail_import_run" name="Import Data"
+    <menuitem id="menu_retail_import_logs" name="Imports"
               parent="menu_retail_import_root"
-              action="action_retail_import_wizard" sequence="10"/>
+              action="action_retail_import_log" sequence="10"/>
 
-    <menuitem id="menu_retail_import_logs" name="Import Logs"
+    <menuitem id="menu_retail_import_lines" name="Row Results"
               parent="menu_retail_import_root"
-              action="action_retail_import_log" sequence="20"/>
+              action="action_retail_import_log_line" sequence="30"/>
 
     <menuitem id="menu_retail_import_config" name="Configuration"
               parent="menu_retail_import_root" sequence="90"
@@ -19,7 +19,11 @@
               parent="menu_retail_import_config"
               action="action_retail_import_profile" sequence="10"/>
 
-    <menuitem id="menu_retail_import_feeds" name="SFTP Feeds"
+    <menuitem id="menu_retail_import_feeds" name="Feeds"
               parent="menu_retail_import_config"
               action="action_retail_import_feed" sequence="20"/>
+
+    <menuitem id="menu_retail_import_settings" name="Settings"
+              parent="menu_retail_import_config"
+              action="action_retail_import_config_settings" sequence="30"/>
 </odoo>

@@ -22,15 +22,55 @@ Coverage:
 
 from __future__ import annotations
 
+import json
 import logging
 from collections import defaultdict
 
-from odoo import _, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
 BATCH = 200
+RAW_JSON_CAP = 8000
+
+
+class _LineBuffer:
+    """Accumulate per-row log lines and flush them in bulk.
+
+    Flushing just ``create()``s the lines; the surrounding loader's existing
+    ``cr.commit()`` calls persist them. Flush is automatic every ``flush_every``
+    rows (to bound memory) and must be called once more at the end via ``flush()``.
+    ``raw_json`` is kept only for error/duplicate rows to bound storage.
+    """
+
+    def __init__(self, log, flush_every=2000):
+        self.log = log
+        self.flush_every = flush_every
+        self.pending = []
+        self.counts = defaultdict(int)
+
+    def add(self, status, row=0, ref_key=None, message=None, model_name=None, res_id=None, raw=None):
+        self.counts[status] += 1
+        vals = {"status": status, "row": int(row or 0)}
+        if ref_key:
+            vals["ref_key"] = str(ref_key)[:255]
+        if message:
+            vals["message"] = str(message)
+        if model_name:
+            vals["model_name"] = model_name
+        if res_id:
+            vals["res_id"] = res_id
+        if raw is not None and status in ("error", "duplicate"):
+            vals["raw_json"] = json.dumps(raw, default=str, ensure_ascii=False)[:RAW_JSON_CAP]
+        self.pending.append(vals)
+        if len(self.pending) >= self.flush_every:
+            self.flush()
+
+    def flush(self):
+        if self.pending:
+            self.log._log_lines(self.pending)
+            self.pending = []
 
 
 class RetailImportExecutor(models.AbstractModel):
@@ -47,15 +87,22 @@ class RetailImportExecutor(models.AbstractModel):
         profile = log.profile_id
         file_b64 = log.source_b64()
         if not file_b64:
-            log.write({"state": "failed", "error_message": "No stored source file on log."})
+            log.write(
+                {"state": "failed", "error_message": "No stored source file on log.",
+                 "finished_at": fields.Datetime.now()}
+            )
+            log._notify_failure()
             return log
-        log.state = "running"
+        log.write({"state": "running", "started_at": fields.Datetime.now()})
         self.env.cr.commit()
         handler = getattr(self, f"_load_{profile.file_type}", None)
         if handler is None:
             log.write(
-                {"state": "failed", "error_message": f"No executor for file_type {profile.file_type!r}."}
+                {"state": "failed", "error_message": f"No executor for file_type {profile.file_type!r}.",
+                 "finished_at": fields.Datetime.now()}
             )
+            self.env.cr.commit()
+            log._notify_failure()
             return log
         try:
             handler(profile, file_b64, log)
@@ -65,13 +112,22 @@ class RetailImportExecutor(models.AbstractModel):
         except Exception as e:  # pragma: no cover - defensive
             self.env.cr.rollback()
             _logger.exception("Retail import failed (log %s)", log.id)
-            log.write({"state": "failed", "error_message": str(e)})
+            log.write(
+                {"state": "failed", "error_message": str(e), "finished_at": fields.Datetime.now()}
+            )
             self.env.cr.commit()
+            log._notify_failure()
             return log
         if log.state == "running":
             log.state = "partial" if log.error_count else "imported"
+        log.finished_at = fields.Datetime.now()
         self.env.cr.commit()
         return log
+
+    @staticmethod
+    def _tick(log, processed):
+        """Update the live row-progress counter (committed by the caller's commit)."""
+        log.processed_count = processed
 
     # ------------------------------------------------------------------
     # External-ID helpers (idempotency)
@@ -99,9 +155,11 @@ class RetailImportExecutor(models.AbstractModel):
         data = profile.read_records(file_b64)
         records = data["records"]
         log.line_count = len(records)
+        buf = _LineBuffer(log)
 
         # ---- aggregate (mirror of 01_extract_x101.py) ----
         sku_best = {}  # sku -> (eff, dict)
+        sku_first_row = {}  # sku -> source row of its first occurrence
         tmpl_meta = {}  # code -> dict
         sizes, inseams = set(), set()
         tmpl_variants = defaultdict(set)
@@ -109,7 +167,15 @@ class RetailImportExecutor(models.AbstractModel):
             pc = r.get("product_code")
             sku = r.get("sku")
             if not pc or not sku:
+                buf.add("skipped", row=r.get("_row"), ref_key=sku or pc,
+                        message="Missing product_code or sku")
                 continue
+            if sku in sku_first_row:
+                # Same SKU appears again in this file -> data-quality duplicate.
+                buf.add("duplicate", row=r.get("_row"), ref_key=sku,
+                        message=f"Duplicate of row {sku_first_row[sku]}", raw=r)
+            else:
+                sku_first_row[sku] = r.get("_row")
             size = (r.get("size") or "").strip()
             inseam_raw = r.get("inseam")
             inseam = (str(inseam_raw).strip() if inseam_raw not in (None, "-", "") else "")
@@ -212,7 +278,9 @@ class RetailImportExecutor(models.AbstractModel):
         for ext in self.env["ir.model.data"].search([("module", "=", ns), ("model", "=", "product.template")]):
             tmpl_xid_to_id[ext.name] = ext.res_id
         created = 0
+        created_txids = set()
         items = sorted(tmpl_meta.items())
+        n_items = max(1, len(items))
         for start in range(0, len(items), BATCH):
             for pc, m in items[start:start + BATCH]:
                 txid = self._safe_xid("tmpl_", pc)
@@ -252,9 +320,13 @@ class RetailImportExecutor(models.AbstractModel):
                 tmpl = self.env["product.template"].create(vals)
                 self._xid_set(ns, txid, "product.template", tmpl.id)
                 tmpl_xid_to_id[txid] = tmpl.id
+                created_txids.add(txid)
                 created += 1
+            self._tick(log, int(log.line_count * 0.5 * min(1.0, (start + BATCH) / n_items)))
+            buf.flush()
             self.env.cr.commit()
-        log.records_created = created
+        # records_created is set per-variant at the end (see below); ``created`` here
+        # counts product.template rows and is used only for logging.
 
         # ---- variants: match auto-generated by (size, inseam) and set sku/barcode ----
         size_val_id = {v: i for (a, v), i in attr_value_id.items() if a == "Size"}
@@ -264,11 +336,16 @@ class RetailImportExecutor(models.AbstractModel):
             by_tmpl[self._safe_xid("tmpl_", v["tmpl_code"])].append(v)
         matched = unmatched = 0
         tkeys = list(by_tmpl.keys())
+        n_tkeys = max(1, len(tkeys))
         for start in range(0, len(tkeys), 100):
             batch_xids = tkeys[start:start + 100]
             tmpl_ids = [tmpl_xid_to_id[x] for x in batch_xids if x in tmpl_xid_to_id]
             if not tmpl_ids:
-                unmatched += sum(len(by_tmpl[x]) for x in batch_xids)
+                for x in batch_xids:
+                    for v in by_tmpl[x]:
+                        buf.add("skipped", row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
+                                message="No template for this SKU")
+                    unmatched += len(by_tmpl[x])
                 continue
             variants = self.env["product.product"].search([("product_tmpl_id", "in", tmpl_ids)])
             var_index = {}
@@ -277,7 +354,11 @@ class RetailImportExecutor(models.AbstractModel):
                 var_index[(vp.product_tmpl_id.id, combo)] = vp
             for txid in batch_xids:
                 tid = tmpl_xid_to_id.get(txid)
+                is_new = txid in created_txids
                 if not tid:
+                    for v in by_tmpl[txid]:
+                        buf.add("skipped", row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
+                                message="No template for this SKU")
                     unmatched += len(by_tmpl[txid])
                     continue
                 for v in by_tmpl[txid]:
@@ -289,6 +370,8 @@ class RetailImportExecutor(models.AbstractModel):
                     vp = var_index.get((tid, frozenset(wanted)))
                     if not vp:
                         unmatched += 1
+                        buf.add("skipped", row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
+                                message=f"No variant for size={v['size']!r} inseam={v['inseam']!r}")
                         continue
                     updates = {}
                     if vp.default_code != v["sku"]:
@@ -302,10 +385,26 @@ class RetailImportExecutor(models.AbstractModel):
                             if "barcode" in updates:
                                 vp.write({k: x for k, x in updates.items() if k != "barcode"})
                     matched += 1
+                    buf.add("created" if is_new else "updated",
+                            row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
+                            model_name="product.product", res_id=vp.id)
+            self._tick(log, int(log.line_count * (0.5 + 0.5 * min(1.0, (start + 100) / n_tkeys))))
+            buf.flush()
             self.env.cr.commit()
-        log.records_matched = matched
+        buf.flush()
+        # Report counters per *variant* (SKU) so they line up with the row table:
+        # a SKU under a newly-created template is "created", under a pre-existing
+        # template "updated". ``created`` (templates) is kept only for the log line.
+        log.records_created = buf.counts.get("created", 0)
+        log.records_updated = buf.counts.get("updated", 0)
+        log.records_matched = matched  # deprecated: total variants touched
         log.records_skipped = unmatched
-        _logger.info("x101 done: created=%s matched=%s unmatched=%s", created, matched, unmatched)
+        log.duplicate_count = buf.counts.get("duplicate", 0)
+        log.processed_count = log.line_count
+        self.env.cr.commit()
+        _logger.info("x101 done: templates=%s created=%s updated=%s unmatched=%s dup=%s",
+                     created, buf.counts.get("created", 0), buf.counts.get("updated", 0),
+                     unmatched, buf.counts.get("duplicate", 0))
 
     # ==================================================================
     # CoA — account.account
@@ -319,19 +418,30 @@ class RetailImportExecutor(models.AbstractModel):
         company = profile.company_id
         created = skipped = 0
         errors = []
+        seen_codes = {}
+        buf = _LineBuffer(log)
         Account = self.env["account.account"]
-        for r in records:
+        for i, r in enumerate(records):
             code = str(r.get("code") or "").strip()
             name = (r.get("account_name") or r.get("name") or "").strip()
             atype = str(r.get("account_type") or "").strip()
             if not code or not name:
+                buf.add("skipped", row=r.get("_row"), ref_key=code, message="Missing code or name")
                 continue
+            if code in seen_codes:
+                buf.add("duplicate", row=r.get("_row"), ref_key=code,
+                        message=f"Duplicate of row {seen_codes[code]}", raw=r)
+                continue
+            seen_codes[code] = r.get("_row")
             if atype not in valid_types:
                 errors.append((r.get("_row"), f"invalid account_type {atype!r} for {code}"))
+                buf.add("error", row=r.get("_row"), ref_key=code,
+                        message=f"Invalid account_type {atype!r}", raw=r)
                 continue
             xid = self._safe_xid("coa_", code)
             if self._xid_get(ns, xid, "account.account"):
                 skipped += 1
+                buf.add("skipped", row=r.get("_row"), ref_key=code, message="Already imported")
                 continue
             existing = Account.with_company(company).search(
                 [("code", "=", code), ("company_ids", "in", company.id)], limit=1
@@ -339,6 +449,8 @@ class RetailImportExecutor(models.AbstractModel):
             if existing:
                 self._xid_set(ns, xid, "account.account", existing.id)
                 skipped += 1
+                buf.add("skipped", row=r.get("_row"), ref_key=code, message="Account already exists",
+                        model_name="account.account", res_id=existing.id)
                 continue
             try:
                 acc = Account.with_company(company).create(
@@ -346,12 +458,24 @@ class RetailImportExecutor(models.AbstractModel):
                 )
                 self._xid_set(ns, xid, "account.account", acc.id)
                 created += 1
+                buf.add("created", row=r.get("_row"), ref_key=code,
+                        model_name="account.account", res_id=acc.id)
             except Exception as e:
                 errors.append((r.get("_row"), f"{code}: {e}"))
+                buf.add("error", row=r.get("_row"), ref_key=code, message=str(e), raw=r)
+            if (i + 1) % 200 == 0:
+                self._tick(log, i + 1)
+        buf.flush()
         self.env.cr.commit()
         log.records_created = created
         log.records_skipped = skipped
-        log.set_errors(errors)
+        log.duplicate_count = buf.counts.get("duplicate", 0)
+        log.processed_count = log.line_count
+        # set_errors records error lines via _log_lines; CoA error lines were already
+        # added above, so only update the counter + legacy summary here.
+        log.error_count = len(errors)
+        if errors:
+            log.raw_payload = "\n".join(f"row {n}: {m}" for n, m in errors[:200])
 
     # ==================================================================
     # Company — res.company / partner (SES legal entity)
@@ -392,6 +516,13 @@ class RetailImportExecutor(models.AbstractModel):
             company.write({k: v for k, v in vals.items() if k in ("name",)})
             company.partner_id.write({k: v for k, v in vals.items() if k != "name"})
             log.records_matched = 1
+            log.records_updated = 1
+            log._log_lines([
+                {"status": "updated", "row": 0, "ref_key": company.name,
+                 "message": "Company / partner fields updated: " + ", ".join(sorted(vals)),
+                 "model_name": "res.company", "res_id": company.id},
+            ])
+        log.processed_count = log.line_count
         log.set_errors([])
 
     # ==================================================================
@@ -418,19 +549,25 @@ class RetailImportExecutor(models.AbstractModel):
 
         prod_by_barcode = {}
         prod_by_code = {}
-        applied = skipped = 0
-        errors = []
-        quant_vals = []
+        applied = skipped = error_count = 0
+        buf = _LineBuffer(log)
+        quant_vals = []  # (prod, loc, qty, row, key)
         for r in records:
             store = r.get("store_code")
             ean = str(r.get("ean") or "").strip()
             item_id = str(r.get("item_id") or "").strip()
+            key = ean or item_id
             qty = float(profile._parse_amount(r.get("onhand_qty")))
             if not store or qty <= 0:
+                buf.add("skipped", row=r.get("_row"), ref_key=key,
+                        message="No store or qty <= 0")
+                skipped += 1
                 continue
             loc = resolve_location(store)
             if not loc:
-                errors.append((r.get("_row"), f"store {store} -> no warehouse (run store loader first)"))
+                buf.add("error", row=r.get("_row"), ref_key=store,
+                        message=f"Store {store} has no warehouse (run store loader first)", raw=r)
+                error_count += 1
                 continue
             prod = False
             if ean:
@@ -442,10 +579,13 @@ class RetailImportExecutor(models.AbstractModel):
                     prod_by_code[item_id] = Product.search([("default_code", "=", item_id)], limit=1)
                 prod = prod_by_code[item_id]
             if not prod:
-                errors.append((r.get("_row"), f"no product for ean={ean!r} item={item_id!r}"))
-                skipped += 1
+                # Row references a product that is not registered in the system.
+                buf.add("error", row=r.get("_row"), ref_key=key,
+                        message=_("Item produk tidak teregister: ean=%s item=%s") % (ean or "-", item_id or "-"),
+                        raw=r)
+                error_count += 1
                 continue
-            quant_vals.append((prod, loc, qty))
+            quant_vals.append((prod, loc, qty, r.get("_row"), key))
 
         # Guard: refuse to re-apply if this profile already applied opening stock.
         prior = self.env["retail.import.log"].search(
@@ -458,21 +598,28 @@ class RetailImportExecutor(models.AbstractModel):
                 % (profile.code, prior.id)
             )
 
-        for i, (prod, loc, qty) in enumerate(quant_vals):
+        for i, (prod, loc, qty, row, key) in enumerate(quant_vals):
             try:
                 q = Quant.with_context(inventory_mode=True).create(
                     {"product_id": prod.id, "location_id": loc.id, "inventory_quantity": qty}
                 )
                 q.action_apply_inventory()
                 applied += 1
+                buf.add("created", row=row, ref_key=prod.default_code or key,
+                        model_name="stock.quant", res_id=q.id)
             except Exception as e:
-                errors.append((None, f"{prod.default_code}: {e}"))
+                buf.add("error", row=row, ref_key=prod.default_code or key, message=str(e))
+                error_count += 1
             if (i + 1) % 500 == 0:
+                self._tick(log, len(records) - len(quant_vals) + i + 1)
+                buf.flush()
                 self.env.cr.commit()
+        buf.flush()
         self.env.cr.commit()
         log.records_created = applied
         log.records_skipped = skipped
-        log.set_errors(errors)
+        log.error_count = error_count
+        log.processed_count = log.line_count
 
     # ==================================================================
     # X24 — Retail sales -> pos.order (financial, no stock move)
@@ -516,10 +663,16 @@ class RetailImportExecutor(models.AbstractModel):
     # ==================================================================
     def _stage_only(self, profile, file_b64, log, note):
         data = profile.read_records(file_b64)
-        log.line_count = len(data["records"])
-        log.records_skipped = len(data["records"])
+        records = data["records"]
+        log.line_count = len(records)
+        log.records_skipped = len(records)
         log.error_message = note
-        _logger.info("%s: staged %s rows (no model writes)", profile.file_type, len(data["records"]))
+        buf = _LineBuffer(log)
+        for r in records:
+            buf.add("skipped", row=r.get("_row"), message="Staged (no model writes)")
+        buf.flush()
+        log.processed_count = log.line_count
+        _logger.info("%s: staged %s rows (no model writes)", profile.file_type, len(records))
 
     def _load_x70t(self, profile, file_b64, log):
         self._stage_only(profile, file_b64, log, "X70T settlement: staged for reconciliation (Phase 5 decision).")
