@@ -94,14 +94,14 @@ class RetailImportExecutor(models.AbstractModel):
             log._notify_failure()
             return log
         log.write({"state": "running", "started_at": fields.Datetime.now()})
-        self.env.cr.commit()
+        self._checkpoint()
         handler = getattr(self, f"_load_{profile.file_type}", None)
         if handler is None:
             log.write(
                 {"state": "failed", "error_message": f"No executor for file_type {profile.file_type!r}.",
                  "finished_at": fields.Datetime.now()}
             )
-            self.env.cr.commit()
+            self._checkpoint()
             log._notify_failure()
             return log
         try:
@@ -115,19 +115,34 @@ class RetailImportExecutor(models.AbstractModel):
             log.write(
                 {"state": "failed", "error_message": str(e), "finished_at": fields.Datetime.now()}
             )
-            self.env.cr.commit()
+            self._checkpoint()
             log._notify_failure()
             return log
         if log.state == "running":
             log.state = "partial" if log.error_count else "imported"
         log.finished_at = fields.Datetime.now()
-        self.env.cr.commit()
+        self._checkpoint()
         return log
 
     @staticmethod
     def _tick(log, processed):
         """Update the live row-progress counter (committed by the caller's commit)."""
         log.processed_count = processed
+
+    def _checkpoint(self):
+        """Commit if allowed; inside a queue job (commits forbidden) flush instead.
+
+        The executor commits in batches (large X101 imports + live progress). Under
+        queue_job, commits are forbidden unless the job function has Allow Commit and
+        the worker honors it; to stay robust across workers/containers we fall back to
+        flushing. The work then stays in the job's single transaction, which queue_job
+        commits once at the end. In synchronous runs (wizard / sync feed) this is a
+        real commit, so batched progress remains visible.
+        """
+        try:
+            self.env.cr.commit()
+        except RuntimeError:
+            self.env.flush_all()
 
     # ------------------------------------------------------------------
     # External-ID helpers (idempotency)
@@ -250,7 +265,7 @@ class RetailImportExecutor(models.AbstractModel):
                 ).id
                 self._xid_set(ns, xid, "product.category", rid)
             xid_to_cat[xid] = rid
-        self.env.cr.commit()
+        self._checkpoint()
 
         # ---- attributes ----
         attr_by_name = {}
@@ -271,7 +286,7 @@ class RetailImportExecutor(models.AbstractModel):
                 if not av:
                     av = self.env["product.attribute.value"].create({"attribute_id": attr.id, "name": v})
                 attr_value_id[(attr_name, v)] = av.id
-        self.env.cr.commit()
+        self._checkpoint()
 
         # ---- templates ----
         tmpl_xid_to_id = {}
@@ -324,7 +339,7 @@ class RetailImportExecutor(models.AbstractModel):
                 created += 1
             self._tick(log, int(log.line_count * 0.5 * min(1.0, (start + BATCH) / n_items)))
             buf.flush()
-            self.env.cr.commit()
+            self._checkpoint()
         # records_created is set per-variant at the end (see below); ``created`` here
         # counts product.template rows and is used only for logging.
 
@@ -390,7 +405,7 @@ class RetailImportExecutor(models.AbstractModel):
                             model_name="product.product", res_id=vp.id)
             self._tick(log, int(log.line_count * (0.5 + 0.5 * min(1.0, (start + 100) / n_tkeys))))
             buf.flush()
-            self.env.cr.commit()
+            self._checkpoint()
         buf.flush()
         # Report counters per *variant* (SKU) so they line up with the row table:
         # a SKU under a newly-created template is "created", under a pre-existing
@@ -401,7 +416,7 @@ class RetailImportExecutor(models.AbstractModel):
         log.records_skipped = unmatched
         log.duplicate_count = buf.counts.get("duplicate", 0)
         log.processed_count = log.line_count
-        self.env.cr.commit()
+        self._checkpoint()
         _logger.info("x101 done: templates=%s created=%s updated=%s unmatched=%s dup=%s",
                      created, buf.counts.get("created", 0), buf.counts.get("updated", 0),
                      unmatched, buf.counts.get("duplicate", 0))
@@ -466,7 +481,7 @@ class RetailImportExecutor(models.AbstractModel):
             if (i + 1) % 200 == 0:
                 self._tick(log, i + 1)
         buf.flush()
-        self.env.cr.commit()
+        self._checkpoint()
         log.records_created = created
         log.records_skipped = skipped
         log.duplicate_count = buf.counts.get("duplicate", 0)
@@ -613,9 +628,9 @@ class RetailImportExecutor(models.AbstractModel):
             if (i + 1) % 500 == 0:
                 self._tick(log, len(records) - len(quant_vals) + i + 1)
                 buf.flush()
-                self.env.cr.commit()
+                self._checkpoint()
         buf.flush()
-        self.env.cr.commit()
+        self._checkpoint()
         log.records_created = applied
         log.records_skipped = skipped
         log.error_count = error_count
