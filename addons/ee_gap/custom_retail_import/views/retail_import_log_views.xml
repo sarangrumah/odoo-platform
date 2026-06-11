@@ -5,10 +5,6 @@
         <field name="model">retail.import.log</field>
         <field name="arch" type="xml">
             <list string="Imports" create="false" decoration-success="state=='imported'" decoration-warning="state=='partial'" decoration-danger="state=='failed'" decoration-muted="state in ('queued','running')">
-                <header>
-                    <button name="action_open_wizard" type="object" string="Upload File" class="btn-primary"/>
-                    <button name="action_sync_feeds" type="object" string="Sync from FTP" icon="fa-cloud-download"/>
-                </header>
                 <field name="name"/>
                 <field name="profile_id"/>
                 <field name="file_type"/>
@@ -173,6 +169,13 @@
                 <field name="error_count" type="measure"/>
             </graph>
         </field>
+    </record>
+
+    <record id="action_server_sync_feeds" model="ir.actions.server">
+        <field name="name">Sync from FTP</field>
+        <field name="model_id" ref="model_retail_import_log"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_sync_feeds()</field>
     </record>
 
     <record id="action_retail_import_log" model="ir.actions.act_window">
