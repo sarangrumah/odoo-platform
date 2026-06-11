@@ -31,13 +31,13 @@ class ProductBarcode(models.Model):
     note = fields.Char(help="Origin/type, e.g. 'GTIN historis' or 'carton'.")
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        # One row per (product, barcode). Non-unique globally on barcode by design:
-        # source data may reuse a GTIN; resolution picks the primary first, then a
-        # single alternate.
-        ("uniq_product_barcode", "unique(product_id, barcode)",
-         "This barcode is already registered for this product."),
-    ]
+    # One row per (product, barcode). Non-unique globally on barcode by design:
+    # source data may reuse a GTIN; resolution picks the primary first, then a
+    # single alternate. (Odoo 19 API — _sql_constraints is ignored.)
+    _uniq_product_barcode = models.Constraint(
+        "unique(product_id, barcode)",
+        "This barcode is already registered for this product.",
+    )
 
 
 class ProductProduct(models.Model):
