@@ -61,7 +61,7 @@
                 <filter name="created" string="Created" domain="[('status','=','created')]"/>
                 <filter name="updated" string="Updated" domain="[('status','=','updated')]"/>
                 <filter name="skipped" string="Skipped" domain="[('status','=','skipped')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_status" string="Status" context="{'group_by':'status'}"/>
                     <filter name="group_log" string="Import" context="{'group_by':'log_id'}"/>
                     <filter name="group_key" string="Key" context="{'group_by':'ref_key'}"/>
