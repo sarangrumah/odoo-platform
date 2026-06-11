@@ -36,6 +36,11 @@ _logger = logging.getLogger(__name__)
 BATCH = 200
 RAW_JSON_CAP = 8000
 
+# Size values that mean "one size" / no real size — treated as NO size so the
+# product stays plain (no Size attribute / no configurable variant). Mirrors how
+# inseam already maps "-" to "". Caps, backpacks, beanies etc. use "OS".
+ONE_SIZE_TOKENS = {"OS", "ONE SIZE", "ONESIZE", "O/S", "OSFA", "FREE", "F", "NS", "N/S", "-", ""}
+
 
 class _LineBuffer:
     """Accumulate per-row log lines and flush them in bulk.
@@ -224,6 +229,8 @@ class RetailImportExecutor(models.AbstractModel):
                         message="Missing product_code or sku")
                 continue
             size = (r.get("size") or "").strip()
+            if size.upper() in ONE_SIZE_TOKENS:
+                size = ""  # one-size (e.g. "OS") -> no Size attribute -> plain product
             inseam_raw = r.get("inseam")
             inseam = (str(inseam_raw).strip() if inseam_raw not in (None, "-", "") else "")
             gtin = str(r.get("gtin") or "").strip()
