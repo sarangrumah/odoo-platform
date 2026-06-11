@@ -3,6 +3,10 @@
     <menuitem id="menu_retail_import_root" name="Retail Import"
               groups="group_retail_import_user" sequence="95"/>
 
+    <menuitem id="menu_retail_import_run" name="Upload File"
+              parent="menu_retail_import_root"
+              action="action_retail_import_wizard" sequence="5"/>
+
     <menuitem id="menu_retail_import_logs" name="Imports"
               parent="menu_retail_import_root"
               action="action_retail_import_log" sequence="10"/>
