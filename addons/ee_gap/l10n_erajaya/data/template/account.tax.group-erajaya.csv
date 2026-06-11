@@ -1,0 +1,8 @@
+"id","country_id","name","tax_payable_account_id","tax_receivable_account_id"
+"erajaya_tg_luxury_good_taxes","base.id","Luxury Good Taxes","",""
+"erajaya_tg_non_luxury_good_taxes","base.id","Non-luxury Good Taxes","",""
+"erajaya_tg_pph_22_impor","base.id","PPh 22 Impor","",""
+"erajaya_tg_pph_23","base.id","PPh 23","",""
+"erajaya_tg_sltg","base.id","SLTG","",""
+"erajaya_tg_tax_exempted","base.id","Tax Exempted","",""
+"erajaya_tg_zero_rated_taxes","base.id","Zero-rated Taxes","",""
