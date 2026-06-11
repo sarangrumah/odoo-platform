@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_retail_import_root" name="Retail Import"
+              groups="group_retail_import_user" sequence="95"/>
+
+    <menuitem id="menu_retail_import_run" name="Import Data"
+              parent="menu_retail_import_root"
+              action="action_retail_import_wizard" sequence="10"/>
+
+    <menuitem id="menu_retail_import_logs" name="Import Logs"
+              parent="menu_retail_import_root"
+              action="action_retail_import_log" sequence="20"/>
+
+    <menuitem id="menu_retail_import_config" name="Configuration"
+              parent="menu_retail_import_root" sequence="90"
+              groups="group_retail_import_manager"/>
+
+    <menuitem id="menu_retail_import_profiles" name="Import Profiles"
+              parent="menu_retail_import_config"
+              action="action_retail_import_profile" sequence="10"/>
+
+    <menuitem id="menu_retail_import_feeds" name="SFTP Feeds"
+              parent="menu_retail_import_config"
+              action="action_retail_import_feed" sequence="20"/>
+</odoo>
