@@ -865,21 +865,16 @@ class RetailImportExecutor(models.AbstractModel):
             [("type_tax_use", "=", "sale"), ("amount", "=", pct), ("company_id", "=", company.id)], limit=1
         )
 
-    def _pos_session(self, profile, config, store_code, day):
-        """Get/create an OPEN historical pos.session for (store, day). day = date."""
+    def _pos_session(self, profile, config, store_code):
+        """Get/create ONE open pos.session per store. Odoo forbids >1 open session per
+        config, so all of a store's historical orders share a single session; the GL
+        move is retargeted to the latest order date when the session is closed (X70D)."""
         ns = profile.namespace
-        ymd = day.strftime("%Y%m%d")
-        sxid = self._safe_xid("pos_sess_", "%s_%s" % (store_code, ymd))
+        sxid = self._safe_xid("pos_sess_", str(store_code))
         sid = self._xid_get(ns, sxid, "pos.session")
         if sid:
             return self.env["pos.session"].browse(sid)
         session = self.env["pos.session"].create({"config_id": config.id})  # auto-opens
-        session.write(
-            {
-                "start_at": datetime.combine(day, datetime.min.time()),
-                "stop_at": datetime.combine(day, datetime.max.time()).replace(microsecond=0),
-            }
-        )
         self._xid_set(ns, sxid, "pos.session", session.id)
         return session
 
@@ -960,7 +955,7 @@ class RetailImportExecutor(models.AbstractModel):
                 buf.add("error", ref_key=oref, message=bad, raw=rows[0])
                 processed += len(rows)
                 continue
-            session = self._pos_session(profile, config, store_code, day)
+            session = self._pos_session(profile, config, store_code)
             order = Order.create({
                 "company_id": company.id,
                 "session_id": session.id,
@@ -1070,34 +1065,34 @@ class RetailImportExecutor(models.AbstractModel):
                 else:
                     buf.add("error", ref_key=oref,
                             message="Tenders %s != order total %s" % (order.amount_paid, order.amount_total))
-            if day:
-                touched.add((store_code, day))
+            touched.add(store_code)
             processed += len(tenders)
             if processed % 50 == 0:
                 self._tick(log, processed)
                 buf.flush()
                 self._checkpoint()
 
-        # close each fully-paid day's session -> posts GL, retarget date to the day
+        # close each store's session -> posts GL; retarget move date to latest order day
         closed = 0
-        for store_code, day in sorted(touched, key=lambda x: (str(x[0]), x[1])):
-            ymd = day.strftime("%Y%m%d")
-            sid = self._xid_get(ns, self._safe_xid("pos_sess_", "%s_%s" % (store_code, ymd)), "pos.session")
+        for store_code in sorted(touched, key=str):
+            sid = self._xid_get(ns, self._safe_xid("pos_sess_", str(store_code)), "pos.session")
             if not sid:
                 continue
             session = self.env["pos.session"].browse(sid)
             if session.state in ("closed", "closing_control"):
                 continue
             if any(o.state == "draft" for o in session.order_ids):
-                buf.add("skipped", ref_key="%s/%s" % (store_code, ymd),
+                buf.add("skipped", ref_key=str(store_code),
                         message="Session has unpaid orders; not closed")
                 continue
+            dates = [d for d in session.order_ids.mapped("date_order") if d]
+            gl_date = (max(dates).date() if dates else fields.Date.context_today(self))
             try:
-                self._close_session_backdated(session, day)
+                self._close_session_backdated(session, gl_date)
                 closed += 1
             except Exception as e:
-                _logger.exception("session close failed %s/%s", store_code, ymd)
-                buf.add("error", ref_key="%s/%s" % (store_code, ymd), message="close failed: %s" % e)
+                _logger.exception("session close failed store %s", store_code)
+                buf.add("error", ref_key=str(store_code), message="close failed: %s" % e)
             self._checkpoint()
 
         buf.flush()
