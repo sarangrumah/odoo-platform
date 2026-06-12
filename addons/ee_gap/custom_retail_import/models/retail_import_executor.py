@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
+from datetime import datetime, timedelta
 
 from psycopg2.extras import execute_values
 
@@ -757,41 +758,374 @@ class RetailImportExecutor(models.AbstractModel):
         log.processed_count = log.line_count
 
     # ==================================================================
-    # X24 — Retail sales -> pos.order (financial, no stock move)
+    # POS bootstrap + helpers (shared by X24 / X70D)
     # ==================================================================
-    def _load_x24(self, profile, file_b64, log):
-        """Create historical pos.order grouped by (store, date, register, trans).
+    def _pos_bootstrap_store(self, profile, store_code, store_name):
+        """Idempotently ensure POS infra for one store. Returns (config, ensure_pm)
+        where ensure_pm(tender_type) creates+links a pos.payment.method and returns id.
+        All artifacts are guarded by 'levis' external IDs so re-runs are no-ops."""
+        ns = profile.namespace
+        company = profile.company_id
+        env = self.env
+        # --- company-level (once) ---
+        if company.point_of_sale_update_stock_quantities != "closing":
+            company.point_of_sale_update_stock_quantities = "closing"
+        if not company.account_default_pos_receivable_account_id:
+            acc = env["account.account"].search(
+                [("account_type", "=", "asset_receivable"), ("company_ids", "in", company.id)], limit=1
+            )
+            if acc:
+                company.account_default_pos_receivable_account_id = acc.id
+        # --- pricelist ---
+        pl_id = self._xid_get(ns, "pricelist_idr", "product.pricelist")
+        if not pl_id:
+            pl = env["product.pricelist"].create(
+                {"name": "Public Pricelist (IDR)", "currency_id": company.currency_id.id, "company_id": company.id}
+            )
+            self._xid_set(ns, "pricelist_idr", "product.pricelist", pl.id)
+            pl_id = pl.id
+        # --- journals ---
+        cj_id = self._xid_get(ns, "journal_cash", "account.journal")
+        if not cj_id:
+            cj = env["account.journal"].search([("type", "=", "cash"), ("company_id", "=", company.id)], limit=1)
+            if not cj:
+                cj = env["account.journal"].create(
+                    {"name": "Cash (POS)", "type": "cash", "code": "CSHPS", "company_id": company.id}
+                )
+            self._xid_set(ns, "journal_cash", "account.journal", cj.id)
+            cj_id = cj.id
+        cash_journal = env["account.journal"].browse(cj_id)
+        bank_journal = env["account.journal"].search([("type", "=", "bank"), ("company_id", "=", company.id)], limit=1)
+        sale_journal = env["account.journal"].search([("type", "=", "sale"), ("company_id", "=", company.id)], limit=1)
+        # --- warehouse (shared with X20 via wh_<store>) ---
+        wh_xid = self._safe_xid("wh_", store_code)
+        wh_id = self._xid_get(ns, wh_xid, "stock.warehouse")
+        if not wh_id:
+            code = ("S" + "".join(c for c in str(store_code) if c.isalnum()))[:5].upper()
+            wh = env["stock.warehouse"].create(
+                {"name": (store_name or str(store_code))[:60], "code": code, "company_id": company.id}
+            )
+            self._xid_set(ns, wh_xid, "stock.warehouse", wh.id)
+            wh_id = wh.id
+        warehouse = env["stock.warehouse"].browse(wh_id)
 
-        Requires, per store: a pos.config with at least one payment method, and the
-        company's accounting periods open for the dates loaded. Tax is taken from the
-        product's sale taxes when present. Stock is NOT moved (config picking is
-        skipped) so this does not double-count against X20 opening stock.
+        # --- cash payment method (config needs >=1) ---
+        def _make_pm(tender):
+            xid = self._safe_xid("pm_", tender)
+            pid = self._xid_get(ns, xid, "pos.payment.method")
+            if not pid:
+                journal = cash_journal if str(tender).upper() == "CASH" else (bank_journal or cash_journal)
+                pm = env["pos.payment.method"].create(
+                    {"name": str(tender), "journal_id": journal.id, "company_id": company.id, "split_transactions": False}
+                )
+                self._xid_set(ns, xid, "pos.payment.method", pm.id)
+                pid = pm.id
+            return pid
 
-        This loader is decision-gated (plan Phase 5): validate against a live DB and
-        confirm history depth + tax mapping before a full run.
-        """
-        raise UserError(
-            _("X24 POS history import is decision-gated (Phase 5): confirm history depth, "
-              "per-store pos.config, payment-method map (from X70D) and tax mapping, then enable. "
-              "The parser + grouping are ready in retail.import.executor._group_x24().")
+        cash_pm_id = _make_pm("CASH")
+        # --- pos.config ---
+        cfg_xid = self._safe_xid("pos_cfg_", store_code)
+        cfg_id = self._xid_get(ns, cfg_xid, "pos.config")
+        if not cfg_id:
+            cfg = env["pos.config"].create(
+                {
+                    "name": store_name or ("Store %s" % store_code),
+                    "company_id": company.id,
+                    "journal_id": sale_journal.id,
+                    "invoice_journal_id": sale_journal.id,
+                    "picking_type_id": warehouse.out_type_id.id,
+                    "payment_method_ids": [(4, cash_pm_id)],
+                    "use_pricelist": True,
+                    "pricelist_id": pl_id,
+                    "available_pricelist_ids": [(6, 0, [pl_id])],
+                }
+            )
+            self._xid_set(ns, cfg_xid, "pos.config", cfg.id)
+            cfg_id = cfg.id
+        config = env["pos.config"].browse(cfg_id)
+
+        def ensure_pm(tender):
+            pid = _make_pm(tender)
+            if pid not in config.payment_method_ids.ids:
+                config.write({"payment_method_ids": [(4, pid)]})
+            return pid
+
+        ensure_pm("CASH")
+        return config, ensure_pm, pl_id
+
+    def _pos_tax_for_rate(self, company, rate):
+        """Map an X24 tax_rate (e.g. 0.11) to a sale account.tax. None/0 -> empty list."""
+        try:
+            pct = round(float(rate or 0) * 100)
+        except (TypeError, ValueError):
+            pct = 0
+        if pct <= 0:
+            return self.env["account.tax"].browse()
+        return self.env["account.tax"].search(
+            [("type_tax_use", "=", "sale"), ("amount", "=", pct), ("company_id", "=", company.id)], limit=1
         )
 
+    def _pos_session(self, profile, config, store_code, day):
+        """Get/create an OPEN historical pos.session for (store, day). day = date."""
+        ns = profile.namespace
+        ymd = day.strftime("%Y%m%d")
+        sxid = self._safe_xid("pos_sess_", "%s_%s" % (store_code, ymd))
+        sid = self._xid_get(ns, sxid, "pos.session")
+        if sid:
+            return self.env["pos.session"].browse(sid)
+        session = self.env["pos.session"].create({"config_id": config.id})  # auto-opens
+        session.write(
+            {
+                "start_at": datetime.combine(day, datetime.min.time()),
+                "stop_at": datetime.combine(day, datetime.max.time()).replace(microsecond=0),
+            }
+        )
+        self._xid_set(ns, sxid, "pos.session", session.id)
+        return session
+
+    # ==================================================================
+    # X24 — Retail sales -> historical pos.order (draft; paid by X70D)
+    # ==================================================================
+    def _load_x24(self, profile, file_b64, log):
+        ns = profile.namespace
+        company = profile.company_id
+        self = self.with_context(tracking_disable=True, mail_create_nolog=True, mail_create_nosubscribe=True)
+        orders = self._group_x24(profile, file_b64)
+        log.line_count = sum(len(v) for v in orders.values())
+        buf = self._line_buffer(log, log.line_count)
+        Order = self.env["pos.order"]
+        Product = self.env["product.product"]
+        cfg_cache, processed, created = {}, 0, 0
+
+        # Pre-flight lock-date check on the earliest date.
+        days = sorted({profile._parse_date(k[1]) for k in orders if profile._parse_date(k[1])})
+        if days:
+            try:
+                violated = company._get_violated_lock_dates(days[0], False)
+            except Exception:
+                violated = None
+            if violated:
+                raise UserError(
+                    _("Accounting is locked on/before %s — open the period (or clear the lock date) "
+                      "for the X24 history dates before importing.") % violated
+                )
+
+        for (store_code, trans_date_raw, register, transnum), rows in orders.items():
+            day = profile._parse_date(trans_date_raw)
+            if not store_code or not day:
+                buf.add("skipped", ref_key=str(transnum), message="Missing store or date")
+                processed += len(rows)
+                continue
+            store_name = (rows[0].get("store_name") or "").strip()
+            if store_code not in cfg_cache:
+                cfg_cache[store_code] = self._pos_bootstrap_store(profile, store_code, store_name)
+            config, _ensure_pm, pl_id = cfg_cache[store_code]
+            oref = "%s_%s_%s" % (store_code, register, transnum)
+            oxid = self._safe_xid("pos_", oref)
+            if self._xid_get(ns, oxid, "pos.order"):
+                buf.add("skipped", ref_key=oref, message="Order already imported")
+                processed += len(rows)
+                continue
+            # build lines
+            line_vals, amt_total, amt_tax, bad = [], 0.0, 0.0, None
+            for r in rows:
+                ean = str(r.get("ean") or "").strip()
+                item = str(r.get("item_code") or "").strip()
+                prod = (Product._resolve_barcode(ean) if ean else Product.browse()) \
+                    or Product.search([("default_code", "=", item)], limit=1)
+                if not prod:
+                    bad = _("Item produk tidak teregister: ean=%s item=%s") % (ean or "-", item or "-")
+                    break
+                qty = float(profile._parse_amount(r.get("net_qty")) or 0)
+                net = float(profile._parse_amount(r.get("net_amount")) or 0)        # ex-tax base
+                total = float(profile._parse_amount(r.get("total_amount")) or 0)    # incl tax
+                tax_amt = float(profile._parse_amount(r.get("tax_amount")) or 0)
+                tax = self._pos_tax_for_rate(company, r.get("tax_rate"))
+                if abs((total - net) - tax_amt) > max(2.0, qty):
+                    bad = _("Line amounts inconsistent (net=%s total=%s tax=%s)") % (net, total, tax_amt)
+                    break
+                line_vals.append((0, 0, {
+                    "product_id": prod.id,
+                    "qty": qty,
+                    "price_unit": (net / qty) if qty else net,  # ex-tax (tax 28 is price-excluded)
+                    "discount": 0.0,
+                    "tax_ids": [(6, 0, tax.ids)],
+                    "price_subtotal": net,
+                    "price_subtotal_incl": total,
+                    "full_product_name": (r.get("item_description") or prod.display_name),
+                }))
+                amt_total += total
+                amt_tax += tax_amt
+            if bad:
+                buf.add("error", ref_key=oref, message=bad, raw=rows[0])
+                processed += len(rows)
+                continue
+            session = self._pos_session(profile, config, store_code, day)
+            order = Order.create({
+                "company_id": company.id,
+                "session_id": session.id,
+                "config_id": config.id,
+                "pricelist_id": pl_id,
+                "partner_id": False,
+                "date_order": datetime.combine(day, datetime.min.time()).replace(hour=12),
+                "pos_reference": "Order %s" % oref,
+                "tracking_number": str(transnum),
+                "amount_tax": amt_tax,
+                "amount_total": amt_total,
+                "amount_paid": 0.0,
+                "amount_return": 0.0,
+                "lines": line_vals,
+                "state": "draft",
+                "to_invoice": False,
+            })
+            self._xid_set(ns, oxid, "pos.order", order.id)
+            buf.add("created", ref_key=oref, model_name="pos.order", res_id=order.id)
+            created += 1
+            processed += len(rows)
+            if created % 50 == 0:
+                self._tick(log, processed)
+                buf.flush()
+                self._checkpoint()
+        buf.flush()
+        log.records_created = created
+        log.records_skipped = buf.counts.get("skipped", 0)
+        log.error_count = buf.counts.get("error", 0)
+        log.processed_count = log.line_count
+        self._checkpoint()
+        _logger.info("x24 done: %s orders created across %s stores", created, len(cfg_cache))
+
     def _group_x24(self, profile, file_b64):
-        """Parse X24 and group rows into transactions. Returned for Phase-5 wiring."""
+        """Parse X24 and group rows into transactions (store, date, register, transnum)."""
         data = profile.read_records(file_b64)
         orders = defaultdict(list)
         for r in data["records"]:
+            if not r.get("store_code") or str(r.get("store_code")).strip().lower().startswith("grand"):
+                continue
             key = (r.get("store_code"), r.get("trans_date"), r.get("register"), r.get("transnum"))
             orders[key].append(r)
         return orders
 
+    def _group_x70d(self, profile, file_b64):
+        """Parse X70D and group tender rows by (store, date, register, transnum)."""
+        data = profile.read_records(file_b64)
+        groups = defaultdict(list)
+        for r in data["records"]:
+            if not r.get("store_code") or str(r.get("store_code")).strip().lower().startswith("grand"):
+                continue
+            key = (r.get("store_code"), r.get("trans_date"), r.get("register"), r.get("transnum"))
+            groups[key].append(r)
+        return groups
+
     # ==================================================================
-    # X70D — Tender detail -> pos.payment (Phase 5, joined to x24)
+    # X70D — Tender detail -> pos.payment; then close the day's session (GL)
     # ==================================================================
     def _load_x70d(self, profile, file_b64, log):
-        raise UserError(
-            _("X70D tender import attaches payments to X24 pos.orders; enable together with X24 (Phase 5).")
-        )
+        ns = profile.namespace
+        company = profile.company_id
+        self = self.with_context(tracking_disable=True, mail_create_nolog=True, mail_create_nosubscribe=True)
+        groups = self._group_x70d(profile, file_b64)
+        log.line_count = sum(len(v) for v in groups.values())
+        buf = self._line_buffer(log, log.line_count)
+        Payment = self.env["pos.payment"]
+        cfg_cache, touched, paid_n, processed = {}, set(), 0, 0
+
+        for (store_code, trans_date_raw, register, transnum), tenders in groups.items():
+            day = profile._parse_date(trans_date_raw)
+            oref = "%s_%s_%s" % (store_code, register, transnum)
+            oid = self._xid_get(ns, self._safe_xid("pos_", oref), "pos.order")
+            if not oid:
+                buf.add("error", ref_key=oref, message="No X24 order for this tender (upload X24 first)")
+                processed += len(tenders)
+                continue
+            order = self.env["pos.order"].browse(oid)
+            if store_code not in cfg_cache:
+                store_name = (tenders[0].get("store_name") or "").strip()
+                cfg_cache[store_code] = self._pos_bootstrap_store(profile, store_code, store_name)
+            config, ensure_pm, _pl = cfg_cache[store_code]
+            for seq, t in enumerate(tenders):
+                pmt_xid = self._safe_xid("pmt_", "%s_%s" % (oref, seq))
+                if self._xid_get(ns, pmt_xid, "pos.payment"):
+                    continue
+                tender_type = (t.get("tender_type") or "CASH").strip() or "CASH"
+                pm_id = ensure_pm(tender_type)
+                amount = float(profile._parse_amount(t.get("tender_amount")) or 0)
+                pay = Payment.create({
+                    "pos_order_id": order.id,
+                    "payment_method_id": pm_id,
+                    "amount": amount,
+                    "payment_date": order.date_order,
+                    "name": str(t.get("auth") or t.get("voucher") or ""),
+                })
+                self._xid_set(ns, pmt_xid, "pos.payment", pay.id)
+            # mark paid if balanced
+            if order.state == "draft":
+                order._compute_amount_all() if hasattr(order, "_compute_amount_all") else None
+                if abs((order.amount_paid or 0) - (order.amount_total or 0)) <= 1.0:
+                    try:
+                        order.action_pos_order_paid()
+                        buf.add("created", ref_key=oref, model_name="pos.order", res_id=order.id)
+                        paid_n += 1
+                    except Exception as e:
+                        buf.add("error", ref_key=oref, message="paid failed: %s" % e)
+                else:
+                    buf.add("error", ref_key=oref,
+                            message="Tenders %s != order total %s" % (order.amount_paid, order.amount_total))
+            if day:
+                touched.add((store_code, day))
+            processed += len(tenders)
+            if processed % 50 == 0:
+                self._tick(log, processed)
+                buf.flush()
+                self._checkpoint()
+
+        # close each fully-paid day's session -> posts GL, retarget date to the day
+        closed = 0
+        for store_code, day in sorted(touched, key=lambda x: (str(x[0]), x[1])):
+            ymd = day.strftime("%Y%m%d")
+            sid = self._xid_get(ns, self._safe_xid("pos_sess_", "%s_%s" % (store_code, ymd)), "pos.session")
+            if not sid:
+                continue
+            session = self.env["pos.session"].browse(sid)
+            if session.state in ("closed", "closing_control"):
+                continue
+            if any(o.state == "draft" for o in session.order_ids):
+                buf.add("skipped", ref_key="%s/%s" % (store_code, ymd),
+                        message="Session has unpaid orders; not closed")
+                continue
+            try:
+                self._close_session_backdated(session, day)
+                closed += 1
+            except Exception as e:
+                _logger.exception("session close failed %s/%s", store_code, ymd)
+                buf.add("error", ref_key="%s/%s" % (store_code, ymd), message="close failed: %s" % e)
+            self._checkpoint()
+
+        buf.flush()
+        log.records_created = paid_n
+        log.records_matched = closed  # sessions posted to GL
+        log.error_count = buf.counts.get("error", 0)
+        log.processed_count = log.line_count
+        self._checkpoint()
+        _logger.info("x70d done: %s orders paid, %s day-sessions closed", paid_n, closed)
+
+    def _close_session_backdated(self, session, day):
+        """Close an open POS session and re-stamp its GL move(s) to the historical day.
+        Odoo hardcodes the session move date to 'today', so we draft->rewrite date->post."""
+        session.action_pos_session_closing_control()  # cash_control off -> validates + posts
+        target = day
+        moves = session.move_id
+        for pk in session.picking_ids:
+            moves |= pk.move_ids.account_move
+        for m in moves:
+            if not m or m.state != "posted":
+                continue
+            m = m.with_context(check_move_validity=False)
+            m.button_draft()
+            m.write({"date": target})
+            if m.line_ids:
+                m.line_ids.write({"date": target})
+            m._post()
+        return True
 
     # ==================================================================
     # Staged / reference-only loaders (parse + count + keep attachment)
