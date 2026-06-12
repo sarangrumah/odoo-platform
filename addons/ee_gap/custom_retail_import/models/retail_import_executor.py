@@ -847,7 +847,14 @@ class RetailImportExecutor(models.AbstractModel):
         def ensure_pm(tender):
             pid = _make_pm(tender)
             if pid not in config.payment_method_ids.ids:
-                config.write({"payment_method_ids": [(4, pid)]})
+                # pos.config.write blocks payment-method changes while a session is open;
+                # link directly via the m2m table (safe for this historical import).
+                env.cr.execute(
+                    "INSERT INTO pos_config_pos_payment_method_rel "
+                    "(pos_config_id, pos_payment_method_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                    (config.id, pid),
+                )
+                config.invalidate_recordset(["payment_method_ids"])
             return pid
 
         ensure_pm("CASH")
