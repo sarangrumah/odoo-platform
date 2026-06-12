@@ -853,6 +853,34 @@ class RetailImportExecutor(models.AbstractModel):
         ensure_pm("CASH")
         return config, ensure_pm, pl_id
 
+    def _x24_product(self, ns, item_code, ean, desc, price):
+        """Resolve an X24 line's product; lazy-create a non-merchandise product (carrier
+        bags, vouchers, etc. sold at POS but absent from the X101 master) so the order
+        is complete and its total balances against the X70D tender. Idempotent by xid."""
+        P = self.env["product.product"]
+        prod = (P._resolve_barcode(ean) if ean else P.browse())
+        if not prod and item_code:
+            prod = P.search([("default_code", "=", item_code)], limit=1)
+        if prod:
+            return prod
+        key = item_code or ean
+        xid = self._safe_xid("x24prod_", key)
+        pid = self._xid_get(ns, xid, "product.product")
+        if pid:
+            return P.browse(pid)
+        tmpl = self.env["product.template"].with_context(tracking_disable=True, mail_create_nolog=True).create(
+            {"name": (desc or key)[:200], "default_code": item_code or False,
+             "type": "consu", "list_price": price, "sale_ok": True}
+        )
+        prod = tmpl.product_variant_id
+        if ean and not prod.barcode and not P.search_count([("barcode", "=", ean)]):
+            try:
+                prod.barcode = ean
+            except Exception:
+                pass
+        self._xid_set(ns, xid, "product.product", prod.id)
+        return prod
+
     def _pos_tax_for_rate(self, company, rate):
         """Map an X24 tax_rate (e.g. 0.11) to a sale account.tax. None/0 -> empty list."""
         try:
@@ -926,8 +954,8 @@ class RetailImportExecutor(models.AbstractModel):
             for r in rows:
                 ean = str(r.get("ean") or "").strip()
                 item = str(r.get("item_code") or "").strip()
-                prod = (Product._resolve_barcode(ean) if ean else Product.browse()) \
-                    or Product.search([("default_code", "=", item)], limit=1)
+                prod = self._x24_product(ns, item, ean, r.get("item_description"),
+                                         float(profile._parse_amount(r.get("retail_price")) or 0))
                 if not prod:
                     bad = _("Item produk tidak teregister: ean=%s item=%s") % (ean or "-", item or "-")
                     break
