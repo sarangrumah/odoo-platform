@@ -382,6 +382,7 @@ class RetailImportExecutor(models.AbstractModel):
                     "default_code": pc,
                     "list_price": m["retail"],
                     "type": "consu",
+                    "is_storable": True,  # track stock (X20 opening, X24 sales reduce on-hand)
                     "sale_ok": True,
                     "purchase_ok": True,
                 }
