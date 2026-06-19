@@ -70,7 +70,7 @@ class ToRule(models.Model):
                 if not raw:
                     continue
                 try:
-                    val = safe_eval(raw, {"__builtins__": {}}, {})
+                    val = safe_eval(raw, {"__builtins__": {}})
                 except Exception as exc:
                     raise ValidationError(_("Invalid domain: %s") % exc) from exc
                 if not isinstance(val, list):
@@ -80,6 +80,6 @@ class ToRule(models.Model):
         if not raw:
             return []
         try:
-            return safe_eval(raw, {"__builtins__": {}}, {})
+            return safe_eval(raw, {"__builtins__": {}})
         except Exception:
             return []
