@@ -1087,9 +1087,13 @@ class RetailImportExecutor(models.AbstractModel):
                     "name": str(t.get("auth") or t.get("voucher") or ""),
                 })
                 self._xid_set(ns, pmt_xid, "pos.payment", pay.id)
-            # mark paid if balanced
+            # mark paid if balanced. ``pos.order.amount_paid`` is a plain stored
+            # field (no @api.depends) — creating pos.payment rows directly does NOT
+            # refresh it; the UI relies on an onchange. Recompute it ourselves from
+            # the payments before checking the balance.
             if order.state == "draft":
-                order._compute_amount_all() if hasattr(order, "_compute_amount_all") else None
+                order.invalidate_recordset(["payment_ids", "amount_paid"])
+                order.amount_paid = sum(order.payment_ids.mapped("amount"))
                 if abs((order.amount_paid or 0) - (order.amount_total or 0)) <= 1.0:
                     try:
                         order.action_pos_order_paid()
