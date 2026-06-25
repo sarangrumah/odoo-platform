@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS pdp.audit_log (
   tenant_db       VARCHAR(64),
   model_name      VARCHAR(128) NOT NULL,
   res_id          BIGINT,
-  action          VARCHAR(16)  NOT NULL CHECK (action IN ('create','read','write','unlink','export','login','logout','dsar','unmask','consent_grant','consent_withdraw','sertel_access','xml_export','xml_import','custom')),
+  -- Action codes are free-form domain identifiers (snake_case), so feature
+  -- modules can log their own verbs (e.g. 'approval_submit', 'fsm_wo_complete')
+  -- without needing a schema change. Format-validated, not enum-restricted.
+  action          VARCHAR(64)  NOT NULL CHECK (action ~ '^[a-z][a-z0-9_]{1,63}$'),
   field_changes   JSONB,
   classification  VARCHAR(32),                -- pii / sensitive_pii / financial / health / ...
   ip_address      INET,
