@@ -107,17 +107,23 @@
                 <t t-foreach="lines" t-as="line">
                     <t t-if="line.display_type == 'line_section'">
                         <tr>
-                            <td colspan="6" style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line.name"/>
+                            <td colspan="6" style="font-weight: bold; background-color: #f3f3f3; border: 1px solid #b0b0b0; padding: 3px 5px;">
+                                <t t-foreach="(line.name or '').split('\n')" t-as="_ln"><t t-out="_ln"/><br t-if="not _ln_last"/></t>
+                            </td>
                         </tr>
                     </t>
                     <t t-elif="line.display_type == 'line_note'">
                         <tr>
-                            <td colspan="6" style="font-style: italic; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line.name"/>
+                            <td colspan="6" style="font-style: italic; border: 1px solid #b0b0b0; padding: 3px 5px;">
+                                <t t-foreach="(line.name or '').split('\n')" t-as="_ln"><t t-out="_ln"/><br t-if="not _ln_last"/></t>
+                            </td>
                         </tr>
                     </t>
                     <t t-else="">
                         <tr>
-                            <td style="white-space: pre-line; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line.name"/>
+                            <td style="border: 1px solid #b0b0b0; padding: 3px 5px;">
+                                <t t-foreach="(line.name or '').split('\n')" t-as="_ln"><t t-out="_ln"/><br t-if="not _ln_last"/></t>
+                            </td>
                             <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="line.price_unit"/></t></td>
                             <td style="text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;" t-out="line[qty_field]"/>
                             <td style="text-align: center; border: 1px solid #b0b0b0; padding: 3px 5px;"><t t-out="'{:.1f}'.format(line.discount)"/>%</td>
@@ -171,8 +177,16 @@
     <template id="signature_block">
         <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
             <tr>
-                <td style="width: 50%;"></td>
-                <td style="width: 50%; text-align: center; font-size: 10px;">
+                <!-- Customer signature (left) — only shown for quotes when show_customer_sig is set -->
+                <td t-if="show_customer_sig" style="width: 50%; text-align: center; font-size: 10px; vertical-align: top; padding-right: 20px;">
+                    <div style="margin-bottom: 4px;">Menyetujui,</div>
+                    <div style="font-weight: bold;" t-out="customer_company or ''"/>
+                    <div style="height: 80px;"></div>
+                    <div t-out="customer_name or ''"/>
+                </td>
+                <td t-else="" style="width: 50%;"></td>
+                <!-- Company signature (right) -->
+                <td style="width: 50%; text-align: center; font-size: 10px; vertical-align: top;">
                     <div style="margin-bottom: 4px;">Yours Faithfully,</div>
                     <div style="font-weight: bold;" t-out="company.name"/>
                     <div style="height: 80px;"></div>
