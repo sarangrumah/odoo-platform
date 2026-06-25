@@ -52,7 +52,6 @@
                     </td>
                     <td style="width: 45%; vertical-align: top;">
                         <t t-call="custom_report_templates.totals_block">
-                            <t t-set="vat_pct" t-value="'{:.1f}'.format(o.amount_tax / o.amount_untaxed * 100 if o.amount_untaxed else 0.0)"/>
                             <t t-set="show_balance" t-value="False"/>
                         </t>
                     </td>
