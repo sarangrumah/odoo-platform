@@ -62,15 +62,30 @@
             <t t-call="custom_report_templates.signature_block">
                 <t t-set="signer" t-value="o.user_id.name"/>
                 <t t-set="doc_noun" t-value="'quotation' if is_quote else 'order'"/>
+                <t t-set="show_customer_sig" t-value="is_quote"/>
+                <t t-set="customer_name" t-value="o.partner_id.name"/>
+                <t t-set="customer_company" t-value="o.partner_id.commercial_partner_id.name"/>
             </t>
         </div>
     </template>
 
+    <!-- Minimal self-contained wrapper: no external HTTP requests → fast wkhtmltopdf -->
     <template id="report_saleorder">
-        <t t-call="web.html_container">
-            <t t-foreach="docs" t-as="o">
-                <t t-call="custom_report_templates.report_saleorder_document" t-lang="o.partner_id.lang"/>
-            </t>
-        </t>
+        <html>
+            <head>
+                <meta charset="utf-8"/>
+                <style>
+                    @page { margin: 15mm; }
+                    * { box-sizing: border-box; }
+                    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; margin: 0; padding: 0; }
+                </style>
+            </head>
+            <body>
+                <t t-foreach="docs" t-as="o">
+                    <div t-if="not o_first" style="page-break-before: always;"></div>
+                    <t t-call="custom_report_templates.report_saleorder_document" t-lang="o.partner_id.lang"/>
+                </t>
+            </body>
+        </html>
     </template>
 </odoo>
