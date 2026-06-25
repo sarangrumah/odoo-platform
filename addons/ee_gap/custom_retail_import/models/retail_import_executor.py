@@ -478,20 +478,9 @@ class RetailImportExecutor(models.AbstractModel):
     # X24 — Retail sales -> pos.order (financial, no stock move)
     # ==================================================================
     def _load_x24(self, profile, file_b64, log):
-        """Create historical pos.order grouped by (store, date, register, trans).
-
-        Requires, per store: a pos.config with at least one payment method, and the
-        company's accounting periods open for the dates loaded. Tax is taken from the
-        product's sale taxes when present. Stock is NOT moved (config picking is
-        skipped) so this does not double-count against X20 opening stock.
-
-        This loader is decision-gated (plan Phase 5): validate against a live DB and
-        confirm history depth + tax mapping before a full run.
-        """
-        raise UserError(
-            _("X24 POS history import is decision-gated (Phase 5): confirm history depth, "
-              "per-store pos.config, payment-method map (from X70D) and tax mapping, then enable. "
-              "The parser + grouping are ready in retail.import.executor._group_x24().")
+        self._stage_only(
+            profile, file_b64, log,
+            "X24DN POS sales: staged (Phase-5 gated — pos.config + payment methods not yet confirmed).",
         )
 
     def _group_x24(self, profile, file_b64):
@@ -504,11 +493,12 @@ class RetailImportExecutor(models.AbstractModel):
         return orders
 
     # ==================================================================
-    # X70D — Tender detail -> pos.payment (Phase 5, joined to x24)
+    # X70D — Tender detail (Phase 5, staged until X24 is enabled)
     # ==================================================================
     def _load_x70d(self, profile, file_b64, log):
-        raise UserError(
-            _("X70D tender import attaches payments to X24 pos.orders; enable together with X24 (Phase 5).")
+        self._stage_only(
+            profile, file_b64, log,
+            "X70D tender detail: staged (Phase-5 gated — depends on X24 enablement).",
         )
 
     # ==================================================================
@@ -536,3 +526,27 @@ class RetailImportExecutor(models.AbstractModel):
             "Store Master: warehouse creation is handled by the Track A odoo-shell loader "
             "(header-wise store columns). This profile is for row-wise enrichment only.",
         )
+
+    def _load_x70(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X70 tender breakdown: staged for settlement reconciliation.")
+
+    def _load_x26(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X26 shipping: staged for transfer-order mapping.")
+
+    def _load_x29(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X29 inventory adjustment: staged for stock adjustment mapping.")
+
+    def _load_x48(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X48 customer return: staged for return order mapping.")
+
+    def _load_x53(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X53 RTV: staged for vendor return mapping.")
+
+    def _load_x53_ebr(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X53-EBR RTV (alternate format): staged for vendor return mapping.")
+
+    def _load_x21(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X21 payment summary: staged for payment reconciliation.")
+
+    def _load_x25n(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X25N receiving: staged for PO receipt mapping.")
