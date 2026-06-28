@@ -52,6 +52,21 @@
                     <group string="Row errors" invisible="not raw_payload">
                         <field name="raw_payload" nolabel="1"/>
                     </group>
+                    <notebook>
+                        <page string="Source Rows" name="source_rows">
+                            <field name="line_ids" nolabel="1" mode="list">
+                                <list string="Source Rows" decoration-success="state=='ok'" decoration-warning="state=='skipped'" decoration-danger="state=='error'">
+                                    <field name="row_number"/>
+                                    <field name="aggregate_key"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="target_model"/>
+                                    <field name="target_res_id"/>
+                                    <field name="error_message" optional="show"/>
+                                    <field name="raw_data_json" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
                 <chatter/>
             </form>

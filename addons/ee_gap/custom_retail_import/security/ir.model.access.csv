@@ -7,3 +7,5 @@ access_retail_feed_user,feed user read,model_retail_import_feed,group_retail_imp
 access_retail_feed_manager,feed manager all,model_retail_import_feed,group_retail_import_manager,1,1,1,1
 access_retail_wizard_user,wizard user,model_retail_import_wizard,group_retail_import_user,1,1,1,1
 access_retail_wizard_manager,wizard manager,model_retail_import_wizard,group_retail_import_manager,1,1,1,1
+access_retail_line_user,line user read,model_retail_import_line,group_retail_import_user,1,0,0,0
+access_retail_line_manager,line manager all,model_retail_import_line,group_retail_import_manager,1,1,1,1

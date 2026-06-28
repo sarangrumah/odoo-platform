@@ -54,6 +54,7 @@ class RetailImportLog(models.Model):
     error_message = fields.Text()
     raw_payload = fields.Text(help="Row-level error summary (first N rows).")
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company, required=True)
+    line_ids = fields.One2many("retail.import.line", "log_id", string="Source Rows")
 
     def _compute_name(self):
         for rec in self:

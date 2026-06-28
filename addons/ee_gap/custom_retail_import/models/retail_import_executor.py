@@ -22,6 +22,7 @@ Coverage:
 
 from __future__ import annotations
 
+import json
 import logging
 from collections import defaultdict
 
@@ -31,6 +32,7 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 BATCH = 200
+LINE_BATCH = 500
 
 
 class RetailImportExecutor(models.AbstractModel):
@@ -91,6 +93,41 @@ class RetailImportExecutor(models.AbstractModel):
     def _safe_xid(prefix, value):
         return prefix + "".join(c if c.isalnum() else "_" for c in str(value)).upper()
 
+    # ------------------------------------------------------------------
+    # Row-level backtracking helpers
+    # ------------------------------------------------------------------
+    def _persist_lines(self, log, records):
+        """Create retail.import.line for every parsed row before aggregation.
+
+        Returns a {row_number: line_record} dict for post-load target linking.
+        Batched in LINE_BATCH creates to avoid ORM memory spikes on large files.
+        """
+        Line = self.env["retail.import.line"]
+        row_to_line = {}
+        for start in range(0, len(records), LINE_BATCH):
+            batch = records[start : start + LINE_BATCH]
+            created = Line.create([
+                {
+                    "log_id": log.id,
+                    "row_number": r.get("_row"),
+                    "raw_data_json": json.dumps(r, default=str),
+                }
+                for r in batch
+            ])
+            for r, ln in zip(batch, created):
+                row_to_line[r.get("_row")] = ln
+        return row_to_line
+
+    def _link_lines(self, row_to_line, row_nums, target_model, target_res_id, aggregate_key=None, state="ok"):
+        """Batch-write target linkage onto a group of source lines."""
+        line_ids = [row_to_line[rn].id for rn in row_nums if rn in row_to_line]
+        if not line_ids:
+            return
+        vals = {"state": state, "target_model": target_model, "target_res_id": target_res_id}
+        if aggregate_key is not None:
+            vals["aggregate_key"] = aggregate_key
+        self.env["retail.import.line"].browse(line_ids).write(vals)
+
     # ==================================================================
     # X101 — Products (categories / attributes / templates / variants)
     # ==================================================================
@@ -100,15 +137,22 @@ class RetailImportExecutor(models.AbstractModel):
         records = data["records"]
         log.line_count = len(records)
 
+        row_to_line = self._persist_lines(log, records)
+
         # ---- aggregate (mirror of 01_extract_x101.py) ----
         sku_best = {}  # sku -> (eff, dict)
         tmpl_meta = {}  # code -> dict
         sizes, inseams = set(), set()
         tmpl_variants = defaultdict(set)
+        tmpl_rows = defaultdict(list)   # pc -> [row_nums] for post-load line linking
+        skipped_row_nums = []
         for r in records:
             pc = r.get("product_code")
             sku = r.get("sku")
+            row_num = r.get("_row")
             if not pc or not sku:
+                if row_num is not None:
+                    skipped_row_nums.append(row_num)
                 continue
             size = (r.get("size") or "").strip()
             inseam_raw = r.get("inseam")
@@ -134,6 +178,7 @@ class RetailImportExecutor(models.AbstractModel):
                     "eff": eff,
                 }
             tmpl_variants[pc].add((size, inseam))
+            tmpl_rows[pc].append(row_num)
             if size:
                 sizes.add(size)
             if inseam:
@@ -307,6 +352,19 @@ class RetailImportExecutor(models.AbstractModel):
         log.records_skipped = unmatched
         _logger.info("x101 done: created=%s matched=%s unmatched=%s", created, matched, unmatched)
 
+        # Link source rows to the product.template they contributed to
+        if row_to_line:
+            for pc, row_nums in tmpl_rows.items():
+                txid = self._safe_xid("tmpl_", pc)
+                tmpl_id = tmpl_xid_to_id.get(txid)
+                if tmpl_id:
+                    self._link_lines(row_to_line, row_nums, "product.template", tmpl_id, aggregate_key=pc)
+            if skipped_row_nums:
+                skip_ids = [row_to_line[rn].id for rn in skipped_row_nums if rn in row_to_line]
+                if skip_ids:
+                    self.env["retail.import.line"].browse(skip_ids).write({"state": "skipped"})
+            self.env.cr.commit()
+
     # ==================================================================
     # CoA — account.account
     # ==================================================================
@@ -315,23 +373,32 @@ class RetailImportExecutor(models.AbstractModel):
         data = profile.read_records(file_b64)
         records = data["records"]
         log.line_count = len(records)
+        row_to_line = self._persist_lines(log, records)
         valid_types = dict(self.env["account.account"]._fields["account_type"].selection)
         company = profile.company_id
         created = skipped = 0
         errors = []
         Account = self.env["account.account"]
         for r in records:
+            rn = r.get("_row")
             code = str(r.get("code") or "").strip()
             name = (r.get("account_name") or r.get("name") or "").strip()
             atype = str(r.get("account_type") or "").strip()
             if not code or not name:
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "skipped"})
                 continue
             if atype not in valid_types:
-                errors.append((r.get("_row"), f"invalid account_type {atype!r} for {code}"))
+                errors.append((rn, f"invalid account_type {atype!r} for {code}"))
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": f"invalid account_type {atype!r}"})
                 continue
             xid = self._safe_xid("coa_", code)
-            if self._xid_get(ns, xid, "account.account"):
+            existing_id = self._xid_get(ns, xid, "account.account")
+            if existing_id:
                 skipped += 1
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "skipped", "aggregate_key": code, "target_model": "account.account", "target_res_id": existing_id})
                 continue
             existing = Account.with_company(company).search(
                 [("code", "=", code), ("company_ids", "in", company.id)], limit=1
@@ -339,6 +406,8 @@ class RetailImportExecutor(models.AbstractModel):
             if existing:
                 self._xid_set(ns, xid, "account.account", existing.id)
                 skipped += 1
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "skipped", "aggregate_key": code, "target_model": "account.account", "target_res_id": existing.id})
                 continue
             try:
                 acc = Account.with_company(company).create(
@@ -346,8 +415,12 @@ class RetailImportExecutor(models.AbstractModel):
                 )
                 self._xid_set(ns, xid, "account.account", acc.id)
                 created += 1
+                if rn in row_to_line:
+                    row_to_line[rn].write({"aggregate_key": code, "target_model": "account.account", "target_res_id": acc.id})
             except Exception as e:
-                errors.append((r.get("_row"), f"{code}: {e}"))
+                errors.append((rn, f"{code}: {e}"))
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": f"{code}: {e}"})
         self.env.cr.commit()
         log.records_created = created
         log.records_skipped = skipped
@@ -402,6 +475,7 @@ class RetailImportExecutor(models.AbstractModel):
         data = profile.read_records(file_b64)
         records = data["records"]
         log.line_count = len(records)
+        row_to_line = self._persist_lines(log, records)
         Product = self.env["product.product"]
         Quant = self.env["stock.quant"]
         # store-code -> internal stock location (warehouse lot_stock_id), resolved by xid
@@ -420,17 +494,22 @@ class RetailImportExecutor(models.AbstractModel):
         prod_by_code = {}
         applied = skipped = 0
         errors = []
-        quant_vals = []
+        quant_vals = []   # (prod, loc, qty, row_num, agg_key)
         for r in records:
+            rn = r.get("_row")
             store = r.get("store_code")
             ean = str(r.get("ean") or "").strip()
             item_id = str(r.get("item_id") or "").strip()
             qty = float(profile._parse_amount(r.get("onhand_qty")))
             if not store or qty <= 0:
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "skipped"})
                 continue
             loc = resolve_location(store)
             if not loc:
-                errors.append((r.get("_row"), f"store {store} -> no warehouse (run store loader first)"))
+                errors.append((rn, f"store {store} -> no warehouse (run store loader first)"))
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": f"store {store}: no warehouse"})
                 continue
             prod = False
             if ean:
@@ -442,10 +521,12 @@ class RetailImportExecutor(models.AbstractModel):
                     prod_by_code[item_id] = Product.search([("default_code", "=", item_id)], limit=1)
                 prod = prod_by_code[item_id]
             if not prod:
-                errors.append((r.get("_row"), f"no product for ean={ean!r} item={item_id!r}"))
+                errors.append((rn, f"no product for ean={ean!r} item={item_id!r}"))
                 skipped += 1
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": f"no product ean={ean!r} item={item_id!r}"})
                 continue
-            quant_vals.append((prod, loc, qty))
+            quant_vals.append((prod, loc, qty, rn, f"{store}|{item_id or ean}"))
 
         # Guard: refuse to re-apply if this profile already applied opening stock.
         prior = self.env["retail.import.log"].search(
@@ -458,15 +539,23 @@ class RetailImportExecutor(models.AbstractModel):
                 % (profile.code, prior.id)
             )
 
-        for i, (prod, loc, qty) in enumerate(quant_vals):
+        for i, (prod, loc, qty, rn, agg_key) in enumerate(quant_vals):
             try:
                 q = Quant.with_context(inventory_mode=True).create(
                     {"product_id": prod.id, "location_id": loc.id, "inventory_quantity": qty}
                 )
                 q.action_apply_inventory()
                 applied += 1
+                if rn in row_to_line:
+                    row_to_line[rn].write({
+                        "aggregate_key": agg_key,
+                        "target_model": "stock.quant",
+                        "target_res_id": q.id,
+                    })
             except Exception as e:
                 errors.append((None, f"{prod.default_code}: {e}"))
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": str(e)})
             if (i + 1) % 500 == 0:
                 self.env.cr.commit()
         self.env.cr.commit()
@@ -478,13 +567,74 @@ class RetailImportExecutor(models.AbstractModel):
     # X24 — Retail sales -> pos.order (financial, no stock move)
     # ==================================================================
     def _load_x24(self, profile, file_b64, log):
-        self._stage_only(
-            profile, file_b64, log,
-            "X24DN POS sales: staged (Phase-5 gated — pos.config + payment methods not yet confirmed).",
+        """Stage X24 rows and pre-compute daily-SKU aggregate keys for traceability.
+
+        Still Phase-5 gated (no pos.order writes). But aggregate_key is already set
+        on each retail.import.line so backtracking is ready the moment Phase-5 is wired:
+        all rows sharing (store|date|sku) point to the same future pos.order.line.
+        """
+        data = profile.read_records(file_b64)
+        records = data["records"]
+        log.line_count = len(records)
+        log.records_skipped = len(records)
+        log.error_message = (
+            "X24DN POS sales: staged (Phase-5 gated — pos.config + payment methods not yet confirmed)."
+        )
+        if not records:
+            return
+
+        row_to_line = self._persist_lines(log, records)
+        agg = self._aggregate_x24_by_sku_day(records)
+
+        # Write aggregate_key onto each line so the trace is ready before Phase-5
+        for (store, date, sku), vals in agg.items():
+            agg_key = f"{store}|{date}|{sku}"
+            line_ids = [row_to_line[rn].id for rn in vals["row_nums"] if rn in row_to_line]
+            if line_ids:
+                self.env["retail.import.line"].browse(line_ids).write({
+                    "state": "skipped",
+                    "aggregate_key": agg_key,
+                })
+
+        self.env.cr.commit()
+        _logger.info(
+            "x24: %s raw rows → %s daily-SKU aggregates (staged, no pos.order writes)",
+            len(records), len(agg),
         )
 
+    def _aggregate_x24_by_sku_day(self, records):
+        """Aggregate X24 rows to (store_code, closing_date, item_code) level.
+
+        Multiple transactions (different transnum) on the same day for the same SKU
+        are summed here. Returns a dict keyed by (store, date, sku) with aggregated
+        qty, amount, unit price, and the source row_numbers for backtracking.
+        """
+        agg = {}
+        for r in records:
+            store = str(r.get("store_code") or "").strip()
+            date = str(r.get("trans_date") or "").strip()
+            sku = str(r.get("item_code") or r.get("sku") or "").strip()
+            if not store or not sku:
+                continue
+            key = (store, date, sku)
+            if key not in agg:
+                agg[key] = {"qty": 0.0, "amount": 0.0, "unit_price": 0.0, "row_nums": []}
+            entry = agg[key]
+            qty = float(r.get("net_qty") or 0)
+            amt = float(r.get("net_amount") or 0)
+            entry["qty"] += qty
+            entry["amount"] += amt
+            if qty:
+                entry["unit_price"] = amt / qty   # last non-zero row wins; close enough for staging
+            entry["row_nums"].append(r.get("_row"))
+        return agg
+
     def _group_x24(self, profile, file_b64):
-        """Parse X24 and group rows into transactions. Returned for Phase-5 wiring."""
+        """Parse X24 and group rows into individual transactions (Phase-5 internal use).
+
+        Returns {(store, date, register, transnum): [rows]} — one pos.order per key.
+        For line-level aggregation use _aggregate_x24_by_sku_day() instead.
+        """
         data = profile.read_records(file_b64)
         orders = defaultdict(list)
         for r in data["records"]:
@@ -506,10 +656,17 @@ class RetailImportExecutor(models.AbstractModel):
     # ==================================================================
     def _stage_only(self, profile, file_b64, log, note):
         data = profile.read_records(file_b64)
-        log.line_count = len(data["records"])
-        log.records_skipped = len(data["records"])
+        records = data["records"]
+        log.line_count = len(records)
+        log.records_skipped = len(records)
         log.error_message = note
-        _logger.info("%s: staged %s rows (no model writes)", profile.file_type, len(data["records"]))
+        if records:
+            row_to_line = self._persist_lines(log, records)
+            line_ids = [ln.id for ln in row_to_line.values()]
+            if line_ids:
+                self.env["retail.import.line"].browse(line_ids).write({"state": "skipped"})
+            self.env.cr.commit()
+        _logger.info("%s: staged %s rows (no model writes)", profile.file_type, len(records))
 
     def _load_x70t(self, profile, file_b64, log):
         self._stage_only(profile, file_b64, log, "X70T settlement: staged for reconciliation (Phase 5 decision).")
