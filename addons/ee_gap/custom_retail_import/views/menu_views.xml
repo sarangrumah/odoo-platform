@@ -19,7 +19,7 @@
               parent="menu_retail_import_config"
               action="action_retail_import_profile" sequence="10"/>
 
-    <menuitem id="menu_retail_import_feeds" name="SFTP Feeds"
+    <menuitem id="menu_retail_import_feeds" name="Import Feeds"
               parent="menu_retail_import_config"
               action="action_retail_import_feed" sequence="20"/>
 </odoo>

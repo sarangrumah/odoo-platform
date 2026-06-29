@@ -37,6 +37,8 @@ class RetailImportLog(models.Model):
     error_count = fields.Integer(default=0)
 
     imported_at = fields.Datetime(default=fields.Datetime.now)
+    started_at = fields.Datetime(help="When execution began.")
+    finished_at = fields.Datetime(help="When execution ended (success or failure).")
     imported_by_id = fields.Many2one("res.users", default=lambda s: s.env.user, readonly=True)
     state = fields.Selection(
         [

@@ -1,19 +1,29 @@
 # -*- coding: utf-8 -*-
-"""Retail import feed — recurring SFTP pull of source files into the importer.
+"""Retail import feed — recurring pull of source files into the importer.
 
 Phase 6 of the Levi's onboarding plan: answers "can Odoo read directly from the
-customer FTP?". A feed binds an SFTP location + glob to a ``retail.import.profile``.
+customer FTP?". A feed binds a source location + glob to a ``retail.import.profile``.
 An ``ir.cron`` polls active feeds; each new file (deduplicated by SHA256 against
 ``retail.import.log``) is stored in ir.attachment and handed to the same
 ``retail.import.executor`` used by the manual wizard.
 
-Credentials: the SFTP secret lives in ``ir.config_parameter`` under the key named
-in ``password_param`` (or a private-key file path). NOTE: the platform does not yet
-expose an at-rest decryptor for config params, so the value is stored raw — restrict
-read access to the parameter and prefer key-based auth where possible.
+Two source types:
 
-Networking: SFTP egress goes out from the Odoo container on ``odoo-net``; no new
-docker volume is needed (downloads land in the shared filestore via ir.attachment).
+* ``sftp`` — Odoo pulls from a remote customer SFTP server (paramiko).
+* ``local`` — Odoo reads a local directory that a partner fills over the bundled
+  FTPS server (``stilliard/pure-ftpd``). Both containers share the
+  ``./data/data_levis`` host volume, so ingestion is a plain filesystem read and
+  the archive step is an atomic local rename. After a file is processed it is moved
+  from ``local_dir`` to ``archive_dir`` with a ``YYYYMMDD_HHMMSS_`` prefix (the
+  processing timestamp). Failed files are left in place for the next poll to retry.
+
+Credentials (SFTP only): the secret lives in ``ir.config_parameter`` under the key
+named in ``password_param`` (or a private-key file path). NOTE: the platform does
+not yet expose an at-rest decryptor for config params, so the value is stored raw —
+restrict read access to the parameter and prefer key-based auth where possible.
+
+Networking: SFTP egress goes out from the Odoo container on ``odoo-net``; the local
+feed needs no egress — it relies on the shared ``./data/data_levis`` bind mount.
 """
 
 from __future__ import annotations
@@ -22,9 +32,11 @@ import base64
 import fnmatch
 import io
 import logging
+import os
+import shutil
 
-from odoo import _, fields, models
-from odoo.exceptions import UserError
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -40,9 +52,17 @@ class RetailImportFeed(models.Model):
     profile_id = fields.Many2one("retail.import.profile", required=True, ondelete="restrict")
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company, required=True)
 
-    host = fields.Char(required=True)
-    port = fields.Integer(default=22, required=True)
-    username = fields.Char(required=True)
+    source_type = fields.Selection(
+        [("sftp", "SFTP pull"), ("local", "Local directory (FTPS drop)")],
+        default="sftp",
+        required=True,
+        help="SFTP: Odoo connects out to a remote server. "
+        "Local: Odoo reads a shared directory filled over the bundled FTPS server.",
+    )
+
+    host = fields.Char()
+    port = fields.Integer(default=22)
+    username = fields.Char()
     auth_type = fields.Selection(
         [("password", "Password"), ("key", "Private key file")], default="password", required=True
     )
@@ -52,7 +72,15 @@ class RetailImportFeed(models.Model):
     )
     private_key_path = fields.Char(help="Path (inside the container) to the SFTP private key file.")
 
-    remote_dir = fields.Char(default="/", required=True)
+    remote_dir = fields.Char(default="/")
+
+    # Local-directory (FTPS drop) mode -----------------------------------------
+    local_dir = fields.Char(help="Directory inside the container to poll, e.g. /mnt/data_levis/data.")
+    archive_dir = fields.Char(
+        help="Where processed files are moved (with a YYYYMMDD_HHMMSS_ prefix), "
+        "e.g. /mnt/data_levis/archive."
+    )
+
     file_glob = fields.Char(default="*", required=True, help="e.g. 'X20_*.csv' or 'X24DN_*.xlsx'.")
     run_async = fields.Boolean(
         string="Process asynchronously", default=True, help="Hand each file to queue_job."
@@ -64,6 +92,23 @@ class RetailImportFeed(models.Model):
     )
     last_message = fields.Text(readonly=True)
     files_imported = fields.Integer(default=0, readonly=True)
+
+    # ------------------------------------------------------------------
+    @api.constrains("source_type", "host", "username", "local_dir", "archive_dir")
+    def _check_source_config(self):
+        for feed in self:
+            if feed.source_type == "sftp":
+                missing = [f for f in ("host", "username") if not feed[f]]
+                if missing:
+                    raise ValidationError(
+                        _("Feed %s: SFTP source requires %s.") % (feed.name, ", ".join(missing))
+                    )
+            elif feed.source_type == "local":
+                missing = [f for f in ("local_dir", "archive_dir") if not feed[f]]
+                if missing:
+                    raise ValidationError(
+                        _("Feed %s: local source requires %s.") % (feed.name, ", ".join(missing))
+                    )
 
     # ------------------------------------------------------------------
     def _secret(self):
@@ -96,19 +141,29 @@ class RetailImportFeed(models.Model):
 
     def action_test_connection(self):
         self.ensure_one()
-        sftp, transport = self._open_sftp()
-        try:
-            names = sftp.listdir(self.remote_dir)
-        finally:
-            sftp.close()
-            transport.close()
+        if self.source_type == "local":
+            if not self.local_dir or not os.path.isdir(self.local_dir):
+                raise UserError(
+                    _("Feed %s: local_dir %s does not exist or is not a directory.")
+                    % (self.name, self.local_dir or "")
+                )
+            names = os.listdir(self.local_dir)
+            where = self.local_dir
+        else:
+            sftp, transport = self._open_sftp()
+            try:
+                names = sftp.listdir(self.remote_dir)
+            finally:
+                sftp.close()
+                transport.close()
+            where = self.remote_dir
         matched = [n for n in names if fnmatch.fnmatch(n, self.file_glob)]
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
                 "title": _("Connection OK"),
-                "message": _("%s file(s) match %s in %s.") % (len(matched), self.file_glob, self.remote_dir),
+                "message": _("%s file(s) match %s in %s.") % (len(matched), self.file_glob, where),
                 "type": "success",
                 "sticky": False,
             },
@@ -116,6 +171,78 @@ class RetailImportFeed(models.Model):
 
     # ------------------------------------------------------------------
     def _poll_one(self):
+        """Dispatch to the source-specific poller. Returns the imported count."""
+        self.ensure_one()
+        if self.source_type == "local":
+            return self._poll_one_local()
+        return self._poll_one_sftp()
+
+    def _archive_file(self, src_path, filename):
+        """Move a processed source file into ``archive_dir`` with a timestamp prefix.
+
+        Prefix is the processing wall-clock time (UTC, matching Odoo's stored
+        datetimes) as ``YYYYMMDD_HHMMSS_``. A numeric suffix guards against
+        same-second name collisions. Returns the destination path.
+        """
+        self.ensure_one()
+        os.makedirs(self.archive_dir, exist_ok=True)
+        ts = fields.Datetime.now().strftime("%Y%m%d_%H%M%S")
+        dest = os.path.join(self.archive_dir, "%s_%s" % (ts, filename))
+        base, ext = os.path.splitext(dest)
+        i = 1
+        while os.path.exists(dest):
+            dest = "%s_%d%s" % (base, i, ext)
+            i += 1
+        shutil.move(src_path, dest)
+        return dest
+
+    def _poll_one_local(self):
+        """Read matching files from ``local_dir``, process them, archive on success.
+
+        Runs the executor synchronously (ignoring ``run_async``) so the poll loop
+        knows each file's outcome before deciding to archive — this is what makes
+        "processed -> archived" exact. The ``started_at``/``finished_at`` fields on
+        ``retail.import.log`` record the precise processing window. Failed files are
+        left in ``local_dir`` for the next poll to retry (surfaced via last_status).
+        """
+        self.ensure_one()
+        Log = self.env["retail.import.log"].sudo()
+        Executor = self.env["retail.import.executor"]
+        if not self.local_dir or not os.path.isdir(self.local_dir):
+            raise UserError(_("Feed %s: local_dir %s does not exist.") % (self.name, self.local_dir or ""))
+        imported = 0
+        for name in sorted(os.listdir(self.local_dir)):
+            if not fnmatch.fnmatch(name, self.file_glob):
+                continue
+            src = os.path.join(self.local_dir, name)
+            if not os.path.isfile(src):
+                continue
+            with open(src, "rb") as fh:
+                raw = fh.read()
+            if not raw:
+                continue
+            file_hash = Log.compute_hash(raw)
+            if Log.find_duplicate(file_hash):
+                self._archive_file(src, name)  # already imported earlier; clear it from the drop
+                continue
+            file_b64 = base64.b64encode(raw).decode("ascii")
+            log = Log.create(
+                {
+                    "profile_id": self.profile_id.id,
+                    "filename": name,
+                    "file_hash": file_hash,
+                    "state": "queued",
+                }
+            )
+            log.store_source(file_b64, name)  # bytes safe in ir.attachment before we touch the file
+            Executor.run(log)
+            if log.exists() and log.state in ("imported", "partial"):
+                self._archive_file(src, name)
+                imported += 1
+            # state == "failed": leave in local_dir for retry; surfaced via last_status/message
+        return imported
+
+    def _poll_one_sftp(self):
         """Download new matching files and feed them to the executor. Returns count."""
         self.ensure_one()
         Log = self.env["retail.import.log"].sudo()

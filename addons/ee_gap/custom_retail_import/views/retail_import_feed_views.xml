@@ -4,11 +4,11 @@
         <field name="name">retail.import.feed.list</field>
         <field name="model">retail.import.feed</field>
         <field name="arch" type="xml">
-            <list string="SFTP Feeds" decoration-success="last_status=='ok'" decoration-danger="last_status=='error'">
+            <list string="Import Feeds" decoration-success="last_status=='ok'" decoration-danger="last_status=='error'">
                 <field name="name"/>
                 <field name="profile_id"/>
-                <field name="host"/>
-                <field name="remote_dir"/>
+                <field name="source_type"/>
+                <field name="host" optional="show"/>
                 <field name="file_glob"/>
                 <field name="last_run"/>
                 <field name="last_status"/>
@@ -22,7 +22,7 @@
         <field name="name">retail.import.feed.form</field>
         <field name="model">retail.import.feed</field>
         <field name="arch" type="xml">
-            <form string="SFTP Feed">
+            <form string="Import Feed">
                 <header>
                     <button name="action_test_connection" type="object" string="Test Connection"/>
                     <button name="action_poll_now" type="object" string="Poll Now" class="btn-primary"/>
@@ -32,11 +32,13 @@
                         <group string="Source">
                             <field name="name"/>
                             <field name="profile_id"/>
+                            <field name="source_type"/>
+                            <field name="file_glob"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="active"/>
-                            <field name="run_async"/>
+                            <field name="run_async" invisible="source_type == 'local'"/>
                         </group>
-                        <group string="SFTP">
+                        <group string="SFTP" invisible="source_type != 'sftp'">
                             <field name="host"/>
                             <field name="port"/>
                             <field name="username"/>
@@ -44,7 +46,10 @@
                             <field name="password_param" invisible="auth_type != 'password'"/>
                             <field name="private_key_path" invisible="auth_type != 'key'"/>
                             <field name="remote_dir"/>
-                            <field name="file_glob"/>
+                        </group>
+                        <group string="Local directory (FTPS drop)" invisible="source_type != 'local'">
+                            <field name="local_dir" placeholder="/mnt/data_levis/data"/>
+                            <field name="archive_dir" placeholder="/mnt/data_levis/archive"/>
                         </group>
                     </group>
                     <group string="Last run">
@@ -60,7 +65,7 @@
     </record>
 
     <record id="action_retail_import_feed" model="ir.actions.act_window">
-        <field name="name">SFTP Feeds</field>
+        <field name="name">Import Feeds</field>
         <field name="res_model">retail.import.feed</field>
         <field name="view_mode">list,form</field>
     </record>

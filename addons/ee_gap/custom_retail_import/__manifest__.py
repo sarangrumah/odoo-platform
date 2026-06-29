@@ -49,6 +49,7 @@ Pieces
         "security/ir.model.access.csv",
         "data/cron.xml",
         "data/retail_import_profiles.xml",
+        "data/feeds.xml",
         "views/retail_import_profile_views.xml",
         "views/retail_import_log_views.xml",
         "views/retail_import_feed_views.xml",
