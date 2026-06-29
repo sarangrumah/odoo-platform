@@ -33,7 +33,7 @@ Pieces
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Retail",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.1.1",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
