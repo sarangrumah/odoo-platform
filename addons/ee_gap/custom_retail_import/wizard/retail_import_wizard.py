@@ -11,8 +11,8 @@ Mirrors ``custom.bank.import.csv.wizard`` (Binary upload + SHA256 dedup) and add
 from __future__ import annotations
 
 import base64
-import json
 import logging
+from markupsafe import Markup
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
@@ -35,7 +35,7 @@ class RetailImportWizard(models.TransientModel):
         string="Force re-import",
         help="Bypass the file-hash duplicate guard (use with care).",
     )
-    preview_text = fields.Text(readonly=True)
+    preview_html = fields.Html(readonly=True, sanitize=False)
 
     # ------------------------------------------------------------------
     def _decoded(self):
@@ -48,16 +48,15 @@ class RetailImportWizard(models.TransientModel):
         self.ensure_one()
         self._decoded()
         sample = self.profile_id.read_records(self.file, limit=20)
-        lines = [
-            f"Profile: {self.profile_id.code} ({self.profile_id.file_type})",
-            f"Parsed sample rows: {len(sample['records'])} (blank skipped: {sample['blank_rows']})",
-            "",
-            "First rows (logical fields):",
-        ]
-        for rec in sample["records"][:8]:
-            shown = {k: v for k, v in rec.items() if k != "_row"}
-            lines.append(f"  row {rec.get('_row')}: {json.dumps(shown, default=str, ensure_ascii=False)}")
-        self.preview_text = "\n".join(lines)
+        rows = sample["records"][:8]
+        # Logical fields vary per profile, so derive the columns from the
+        # union of keys across the sampled rows (preserving first-seen order).
+        columns = []
+        for rec in rows:
+            for key in rec:
+                if key != "_row" and key not in columns:
+                    columns.append(key)
+        self.preview_html = self._build_preview_table(sample, rows, columns)
         return {
             "type": "ir.actions.act_window",
             "res_model": self._name,
@@ -65,6 +64,33 @@ class RetailImportWizard(models.TransientModel):
             "view_mode": "form",
             "target": "new",
         }
+
+    def _build_preview_table(self, sample, rows, columns):
+        """Render the sampled rows as an HTML table (logical fields as columns)."""
+        summary = _(
+            "Profile: %(code)s (%(ftype)s) — parsed %(count)s sample row(s), "
+            "%(blank)s blank skipped",
+            code=self.profile_id.code,
+            ftype=self.profile_id.file_type,
+            count=len(sample["records"]),
+            blank=sample["blank_rows"],
+        )
+        head = Markup("<th>{}</th>").format(_("Row"))
+        head += Markup("").join(
+            Markup("<th>{}</th>").format(col) for col in columns
+        )
+        body = Markup("")
+        for rec in rows:
+            cells = Markup("<td>{}</td>").format(rec.get("_row"))
+            for col in columns:
+                val = rec.get(col)
+                cells += Markup("<td>{}</td>").format("" if val is None else val)
+            body += Markup("<tr>{}</tr>").format(cells)
+        return Markup(
+            '<p class="text-muted">{summary}</p>'
+            '<table class="table table-sm table-bordered o_list_table">'
+            "<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+        ).format(summary=summary, head=head, body=body)
 
     def action_import(self):
         self.ensure_one()

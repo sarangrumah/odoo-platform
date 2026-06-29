@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models
+import json
+
+from markupsafe import Markup
+
+from odoo import api, fields, models
 
 
 class RetailImportLine(models.Model):
@@ -11,6 +15,41 @@ class RetailImportLine(models.Model):
     row_number = fields.Integer(index=True)
     aggregate_key = fields.Char(index=True, help="Grouping key used during aggregation (e.g. product_code, store|date|reg|transnum).")
     raw_data_json = fields.Text(help="Full parsed row dict as JSON. May be purged after a retention period while keeping linkage metadata.")
+    raw_data_html = fields.Html(
+        string="Parsed Row",
+        compute="_compute_raw_data_html",
+        sanitize=False,
+        help="raw_data_json rendered as a field/value table.",
+    )
+
+    @api.depends("raw_data_json")
+    def _compute_raw_data_html(self):
+        for line in self:
+            line.raw_data_html = line._render_raw_data_table()
+
+    def _render_raw_data_table(self):
+        """Render raw_data_json as a two-column field/value HTML table."""
+        self.ensure_one()
+        if not self.raw_data_json:
+            return False
+        try:
+            data = json.loads(self.raw_data_json)
+        except (ValueError, TypeError):
+            return False
+        if not isinstance(data, dict):
+            return False
+        rows = Markup("")
+        for key, val in data.items():
+            rows += Markup("<tr><th>{}</th><td>{}</td></tr>").format(
+                key, "" if val is None else val
+            )
+        if not rows:
+            return False
+        return Markup(
+            '<table class="table table-sm table-bordered o_list_table">'
+            "<thead><tr><th>Field</th><th>Value</th></tr></thead>"
+            "<tbody>{}</tbody></table>"
+        ).format(rows)
     state = fields.Selection(
         [("ok", "OK"), ("skipped", "Skipped"), ("error", "Error")],
         default="ok",

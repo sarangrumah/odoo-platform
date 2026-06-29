@@ -64,6 +64,25 @@
                                     <field name="error_message" optional="show"/>
                                     <field name="raw_data_json" optional="hide"/>
                                 </list>
+                                <form string="Source Row">
+                                    <group>
+                                        <group>
+                                            <field name="row_number"/>
+                                            <field name="aggregate_key"/>
+                                            <field name="state"/>
+                                        </group>
+                                        <group>
+                                            <field name="target_model"/>
+                                            <field name="target_res_id"/>
+                                        </group>
+                                    </group>
+                                    <group string="Error message" invisible="not error_message">
+                                        <field name="error_message" nolabel="1"/>
+                                    </group>
+                                    <group string="Parsed Row" invisible="not raw_data_html">
+                                        <field name="raw_data_html" nolabel="1" readonly="1"/>
+                                    </group>
+                                </form>
                             </field>
                         </page>
                     </notebook>
