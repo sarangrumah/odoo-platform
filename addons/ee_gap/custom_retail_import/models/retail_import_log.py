@@ -11,7 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 
-from odoo import fields, models
+from odoo import _, fields, models
 
 
 class RetailImportLog(models.Model):
@@ -101,3 +101,37 @@ class RetailImportLog(models.Model):
         if self.attachment_id and self.attachment_id.datas:
             return self.attachment_id.datas
         return False
+
+    def action_sync_feeds(self):
+        """Poll every active FTP/SFTP feed once (one-click 'Sync from FTP')."""
+        feeds = self.env["retail.import.feed"].search([("active", "=", True)])
+        if not feeds:
+            return {
+                "type": "ir.actions.client",
+                "tag": "display_notification",
+                "params": {
+                    "title": _("No feeds"),
+                    "message": _("No active feeds. Add one under Configuration → Import Feeds."),
+                    "type": "warning",
+                    "sticky": False,
+                },
+            }
+        for feed in feeds:
+            feed._run_feed()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Sync complete"),
+                "message": _("Synced %(n)s feed(s) from FTP.") % {"n": len(feeds)},
+                "type": "success",
+                "sticky": False,
+                "next": {
+                    "type": "ir.actions.act_window",
+                    "res_model": "retail.import.log",
+                    "view_mode": "list,form",
+                    "target": "current",
+                    "name": _("Imports"),
+                },
+            },
+        }

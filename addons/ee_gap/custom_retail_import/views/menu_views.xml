@@ -3,13 +3,17 @@
     <menuitem id="menu_retail_import_root" name="Retail Import"
               groups="group_retail_import_user" sequence="95"/>
 
+    <menuitem id="menu_retail_import_logs" name="Imports"
+              parent="menu_retail_import_root"
+              action="action_retail_import_log" sequence="1"/>
+
+    <menuitem id="menu_retail_import_sync" name="Sync from FTP"
+              parent="menu_retail_import_root"
+              action="action_server_sync_feeds" sequence="10"/>
+
     <menuitem id="menu_retail_import_run" name="Import Data"
               parent="menu_retail_import_root"
-              action="action_retail_import_wizard" sequence="10"/>
-
-    <menuitem id="menu_retail_import_logs" name="Import Logs"
-              parent="menu_retail_import_root"
-              action="action_retail_import_log" sequence="20"/>
+              action="action_retail_import_wizard" sequence="20"/>
 
     <menuitem id="menu_retail_import_config" name="Configuration"
               parent="menu_retail_import_root" sequence="90"
