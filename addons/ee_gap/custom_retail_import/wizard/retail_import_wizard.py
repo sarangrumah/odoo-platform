@@ -75,21 +75,26 @@ class RetailImportWizard(models.TransientModel):
             count=len(sample["records"]),
             blank=sample["blank_rows"],
         )
-        head = Markup("<th>{}</th>").format(_("Row"))
+        cell_style = "white-space:nowrap;padding:2px 8px;"
+        head = Markup('<th style="{}">{}</th>').format(cell_style, _("Row"))
         head += Markup("").join(
-            Markup("<th>{}</th>").format(col) for col in columns
+            Markup('<th style="{}">{}</th>').format(cell_style, col) for col in columns
         )
         body = Markup("")
         for rec in rows:
-            cells = Markup("<td>{}</td>").format(rec.get("_row"))
+            cells = Markup('<td style="{}">{}</td>').format(cell_style, rec.get("_row"))
             for col in columns:
                 val = rec.get(col)
-                cells += Markup("<td>{}</td>").format("" if val is None else val)
+                cells += Markup('<td style="{}">{}</td>').format(
+                    cell_style, "" if val is None else val
+                )
             body += Markup("<tr>{}</tr>").format(cells)
         return Markup(
             '<p class="text-muted">{summary}</p>'
-            '<table class="table table-sm table-bordered o_list_table">'
+            '<div style="overflow-x:auto;">'
+            '<table class="table table-sm table-bordered" style="width:auto;">'
             "<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+            "</div>"
         ).format(summary=summary, head=head, body=body)
 
     def action_import(self):

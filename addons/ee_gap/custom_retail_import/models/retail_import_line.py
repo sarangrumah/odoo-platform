@@ -38,17 +38,20 @@ class RetailImportLine(models.Model):
             return False
         if not isinstance(data, dict):
             return False
+        cell_style = "padding:2px 8px;"
         rows = Markup("")
         for key, val in data.items():
-            rows += Markup("<tr><th>{}</th><td>{}</td></tr>").format(
-                key, "" if val is None else val
-            )
+            rows += Markup(
+                '<tr><th style="{}white-space:nowrap;">{}</th><td style="{}">{}</td></tr>'
+            ).format(cell_style, key, cell_style, "" if val is None else val)
         if not rows:
             return False
         return Markup(
-            '<table class="table table-sm table-bordered o_list_table">'
+            '<div style="overflow-x:auto;">'
+            '<table class="table table-sm table-bordered" style="width:auto;">'
             "<thead><tr><th>Field</th><th>Value</th></tr></thead>"
             "<tbody>{}</tbody></table>"
+            "</div>"
         ).format(rows)
     state = fields.Selection(
         [("ok", "OK"), ("skipped", "Skipped"), ("error", "Error")],

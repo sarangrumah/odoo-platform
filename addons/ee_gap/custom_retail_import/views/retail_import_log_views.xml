@@ -79,9 +79,8 @@
                                     <group string="Error message" invisible="not error_message">
                                         <field name="error_message" nolabel="1"/>
                                     </group>
-                                    <group string="Parsed Row" invisible="not raw_data_html">
-                                        <field name="raw_data_html" nolabel="1" readonly="1"/>
-                                    </group>
+                                    <separator string="Parsed Row" invisible="not raw_data_html"/>
+                                    <field name="raw_data_html" nolabel="1" readonly="1" invisible="not raw_data_html"/>
                                 </form>
                             </field>
                         </page>
