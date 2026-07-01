@@ -171,7 +171,7 @@ class CustomReportAdvance(models.AbstractModel):
                 {
                     "type": "account",
                     "account_id": aid,
-                    "account_code": ml.account_id.code or "",
+                    "account_code": self._account_code(ml.account_id),
                     "account_name": ml.account_id.name or "",
                     "opening": opening_by_account.get(aid, 0.0),
                     "lines": [],
@@ -208,7 +208,7 @@ class CustomReportAdvance(models.AbstractModel):
             by_account[aid] = {
                 "type": "account",
                 "account_id": aid,
-                "account_code": account.code or "",
+                "account_code": self._account_code(account),
                 "account_name": account.name or "",
                 "opening": opening,
                 "lines": [],
