@@ -61,6 +61,20 @@ docker exec -i odoo19-platform-odoo-mgmt odoo shell -d levis --no-http < scripts
 ONE-SHOT (guarded by `ir.config_parameter` marker `levis.x20_opening_stock_applied`).
 Prereq: steps 2 + 3 done.
 
+### 5. COA hygiene (demo DBs) — clean stray categories + map to EBR
+The demo DBs (`demo_levis`) pick up Odoo demo-noise categories (Furniture/Office/
+Outdoor/Home Construction/Non-Trade/Rental) that aren't in the EBR chart and stay
+unmapped, breaking journal posting for their ~30 leftover products. Run against the
+**demo** DB after seeding:
+```
+docker exec -i odoo19-platform-odoo-mgmt odoo shell -d demo_levis --no-http < scripts/tenants/levis/32_clean_stray_categ.py
+docker exec -i odoo19-platform-odoo-mgmt odoo shell -d demo_levis --no-http < scripts/tenants/levis/33_map_categ.py
+```
+`32` deletes the 6 stray categories (products deleted if unreferenced, else archived).
+`33` is an **idempotent** safety net: maps any category still missing an income/
+expense/valuation/variation/journal account to the right EBR branch (unknown roots →
+`misc`). Both re-runnable; `33` no-ops once every category is complete.
+
 ## Track B (module) — Excel/CSV wizard + SFTP feed
 After adding `openpyxl`+`paramiko` to `odoo/requirements.txt` and rebuilding the
 image, install `custom_retail_import` on `levis`. Then:
