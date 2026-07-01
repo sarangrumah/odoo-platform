@@ -43,6 +43,7 @@ core rental.asset / rental.order skeleton with:
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",
         "report/rental_contract_report.xml",
+        "reports/bast_report_loan.xml",
     ],
     "installable": True,
     "application": True,

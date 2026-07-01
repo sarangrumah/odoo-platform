@@ -101,7 +101,15 @@ class PurchaseOrder(models.Model):
             raise ValueError(_("No warehouse in receiving company '%s'.") % target_company.name)
 
         order_lines = []
+        skipped_physical = self.env["product.product"]
         for pol in self.order_line:
+            # For asset-loan rules, only the service line may cross intercompany.
+            # A physical (non-service) product must never become an SO delivery
+            # line — that would post COGS and derecognise the fixed asset. The
+            # asset moves separately via an Internal->Internal loan transfer.
+            if rule.spawn_rental_loan and pol.product_id.type != "service":
+                skipped_physical |= pol.product_id
+                continue
             order_lines.append(
                 (
                     0,
@@ -115,6 +123,20 @@ class PurchaseOrder(models.Model):
                         "tax_id": [(6, 0, [])],
                     },
                 )
+            )
+        if skipped_physical:
+            self.message_post(
+                body=_(
+                    "Intercompany asset-loan mirror: skipped physical line(s) %s — "
+                    "only the service line crosses intercompany; the asset moves via "
+                    "an internal loan transfer."
+                )
+                % ", ".join(skipped_physical.mapped("display_name"))
+            )
+        if not order_lines:
+            raise ValueError(
+                _("No service line to mirror on PO %s. An asset-loan PO must carry the loan service product.")
+                % (self.name or self.id)
             )
 
         return (

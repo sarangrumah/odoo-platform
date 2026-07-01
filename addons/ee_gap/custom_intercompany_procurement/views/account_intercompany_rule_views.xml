@@ -10,6 +10,16 @@
                 <field name="mirror_picking"/>
                 <field name="target_warehouse_id"/>
                 <field name="target_sale_journal_id"/>
+                <field name="spawn_rental_loan"/>
+                <field name="loan_service_product_id"
+                       invisible="not spawn_rental_loan"
+                       required="spawn_rental_loan"/>
+                <field name="loan_asset_product_id"
+                       invisible="not spawn_rental_loan"
+                       required="spawn_rental_loan"/>
+                <field name="loan_on_loan_location_id"
+                       invisible="not spawn_rental_loan"
+                       required="spawn_rental_loan"/>
             </xpath>
         </field>
     </record>

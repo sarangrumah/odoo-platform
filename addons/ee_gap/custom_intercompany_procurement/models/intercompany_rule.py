@@ -47,3 +47,33 @@ class IntercompanyRule(models.Model):
         domain="[('company_id', '=', company_to_id), ('type', '=', 'sale')]",
         help="(Reserved) Future: journal used when receiving company invoices the mirrored SO.",
     )
+
+    # --- Asset-loan (drone rental) spawn config ---------------------------
+    # When the mirrored SO in the receiving company is confirmed and carries
+    # the loan service line, auto-create an internal asset-loan rental.order.
+    spawn_rental_loan = fields.Boolean(
+        string="Spawn Asset-Loan on SO Confirm",
+        default=False,
+        help="When the mirrored sales order is confirmed and contains the Loan "
+        "Service line, auto-create a draft internal asset-loan (rental.order) in "
+        "the receiving company. The physical unit stays as an internal transfer; "
+        "only the service line is invoiced.",
+    )
+    loan_service_product_id = fields.Many2one(
+        "product.product",
+        string="Loan Service Product",
+        domain="[('type', '=', 'service')]",
+        help="Service product (e.g. 'Jasa Sewa Drone') whose presence on the SO "
+        "marks it as an asset loan and whose qty becomes the primary loan qty.",
+    )
+    loan_asset_product_id = fields.Many2one(
+        "product.product",
+        string="Loan Asset Product",
+        help="Physical, serial-tracked asset moved on loan (e.g. the drone).",
+    )
+    loan_on_loan_location_id = fields.Many2one(
+        "stock.location",
+        string="On-Loan Location",
+        domain="[('usage', '=', 'internal')]",
+        help="Internal location the asset sits in while on loan (Internal->Internal).",
+    )

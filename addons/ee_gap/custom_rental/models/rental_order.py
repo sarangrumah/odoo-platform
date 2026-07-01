@@ -104,6 +104,26 @@ class RentalOrder(models.Model):
     pickup_picking_id = fields.Many2one("stock.picking", copy=False, readonly=True)
     return_picking_id = fields.Many2one("stock.picking", copy=False, readonly=True)
 
+    # Internal asset-loan mode (opt-in). When enabled the pickup/return moves
+    # are Internal->Internal (Stock <-> On-Loan) so a serial-tracked fixed
+    # asset (e.g. a drone) never leaves the company's own location tree and
+    # posts no COGS/valuation journal. Off by default -> standard
+    # outgoing/incoming behaviour is unchanged for all other rentals.
+    is_internal_loan = fields.Boolean(
+        string="Internal Asset Loan",
+        tracking=True,
+        help="Move the unit via an internal transfer (Stock <-> On-Loan) instead of "
+        "an outbound/inbound delivery. Keeps a fixed asset on the company's books "
+        "with zero accounting impact. Requires an On-Loan Location.",
+    )
+    on_loan_location_id = fields.Many2one(
+        "stock.location",
+        string="On-Loan Location",
+        domain="[('usage', '=', 'internal')]",
+        help="Internal location the unit sits in while on loan. Used only when "
+        "Internal Asset Loan is enabled.",
+    )
+
     def _pdp_audit_classification(self):
         return "financial"
 
@@ -149,7 +169,7 @@ class RentalOrder(models.Model):
                     vals["deposit_amount"] = asset.deposit_amount
         return super().create(vals_list)
 
-    @api.constrains("asset_id", "product_id", "qty", "loan_qty")
+    @api.constrains("asset_id", "product_id", "qty", "loan_qty", "is_internal_loan", "on_loan_location_id")
     def _check_rental_mode(self):
         for rec in self:
             if not rec.asset_id and not rec.product_id:
@@ -162,6 +182,8 @@ class RentalOrder(models.Model):
                 raise ValidationError(_("qty must be at least 1."))
             if rec.loan_qty < 0:
                 raise ValidationError(_("loan_qty cannot be negative."))
+            if rec.is_internal_loan and not rec.on_loan_location_id:
+                raise ValidationError(_("Internal Asset Loan requires an On-Loan Location."))
 
     @api.constrains("pickup_dt", "return_dt_expected", "asset_id", "state")
     def _check_overlap(self):
@@ -252,6 +274,53 @@ class RentalOrder(models.Model):
             return self.asset_id.product_id
         return self.env["product.product"]
 
+    def _resolve_picking_type_and_locations(self, direction):
+        """Return (picking_type, location_src, location_dest) for a pickup/return.
+
+        Standard mode (is_internal_loan=False): keep legacy behaviour — first
+        outgoing/incoming picking type in the company, delivering to/from the
+        Customer/Supplier location. Untouched for every non-loan rental.
+
+        Internal loan mode (is_internal_loan=True): use an internal picking type
+        and move the unit Stock <-> On-Loan so a serial-tracked fixed asset never
+        leaves the company's internal tree (no COGS, no valuation journal).
+        """
+        self.ensure_one()
+        empty = self.env["stock.picking.type"]
+        if self.is_internal_loan:
+            if not self.on_loan_location_id:
+                return empty, False, False
+            ptype = self.env["stock.picking.type"].search(
+                [
+                    ("code", "=", "internal"),
+                    ("company_id", "in", (False, self.company_id.id)),
+                ],
+                limit=1,
+            )
+            if not ptype:
+                return empty, False, False
+            stock_loc = ptype.default_location_src_id or ptype.warehouse_id.lot_stock_id
+            on_loan_loc = self.on_loan_location_id
+            if not stock_loc:
+                return empty, False, False
+            # outgoing (confirm) = Stock -> On-Loan; incoming (return) = On-Loan -> Stock
+            if direction == "outgoing":
+                return ptype, stock_loc, on_loan_loc
+            return ptype, on_loan_loc, stock_loc
+        # Legacy standard delivery flow.
+        ptype = self.env["stock.picking.type"].search(
+            [
+                ("code", "=", direction),
+                ("company_id", "in", (False, self.company_id.id)),
+            ],
+            limit=1,
+        )
+        if not ptype:
+            return empty, False, False
+        loc_src = ptype.default_location_src_id or ptype.warehouse_id.lot_stock_id
+        loc_dst = ptype.default_location_dest_id
+        return ptype, loc_src, loc_dst
+
     def _create_stock_picking(self, direction):
         """direction: 'outgoing' (confirm) or 'incoming' (return).
 
@@ -265,19 +334,8 @@ class RentalOrder(models.Model):
         if not product:
             return False
         Picking = self.env["stock.picking"]
-        # Pick the first matching picking type in this company.
-        ptype = self.env["stock.picking.type"].search(
-            [
-                ("code", "=", direction),
-                ("company_id", "in", (False, self.company_id.id)),
-            ],
-            limit=1,
-        )
-        if not ptype:
-            return False
-        loc_src = ptype.default_location_src_id or ptype.warehouse_id.lot_stock_id
-        loc_dst = ptype.default_location_dest_id
-        if not (loc_src and loc_dst):
+        ptype, loc_src, loc_dst = self._resolve_picking_type_and_locations(direction)
+        if not ptype or not (loc_src and loc_dst):
             return False
 
         def _move(qty, is_loan):
@@ -320,27 +378,59 @@ class RentalOrder(models.Model):
         return picking
 
     def action_validate_loan_return(self):
-        """Operator confirms that the loan quantity has come back in the return
-        picking. Raises if quantity_done on loan moves is short."""
+        """Operator confirms the dispatched units have come back in the return
+        picking: loan/cadangan quantity in full, and (for serial-tracked units)
+        the exact same serials that went out."""
         for rec in self:
-            if not rec.loan_qty:
-                continue
-            picking = rec.return_picking_id
-            if not picking:
-                raise UserError(_("No return picking on order %s.") % rec.name)
-            loan_moves = picking.move_ids.filtered("is_loan")
-            done = sum(loan_moves.mapped("quantity"))
-            if done < rec.loan_qty:
-                raise UserError(
-                    _(
-                        "Loan unit shortage on %(name)s: %(done)s returned of %(expected)s expected. "
-                        "Resolve via inventory adjustment or pursue claim before closing the order.",
-                        name=rec.name,
-                        done=done,
-                        expected=rec.loan_qty,
+            if rec.loan_qty:
+                picking = rec.return_picking_id
+                if not picking:
+                    raise UserError(_("No return picking on order %s.") % rec.name)
+                loan_moves = picking.move_ids.filtered("is_loan")
+                done = sum(loan_moves.mapped("quantity"))
+                if done < rec.loan_qty:
+                    raise UserError(
+                        _(
+                            "Loan unit shortage on %(name)s: %(done)s returned of %(expected)s expected. "
+                            "Resolve via inventory adjustment or pursue claim before closing the order.",
+                            name=rec.name,
+                            done=done,
+                            expected=rec.loan_qty,
+                        )
                     )
-                )
+            rec._check_returned_serials()
         return True
+
+    def _check_returned_serials(self):
+        """For serial-tracked units, the exact serials dispatched at pickup must
+        come back in the return picking. Catches substituted/missing units that a
+        pure quantity check would miss. No-op for non-serial (bulk) products."""
+        self.ensure_one()
+        product = self._resolve_rental_product()
+        if not product or product.tracking != "serial":
+            return
+        if not (self.pickup_picking_id and self.return_picking_id):
+            return
+        out_serials = set(self.pickup_picking_id.move_line_ids.lot_id.ids)
+        back_serials = set(self.return_picking_id.move_line_ids.lot_id.ids)
+        if not out_serials:
+            return
+        missing = out_serials - back_serials
+        extra = back_serials - out_serials
+        if missing or extra:
+            Lot = self.env["stock.lot"]
+            missing_names = ", ".join(Lot.browse(list(missing)).mapped("name")) or "-"
+            extra_names = ", ".join(Lot.browse(list(extra)).mapped("name")) or "-"
+            raise UserError(
+                _(
+                    "Serial mismatch on return of %(name)s. Dispatched serials must return "
+                    "in full.\nMissing: %(missing)s\nUnexpected: %(extra)s\n"
+                    "Resolve via inventory adjustment or claim before closing the order.",
+                    name=self.name,
+                    missing=missing_names,
+                    extra=extra_names,
+                )
+            )
 
     # ------------------------------------------------------------------
     # BAST generation
