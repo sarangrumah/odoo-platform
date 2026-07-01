@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Extensions to `repair.order` for warranty matrix, SLA, MRP, WhatsApp,
-cost analysis, quality check, and returns flow."""
+"""Extensions to `repair.order` for internal asset maintenance: equipment
+link + maintenance.request bridge, SLA, MRP, cost analysis, quality check,
+and rework flow."""
 
 from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
 
@@ -16,28 +16,35 @@ _logger = logging.getLogger(__name__)
 class RepairOrder(models.Model):
     _inherit = "repair.order"
 
-    # ---------- Warranty fields ----------
-    x_warranty_status = fields.Selection(
-        [
-            ("in_warranty", "In Warranty"),
-            ("out_of_warranty", "Out of Warranty"),
-            ("extended", "Extended Warranty"),
-            ("na", "Not Applicable"),
-        ],
-        string="Warranty Status",
-        compute="_compute_warranty_status",
-        store=True,
-        readonly=False,
+    # ---------- Internal asset link ----------
+    x_equipment_id = fields.Many2one(
+        "maintenance.equipment",
+        string="Asset / Equipment",
+        tracking=True,
+        index="btree_not_null",
+        help="Internal asset being repaired. Bridges this repair to the "
+        "maintenance module.",
+    )
+    x_maintenance_request_id = fields.Many2one(
+        "maintenance.request",
+        string="Maintenance Request",
+        readonly=True,
+        copy=False,
+        help="Corrective maintenance request auto-created for the linked "
+        "asset when this repair is confirmed.",
+    )
+
+    # ---------- Internal requester ----------
+    x_requesting_user_id = fields.Many2one(
+        "res.users",
+        string="Requested By",
+        default=lambda self: self.env.user,
         tracking=True,
     )
-    x_warranty_until = fields.Date(
-        string="Warranty Until",
-        compute="_compute_warranty_status",
-        store=True,
-        readonly=False,
+    x_requesting_team_id = fields.Many2one(
+        "maintenance.team",
+        string="Requesting Team",
     )
-    x_serial_number = fields.Char(string="Serial Number", tracking=True)
-    x_purchase_date = fields.Date(string="Purchase Date", tracking=True)
 
     # ---------- SLA fields ----------
     x_promised_completion_date = fields.Date(
@@ -60,15 +67,10 @@ class RepairOrder(models.Model):
         store=True,
     )
 
-    # ---------- Customer comm ----------
-    x_customer_notified = fields.Boolean(
-        string="Customer Notified",
-        default=False,
-        tracking=True,
-    )
+    # ---------- Fault description (internal) ----------
     x_id_complaint = fields.Text(
-        string="Customer Complaint (ID)",
-        help="Customer complaint in Bahasa Indonesia",
+        string="Fault Description (Internal)",
+        help="Internal description of the fault / reason for the repair.",
     )
 
     # ---------- Cost analysis ----------
@@ -93,20 +95,20 @@ class RepairOrder(models.Model):
         store=True,
     )
 
-    # ---------- Returns ----------
+    # ---------- Rework (re-opened) ----------
     x_returned = fields.Boolean(
-        string="Customer Returned",
+        string="Re-opened / Rework",
         default=False,
         tracking=True,
         readonly=True,
         copy=False,
     )
     x_return_date = fields.Datetime(
-        string="Return Date",
+        string="Rework Date",
         readonly=True,
         copy=False,
     )
-    x_return_reason = fields.Text(string="Return Reason")
+    x_return_reason = fields.Text(string="Rework Reason")
 
     # ---------- MRP link ----------
     x_mrp_production_id = fields.Many2one(
@@ -137,35 +139,6 @@ class RepairOrder(models.Model):
             return float(ICP.get_param("custom_repairs.labor_rate", "100000"))
         except (TypeError, ValueError):
             return 100000.0
-
-    # ====================================================================
-    # Warranty status compute (matrix lookup)
-    # ====================================================================
-
-    @api.depends("x_serial_number", "x_purchase_date", "product_id")
-    def _compute_warranty_status(self):
-        Matrix = self.env["custom.repairs.warranty.matrix"].sudo()
-        today = fields.Date.context_today(self)
-        for rec in self:
-            product = rec.product_id
-            if not (rec.x_serial_number and rec.x_purchase_date and product):
-                # Keep existing manual values when prerequisites missing.
-                if not rec.x_warranty_status:
-                    rec.x_warranty_status = "na"
-                if rec.x_warranty_until is False:
-                    rec.x_warranty_until = False
-                continue
-            entry = Matrix.search(
-                [("product_id", "=", product.id), ("active", "=", True)],
-                limit=1,
-            )
-            if not entry:
-                rec.x_warranty_status = "na"
-                rec.x_warranty_until = False
-                continue
-            until = rec.x_purchase_date + relativedelta(months=int(entry.warranty_months or 0))
-            rec.x_warranty_until = until
-            rec.x_warranty_status = "in_warranty" if today <= until else "out_of_warranty"
 
     # ====================================================================
     # SLA compute
@@ -286,6 +259,7 @@ class RepairOrder(models.Model):
         if new_state == "confirmed":
             for rec in self:
                 rec._maybe_create_mrp_workorder()
+                rec._maybe_create_maintenance_request()
         return res
 
     # ====================================================================
@@ -338,60 +312,59 @@ class RepairOrder(models.Model):
         )
 
     # ====================================================================
-    # WhatsApp status update
+    # Maintenance request bridge
     # ====================================================================
 
-    def action_send_status_whatsapp(self):
-        """Queue a WhatsApp status update to the customer in Indonesian."""
-        Wa = self.env["whatsapp.message"]
-        Account = self.env["whatsapp.account"]
-        state_labels = dict(self._fields["state"].selection)
-        for rec in self:
-            partner = rec.partner_id
-            phone = (partner.mobile or partner.phone) if partner else False
-            if not partner or not phone:
-                _logger.info(
-                    "custom_repairs: skip WhatsApp for %s (no phone on partner)",
-                    rec.display_name,
-                )
-                continue
-            account = Account.search([("active", "=", True)], limit=1)
-            if not account:
-                _logger.info(
-                    "custom_repairs: no active whatsapp.account; skipping %s",
-                    rec.display_name,
-                )
-                continue
-            customer_name = partner.name or _("Pelanggan")
-            ref = rec.name or rec.display_name or ""
-            state_label = state_labels.get(rec.state, rec.state or "")
-            date_str = (
-                fields.Date.to_string(rec.x_promised_completion_date)
-                if rec.x_promised_completion_date
-                else _("belum dijadwalkan")
-            )
-            body = _("Halo %(customer_name)s, status perbaikan %(ref)s: %(state)s. Estimasi selesai: %(date)s") % {
-                "customer_name": customer_name,
-                "ref": ref,
-                "state": state_label,
-                "date": date_str,
-            }
-            Wa.create(
+    def _maybe_create_maintenance_request(self):
+        """Open a corrective maintenance.request on the linked asset.
+
+        Best-effort and idempotent: silently skips when no equipment is
+        linked, when `maintenance` is not installed, or when the request
+        can't be created (e.g. no default team resolvable).
+        """
+        self.ensure_one()
+        if self.x_maintenance_request_id:
+            return
+        if "maintenance.request" not in self.env or not self.x_equipment_id:
+            return
+        Request = self.env["maintenance.request"].sudo()
+        owner = self.x_requesting_user_id or self.user_id or self.env.user
+        try:
+            request = Request.create(
                 {
-                    "account_id": account.id,
-                    "to_phone": phone,
-                    "to_partner_id": partner.id,
-                    "body": body,
-                    "state": "draft",
+                    "name": _("Repair %s") % (self.name or self.display_name or ""),
+                    "equipment_id": self.x_equipment_id.id,
+                    "maintenance_type": "corrective",
+                    "request_date": fields.Date.context_today(self),
+                    "description": self.x_id_complaint or "",
+                    "owner_user_id": owner.id,
+                    "company_id": self.company_id.id,
                 }
             )
-            rec.x_customer_notified = True
+        except Exception as exc:  # pragma: no cover (defensive)
             _logger.info(
-                "custom_repairs: queued WhatsApp status for %s -> %s",
-                rec.display_name,
-                phone,
+                "custom_repairs: maintenance.request create skipped (%s)", exc
             )
-        return True
+            return
+        self.x_maintenance_request_id = request.id
+        _logger.info(
+            "custom_repairs: created maintenance.request %s for repair %s",
+            request.id,
+            self.display_name,
+        )
+
+    def action_view_maintenance_request(self):
+        """Open the linked maintenance request."""
+        self.ensure_one()
+        if not self.x_maintenance_request_id:
+            return False
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "maintenance.request",
+            "res_id": self.x_maintenance_request_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
 
     # ====================================================================
     # Quality check on completion
@@ -428,11 +401,11 @@ class RepairOrder(models.Model):
         return check
 
     # ====================================================================
-    # Returns flow
+    # Rework flow
     # ====================================================================
 
-    def action_set_returned(self):
-        """Mark the repair as customer-returned."""
+    def action_set_rework(self):
+        """Mark the repair as re-opened for rework."""
         for rec in self:
             rec.write(
                 {
@@ -441,6 +414,6 @@ class RepairOrder(models.Model):
                 }
             )
             rec.message_post(
-                body=_("Repair marked as customer-returned."),
+                body=_("Repair re-opened for rework."),
             )
         return True
