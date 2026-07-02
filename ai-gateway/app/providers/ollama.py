@@ -14,7 +14,7 @@ class OllamaProvider(LLMProvider):
     def __init__(self) -> None:
         s = get_settings()
         self._base_url = s.ollama_base_url.rstrip("/")
-        self._client = httpx.AsyncClient(timeout=httpx.Timeout(120.0))
+        self._client = httpx.AsyncClient(timeout=httpx.Timeout(s.ollama_timeout))
 
     async def chat(self, req: ChatRequest) -> ChatResponse:
         s = get_settings()
@@ -33,7 +33,11 @@ class OllamaProvider(LLMProvider):
             "model": model,
             "messages": messages,
             "stream": False,
-            "options": {"temperature": req.temperature, "num_predict": req.max_tokens},
+            "options": {
+                "temperature": req.temperature,
+                "num_predict": req.max_tokens,
+                "num_ctx": s.ollama_num_ctx,
+            },
         }
         # Native JSON mode — Ollama constrains the decoder to emit valid JSON.
         # The shopper's intent-extraction step relies on this for a parseable
