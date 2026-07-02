@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Mount under Custom root -->
+    <!-- Mount under the native Repairs app -->
     <menuitem id="menu_repairs_in_custom"
               name="Asset Repairs"
               parent="custom_core.menu_custom_root"

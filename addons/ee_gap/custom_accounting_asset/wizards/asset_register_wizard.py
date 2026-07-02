@@ -20,10 +20,14 @@ class AssetRegisterWizard(models.TransientModel):
     # (custom_fixed_asset_group_custom_report_asset_register_wizard_rel, etc.)
     # exceed PostgreSQL's 63-char identifier limit and break registry load on Odoo 19.
     group_ids = fields.Many2many(
-        "custom.fixed.asset.group", relation="cfa_asset_reg_wiz_group_rel", string="Groups"
+        "custom.fixed.asset.group",
+        relation="asset_reg_wiz_group_rel",
+        string="Groups",
     )
     location_ids = fields.Many2many(
-        "custom.fixed.asset.location", relation="cfa_asset_reg_wiz_loc_rel", string="Locations"
+        "custom.fixed.asset.location",
+        relation="asset_reg_wiz_location_rel",
+        string="Locations",
     )
     asset_states = fields.Selection(
         [

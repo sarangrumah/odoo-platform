@@ -23,6 +23,7 @@ EE-equivalent feature set:
     "depends": [
         "custom_core",
         "custom_pdp_audit",
+        "custom_product_barcode",
         "barcodes",
         "barcodes_gs1_nomenclature",
         "stock",

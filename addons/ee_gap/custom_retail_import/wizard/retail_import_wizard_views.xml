@@ -12,8 +12,9 @@
                     <field name="filename" invisible="1"/>
                     <field name="force"/>
                 </group>
-                <separator string="Preview" invisible="not preview_html"/>
-                <field name="preview_html" nolabel="1" readonly="1" invisible="not preview_html"/>
+                <group string="Preview" invisible="not preview_text">
+                    <field name="preview_text" nolabel="1" widget="text" readonly="1"/>
+                </group>
                 <footer>
                     <button name="action_preview" type="object" string="Preview (dry-run)"/>
                     <button name="action_import" type="object" string="Import" class="btn-primary"/>

@@ -10,6 +10,12 @@
         <field name="binding_type">report</field>
     </record>
 
+    <!-- Indonesian long date, e.g. "9 Juni 2026" (accepts date or datetime in `d`). -->
+    <template id="id_date">
+        <t t-set="_bulan" t-value="['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']"/>
+        <t t-if="d"><t t-out="d.day"/> <t t-out="_bulan[d.month]"/> <t t-out="d.year"/></t>
+    </template>
+
     <template id="report_rental_contract_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
@@ -50,8 +56,8 @@
                         </table>
                         <h4 class="mt32">Period &amp; Pricing</h4>
                         <table class="table table-sm">
-                            <tr><td>Pickup</td><td t-out="o.pickup_dt"/></tr>
-                            <tr><td>Expected Return</td><td t-out="o.return_dt_expected"/></tr>
+                            <tr><td>Pickup</td><td><t t-call="custom_rental.id_date"><t t-set="d" t-value="o.pickup_dt"/></t></td></tr>
+                            <tr><td>Expected Return</td><td><t t-call="custom_rental.id_date"><t t-set="d" t-value="o.return_dt_expected"/></t></td></tr>
                             <tr><td>Planned Days</td><td t-out="o.days_planned"/></tr>
                             <tr><td>Rental Fee</td>
                                 <td><t t-out="o.rental_fee"
@@ -86,7 +92,7 @@
                                          style="max-height:80px;"/>
                                     <span t-else=""> ____________________ </span>
                                     <div><small t-out="o.customer_signed_by"/></div>
-                                    <div><small t-out="o.customer_signed_at"/></div>
+                                    <div><small><t t-call="custom_rental.id_date"><t t-set="d" t-value="o.customer_signed_at"/></t></small></div>
                                 </td>
                             </tr>
                         </table>

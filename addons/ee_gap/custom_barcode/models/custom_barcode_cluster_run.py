@@ -133,9 +133,9 @@ class CustomBarcodeClusterRun(models.Model):
         status = "ok"
 
         if gs1.get("gtin"):
-            product = self.env["product.product"].search([("barcode", "=", gs1["gtin"])], limit=1)
+            product = self.env["product.product"]._resolve_barcode(gs1["gtin"])
         if not product:
-            product = self.env["product.product"].search([("barcode", "=", barcode)], limit=1)
+            product = self.env["product.product"]._resolve_barcode(barcode)
         if gs1.get("lot") and product:
             lot = self.env["stock.lot"].search(
                 [("name", "=", gs1["lot"]), ("product_id", "=", product.id)],

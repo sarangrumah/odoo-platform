@@ -29,12 +29,4 @@
               parent="menu_whatsapp_config"
               action="action_whatsapp_account"
               sequence="10"/>
-
-    <!-- Also mount under Custom root -->
-    <menuitem id="menu_whatsapp_in_custom"
-              name="WhatsApp"
-              parent="custom_core.menu_custom_root"
-              action="action_whatsapp_message"
-              sequence="45"
-              groups="custom_whatsapp.group_user"/>
 </odoo>

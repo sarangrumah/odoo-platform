@@ -57,12 +57,4 @@
               parent="menu_barcode_root"
               action="action_custom_print_queue"
               sequence="40"/>
-
-    <!-- Also mount under the Custom root -->
-    <menuitem id="menu_barcode_in_custom"
-              name="Barcode"
-              parent="custom_core.menu_custom_root"
-              action="action_custom_barcode_scan_session"
-              sequence="50"
-              groups="custom_barcode.group_user"/>
 </odoo>

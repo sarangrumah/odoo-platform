@@ -111,10 +111,9 @@ def _handle_scan(device, data: dict) -> dict:
 
     try:
         if action == "lookup":
-            product = env["product.product"].search(
-                ["|", ("barcode", "=", barcode), ("default_code", "=", barcode)],
-                limit=1,
-            )
+            product = env["product.product"]._resolve_barcode(barcode)
+            if not product:
+                product = env["product.product"].search([("default_code", "=", barcode)], limit=1)
             result_payload = {
                 "product_id": product.id if product else None,
                 "product_name": product.display_name if product else None,
@@ -123,10 +122,9 @@ def _handle_scan(device, data: dict) -> dict:
             hint = "ready_for_qty" if product else "unknown_barcode"
         elif action in ("receipt", "issue", "transfer", "count"):
             # Resolve product, validate location.
-            product = env["product.product"].search(
-                ["|", ("barcode", "=", barcode), ("default_code", "=", barcode)],
-                limit=1,
-            )
+            product = env["product.product"]._resolve_barcode(barcode)
+            if not product:
+                product = env["product.product"].search([("default_code", "=", barcode)], limit=1)
             if not product:
                 raise UserError(_("Unknown barcode: %s") % barcode)
             if not location_id:

@@ -15,12 +15,4 @@
               action="action_custom_email_ab_test"
               sequence="36"
               groups="custom_email_marketing.group_user"/>
-
-    <!-- Also mount under Custom root -->
-    <menuitem id="menu_email_marketing_in_custom"
-              name="Email Marketing"
-              parent="custom_core.menu_custom_root"
-              action="action_email_template_gallery"
-              sequence="45"
-              groups="custom_email_marketing.group_user"/>
 </odoo>

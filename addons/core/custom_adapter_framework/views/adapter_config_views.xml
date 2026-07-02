@@ -108,7 +108,8 @@
         <field name="view_mode">list</field>
     </record>
 
-    <menuitem id="menu_hub_root" name="Hub" parent="custom_core.menu_custom_root" sequence="10"/>
+    <!-- Top-level Integrations app menu (distinct from custom_hub_console's "Hub" aggregator) -->
+    <menuitem id="menu_hub_root" name="Integrations" sequence="10"/>
     <menuitem id="menu_hub_config" name="Configuration" parent="menu_hub_root" sequence="10"/>
     <menuitem id="menu_hub_adapters" name="Adapters" parent="menu_hub_config" action="action_adapter_config" sequence="10"/>
     <menuitem id="menu_hub_adapter_logs" name="Adapter Calls" parent="menu_hub_config" action="action_adapter_call_log" sequence="20"/>

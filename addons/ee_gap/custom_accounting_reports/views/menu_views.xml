@@ -2,7 +2,7 @@
 <odoo>
     <menuitem id="menu_custom_reports_root"
               name="Reports"
-              parent="account.menu_finance"
+              parent="account.menu_finance_reports"
               sequence="80"
               groups="group_report_user"/>
 

@@ -23,12 +23,4 @@
               parent="menu_sms_id_config"
               action="action_custom_sms_account"
               sequence="10"/>
-
-    <!-- Also mount under Custom root -->
-    <menuitem id="menu_sms_id_in_custom"
-              name="SMS ID"
-              parent="custom_core.menu_custom_root"
-              action="action_custom_sms_message"
-              sequence="46"
-              groups="custom_sms_id.group_user"/>
 </odoo>

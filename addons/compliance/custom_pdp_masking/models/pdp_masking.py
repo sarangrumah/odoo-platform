@@ -107,7 +107,7 @@ class PdpMaskingService(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _reveal_field(self, model_name: str, res_id: int, field_name: str, reason: str | None = None):
+    def reveal_field(self, model_name: str, res_id: int, field_name: str, reason: str | None = None):
         """Return the clear value of one field for one record, with audit.
 
         Server-enforced: validates that the field is actually registered as
