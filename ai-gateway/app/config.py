@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://ollama:11434"
     ollama_model_default: str = "llama3.2:3b"
     ollama_model_quality: str = "qwen2.5:7b"
+    # Read timeout (s) for the upstream Ollama call. Large batch/knowledge
+    # prompts on a CPU-only host can take minutes, so this is configurable.
+    ollama_timeout: float = 120.0
+    # Context window override. Ollama defaults to 4096 regardless of the model's
+    # max, which truncates long prompts; raise for large summarization inputs.
+    ollama_num_ctx: int = 8192
 
     # Personal shopper (retrieval-controlled, runs on the local Ollama provider).
     # `odoo_storefront_url` is the internal base for the public catalog API the

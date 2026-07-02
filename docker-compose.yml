@@ -190,6 +190,10 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OLLAMA_MODEL_DEFAULT: ${OLLAMA_MODEL_DEFAULT:-llama3.2}
       OLLAMA_MODEL_QUALITY: ${OLLAMA_MODEL_QUALITY:-qwen2.5:7b}
+      # Upstream Ollama read timeout (s) and context window. Raise for large
+      # batch/summarization prompts on CPU-only hosts (e.g. knowledge gen).
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-120}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       # Personal shopper (retrieval-controlled, runs on local Ollama)
       AI_MODEL_SHOPPER: ${AI_MODEL_SHOPPER:-qwen2.5:7b}
       ODOO_STOREFRONT_URL: ${ODOO_STOREFRONT_URL:-http://odoo:8069}

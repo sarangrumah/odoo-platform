@@ -48,6 +48,7 @@ ADDONS_ROOTS = [
     ROOT / "addons" / "ee_gap",
     ROOT / "addons" / "operations",
     ROOT / "addons" / "verticals",
+    ROOT / "addons" / "_tenants",
 ]
 
 DEFAULT_GATEWAY_URL = os.environ.get("AI_GATEWAY_URL", "http://localhost:18080")
@@ -267,7 +268,7 @@ def _sign(secret: str, body: bytes) -> tuple[str, str]:
 
 
 def call_ai_gateway(
-    *, system: str, user: str, base_url: str, secret: str, quality: str = "fast", max_tokens: int = 4000
+    *, system: str, user: str, base_url: str, secret: str, quality: str = "fast", max_tokens: int = 4000, timeout: int = 600
 ) -> str:
     body_dict = {
         "messages": [{"role": "user", "content": user}],
@@ -288,7 +289,7 @@ def call_ai_gateway(
             "X-Tenant-Id": "bootstrap",
         },
     )
-    with urllib.request.urlopen(req, timeout=600) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
     content = payload.get("content")
     if isinstance(content, str):
@@ -348,6 +349,7 @@ def main() -> int:
         help="Model tier: 'fast' = Sonnet 4.6 (~Rp 1-2rb/modul), 'high' = Opus 4.7 (~Rp 5-10rb/modul). Default 'fast'.",
     )
     ap.add_argument("--sleep", type=float, default=2.0, help="Seconds to sleep between calls (default 2.0).")
+    ap.add_argument("--timeout", type=int, default=600, help="Per-call HTTP timeout in seconds (default 600). Raise for slow local models.")
     args = ap.parse_args()
 
     if not args.dry_run and not args.secret:
@@ -392,7 +394,7 @@ def main() -> int:
             continue
         try:
             body = call_ai_gateway(
-                system=SYSTEM_PROMPT, user=user, base_url=args.gateway, secret=args.secret, quality=args.quality
+                system=SYSTEM_PROMPT, user=user, base_url=args.gateway, secret=args.secret, quality=args.quality, timeout=args.timeout
             )
         except urllib.error.HTTPError as e:
             err_body = ""
