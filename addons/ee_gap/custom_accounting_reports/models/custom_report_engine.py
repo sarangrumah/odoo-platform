@@ -328,7 +328,7 @@ class CustomReportEngine(models.AbstractModel):
             acc = accounts.get(row["account_id"])
             result[row["account_id"]] = {
                 "account_id": row["account_id"],
-                "account_code": acc.code if acc else "",
+                "account_code": self._account_code(acc),
                 "account_name": acc.name if acc else "",
                 "account_type": acc.account_type if acc else "",
                 "debit": row["debit"] or 0.0,
@@ -336,6 +336,21 @@ class CustomReportEngine(models.AbstractModel):
                 "balance": row["balance"] or 0.0,
             }
         return result
+
+    def _account_code(self, account):
+        """Return an account's code resolved in its OWN company.
+
+        ``account.account.code`` is company-dependent in Odoo 19 (stored per
+        company in ``code_store``). Reading it in the ambient ``self.env.company``
+        yields a blank for accounts that belong to a different company -- which is
+        why a report scoped to company B, but viewed from a session whose active
+        company is A, showed an empty Code column. Resolve the code in the
+        account's own company so it is correct regardless of the active company.
+        """
+        if not account:
+            return ""
+        company = account.company_ids[:1] or self.env.company
+        return account.with_company(company).code or ""
 
     # ------------------------------------------------------------------
     # Render-context helpers

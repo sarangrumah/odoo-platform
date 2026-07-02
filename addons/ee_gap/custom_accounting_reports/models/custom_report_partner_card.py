@@ -156,7 +156,7 @@ class CustomReportPartnerCardBase(models.AbstractModel):
                     "date": ml.date,
                     "doc_no": ml.move_id.name or "",
                     "reference": ml.move_id.ref or ml.ref or "",
-                    "account_code": ml.account_id.code or "",
+                    "account_code": self._account_code(ml.account_id),
                     "label": ml.name or "",
                     "debit": ml.debit,
                     "credit": ml.credit,

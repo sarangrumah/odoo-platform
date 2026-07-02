@@ -16,6 +16,9 @@ class AssetRegisterWizard(models.TransientModel):
         "res.company",
         default=lambda self: self.env.companies,
     )
+    # Explicit short relation names: the auto-generated names
+    # (custom_fixed_asset_group_custom_report_asset_register_wizard_rel, etc.)
+    # exceed PostgreSQL's 63-char identifier limit and break registry load on Odoo 19.
     group_ids = fields.Many2many(
         "custom.fixed.asset.group",
         relation="asset_reg_wiz_group_rel",

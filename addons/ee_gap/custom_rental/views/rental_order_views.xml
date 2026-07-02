@@ -41,8 +41,8 @@
                             invisible="state != 'returned' or bast_return_id"/>
                     <button name="action_validate_loan_return" type="object"
                             string="Validate Loan Return"
-                            invisible="loan_qty == 0 or state != 'returned'"
-                            help="Check that all loan/cadangan units have come back in the return picking."/>
+                            invisible="(loan_qty == 0 and not is_internal_loan) or state != 'returned'"
+                            help="Check that all loan/cadangan units and serial-tracked assets have come back in the return picking."/>
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
@@ -54,6 +54,10 @@
                             <field name="product_id" invisible="asset_id"/>
                             <field name="qty" readonly="asset_id"/>
                             <field name="loan_qty"/>
+                            <field name="is_internal_loan"/>
+                            <field name="on_loan_location_id"
+                                   invisible="not is_internal_loan"
+                                   required="is_internal_loan"/>
                             <field name="daily_rate"/>
                             <field name="deposit_amount"/>
                         </group>

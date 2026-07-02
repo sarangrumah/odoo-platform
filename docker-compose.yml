@@ -144,6 +144,9 @@ services:
     volumes:
       - ./addons:/mnt/extra-addons:ro
       - ./data/odoo-filestore:/var/lib/odoo
+      # Shared FTPS drop folder: custom_retail_import local feed reads
+      # /mnt/data_levis/data and archives to /mnt/data_levis/archive.
+      - ./data/data_levis:/mnt/data_levis
     extra_hosts:
       - "erp_dev_aimarka:127.0.0.1"
     ports:
@@ -476,6 +479,46 @@ services:
       resources:
         limits:
           memory: 64m
+
+  # ---- FTPS drop server (pure-ftpd, explicit TLS) ----
+  # Partner pushes retail source files (X20/X24/X70D/...) over explicit FTPS.
+  # The FTP user is chrooted to /home/data_levis/data (the upload folder); the
+  # sibling archive/ lives outside the chroot and is written only by Odoo, which
+  # shares the same ./data/data_levis host volume (see the odoo service above).
+  ftps:
+    image: stilliard/pure-ftpd:hardened
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-ftps
+    <<: [*restart-policy, *default-logging, *security-baseline]
+    environment:
+      PUBLICHOST: ${FTPS_PUBLICHOST:-127.0.0.1}        # advertised host for passive mode
+      FTP_USER_NAME: ${FTPS_USER:-levis}
+      FTP_USER_PASS: ${FTPS_PASS}                       # required (secret, no default)
+      FTP_USER_HOME: /home/data_levis/data              # chroot = data/ only
+      # pure-ftpd wants the passive range in colon form (min:max).
+      FTP_PASSIVE_PORTS: "${FTPS_PASSIVE_MIN:-30000}:${FTPS_PASSIVE_MAX:-30009}"
+      # --tls=2 => require explicit FTPS (AUTH TLS). -U 177:000 => umask: files 666 / dirs 777
+      # so the Odoo container (different uid) can read uploads and move them to archive/.
+      ADDED_FLAGS: "--tls=2 -U 177:000"
+      # Self-signed cert auto-generated on first boot when no PEM is mounted.
+      TLS_CN: ${FTPS_PUBLICHOST:-localhost}
+      TLS_ORG: ${FTPS_TLS_ORG:-Platform}
+      TLS_C: ${FTPS_TLS_C:-ID}
+    volumes:
+      - ./data/data_levis:/home/data_levis             # shared with Odoo (drop + archive)
+      # Optional: reuse the platform TLS cert instead of the self-signed one. Build a
+      # combined PEM once (cat server.key server.crt > data/data_levis/.ftps/pure-ftpd.pem)
+      # then uncomment:
+      # - ./data/data_levis/.ftps/pure-ftpd.pem:/etc/ssl/private/pure-ftpd.pem:ro
+    ports:
+      - "${FTPS_PORT:-21}:21"
+      # Docker wants the published range in dash form (min-max); must match
+      # FTP_PASSIVE_PORTS above and the PUBLICHOST advertised to the client.
+      - "${FTPS_PASSIVE_MIN:-30000}-${FTPS_PASSIVE_MAX:-30009}:${FTPS_PASSIVE_MIN:-30000}-${FTPS_PASSIVE_MAX:-30009}"
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
 networks:
   odoo-net:

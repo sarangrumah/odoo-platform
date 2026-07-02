@@ -238,7 +238,7 @@ class CustomReportAgedReceivable(models.AbstractModel):
                 "doc_date": line.date,
                 "due_date": line.date_maturity,
                 "overdue_days": str(overdue),
-                "account_code": line.account_id.code or "",
+                "account_code": self._account_code(line.account_id),
                 "total": residual,
                 **{c: 0.0 for c in bucket_codes},
             }

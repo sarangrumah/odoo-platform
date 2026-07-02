@@ -24,6 +24,7 @@ PT B (sister company); previously only the GL invoice was mirrored.
         "custom_core",
         "custom_pdp_audit",
         "custom_accounting_full",
+        "custom_rental",
         "purchase",
         "sale_management",
         "stock",
@@ -31,6 +32,7 @@ PT B (sister company); previously only the GL invoice was mirrored.
     "capability_tags": ["intercompany", "procurement", "audit-trail"],
     "data": [
         "views/account_intercompany_rule_views.xml",
+        "views/sale_order_views.xml",
     ],
     "installable": True,
     "application": False,

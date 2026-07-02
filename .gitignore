@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.*.local
+.env.bak-*
 .secrets/
 .claude/
 *.pem
@@ -70,3 +71,6 @@ sbom-*.xml
 # ----- Coretax sertel (encrypted at rest, but never commit) -----
 addons/compliance/custom_coretax/data/sertel/*.p12
 addons/compliance/custom_coretax/data/sertel/*.pfx
+
+# ----- Generated extract artifacts (reproducible via 01_extract_x101.py) -----
+scripts/tenants/levis/out_*.csv

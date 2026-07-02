@@ -239,7 +239,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
                 {
                     "type": "account",
                     "account_id": aid,
-                    "account_code": acc.code,
+                    "account_code": self._account_code(acc),
                     "account_name": acc.name,
                     "account_type": acc.account_type,
                     "opening": opening_by_account.get(aid, 0.0),
@@ -274,7 +274,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
             by_account[aid] = {
                 "type": "account",
                 "account_id": aid,
-                "account_code": acc.code,
+                "account_code": self._account_code(acc),
                 "account_name": acc.name,
                 "account_type": acc.account_type,
                 "opening": opening,
@@ -428,7 +428,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
                 {
                     "date": r["date"],
                     "journal_code": journal.code if journal else "",
-                    "account_code": acc.code if acc else "",
+                    "account_code": self._account_code(acc),
                     "account_name": acc.name if acc else "",
                     "partner": partner.display_name if partner else "",
                     "label": r["label"] or "",

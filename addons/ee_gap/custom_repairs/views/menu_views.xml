@@ -2,8 +2,8 @@
 <odoo>
     <!-- Mount under the native Repairs app -->
     <menuitem id="menu_repairs_in_custom"
-              name="Repairs"
-              parent="repair.menu_repair_order"
+              name="Asset Repairs"
+              parent="custom_core.menu_custom_root"
               action="action_repair_order_custom"
               sequence="60"
               groups="custom_repairs.group_user"/>
