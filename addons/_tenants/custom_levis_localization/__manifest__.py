@@ -29,6 +29,13 @@ Bundles four tenant-specific requirements for the Levi's databases
    a *Payment Receipt* for customer (inbound) payments, each with an
    amount-in-words line and prepared/approved/received signature blocks.
 
+5. **Periodic Inventory Reconciliation.** Because receipts/deliveries do not
+   post inventory journals in this setup, GL inventory-asset accounts drift from
+   the real on-hand value. ``levis.inventory.reconciliation`` (Accounting >
+   Accounting > Inventory Reconciliation) computes, per valuation account, the
+   actual stock value (``stock.quant.value``) vs the GL balance and generates a
+   DRAFT adjustment journal for review. An inactive monthly cron is provided.
+
 TENANT-SCOPED: install only on the Levi's tenant databases.
 """,
     "author": "Custom Platform",
@@ -44,7 +51,10 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "account",
     ],
     "data": [
+        "security/ir.model.access.csv",
+        "data/inventory_reconciliation_data.xml",
         "views/product_template_views.xml",
+        "views/inventory_reconciliation_views.xml",
         "reports/paperformat.xml",
         "reports/payment_report_actions.xml",
         "reports/payment_voucher_templates.xml",
