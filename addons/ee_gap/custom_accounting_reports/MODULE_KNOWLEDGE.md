@@ -9,62 +9,82 @@ manifest_version: 19.0.0.1.0
 # custom_accounting_reports
 
 ## Purpose
-This module provides a comprehensive suite of financial reports for the Custom Platform, including P&L (Profit and Loss), Balance Sheet, General Ledger, Trial Balance, Cash Flow Statement, Aging Reports, Partner Ledger, Tax Reports, Day/Cash/Bank Books, Journal Audit, and more. It is designed to offer production-grade reporting capabilities tailored to the needs of a multi-tenant Odoo 19 environment.
+This module closes the Enterprise gap on Odoo CE `account_reports`. It provides a comprehensive suite of financial reports for the Custom Platform — P&L, Balance Sheet, Cash Flow (indirect method), General Ledger, Trial Balance, Partner Ledger, Partner Cards, Aged Receivable/Payable, Tax (PPN/PPh), Day/Cash/Bank Book, Journal Audit, Down-Payment (Uang Muka) ledger, Sales, and a tree-driven custom Financial Report. All reports are built on a single shared `custom.report.engine` AbstractModel and render to QWeb PDF/HTML or XLSX.
 
 ## Business Flow
-1. **User Selection**: The user selects a report type from the menu (e.g., Trial Balance, General Ledger).
-2. **Wizard Input**: A wizard appears where the user inputs filters such as date range, company, and account.
-3. **Report Generation**: Based on the selected report and input filters, the module processes the data to generate the required financial statements.
-4. **Export/View**: The generated report is either exported in a format like XLSX or displayed directly within Odoo.
+1. **User Selection**: The user opens a report from the menu (e.g., Trial Balance, General Ledger).
+2. **Wizard Input**: A transient wizard (`custom.report.*.wizard`, under `wizard/`) collects filters such as date range, companies, journals, accounts, partners, and posted-only.
+3. **Report Generation**: The wizard normalises its fields into a `filters`/`options` dict and hands off to the matching report model, which runs parameterised SQL against `account_move_line` via the engine helpers and builds report lines.
+4. **Export/View**: Output is rendered as a QWeb PDF/HTML report (via the shared dispatch model) or exported to XLSX. Each run is written to the `pdp.audit_log` audit trail.
 
 ## Key Models
-- `custom.report.advance` — Uang Muka / Down Payment Ledger
-- `custom.report.aged.payable` — Aged Payable Report
-- `custom.report.aged.receivable` — Aged Receivable Report
-- `custom.report.balance.sheet` — Balance Sheet Report
-- `custom.report.cash.flow` — Cash Flow Statement
-- `custom.report.day.book` — Day Book / Cash Book / Bank Book
-- `custom.report.journal.audit` — Journal Audit
+All report models are `AbstractModel`s that inherit `custom.report.engine` (the architectural base), except the concrete `custom.report.financial` tree and the QWeb dispatch model.
+
+- `custom.report.engine` — **AbstractModel base.** Filter normalisation, raw-SQL aggregation (`_get_account_balances`, `_get_move_lines_query`, `_sum_by_account`), XLSX export, render context, and PDP audit logging.
+- `report.custom_accounting_reports.report_dispatch` — **AbstractModel.** QWeb report dispatcher; maps a `report_code` to the target report model and returns its computed context.
+- `custom.report.general.ledger` — General Ledger.
+- `custom.report.trial.balance` — Trial Balance (default dispatch target).
+- `custom.report.profit.loss` — Profit & Loss.
+- `custom.report.balance.sheet` — Balance Sheet (Asset / Liability / Equity by account type).
+- `custom.report.cash.flow` — Cash Flow Statement (indirect method).
+- `custom.report.partner.ledger` — Partner Ledger.
+- `custom.report.partner.card.base` — Partner card base, subclassed by `custom.report.payable.card` and `custom.report.receivable.card`.
+- `custom.report.aged.receivable` — Aged Receivable; `custom.report.aged.payable` inherits it.
+- `custom.report.advance` — Uang Muka / Down-Payment ledger (auto-detects advance accounts).
+- `custom.report.sales` — Sales report.
+- `custom.report.tax` — Tax report (PPN / PPh subtotals; cross-references Coretax).
+- `custom.report.book.mixin` — Day/Cash/Bank book mixin, subclassed by `custom.report.day.book`, `custom.report.cash.book`, `custom.report.bank.book` (three distinct models).
+- `custom.report.journal.audit` — Journal Audit.
+- `custom.report.financial` — **Concrete `models.Model`.** The only ORM model with stored fields; a self-referential tree defining custom financial-report line structure. Rendered by the `custom.report.financial.renderer` AbstractModel.
 
 ## Important Fields
-- **CustomReportAdvance**
-  - `account_ids`: Selection of accounts related to Uang Muka.
-  - `date_from`, `date_to`: Date range for the report.
+Report models are AbstractModels and generally have no stored fields; user input lives on the transient wizards under `wizard/`.
 
-- **CustomReportAgedReceivable, CustomReportAgedPayable**
-  - `partner_ids`: List of partners involved in the aging process.
-  - `aging_detail`: Boolean flag to switch between summary and detail layouts.
+- **custom.report.financial** (the only model with fields)
+  - `parent_id` / `child_ids`: self-referential tree (`custom.report.financial`).
+  - `account_ids`: `Many2many` to `account.account`.
+  - `company_id`: `Many2one` to `res.company`.
+  - `code`, `name`: used to compute the display name `[code] name`.
 
-- **CustomReportBalanceSheet**
-  - `account_type`: Selection of account types (e.g., asset_receivable, liability_payable).
+- **custom.report.advance.wizard**
+  - `account_ids`: `Many2many` to `account.account`.
+  - `company_ids`: `Many2many` to `res.company`.
+  - `date_from`, `date_to`: report date range.
+  - `posted_only`: `Boolean` (default `True`).
 
-- **CustomReportCashFlow**
-  - `account_type`: Selection of account types for categorizing cash flows.
+- **custom.report.aged.receivable.wizard / aged.payable.wizard**
+  - `partner_ids`: `Many2many` to `res.partner`.
+  - `detail_mode`: `Selection` switching summary vs. detail layout. (Note: `aging_detail` is only a **context key** derived from `detail_mode == "detail"`, not a field.)
+
+- **Cash Flow bucketing** — `custom.report.cash.flow` has no `account_type` field. Buckets are defined by module-level tuples `OPERATING_TYPES`, `INVESTING_TYPES`, `FINANCING_TYPES`, `CASH_TYPES` matched against each row's Odoo `account_type`.
 
 ## Public Methods
-- **CustomReportAdvance**
-  - `action_activate()`: Activates the report and generates initial data.
-  
-- **CustomReportAgedReceivable, CustomReportAgedPayable**
-  - `build_lines(filters)`: Builds the lines based on input filters.
+- **Wizards** (entry points, e.g. `custom.report.advance.wizard`)
+  - `action_print()`: renders the report to QWeb PDF/HTML.
+  - `action_export_xlsx()`: exports to XLSX.
 
-- **CustomReportBalanceSheet**
-  - `_get_account_balances(filters)`: Retrieves account balances for the given period.
+- **custom.report.engine** (shared, inherited by all report models)
+  - `_default_filters()` / filter normalisation.
+  - `_get_account_balances(filters)`, `_get_move_lines_query(...)`, `_sum_by_account(...)`: raw-SQL aggregation helpers.
+  - `_compute(options)`: builds the render context.
+  - `_log_report_run(...)`: writes a run record to `pdp.audit_log`.
 
-- **CustomReportCashFlow**
-  - `_bucket(label, code, type_codes, balances, sign=-1)`: Computes a bucket of accounts for cash flow categorization.
+- **Report models**
+  - `_build_lines(filters)`: overridden per report to build its lines (e.g. `custom.report.aged.receivable._build_lines`).
+  - `custom.report.cash.flow._bucket(label, code, type_codes, balances, sign=-1)`: computes an activity bucket.
 
 ## Integration Points
 - **Depends on**: `custom_core`, `custom_pdp_audit`, `custom_accounting_full`, `account`
-- **Inherits from**: `account.move` (adds `rental_line_ids`)
-- **Extended by**: `custom_rental_prorata`, `custom_drone_rental`
-- **External calls**: None
-- **Cross-vertical**: Deployed in arkaim, jds, ppob
+- **Architecture**: every report is an AbstractModel inheriting the shared `custom.report.engine`; only `custom.report.financial` is a concrete ORM model. No `account.move` inheritance.
+- **External calls**: `_log_report_run` executes a raw SQL `INSERT INTO pdp.audit_log` on every report run (via `self.env.cr.execute`).
+- **Wizards**: live under `wizard/` (singular). There is no `controllers/` directory.
 
 ## Gotchas
-- The module relies heavily on the `account.move` model for most of its operations.
-- The `CustomReportAdvance` model auto-detects accounts based on their names, which might not cover all edge cases.
+- All computation runs through the single `custom.report.engine` base; overriding `_build_lines` is the extension point, not adding fields.
+- The `custom.report.advance` model auto-detects advance/down-payment accounts by name, which may not cover all chart-of-account edge cases.
+- `custom.report.aged.payable` inherits `custom.report.aged.receivable`, reusing its layout logic.
+- Every run performs a defensive raw-SQL insert into `pdp.audit_log`; failures are logged as warnings and do not block the report.
 
 ## Out of Scope
-- This module does not handle real-time reporting or live data updates.
-- It focuses solely on static reports and does not integrate with external tax systems directly.
+- No real-time reporting or live data updates; reports are computed on demand from posted/existing move lines.
+- No direct integration with external tax-filing systems (the tax report only cross-references Coretax data).
