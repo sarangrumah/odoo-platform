@@ -12,6 +12,8 @@
                     <field name="disposal_date"/>
                     <field name="disposal_value"/>
                     <field name="gain_loss"/>
+                    <field name="surplus_balance"
+                           invisible="surplus_balance == 0"/>
                     <field name="currency_id" invisible="1"/>
                 </group>
                 <group string="Posting">
@@ -22,6 +24,10 @@
                            invisible="not create_journal_entry"/>
                     <field name="loss_account_id"
                            invisible="not create_journal_entry"/>
+                    <field name="surplus_account_id"
+                           invisible="not create_journal_entry or surplus_balance == 0"/>
+                    <field name="retained_earnings_account_id"
+                           invisible="not create_journal_entry or surplus_balance == 0"/>
                 </group>
                 <group>
                     <field name="note" nolabel="1" placeholder="Disposal notes..."/>
