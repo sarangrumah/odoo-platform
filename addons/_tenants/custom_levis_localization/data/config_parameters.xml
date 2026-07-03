@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Goods-Receipt GL switch.
+
+        "0" (default) -> Automated valuation: the GR journal IS posted at
+                         receipt confirm (Dr Inventory / Cr Stock Input / GRIR).
+        "1"           -> Periodic behaviour: the GR journal is suppressed and
+                         the GL is kept in sync via Inventory Reconciliation.
+
+      noupdate="1" so a value changed by an administrator survives module
+      upgrades. Editable at Settings > Technical > System Parameters.
+    -->
+    <data noupdate="1">
+        <record id="param_suppress_gr_journal" model="ir.config_parameter">
+            <field name="key">custom_levis_localization.suppress_gr_journal</field>
+            <field name="value">0</field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Levi's Retail — Struktur Proses Bisnis SES (SAP) × EBR (Odoo)</title>
+<style>
+  :root{
+    --ink:#1a2332;
+    --muted:#5b6878;
+    --line:#d7dde6;
+    --bg:#f4f6f9;
+    --card:#ffffff;
+    --sap:#0a6ed1;     /* SAP blue */
+    --sap-bg:#e8f1fb;
+    --odoo:#714b67;    /* Odoo purple */
+    --odoo-bg:#f3ecf1;
+    --pos:#b9770e;     /* POS amber */
+    --pos-bg:#fdf3e3;
+    --principal:#c41230; /* Levi's red */
+    --principal-bg:#fbe9ec;
+    --bridge:#1e7d4e;  /* integration green */
+    --bridge-bg:#e7f4ed;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;padding:32px 24px 64px;}
+  .wrap{max-width:1280px;margin:0 auto;}
+
+  header.doc{border-bottom:3px solid var(--ink);padding-bottom:16px;margin-bottom:8px;}
+  header.doc h1{font-size:26px;letter-spacing:.2px;}
+  header.doc .sub{color:var(--muted);font-size:14px;margin-top:4px;}
+  .meta{display:flex;gap:24px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:10px 0 28px;}
+  .meta b{color:var(--ink);}
+
+  h2.section{font-size:18px;margin:40px 0 6px;display:flex;align-items:center;gap:10px;}
+  h2.section .no{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;font-size:14px;flex:none;}
+  p.section-desc{color:var(--muted);font-size:13.5px;margin-bottom:18px;max-width:900px;}
+
+  /* ===== legend ===== */
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 6px;font-size:12.5px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line);}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+
+  /* ===== swimlane overview ===== */
+  .lanes{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px;}
+  .lane{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
+  .lane-h{padding:10px 14px;font-weight:700;font-size:13.5px;color:#fff;display:flex;flex-direction:column;gap:2px;}
+  .lane-h small{font-weight:400;opacity:.85;font-size:11.5px;}
+  .lane-b{padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;}
+  .lane.principal .lane-h{background:var(--principal);}
+  .lane.sap .lane-h{background:var(--sap);}
+  .lane.pos .lane-h{background:var(--pos);}
+  .lane.odoo .lane-h{background:var(--odoo);}
+
+  .node{border-radius:8px;padding:9px 12px;font-size:12.5px;border:1px solid;position:relative;}
+  .node b{display:block;font-size:12.5px;}
+  .node small{color:var(--muted);font-size:11px;display:block;margin-top:2px;}
+  .node.sap{background:var(--sap-bg);border-color:#bcd6f2;}
+  .node.odoo{background:var(--odoo-bg);border-color:#e0cdd9;}
+  .node.pos{background:var(--pos-bg);border-color:#f0ddb6;}
+  .node.principal{background:var(--principal-bg);border-color:#f2c4cd;}
+  .node.bridge{background:var(--bridge-bg);border-color:#bfe2cf;}
+  .badge{position:absolute;top:-9px;right:8px;background:var(--ink);color:#fff;font-size:10px;padding:1px 8px;border-radius:999px;letter-spacing:.3px;}
+
+  /* ===== flow (vertical steps) ===== */
+  .flow{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-top:14px;}
+  .flow-title{font-weight:700;font-size:14.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  .pill{font-size:10.5px;font-weight:700;letter-spacing:.5px;color:#fff;padding:2px 9px;border-radius:999px;}
+  .pill.sap{background:var(--sap);} .pill.odoo{background:var(--odoo);} .pill.pos{background:var(--pos);} .pill.principal{background:var(--principal);} .pill.bridge{background:var(--bridge);}
+
+  .steps{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;}
+  .step{flex:1;min-width:150px;border-radius:10px;border:1.5px solid;padding:12px 14px;font-size:12.5px;position:relative;}
+  .step b{display:block;font-size:13px;margin-bottom:3px;}
+  .step small{color:var(--muted);font-size:11px;line-height:1.45;display:block;}
+  .step .sys{display:inline-block;margin-top:8px;font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 8px;border-radius:4px;color:#fff;}
+  .step.sap{background:var(--sap-bg);border-color:var(--sap);} .step.sap .sys{background:var(--sap);}
+  .step.odoo{background:var(--odoo-bg);border-color:var(--odoo);} .step.odoo .sys{background:var(--odoo);}
+  .step.pos{background:var(--pos-bg);border-color:var(--pos);} .step.pos .sys{background:var(--pos);}
+  .step.principal{background:var(--principal-bg);border-color:var(--principal);} .step.principal .sys{background:var(--principal);}
+  .step.bridge{background:var(--bridge-bg);border-color:var(--bridge);} .step.bridge .sys{background:var(--bridge);}
+  .arrow{display:flex;align-items:center;justify-content:center;min-width:34px;color:var(--muted);font-size:20px;flex:none;}
+  .arrow span{transform:translateY(-1px);}
+
+  /* ===== mirroring table ===== */
+  table.feeds{width:100%;border-collapse:collapse;margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:12.5px;}
+  table.feeds th,table.feeds td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  table.feeds th{background:var(--ink);color:#fff;font-size:12px;letter-spacing:.3px;}
+  table.feeds tr:last-child td{border-bottom:none;}
+  table.feeds code{background:#eef1f5;padding:1px 6px;border-radius:4px;font-size:11.5px;font-family:Consolas,monospace;}
+  table.feeds td small{color:var(--muted);}
+
+  /* ===== phase cards ===== */
+  .phases{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;}
+  .phase{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;}
+  .phase h3{font-size:14.5px;display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .phase ul{margin-left:18px;font-size:12.5px;color:var(--ink);}
+  .phase ul li{margin-bottom:6px;}
+  .phase ul li small{color:var(--muted);}
+  .tag{font-size:10px;font-weight:700;letter-spacing:.5px;padding:2px 8px;border-radius:4px;color:#fff;}
+  .tag.now{background:var(--bridge);} .tag.next{background:var(--sap);}
+
+  /* ===== module cards ===== */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:14px;}
+  .modcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;}
+  .modcard h3{font-size:14px;display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .modcard ul{list-style:none;font-size:12.5px;}
+  .modcard ul li{padding:7px 0;border-bottom:1px dashed var(--line);}
+  .modcard ul li:last-child{border-bottom:none;}
+  .modcard ul li code{background:#eef1f5;padding:1px 6px;border-radius:4px;font-size:11.5px;font-family:Consolas,monospace;}
+  .modcard ul li small{display:block;color:var(--muted);font-size:11px;margin-top:2px;}
+  .feat{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px;}
+  .feat .f{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--bridge);border-radius:8px;padding:11px 14px;font-size:12.5px;}
+  .feat .f b{display:block;font-size:12.5px;}
+  .feat .f small{color:var(--muted);font-size:11px;}
+
+  .chk{margin-top:6px;}
+  .chk td:first-child{white-space:nowrap;font-weight:600;}
+
+  .note{margin-top:26px;background:#fff8e6;border:1px solid #efdca3;border-radius:10px;padding:14px 18px;font-size:12.5px;color:#6b5712;}
+  .note b{color:#4d3f0c;}
+
+  footer{margin-top:42px;border-top:1px solid var(--line);padding-top:12px;font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+
+  @media (max-width:980px){
+    .lanes{grid-template-columns:1fr 1fr;}
+    .phases{grid-template-columns:1fr;}
+    .grid3{grid-template-columns:1fr;}
+    .feat{grid-template-columns:1fr;}
+    .steps{flex-direction:column;}
+    .arrow{transform:rotate(90deg);min-height:30px;}
+  }
+  @media print{
+    body{background:#fff;padding:0;}
+    .flow,.lane,.phase{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <h1>Struktur Proses Bisnis — Levi's Retail Indonesia</h1>
+    <div class="sub">PT Sinar Eka Selaras (SES, distributor — SAP) &nbsp;×&nbsp; PT EBR (retail Levi's — Odoo) &nbsp;×&nbsp; POS Principal di Toko</div>
+  </header>
+  <div class="meta">
+    <span><b>Pemilik dokumen:</b> Erajaya (role internal)</span>
+    <span><b>Sistem:</b> SAP (SES) · Odoo (EBR) · POS bawaan Principal (Toko)</span>
+    <span><b>Status integrasi:</b> Phase 1 — Excel/CSV mirroring · Phase 2 — FTP/SFTP Erajaya</span>
+  </div>
+
+  <!-- ================= 1. OVERVIEW SWIMLANE ================= -->
+  <h2 class="section"><span class="no">1</span> Peta Aktor &amp; Sistem (Overview)</h2>
+  <p class="section-desc">Empat aktor dalam rantai pasok: Levi's Principal sebagai pemasok produk, PT SES sebagai distributor (transaksi penuh di SAP), toko retail yang beroperasi dengan POS bawaan principal, dan PT EBR sebagai entitas retail yang pembukuannya dijalankan di Odoo. Odoo menerima mirroring data operasional toko.</p>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--principal)"></span> Levi's Principal</span>
+    <span><span class="dot" style="background:var(--sap)"></span> SAP — PT SES</span>
+    <span><span class="dot" style="background:var(--pos)"></span> POS Principal — Toko</span>
+    <span><span class="dot" style="background:var(--odoo)"></span> Odoo — PT EBR</span>
+    <span><span class="dot" style="background:var(--bridge)"></span> Integrasi / Mirroring</span>
+  </div>
+
+  <div class="lanes">
+    <div class="lane principal">
+      <div class="lane-h">Levi's Principal<small>Pemasok / Brand owner</small></div>
+      <div class="lane-b">
+        <div class="node principal"><b>Terima PO dari SES</b><small>Sales order di sisi principal</small></div>
+        <div class="node principal"><b>Kirim barang + dokumen</b><small>Shipment, invoice, packing list</small></div>
+        <div class="node principal"><b>Menyediakan POS toko</b><small>POS bawaan principal dipakai seluruh store Levi's</small></div>
+      </div>
+    </div>
+    <div class="lane sap">
+      <div class="lane-h">PT SES — SAP<small>Distributor (Erajaya Group)</small></div>
+      <div class="lane-b">
+        <div class="node sap"><span class="badge">A1</span><b>Purchase Order ke Principal</b><small>PO dibuat di SAP</small></div>
+        <div class="node sap"><span class="badge">A2</span><b>GR di SES (SAP)</b><small>Goods Receipt atas kiriman principal → stok DC SES</small></div>
+        <div class="node sap"><span class="badge">B2</span><b>SO + Delivery ke EBR</b><small>Memenuhi PO dari EBR, kirim ke toko</small></div>
+      </div>
+    </div>
+    <div class="lane pos">
+      <div class="lane-h">Toko Levi's — POS Principal<small>Store operations</small></div>
+      <div class="lane-b">
+        <div class="node pos"><span class="badge">B3</span><b>GR di Toko (POS)</b><small>Terima barang dari SES via POS bawaan principal</small></div>
+        <div class="node pos"><b>POS Sales &amp; Tender</b><small>Transaksi penjualan + metode pembayaran harian</small></div>
+        <div class="node pos"><b>Inventory Movement</b><small>Stock movement, adjustment, transfer, on-hand</small></div>
+      </div>
+    </div>
+    <div class="lane odoo">
+      <div class="lane-h">PT EBR — Odoo<small>Entitas retail Levi's</small></div>
+      <div class="lane-b">
+        <div class="node odoo"><span class="badge">B1</span><b>Purchase Order ke SES</b><small>PO dibuat di Odoo (EBR → SES)</small></div>
+        <div class="node bridge"><span class="badge">C</span><b>Mirroring masuk Odoo</b><small>GR, POS Sales &amp; Tender, inventory movement via Excel/CSV → SFTP</small></div>
+        <div class="node odoo"><b>Pembukuan &amp; Pelaporan</b><small>Inventory valuation, sales recap, rekonsiliasi, accounting</small></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 2. FLOW A ================= -->
+  <h2 class="section"><span class="no">2</span> Flow A — Pengadaan SES ke Levi's Principal <span class="pill sap" style="margin-left:6px">SAP</span></h2>
+  <p class="section-desc">Seluruh proses pengadaan dari principal dijalankan dan dicatat di SAP milik PT SES.</p>
+  <div class="flow">
+    <div class="flow-title">PT SES (SAP) &nbsp;⇄&nbsp; Levi's Principal</div>
+    <div class="steps">
+      <div class="step sap"><b>A1 · PO SES → Principal</b><small>SES membuat Purchase Order produk Levi's di SAP dan mengirimkannya ke principal.</small><span class="sys">SAP — SES</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step principal"><b>A2 · Principal Proses Order</b><small>Principal mengonfirmasi order dan mengirim barang beserta dokumen pengiriman &amp; invoice.</small><span class="sys">PRINCIPAL</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step sap"><b>A3 · GR di SES</b><small>Goods Receipt di SAP atas barang yang diterima dari principal. Stok bertambah di gudang/DC SES.</small><span class="sys">SAP — SES</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step sap"><b>A4 · Invoice Verification &amp; AP</b><small>Three-way match (PO–GR–Invoice) dan pembayaran ke principal diproses di SAP.</small><span class="sys">SAP — SES</span></div>
+    </div>
+  </div>
+
+  <!-- ================= 3. FLOW B ================= -->
+  <h2 class="section"><span class="no">3</span> Flow B — Pembelian EBR ke SES &amp; GR di Toko <span class="pill odoo" style="margin-left:6px">ODOO</span> <span class="pill pos">POS PRINCIPAL</span></h2>
+  <p class="section-desc">PT EBR sebagai entitas retail Levi's membeli barang dari SES. PO diterbitkan dari Odoo; penerimaan barang fisik di toko dilakukan menggunakan POS bawaan principal.</p>
+  <div class="flow">
+    <div class="flow-title">PT EBR (Odoo) &nbsp;⇄&nbsp; PT SES (SAP) &nbsp;⇄&nbsp; Toko (POS Principal)</div>
+    <div class="steps">
+      <div class="step odoo"><b>B1 · PO EBR → SES</b><small>EBR membuat Purchase Order di Odoo untuk pembelian produk Levi's dari SES (intercompany B2B).</small><span class="sys">ODOO — EBR</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step sap"><b>B2 · SO &amp; Delivery di SES</b><small>SES menerima PO, membuat Sales Order &amp; Delivery di SAP, lalu mengirim barang dari DC ke toko tujuan.</small><span class="sys">SAP — SES</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step pos"><b>B3 · GR di Toko</b><small>Toko menerima barang dan melakukan Goods Receipt menggunakan POS bawaan principal. Stok toko bertambah di sistem POS.</small><span class="sys">POS PRINCIPAL</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step bridge"><b>B4 · Mirror GR ke Odoo</b><small>Data GR toko dimirror ke Odoo (lihat Flow C) untuk memvalidasi receipt atas PO EBR → stok &amp; hutang EBR tercatat.</small><span class="sys">MIRRORING</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step odoo"><b>B5 · Billing &amp; AP di Odoo</b><small>EBR mencatat vendor bill dari SES, matching dengan PO + GR, dan memproses pembayaran ke SES.</small><span class="sys">ODOO — EBR</span></div>
+    </div>
+  </div>
+
+  <!-- ================= 4. FLOW C ================= -->
+  <h2 class="section"><span class="no">4</span> Flow C — Operasional Toko &amp; Mirroring ke Odoo <span class="pill bridge" style="margin-left:6px">INTEGRASI</span></h2>
+  <p class="section-desc">Seluruh transaksi operasional toko (GR, POS Sales &amp; Tender, dan inventory movement lainnya) terjadi di POS bawaan principal, lalu dimirror ke Odoo sebagai sistem pembukuan PT EBR.</p>
+  <div class="flow">
+    <div class="flow-title">Toko (POS Principal) &nbsp;➜&nbsp; Odoo (EBR)</div>
+    <div class="steps">
+      <div class="step pos"><b>C1 · Transaksi di POS</b><small>GR toko, penjualan retail (sales &amp; tender/settlement), stock movement, adjustment, dan on-hand inventory.</small><span class="sys">POS PRINCIPAL</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step bridge"><b>C2 · Ekstrak Report</b><small>Report standar principal diekspor per periode dalam format Excel/CSV (lihat tabel feed di bawah).</small><span class="sys">EXPORT</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step bridge"><b>C3 · Transfer File</b><small><b>Phase 1:</b> upload manual Excel/CSV.<br><b>Phase 2:</b> drop otomatis ke FTP/SFTP Erajaya, dipoll terjadwal.</small><span class="sys">FILE / SFTP</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step odoo"><b>C4 · Import Adapter Odoo</b><small>Adapter memetakan tiap report ke dokumen Odoo: receipt, POS/sales order, stock move, payment register.</small><span class="sys">ODOO — EBR</span></div>
+      <div class="arrow"><span>➜</span></div>
+      <div class="step odoo"><b>C5 · Posting &amp; Rekonsiliasi</b><small>Jurnal otomatis terbentuk: penjualan, HPP, mutasi persediaan, settlement tender vs penerimaan bank.</small><span class="sys">ODOO — EBR</span></div>
+    </div>
+  </div>
+
+  <!-- ================= 5. FEED TABLE ================= -->
+  <h2 class="section"><span class="no">5</span> Daftar Feed Mirroring (Excel/CSV)</h2>
+  <p class="section-desc">Report standar dari sistem principal yang menjadi sumber data mirroring ke Odoo.</p>
+  <table class="feeds">
+    <thead>
+      <tr><th style="width:220px">Report / File</th><th>Isi Data</th><th>Tujuan di Odoo</th><th style="width:140px">Frekuensi</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>X101_Material_Master</code></td>
+        <td>Master produk Levi's (artikel, SKU, barcode, harga)</td>
+        <td>Product master <small>(create/update produk)</small></td>
+        <td>Saat ada perubahan</td>
+      </tr>
+      <tr>
+        <td><code>X20_Current_Onhand_Inventory</code></td>
+        <td>Posisi stok on-hand per toko</td>
+        <td>Validasi stok / inventory adjustment</td>
+        <td>Harian / periodik</td>
+      </tr>
+      <tr>
+        <td><code>X24DN_Retail_Sales_Detail</code></td>
+        <td>Detail transaksi penjualan POS per toko</td>
+        <td>Sales recording <small>(POS sales → jurnal penjualan + HPP)</small></td>
+        <td>Harian (EOD)</td>
+      </tr>
+      <tr>
+        <td><code>X70D_Tender_Detail</code> &amp; <code>X70T_Tender_Settlement</code></td>
+        <td>Detail metode pembayaran (cash, EDC, e-wallet) &amp; settlement-nya</td>
+        <td>Payment register &amp; rekonsiliasi bank</td>
+        <td>Harian (EOD)</td>
+      </tr>
+      <tr>
+        <td><code>X32P_Stock_Movement_With_Price</code></td>
+        <td>Mutasi persediaan: GR toko, transfer, return, adjustment (dengan nilai)</td>
+        <td>Stock move &amp; receipt <small>(termasuk GR atas PO EBR→SES)</small></td>
+        <td>Harian / periodik</td>
+      </tr>
+      <tr>
+        <td><code>X31_Discount_Journal</code></td>
+        <td>Data diskon/promo untuk klaim promosi</td>
+        <td>Promotion claim ke principal/SES</td>
+        <td>Bulanan / per program</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ================= 6. PHASES ================= -->
+  <h2 class="section"><span class="no">6</span> Roadmap Integrasi</h2>
+  <div class="phases">
+    <div class="phase">
+      <h3><span class="tag now">PHASE 1 — BERJALAN</span> Manual Excel/CSV</h3>
+      <ul>
+        <li>Tim toko/operasional mengekspor report dari sistem principal dalam format Excel/CSV.</li>
+        <li>File diunggah/diimpor ke Odoo melalui adapter import <small>(mapping kolom report → dokumen Odoo sudah ditetapkan)</small>.</li>
+        <li>Validasi manual: jumlah baris, total nilai, dan exception report sebelum posting.</li>
+        <li>Cocok untuk fase awal pembukaan toko dan stabilisasi master data.</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <h3><span class="tag next">PHASE 2 — BERIKUTNYA</span> FTP/SFTP Erajaya</h3>
+      <ul>
+        <li>File report di-drop otomatis ke server FTP/SFTP Erajaya per jadwal (EOD/intra-day).</li>
+        <li>Odoo melakukan polling terjadwal: ambil file → parse → import → arsip <small>(folder incoming/processed/error)</small>.</li>
+        <li>Notifikasi otomatis bila file gagal parse atau ada selisih rekonsiliasi.</li>
+        <li>Menghilangkan proses manual; data toko di Odoo selalu up-to-date H+0/H+1.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ================= 7. MODULES & FEATURES ================= -->
+  <h2 class="section"><span class="no">7</span> Modul Odoo yang Diinstal &amp; Customisasi</h2>
+  <p class="section-desc">Tenant EBR di-provision dengan <b>Industry Pack "Retail / POS"</b> dari platform (1-action deploy). Pack ini berisi modul standar Odoo CE + modul custom platform; di atasnya ditambahkan modul yang dibangun khusus untuk kebutuhan Levi's.</p>
+
+  <div class="grid3">
+    <div class="modcard">
+      <h3><span class="tag" style="background:var(--odoo)">ODOO STANDARD (CE)</span></h3>
+      <ul>
+        <li><code>purchase</code><small>Purchase Order EBR → SES, vendor bill matching (PO–GR–Invoice)</small></li>
+        <li><code>stock</code> / Inventory<small>Warehouse per toko, receipt (GR mirror), stock move, valuation</small></li>
+        <li><code>account</code> / Accounting<small>CoA, jurnal, AP/AR, bank reconciliation</small></li>
+        <li><code>point_of_sale</code><small>Representasi transaksi POS hasil mirroring (bukan POS transaksional toko)</small></li>
+        <li><code>sale_management</code><small>Sales order &amp; pricelist</small></li>
+        <li><code>crm</code> · <code>website_sale</code><small>Bawaan pack retail; aktivasi sesuai kebutuhan</small></li>
+      </ul>
+    </div>
+    <div class="modcard">
+      <h3><span class="tag" style="background:var(--ink)">CUSTOM PLATFORM (PACK RETAIL)</span></h3>
+      <ul>
+        <li><code>custom_accounting_full</code><small>Pelengkap akuntansi CE→EE: laporan keuangan lengkap (Excel/PDF)</small></li>
+        <li><code>custom_coretax</code> + <code>custom_coretax_bupot</code><small>Pajak Indonesia: e-Faktur/Coretax &amp; bukti potong</small></li>
+        <li><code>custom_pos_id</code><small>Lokalisasi POS Indonesia (format struk, pembayaran lokal)</small></li>
+        <li><code>custom_retail_pos_offline</code><small>Kapabilitas POS offline (cadangan; toko tetap pakai POS principal)</small></li>
+        <li><code>custom_wms_putaway</code> · <code>custom_wms_cycle_count</code><small>Putaway &amp; cycle count untuk DC/gudang</small></li>
+        <li><code>custom_approval_engine</code><small>Approval berjenjang untuk PO &amp; dokumen lain</small></li>
+      </ul>
+    </div>
+    <div class="modcard">
+      <h3><span class="tag" style="background:var(--bridge)">CUSTOM KHUSUS LEVI'S</span></h3>
+      <ul>
+        <li><code>custom_retail_import</code><small>Adapter mirroring Excel/CSV → Odoo + SFTP feed (inti integrasi Flow C)</small></li>
+        <li><code>custom_report_templates</code><small>PDF ber-branding per company: Invoice, Quotation, PO</small></li>
+        <li><code>queue_job</code> (OCA)<small>Eksekusi import file besar secara async (X101 = 159 ribu SKU) tanpa kena timeout proxy</small></li>
+        <li>Library: <code>openpyxl</code> + <code>paramiko</code><small>Parser Excel &amp; koneksi SFTP (ditambahkan ke image Odoo)</small></li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="section-desc" style="margin-top:22px"><b>Fitur utama <code>custom_retail_import</code></b> (modul yang dibangun untuk onboarding Levi's, reusable untuk tenant retail lain):</p>
+  <div class="feat">
+    <div class="f"><b>Import Profile per jenis file</b><small>Tiap report (X101, X20, X24, X70D, CoA, Company, Store Master) punya profil sendiri: format xlsx/csv, baris awal data, mapping kolom (JSON), parsing tanggal/desimal, perbaikan karakter rusak (U+FFFD → ®).</small></div>
+    <div class="f"><b>Upload Wizard + Dry-run Preview</b><small>User upload file → preview hasil parsing dulu (jumlah baris, sampel mapping) sebelum commit. Mencegah salah posting.</small></div>
+    <div class="f"><b>Dedup &amp; Idempotent</b><small>SHA256 hash per file menolak file yang sama diimpor dua kali; external ID per record membuat re-import aman (update, bukan duplikat).</small></div>
+    <div class="f"><b>Audit Log + Arsip File</b><small>Setiap import tercatat: siapa, kapan, berapa baris, error apa; file sumber disimpan sebagai attachment untuk audit.</small></div>
+    <div class="f"><b>SFTP Feed Poller (Phase 2)</b><small>Cron terjadwal menarik file baru dari FTP/SFTP Erajaya per jenis file (pola nama file), lalu memprosesnya lewat executor yang sama dengan upload manual.</small></div>
+    <div class="f"><b>Async untuk File Besar</b><small>File besar (X101 master produk) diproses di background via queue_job — tidak membebani sesi user dan tidak terputus timeout.</small></div>
+  </div>
+
+  <!-- ================= 8. DATA UPLOAD & CONFIG ================= -->
+  <h2 class="section"><span class="no">8</span> File Upload &amp; Konfigurasi Data yang Dibutuhkan</h2>
+  <p class="section-desc">Urutan setup data tenant EBR: konfigurasi dasar dulu (company, CoA, bank, pajak), lalu master data, lalu saldo awal, baru transaksi harian mengalir via mirroring.</p>
+
+  <table class="feeds chk">
+    <thead>
+      <tr><th style="width:30px">#</th><th style="width:210px">Data</th><th>File / Sumber</th><th>Isi yang Dibutuhkan</th><th style="width:170px">Cara Load</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td><td>Company Detail (EBR)</td>
+        <td>Sheet legal entity <small>(format key/value: <code>PT Sinar Eka Selaras (SES).xlsx</code> sebagai acuan)</small></td>
+        <td>Nama legal PT, NPWP, alamat lengkap, telepon, email, logo perusahaan, mata uang IDR</td>
+        <td>Profil import <code>levis_company</code> / manual di Settings ▸ Companies</td>
+      </tr>
+      <tr>
+        <td>2</td><td>Chart of Accounts</td>
+        <td><code>CoA EBR.xlsx</code> <small>(sudah lengkap &amp; clean)</small></td>
+        <td>Kolom: <code>code</code>, <code>name</code>, <code>account_type</code> (enum Odoo). Termasuk akun persediaan, HPP, penjualan, kas/bank, AP/AR</td>
+        <td>Profil import <code>levis_coa</code> / Accounting ▸ CoA ▸ Import</td>
+      </tr>
+      <tr>
+        <td>3</td><td>Bank Account &amp; Journals</td>
+        <td>Data rekening dari finance EBR</td>
+        <td>Rekening bank EBR (bank, no. rekening, atas nama) → jurnal Bank per rekening; jurnal Cash per toko untuk tender tunai; jurnal Sales/Purchase/Inventory; mapping akun settlement per jenis tender (cash, EDC per acquirer, e-wallet)</td>
+        <td>Manual di Accounting ▸ Configuration <small>(satu kali)</small></td>
+      </tr>
+      <tr>
+        <td>4</td><td>Pajak (PPN)</td>
+        <td>Konfigurasi tax Odoo + data Coretax</td>
+        <td>PPN keluaran/masukan sesuai tarif berlaku, NPWP &amp; sertifikat Coretax untuk e-Faktur; <b>tax mapping POS sales = keputusan Phase 5</b> (harga POS inklusif/eksklusif PPN)</td>
+        <td><code>custom_coretax</code> + konfigurasi tax</td>
+      </tr>
+      <tr>
+        <td>5</td><td>Vendor: PT SES</td>
+        <td>Data vendor dari procurement</td>
+        <td>SES sebagai vendor di Odoo EBR: NPWP, alamat, term of payment, rekening tujuan pembayaran</td>
+        <td>Manual / import partner <small>(satu kali)</small></td>
+      </tr>
+      <tr>
+        <td>6</td><td>Master Produk</td>
+        <td><code>X101_Material_Master.xlsx</code> <small>(full: 14.885 artikel / 159.658 SKU, atribut Size 89 &amp; Inseam 24)</small></td>
+        <td>Artikel, varian (size/inseam), barcode, kategori (170), harga</td>
+        <td>Profil import <code>levis_x101</code> <small>(async, ±30 menit)</small></td>
+      </tr>
+      <tr>
+        <td>7</td><td>Store Master → Warehouse</td>
+        <td><code>LEVI'S - STORE MASTER DATA (for Odoo).xlsx</code></td>
+        <td>24 lokasi (1 DC + 23 toko) → 1 warehouse per toko. <b>Butuh kode toko SAP untuk semua 24 toko</b> sebagai kunci join semua file X (saat ini baru 1 kode diketahui)</td>
+        <td>Script load store / profil <code>store_master</code></td>
+      </tr>
+      <tr>
+        <td>8</td><td>Saldo Awal Stok</td>
+        <td><code>X20_Current_Onhand_Inventory</code></td>
+        <td>On-hand per toko per SKU pada tanggal cut-over <small>(one-shot, dikunci agar tidak terimpor dua kali)</small></td>
+        <td>Profil import <code>levis_x20</code> <small>(prasyarat: #6 &amp; #7 selesai)</small></td>
+      </tr>
+      <tr>
+        <td>9</td><td>Transaksi Harian</td>
+        <td><code>X24DN</code> (sales), <code>X70D/X70T</code> (tender), <code>X32P</code> (stock movement), <code>X31</code> (discount)</td>
+        <td>Mengalir rutin setelah go-live sesuai Flow C <small>(X24/X70D menunggu keputusan Phase 5: representasi POS, kedalaman histori, tax mapping)</small></td>
+        <td>Wizard upload → SFTP feed (Phase 2)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note" style="background:#fdecec;border-color:#f0bcbc;color:#7a1f1f;margin-top:18px">
+    <b>Prasyarat data yang masih harus dilengkapi (raise ke principal/SES):</b>
+    (1) File X20/X24/X70D yang diterima saat ini masih <b>sampel 1 toko</b> (store 14694 — Tunjungan Plaza 3); butuh ekstrak lengkap semua toko atau langsung via feed SFTP.
+    (2) Store Master baru berisi <b>nama toko tanpa kode toko</b> untuk 23 dari 24 lokasi — kode toko adalah kunci penghubung semua file X ke warehouse Odoo.
+    Sebelum lengkap: produk, CoA, company, dan 24 warehouse bisa dimuat penuh; saldo awal &amp; penjualan hanya untuk store 14694.
+  </div>
+
+  <div class="note">
+    <b>Catatan kunci:</b> Odoo (PT EBR) adalah sistem pembukuan — bukan sistem transaksi toko. Sumber transaksi tetap di POS bawaan principal (operasional toko) dan SAP SES (distribusi). Odoo menerima mirror data untuk: (1) validasi GR atas PO EBR→SES, (2) pencatatan penjualan &amp; settlement tender, (3) mutasi persediaan &amp; valuasi, dan (4) pelaporan keuangan PT EBR.
+  </div>
+
+  <footer>
+    <span>Dokumen internal Erajaya — Levi's Retail Business Process (SES × EBR × Principal POS)</span>
+    <span>Disusun: Juni 2026</span>
+  </footer>
+
+</div>
+</body>
+</html>

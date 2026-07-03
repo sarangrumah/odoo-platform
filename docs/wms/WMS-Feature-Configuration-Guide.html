@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WMS Feature &amp; Configuration Guide — Odoo 19 Platform</title>
+<style>
+  :root{
+    --odoo:#714B67; --odoo-d:#5b3a52; --ink:#1b2230; --slate:#384152; --muted:#6b7280;
+    --line:#e4e8ef; --line-2:#eef1f6; --bg:#f6f7f9; --paper:#fff;
+    --accent:#6366f1; --teal:#0d9488;
+    --green:#16a34a; --green-bg:#e9f7ee; --amber:#b45309; --amber-bg:#fcf3e3;
+    --blue:#1d4ed8; --blue-bg:#e8effd; --red:#dc2626;
+    --code-bg:#f1eef4; --code-fg:#5b3a52;
+    --sidebar:288px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:"Segoe UI",Roboto,-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;font-size:15px}
+
+  /* ---------- Layout ---------- */
+  .wrap{display:grid;grid-template-columns:var(--sidebar) 1fr;max-width:1280px;margin:0 auto;background:var(--paper);
+    box-shadow:0 0 60px rgba(20,25,40,.08);min-height:100vh}
+  /* Sidebar TOC */
+  aside{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;border-right:1px solid var(--line);
+    background:linear-gradient(180deg,#fbfafc,#fff);padding:26px 18px 40px}
+  aside .brand{font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--odoo);margin-bottom:4px}
+  aside .brand small{display:block;color:var(--muted);font-weight:600;letter-spacing:.02em;text-transform:none;font-size:11.5px;margin-top:4px}
+  nav{margin-top:18px}
+  nav a{display:block;color:var(--slate);text-decoration:none;font-size:13.5px;padding:6px 10px;border-radius:7px;border-left:2px solid transparent}
+  nav a.sub{padding-left:24px;font-size:12.5px;color:var(--muted)}
+  nav a:hover{background:#f3f0f5;color:var(--ink)}
+  nav a.active{background:#f3eef6;color:var(--odoo-d);border-left-color:var(--odoo);font-weight:700}
+  nav .grp{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#9aa3b2;margin:16px 0 4px 10px}
+
+  /* Main */
+  main{padding:0 56px 90px;min-width:0}
+  header.doc{padding:46px 0 26px;border-bottom:3px solid var(--odoo);margin-bottom:8px}
+  .eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--odoo)}
+  header.doc h1{font-size:38px;line-height:1.12;margin:12px 0 10px;letter-spacing:-.02em}
+  header.doc p{color:var(--slate);font-size:16px;max-width:760px;margin:0}
+  .meta{margin-top:20px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 20px}
+  .meta b{color:var(--slate)}
+
+  h2{font-size:25px;margin:50px 0 6px;letter-spacing:-.01em;scroll-margin-top:20px;padding-top:6px}
+  h2 .n{color:var(--odoo);font-weight:800;margin-right:10px}
+  h3{font-size:18px;margin:30px 0 8px;color:var(--ink);scroll-margin-top:20px}
+  h4{font-size:15px;margin:20px 0 6px;color:var(--odoo-d);text-transform:uppercase;letter-spacing:.04em;font-size:13px}
+  p{margin:10px 0}
+  .lead{font-size:16.5px;color:var(--slate)}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);color:var(--code-fg);font-family:"Cascadia Code",Consolas,monospace;font-size:12.8px;padding:1.5px 6px;border-radius:5px}
+  a.x{color:var(--accent);text-decoration:none;border-bottom:1px dotted #aab}
+  hr{border:none;border-top:1px solid var(--line-2);margin:34px 0}
+
+  /* Badges */
+  .tag{display:inline-block;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;vertical-align:middle;letter-spacing:.02em}
+  .native{background:var(--blue-bg);color:var(--blue)}
+  .custom{background:#f3eef6;color:var(--odoo-d)}
+  .both{background:var(--green-bg);color:var(--green)}
+
+  /* Tables */
+  table{width:100%;border-collapse:separate;border-spacing:0;margin:14px 0 6px;font-size:13.5px}
+  thead th{text-align:left;background:#faf9fb;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
+    padding:9px 12px;border-bottom:2px solid var(--line);font-weight:700}
+  tbody td{padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:top;color:var(--slate)}
+  tbody tr:hover{background:#fcfbfd}
+  td .f{font-family:"Cascadia Code",Consolas,monospace;font-size:12.3px;color:var(--ink);font-weight:600}
+  td .path{font-size:12px;color:var(--muted)}
+  .col-narrow{width:22%}.col-mid{width:26%}
+
+  /* Callouts */
+  .note,.tip,.warn{border-radius:10px;padding:13px 16px 13px 44px;margin:16px 0;font-size:13.8px;position:relative;line-height:1.5}
+  .note{background:var(--blue-bg);color:#1e3a8a}
+  .tip{background:var(--green-bg);color:#14532d}
+  .warn{background:var(--amber-bg);color:#7c2d12}
+  .note::before,.tip::before,.warn::before{position:absolute;left:15px;top:12px;font-size:16px}
+  .note::before{content:"ℹ️"}.tip::before{content:"✅"}.warn::before{content:"⚠️"}
+  .note b,.tip b,.warn b{font-weight:800}
+
+  /* Figure / screenshots */
+  figure{margin:20px 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(20,25,40,.10)}
+  figure .bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#ece8f0;border-bottom:1px solid var(--line)}
+  figure .bar i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .bar .r{background:#ff5f57}.bar .y{background:#febc2e}.bar .g{background:#28c840}
+  .bar .addr{font-size:11px;color:var(--muted);margin-left:10px;font-family:"Cascadia Code",Consolas,monospace}
+  figure img{width:100%;height:auto;display:block;background:#fff}
+  figcaption{padding:9px 14px;font-size:12.8px;color:var(--muted);background:#fafafa;border-top:1px solid var(--line)}
+  figcaption b{color:var(--slate)}
+
+  /* Flow chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+  .chip{font-size:12.5px;font-weight:600;background:#f3f0f5;border:1px solid var(--line);border-radius:8px;padding:6px 11px;color:var(--slate)}
+  .chip b{color:var(--odoo-d)}
+
+  /* Steps (checklist) */
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:18px 0}
+  ol.steps>li{position:relative;padding:12px 0 12px 50px;border-bottom:1px solid var(--line-2)}
+  ol.steps>li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:11px;width:32px;height:32px;border-radius:50%;
+    background:var(--odoo);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px}
+  ol.steps>li b{color:var(--ink)}
+
+  .pathline{font-size:12.5px;color:var(--muted);margin:4px 0 0}
+  .pathline code{font-size:12px}
+
+  footer.doc{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+
+  @media print{
+    body{background:#fff;font-size:11.5px}
+    .wrap{grid-template-columns:1fr;max-width:none;box-shadow:none}
+    aside{display:none}
+    main{padding:0 8mm}
+    figure{box-shadow:none;break-inside:avoid}
+    h2{break-after:avoid}
+    table,figure,.note,.tip,.warn{break-inside:avoid}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ SIDEBAR TOC ============ -->
+  <aside>
+    <div class="brand">WMS Guide<small>Odoo 19 CE + custom layer · v1.0</small></div>
+    <nav id="toc">
+      <a href="#overview">1 · Overview &amp; layering</a>
+      <div class="grp">Master data</div>
+      <a href="#product">2 · Product configuration</a>
+      <a href="#product-storable" class="sub">2.1 Storability</a>
+      <a href="#product-tracking" class="sub">2.2 Lot / serial / expiry</a>
+      <a href="#product-uom" class="sub">2.3 UoM &amp; packaging</a>
+      <a href="#product-logistics" class="sub">2.4 Weight &amp; volume</a>
+      <a href="#product-barcode" class="sub">2.5 Barcode &amp; GS1</a>
+      <a href="#product-abc" class="sub">2.6 ABC velocity class</a>
+      <a href="#product-replenish" class="sub">2.7 Routes &amp; reordering</a>
+      <a href="#warehouse">3 · Warehouse &amp; locations</a>
+      <a href="#wh-steps" class="sub">3.2 Multi-step routes</a>
+      <a href="#wh-locations" class="sub">3.3 Location types &amp; bins</a>
+      <a href="#wh-volume" class="sub">3.4 Bin capacity</a>
+      <a href="#wh-storage" class="sub">3.5 Storage &amp; removal</a>
+      <a href="#optypes">4 · Operation types &amp; routes</a>
+      <div class="grp">WMS engines</div>
+      <a href="#putaway">5 · Putaway engine</a>
+      <a href="#cyclecount">6 · Cycle counting</a>
+      <a href="#transfer">7 · Transfer / replenishment</a>
+      <a href="#quality">8 · Quality control</a>
+      <div class="grp">Mobility &amp; hardware</div>
+      <a href="#hht">9 · Handheld (HHT) devices</a>
+      <a href="#barcode">10 · Barcode, labels &amp; printers</a>
+      <div class="grp">Run-time</div>
+      <a href="#features">11 · Operational features</a>
+      <a href="#automation">12 · Automation, security, audit</a>
+      <a href="#checklist">13 · Setup checklist</a>
+      <a href="#appendix">14 · Selection reference</a>
+    </nav>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+    <header class="doc">
+      <div class="eyebrow">Warehouse Management System</div>
+      <h1>WMS Feature &amp; Configuration Guide</h1>
+      <p class="lead">End-to-end configuration of the warehouse: from the product record, through warehouse &amp; location master data, into the custom WMS engines (putaway, cycle counting, transfers), quality, and handheld/label hardware — and how each setting drives run-time behaviour.</p>
+      <div class="meta">
+        <span>Platform: <b>Odoo 19 Community + custom_* layer</b></span>
+        <span>Deployment: <b>multi-tenant (DB-per-tenant)</b></span>
+        <span>Screens: <b>live from <code>erp_dev</code></b></span>
+        <span>Status: <b>June 2026</b></span>
+      </div>
+      <div style="margin-top:16px">
+        <span class="tag native">Native CE</span> standard Odoo &nbsp;·&nbsp;
+        <span class="tag custom">Custom</span> built in this platform &nbsp;·&nbsp;
+        <span class="tag both">Native + Custom</span> custom extends native
+      </div>
+    </header>
+
+    <!-- 1. OVERVIEW -->
+    <h2 id="overview"><span class="n">1</span>Overview &amp; layering</h2>
+    <p>The WMS is delivered in two layers. <b>Odoo Community <code>stock</code></b> provides the inventory backbone — products, locations, lots/serials, routes, reservations, valuation. On top, a set of <b>custom modules</b> add the directed-work logic that Community lacks (and Enterprise charges for): scored putaway, plan-driven cycle counting, rule-driven transfers, handheld scanning, full quality, and label printing.</p>
+    <table>
+      <thead><tr><th class="col-narrow">Module</th><th class="col-mid">Adds</th><th>Configured under</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">stock</span> <span class="tag native">Native</span></td><td>Products, warehouses, locations, routes, lots/serials, packages, reordering, valuation</td><td class="path">Inventory ▸ Configuration</td></tr>
+        <tr><td><span class="f">custom_wms_putaway</span> <span class="tag custom">Custom</span></td><td>Tiered, scored putaway strategies &amp; rules; bin volume capacity; ABC class</td><td class="path">Inventory ▸ Configuration ▸ Putaway</td></tr>
+        <tr><td><span class="f">custom_wms_cycle_count</span> <span class="tag custom">Custom</span></td><td>Cycle-count plans, sessions, variance approval</td><td class="path">Inventory ▸ Operations ▸ Cycle Count</td></tr>
+        <tr><td><span class="f">custom_wms_to_engine</span> <span class="tag custom">Custom</span></td><td>Transfer-order rules &amp; orders (replenishment)</td><td class="path">Inventory ▸ Operations ▸ Transfer Orders</td></tr>
+        <tr><td><span class="f">custom_barcode</span> <span class="tag custom">Custom</span></td><td>Scan sessions (single/batch/cluster), GS1, label templates, printers</td><td class="path">Inventory ▸ Barcode / Configuration</td></tr>
+        <tr><td><span class="f">custom_hht_bridge</span> <span class="tag custom">Custom</span></td><td>Handheld device registry, secure REST API, offline sync, PWA</td><td class="path">HHT app ▸ Devices</td></tr>
+        <tr><td><span class="f">custom_quality_full</span> <span class="tag custom">Custom</span></td><td>Quality points/checks, NCR alerts, CAPA, e-signatures</td><td class="path">Quality app ▸ Configuration</td></tr>
+      </tbody>
+    </table>
+    <h4>Recommended configuration order</h4>
+    <div class="chips">
+      <span class="chip">1 · <b>Products</b></span><span class="chip">2 · <b>Warehouse &amp; locations</b></span>
+      <span class="chip">3 · <b>Operation types &amp; routes</b></span><span class="chip">4 · <b>Putaway / count / transfer rules</b></span>
+      <span class="chip">5 · <b>Quality points</b></span><span class="chip">6 · <b>Devices, labels &amp; printers</b></span>
+    </div>
+    <p class="pathline">Each later layer reads attributes set in the earlier ones — e.g. putaway scoring reads the product's <code>volume</code> and <code>abc_class</code>, and the bin's <code>volume_capacity_m3</code>. Configure top-down.</p>
+
+    <!-- 2. PRODUCT -->
+    <h2 id="product"><span class="n">2</span>Product configuration</h2>
+    <p>The product record is where most WMS behaviour originates. The fields below — mostly native, with one custom addition — determine whether stock is tracked, how it is traced, and how the engines slot, count and move it.</p>
+    <table>
+      <thead><tr><th class="col-narrow">Field</th><th class="col-mid">Where</th><th>Purpose &amp; WMS impact</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">type</span> / <span class="f">is_storable</span> <span class="tag native">Native</span></td><td class="path">Product ▸ General</td><td>Must be <b>Goods + “Track Inventory”</b> for the product to have quants, locations and appear in WMS flows.</td></tr>
+        <tr><td><span class="f">tracking</span> <span class="tag native">Native</span></td><td class="path">Product ▸ Inventory</td><td><code>none</code> / <code>lot</code> / <code>serial</code>. Lot/serial unlocks traceability, FEFO and per-lot counting.</td></tr>
+        <tr><td><span class="f">expiration_date</span> (lots) <span class="tag native">Native</span></td><td class="path">Settings ▸ “Expiration Dates”</td><td>Enables FEFO removal and the <b>expiry-approaching</b> transfer trigger.</td></tr>
+        <tr><td><span class="f">uom_id</span>, <span class="f">uom_po_id</span> <span class="tag native">Native</span></td><td class="path">Product ▸ General</td><td>Stocking vs purchase unit; conversions applied across moves &amp; counts.</td></tr>
+        <tr><td><span class="f">volume</span> <span class="tag native">Native</span></td><td class="path">Product ▸ Inventory</td><td><b>Drives <code>by_volume</code> putaway scoring</b> and the bin’s computed <code>volume_used_m3</code>.</td></tr>
+        <tr><td><span class="f">weight</span> <span class="tag native">Native</span></td><td class="path">Product ▸ Inventory</td><td>Feeds storage-category weight limits and shipping.</td></tr>
+        <tr><td><span class="f">barcode</span> <span class="tag native">Native</span></td><td class="path">Product ▸ General</td><td>Resolved on every handheld/scan lookup; can be auto-generated (§10).</td></tr>
+        <tr><td><span class="f">abc_class</span> <span class="tag custom">Custom</span></td><td class="path">Product (ABC Class)</td><td><b>A/B/C velocity.</b> Drives <code>by_abc_velocity</code> putaway (A=95, B=75, C=55) and <code>abc_velocity</code> cycle-count sampling.</td></tr>
+        <tr><td><span class="f">standard_price</span> <span class="tag native">Native</span></td><td class="path">Product ▸ General</td><td>Used to value cycle-count variances (<code>Σ |variance| × standard_price</code>).</td></tr>
+        <tr><td>Routes <span class="tag native">Native</span></td><td class="path">Product ▸ Inventory</td><td>Buy / Manufacture / Replenish-on-order; governs how demand is sourced.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="product-storable">2.1 — 2.4 The essentials in practice</h3>
+    <p>For a product to participate in WMS at all it must be <b>storable</b> (<span id="product-tracking"></span>type Goods with inventory tracking). Set <b>tracking</b> to <code>lot</code> for fashion/FMCG batches or <code>serial</code> for unique items; enable <b>Expiration Dates</b> in Inventory settings if shelf-life matters — this is what powers FEFO and the near-expiry transfer rule.</p>
+    <p id="product-uom">Define <b>units of measure</b> and, where relevant, <b>packaging</b> (case/inner/pallet quantities) so scans and counts can be entered in operational units. <span id="product-logistics"></span>Crucially for this platform, fill in <b>volume</b> (m³) on every product you intend to slot by volume — without it, the <code>by_volume</code> putaway strategy cannot score a bin and the bin’s used-volume gauge stays at zero.</p>
+    <div class="note"><b>Volumetric putaway depends on product volume.</b> The bin’s <code>volume_used_m3</code> is computed as <code>Σ(product.volume × quant.quantity)</code>. If product volume is blank, volume-fit scoring is skipped for that line.</div>
+
+    <h3 id="product-barcode">2.5 Barcode &amp; GS1</h3>
+    <p>Set the native <b>barcode</b> on each product, or let the platform generate one (§10, <code>custom.barcode.format</code>). On scan, handhelds parse <b>GS1 Application Identifiers</b> from a single symbol — GTIN (01), batch/lot (10), expiry (17), serial (21), count (30) and net weight (310n/320n) — and store the parsed values on the scan line.</p>
+
+    <h3 id="product-abc">2.6 ABC velocity class <span class="tag custom">Custom</span></h3>
+    <p>The custom <code>abc_class</code> field (A = fast, B = medium, C = slow; default B) is the single most influential custom product attribute. Two engines read it:</p>
+    <ul>
+      <li><b>Putaway</b> — the <code>by_abc_velocity</code> rule scores A items highest (95) so fast movers land near the dock; B (75) and C (55) fall back to deeper storage.</li>
+      <li><b>Cycle counting</b> — the <code>abc_velocity</code> sampling method counts A items most frequently, holding accuracy where it matters without a full stop-count.</li>
+    </ul>
+
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Products · Inventory tab</span></div>
+      <img src="img/product-inventory.png" alt="Product Inventory tab: routes, weight/volume, traceability and ABC class"/>
+      <figcaption><b>Product Inventory tab</b> — native routes, weight &amp; volume and traceability, plus the custom <b>ABC Class</b> (Putaway / Velocity) group at the bottom.</figcaption>
+    </figure>
+
+    <h3 id="product-replenish">2.7 Routes &amp; reordering</h3>
+    <p>On the product’s <b>Inventory</b> tab, assign <b>routes</b> (Buy, Manufacture, Replenish on Order) and create <b>reordering rules</b> (min/max per warehouse, <code>stock.warehouse.orderpoint</code>). These are native and feed procurement; the custom transfer-order engine (§7) handles <i>internal</i> bin-to-bin replenishment independently.</p>
+
+    <!-- 3. WAREHOUSE -->
+    <h2 id="warehouse"><span class="n">3</span>Warehouse &amp; location configuration</h2>
+    <p>A warehouse (<code>stock.warehouse</code>) owns a tree of locations. Zones and bins are just internal child locations you create under the warehouse’s stock location; the WMS engines target them by record or by domain.</p>
+
+    <h3 id="wh-steps">3.1 – 3.2 Warehouse &amp; multi-step routes <span class="tag native">Native</span></h3>
+    <p>Create one warehouse per physical site (set its short <b>code</b> — it prefixes operation references like <code>WH/IN/00002</code>). On the warehouse, choose the <b>incoming</b> and <b>outgoing</b> steps:</p>
+    <table>
+      <thead><tr><th class="col-narrow">Steps</th><th>Locations created &amp; when to use</th></tr></thead>
+      <tbody>
+        <tr><td><b>1-step</b></td><td>Receive straight to stock / deliver straight out. Simplest; fine for small sites.</td></tr>
+        <tr><td><b>2-step</b></td><td>Input → Stock (receive then putaway) / Pick → Ship. Enables a putaway leg — recommended when using the putaway engine.</td></tr>
+        <tr><td><b>3-step</b></td><td>Input → QC → Stock / Pick → Pack → Ship. Adds an inspection &amp; pack stage — pair with Quality (§8).</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="wh-locations">3.3 Location hierarchy, types &amp; bins <span class="tag native">Native</span></h3>
+    <p>Each location has a <b>usage</b> type that defines its role:</p>
+    <div class="chips">
+      <span class="chip"><b>view</b> — structural, no stock</span>
+      <span class="chip"><b>internal</b> — your zones &amp; bins</span>
+      <span class="chip"><b>supplier</b> / <b>customer</b> — virtual partners</span>
+      <span class="chip"><b>transit</b> — inter-warehouse</span>
+      <span class="chip"><b>inventory</b> — adjustment counterpart</span>
+      <span class="chip"><b>production</b> — MRP</span>
+      <span class="chip"><b>scrap</b> — write-off / quarantine</span>
+    </div>
+    <p>Model the floor as <b>internal</b> locations: a zone (e.g. <i>Zone A – Fast Movers</i>) with bins beneath it (<code>A-01-01</code>, <code>A-01-02</code>, …). The seeded demo below uses exactly this pattern, which the putaway and transfer engines then target.</p>
+
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Configuration ▸ Locations</span></div>
+      <img src="img/locations-list.png" alt="Location hierarchy with zones and bins"/>
+      <figcaption><b>Location tree</b> — internal zones (Zone A / Zone B) and bins (A-01-01 …) beneath the warehouse stock location.</figcaption>
+    </figure>
+
+    <h3 id="wh-volume">3.4 Bin volumetric capacity <span class="tag custom">Custom</span></h3>
+    <p>Each location gains a custom <b>Volume Capacity (m³)</b> field plus a computed <b>Volume Used (m³)</b>. Set capacity on bins you want to slot by volume; the <code>by_volume</code> putaway rule rejects a bin when <code>used + incoming &gt; capacity</code> and scores remaining fit otherwise.</p>
+    <table>
+      <thead><tr><th class="col-narrow">Field</th><th class="col-mid">Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">volume_capacity_m3</span></td><td>Editable, per location</td><td>Physical bin capacity; <code>0</code> = volume scoring disabled for that bin.</td></tr>
+        <tr><td><span class="f">volume_used_m3</span></td><td>Computed from quants</td><td><code>Σ(product.volume × quantity)</code> currently in the bin.</td></tr>
+      </tbody>
+    </table>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Configuration ▸ Locations · Bin A-01-01</span></div>
+      <img src="img/location-bin.png" alt="Bin form with removal strategy and putaway volumetrics"/>
+      <figcaption><b>Bin form</b> — cyclic-counting hints and native removal strategy alongside the custom <b>Putaway Volumetrics</b> (Volume Capacity / Volume Used).</figcaption>
+    </figure>
+
+    <div class="note"><b>Temperature zones</b> are matched at the <i>rule</i> level (<code>by_temperature</code> with <code>ambient</code>/<code>chilled</code>/<code>frozen</code>), not via a native location field — tag your cold/ambient bins by naming convention and point the rule’s target/domain at them.</div>
+
+    <h3 id="wh-storage">3.5 Storage categories &amp; removal strategies <span class="tag native">Native</span></h3>
+    <p>Native Odoo offers <b>storage categories</b> (capacity by weight/volume/package) and per-location <b>removal strategies</b> (FIFO / LIFO / FEFO / Closest). Use FEFO for expirable stock so picks consume the soonest-to-expire lot. The custom putaway engine <i>complements</i> native putaway rules — you can run either or both; one active custom strategy per warehouse is enforced.</p>
+
+    <!-- 4. OPERATION TYPES -->
+    <h2 id="optypes"><span class="n">4</span>Operation types &amp; routes <span class="tag native">Native</span></h2>
+    <p>Operation types (a.k.a. picking types, <code>stock.picking.type</code>) classify every transfer. Their <b>code</b> — <code>incoming</code>, <code>outgoing</code>, <code>internal</code> — and default source/destination locations drive both native moves and the custom hooks.</p>
+    <table>
+      <thead><tr><th class="col-narrow">Setting</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">code</span></td><td>Classifies the transfer. The putaway engine fires only on <code>incoming</code> move lines.</td></tr>
+        <tr><td>Default Source / Destination</td><td>Pre-fills move locations (e.g. Vendors → Input).</td></tr>
+        <tr><td>Reference Sequence</td><td>Generates references like <code>WH/IN/00001</code>.</td></tr>
+        <tr><td>Create Backorder / Reservation</td><td>Standard partial-fulfilment behaviour.</td></tr>
+      </tbody>
+    </table>
+    <div class="tip"><b>Key integration:</b> when a move line is created on an <code>incoming</code> transfer, the putaway engine automatically proposes a destination bin (see §5). No extra configuration is needed beyond having an active strategy on the warehouse.</div>
+
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Overview (Operation Types)</span></div>
+      <img src="img/operation-types.png" alt="Operation types overview: receipts, internal transfers, deliveries"/>
+      <figcaption><b>Operation types</b> — Receipts, Internal Transfers, Delivery Orders and more; each is a picking type with its own source/destination, sequence and behaviour.</figcaption>
+    </figure>
+
+    <!-- 5. PUTAWAY -->
+    <h2 id="putaway"><span class="n">5</span>Putaway engine <span class="tag custom">Custom</span></h2>
+    <p>Configure one <b>putaway strategy</b> per warehouse, holding an ordered set of <b>rules</b>. On goods receipt the engine scores candidate bins (0–100) and either auto-applies the winning bin or surfaces a suggestion for the operator.</p>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Configuration ▸ Putaway Strategies</span></div>
+      <img src="img/putaway-strategy.png" alt="Putaway strategy form with six tiered rules"/>
+      <figcaption><b>Strategy form</b> — rule set <code>ZWME001 6-Tier</code> with six rules across tiers 1–6.</figcaption>
+    </figure>
+    <h4>Strategy fields</h4>
+    <table>
+      <thead><tr><th class="col-narrow">Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">warehouse_id</span></td><td>One <b>active</b> strategy per warehouse (DB-enforced).</td></tr>
+        <tr><td><span class="f">rule_set</span></td><td><code>zwme001_6tier</code> · <code>abc</code> · <code>fefo</code> · <code>custom</code>. ZWME001 enforces tiers 1–6.</td></tr>
+        <tr><td><span class="f">auto_apply_suggestions</span></td><td>If on, the engine rewrites the move-line destination automatically (no operator step).</td></tr>
+      </tbody>
+    </table>
+    <h4>Rule fields &amp; the seven strategies</h4>
+    <table>
+      <thead><tr><th class="col-narrow">Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">tier</span></td><td>1–6; lowest tier with a positive score wins, ties broken by score.</td></tr>
+        <tr><td><span class="f">kind</span></td><td><code>fixed_location</code> (100) · <code>by_abc_velocity</code> (A/B/C) · <code>nearest_empty</code> (85) · <code>by_volume</code> (60–100, rejects oversize) · <code>by_temperature</code> (75) · <code>zone_round_robin</code> (70) · <code>custom_python</code> (sandboxed).</td></tr>
+        <tr><td><span class="f">target_location_id</span> / <span class="f">target_location_domain</span></td><td>A fixed bin, or a domain of candidate bins to score.</td></tr>
+        <tr><td><span class="f">abc_class</span>, <span class="f">temperature_zone</span></td><td>Optional filters for velocity/temperature rules.</td></tr>
+        <tr><td><span class="f">custom_python</span></td><td><code>safe_eval</code> expression returning <code>(location_id, score)</code> for site-specific logic.</td></tr>
+      </tbody>
+    </table>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Configuration ▸ Putaway Suggestions</span></div>
+      <img src="img/putaway-suggestions.png" alt="Putaway suggestions grouped by status with confidence scores"/>
+      <figcaption><b>Run-time output</b> — suggestions as Applied (score &gt; 90), Overridden and Pending, each with its rule reason.</figcaption>
+    </figure>
+    <div class="tip"><b>Behaviour:</b> creating a move line on an incoming transfer calls <code>custom.putaway.engine.apply_top_proposal()</code>; a confidence above 90 (with auto-apply on) rewrites the destination, otherwise the suggestion waits for review on the handheld.</div>
+
+    <!-- 6. CYCLE COUNT -->
+    <h2 id="cyclecount"><span class="n">6</span>Cycle counting <span class="tag custom">Custom</span></h2>
+    <p>Define <b>plans</b> that periodically generate <b>count sessions</b>; counters record actuals on lines; a supervisor approves variances before any stock is adjusted.</p>
+    <table>
+      <thead><tr><th class="col-narrow">Plan field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">method</span></td><td>Sampling: <code>abc_velocity</code> · <code>random</code> · <code>by_zone</code> · <code>by_value</code> · <code>last_counted</code>.</td></tr>
+        <tr><td><span class="f">frequency</span></td><td><code>daily</code> · <code>weekly</code> · <code>monthly</code> · <code>quarterly</code> · <code>adhoc</code>.</td></tr>
+        <tr><td><span class="f">target_count_per_period</span></td><td>How many lines to sample each run.</td></tr>
+        <tr><td><span class="f">next_run_date</span> / <span class="f">state</span></td><td>A daily cron generates a session when due; <code>active</code>/<code>paused</code> toggles the plan.</td></tr>
+      </tbody>
+    </table>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Operations ▸ Cycle Count ▸ Plans</span></div>
+      <img src="img/cycle-count-plan.png" alt="Cycle count plan"/>
+      <figcaption><b>Plan</b> — the sampling method, frequency and target per period drive automatic session generation by the daily cron.</figcaption>
+    </figure>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Operations ▸ Cycle Count · Session (Reviewing)</span></div>
+      <img src="img/cycle-count-session.png" alt="Cycle count session lines with expected, counted and variance"/>
+      <figcaption><b>Session lines</b> — expected vs counted per bin/lot with computed variance and per-line status; variance posting is supervisor-gated.</figcaption>
+    </figure>
+    <p>Session states run <code>draft → in_progress → reviewing → closed</code>; lines carry <code>pending → counted → approved / recount_required / skipped</code>. On approval a corrective <code>stock.move</code> is created and the variance value rolls up to the session.</p>
+
+    <!-- 7. TRANSFER -->
+    <h2 id="transfer"><span class="n">7</span>Transfer orders &amp; replenishment <span class="tag custom">Custom</span></h2>
+    <p>Configure <b>transfer-order rules</b> that fire on triggers and materialise into real internal <code>stock.move</code>s (with a barcoded pick slip). A cron evaluates active rules on a schedule.</p>
+    <table>
+      <thead><tr><th class="col-narrow">Rule field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">trigger</span></td><td><code>low_water_mark</code> · <code>expiry_approaching</code> · <code>zone_consolidation</code> · <code>picking_replenishment</code> · <code>manual</code>.</td></tr>
+        <tr><td><span class="f">source_location_domain</span> / <span class="f">target_location_domain</span></td><td>Odoo domains selecting donor/receiver bins.</td></tr>
+        <tr><td><span class="f">low_water_qty</span></td><td>Threshold below which a bin is replenished.</td></tr>
+        <tr><td><span class="f">expiry_days_ahead</span></td><td>Window for routing near-expiry lots to quarantine/scrap.</td></tr>
+        <tr><td><span class="f">priority</span> / <span class="f">schedule_interval_minutes</span></td><td>Evaluation order and cadence.</td></tr>
+      </tbody>
+    </table>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Operations ▸ Transfer Order Rules</span></div>
+      <img src="img/transfer-order-rules.png" alt="Transfer order rules listing the five triggers"/>
+      <figcaption><b>The five triggers</b> configured as rules, each with its source/target domains and thresholds.</figcaption>
+    </figure>
+
+    <!-- 8. QUALITY -->
+    <h2 id="quality"><span class="n">8</span>Quality control <span class="tag custom">Custom</span></h2>
+    <p>Configure <b>quality points</b> that attach checks to operations; failures raise an NCR alert that drives a CAPA, with tamper-evident e-signatures throughout.</p>
+    <table>
+      <thead><tr><th class="col-narrow">Point field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">operation</span></td><td><code>incoming</code> · <code>manufacturing</code> · <code>outgoing</code> · <code>ad_hoc</code> — when the check applies.</td></tr>
+        <tr><td><span class="f">check_kind</span></td><td><code>instructions</code> · <code>pass_fail</code> · <code>measure</code> (with min/max) · <code>visual</code>.</td></tr>
+        <tr><td><span class="f">frequency</span></td><td><code>every</code> · <code>first</code> · <code>random</code> · <code>periodic</code>.</td></tr>
+        <tr><td><span class="f">measure_min</span> / <span class="f">measure_max</span> / <span class="f">measure_uom_id</span></td><td>Tolerance band for measurement checks.</td></tr>
+        <tr><td><span class="f">default_test_id</span></td><td>Reusable test template seeding the check’s inspection lines.</td></tr>
+      </tbody>
+    </table>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Quality ▸ Configuration ▸ Quality Points</span></div>
+      <img src="img/quality-points.png" alt="Quality points list bound to operations"/>
+      <figcaption><b>Quality points</b> — each binds a check kind &amp; frequency to an incoming / outgoing operation, with measurement tolerances where relevant.</figcaption>
+    </figure>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Quality ▸ Checks / Alerts (NCR) / CAPA</span></div>
+      <img src="img/quality-checks.png" alt="Quality checks: a pass and a failed inseam measurement raising an NCR"/>
+      <figcaption>A pass/fail fabric check and a failed inseam measurement that automatically raised the NCR <i>“Inseam out of tolerance”</i>.</figcaption>
+    </figure>
+
+    <!-- 9. HHT -->
+    <h2 id="hht"><span class="n">9</span>Handheld (HHT) devices <span class="tag custom">Custom</span></h2>
+    <p>Enrol every physical scanner before it can call the API. Each device gets an auto-generated key/secret used to sign requests.</p>
+    <table>
+      <thead><tr><th class="col-narrow">Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">device_id</span></td><td>Physical serial / browser fingerprint; unique per tenant.</td></tr>
+        <tr><td><span class="f">model</span></td><td><code>zebra_tc21/52/72</code> · <code>honeywell_ct40</code> · <code>generic_browser</code> · <code>other</code>.</td></tr>
+        <tr><td><span class="f">api_key</span> / <span class="f">api_secret</span></td><td>Auto-generated, write-protected; rotate via the <b>Regenerate Secret</b> wizard.</td></tr>
+        <tr><td><span class="f">allowed_cidrs</span></td><td>Comma-separated CIDR allow-list (per device).</td></tr>
+        <tr><td><span class="f">enabled</span> / <span class="f">status</span></td><td>Toggle; status computes Active / Disabled / Quarantined.</td></tr>
+      </tbody>
+    </table>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">HHT ▸ Devices</span></div>
+      <img src="img/hht-devices.png" alt="HHT device registry with Zebra and Honeywell scanners"/>
+      <figcaption><b>Device registry</b> — Zebra TC52/TC72, Honeywell CT40 and a PWA browser, each with operator, status and last-seen.</figcaption>
+    </figure>
+    <div class="note"><b>Security model:</b> the REST API <code>/api/hht/*</code> requires HMAC-SHA256 request signing, timestamp-drift &amp; nonce replay checks and the per-device CIDR allow-list. Thin keyboard-wedge scanners can post to <code>/api/hht/datawedge</code> under an IP allow-list.</div>
+
+    <!-- 10. BARCODE / LABELS / PRINTERS -->
+    <h2 id="barcode"><span class="n">10</span>Barcode, labels &amp; printers <span class="tag custom">Custom</span></h2>
+    <h3>Barcode formats</h3>
+    <p><code>custom.barcode.format</code> lets you auto-generate product/location barcodes: choose a symbology (<code>Code128</code>, <code>EAN-13</code>, <code>EAN-8</code>, <code>QR</code>), a prefix/suffix and a sequence, scoped to the models it applies to.</p>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Barcode ▸ Configuration ▸ Barcode Formats</span></div>
+      <img src="img/barcode-formats.png" alt="Barcode formats: symbology, prefix and sequence"/>
+      <figcaption><b>Barcode formats</b> — symbology (Code128 / EAN / QR), prefix/suffix and a sequence for auto-generated codes.</figcaption>
+    </figure>
+    <h3>Label templates</h3>
+    <table>
+      <thead><tr><th class="col-narrow">Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">paper_format</span></td><td><code>zebra_2x1</code> · <code>zebra_4x6</code> · <code>thermal_50x30</code> · <code>a4_30up</code> · <code>custom</code> (uses width/height mm).</td></tr>
+        <tr><td><span class="f">output_mode</span></td><td><code>zpl</code> (Zebra) · <code>escpos</code> (thermal) · <code>pdf</code>.</td></tr>
+        <tr><td><span class="f">template_source</span></td><td>The ZPL/ESC-POS body or QWeb source.</td></tr>
+        <tr><td><span class="f">applies_to</span></td><td>The model the label is for (product, location, pallet…).</td></tr>
+      </tbody>
+    </table>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Barcode ▸ Configuration ▸ Label Templates</span></div>
+      <img src="img/label-templates.png" alt="Label templates with paper format and output mode"/>
+      <figcaption><b>Label templates</b> — paper format, output mode (ZPL / ESC-POS / PDF) and the model each label applies to.</figcaption>
+    </figure>
+    <h3>Printer configuration</h3>
+    <table>
+      <thead><tr><th class="col-narrow">Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="f">printer_type</span></td><td><code>zebra_network</code> (raw 9100) · <code>zebra_usb</code> (local agent) · <code>escpos_network</code> · <code>cups</code>.</td></tr>
+        <tr><td><span class="f">host</span> / <span class="f">port</span></td><td>Network address (default port <code>9100</code>).</td></tr>
+        <tr><td><span class="f">cups_queue</span></td><td>Queue name when <code>printer_type = cups</code>.</td></tr>
+        <tr><td><span class="f">label_template_id</span></td><td>Default template for this printer.</td></tr>
+      </tbody>
+    </table>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Barcode ▸ Configuration ▸ Printers</span></div>
+      <img src="img/printer-config.png" alt="Printer configuration: Zebra network, CUPS"/>
+      <figcaption><b>Printers</b> — Zebra (raw 9100), ESC/POS or CUPS endpoints, each with a default label template.</figcaption>
+    </figure>
+    <p>Jobs are spooled to <code>custom.print.queue</code> and dispatched by a cron, so a momentary printer outage doesn’t block the operator.</p>
+
+    <!-- 11. FEATURES -->
+    <h2 id="features"><span class="n">11</span>Operational features at run-time</h2>
+    <p>With configuration in place, the day-to-day flows behave as follows:</p>
+    <h3>Receiving &amp; directed putaway</h3>
+    <p>Goods are received against a PO/transfer (scan-in via <code>custom_barcode</code> or the HHT <i>Receive</i> page). As move lines are created, the putaway engine proposes bins; large receipts can be validated in the background via <code>queue_job</code> to avoid browser timeouts.</p>
+    <h3>Picking — single, batch &amp; cluster</h3>
+    <p><code>custom_barcode</code> provides a single-picking scan session, a <b>batch</b> session (scan once, auto-distribute across orders) and a <b>cluster</b> run (group lines by source bin for one efficient walk).</p>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Barcode ▸ Scan Sessions</span></div>
+      <img src="img/barcode-session.png" alt="Barcode scan session with GS1-parsed lines"/>
+      <figcaption><b>Scan session</b> — scanned lines against the picking, with GS1-parsed GTIN / lot / expiry stored per line.</figcaption>
+    </figure>
+    <h3>Internal transfers &amp; replenishment</h3>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">Inventory ▸ Operations ▸ Transfer Orders</span></div>
+      <img src="img/transfer-orders.png" alt="Transfer order kanban: Done, In Progress, Proposed"/>
+      <figcaption>Transfer orders as a kanban — Proposed → In Progress → Done, each card showing product, qty and source → destination bin.</figcaption>
+    </figure>
+    <h3>Scanning on the handheld</h3>
+    <figure>
+      <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">HHT ▸ Scan Logs</span></div>
+      <img src="img/hht-scan-log.png" alt="HHT scan log with receipt, issue, transfer and count actions"/>
+      <figcaption>Every receipt / issue / transfer / count is written to an append-only scan log with barcode, location, qty, result and client IP.</figcaption>
+    </figure>
+    <h3>Cycle counting &amp; quality</h3>
+    <p>Counters work the session lines on the floor; supervisors approve variances. Quality checks gate inbound and outbound operations, raising NCRs and CAPAs on failure.</p>
+
+    <!-- 12. AUTOMATION -->
+    <h2 id="automation"><span class="n">12</span>Automation, security &amp; audit</h2>
+    <h4>Scheduled actions (cron)</h4>
+    <table>
+      <thead><tr><th class="col-mid">Cron</th><th>Cadence</th><th>Does</th></tr></thead>
+      <tbody>
+        <tr><td>Cycle-count session generator</td><td>Daily</td><td>Creates sessions from due plans.</td></tr>
+        <tr><td>Transfer-order evaluate &amp; materialize</td><td>Per-rule interval</td><td>Fires active rules, creates proposed TOs.</td></tr>
+        <tr><td>Print-queue processor</td><td>Frequent</td><td>Renders &amp; dispatches queued labels.</td></tr>
+        <tr><td>HHT sync-queue purge</td><td>Daily</td><td>Removes applied/deduped offline events &gt; 30 days.</td></tr>
+      </tbody>
+    </table>
+    <h4>Security &amp; audit</h4>
+    <ul>
+      <li>Every WMS model mixes in <code>pdp.audited.mixin</code> + <code>mail.thread</code> — who changed what, when, with chatter.</li>
+      <li>The handheld scan log is <b>append-only</b> and immutable.</li>
+      <li>Approval gates: putaway auto-apply has a confidence threshold; cycle-count variance posting is supervisor-only.</li>
+      <li>Multi-tenant: devices, logs and stock are scoped per tenant (DB-per-tenant).</li>
+    </ul>
+
+    <!-- 13. CHECKLIST -->
+    <h2 id="checklist"><span class="n">13</span>End-to-end setup checklist</h2>
+    <p>To stand up a WMS-enabled warehouse on a fresh tenant:</p>
+    <ol class="steps">
+      <li><b>Products</b> — mark storable; set tracking (lot/serial), UoM, <b>volume</b>, weight, barcode, <b>ABC class</b>, standard price, routes &amp; reordering rules.<div class="pathline">Inventory ▸ Products</div></li>
+      <li><b>Warehouse</b> — create it with a short code; choose 2- or 3-step receipts/deliveries.<div class="pathline">Inventory ▸ Configuration ▸ Warehouses</div></li>
+      <li><b>Locations</b> — build zones &amp; bins as internal locations; set <b>volume capacity</b> on bins to be slotted by volume.<div class="pathline">Inventory ▸ Configuration ▸ Locations</div></li>
+      <li><b>Removal strategy</b> — set FEFO on locations holding expirable stock; enable Expiration Dates.<div class="pathline">Inventory ▸ Configuration ▸ Settings / Locations</div></li>
+      <li><b>Putaway strategy</b> — one active strategy per warehouse; add tiered rules; decide auto-apply.<div class="pathline">Inventory ▸ Configuration ▸ Putaway Strategies</div></li>
+      <li><b>Cycle-count plans</b> — pick a sampling method &amp; frequency; assign counters &amp; the supervisor group.<div class="pathline">Inventory ▸ Operations ▸ Cycle Count ▸ Plans</div></li>
+      <li><b>Transfer-order rules</b> — configure replenishment/expiry/consolidation triggers &amp; domains.<div class="pathline">Inventory ▸ Operations ▸ Transfer Order Rules</div></li>
+      <li><b>Quality points</b> — attach incoming/outgoing checks with tolerances &amp; test templates.<div class="pathline">Quality ▸ Configuration ▸ Quality Points</div></li>
+      <li><b>Devices</b> — enrol handhelds; set CIDR allow-lists; distribute keys.<div class="pathline">HHT ▸ Devices</div></li>
+      <li><b>Labels &amp; printers</b> — define label templates &amp; printer endpoints; map default templates.<div class="pathline">Inventory ▸ Configuration ▸ Labels / Printers</div></li>
+    </ol>
+    <div class="tip"><b>Shortcut:</b> deploying the <b>Wholesale Distribution</b> or <b>Manufacturing</b> industry pack installs and groups all of the above WMS modules in one action, leaving only the data steps (products, locations, rules) to configure.</div>
+
+    <!-- 14. APPENDIX -->
+    <h2 id="appendix"><span class="n">14</span>Selection-value reference</h2>
+    <table>
+      <thead><tr><th class="col-mid">Field</th><th>Allowed values</th></tr></thead>
+      <tbody>
+        <tr><td>Putaway rule <span class="f">kind</span></td><td>fixed_location · nearest_empty · zone_round_robin · by_volume · by_temperature · by_abc_velocity · custom_python</td></tr>
+        <tr><td>Putaway <span class="f">rule_set</span></td><td>zwme001_6tier · abc · fefo · custom</td></tr>
+        <tr><td>Suggestion <span class="f">status</span></td><td>pending · accepted · overridden · applied · rejected</td></tr>
+        <tr><td>Cycle plan <span class="f">method</span></td><td>abc_velocity · random · by_zone · by_value · last_counted</td></tr>
+        <tr><td>Cycle plan <span class="f">frequency</span></td><td>daily · weekly · monthly · quarterly · adhoc</td></tr>
+        <tr><td>Cycle session <span class="f">state</span></td><td>draft · in_progress · reviewing · closed · canceled</td></tr>
+        <tr><td>TO rule <span class="f">trigger</span></td><td>low_water_mark · expiry_approaching · zone_consolidation · picking_replenishment · manual</td></tr>
+        <tr><td>TO <span class="f">state</span></td><td>draft · proposed · in_progress · done · canceled</td></tr>
+        <tr><td>HHT device <span class="f">model</span></td><td>zebra_tc21 · zebra_tc52 · zebra_tc72 · honeywell_ct40 · generic_browser · other</td></tr>
+        <tr><td>Scan-log <span class="f">action</span> / <span class="f">result</span></td><td>receipt · issue · transfer · count · handover · lookup&nbsp;&nbsp;|&nbsp;&nbsp;ok · error · pending_sync</td></tr>
+        <tr><td>Quality <span class="f">operation</span> / <span class="f">check_kind</span></td><td>incoming · manufacturing · outgoing · ad_hoc&nbsp;&nbsp;|&nbsp;&nbsp;instructions · pass_fail · measure · visual</td></tr>
+        <tr><td>Label <span class="f">output_mode</span> / Printer <span class="f">type</span></td><td>zpl · escpos · pdf&nbsp;&nbsp;|&nbsp;&nbsp;zebra_network · zebra_usb · escpos_network · cups</td></tr>
+      </tbody>
+    </table>
+
+    <footer class="doc">
+      WMS Feature &amp; Configuration Guide · Odoo 19 CE + custom_* layer · Confidential · June 2026<br/>
+      Companion to the <i>Warehouse Management on Odoo — Capability Assessment</i> deck. Screenshots captured live from the <code>erp_dev</code> instance.
+    </footer>
+  </main>
+</div>
+
+<script>
+  // Scrollspy: highlight the current section in the TOC
+  const links = [...document.querySelectorAll('#toc a')];
+  const map = new Map();
+  links.forEach(a => { const id = a.getAttribute('href').slice(1); const el = document.getElementById(id); if (el) map.set(el, a); });
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = map.get(e.target); if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '0px 0px -75% 0px', threshold: 0 });
+  map.forEach((a, el) => obs.observe(el));
+</script>
+</body>
+</html>

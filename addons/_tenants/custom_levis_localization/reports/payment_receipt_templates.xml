@@ -5,10 +5,8 @@
     <template id="report_payment_receipt">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
-                <t t-call="web.external_layout">
-                    <t t-set="doc_title">PAYMENT RECEIPT</t>
-                    <t t-call="custom_levis_localization.report_payment_document"/>
-                </t>
+                <t t-set="doc_title">PAYMENT RECEIPT</t>
+                <t t-call="custom_levis_localization.report_payment_document"/>
             </t>
         </t>
     </template>

@@ -7,6 +7,16 @@ from odoo.tools.float_utils import float_compare
 class StockPicking(models.Model):
     _inherit = "stock.picking"
 
+    def _levis_purchase_orders(self):
+        """Purchase order(s) this receipt is linked to.
+
+        Combines the direct ``purchase_id`` link with the orders reached through
+        each move's ``purchase_line_id`` (covers receipts that group several
+        POs). Empty when the receipt is a standalone / non-PO incoming transfer.
+        """
+        self.ensure_one()
+        return self.move_ids.purchase_line_id.order_id | self.purchase_id
+
     def button_validate(self):
         # Requirement 2: on goods receipt the received (done) quantity of each
         # line must not exceed its demand (ordered) quantity.

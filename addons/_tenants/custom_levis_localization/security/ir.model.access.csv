@@ -3,3 +3,4 @@ access_levis_inv_recon_acct,levis.inventory.reconciliation account,model_levis_i
 access_levis_inv_recon_line_acct,levis.inventory.reconciliation.line account,model_levis_inventory_reconciliation_line,account.group_account_manager,1,1,1,1
 access_levis_inv_recon_stock,levis.inventory.reconciliation stock,model_levis_inventory_reconciliation,stock.group_stock_manager,1,0,0,0
 access_levis_inv_recon_line_stock,levis.inventory.reconciliation.line stock,model_levis_inventory_reconciliation_line,stock.group_stock_manager,1,0,0,0
+access_levis_payment_register_fee,levis.payment.register.fee,model_levis_payment_register_fee,account.group_account_invoice,1,1,1,1

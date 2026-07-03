@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Warehouse Management on Odoo — Capability Assessment</title>
+<style>
+  :root{
+    --odoo:#714B67;
+    --odoo-2:#8f5d83;
+    --ink:#1b2230;
+    --slate:#334155;
+    --muted:#64748b;
+    --line:#e3e8ef;
+    --bg:#0f1422;
+    --paper:#ffffff;
+    --accent:#2dd4bf;
+    --accent-2:#6366f1;
+    --green:#16a34a;
+    --green-bg:#e8f7ee;
+    --yellow:#ca8a04;
+    --yellow-bg:#fdf6e3;
+    --orange:#ea580c;
+    --orange-bg:#fdeede;
+    --red:#dc2626;
+    --red-bg:#fdeaea;
+    --shadow:0 18px 50px rgba(15,20,34,.16);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:"Segoe UI",Roboto,-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;
+    background:#0a0e18;color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+
+  /* ---------- Deck / slide framing ---------- */
+  .deck{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  .slide{
+    position:absolute;width:100vw;height:100vh;
+    display:none;flex-direction:column;
+    padding:54px 70px 64px;
+    background:var(--paper);
+    animation:fade .35s ease;
+  }
+  .slide.active{display:flex}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* ---------- Dark slides (cover + dividers) ---------- */
+  .slide.dark{
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(45,212,191,.18), transparent 60%),
+      radial-gradient(900px 700px at -5% 110%, rgba(99,102,241,.22), transparent 55%),
+      linear-gradient(135deg,#11162a 0%, #1c1430 55%, #2a1d3a 100%);
+    color:#f1f5f9;
+  }
+  .slide.dark h1,.slide.dark h2,.slide.dark p,.slide.dark li{color:#f1f5f9}
+
+  /* ---------- Headings ---------- */
+  .eyebrow{
+    font-size:13px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--odoo);margin-bottom:14px;display:flex;align-items:center;gap:10px;
+  }
+  .slide.dark .eyebrow{color:var(--accent)}
+  .eyebrow::before{content:"";width:34px;height:3px;background:var(--odoo);border-radius:3px}
+  .slide.dark .eyebrow::before{background:var(--accent)}
+  h1{font-size:54px;line-height:1.05;font-weight:800;letter-spacing:-.02em}
+  h2{font-size:34px;line-height:1.12;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+  .sub{font-size:17px;color:var(--muted);margin-top:6px;max-width:1000px}
+  .slide.dark .sub{color:#c5cbe0}
+
+  /* ---------- Cover ---------- */
+  .cover-wrap{max-width:1050px}
+  .cover-wrap h1{font-size:62px;margin:18px 0 18px}
+  .cover-badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+  .badge{
+    font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#e2e8f0;
+  }
+  .cover-meta{margin-top:46px;font-size:14px;color:#aeb6d0;line-height:1.7}
+  .cover-meta b{color:#fff}
+
+  /* ---------- Generic content ---------- */
+  .body{flex:1;margin-top:26px;min-height:0;display:flex;flex-direction:column;gap:18px}
+  p.lead{font-size:18px;color:var(--slate);line-height:1.55;max-width:1050px}
+  ul.clean{list-style:none;display:flex;flex-direction:column;gap:11px}
+  ul.clean li{position:relative;padding-left:30px;font-size:16.5px;line-height:1.5;color:var(--slate)}
+  ul.clean li::before{content:"";position:absolute;left:6px;top:9px;width:9px;height:9px;border-radius:3px;background:var(--odoo);transform:rotate(45deg)}
+  ul.clean li b{color:var(--ink)}
+
+  /* ---------- Cards grid ---------- */
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .card{
+    border:1px solid var(--line);border-radius:14px;padding:18px 18px;background:#fff;
+    box-shadow:0 1px 2px rgba(16,24,40,.04);display:flex;flex-direction:column;gap:7px;
+  }
+  .card .ico{font-size:22px}
+  .card h3{font-size:16px;font-weight:750;color:var(--ink);letter-spacing:-.01em}
+  .card p{font-size:13.5px;color:var(--muted);line-height:1.45}
+  .card.tinted{background:linear-gradient(180deg,#faf7f9,#fff)}
+
+  /* ---------- Maturity matrix table ---------- */
+  table.matrix{width:100%;border-collapse:separate;border-spacing:0;font-size:14.5px}
+  table.matrix th,table.matrix td{padding:10px 12px;text-align:left;vertical-align:top}
+  table.matrix thead th{
+    font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+    border-bottom:2px solid var(--line);font-weight:700;
+  }
+  table.matrix tbody tr{border-bottom:1px solid var(--line)}
+  table.matrix tbody td{border-bottom:1px solid #eef1f6}
+  table.matrix td.fn{font-weight:700;color:var(--ink);white-space:nowrap}
+  table.matrix td.note{color:var(--muted);font-size:13px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .p-green{background:var(--green-bg);color:var(--green)}
+  .p-yellow{background:var(--yellow-bg);color:var(--yellow)}
+  .p-orange{background:var(--orange-bg);color:var(--orange)}
+  .p-red{background:var(--red-bg);color:var(--red)}
+
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:4px;font-size:13px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .d-green{background:var(--green)} .d-yellow{background:var(--yellow)}
+  .d-orange{background:var(--orange)} .d-red{background:var(--red)}
+
+  /* ---------- Flow diagram ---------- */
+  .flow{display:flex;align-items:stretch;gap:0;width:100%;margin-top:6px}
+  .flow .stage{flex:1;display:flex;flex-direction:column;gap:8px}
+  .flow .stage-head{font-weight:800;font-size:15px;color:#fff;padding:10px 12px;border-radius:10px 10px 0 0;text-align:center}
+  .flow .stage-body{border:1px solid var(--line);border-top:none;border-radius:0 0 10px 10px;padding:12px 12px;display:flex;flex-direction:column;gap:7px;flex:1;background:#fff}
+  .flow .step{font-size:13px;color:var(--slate);background:#f7f8fb;border:1px solid #eef1f6;border-radius:8px;padding:7px 9px;line-height:1.3}
+  .flow .step b{color:var(--ink)}
+  .flow .arrow{display:flex;align-items:center;color:var(--muted);font-size:24px;padding:0 6px;align-self:center}
+  .h-in{background:linear-gradient(135deg,#0ea5e9,#2563eb)}
+  .h-store{background:linear-gradient(135deg,#7c3aed,#714B67)}
+  .h-out{background:linear-gradient(135deg,#059669,#0d9488)}
+
+  /* ---------- Two-column requirement vs coverage ---------- */
+  .reqcov{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .reqcov .col{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .reqcov .col h4{font-size:13px;letter-spacing:.06em;text-transform:uppercase;padding:11px 16px;color:#fff}
+  .reqcov .col .h-req{background:var(--slate)}
+  .reqcov .col .h-cov{background:var(--odoo)}
+  .reqcov .col .inner{padding:14px 16px;display:flex;flex-direction:column;gap:9px}
+  .reqcov .col .inner div{font-size:14px;color:var(--slate);line-height:1.42;padding-left:18px;position:relative}
+  .reqcov .col .inner div::before{content:"";position:absolute;left:3px;top:7px;width:7px;height:7px;border-radius:2px;background:var(--muted)}
+  .reqcov .col .inner div b{color:var(--ink)}
+  .reqcov .col .h-cov ~ .inner div::before{background:var(--green)}
+
+  /* ---------- Stat row ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:8px}
+  .stat{border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center;background:linear-gradient(180deg,#faf9fb,#fff)}
+  .stat .num{font-size:38px;font-weight:850;color:var(--odoo);line-height:1}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.35}
+
+  /* code chips */
+  code{background:#f1eef4;color:#5b3a52;font-size:12.5px;padding:2px 6px;border-radius:5px;font-family:"Cascadia Code",Consolas,monospace}
+  .slide.dark code{background:rgba(255,255,255,.12);color:#e9d5ff}
+
+  /* ---------- Chrome: progress, counter, controls ---------- */
+  .progress{position:fixed;top:0;left:0;height:4px;background:linear-gradient(90deg,var(--odoo),var(--accent));z-index:50;transition:width .3s ease}
+  .chrome{position:fixed;bottom:18px;right:24px;z-index:50;display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted)}
+  .chrome .counter{font-weight:700;color:var(--slate);background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .slide.dark ~ .chrome .counter{}
+  .navbtn{cursor:pointer;user-select:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--slate);box-shadow:0 2px 8px rgba(0,0,0,.06);transition:.15s}
+  .navbtn:hover{background:var(--odoo);color:#fff;border-color:var(--odoo)}
+  .hint{position:fixed;bottom:20px;left:24px;z-index:50;font-size:12px;color:#94a3b8}
+  .footer-tag{position:absolute;bottom:20px;left:70px;font-size:11.5px;color:#b8c0cf;letter-spacing:.04em}
+  .slide.dark .footer-tag{color:#7e88a8}
+
+  .kicker{font-size:15px;color:var(--muted);max-width:760px;line-height:1.5;margin-top:10px}
+  .slide.dark .kicker{color:#c5cbe0}
+
+  .twocol{display:grid;grid-template-columns:1.15fr .85fr;gap:30px;flex:1;min-height:0}
+  .panel{background:#faf9fb;border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+  .panel h3{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--odoo);margin-bottom:12px}
+
+  .tag{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:6px;background:#eef2ff;color:var(--accent-2);margin-right:6px;margin-bottom:6px}
+  .tag.b{background:#e8f7ee;color:var(--green)}
+
+  /* ---------- Screenshot slides ---------- */
+  .live-badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#fff;background:linear-gradient(135deg,#dc2626,#ea580c);padding:4px 11px;border-radius:999px;margin-left:10px;vertical-align:middle}
+  .live-badge::before{content:"";width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 0 0 rgba(255,255,255,.7);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.6)}70%{box-shadow:0 0 0 6px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
+  .shotwrap{display:flex;gap:20px;flex:1;min-height:0;margin-top:18px;align-items:flex-start;justify-content:center}
+  .shot{flex:1;display:flex;flex-direction:column;min-width:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);background:#fff}
+  .shot .bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#ece8f0;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .shot .bar i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .shot .bar .r{background:#ff5f57}.shot .bar .y{background:#febc2e}.shot .bar .g{background:#28c840}
+  .shot .bar .addr{font-size:11px;color:var(--muted);margin-left:10px;font-family:"Cascadia Code",Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .shot .imgbox{display:block;background:#fff;overflow:hidden;border-bottom:1px solid var(--line)}
+  .shot img{width:100%;height:auto;display:block}
+  .shot .cap{flex:0 0 auto;padding:10px 14px;font-size:13.5px;color:var(--slate);background:#fafafa;line-height:1.4}
+  .shot .cap b{color:var(--ink)}
+
+  /* ---------- Data-model appendix cards ---------- */
+  .card.dm{gap:8px}
+  .card.dm h3{font-size:13.5px;margin-bottom:3px;color:var(--odoo);font-weight:800}
+  .card.dm ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+  .card.dm li{font-size:11.5px;color:var(--muted);line-height:1.4;padding-left:12px;position:relative}
+  .card.dm li::before{content:"";position:absolute;left:0;top:6px;width:5px;height:5px;border-radius:1px;background:var(--accent-2)}
+  .card.dm li b{color:var(--ink);font-family:"Cascadia Code",Consolas,monospace;font-weight:600;font-size:10.8px}
+  .appx{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:14px}
+
+  /* ---------- Print: one slide per page ---------- */
+  @media print{
+    @page{size:1280px 720px;margin:0}
+    html,body{overflow:visible;height:auto}
+    .deck{position:static}
+    .slide{position:relative;display:flex !important;width:1280px;height:720px;page-break-after:always;animation:none;box-shadow:none}
+    .progress,.chrome,.hint{display:none !important}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="deck" id="deck">
+
+  <!-- 1. COVER -->
+  <section class="slide dark active">
+    <div class="cover-wrap">
+      <div class="eyebrow">Capability Assessment · 2026</div>
+      <h1>Warehouse Management on Odoo</h1>
+      <p class="sub">How far the platform — Odoo 19 Community + the custom EE-gap layer — can run a real Warehouse Management System, what a WMS actually requires, and where the honest boundaries are.</p>
+      <div class="cover-badges">
+        <span class="badge">Putaway Engine</span>
+        <span class="badge">Cycle Counting</span>
+        <span class="badge">Transfer / Replenishment</span>
+        <span class="badge">Handheld (RF) Bridge</span>
+        <span class="badge">Barcode &amp; GS1</span>
+        <span class="badge">QC &amp; Traceability</span>
+      </div>
+      <div class="cover-meta">
+        Prepared for: <b>Stakeholder / Client review</b> &nbsp;·&nbsp; Platform: <b>Odoo 19 CE + custom_* delta</b> &nbsp;·&nbsp; Deployment: <b>Multi-tenant (DB-per-tenant)</b><br/>
+        Scope: built &amp; verified modules in <b>addons/ee_gap</b> + <b>addons/core</b> &nbsp;·&nbsp; Status as of June 2026
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 2. EXECUTIVE SUMMARY -->
+  <section class="slide">
+    <div class="eyebrow">Executive Summary</div>
+    <h2>The platform already runs a credible mid-market WMS</h2>
+    <p class="kicker">Odoo Community gives the inventory backbone (locations, lots/serials, routes, reservations). On top of it, this platform adds a directed-work layer that normally only exists in Odoo Enterprise or a standalone WMS.</p>
+    <div class="stats">
+      <div class="stat"><div class="num">6</div><div class="lbl">Custom WMS / mobility modules built on top of CE <code>stock</code></div></div>
+      <div class="stat"><div class="num">7</div><div class="lbl">Putaway scoring strategies (ZWME001 6-tier, ABC, FEFO, volume, temp, velocity, Python)</div></div>
+      <div class="stat"><div class="num">5</div><div class="lbl">Auto transfer-order triggers (low-water, expiry, consolidation, replenish, manual)</div></div>
+      <div class="stat"><div class="num">RF</div><div class="lbl">Secure handheld bridge — Zebra / Honeywell, offline-capable, HMAC-signed</div></div>
+    </div>
+    <div class="body" style="margin-top:18px">
+      <ul class="clean">
+        <li><b>Strong today:</b> directed putaway, plan-driven cycle counting, rule-driven replenishment, barcode batch/cluster picking, handheld scanning, inbound/outbound QC, label printing — all with audit trails.</li>
+        <li><b>Covered by native Odoo:</b> multi-step receiving/delivery routes, lot/serial/expiry traceability &amp; FEFO, packages, reordering rules, stock valuation.</li>
+        <li><b>Honest gaps vs Tier-1 WMS:</b> wave planning, labor management, true slotting optimization, yard/dock scheduling, voice/pick-to-light.</li>
+      </ul>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 3. AGENDA -->
+  <section class="slide">
+    <div class="eyebrow">Agenda</div>
+    <h2>What we will cover</h2>
+    <div class="body">
+      <div class="grid g2" style="margin-top:8px">
+        <div class="card tinted"><div class="ico">📚</div><h3>Part A — What a WMS must do</h3><p>The 12 core functions of warehouse management and the end-to-end flow from dock to dock. The requirement baseline before we judge any tool.</p></div>
+        <div class="card tinted"><div class="ico">🧭</div><h3>Part B — How far Odoo handles it</h3><p>The coverage model (CE + custom delta), the maturity matrix, and function-by-function deep dives grounded in shipped code.</p></div>
+        <div class="card tinted"><div class="ico">📡</div><h3>Mobility, security &amp; deployment</h3><p>The handheld (RF) bridge, audit &amp; security posture, and how WMS ships as a one-click industry pack per tenant.</p></div>
+        <div class="card tinted"><div class="ico">🎯</div><h3>Gaps &amp; roadmap</h3><p>Where this stops short of a Tier-1 WMS, and a pragmatic path to close the highest-value gaps.</p></div>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 4. SECTION DIVIDER A -->
+  <section class="slide dark">
+    <div style="margin:auto 0">
+      <div class="eyebrow">Part A</div>
+      <h1>What a WMS<br/>actually requires</h1>
+      <p class="sub" style="margin-top:18px">A Warehouse Management System exists to make stock <b>accurate</b>, work <b>directed</b>, and movement <b>traceable</b> — in real time, at throughput, on mobile hardware. Twelve functions deliver that.</p>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 5. THE 12 CORE FUNCTIONS -->
+  <section class="slide">
+    <div class="eyebrow">Part A · The Requirement Baseline</div>
+    <h2>The 12 core functions of a WMS</h2>
+    <div class="body">
+      <div class="grid g4" style="gap:13px;margin-top:6px">
+        <div class="card"><div class="ico">📥</div><h3>1 · Receiving / Inbound</h3><p>Book goods against ASN/PO, capture lot, expiry, qty; reconcile over/short.</p></div>
+        <div class="card"><div class="ico">📦</div><h3>2 · Putaway</h3><p>Direct each pallet to the <i>right</i> bin by rules — not "anywhere there's space".</p></div>
+        <div class="card"><div class="ico">🗺️</div><h3>3 · Slotting / Storage</h3><p>Bin layout, capacity, zones; place fast movers where they cut travel.</p></div>
+        <div class="card"><div class="ico">🛒</div><h3>4 · Picking</h3><p>Single, batch, cluster, wave — convert orders into an efficient pick path.</p></div>
+        <div class="card"><div class="ico">📤</div><h3>5 · Packing &amp; Shipping</h3><p>Pack into cartons, weigh, label, manifest to the carrier, hand over.</p></div>
+        <div class="card"><div class="ico">🔁</div><h3>6 · Replenishment</h3><p>Keep pick faces full from reserve; min/max &amp; demand-driven transfers.</p></div>
+        <div class="card"><div class="ico">🔢</div><h3>7 · Cycle Counting</h3><p>Continuous counting to hold inventory accuracy without a full stop-count.</p></div>
+        <div class="card"><div class="ico">🧬</div><h3>8 · Traceability</h3><p>Lot / serial / expiry, FEFO, full genealogy for recall &amp; compliance.</p></div>
+        <div class="card"><div class="ico">📡</div><h3>9 · Barcode / RF Mobility</h3><p>Scan-driven work on handhelds; offline-tolerant; no paper.</p></div>
+        <div class="card"><div class="ico">✅</div><h3>10 · Quality / QC</h3><p>Inbound &amp; outbound inspection gates, holds, NCR &amp; corrective action.</p></div>
+        <div class="card"><div class="ico">🏷️</div><h3>11 · Labeling &amp; Print</h3><p>Product, location, pallet (SSCC) &amp; shipping labels to thermal printers.</p></div>
+        <div class="card"><div class="ico">📊</div><h3>12 · Reporting / KPI / Audit</h3><p>Accuracy, throughput, dock-to-stock, who-did-what immutable trail.</p></div>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 6. PROCESS FLOW -->
+  <section class="slide">
+    <div class="eyebrow">Part A · End-to-End</div>
+    <h2>The warehouse flow: dock → storage → dock</h2>
+    <p class="kicker">A WMS orchestrates three streams. The custom modules in this platform plug into specific steps of each — shown in the next section.</p>
+    <div class="body">
+      <div class="flow">
+        <div class="stage">
+          <div class="stage-head h-in">INBOUND</div>
+          <div class="stage-body">
+            <div class="step"><b>Receive</b> against PO/ASN, capture lot &amp; expiry</div>
+            <div class="step"><b>QC gate</b> — inspect, hold or accept</div>
+            <div class="step"><b>Putaway</b> — directed to best bin</div>
+            <div class="step"><b>Confirm</b> stock on hand by bin</div>
+          </div>
+        </div>
+        <div class="arrow">➜</div>
+        <div class="stage">
+          <div class="stage-head h-store">STORAGE</div>
+          <div class="stage-body">
+            <div class="step"><b>Slotting</b> — zones, capacity, ABC</div>
+            <div class="step"><b>Replenish</b> pick faces from reserve</div>
+            <div class="step"><b>Cycle count</b> — perpetual accuracy</div>
+            <div class="step"><b>Internal transfers</b> &amp; consolidation</div>
+          </div>
+        </div>
+        <div class="arrow">➜</div>
+        <div class="stage">
+          <div class="stage-head h-out">OUTBOUND</div>
+          <div class="stage-body">
+            <div class="step"><b>Pick</b> — single / batch / cluster</div>
+            <div class="step"><b>QC / pack</b> — verify, carton, weigh</div>
+            <div class="step"><b>Label &amp; ship</b> — manifest, handover</div>
+            <div class="step"><b>Proof</b> of delivery / BAST</div>
+          </div>
+        </div>
+      </div>
+      <p class="kicker" style="margin-top:18px">Cross-cutting throughout: <b>barcode/RF on handhelds</b>, <b>lot/serial traceability</b>, and an <b>immutable audit trail</b> — the three properties that separate a WMS from a spreadsheet.</p>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 7. SECTION DIVIDER B -->
+  <section class="slide dark">
+    <div style="margin:auto 0">
+      <div class="eyebrow">Part B</div>
+      <h1>How far Odoo<br/>handles it</h1>
+      <p class="sub" style="margin-top:18px">Architecture philosophy: <b>Platform = Odoo CE + a <code>custom_*</code> delta</b> that fills the gap from Community up to (and past) Enterprise — no stubs, generic by design.</p>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 8. COVERAGE MODEL -->
+  <section class="slide">
+    <div class="eyebrow">Part B · Coverage Model</div>
+    <h2>Three layers deliver the WMS</h2>
+    <div class="body">
+      <div class="grid g3" style="margin-top:6px">
+        <div class="card tinted">
+          <div class="ico">🟦</div><h3>Layer 1 — Odoo CE <code>stock</code></h3>
+          <p>The proven inventory backbone: hierarchical locations, lots/serials &amp; expiry, multi-step receipt/delivery routes, reservations, reordering rules, packages, scrap, valuation.</p>
+        </div>
+        <div class="card tinted">
+          <div class="ico">🟪</div><h3>Layer 2 — <code>custom_*</code> EE-gap</h3>
+          <p>Directed-work engines that CE lacks and EE charges for: putaway scoring, cycle counting, transfer orders, CE barcode (batch/cluster/GS1), full quality, label printing.</p>
+        </div>
+        <div class="card tinted">
+          <div class="ico">🟩</div><h3>Layer 3 — Platform services</h3>
+          <p>Multi-tenant (DB-per-tenant), handheld bridge with secure REST + offline sync, PDP audit trail on every operation, one-click industry-pack provisioning.</p>
+        </div>
+      </div>
+      <div class="reqcov" style="margin-top:20px">
+        <div class="col">
+          <h4 class="h-req">What Enterprise / 3rd-party WMS normally charges for</h4>
+          <div class="inner">
+            <div>Stock Barcode app (mobile scanning)</div>
+            <div>Quality control (points, checks, NCR)</div>
+            <div>Advanced putaway / removal strategies</div>
+            <div>Multi-step routes &amp; replenishment orchestration</div>
+          </div>
+        </div>
+        <div class="col">
+          <h4 class="h-cov">What this platform provides instead — as owned code</h4>
+          <div class="inner">
+            <div><b>custom_barcode</b> + <b>custom_hht_bridge</b> (CE, owned)</div>
+            <div><b>custom_quality_full</b> (+ CAPA &amp; e-signature)</div>
+            <div><b>custom_wms_putaway</b> 6-tier engine</div>
+            <div><b>custom_wms_to_engine</b> rule-driven transfers</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 9. MATURITY MATRIX -->
+  <section class="slide">
+    <div class="eyebrow">Part B · The Centerpiece</div>
+    <h2>WMS maturity matrix — function by function</h2>
+    <div class="legend" style="margin-bottom:6px">
+      <span><i class="dot d-green"></i> Strong — built &amp; tested, production-ready</span>
+      <span><i class="dot d-yellow"></i> Covered — native or built, baseline</span>
+      <span><i class="dot d-orange"></i> Partial — works but rule-based, not optimization-grade</span>
+      <span><i class="dot d-red"></i> Gap — not built</span>
+    </div>
+    <div class="body" style="margin-top:0">
+      <table class="matrix">
+        <thead><tr><th style="width:18%">Function</th><th style="width:11%">Status</th><th>How it is delivered</th></tr></thead>
+        <tbody>
+          <tr><td class="fn">Receiving</td><td><span class="pill p-green">Strong</span></td><td class="note">CE multi-step receipt routes + <code>custom_receipt_async</code> (queue_job for 1000s of lines) + HHT Receive page + incoming QC + barcode scan-in</td></tr>
+          <tr><td class="fn">Putaway</td><td><span class="pill p-green">Strong</span></td><td class="note"><code>custom_wms_putaway</code> — ZWME001 6-tier / ABC / FEFO engine, 7 scoring algorithms, confidence auto-apply &gt;90, pallet/HU model</td></tr>
+          <tr><td class="fn">Slotting / Storage</td><td><span class="pill p-yellow">Covered</span></td><td class="note">CE location hierarchy &amp; types + volume-capacity fields on bins; rule-based, not optimization-driven</td></tr>
+          <tr><td class="fn">Picking</td><td><span class="pill p-green">Strong</span></td><td class="note"><code>custom_barcode</code> batch picking &amp; cluster picking + CE backorders; <span style="color:var(--orange)">wave planning not built</span></td></tr>
+          <tr><td class="fn">Packing &amp; Shipping</td><td><span class="pill p-yellow">Covered</span></td><td class="note">CE packages &amp; delivery slips + <code>custom_sale_bast</code> handover docs; carrier rate-shopping is a gap in CE</td></tr>
+          <tr><td class="fn">Replenishment / Transfer</td><td><span class="pill p-green">Strong</span></td><td class="note"><code>custom_wms_to_engine</code> — 5 triggers, materializes to <code>stock.move</code>, barcoded pick slip + CE reordering rules</td></tr>
+          <tr><td class="fn">Cycle Counting</td><td><span class="pill p-green">Strong</span></td><td class="note"><code>custom_wms_cycle_count</code> — ABC/random/zone/value/last-counted sampling, supervisor approval gate, daily cron</td></tr>
+          <tr><td class="fn">Traceability / FEFO</td><td><span class="pill p-green">Strong</span></td><td class="note">CE lot/serial/expiry &amp; FEFO + FEFO putaway slotting + expiry-approaching auto-routing to scrap + GS1 lot/exp capture</td></tr>
+          <tr><td class="fn">Barcode / RF Mobility</td><td><span class="pill p-green">Strong</span></td><td class="note"><code>custom_barcode</code> (GS1) + <code>custom_hht_bridge</code> — PWA + secure REST + offline sync + DataWedge for Zebra/Honeywell</td></tr>
+          <tr><td class="fn">Quality / QC Gates</td><td><span class="pill p-green">Strong</span></td><td class="note"><code>custom_quality_full</code> — points/checks/NCR/CAPA/e-signature on incoming &amp; outgoing operations</td></tr>
+          <tr><td class="fn">Labeling &amp; Printing</td><td><span class="pill p-green">Strong</span></td><td class="note"><code>custom_barcode</code> — label templates + printer config (Zebra ZPL, ESC-POS, CUPS) + async print queue</td></tr>
+          <tr><td class="fn">Reporting / KPI / Audit</td><td><span class="pill p-yellow">Covered</span></td><td class="note">CE stock reports + PDP audit trail + immutable HHT scan log + barcode deviation report; no dedicated labor/throughput dashboards yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 10. DEEP DIVE: INBOUND + PUTAWAY -->
+  <section class="slide">
+    <div class="eyebrow">Part B · Deep Dive 1 — Inbound</div>
+    <h2>Receiving &amp; directed putaway</h2>
+    <div class="twocol">
+      <div class="panel">
+        <h3>What WMS requires</h3>
+        <ul class="clean">
+          <li><b>Book against ASN/PO</b> with lot, expiry, serial capture at the dock.</li>
+          <li><b>Inspection gate</b> before stock becomes available.</li>
+          <li><b>Directed putaway</b> — system tells the operator the <i>best</i> bin, by tiered rules (fixed → fast-mover zone → nearest empty → volume fit → temperature).</li>
+          <li><b>High throughput</b> — receipts of thousands of lines must not stall.</li>
+        </ul>
+      </div>
+      <div class="panel" style="background:linear-gradient(180deg,#f4fbf6,#fff);border-color:#cdeede">
+        <h3 style="color:var(--green)">What's built here</h3>
+        <ul class="clean">
+          <li><b>custom_wms_putaway</b> — a <code>custom.putaway.engine</code> that scores every candidate bin 0–100 across 7 strategies and proposes a destination.</li>
+          <li><b>Confidence auto-apply:</b> score &gt; 90 rewrites the move-line destination automatically; lower scores surface to the handheld for operator review.</li>
+          <li><b>Strategy presets:</b> <code>zwme001_6tier</code>, <code>abc</code>, <code>fefo</code>, <code>custom</code> — one active strategy per warehouse, enforced.</li>
+          <li><b>custom_receipt_async</b> validates huge receipts in the background via queue_job (no browser timeout).</li>
+          <li><b>Incoming QC</b> via custom_quality_full + scan-in via custom_barcode / HHT Receive page.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 11. DEEP DIVE: PUTAWAY STRATEGIES detail -->
+  <section class="slide">
+    <div class="eyebrow">Part B · Deep Dive 1b — Putaway Engine</div>
+    <h2>Seven pluggable putaway strategies, tier-prioritised</h2>
+    <p class="kicker">SAP-style ZWME001 logic in owned code: rules are grouped into tiers; the lowest tier with a positive score wins, ties broken by score. Generic — no vertical assumptions.</p>
+    <div class="body">
+      <div class="grid g3" style="gap:13px;margin-top:6px">
+        <div class="card"><h3>① fixed_location</h3><p>Pre-assigned home bin → confidence <b>100</b>.</p></div>
+        <div class="card"><h3>② nearest_empty</h3><p>First bin with zero quants → <b>85</b>.</p></div>
+        <div class="card"><h3>③ zone_round_robin</h3><p>Even spread across a zone → <b>70</b>.</p></div>
+        <div class="card"><h3>④ by_volume</h3><p>Best volumetric fit vs bin capacity → <b>60–100</b>; rejects oversize.</p></div>
+        <div class="card"><h3>⑤ by_temperature</h3><p>Matches ambient / chilled / frozen zone → <b>75</b>.</p></div>
+        <div class="card"><h3>⑥ by_abc_velocity</h3><p>Fast movers near dock — A=<b>95</b>, B=<b>75</b>, C=<b>55</b>.</p></div>
+        <div class="card" style="grid-column:span 3;background:linear-gradient(90deg,#faf7f9,#fff)"><h3>⑦ custom_python</h3><p>Operator-defined expression evaluated in a sandbox (<code>safe_eval</code>), returning <code>(location_id, score)</code> — for site-specific logic without a code change. Dangerous builtins are blocked.</p></div>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- LIVE: PUTAWAY -->
+  <section class="slide">
+    <div class="eyebrow">Live from the platform <span class="live-badge">LIVE · Odoo 19</span></div>
+    <h2>Putaway engine — running, not slideware</h2>
+    <div class="shotwrap">
+      <div class="shot">
+        <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">/odoo/inventory · Putaway Strategies</span></div>
+        <div class="imgbox"><img src="img/putaway-strategy.png" alt="Putaway strategy form with 6 tiered rules"/></div>
+        <div class="cap"><b>ZWME001 6-tier strategy</b> with all six rules — fixed, ABC velocity, nearest-empty, volume fit, temperature, custom Python.</div>
+      </div>
+      <div class="shot">
+        <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">/odoo/inventory · Putaway Suggestions</span></div>
+        <div class="imgbox"><img src="img/putaway-suggestions.png" alt="Putaway suggestions kanban with confidence scores"/></div>
+        <div class="cap"><b>Confidence-scored suggestions</b> — Applied (score&gt;90), Overridden, Pending — each with the rule reason.</div>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 12. DEEP DIVE: PICKING + REPLENISHMENT -->
+  <section class="slide">
+    <div class="eyebrow">Part B · Deep Dive 2 — Internal &amp; Outbound</div>
+    <h2>Picking &amp; rule-driven replenishment</h2>
+    <div class="twocol">
+      <div class="panel">
+        <h3>What WMS requires</h3>
+        <ul class="clean">
+          <li><b>Efficient pick paths</b> — group orders so the picker walks once, not once per order.</li>
+          <li><b>Batch &amp; cluster picking</b> — scan once, distribute across many orders / cluster by source bin.</li>
+          <li><b>Keep pick faces full</b> — replenish from reserve before they run dry.</li>
+          <li><b>Move stock proactively</b> — consolidate half-bins, pull expiring lots, pre-stage for today's shipments.</li>
+        </ul>
+      </div>
+      <div class="panel" style="background:linear-gradient(180deg,#f4fbf6,#fff);border-color:#cdeede">
+        <h3 style="color:var(--green)">What's built here</h3>
+        <ul class="clean">
+          <li><b>custom_barcode</b> — batch session (auto-distributes scanned qty across pickings) and cluster run (groups lines by source location for one efficient walk).</li>
+          <li><b>custom_wms_to_engine</b> — a transfer-order engine firing on <b>5 triggers</b>:</li>
+        </ul>
+        <div style="margin-top:8px">
+          <span class="tag b">low-water mark</span><span class="tag b">expiry approaching → scrap</span><span class="tag b">zone consolidation</span><span class="tag b">picking replenishment (24h horizon)</span><span class="tag b">manual</span>
+        </div>
+        <ul class="clean" style="margin-top:10px">
+          <li>Proposals <b>materialize into real <code>stock.move</code></b> transfers, with a barcoded pick-slip QWeb report and a daily cron.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- LIVE: TRANSFER ORDERS -->
+  <section class="slide">
+    <div class="eyebrow">Live from the platform <span class="live-badge">LIVE · Odoo 19</span></div>
+    <h2>Transfer-order engine — rules firing into real moves</h2>
+    <div class="shotwrap">
+      <div class="shot">
+        <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">/odoo/inventory · Transfer Orders</span></div>
+        <div class="imgbox"><img src="img/transfer-orders.png" alt="Transfer order kanban: Done, In Progress, Proposed"/></div>
+        <div class="cap"><b>Orders as a kanban</b> — Proposed → In Progress → Done, each card showing product, qty and source → destination bin.</div>
+      </div>
+      <div class="shot">
+        <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">/odoo/inventory · Transfer Order Rules</span></div>
+        <div class="imgbox"><img src="img/transfer-order-rules.png" alt="Transfer order rules listing the five triggers"/></div>
+        <div class="cap"><b>The five triggers</b> — low-water, expiry, consolidation, picking-replenishment, manual — each with source/target domains.</div>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 13. DEEP DIVE: CYCLE COUNT + TRACEABILITY -->
+  <section class="slide">
+    <div class="eyebrow">Part B · Deep Dive 3 — Accuracy</div>
+    <h2>Cycle counting &amp; lot/expiry traceability</h2>
+    <div class="twocol">
+      <div class="panel">
+        <h3>Cycle counting — perpetual accuracy</h3>
+        <ul class="clean">
+          <li><b>Plan-driven sampling:</b> ABC-velocity, random, by-zone, by-value, last-counted.</li>
+          <li><b>Session → line model</b> with assigned counters; variance qty, %, and value rolled up automatically.</li>
+          <li><b>Approval gate:</b> only a supervisor can post a variance adjustment (creates the corrective <code>stock.move</code>).</li>
+          <li><b>Daily cron</b> generates new sessions from due plans — no manual scheduling.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Traceability &amp; FEFO</h3>
+        <ul class="clean">
+          <li><b>Native CE:</b> full lot/serial tracking, expiration dates, FEFO removal, upstream/downstream traceability.</li>
+          <li><b>FEFO slotting</b> as a putaway strategy preset.</li>
+          <li><b>Expiry-approaching trigger</b> auto-routes near-expiry lots to a scrap/quarantine location within a configurable window.</li>
+          <li><b>GS1 capture:</b> handhelds parse GTIN, lot, expiry, serial, weight from a single barcode (Application Identifiers).</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- LIVE: CYCLE COUNT -->
+  <section class="slide">
+    <div class="eyebrow">Live from the platform <span class="live-badge">LIVE · Odoo 19</span></div>
+    <h2>Cycle counting — variances under a supervisor gate</h2>
+    <div class="shotwrap" style="justify-content:center">
+      <div class="shot" style="max-width:74%">
+        <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">/odoo/inventory · Cycle Count Session · Reviewing</span></div>
+        <div class="imgbox"><img src="img/cycle-count-session.png" alt="Cycle count session lines with expected vs counted and variance"/></div>
+        <div class="cap"><b>Session in “Reviewing”</b> — expected vs counted per bin/lot, computed variance, and per-line status (Approved / Counted / Recount Required / Pending) before any stock is adjusted.</div>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 14. DEEP DIVE: HHT / RF MOBILITY -->
+  <section class="slide">
+    <div class="eyebrow">Part B · Deep Dive 4 — The Mobility Differentiator</div>
+    <h2>Handheld (RF) bridge — scanners as first-class clients</h2>
+    <p class="kicker">CE has no mobile scanning app (that's an Enterprise add-on). This platform owns the whole stack — a PWA shell plus a hardened API for physical scanners.</p>
+    <div class="body">
+      <div class="grid g4" style="gap:14px;margin-top:6px">
+        <div class="card"><div class="ico">📲</div><h3>Device registry</h3><p><code>hht.device</code> — enrolled Zebra/Honeywell, per-device API key + secret, last-seen, scan counts.</p></div>
+        <div class="card"><div class="ico">🔐</div><h3>Hardened API</h3><p><code>/api/hht/*</code> — HMAC-SHA256 signing, timestamp-drift &amp; nonce replay protection, per-device CIDR allow-list.</p></div>
+        <div class="card"><div class="ico">📴</div><h3>Offline-tolerant</h3><p><code>hht.sync.queue</code> — FIFO journal; the PWA queues scans offline and replays them, idempotent on client-id.</p></div>
+        <div class="card"><div class="ico">🧾</div><h3>Immutable scan log</h3><p><code>hht.scan.log</code> — append-only record of every scan with IP, optional GPS, result &amp; payload.</p></div>
+      </div>
+      <div style="margin-top:18px">
+        <span class="tag">Receive</span><span class="tag">Issue</span><span class="tag">Transfer</span><span class="tag">Count</span><span class="tag">Handover (BAST)</span>
+        <span style="color:var(--muted);font-size:14px;margin-left:8px">— five operator pages in the PWA shell, plus a thin <b>DataWedge</b> ingest endpoint for keyboard-wedge scanners.</span>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- LIVE: HHT -->
+  <section class="slide">
+    <div class="eyebrow">Live from the platform <span class="live-badge">LIVE · Odoo 19</span></div>
+    <h2>Handheld bridge — devices &amp; immutable scan log</h2>
+    <div class="shotwrap">
+      <div class="shot">
+        <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">/odoo/hht · Devices</span></div>
+        <div class="imgbox"><img src="img/hht-devices.png" alt="HHT device registry: Zebra and Honeywell devices"/></div>
+        <div class="cap"><b>Enrolled scanners</b> — Zebra TC52/TC72, Honeywell CT40, PWA browser — with operator, status, scans-today and last-seen.</div>
+      </div>
+      <div class="shot">
+        <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">/odoo/hht · Scan Logs</span></div>
+        <div class="imgbox"><img src="img/hht-scan-log.png" alt="HHT scan log: receipt, issue, transfer, count actions"/></div>
+        <div class="cap"><b>Append-only scan log</b> — every receipt / issue / transfer / count with barcode, location, qty, result and client IP.</div>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 15. QUALITY + LABELING -->
+  <section class="slide">
+    <div class="eyebrow">Part B · Deep Dive 5 — QC &amp; Print</div>
+    <h2>Quality gates &amp; label printing</h2>
+    <div class="twocol">
+      <div class="panel">
+        <h3>Quality — inbound &amp; outbound gates</h3>
+        <ul class="clean">
+          <li><b>custom_quality_full</b> — quality points &amp; checks on <i>incoming</i> and <i>outgoing</i> operations.</li>
+          <li><b>Multi-line inspections</b> with min/max ranges &amp; accepted-value sets.</li>
+          <li><b>NCR → CAPA</b> — non-conformance raises an alert; corrective / preventive / containment actions tracked to closure.</li>
+          <li><b>Tamper-evident e-signatures</b> on checks and CAPAs; reusable test templates.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Labeling &amp; printing</h3>
+        <ul class="clean">
+          <li><b>Label templates</b> + <b>printer config</b> — Zebra ZPL over network (raw 9100) or USB agent, ESC-POS, and CUPS.</li>
+          <li><b>Async print queue</b> with a cron that batches and dispatches jobs — survives printer hiccups.</li>
+          <li><b>Picking barcode summary</b> report — scanned vs expected with deviation %.</li>
+          <li>Drives product, location and pallet labels from the same engine.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- LIVE: QUALITY -->
+  <section class="slide">
+    <div class="eyebrow">Live from the platform <span class="live-badge">LIVE · Odoo 19</span></div>
+    <h2>Quality gates — pass/fail with NCR escalation</h2>
+    <div class="shotwrap" style="justify-content:center">
+      <div class="shot" style="max-width:80%">
+        <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="addr">/odoo/quality · Checks · Alerts (NCR) · CAPA</span></div>
+        <div class="imgbox"><img src="img/quality-checks.png" alt="Quality checks: a pass and a failed inseam measurement raising an NCR"/></div>
+        <div class="cap"><b>Incoming inspections on real products</b> — a pass/fail fabric-grade check and a failed inseam measurement that automatically raised the <b>NCR “Inseam out of tolerance”</b>, which then drives a CAPA.</div>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 16. SECURITY & AUDIT -->
+  <section class="slide">
+    <div class="eyebrow">Part B · Trust</div>
+    <h2>Security, audit &amp; multi-tenancy</h2>
+    <div class="body">
+      <div class="grid g3" style="margin-top:6px">
+        <div class="card tinted"><div class="ico">🧾</div><h3>Audit on every move</h3><p>WMS records mix in the <code>pdp.audited.mixin</code> and <code>mail.thread</code> — who changed what, when, with chatter. HHT scans are append-only and immutable.</p></div>
+        <div class="card tinted"><div class="ico">🛡️</div><h3>Hardened device edge</h3><p>HMAC-signed requests, nonce replay protection, timestamp drift checks and per-device CIDR allow-lists keep rogue scanners out.</p></div>
+        <div class="card tinted"><div class="ico">🏢</div><h3>True multi-tenant</h3><p>DB-per-tenant isolation; devices, audit logs and stock are scoped per tenant — one platform, many independent warehouses.</p></div>
+      </div>
+      <p class="kicker" style="margin-top:20px">Approval gates are built in where they matter: putaway auto-apply has a confidence threshold, and cycle-count variance posting is supervisor-only. Nothing silently rewrites stock.</p>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 17. DEPLOYMENT / INDUSTRY PACKS -->
+  <section class="slide">
+    <div class="eyebrow">Part B · Deployment</div>
+    <h2>WMS ships as a one-click industry pack</h2>
+    <p class="kicker">A new tenant doesn't get loose modules — they get a curated bundle. The WMS engines are pre-grouped into the warehouse-heavy packs and provisioned together.</p>
+    <div class="body">
+      <div class="grid g3" style="margin-top:6px">
+        <div class="card"><div class="ico">🚚</div><h3>Wholesale Distribution</h3><p>The full WMS stack: <code>wms_putaway</code> + <code>wms_cycle_count</code> + <code>wms_to_engine</code> + <code>hht_bridge</code>, on top of purchase &amp; sales.</p></div>
+        <div class="card"><div class="ico">🏭</div><h3>Manufacturing</h3><p><code>wms_putaway</code> + <code>wms_to_engine</code> + MRP + asset register + planning + maintenance.</p></div>
+        <div class="card"><div class="ico">🛍️</div><h3>Retail / POS</h3><p><code>wms_putaway</code> + <code>wms_cycle_count</code> alongside POS, e-commerce and Indonesia tax.</p></div>
+      </div>
+      <p class="kicker" style="margin-top:18px">Packs topologically resolve dependencies and deploy in one action — so "stand up a warehouse tenant" is an operator task, not an engineering project. <span style="color:var(--muted)">(Sibling modules such as 3-way match &amp; cross-dock dropship are defined in the distribution pack but still on the roadmap.)</span></p>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 18. SECTION DIVIDER C -->
+  <section class="slide dark">
+    <div style="margin:auto 0">
+      <div class="eyebrow">Part C</div>
+      <h1>The honest<br/>boundaries</h1>
+      <p class="sub" style="margin-top:18px">This is a strong mid-market WMS. It is not (yet) a Tier-1 WMS like Manhattan, Blue Yonder or SAP EWM. Here is exactly where the line sits — and how to move it.</p>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 19. GAPS -->
+  <section class="slide">
+    <div class="eyebrow">Part C · Gap Analysis</div>
+    <h2>Gaps vs a Tier-1 / Enterprise WMS</h2>
+    <div class="body" style="margin-top:6px">
+      <table class="matrix">
+        <thead><tr><th style="width:24%">Capability</th><th style="width:13%">Status</th><th>Impact &amp; current workaround</th></tr></thead>
+        <tbody>
+          <tr><td class="fn">Wave planning</td><td><span class="pill p-red">Gap</span></td><td class="note">No wave creation/release engine. Batch &amp; cluster picking partly compensate; transfer-order engine pre-stages work.</td></tr>
+          <tr><td class="fn">Labor management (LMS)</td><td><span class="pill p-red">Gap</span></td><td class="note">No engineered standards / performance tracking. Scan logs capture activity but not productivity KPIs.</td></tr>
+          <tr><td class="fn">Slotting optimization</td><td><span class="pill p-orange">Partial</span></td><td class="note">Putaway is rule/score-based, not a true optimizer (no LP/heuristic re-slotting). Covers most mid-market needs.</td></tr>
+          <tr><td class="fn">Yard / dock / appointment</td><td><span class="pill p-red">Gap</span></td><td class="note">No dock-door scheduling or yard management. Frontdesk module is visitor-oriented, not dock.</td></tr>
+          <tr><td class="fn">Voice / pick-to-light</td><td><span class="pill p-red">Gap</span></td><td class="note">RF/scan only. No voice-directed picking or light hardware integration.</td></tr>
+          <tr><td class="fn">Cartonization / load build</td><td><span class="pill p-red">Gap</span></td><td class="note">No 3D carton selection or truck load planning. Packing is manual against CE packages.</td></tr>
+          <tr><td class="fn">Carrier rate-shop / EDI / ASN</td><td><span class="pill p-orange">Partial</span></td><td class="note">CE lacks multi-carrier rate shopping &amp; EDI. Adapter framework exists; connectors are per-project.</td></tr>
+          <tr><td class="fn">Cross-dock automation</td><td><span class="pill p-orange">Partial</span></td><td class="note">Approximated via routes + transfer-order engine; no dedicated cross-dock flow.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 20. ROADMAP -->
+  <section class="slide">
+    <div class="eyebrow">Part C · Recommendation</div>
+    <h2>A pragmatic path to close the gaps</h2>
+    <div class="body">
+      <div class="grid g3" style="margin-top:6px">
+        <div class="card" style="border-top:4px solid var(--green)">
+          <h3>Now — high value, low effort</h3>
+          <p style="color:var(--slate)">• WMS KPI dashboard (accuracy, dock-to-stock, picks/hr) from existing scan logs.<br/>• Wave-lite: release batches by ship-date from the TO engine.<br/>• Carrier connector for the primary 3PL via the adapter framework.</p>
+        </div>
+        <div class="card" style="border-top:4px solid var(--yellow)">
+          <h3>Next — differentiators</h3>
+          <p style="color:var(--slate)">• Dock-door / appointment scheduling module.<br/>• Cartonization &amp; pack-bench flow.<br/>• Re-slotting recommendations from ABC velocity history.</p>
+        </div>
+        <div class="card" style="border-top:4px solid var(--orange)">
+          <h3>Later — only if demanded</h3>
+          <p style="color:var(--slate)">• Labor-management standards &amp; gamified KPIs.<br/>• Voice / pick-to-light integration.<br/>• EDI/ASN automation for enterprise trading partners.</p>
+        </div>
+      </div>
+      <p class="kicker" style="margin-top:20px"><b>Build vs integrate:</b> for the &ldquo;Later&rdquo; column, integrating a specialist WMS at the edge is often cheaper than rebuilding it — the platform already exposes the secure API and audit surface to do so cleanly.</p>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- 21. CLOSING -->
+  <section class="slide dark">
+    <div style="margin:auto 0;max-width:1000px">
+      <div class="eyebrow">In one line</div>
+      <h1 style="font-size:46px">Odoo here runs a real, mid-market WMS<br/>— directed, mobile, auditable — today.</h1>
+      <ul class="clean" style="margin-top:26px">
+        <li><b>Strong &amp; shipped:</b> putaway, cycle counting, transfer/replenishment, barcode &amp; RF mobility, QC, labeling — all on owned code with full audit.</li>
+        <li><b>Solid native base:</b> CE delivers locations, lots/serials, expiry/FEFO, routes, reservations, valuation.</li>
+        <li><b>Clear next steps:</b> KPI dashboards, wave-lite and a carrier connector unlock the most value first; Tier-1 features (LMS, voice, yard) are deliberate, demand-driven choices.</li>
+      </ul>
+      <div class="cover-meta" style="margin-top:34px">Recommended next action: <b>pick one target warehouse, deploy the Distribution pack, and run a 2-week pilot</b> to validate throughput on real handhelds.</div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential · Thank you</div>
+  </section>
+
+  <!-- APPENDIX DIVIDER -->
+  <section class="slide dark">
+    <div style="margin:auto 0">
+      <div class="eyebrow">Appendix</div>
+      <h1>Technical reference</h1>
+      <p class="sub" style="margin-top:18px">The data model, engines, integration surface and cron/security footprint behind the screens — for architects and the implementation team.</p>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- APPENDIX A: DATA MODEL -->
+  <section class="slide">
+    <div class="eyebrow">Appendix A · Data Model</div>
+    <h2>Custom WMS objects &amp; key fields</h2>
+    <p class="kicker">All models mix in <code>pdp.audited.mixin</code> + <code>mail.thread</code> and extend native <code>stock.*</code> — no forks of Odoo core.</p>
+    <div class="appx">
+      <div class="card dm">
+        <h3>custom_wms_putaway</h3>
+        <ul>
+          <li><b>custom.wms.putaway.strategy</b> — rule_set (ZWME001/ABC/FEFO), warehouse_id, auto_apply</li>
+          <li><b>custom.wms.putaway.rule</b> — tier 1–6, kind ×7, target/domain, abc_class, temperature_zone, custom_python</li>
+          <li><b>custom.wms.putaway.suggestion</b> — move_line_id, score, status: pending→applied/overridden/rejected</li>
+          <li><b>custom.putaway.engine</b> — propose() · apply_top_proposal() (&gt;90 auto)</li>
+        </ul>
+      </div>
+      <div class="card dm">
+        <h3>custom_wms_cycle_count</h3>
+        <ul>
+          <li><b>custom.cycle.count.plan</b> — method (ABC/random/zone/value/last), frequency, next_run_date</li>
+          <li><b>custom.cycle.count.session</b> — state: draft→in_progress→reviewing→closed; variance_count/value</li>
+          <li><b>custom.cycle.count.line</b> — expected/counted/variance_qty, status</li>
+          <li><b>custom.cycle.count.adjustment</b> — stock_move_id, approved_by_id</li>
+        </ul>
+      </div>
+      <div class="card dm">
+        <h3>custom_wms_to_engine</h3>
+        <ul>
+          <li><b>custom.to.rule</b> — trigger ×5, low_water_qty, expiry_days_ahead, source/target domains</li>
+          <li><b>custom.transfer.order</b> — source/target_location_id, planned/actual_qty, state, stock_move_id</li>
+          <li><b>custom.to.engine</b> — evaluate_all() · materialize() → stock.move</li>
+        </ul>
+      </div>
+      <div class="card dm">
+        <h3>custom_hht_bridge</h3>
+        <ul>
+          <li><b>hht.device</b> — device_id, model (Zebra/Honeywell/browser), api_key/secret, allowed_cidrs, status</li>
+          <li><b>hht.scan.log</b> — action ×6, barcode, location_id, qty, result, client_ip (append-only)</li>
+          <li><b>hht.sync.queue</b> — client_id, payload, state: queued→applied/deduped</li>
+        </ul>
+      </div>
+      <div class="card dm">
+        <h3>custom_barcode</h3>
+        <ul>
+          <li><b>custom.barcode.scan.session / batch.session / cluster.run</b> — picking(s), state, lines</li>
+          <li><b>custom.barcode.scan.line</b> — product_id, lot_id, raw_barcode, GS1 (gtin/lot/exp/serial)</li>
+          <li><b>custom.label.template · printer.config</b> (Zebra/ESC-POS/CUPS) <b>· print.queue</b></li>
+        </ul>
+      </div>
+      <div class="card dm">
+        <h3>custom_quality_full</h3>
+        <ul>
+          <li><b>quality.point</b> — operation (in/mfg/out), check_kind ×4, measure_min/max</li>
+          <li><b>quality.check</b> — state (waiting/pass/fail), measure_value, alert_id, inspection lines</li>
+          <li><b>quality.alert</b> (NCR) · <b>custom.quality.capa</b> (action_type) · <b>quality.signature</b></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+  <!-- APPENDIX B: ENGINES / ENDPOINTS / CRONS / SECURITY -->
+  <section class="slide">
+    <div class="eyebrow">Appendix B · Runtime</div>
+    <h2>Engines, endpoints, crons &amp; trust</h2>
+    <div class="twocol">
+      <div class="panel">
+        <h3>Engines &amp; algorithms</h3>
+        <ul class="clean">
+          <li><b>Putaway scoring</b> — 7 strategies, 0–100 confidence, strict tier priority; score &gt;90 auto-applies; <code>custom_python</code> via sandboxed <code>safe_eval</code>.</li>
+          <li><b>Transfer triggers</b> — low-water, expiry→scrap, zone-consolidation, picking-replenish, manual → materialized to real <code>stock.move</code>.</li>
+          <li><b>Cycle sampling</b> — ABC-velocity / random / zone / value / last-counted; variance posting behind a supervisor approval gate.</li>
+          <li><b>Barcode</b> — GS1 AI parsing (01/10/17/21/30/310n); batch auto-distribute &amp; cluster-by-location.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Integration, crons &amp; audit</h3>
+        <ul class="clean">
+          <li><b>REST</b> — <code>/api/hht/*</code> (HMAC-SHA256 + timestamp-drift + nonce + per-device CIDR); <code>/api/hht/datawedge</code> for wedge scanners.</li>
+          <li><b>Crons</b> — cycle-session generator (daily) · TO evaluate+materialize · barcode print-queue · HHT sync-queue purge (30 d).</li>
+          <li><b>Audit</b> — <code>pdp.audited.mixin</code> + <code>mail.thread</code> on every WMS model; append-only <code>hht.scan.log</code>.</li>
+          <li><b>Native base</b> — <code>stock.location / lot / quant / move(.line) / picking / warehouse</code>; labels via QWeb-PDF.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-tag">WMS Capability Deck · Confidential</div>
+  </section>
+
+</div>
+
+<!-- chrome -->
+<div class="hint">← → / Space to navigate · F fullscreen · Ctrl+P → PDF</div>
+<div class="chrome">
+  <div class="navbtn" id="prev">‹</div>
+  <div class="counter"><span id="cur">1</span> / <span id="total">21</span></div>
+  <div class="navbtn" id="next">›</div>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let i = 0;
+  const total = slides.length;
+  document.getElementById('total').textContent = total;
+  function show(n){
+    i = Math.max(0, Math.min(total-1, n));
+    slides.forEach((s,k)=>s.classList.toggle('active', k===i));
+    document.getElementById('cur').textContent = i+1;
+    document.getElementById('progress').style.width = ((i+1)/total*100)+'%';
+  }
+  function next(){show(i+1)} function prev(){show(i-1)}
+  document.getElementById('next').onclick = next;
+  document.getElementById('prev').onclick = prev;
+  document.addEventListener('keydown', e=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();next()}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();prev()}
+    else if(e.key==='Home'){show(0)} else if(e.key==='End'){show(total-1)}
+    else if(e.key.toLowerCase()==='f'){
+      if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}
+      else{document.exitFullscreen&&document.exitFullscreen()}
+    }
+  });
+  // click right/left third of screen to navigate (ignore controls)
+  document.getElementById('deck').addEventListener('click', e=>{
+    if(e.target.closest('.chrome')||e.target.closest('a')) return;
+    const x = e.clientX / window.innerWidth;
+    if(x>0.62) next(); else if(x<0.38) prev();
+  });
+  show(0);
+</script>
+</body>
+</html>
