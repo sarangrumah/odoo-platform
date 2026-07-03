@@ -7,6 +7,24 @@ class CustomFixedAssetDisposalWizard(models.TransientModel):
     _name = "custom.fixed.asset.disposal.wizard"
     _description = "Custom Fixed Asset Disposal Wizard"
 
+    def _default_asset(self):
+        return self.env["custom.fixed.asset"].browse(self.env.context.get("default_asset_id"))
+
+    def _default_surplus_account(self):
+        asset = self._default_asset()
+        if not asset:
+            return False
+        # Prefer the surplus account actually used by the latest revaluation.
+        reval = asset.revaluation_ids.filtered("surplus_account_id")[:1]
+        if reval:
+            return reval.surplus_account_id.id
+        return asset.group_id.default_revaluation_surplus_account_id.id if asset.group_id else False
+
+    def _default_retained_earnings(self):
+        asset = self._default_asset()
+        grp = asset.group_id if asset else False
+        return grp.default_retained_earnings_account_id.id if grp else False
+
     asset_id = fields.Many2one(
         comodel_name="custom.fixed.asset",
         required=True,
@@ -52,6 +70,24 @@ class CustomFixedAssetDisposalWizard(models.TransientModel):
         string="Proceeds Account",
         help="Receivable / bank account that will be debited for the proceeds.",
     )
+    surplus_balance = fields.Monetary(
+        related="asset_id.revaluation_surplus_balance",
+        readonly=True,
+        currency_field="currency_id",
+    )
+    surplus_account_id = fields.Many2one(
+        comodel_name="account.account",
+        string="Revaluation Surplus Account",
+        default=_default_surplus_account,
+        help="Equity account holding the revaluation surplus to be released.",
+    )
+    retained_earnings_account_id = fields.Many2one(
+        comodel_name="account.account",
+        string="Retained Earnings Account",
+        default=_default_retained_earnings,
+        help="Equity account the remaining revaluation surplus is transferred to on "
+        "disposal (IAS 16.41). Not routed through profit or loss.",
+    )
     create_journal_entry = fields.Boolean(
         default=True,
         help="If checked, a journal entry will be generated that retires the "
@@ -75,15 +111,18 @@ class CustomFixedAssetDisposalWizard(models.TransientModel):
         if self.create_journal_entry:
             move = self._create_disposal_move()
 
-        asset.write(
-            {
-                "state": "disposed",
-                "disposal_date": self.disposal_date,
-                "disposal_value": self.disposal_value,
-                "disposal_gain_loss": self.gain_loss,
-                "disposal_move_id": move.id if move else False,
-            }
-        )
+        disposal_vals = {
+            "state": "disposed",
+            "disposal_date": self.disposal_date,
+            "disposal_value": self.disposal_value,
+            "disposal_gain_loss": self.gain_loss,
+            "disposal_move_id": move.id if move else False,
+        }
+        # The surplus is transferred to retained earnings inside the disposal move;
+        # clear the running balance so it is not double-counted on a later action.
+        if move and asset.revaluation_surplus_balance:
+            disposal_vals["revaluation_surplus_balance"] = 0.0
+        asset.write(disposal_vals)
         asset.message_post(
             body=_(
                 "Asset disposed on %(date)s. Proceeds: %(value)s, gain/(loss): %(gain)s. %(note)s",
@@ -115,9 +154,21 @@ class CustomFixedAssetDisposalWizard(models.TransientModel):
             raise UserError(_("Gain account is required when proceeds exceed NBV."))
         if self.gain_loss < 0 and not self.loss_account_id:
             raise UserError(_("Loss account is required when proceeds fall short of NBV."))
+        surplus = asset.revaluation_surplus_balance or 0.0
+        if surplus > 0 and (not self.surplus_account_id or not self.retained_earnings_account_id):
+            raise UserError(
+                _(
+                    "This asset carries a revaluation surplus of %(amount)s. A "
+                    "revaluation surplus account and a retained earnings account are "
+                    "required to transfer it on disposal.",
+                    amount=surplus,
+                )
+            )
 
         accum = asset.accumulated_depreciation
-        cost = asset.acquisition_value
+        # Release the full carrying amount held in the asset account, including
+        # any cumulative revaluation booked over the asset's life.
+        cost = asset.acquisition_value + (asset.revaluation_value or 0.0)
         proceeds = self.disposal_value
         gain = self.gain_loss
 
@@ -183,6 +234,34 @@ class CustomFixedAssetDisposalWizard(models.TransientModel):
                         "account_id": self.gain_account_id.id,
                         "debit": 0.0,
                         "credit": gain,
+                    },
+                )
+            )
+        # IAS 16.41 — transfer any remaining revaluation surplus to retained
+        # earnings (an equity-to-equity movement; not through P&L). Balanced within
+        # itself, so it keeps the disposal move balanced.
+        if surplus > 0:
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "name": _("Release revaluation surplus"),
+                        "account_id": self.surplus_account_id.id,
+                        "debit": surplus,
+                        "credit": 0.0,
+                    },
+                )
+            )
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "name": _("Revaluation surplus to retained earnings"),
+                        "account_id": self.retained_earnings_account_id.id,
+                        "debit": 0.0,
+                        "credit": surplus,
                     },
                 )
             )

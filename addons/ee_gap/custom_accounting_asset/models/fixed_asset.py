@@ -56,6 +56,24 @@ class CustomFixedAsset(models.Model):
         default=fields.Date.context_today,
         tracking=True,
     )
+    posting_date = fields.Date(
+        string="Posting Date",
+        tracking=True,
+        copy=False,
+        help="Reference date used to schedule and date each depreciation entry. "
+        "Falls back to the acquisition date when left empty.",
+    )
+    depreciation_date_mode = fields.Selection(
+        selection=[
+            ("specific", "Specific date (same day as posting date)"),
+            ("next_month", "Specific date, next month"),
+            ("end_following_month", "End of the following month"),
+        ],
+        string="Depreciation Date Rule",
+        default="next_month",
+        required=True,
+        help="How each depreciation line date is derived from the posting date.",
+    )
     acquisition_value = fields.Monetary(
         required=True,
         currency_field="currency_id",
@@ -64,6 +82,37 @@ class CustomFixedAsset(models.Model):
     salvage_value = fields.Monetary(
         default=0.0,
         currency_field="currency_id",
+    )
+    revaluation_value = fields.Monetary(
+        string="Cumulative Revaluation",
+        default=0.0,
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
+        tracking=True,
+        help="Net cumulative revaluation booked to the asset account. Positive for "
+        "upward revaluations, negative for downward ones.",
+    )
+    revaluation_surplus_balance = fields.Monetary(
+        string="Revaluation Surplus Balance",
+        default=0.0,
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
+        tracking=True,
+        help="Credit balance of the revaluation surplus (equity) held for this asset. "
+        "A downward revaluation offsets this before hitting P&L; the remainder is "
+        "transferred to retained earnings on disposal.",
+    )
+    revaluation_loss_recognized = fields.Monetary(
+        string="Revaluation Loss Recognized",
+        default=0.0,
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
+        tracking=True,
+        help="Cumulative downward revaluation expensed to P&L that a future upward "
+        "revaluation reverses (as income) before crediting surplus.",
     )
     useful_life_months = fields.Integer(
         string="Useful Life (months)",
@@ -124,6 +173,19 @@ class CustomFixedAsset(models.Model):
         compute="_compute_depreciation_totals",
         currency_field="currency_id",
         store=False,
+    )
+
+    # ------------------------------------------------------------------
+    # Revaluation history
+    # ------------------------------------------------------------------
+    revaluation_ids = fields.One2many(
+        comodel_name="custom.fixed.asset.revaluation",
+        inverse_name="asset_id",
+        string="Revaluations",
+        copy=False,
+    )
+    revaluation_count = fields.Integer(
+        compute="_compute_revaluation_count",
     )
 
     # ------------------------------------------------------------------
@@ -207,6 +269,12 @@ class CustomFixedAsset(models.Model):
     # ------------------------------------------------------------------
     # On-change: pull defaults from group
     # ------------------------------------------------------------------
+    @api.onchange("acquisition_date")
+    def _onchange_acquisition_date(self):
+        for asset in self:
+            if asset.acquisition_date and not asset.posting_date:
+                asset.posting_date = asset.acquisition_date
+
     @api.onchange("group_id")
     def _onchange_group_id(self):
         for asset in self:
@@ -231,20 +299,46 @@ class CustomFixedAsset(models.Model):
         "depreciation_line_ids.amount",
         "depreciation_line_ids.posted",
         "acquisition_value",
+        "revaluation_value",
     )
     def _compute_depreciation_totals(self):
         for asset in self:
             posted = asset.depreciation_line_ids.filtered("posted")
             accum = sum(posted.mapped("amount"))
             asset.accumulated_depreciation = accum
-            asset.net_book_value = (asset.acquisition_value or 0.0) - accum
+            asset.net_book_value = (
+                (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0) - accum
+            )
+
+    def _compute_revaluation_count(self):
+        for asset in self:
+            asset.revaluation_count = len(asset.revaluation_ids)
 
     # ------------------------------------------------------------------
     # Schedule generation
     # ------------------------------------------------------------------
     def _depreciable_base(self):
         self.ensure_one()
-        return max(0.0, self.acquisition_value - (self.salvage_value or 0.0))
+        return max(
+            0.0,
+            self.acquisition_value + (self.revaluation_value or 0.0) - (self.salvage_value or 0.0),
+        )
+
+    def _depreciation_date_for(self, seq_number):
+        """Return the date of the depreciation line with the given month ordinal,
+        honouring ``depreciation_date_mode`` and anchored on ``posting_date``.
+        """
+        self.ensure_one()
+        start = self.posting_date or self.acquisition_date or fields.Date.context_today(self)
+        mode = self.depreciation_date_mode or "next_month"
+        if mode == "specific":
+            # Line 1 lands exactly on the posting date, then monthly increments.
+            return start + relativedelta(months=seq_number - 1)
+        if mode == "end_following_month":
+            # Last day of the month that follows the anchor by ``seq_number`` months.
+            return start + relativedelta(months=seq_number, day=31)
+        # next_month (default) — one month after the anchor for line 1.
+        return start + relativedelta(months=seq_number)
 
     def _build_schedule(self):
         """Regenerate the depreciation schedule. Already-posted lines are
@@ -266,7 +360,6 @@ class CustomFixedAsset(models.Model):
         if remaining <= 0:
             return
 
-        start = self.acquisition_date or fields.Date.context_today(self)
         first_seq = max(self.depreciation_line_ids.mapped("sequence")) + 1 if self.depreciation_line_ids else 1
         months_left = months - len(self.depreciation_line_ids.filtered("posted"))
         if months_left <= 0:
@@ -277,7 +370,7 @@ class CustomFixedAsset(models.Model):
             monthly = round(remaining / months_left, 2)
             running = 0.0
             for i in range(months_left):
-                line_date = start + relativedelta(months=first_seq + i)
+                line_date = self._depreciation_date_for(first_seq + i)
                 if i == months_left - 1:
                     # Absorb rounding residual in the last line so total == base.
                     amount = round(remaining - running, 2)
@@ -300,7 +393,7 @@ class CustomFixedAsset(models.Model):
             nbv = remaining
             running = 0.0
             for i in range(months_left):
-                line_date = start + relativedelta(months=first_seq + i)
+                line_date = self._depreciation_date_for(first_seq + i)
                 if i == months_left - 1:
                     amount = round(remaining - running, 2)
                 else:
@@ -388,6 +481,30 @@ class CustomFixedAsset(models.Model):
             "context": {"default_asset_id": self.id},
         }
 
+    def action_open_revaluation_wizard(self):
+        self.ensure_one()
+        if self.state != "running":
+            raise UserError(_("Only running assets can be revalued."))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Revalue Asset"),
+            "res_model": "custom.fixed.asset.revaluation.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_asset_id": self.id},
+        }
+
+    def action_view_revaluations(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Revaluations"),
+            "res_model": "custom.fixed.asset.revaluation",
+            "view_mode": "list,form",
+            "domain": [("asset_id", "=", self.id)],
+            "context": {"default_asset_id": self.id},
+        }
+
     # ------------------------------------------------------------------
     # Posting due depreciation lines
     # ------------------------------------------------------------------
@@ -449,6 +566,22 @@ class CustomFixedAsset(models.Model):
         _logger.info("custom.fixed.asset: posted %s depreciation lines", count)
         return count
 
+    def action_post_selected(self):
+        """Bulk-post every due depreciation line (as of today) for the assets
+        in ``self``. Wired to a list multi-select server action.
+        """
+        count = self._post_due_depreciation()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "type": "success" if count else "warning",
+                "title": _("Depreciation Posting"),
+                "message": _("%(count)s depreciation entr(y/ies) posted.", count=count),
+                "sticky": False,
+            },
+        }
+
     # ------------------------------------------------------------------
     # Create with sequence
     # ------------------------------------------------------------------
@@ -458,4 +591,7 @@ class CustomFixedAsset(models.Model):
             if vals.get("code", _("New")) == _("New"):
                 seq = self.env["ir.sequence"].next_by_code("custom.fixed.asset")
                 vals["code"] = seq or _("New")
+            # Default the depreciation anchor to the acquisition date.
+            if not vals.get("posting_date") and vals.get("acquisition_date"):
+                vals["posting_date"] = vals["acquisition_date"]
         return super().create(vals_list)

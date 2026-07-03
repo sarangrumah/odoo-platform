@@ -55,6 +55,39 @@ class TestCustomFixedAsset(TransactionCase):
             }
         )
 
+        cls.surplus_account = cls.Account.create(
+            {
+                "name": "Revaluation Surplus",
+                "code": "320100",
+                "account_type": "equity",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.reval_loss_account = cls.Account.create(
+            {
+                "name": "Revaluation Loss",
+                "code": "699200",
+                "account_type": "expense",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.reval_income_account = cls.Account.create(
+            {
+                "name": "Revaluation Income",
+                "code": "799200",
+                "account_type": "income_other",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.retained_earnings_account = cls.Account.create(
+            {
+                "name": "Retained Earnings",
+                "code": "330100",
+                "account_type": "equity",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+
         cls.group = cls.env["custom.fixed.asset.group"].create(
             {
                 "name": "Equipment",
@@ -219,6 +252,260 @@ class TestCustomFixedAsset(TransactionCase):
 
         grand = next(l for l in lines if l.get("type") == "grand_total")
         self.assertAlmostEqual(grand["ytd"], 11000.0, places=2)
+
+    def test_07_posting_date_modes(self):
+        # posting_date defaults to acquisition_date; next_month keeps behavior.
+        a_next = self._make_asset(depreciation_date_mode="next_month")
+        self.assertEqual(a_next.posting_date, date(2025, 1, 1))
+        a_next.action_confirm()
+        self.assertEqual(a_next.depreciation_line_ids.sorted("sequence")[0].date, date(2025, 2, 1))
+
+        # specific: line 1 lands exactly on the posting date.
+        a_spec = self._make_asset(
+            depreciation_date_mode="specific", posting_date=date(2025, 1, 10)
+        )
+        a_spec.action_confirm()
+        spec_lines = a_spec.depreciation_line_ids.sorted("sequence")
+        self.assertEqual(spec_lines[0].date, date(2025, 1, 10))
+        self.assertEqual(spec_lines[1].date, date(2025, 2, 10))
+
+        # end_following_month: last day of the month following the anchor.
+        a_eom = self._make_asset(
+            depreciation_date_mode="end_following_month", posting_date=date(2025, 1, 15)
+        )
+        a_eom.action_confirm()
+        eom_lines = a_eom.depreciation_line_ids.sorted("sequence")
+        self.assertEqual(eom_lines[0].date, date(2025, 2, 28))
+        self.assertEqual(eom_lines[1].date, date(2025, 3, 31))
+
+    def test_08_bulk_post_wizard_and_action(self):
+        a1 = self._make_asset(name="Bulk A")
+        a2 = self._make_asset(name="Bulk B")
+        a1.action_confirm()
+        a2.action_confirm()
+
+        # Wizard posts every running asset's lines due on/before the cutoff.
+        wiz = self.env["custom.fixed.asset.post.wizard"].create(
+            {"cutoff_date": date(2025, 3, 5)}
+        )
+        wiz.action_post()
+        self.assertEqual(len(a1.depreciation_line_ids.filtered("posted")), 2)
+        self.assertEqual(len(a2.depreciation_line_ids.filtered("posted")), 2)
+
+        # Multi-select server-action entry point posts the rest as of today.
+        with self._mock_today(date(2025, 6, 5)):
+            (a1 | a2).action_post_selected()
+        self.assertEqual(len(a1.depreciation_line_ids.filtered("posted")), 5)
+        self.assertEqual(len(a2.depreciation_line_ids.filtered("posted")), 5)
+
+    def test_09_revaluation_upward_prospective(self):
+        asset = self._make_asset()
+        asset.action_confirm()
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))  # 3 months posted
+        posted_before = asset.depreciation_line_ids.filtered("posted")
+        posted_moves = posted_before.mapped("move_id")
+        self.assertEqual(len(posted_before), 3)
+
+        wiz = self.env["custom.fixed.asset.revaluation.wizard"].create(
+            {
+                "asset_id": asset.id,
+                "revaluation_date": date(2025, 4, 30),
+                "new_value": 13500.0,  # NBV 9000 -> +4500
+                "new_remaining_life": 6,
+                "surplus_account_id": self.surplus_account.id,
+                "journal_id": self.journal.id,
+            }
+        )
+        self.assertAlmostEqual(wiz.revaluation_amount, 4500.0, places=2)
+        wiz.action_revalue()
+
+        # Posted lines and their moves are untouched.
+        for line in posted_before:
+            self.assertTrue(line.posted)
+            self.assertAlmostEqual(line.amount, 1000.0, places=2)
+        self.assertEqual(set(posted_before.mapped("move_id").ids), set(posted_moves.ids))
+        for mv in posted_moves:
+            self.assertEqual(mv.state, "posted")
+
+        # Carrying value and schedule reflect the new value going forward.
+        self.assertAlmostEqual(asset.revaluation_value, 4500.0, places=2)
+        self.assertAlmostEqual(asset.net_book_value, 13500.0, places=2)
+        self.assertEqual(asset.useful_life_months, 9)  # 3 posted + 6 remaining
+        unposted = asset.depreciation_line_ids.filtered(lambda l: not l.posted)
+        self.assertEqual(len(unposted), 6)
+        self.assertAlmostEqual(sum(unposted.mapped("amount")), 13500.0, places=2)
+        self.assertAlmostEqual(unposted.sorted("sequence")[0].amount, 2250.0, places=2)
+
+        # A balanced revaluation entry exists: DR asset / CR surplus.
+        self.assertEqual(asset.revaluation_count, 1)
+        reval = asset.revaluation_ids
+        move = reval.move_id
+        self.assertTrue(move)
+        self.assertAlmostEqual(
+            sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2
+        )
+        asset_line = move.line_ids.filtered(lambda l: l.account_id == self.asset_account)
+        surplus_line = move.line_ids.filtered(lambda l: l.account_id == self.surplus_account)
+        self.assertAlmostEqual(asset_line.debit, 4500.0, places=2)
+        self.assertAlmostEqual(surplus_line.credit, 4500.0, places=2)
+
+    def test_10_revaluation_downward(self):
+        asset = self._make_asset()
+        asset.action_confirm()
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))  # NBV 9000
+
+        wiz = self.env["custom.fixed.asset.revaluation.wizard"].create(
+            {
+                "asset_id": asset.id,
+                "revaluation_date": date(2025, 4, 30),
+                "new_value": 6000.0,  # -3000
+                "new_remaining_life": 9,
+                "loss_account_id": self.reval_loss_account.id,
+                "journal_id": self.journal.id,
+            }
+        )
+        wiz.action_revalue()
+        self.assertAlmostEqual(asset.revaluation_value, -3000.0, places=2)
+        self.assertAlmostEqual(asset.net_book_value, 6000.0, places=2)
+        move = asset.revaluation_ids.move_id
+        loss_line = move.line_ids.filtered(lambda l: l.account_id == self.reval_loss_account)
+        asset_line = move.line_ids.filtered(lambda l: l.account_id == self.asset_account)
+        self.assertAlmostEqual(loss_line.debit, 3000.0, places=2)
+        self.assertAlmostEqual(asset_line.credit, 3000.0, places=2)
+
+    def test_11_disposal_after_revaluation_releases_full_carrying(self):
+        asset = self._make_asset()
+        asset.action_confirm()
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))  # accum 3000
+
+        self.env["custom.fixed.asset.revaluation.wizard"].create(
+            {
+                "asset_id": asset.id,
+                "revaluation_date": date(2025, 4, 30),
+                "new_value": 13500.0,  # +4500 -> carrying 16500
+                "new_remaining_life": 9,
+                "surplus_account_id": self.surplus_account.id,
+                "journal_id": self.journal.id,
+            }
+        ).action_revalue()
+
+        proceeds_account = self.Account.create(
+            {
+                "name": "Disposal proceeds clearing",
+                "code": "110950",
+                "account_type": "asset_current",
+                "company_ids": [(6, 0, [self.company.id])],
+            }
+        )
+        wiz = self.env["custom.fixed.asset.disposal.wizard"].create(
+            {
+                "asset_id": asset.id,
+                "disposal_date": date(2025, 5, 31),
+                "disposal_value": 13500.0,  # equals NBV -> no gain/loss
+                "receivable_account_id": proceeds_account.id,
+                "surplus_account_id": self.surplus_account.id,
+                "retained_earnings_account_id": self.retained_earnings_account.id,
+            }
+        )
+        wiz.action_dispose()
+        move = asset.disposal_move_id
+        self.assertTrue(move)
+        # Full carrying (acquisition 12000 + revaluation 4500) is released.
+        asset_line = move.line_ids.filtered(lambda l: l.account_id == self.asset_account)
+        self.assertAlmostEqual(asset_line.credit, 16500.0, places=2)
+        # Revaluation surplus (4500) transferred to retained earnings and cleared.
+        surplus_line = move.line_ids.filtered(lambda l: l.account_id == self.surplus_account)
+        re_line = move.line_ids.filtered(lambda l: l.account_id == self.retained_earnings_account)
+        self.assertAlmostEqual(surplus_line.debit, 4500.0, places=2)
+        self.assertAlmostEqual(re_line.credit, 4500.0, places=2)
+        self.assertAlmostEqual(asset.revaluation_surplus_balance, 0.0, places=2)
+        self.assertAlmostEqual(
+            sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2
+        )
+
+    def test_12_downward_offsets_existing_surplus(self):
+        asset = self._make_asset()
+        asset.action_confirm()
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))  # NBV 9000
+
+        # Upward first to create a 2000 surplus.
+        self.env["custom.fixed.asset.revaluation.wizard"].create(
+            {
+                "asset_id": asset.id,
+                "revaluation_date": date(2025, 4, 30),
+                "new_value": 11000.0,  # +2000
+                "new_remaining_life": 9,
+                "surplus_account_id": self.surplus_account.id,
+                "journal_id": self.journal.id,
+            }
+        ).action_revalue()
+        self.assertAlmostEqual(asset.revaluation_surplus_balance, 2000.0, places=2)
+
+        # Downward by 3000: 2000 offsets the surplus, 1000 goes to P&L loss.
+        self.env["custom.fixed.asset.revaluation.wizard"].create(
+            {
+                "asset_id": asset.id,
+                "revaluation_date": date(2025, 5, 31),
+                "new_value": 8000.0,  # -3000
+                "new_remaining_life": 9,
+                "surplus_account_id": self.surplus_account.id,
+                "loss_account_id": self.reval_loss_account.id,
+                "journal_id": self.journal.id,
+            }
+        ).action_revalue()
+
+        self.assertAlmostEqual(asset.revaluation_surplus_balance, 0.0, places=2)
+        self.assertAlmostEqual(asset.revaluation_loss_recognized, 1000.0, places=2)
+        self.assertAlmostEqual(asset.net_book_value, 8000.0, places=2)
+        move = asset.revaluation_ids.sorted("id")[-1].move_id
+        surplus_line = move.line_ids.filtered(lambda l: l.account_id == self.surplus_account)
+        loss_line = move.line_ids.filtered(lambda l: l.account_id == self.reval_loss_account)
+        asset_line = move.line_ids.filtered(lambda l: l.account_id == self.asset_account)
+        self.assertAlmostEqual(surplus_line.debit, 2000.0, places=2)
+        self.assertAlmostEqual(loss_line.debit, 1000.0, places=2)
+        self.assertAlmostEqual(asset_line.credit, 3000.0, places=2)
+
+    def test_13_upward_reverses_prior_loss(self):
+        asset = self._make_asset()
+        asset.action_confirm()
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))  # NBV 9000
+
+        # Downward first to expense a 3000 loss.
+        self.env["custom.fixed.asset.revaluation.wizard"].create(
+            {
+                "asset_id": asset.id,
+                "revaluation_date": date(2025, 4, 30),
+                "new_value": 6000.0,  # -3000
+                "new_remaining_life": 9,
+                "loss_account_id": self.reval_loss_account.id,
+                "journal_id": self.journal.id,
+            }
+        ).action_revalue()
+        self.assertAlmostEqual(asset.revaluation_loss_recognized, 3000.0, places=2)
+
+        # Upward by 4000: 3000 reverses the prior loss (income), 1000 to surplus.
+        self.env["custom.fixed.asset.revaluation.wizard"].create(
+            {
+                "asset_id": asset.id,
+                "revaluation_date": date(2025, 5, 31),
+                "new_value": 10000.0,  # +4000
+                "new_remaining_life": 9,
+                "surplus_account_id": self.surplus_account.id,
+                "income_account_id": self.reval_income_account.id,
+                "journal_id": self.journal.id,
+            }
+        ).action_revalue()
+
+        self.assertAlmostEqual(asset.revaluation_loss_recognized, 0.0, places=2)
+        self.assertAlmostEqual(asset.revaluation_surplus_balance, 1000.0, places=2)
+        self.assertAlmostEqual(asset.net_book_value, 10000.0, places=2)
+        move = asset.revaluation_ids.sorted("id")[-1].move_id
+        income_line = move.line_ids.filtered(lambda l: l.account_id == self.reval_income_account)
+        surplus_line = move.line_ids.filtered(lambda l: l.account_id == self.surplus_account)
+        asset_line = move.line_ids.filtered(lambda l: l.account_id == self.asset_account)
+        self.assertAlmostEqual(income_line.credit, 3000.0, places=2)
+        self.assertAlmostEqual(surplus_line.credit, 1000.0, places=2)
+        self.assertAlmostEqual(asset_line.debit, 4000.0, places=2)
 
     def _mock_today(self, today):
         """Lightweight context manager that monkey-patches
