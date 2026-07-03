@@ -36,10 +36,16 @@ credit notes, and shows which GR and vendor bill back every slice.
 - **Stock**: drives core `stock.return.picking` wizard per source GR;
   `_create_return()` copies moves so `purchase_line_id` survives (field has
   no `copy=False`), sets `origin_returned_move_id`, `to_refund=True`
-  (stock_account default). Done qty forced + `picked=True`, validated with
-  `skip_backorder` + `picking_ids_not_to_backorder` context.
-  `qty_received` decrement happens in core
+  (stock_account default). The return picking is left in its natural
+  **draft/ready** state (core already `action_confirm`+`action_assign`ed it) —
+  `custom.po.return` only wires `allocation.return_move_id/return_picking_id`;
+  it does **not** force done qty or validate. The warehouse validates each
+  return picking manually, and only then does the inventory move post (stock
+  out + valuation journal) and `qty_received` decrement in core
   (`purchase_stock/.../purchase_order_line.py::_prepare_qty_received`).
+  Over-return protection still holds pre-validation because
+  `_get_move_returnable_qty` counts confirmed (non-done) `returned_move_ids`
+  by their demand qty.
 - **Valuation**: Odoo 19 has NO `stock.valuation.layer`; `stock.move.value`
   resolves via posted bill of the POL, else PO price
   (`_get_value_from_quotation`). Return moves carry `purchase_line_id`, so

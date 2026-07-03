@@ -22,6 +22,17 @@ class TestPoReturn(PurchaseTestCommon):
     def _make_received_po(self, qty, price):
         return self._create_purchase(self.product, qty, price, receive=True)
 
+    def _validate_pickings(self, pickings):
+        """Validate return pickings manually (they are now created as draft)."""
+        for picking in pickings:
+            for move in picking.move_ids:
+                move.quantity = move.product_uom_qty
+                move.picked = True
+            picking.with_context(
+                skip_backorder=True,
+                picking_ids_not_to_backorder=picking.ids,
+            ).button_validate()
+
     def _make_return(self, lines, partner=None):
         return self.env["custom.po.return"].create(
             {
@@ -67,19 +78,28 @@ class TestPoReturn(PurchaseTestCommon):
         ret.action_validate()
         self.assertEqual(ret.state, "done")
 
-        # Inventory decreased by the full returned quantity
-        self.assertEqual(self.product.qty_available, qty_before - 55)
-
-        # qty_received netted per PO by the standard to_refund mechanism
-        self.assertEqual(po1.order_line.qty_received, 0)
-        self.assertEqual(po2.order_line.qty_received, 0)
-        self.assertEqual(po3.order_line.qty_received, 5)
-
-        # One return picking per source GR, all done
+        # One return picking per source GR, created as DRAFT (ready) for manual
+        # validation -- not auto-completed. Stock and qty_received are untouched
+        # until the warehouse validates each picking.
         self.assertEqual(len(ret.return_picking_ids), 3)
+        self.assertTrue(
+            all(p.state not in ("done", "cancel") for p in ret.return_picking_ids)
+        )
+        self.assertEqual(self.product.qty_available, qty_before)
+        self.assertEqual(po1.order_line.qty_received, 20)
+        self.assertEqual(po2.order_line.qty_received, 30)
+        self.assertEqual(po3.order_line.qty_received, 10)
+
+        # Validating the return pickings moves the stock and nets qty_received
+        # per PO through the standard to_refund mechanism.
+        self._validate_pickings(ret.return_picking_ids)
         self.assertTrue(
             all(p.state == "done" for p in ret.return_picking_ids)
         )
+        self.assertEqual(self.product.qty_available, qty_before - 55)
+        self.assertEqual(po1.order_line.qty_received, 0)
+        self.assertEqual(po2.order_line.qty_received, 0)
+        self.assertEqual(po3.order_line.qty_received, 5)
 
         # GR + invoice traceability on allocations
         self.assertEqual(ret.allocation_ids[0].source_bill_id, bill1)
@@ -118,6 +138,12 @@ class TestPoReturn(PurchaseTestCommon):
         self.assertEqual(second.allocation_ids.order_id, po3)
         self.assertEqual(second.allocation_ids.qty, 5)
         second.action_validate()
+
+        # PO3 received 10, returned 5 + 5 across both returns; qty_received nets
+        # to 0 only once both draft return pickings are validated.
+        self._validate_pickings(
+            first.return_picking_ids | second.return_picking_ids
+        )
         self.assertEqual(po3.order_line.qty_received, 0)
 
     def test_over_return_raises(self):

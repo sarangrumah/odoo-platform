@@ -15,18 +15,26 @@ transfer, if a line's done quantity exceeds its demand (ordered) quantity, a
 `UserError` is raised listing the offending products. Partial receipts
 (done < demand, → backorder) are unaffected.
 
-## 3. No inventory journal at Goods Receipt confirm
-`models/stock_move.py` overrides `_should_create_account_move` to return
-`False` for vendor goods receipts (moves whose source location usage is
-`supplier`). The stock **valuation layer / `stock.move.value`** is still
-produced, so on-hand quantity and value stay correct; only the GL
-`account.move` at receipt is skipped. Outgoing/COGS, internal transfers,
-manufacturing and customer returns keep posting normally.
+## 3. Inventory journal at Goods Receipt & Vendor Return (opt-in switch)
+`models/stock_move.py` books inventory GL directly through the product
+category pair `property_stock_valuation_account_id` +
+`account_stock_variation_id` (this build has no stock input/output interim
+accounts, so core real-time valuation posts nothing on its own). Behaviour is
+governed by the `ir.config_parameter`
+`custom_levis_localization.suppress_gr_journal` (default **OFF**):
 
-> **Accounting note:** because the receipt no longer credits the *Stock Interim
-> (Received)* account, posting the related vendor bill (anglo-saxon) will leave a
-> balance on that interim account. Reconcile inventory value into the GL via a
-> periodic manual journal, or revisit this if full perpetual GL is required.
+- **Goods receipt** (source = supplier): `Dr Stock Valuation /
+  Cr Stock Variation` for `move.value` — ref `GR-VAL:<move id>`.
+- **Vendor return / RTV** (destination = supplier): the exact reverse,
+  `Dr Stock Variation / Cr Stock Valuation` — ref `GR-RET-VAL:<move id>`.
+
+Both fire on `_action_done`, only for `real_time` categories, and are
+idempotent by `ref`. The stock `stock.move.value` is produced either way, so
+on-hand quantity and value stay correct.
+
+> **Switch ON (periodic mode):** both the receipt and the return journals are
+> suppressed and the GL is trued up later by the **Inventory Reconciliation**
+> tool (section 5). Use this only if perpetual GL posting is not wanted.
 
 ## 4. Payment Voucher & Payment Receipt
 `reports/` adds two branded PDF documents on `account.payment`, bound to its
