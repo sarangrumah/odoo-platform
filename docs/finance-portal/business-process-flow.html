@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Portal — Alur Proses Bisnis (Odoo × SAP × HRIS)</title>
+<style>
+  :root{
+    --ink:#1a2332;
+    --muted:#5b6878;
+    --line:#d7dde6;
+    --bg:#f4f6f9;
+    --card:#ffffff;
+    --emp:#b9770e;        /* Karyawan amber */
+    --emp-bg:#fdf3e3;
+    --vendor:#c0392b;     /* Vendor red */
+    --vendor-bg:#fdedec;
+    --odoo:#714b67;       /* Odoo purple */
+    --odoo-bg:#f3ecf1;
+    --sap:#0a6ed1;        /* SAP blue */
+    --sap-bg:#e8f1fb;
+    --bridge:#1e7d4e;     /* Bridge / Kafka green */
+    --bridge-bg:#e7f4ed;
+    --hris:#7d3c98;       /* HRIS violet */
+    --hris-bg:#f5eef8;
+    --kc:#d68910;         /* Keycloak / SSO amber-dark */
+    --kc-bg:#fef5e7;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;padding:32px 24px 64px;}
+  .wrap{max-width:1280px;margin:0 auto;}
+
+  header.doc{border-bottom:3px solid var(--ink);padding-bottom:16px;margin-bottom:8px;}
+  header.doc h1{font-size:26px;letter-spacing:.2px;}
+  header.doc .sub{color:var(--muted);font-size:14px;margin-top:4px;}
+  .meta{display:flex;gap:24px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:10px 0 28px;}
+  .meta b{color:var(--ink);}
+
+  h2.section{font-size:18px;margin:40px 0 6px;display:flex;align-items:center;gap:10px;}
+  h2.section .no{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;font-size:14px;flex:none;}
+  p.section-desc{color:var(--muted);font-size:13.5px;margin-bottom:18px;max-width:900px;}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 6px;font-size:12.5px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line);}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+
+  /* swimlane */
+  .lanes{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:14px;}
+  .lanes-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px;}
+  .lane{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
+  .lane-h{padding:10px 14px;font-weight:700;font-size:13.5px;color:#fff;display:flex;flex-direction:column;gap:2px;}
+  .lane-h small{font-weight:400;opacity:.85;font-size:11.5px;}
+  .lane-b{padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;}
+  .lane.emp    .lane-h{background:var(--emp);}
+  .lane.vendor .lane-h{background:var(--vendor);}
+  .lane.odoo   .lane-h{background:var(--odoo);}
+  .lane.sap    .lane-h{background:var(--sap);}
+  .lane.bridge .lane-h{background:var(--bridge);}
+  .lane.hris   .lane-h{background:var(--hris);}
+
+  .node{border-radius:8px;padding:9px 12px;font-size:12.5px;border:1px solid;position:relative;}
+  .node b{display:block;font-size:12.5px;}
+  .node small{color:var(--muted);font-size:11px;display:block;margin-top:2px;}
+  .node.emp   {background:var(--emp-bg);border-color:#f0ddb6;}
+  .node.vendor{background:var(--vendor-bg);border-color:#f2c4c0;}
+  .node.odoo  {background:var(--odoo-bg);border-color:#e0cdd9;}
+  .node.sap   {background:var(--sap-bg);border-color:#bcd6f2;}
+  .node.bridge{background:var(--bridge-bg);border-color:#bfe2cf;}
+  .node.hris  {background:var(--hris-bg);border-color:#d2b4de;}
+  .node.kc    {background:var(--kc-bg);border-color:#f8e0a0;}
+  .badge{position:absolute;top:-9px;right:8px;background:var(--ink);color:#fff;font-size:10px;padding:1px 8px;border-radius:999px;letter-spacing:.3px;}
+
+  /* flow */
+  .flow{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-top:14px;}
+  .flow-title{font-weight:700;font-size:14.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  .pill{font-size:10.5px;font-weight:700;letter-spacing:.5px;color:#fff;padding:2px 9px;border-radius:999px;}
+  .pill.emp   {background:var(--emp);}    .pill.vendor{background:var(--vendor);}
+  .pill.odoo  {background:var(--odoo);}   .pill.sap   {background:var(--sap);}
+  .pill.bridge{background:var(--bridge);} .pill.hris  {background:var(--hris);}
+  .pill.kc    {background:var(--kc);}
+
+  .steps{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;}
+  .step{flex:1;min-width:150px;border-radius:10px;border:1.5px solid;padding:12px 14px;font-size:12.5px;position:relative;}
+  .step b{display:block;font-size:13px;margin-bottom:3px;}
+  .step small{color:var(--muted);font-size:11px;line-height:1.45;display:block;}
+  .step .sys{display:inline-block;margin-top:8px;font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 8px;border-radius:4px;color:#fff;}
+  .step.emp   {background:var(--emp-bg);border-color:var(--emp);}    .step.emp    .sys{background:var(--emp);}
+  .step.vendor{background:var(--vendor-bg);border-color:var(--vendor);} .step.vendor .sys{background:var(--vendor);}
+  .step.odoo  {background:var(--odoo-bg);border-color:var(--odoo);}  .step.odoo   .sys{background:var(--odoo);}
+  .step.sap   {background:var(--sap-bg);border-color:var(--sap);}    .step.sap    .sys{background:var(--sap);}
+  .step.bridge{background:var(--bridge-bg);border-color:var(--bridge);} .step.bridge .sys{background:var(--bridge);}
+  .step.hris  {background:var(--hris-bg);border-color:var(--hris);}  .step.hris   .sys{background:var(--hris);}
+  .step.kc    {background:var(--kc-bg);border-color:var(--kc);}      .step.kc     .sys{background:var(--kc);}
+  .arrow{display:flex;align-items:center;justify-content:center;min-width:34px;color:var(--muted);font-size:20px;flex:none;}
+  .arrow span{transform:translateY(-1px);}
+
+  /* table */
+  table.feeds{width:100%;border-collapse:collapse;margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:12.5px;}
+  table.feeds th,table.feeds td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  table.feeds th{background:var(--ink);color:#fff;font-size:12px;letter-spacing:.3px;}
+  table.feeds tr:last-child td{border-bottom:none;}
+  table.feeds code{background:#eef1f5;padding:1px 6px;border-radius:4px;font-size:11.5px;font-family:Consolas,monospace;}
+  table.feeds td small{color:var(--muted);}
+
+  /* lifecycle states */
+  .states{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin-top:14px;}
+  .state-box{border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;border:1.5px solid;text-align:center;min-width:90px;}
+  .state-box small{display:block;font-weight:400;font-size:10.5px;color:var(--muted);margin-top:2px;}
+  .state-arrow{color:var(--muted);font-size:18px;padding:0 6px;display:flex;align-items:center;}
+  .st-draft   {background:#f8f9fa;border-color:#ced4da;}
+  .st-submit  {background:#e8f1fb;border-color:var(--sap);color:var(--sap);}
+  .st-tax     {background:var(--kc-bg);border-color:var(--kc);color:var(--kc);}
+  .st-fin     {background:var(--odoo-bg);border-color:var(--odoo);color:var(--odoo);}
+  .st-approved{background:#d4edda;border-color:#28a745;color:#1a6530;}
+  .st-pushed  {background:var(--bridge-bg);border-color:var(--bridge);color:var(--bridge);}
+  .st-posted  {background:var(--sap-bg);border-color:var(--sap);color:var(--sap);}
+  .st-paid    {background:#d1f2eb;border-color:#1abc9c;color:#0e6655;}
+  .st-reject  {background:#fce4e4;border-color:#e74c3c;color:#c0392b;}
+  .st-cancel  {background:#f0f0f0;border-color:#aaa;color:#555;}
+
+  /* module cards */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:14px;}
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:14px;}
+  .modcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;}
+  .modcard h3{font-size:14px;display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .modcard ul{list-style:none;font-size:12.5px;}
+  .modcard ul li{padding:7px 0;border-bottom:1px dashed var(--line);}
+  .modcard ul li:last-child{border-bottom:none;}
+  .modcard ul li code{background:#eef1f5;padding:1px 6px;border-radius:4px;font-size:11.5px;font-family:Consolas,monospace;}
+  .modcard ul li small{display:block;color:var(--muted);font-size:11px;margin-top:2px;}
+
+  .tag{font-size:10px;font-weight:700;letter-spacing:.5px;padding:2px 8px;border-radius:4px;color:#fff;}
+  .tag.odoo  {background:var(--odoo);}  .tag.sap   {background:var(--sap);}
+  .tag.bridge{background:var(--bridge);}  .tag.hris  {background:var(--hris);}
+  .tag.kc    {background:var(--kc);}  .tag.dark  {background:var(--ink);}
+  .tag.ok    {background:#28a745;} .tag.warn  {background:#e67e22;} .tag.tbd{background:#95a5a6;}
+
+  /* feat */
+  .feat{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px;}
+  .feat .f{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--bridge);border-radius:8px;padding:11px 14px;font-size:12.5px;}
+  .feat .f b{display:block;font-size:12.5px;}
+  .feat .f small{color:var(--muted);font-size:11px;}
+
+  .note{margin-top:26px;background:#fff8e6;border:1px solid #efdca3;border-radius:10px;padding:14px 18px;font-size:12.5px;color:#6b5712;}
+  .note b{color:#4d3f0c;}
+  .note.danger{background:#fdecec;border-color:#f0bcbc;color:#7a1f1f;}
+  .note.danger b{color:#7a1f1f;}
+  .note.info{background:#e8f4f8;border-color:#a9cfe4;color:#1a4f6e;}
+  .note.info b{color:#1a4f6e;}
+
+  footer{margin-top:42px;border-top:1px solid var(--line);padding-top:12px;font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+
+  @media(max-width:1024px){.lanes{grid-template-columns:repeat(3,1fr);} .lanes-4{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:800px){.lanes,.lanes-4,.grid3,.grid2{grid-template-columns:1fr;} .feat{grid-template-columns:1fr;} .steps{flex-direction:column;} .arrow{transform:rotate(90deg);min-height:30px;}}
+  @media print{body{background:#fff;padding:0;} .flow,.lane,.modcard{break-inside:avoid;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <h1>Alur Proses Bisnis — Finance Portal (Odoo × SAP × HRIS)</h1>
+  <div class="sub">System of Engagement (Odoo 19) &nbsp;×&nbsp; System of Record (SAP S/4HANA) &nbsp;×&nbsp; HRIS Travel &nbsp;×&nbsp; Keycloak SSO</div>
+</header>
+<div class="meta">
+  <span><b>Klien:</b> PT Erajaya Group</span>
+  <span><b>Sistem:</b> Odoo 19 CE · SAP S/4HANA · SAP Bridge (FastAPI) · Kafka · HRIS</span>
+  <span><b>Prinsip:</b> Odoo = Form + Approval + Tracking — bukan GL posting. SAP = System of Record.</span>
+  <span><b>Versi:</b> 2.0 · Juni 2026</span>
+</div>
+
+<!-- ================= 1. OVERVIEW SWIMLANE ================= -->
+<h2 class="section"><span class="no">1</span> Peta Aktor &amp; Sistem (Overview)</h2>
+<p class="section-desc">Lima aktor utama: Karyawan sebagai pengaju dokumen (CA, Reimb, Travel), Vendor sebagai pengaju invoice melalui portal mandiri, Tim Finance &amp; Tax sebagai approver, Odoo Finance Portal sebagai sistem engagement (form + approval + tracking), dan SAP S/4HANA sebagai system of record (GL posting, MIRO, pembayaran). Semua komunikasi ke SAP hanya melalui Kafka via SAP Bridge — Odoo tidak pernah terhubung langsung ke SAP.</p>
+
+<div class="legend">
+  <span><span class="dot" style="background:var(--emp)"></span> Karyawan</span>
+  <span><span class="dot" style="background:var(--vendor)"></span> Vendor</span>
+  <span><span class="dot" style="background:var(--odoo)"></span> Odoo Finance Portal</span>
+  <span><span class="dot" style="background:var(--bridge)"></span> SAP Bridge + Kafka</span>
+  <span><span class="dot" style="background:var(--sap)"></span> SAP S/4HANA</span>
+  <span><span class="dot" style="background:var(--hris)"></span> HRIS</span>
+  <span><span class="dot" style="background:var(--kc)"></span> Keycloak (SSO)</span>
+</div>
+
+<div class="lanes">
+  <div class="lane emp">
+    <div class="lane-h">Karyawan<small>Pengaju internal</small></div>
+    <div class="lane-b">
+      <div class="node emp"><b>Login via SSO Keycloak</b><small>Redirect → Keycloak OIDC → back ke Odoo</small></div>
+      <div class="node emp"><b>Buat &amp; Submit Dokumen</b><small>Cash Advance, Reimbursement, Travel Settlement</small></div>
+      <div class="node emp"><b>Tracking Status</b><small>Dashboard: dari submitted sampai paid</small></div>
+    </div>
+  </div>
+  <div class="lane vendor">
+    <div class="lane-h">Vendor<small>Pengaju invoice eksternal</small></div>
+    <div class="lane-b">
+      <div class="node vendor"><b>Self-register / Invite</b><small>NPWP divalidasi ke master SAP; approval Finance Admin</small></div>
+      <div class="node vendor"><b>Upload Invoice PDF + OCR</b><small>Tesseract pre-fill form; vendor konfirmasi sebelum submit</small></div>
+      <div class="node vendor"><b>Tracking PO/GR &amp; Pembayaran</b><small>Status payment plan dari SAP via webhook</small></div>
+    </div>
+  </div>
+  <div class="lane odoo">
+    <div class="lane-h">Odoo Finance Portal<small>System of Engagement</small></div>
+    <div class="lane-b">
+      <div class="node odoo"><span class="badge">A</span><b>Form + Validasi PR &amp; Budget</b><small>PR lookup ke Bridge cache; cek budget per divisi</small></div>
+      <div class="node odoo"><span class="badge">B</span><b>Approval Tax → Finance</b><small>2-tier approval; approval matrix per company</small></div>
+      <div class="node odoo"><span class="badge">C</span><b>Push ke SAP (async)</b><small>queue_job → Bridge → Kafka → SAP; tidak blocking UI</small></div>
+      <div class="node odoo"><b>Terima Status dari SAP</b><small>Webhook HMAC: posting-confirm → paid</small></div>
+    </div>
+  </div>
+  <div class="lane bridge">
+    <div class="lane-h">SAP Bridge + Kafka<small>Satu-satunya titik integrasi</small></div>
+    <div class="lane-b">
+      <div class="node bridge"><b>Kafka Consumer (inbound)</b><small>Consume topic SAP/HRIS → simpan ke Redis cache</small></div>
+      <div class="node bridge"><b>HMAC REST Endpoints</b><small>Odoo query Bridge via REST internal; Bridge query Redis</small></div>
+      <div class="node bridge"><b>Kafka Producer (outbound)</b><small>Terima push Odoo → produce ke topic SAP</small></div>
+    </div>
+  </div>
+  <div class="lane sap">
+    <div class="lane-h">SAP S/4HANA + HRIS<small>System of Record</small></div>
+    <div class="lane-b">
+      <div class="node sap"><b>Master Data (SAP)</b><small>Vendor, PR, PO/GR, Budget, Bank — produce ke Kafka</small></div>
+      <div class="node sap"><b>GL / MIRO Posting</b><small>Consume event dari Kafka; proses posting SAP; kirim konfirmasi</small></div>
+      <div class="node sap"><b>Payment Plan &amp; Status</b><small>Produce ke Kafka → Odoo update state → paid</small></div>
+      <div class="node hris"><b>HRIS — Travel &amp; Employee</b><small>Produce employee master + travel request ke Kafka</small></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 2. FLOW A — EMPLOYEE ================= -->
+<h2 class="section"><span class="no">2</span> Flow A — Pengajuan Dokumen Karyawan <span class="pill emp" style="margin-left:6px">KARYAWAN</span> <span class="pill odoo">ODOO</span></h2>
+<p class="section-desc">Karyawan mengajukan dokumen keuangan (Cash Advance, Reimbursement, atau Travel Settlement) melalui Odoo Finance Portal. Sebelum submit, sistem memvalidasi nomor PR ke SAP Bridge cache dan memeriksa kecukupan budget divisi secara otomatis.</p>
+
+<div class="flow">
+  <div class="flow-title">Karyawan &nbsp;➜&nbsp; Odoo Finance Portal</div>
+  <div class="steps">
+    <div class="step emp"><b>A1 · Login SSO</b><small>Karyawan login ke portal via Keycloak OIDC. Role Keycloak di-map ke group Odoo (requester, approver). Company switcher aktif untuk user multi-PT.</small><span class="sys">KEYCLOAK</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step odoo"><b>A2 · Buat Dokumen</b><small>Pilih jenis: Cash Advance, Reimbursement, atau Travel Settlement. Data karyawan &amp; divisi ter-autofill dari HR Employee (HRIS sync). Untuk Travel: pilih travel request yang sudah approved di HRIS.</small><span class="sys">ODOO</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step odoo"><b>A3 · Isi &amp; Lampiran</b><small>Isi rincian biaya, tanggal, item. Upload dokumen pendukung (struk, nota, surat tugas). Amount total dihitung otomatis.</small><span class="sys">ODOO</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step bridge"><b>A4 · Validasi PR &amp; Budget</b><small>Jika amount &gt; Rp 1 juta: PR wajib diisi → Odoo lookup ke Bridge Redis cache. Jika PR valid: cek budget divisi (hard/soft mode). Gagal → UserError ke karyawan.</small><span class="sys">BRIDGE CACHE</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step odoo"><b>A5 · Submit</b><small>Dokumen masuk state <b>submitted</b>. Notifikasi email ke approver Tax. Karyawan bisa tracking di dashboard.</small><span class="sys">ODOO</span></div>
+  </div>
+</div>
+
+<!-- ================= 3. FLOW B — VENDOR INVOICE ================= -->
+<h2 class="section"><span class="no">3</span> Flow B — Pengajuan Invoice Vendor <span class="pill vendor" style="margin-left:6px">VENDOR</span> <span class="pill odoo">ODOO</span></h2>
+<p class="section-desc">Vendor mengakses portal mandiri untuk mendaftarkan diri dan mengajukan invoice non-trade. Dokumen fisik PDF di-scan dan diekstrak otomatis menggunakan Tesseract OCR — vendor wajib mengkonfirmasi hasil sebelum submit. PO/GR divalidasi ke Bridge cache dari data SAP.</p>
+
+<div class="flow">
+  <div class="flow-title">Vendor &nbsp;➜&nbsp; Odoo Vendor Portal &nbsp;⇄&nbsp; Bridge SAP Cache</div>
+  <div class="steps">
+    <div class="step vendor"><b>B1 · Registrasi / Invite</b><small>Vendor self-register (isi nama PT + NPWP) atau diundang Finance Admin. NPWP divalidasi ke vendor master SAP via Bridge. Akun aktif setelah Finance Admin approve.</small><span class="sys">ODOO PORTAL</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step vendor"><b>B2 · Lihat PO &amp; GR</b><small>Vendor melihat daftar PO + GR yang terkait (unbilled qty) — ditarik dari Bridge Redis cache data SAP (topik <code>sap.to.portal.po-gr-master</code>).</small><span class="sys">BRIDGE CACHE</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step vendor"><b>B3 · Upload Invoice PDF</b><small>Upload file PDF (scan). Sistem cek kualitas scan: DPI ≥ 200, blur score. Tesseract ekstrak: no. invoice, tanggal, NPWP, total, PPN/PPh, no. PO/DO.</small><span class="sys">OCR (TESSERACT)</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step vendor"><b>B4 · Review &amp; Konfirmasi</b><small>Field hijau (conf ≥ 88%): pre-fill. Field kuning (70–87%): wajib periksa. Field merah (&lt; 70%): isi manual. Vendor WAJIB konfirmasi sebelum submit — tidak ada auto-submit.</small><span class="sys">ODOO + OCR</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step odoo"><b>B5 · Submit Invoice</b><small>Odoo buat <code>finance.vendor.invoice</code>. Validasi: PO Non-Trade wajib <code>po_number</code>. Dokumen masuk state <b>submitted</b> → notifikasi ke Tax Approver.</small><span class="sys">ODOO</span></div>
+  </div>
+</div>
+
+<!-- ================= 4. FLOW C — APPROVAL ================= -->
+<h2 class="section"><span class="no">4</span> Flow C — Approval &amp; Validasi <span class="pill kc" style="margin-left:6px">TAX REVIEW</span> <span class="pill odoo">FINANCE REVIEW</span></h2>
+<p class="section-desc">Setiap dokumen yang disubmit melewati dua lapis approval: Tax Review (verifikasi aspek perpajakan: PPN, PPh, e-Faktur) lalu Finance Review (verifikasi keuangan, budget, kelengkapan). Approval matrix dikonfigurasi per PT Erajaya dan per jenis dokumen.</p>
+
+<div class="flow">
+  <div class="flow-title">Approval 2-Tier: Tax → Finance</div>
+  <div class="steps">
+    <div class="step odoo"><b>C1 · Tax Review</b><small>Notifikasi ke grup Tax Approver (per company). Verifikasi: PPN/PPh sesuai, e-Faktur lengkap untuk vendor invoice, batas pengecualian pajak. Bisa Approve atau Reject.</small><span class="sys">ODOO — TAX</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step odoo"><b>C2 · Finance Review</b><small>Setelah Tax approve: notifikasi ke Finance Approver (per company). Verifikasi: nilai sesuai PR, budget tersedia, kelengkapan attachment, kewajaran biaya. Bisa Approve atau Reject ke pengaju.</small><span class="sys">ODOO — FINANCE</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step odoo"><b>C3 · Approved</b><small>State dokumen berubah ke <b>approved</b>. Notifikasi ke pengaju. Odoo otomatis mengantri job push ke SAP via queue_job.</small><span class="sys">ODOO</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step bridge"><b>C4 · Push ke SAP (async)</b><small>queue_job worker panggil <code>_job_push_to_sap()</code>. Adapter kirim payload ke SAP Bridge via HMAC REST. Bridge produce ke Kafka topic SAP. State: <b>pushed</b>.</small><span class="sys">BRIDGE + KAFKA</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step sap"><b>C5 · SAP Posting</b><small>SAP consume event Kafka → GL/MIRO posting. Setelah selesai, SAP produce ke <code>sap.to.portal.posting-confirm</code>. Bridge forward via webhook ke Odoo → state: <b>posted</b>. Sap document no tercatat.</small><span class="sys">SAP</span></div>
+  </div>
+</div>
+
+<!-- ================= 5. FLOW D — PAYMENT TRACKING ================= -->
+<h2 class="section"><span class="no">5</span> Flow D — Tracking Pembayaran <span class="pill sap" style="margin-left:6px">SAP</span> <span class="pill bridge">KAFKA</span></h2>
+<p class="section-desc">Setelah dokumen diposting di SAP, sistem menunggu konfirmasi jadwal dan realisasi pembayaran yang dikirim SAP melalui Kafka. Odoo menerima webhook dari Bridge dan mengupdate status dokumen secara otomatis — pengaju dan vendor bisa melihat payment plan date di dashboard tanpa perlu menelepon Finance.</p>
+
+<div class="flow">
+  <div class="flow-title">SAP S/4HANA &nbsp;➜&nbsp; Kafka &nbsp;➜&nbsp; Bridge &nbsp;➜&nbsp; Odoo</div>
+  <div class="steps">
+    <div class="step sap"><b>D1 · SAP Jadwalkan Bayar</b><small>SAP menetapkan tanggal dan jumlah pembayaran. Produce event ke Kafka topic <code>sap.to.portal.payment-status</code>.</small><span class="sys">SAP</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step bridge"><b>D2 · Bridge Consume &amp; Forward</b><small>Bridge consumer thread terima event → update Redis cache payment status → kirim webhook HMAC ke Odoo endpoint <code>/finance/sap/status</code>.</small><span class="sys">BRIDGE</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step odoo"><b>D3 · Odoo Verifikasi &amp; Update</b><small>Odoo verify HMAC (canonical: <code>ts.encode() + raw_body</code>, drift ±300s). Panggil <code>_finance_apply_sap_status()</code>: isi <code>payment_plan_date</code> + amount. State: <b>posted → paid</b>.</small><span class="sys">ODOO</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step odoo"><b>D4 · Dashboard Update</b><small>Pengaju (karyawan) dan vendor melihat status <b>Paid</b> di dashboard + payment plan date. Notifikasi email otomatis.</small><span class="sys">ODOO</span></div>
+  </div>
+</div>
+
+<!-- ================= 6. DOCUMENT LIFECYCLE ================= -->
+<h2 class="section"><span class="no">6</span> Siklus Hidup Dokumen (State Machine)</h2>
+<p class="section-desc">Setiap dokumen keuangan (CA, Reimb, Vendor Invoice, Travel Settlement) melewati state yang sama — dari draft hingga paid atau cancelled. SAP Bridge adalah satu-satunya yang men-trigger transisi state di sisi SAP.</p>
+
+<div class="flow">
+  <div class="flow-title">State Machine — finance.document.mixin</div>
+  <div class="states">
+    <div class="state-box st-draft">draft<small>Buat / Edit</small></div>
+    <div class="state-arrow">→</div>
+    <div class="state-box st-submit">submitted<small>Kirim ke Tax</small></div>
+    <div class="state-arrow">→</div>
+    <div class="state-box st-tax">tax_review<small>Tax Approver</small></div>
+    <div class="state-arrow">→</div>
+    <div class="state-box st-fin">fin_review<small>Finance Approver</small></div>
+    <div class="state-arrow">→</div>
+    <div class="state-box st-approved">approved<small>Siap push SAP</small></div>
+    <div class="state-arrow">→</div>
+    <div class="state-box st-pushed">pushed<small>Antri di SAP</small></div>
+    <div class="state-arrow">→</div>
+    <div class="state-box st-posted">posted<small>GL/MIRO SAP</small></div>
+    <div class="state-arrow">→</div>
+    <div class="state-box st-paid">paid<small>Dibayar SAP</small></div>
+  </div>
+  <div style="margin-top:14px;display:flex;gap:12px;flex-wrap:wrap;">
+    <div class="state-box st-reject" style="min-width:130px">rejected<small>Tax/Finance reject → kembali ke draft</small></div>
+    <div class="state-box st-cancel" style="min-width:130px">cancelled<small>Pengaju/Admin cancel sebelum push</small></div>
+  </div>
+</div>
+
+<div class="note info" style="margin-top:14px">
+  <b>Prinsip utama:</b> Odoo <b>tidak memposting GL</b> — state <b>approved</b> hanya berarti dokumen disetujui untuk dikirim ke SAP. Posting sebenarnya (GL/MIRO) terjadi di SAP setelah Bridge produce ke Kafka dan SAP consume. Odoo hanya menerima konfirmasi balik.
+</div>
+
+<!-- ================= 7. KAFKA TOPIC ================= -->
+<h2 class="section"><span class="no">7</span> Peta Kafka Topic (Integrasi SAP &amp; HRIS)</h2>
+<p class="section-desc">Semua data antara SAP/HRIS dan Odoo mengalir melalui Kafka — Bridge adalah satu-satunya consumer/producer dari sisi portal. Odoo tidak pernah terhubung ke Kafka langsung; Odoo hanya bicara HMAC REST ke Bridge.</p>
+
+<table class="feeds">
+  <thead>
+    <tr><th style="width:40px">#</th><th>Kafka Topic</th><th>Arah</th><th>Isi / Fungsi</th><th style="width:130px">Frekuensi</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><code>sap.to.portal.pr-master</code></td>
+      <td><span class="tag sap">SAP → Bridge</span></td>
+      <td>PR create/update/close → Bridge Redis cache → Odoo lookup saat submit</td>
+      <td>Event-driven</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>sap.to.portal.po-gr-master</code></td>
+      <td><span class="tag sap">SAP → Bridge</span></td>
+      <td>PO/GR create/update → cache → Vendor Portal lihat unbilled qty</td>
+      <td>Event-driven</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>sap.to.portal.vendor-master</code></td>
+      <td><span class="tag sap">SAP → Bridge</span></td>
+      <td>Supplier master (NPWP, alamat, rekening, kode SAP) → upsert <code>res.partner</code></td>
+      <td>Daily + on-change</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code>sap.to.portal.budget-master</code></td>
+      <td><span class="tag sap">SAP → Bridge</span></td>
+      <td>Budget per divisi + fiscal year → <code>finance.budget</code> → validasi saat submit</td>
+      <td>Daily + on-revision</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code>sap.to.portal.payment-status</code></td>
+      <td><span class="tag sap">SAP → Bridge → Odoo</span></td>
+      <td>Payment plan date + amount → webhook Odoo → state: posted → paid</td>
+      <td>Event-driven</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><code>sap.to.portal.posting-confirm</code></td>
+      <td><span class="tag sap">SAP → Bridge → Odoo</span></td>
+      <td>GL/MIRO berhasil diposting → <code>sap_document_no</code> → state: pushed → posted</td>
+      <td>Event-driven</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td><code>hris.to.portal.employee-master</code></td>
+      <td><span class="tag hris">HRIS → Bridge</span></td>
+      <td>Employee + divisi + rekening → <code>hr.employee</code>; login SSO matching via email</td>
+      <td>Daily + on-change</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td><code>hris.to.portal.travel-request</code></td>
+      <td><span class="tag hris">HRIS → Bridge</span></td>
+      <td>Travel approved/updated → <code>finance.travel.settlement</code> read-only mirror; allowance per hari</td>
+      <td>Event-driven</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td><code>portal.to.sap.cash-advance</code></td>
+      <td><span class="tag bridge">Odoo → Bridge → SAP</span></td>
+      <td>CA GL posting request: employee, cost center, rincian biaya, rekening, lampiran</td>
+      <td>Event-driven</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td><code>portal.to.sap.reimbursement</code></td>
+      <td><span class="tag bridge">Odoo → Bridge → SAP</span></td>
+      <td>Reimbursement GL posting: kategori biaya, nominal, lampiran struk</td>
+      <td>Event-driven</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td><code>portal.to.sap.vendor-invoice</code></td>
+      <td><span class="tag bridge">Odoo → Bridge → SAP</span></td>
+      <td>MIRO request: vendor, PO/GR reference, tax code (PPh/PPN), line items, faktur pajak</td>
+      <td>Event-driven</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td><code>portal.to.sap.travel-settlement</code></td>
+      <td><span class="tag bridge">Odoo → Bridge → SAP</span></td>
+      <td>Travel settlement GL posting: HRIS travel ID, realisasi vs advance, selisih</td>
+      <td>Event-driven</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ================= 8. MODULES ================= -->
+<h2 class="section"><span class="no">8</span> Modul Odoo yang Diinstal</h2>
+<p class="section-desc">Finance Portal dijalankan di <b>database Odoo terpisah</b> (<code>finance_portal</code>) — tidak menyentuh existing Odoo DB. Terdiri dari 4 modul custom yang dibangun di atas platform core (approval engine, adapter framework, queue_job, PDP audit).</p>
+
+<div class="grid3">
+  <div class="modcard">
+    <h3><span class="tag odoo">CUSTOM FINANCE PORTAL</span></h3>
+    <ul>
+      <li><code>finance.document.mixin</code><small>State machine, SAP sync state, PR/budget validation hook, PDP audit mixin</small></li>
+      <li><code>finance.cash.advance</code><small>Pengajuan uang muka + realisasi; link ke HR employee</small></li>
+      <li><code>finance.reimbursement</code><small>Pengajuan reimb &amp; expenses; kategori biaya per divisi</small></li>
+      <li><code>finance.vendor.invoice</code><small>Invoice non-trade PO/Non-PO; subtype + PO number validation</small></li>
+      <li><code>finance.travel.settlement</code><small>Read-only mirror dari HRIS travel; input realisasi biaya</small></li>
+      <li><code>finance.master</code><small>Master divisi, item kategori biaya, approval matrix per company</small></li>
+    </ul>
+  </div>
+  <div class="modcard">
+    <h3><span class="tag dark">CUSTOM FINANCE BUDGET</span></h3>
+    <ul>
+      <li><code>finance.budget</code><small>Budget per divisi + fiscal year; consumed_amount updated saat approved</small></li>
+      <li><code>_check_document_budget()</code><small>Hard/soft mode: hard → block submit jika over budget; soft → log warning</small></li>
+      <li>Budget dari SAP<small>Sync via topik <code>sap.to.portal.budget-master</code> → Bridge → upsert Odoo</small></li>
+    </ul>
+  </div>
+  <div class="modcard">
+    <h3><span class="tag bridge">CUSTOM FINANCE PORTAL SAP</span></h3>
+    <ul>
+      <li><code>SapBridgeAdapter</code><small>HMAC REST client ke Bridge; sign outbound + verify inbound webhook</small></li>
+      <li><code>HrisBridgeAdapter</code><small>Lookup employee / travel dari Bridge Redis cache</small></li>
+      <li><code>finance.sync.log</code><small>Audit setiap push ke SAP: status, job_uuid, payload hash, sap_document_no</small></li>
+      <li><code>queue_job</code> async push<small>Approved → <code>with_delay()._job_push_to_sap()</code>; tidak blocking UI</small></li>
+      <li>Webhook endpoint<small><code>/finance/sap/status</code> via <code>secure_endpoint</code>; HMAC verify + nonce cache</small></li>
+      <li>Cron sync master<small>Upsert vendor/employee dari Bridge Redis cache setiap jam</small></li>
+    </ul>
+  </div>
+</div>
+
+<div class="grid2" style="margin-top:16px">
+  <div class="modcard">
+    <h3><span class="tag kc">CUSTOM FINANCE PORTAL SSO</span></h3>
+    <ul>
+      <li>Keycloak OIDC via <code>auth_oauth</code><small>Override <code>_auth_oauth_signin()</code>; verify JWKS; parse <code>realm_access.roles</code></small></li>
+      <li>Role → Group mapping<small>Keycloak role <code>finance_requester / finance_approver_tax / finance_approver_fin</code> → Odoo group</small></li>
+      <li>Vendor self-registration<small>Controller <code>/finance/vendor/register</code>; validasi NPWP ke Bridge; queue approval Finance Admin</small></li>
+      <li>Company switcher<small>User multi-PT (Finance Group) mendapat akses semua <code>res.company</code>; company_ids sesuai SSO token</small></li>
+    </ul>
+  </div>
+  <div class="modcard">
+    <h3><span class="tag dark">PLATFORM CORE (REUSED)</span></h3>
+    <ul>
+      <li><code>custom_approval_engine</code><small>Approval mixin + approval matrix; per-company, per-document-type, tier 1–2</small></li>
+      <li><code>custom_adapter_framework</code><small>BaseAdapter: HMAC sign/verify, sanitize log PDP, register_adapter</small></li>
+      <li><code>custom_pdp_audit</code><small>pdp.audited.mixin → INSERT INTO pdp.audit_log; masking NIK/rekening di view</small></li>
+      <li><code>queue_job</code> (OCA)<small>Async worker untuk push SAP; tidak kena timeout proxy pada long process</small></li>
+      <li><code>auth_jwt</code> (OCA vendored)<small>JWT verification untuk SSO token parsing</small></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ================= 9. MULTI-COMPANY ================= -->
+<h2 class="section"><span class="no">9</span> Arsitektur Multi-Company (Satu DB, Banyak PT)</h2>
+<p class="section-desc">Satu Finance Portal DB melayani seluruh PT Erajaya Group. Isolasi data via <code>company_id</code> pada semua model dokumen, budget, dan approval matrix. Finance Group Manager dapat memonitor semua PT dari satu dashboard dengan akses lintas company.</p>
+
+<table class="feeds">
+  <thead>
+    <tr><th>Aspek</th><th>Implementasi</th><th>Keterangan</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Isolasi Dokumen</td>
+      <td><code>company_id</code> pada semua model + security rule <code>company_ids ∋ user.company_ids</code></td>
+      <td>User hanya lihat dokumen PT yang dia punya akses</td>
+    </tr>
+    <tr>
+      <td>Approval Matrix</td>
+      <td><code>approval.matrix</code> per <code>company_id</code></td>
+      <td>Tax Approver PT-A ≠ Tax Approver PT-B; dikonfigurasi terpisah</td>
+    </tr>
+    <tr>
+      <td>Budget</td>
+      <td><code>finance.budget</code> per <code>company_id</code> + <code>fiscal_year</code></td>
+      <td>Budget PT-A tidak tercampur dengan PT-B</td>
+    </tr>
+    <tr>
+      <td>SAP Company Code</td>
+      <td><code>res.company.x_sap_company_code</code></td>
+      <td>Setiap outbound payload ke SAP menyertakan kode company SAP</td>
+    </tr>
+    <tr>
+      <td>Vendor Master (shared)</td>
+      <td><code>res.partner</code> tanpa company scoping</td>
+      <td>Satu vendor bisa supply ke banyak PT; satu akun portal vendor</td>
+    </tr>
+    <tr>
+      <td>Employee Master (shared)</td>
+      <td><code>hr.employee</code> dari HRIS sync; company via divisi</td>
+      <td>Employee bisa punya akses ke satu atau beberapa PT via SSO token</td>
+    </tr>
+    <tr>
+      <td>Finance Group Manager</td>
+      <td><code>company_ids</code> berisi semua PT; dashboard lintas company</td>
+      <td>Holding/Finance Group monitoring tanpa perlu login berulang</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ================= 10. OCR PIPELINE ================= -->
+<h2 class="section"><span class="no">10</span> Pipeline OCR Invoice Vendor</h2>
+<p class="section-desc">Format utama invoice adalah scanned PDF (fisik). Tesseract 4 LSTM sebagai primary OCR; pdfplumber sebagai shortcut untuk PDF digital. Setiap field diberi confidence score — vendor wajib konfirmasi sebelum submit; tidak ada auto-submit berdasarkan OCR.</p>
+
+<div class="flow">
+  <div class="flow-title">Upload PDF &nbsp;➜&nbsp; OCR &nbsp;➜&nbsp; Pre-fill Form &nbsp;➜&nbsp; Vendor Konfirmasi</div>
+  <div class="steps">
+    <div class="step vendor"><b>1 · Upload &amp; Cek Kualitas</b><small>Cek metadata PDF: DPI ≥ 200, blur score. Jika tidak memenuhi: tolak dengan pesan "Scan ulang, min 300 DPI, dokumen rata".</small><span class="sys">ODOO PORTAL</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step bridge"><b>2 · Deteksi Format</b><small>Cek ada text layer? → Ya: <b>pdfplumber</b> ekstrak langsung. → Tidak: <b>pdf2image</b> (300 DPI PNG) → OpenCV (grayscale, denoise, deskew, Otsu) → <b>Tesseract 4 LSTM</b>.</small><span class="sys">OCR ENGINE</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step bridge"><b>3 · Parse &amp; Scoring</b><small>Regex parser ekstrak: no. invoice, tanggal, NPWP, total, PPN, PPh, no. PO/DO, line items. Tiap field diberi confidence score 0–1.</small><span class="sys">OCR PARSER</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step vendor"><b>4 · Pre-fill Berwarna</b><small>≥ 88% → hijau (konfirmasi saja). 70–87% → kuning (wajib periksa + tampil teks mentah). &lt; 70% → merah (isi manual, tampil hint mentah). Vendor WAJIB konfirmasi semua field.</small><span class="sys">ODOO FORM</span></div>
+    <div class="arrow"><span>➜</span></div>
+    <div class="step odoo"><b>5 · Submit Setelah Konfirmasi</b><small>Vendor klik Submit setelah semua field dikonfirmasi. Sistem buat <code>finance.vendor.invoice</code> dengan lampiran PDF asli tersimpan.</small><span class="sys">ODOO</span></div>
+  </div>
+</div>
+
+<div class="feat">
+  <div class="f"><b>Ekspektasi akurasi (CPU, tanpa GPU)</b><small>Scan bersih ≥ 300 DPI: field numerik ~87–90%, tabel ~75–82%.<br>Normal 200–300 DPI: numerik ~78–84%, tabel ~65–72%.<br>Buruk &lt; 200 DPI: numerik ~55–68%, tabel ~40–55%.</small></div>
+  <div class="f"><b>Panduan upload untuk vendor</b><small>✓ PDF hasil scan, DPI ≥ 300, hitam-putih/grayscale.<br>✓ Dokumen rata, tidak terlipat, tidak ada bayangan.<br>✗ Foto dari kamera HP — tidak disarankan.</small></div>
+  <div class="f"><b>PDP — data sensitif dari OCR</b><small>NPWP: simpan di <code>res.partner.npwp</code>; masking 6 digit tengah di view non-privileged.<br>Rekening: masking 4 digit terakhir. Log adapter strip field PDP sebelum disimpan.</small></div>
+  <div class="f"><b>Fallback &amp; manual override</b><small>Jika OCR gagal total (kerusakan parah, bahasa tidak dikenal): form dibuka kosong. Vendor isi manual 100%. PDF asli selalu tersimpan sebagai attachment audit trail.</small></div>
+</div>
+
+<!-- ================= 11. DATA READINESS ================= -->
+<h2 class="section"><span class="no">11</span> Ketergantungan Data — SAP &amp; HRIS</h2>
+<p class="section-desc">Seluruh data master (vendor, budget, PR, PO/GR, employee, travel) harus tersedia di Kafka sebelum fitur terkait bisa digunakan. Kolom Status diisi tim SAP/HRIS klien saat M1.</p>
+
+<table class="feeds">
+  <thead>
+    <tr><th>#</th><th>Data Feed</th><th>Kafka Topic</th><th>Digunakan Untuk</th><th style="width:110px">Status</th><th>Blocker Jika Belum</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>Vendor / Supplier Master</td><td><code>sap.to.portal.vendor-master</code></td><td>Vendor invoice, validasi NPWP self-reg, partner upsert</td><td><span class="tag tbd">TBD</span></td><td>Vendor tidak bisa register atau submit invoice</td></tr>
+    <tr><td>2</td><td>Division / Cost Center</td><td><code>sap.to.portal.vendor-master</code></td><td>Dropdown divisi, scoping budget check, SAP payload</td><td><span class="tag tbd">TBD</span></td><td>Budget check tidak berjalan; dropdown kosong</td></tr>
+    <tr><td>3</td><td>Cost Budget</td><td><code>sap.to.portal.budget-master</code></td><td>Validasi budget saat submit (hard/soft mode)</td><td><span class="tag tbd">TBD</span></td><td>Budget selalu "lulus" (tidak ada data pembanding)</td></tr>
+    <tr><td>4</td><td>Item Category</td><td><code>sap.to.portal.item-category</code></td><td>Dropdown kategori biaya di form CA &amp; Reimb</td><td><span class="tag tbd">TBD</span></td><td>Dropdown kosong — bisa diisi manual sementara</td></tr>
+    <tr><td>5</td><td>Bank Master</td><td><code>sap.to.portal.bank-master</code></td><td>Rekening tujuan pembayaran di payload SAP</td><td><span class="tag tbd">TBD</span></td><td>Bisa manual input sementara</td></tr>
+    <tr><td>6</td><td><b>PR Master (event-driven)</b></td><td><code>sap.to.portal.pr-master</code></td><td><b>Validasi PR saat submit pengajuan &gt; Rp 1 juta</b></td><td><span class="tag tbd">TBD</span></td><td><b>Semua pengajuan &gt; 1 juta akan diblok (PR not found)</b></td></tr>
+    <tr><td>7</td><td><b>PO/GR Master (event-driven)</b></td><td><code>sap.to.portal.po-gr-master</code></td><td><b>Vendor Portal: lihat PO &amp; GR unbilled, validasi invoice</b></td><td><span class="tag tbd">TBD</span></td><td><b>Vendor Invoice PO tidak bisa diproses</b></td></tr>
+    <tr><td>8</td><td>Posting Confirmation</td><td><code>sap.to.portal.posting-confirm</code></td><td>State: pushed → posted; <code>sap_document_no</code> terisi</td><td><span class="tag tbd">TBD</span></td><td>Dokumen stuck di state "pushed" selamanya</td></tr>
+    <tr><td>9</td><td>Payment Status</td><td><code>sap.to.portal.payment-status</code></td><td>State: posted → paid; tampil payment plan date di dashboard</td><td><span class="tag tbd">TBD</span></td><td>Tidak ada tracking pembayaran</td></tr>
+    <tr><td>10</td><td>Employee Master (HRIS)</td><td><code>hris.to.portal.employee-master</code></td><td>Login SSO matching, autofill divisi, rekening karyawan</td><td><span class="tag tbd">TBD</span></td><td>Karyawan tidak bisa login atau autofill gagal</td></tr>
+    <tr><td>11</td><td>Travel Request (HRIS)</td><td><code>hris.to.portal.travel-request</code></td><td>Read-only mirror travel; input realisasi biaya settlement</td><td><span class="tag tbd">TBD</span></td><td>Fitur Travel Settlement tidak berfungsi</td></tr>
+  </tbody>
+</table>
+
+<div class="note danger" style="margin-top:16px">
+  <b>Ketergantungan kritis (gating M4 — SIT):</b>
+  Konektor Kafka dari sisi SAP dan HRIS <b>harus siap sebelum SIT (±W13)</b>. Tanpa feed #6 (PR Master) dan #7 (PO/GR Master) yang event-driven, fitur inti Portal — validasi PR dan Vendor Invoice PO — tidak dapat diuji end-to-end. Build Odoo dilakukan contract-first terhadap kontrak JSON yang disepakati; stub/mock digunakan selama development.
+</div>
+
+<!-- ================= 12. SECURITY ================= -->
+<h2 class="section"><span class="no">12</span> Keamanan &amp; Kepatuhan PDP</h2>
+
+<table class="feeds">
+  <thead>
+    <tr><th>Aspek</th><th>Mekanisme</th><th>Keterangan</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Autentikasi karyawan</td>
+      <td>Keycloak OIDC + JWKS verify</td>
+      <td>MFA enforced di Keycloak. Sesi Odoo dari token; tidak ada password Odoo untuk karyawan.</td>
+    </tr>
+    <tr>
+      <td>Autentikasi vendor</td>
+      <td>Odoo native portal (self-reg + invite)</td>
+      <td>NPWP divalidasi ke vendor master SAP. Akun aktif hanya setelah Finance Admin approve.</td>
+    </tr>
+    <tr>
+      <td>Keamanan API Bridge</td>
+      <td>HMAC-SHA256 (canonical: <code>ts.encode() + raw_body</code>)</td>
+      <td>Drift ±300 detik; nonce cache anti-replay. 2 secret terpisah: Odoo→Bridge &amp; Bridge→Odoo.</td>
+    </tr>
+    <tr>
+      <td>Data NIK</td>
+      <td><code>pdp_class="specific"</code> + masking view</td>
+      <td>Masking untuk non-privileged. Full hanya <code>group_finance_officer</code>+. Log PDP di raw SQL.</td>
+    </tr>
+    <tr>
+      <td>Rekening bank</td>
+      <td>Masking 4 digit terakhir di view</td>
+      <td>Full hanya <code>group_finance_officer</code>+. Strip dari adapter call log.</td>
+    </tr>
+    <tr>
+      <td>NPWP vendor</td>
+      <td>Masking 6 digit tengah</td>
+      <td>Full hanya <code>group_finance_officer</code>+. Visible saat input oleh vendor sendiri.</td>
+    </tr>
+    <tr>
+      <td>Audit trail dokumen</td>
+      <td><code>pdp.audited.mixin</code> → <code>pdp.audit_log</code></td>
+      <td>Setiap transisi state tercatat: siapa, kapan, dari mana (IP), perubahan apa.</td>
+    </tr>
+    <tr>
+      <td>Isolasi DB</td>
+      <td>Finance Portal DB terpisah dari existing Odoo DB</td>
+      <td>nginx routing via subdomain (<code>finance.erajaya.com</code>). Filestore dishare via volume Docker.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <b>Catatan kunci:</b> Finance Portal adalah <b>System of Engagement</b> — bukan System of Record. Odoo tidak menyimpan data akuntansi final; semua pembukuan (GL, MIRO, pembayaran) tetap di SAP S/4HANA. Odoo hanya menyimpan status dokumen, attachment, dan mirror status dari SAP untuk keperluan tracking oleh pengaju dan vendor.
+</div>
+
+<footer>
+  <span>Dokumen internal Erajaya — Finance Portal Business Process Flow (Odoo × SAP × HRIS)</span>
+  <span>Disusun: Juni 2026 · v2.0</span>
+</footer>
+
+</div>
+</body>
+</html>
