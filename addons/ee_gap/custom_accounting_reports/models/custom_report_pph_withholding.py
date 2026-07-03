@@ -36,12 +36,6 @@ class CustomReportPphWithholding(models.AbstractModel):
     _report_code = "pph_withholding"
     _report_title = "Rekap PPh Pemotongan (per Jenis Penghasilan)"
 
-    @staticmethod
-    def _opt(record, field_name, default=""):
-        if record and field_name in record._fields:
-            return record[field_name] or default
-        return default
-
     def _xlsx_columns(self):
         return [
             {"header": "Tanggal", "field": "date", "kind": "date", "width": 12},

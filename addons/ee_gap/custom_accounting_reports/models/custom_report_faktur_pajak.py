@@ -35,17 +35,6 @@ class CustomReportFakturPajak(models.AbstractModel):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    @staticmethod
-    def _opt(record, field_name, default=""):
-        """Read an optional field only when it exists on the model.
-
-        Keeps the report resilient to a DB where ``custom_coretax`` /
-        ``custom_tax_id`` are not installed.
-        """
-        if record and field_name in record._fields:
-            return record[field_name] or default
-        return default
-
     def _ppn_tax_ids(self, type_tax_use, company_ids):
         """VAT (PPN) taxes on the given side, excluding PPh withholding.
 

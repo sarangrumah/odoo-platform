@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from datetime import date
 
-from odoo import fields, models
+from odoo import _, fields, models
+from odoo.exceptions import UserError
 
 
 class NpwpQualityWizard(models.TransientModel):
@@ -52,3 +53,17 @@ class NpwpQualityWizard(models.TransientModel):
         }
         filename = "Data_Quality_NPWP_%s_%s.xlsx" % (self.date_from, self.date_to)
         return self.env["custom.report.npwp.quality"]._xlsx_action(options, filename)
+
+    def action_view_source(self):
+        self.ensure_one()
+        Partner = self.env["res.partner"]
+        if "x_custom_npwp_status" not in Partner._fields:
+            raise UserError(_("Modul PPh (custom_tax_id) belum terpasang."))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Lawan Transaksi Bermasalah (NPWP/NIK)"),
+            "res_model": "res.partner",
+            "view_mode": "list,form",
+            "domain": [("x_custom_npwp_status", "in", ("invalid", "none"))],
+            "target": "current",
+        }

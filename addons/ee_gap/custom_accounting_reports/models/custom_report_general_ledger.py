@@ -377,6 +377,11 @@ class CustomReportGeneralLedger(models.AbstractModel):
         return ", ".join(filter(None, cost)), ", ".join(filter(None, profit))
 
     def _build_flat_lines(self, filters):
+        # The flat query reads ``parent_state`` (a stored related of
+        # ``move_id.state``) via raw SQL. Flush pending ORM writes first so a
+        # move posted earlier in the same transaction — e.g. post-then-export
+        # in one server action, or a test — is visible to the SQL.
+        self.env.flush_all()
         query, params = self._flat_query(filters)
         self.env.cr.execute(query, params)
         rows = self.env.cr.dictfetchall()

@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from odoo import Command
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -254,7 +255,7 @@ class TestCustomReports(TransactionCase):
             (10, 200.0, "d_0_30"),  # 1..30
             (45, 300.0, "d_31_60"),  # 31..60
             (80, 400.0, "d_61_90"),  # 61..90
-            (200, 500.0, "d_91_180"),  # 91..180
+            (120, 500.0, "d_91_180"),  # 91..180 (BUCKETS now also has 181-365)
         ]
         partners = []
         for i, (overdue, amount, _bucket) in enumerate(cases):
@@ -1186,3 +1187,36 @@ class TestCustomReports(TransactionCase):
         grand = next(l for l in lines if l.get("type") == "grand_total")
         self.assertAlmostEqual(grand["api_calls"], 10, places=0)
         self.assertAlmostEqual(grand["faktur_submits"], 3, places=0)
+
+    def test_drill_down_actions(self):
+        """Every 'Lihat Transaksi' button returns a valid act_window whose
+        domain is accepted by the ORM."""
+        cases = [
+            ("custom.report.faktur.pajak.wizard", "account.move"),
+            ("custom.report.bupot.wizard", "custom.coretax.bukti.potong"),
+            ("custom.report.pph.withholding.wizard", "account.move.withholding.line"),
+            ("custom.report.nsfp.monitoring.wizard", "account.move"),
+            ("custom.report.npwp.quality.wizard", "res.partner"),
+            ("custom.report.dpp.nilai.lain.wizard", "account.move.line"),
+            ("custom.report.faktur.pengganti.wizard", "account.move"),
+            ("custom.report.pph.equalisasi.wizard", "account.move.line"),
+            ("custom.report.coretax.submission.wizard", "custom.coretax.transaction"),
+            ("custom.report.pajakku.usage.wizard", "custom.coretax.pajakku.usage"),
+        ]
+        for wizard_model, expected in cases:
+            if expected not in self.env:
+                continue  # optional source module not installed in this DB
+            wiz = self.env[wizard_model].create({})
+            try:
+                action = wiz.action_view_source()
+            except UserError:
+                continue  # guarded when the source module is absent
+            self.assertEqual(action.get("type"), "ir.actions.act_window")
+            self.assertEqual(action.get("res_model"), expected)
+            # The domain must be valid against the ORM.
+            self.env[expected].search(action["domain"], limit=1)
+
+        # Summary reports intentionally have no drill-down.
+        wiz = self.env["custom.report.ekualisasi.omzet.wizard"].create({})
+        with self.assertRaises(UserError):
+            wiz.action_view_source()

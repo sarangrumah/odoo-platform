@@ -31,12 +31,6 @@ class CustomReportNsfpMonitoring(models.AbstractModel):
     _report_code = "nsfp_monitoring"
     _report_title = "Monitoring NSFP & Status Faktur"
 
-    @staticmethod
-    def _opt(record, field_name, default=""):
-        if record and field_name in record._fields:
-            return record[field_name] or default
-        return default
-
     def _xlsx_columns(self):
         return [
             {"header": "Tanggal", "field": "date", "kind": "date", "width": 12},

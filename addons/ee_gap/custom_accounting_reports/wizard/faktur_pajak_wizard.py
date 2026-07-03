@@ -67,3 +67,25 @@ class FakturPajakWizard(models.TransientModel):
         }
         filename = "Rekap_Faktur_%s_%s_%s.xlsx" % (self.faktur_type, self.date_from, self.date_to)
         return self.env["custom.report.faktur.pajak"]._xlsx_action(options, filename)
+
+    def action_view_source(self):
+        self.ensure_one()
+        move_types = ("in_invoice", "in_refund") if self.faktur_type == "masukan" else ("out_invoice", "out_refund")
+        domain = [
+            ("company_id", "in", self.company_ids.ids or self.env.companies.ids),
+            ("move_type", "in", move_types),
+            ("date", ">=", self.date_from),
+            ("date", "<=", self.date_to),
+        ]
+        if self.posted_only:
+            domain.append(("state", "=", "posted"))
+        if self.partner_ids:
+            domain.append(("partner_id", "in", self.partner_ids.ids))
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Faktur Pajak",
+            "res_model": "account.move",
+            "view_mode": "list,form",
+            "domain": domain,
+            "target": "current",
+        }

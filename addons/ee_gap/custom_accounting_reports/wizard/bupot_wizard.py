@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from datetime import date
 
-from odoo import fields, models
+from odoo import _, fields, models
+from odoo.exceptions import UserError
 
 
 class BupotWizard(models.TransientModel):
@@ -78,3 +79,23 @@ class BupotWizard(models.TransientModel):
         }
         filename = "Rekap_Bupot_%s_%s_%s.xlsx" % (self.direction, self.date_from, self.date_to)
         return self.env["custom.report.bupot"]._xlsx_action(options, filename)
+
+    def action_view_source(self):
+        self.ensure_one()
+        if "custom.coretax.bukti.potong" not in self.env:
+            raise UserError(_("Modul Bukti Potong (custom_coretax) belum terpasang."))
+        domain = [
+            ("source", "=", self.direction),
+            ("tanggal_bupot", ">=", self.date_from),
+            ("tanggal_bupot", "<=", self.date_to),
+        ]
+        if self.pph_kind != "all":
+            domain.append(("jenis_pph", "=", self.pph_kind))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Bukti Potong PPh"),
+            "res_model": "custom.coretax.bukti.potong",
+            "view_mode": "list,form",
+            "domain": domain,
+            "target": "current",
+        }

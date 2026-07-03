@@ -22,6 +22,8 @@
                             type="object" class="btn-primary"/>
                     <button string="Export Excel" name="action_export_xlsx"
                             type="object" class="btn-secondary"/>
+                    <button string="Lihat Transaksi" name="action_view_source"
+                            type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary"
                             special="cancel"/>
                 </footer>

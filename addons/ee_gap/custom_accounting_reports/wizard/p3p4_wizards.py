@@ -6,9 +6,10 @@ common fields and the print / xlsx actions live on an AbstractModel mixin;
 each concrete wizard just declares which report model/code it drives.
 """
 
-from datetime import date
+from datetime import date, datetime, time
 
-from odoo import fields, models
+from odoo import _, fields, models
+from odoo.exceptions import UserError
 
 
 class TaxReportWizardMixin(models.AbstractModel):
@@ -32,6 +33,9 @@ class TaxReportWizardMixin(models.AbstractModel):
     _report_code = None
     _report_model = None
     _filename_prefix = "Report"
+    # Drill-down: source model + optional custom domain. Leave ``_source_model``
+    # None on pure-summary reports (no per-row transaction to open).
+    _source_model = None
 
     def _build_filters(self):
         self.ensure_one()
@@ -59,6 +63,31 @@ class TaxReportWizardMixin(models.AbstractModel):
         filename = "%s_%s_%s.xlsx" % (self._filename_prefix, self.date_from, self.date_to)
         return self.env[self._report_model]._xlsx_action(self._options(), filename)
 
+    # ------------------------------------------------------------------
+    # Drill-down to the source transactions
+    # ------------------------------------------------------------------
+    def _source_domain(self):
+        """Default drill-down domain (masa + company). Overridden per report."""
+        self.ensure_one()
+        return [
+            ("company_id", "in", self.company_ids.ids or self.env.companies.ids),
+            ("date", ">=", self.date_from),
+            ("date", "<=", self.date_to),
+        ]
+
+    def action_view_source(self):
+        self.ensure_one()
+        if not self._source_model or self._source_model not in self.env:
+            raise UserError(_("Tidak ada drill-down transaksi untuk laporan ini."))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Transaksi Sumber"),
+            "res_model": self._source_model,
+            "view_mode": "list,form",
+            "domain": self._source_domain(),
+            "target": "current",
+        }
+
 
 class DppNilaiLainWizard(models.TransientModel):
     _name = "custom.report.dpp.nilai.lain.wizard"
@@ -67,6 +96,24 @@ class DppNilaiLainWizard(models.TransientModel):
     _report_code = "dpp_nilai_lain"
     _report_model = "custom.report.dpp.nilai.lain"
     _filename_prefix = "DPP_Nilai_Lain"
+    _source_model = "account.move.line"
+
+    def _source_domain(self):
+        self.ensure_one()
+        domain = [
+            ("company_id", "in", self.company_ids.ids or self.env.companies.ids),
+            ("date", ">=", self.date_from),
+            ("date", "<=", self.date_to),
+        ]
+        if self.posted_only:
+            domain.append(("parent_state", "=", "posted"))
+        if "x_custom_dpp_method" in self.env["account.tax"]._fields:
+            domain += [
+                "|",
+                ("tax_line_id.x_custom_dpp_method", "=", "nilai_lain"),
+                ("tax_ids.x_custom_dpp_method", "=", "nilai_lain"),
+            ]
+        return domain
 
 
 class FakturPenggantiWizard(models.TransientModel):
@@ -76,6 +123,24 @@ class FakturPenggantiWizard(models.TransientModel):
     _report_code = "faktur_pengganti"
     _report_model = "custom.report.faktur.pengganti"
     _filename_prefix = "Faktur_Pengganti"
+    _source_model = "account.move"
+
+    def _source_domain(self):
+        self.ensure_one()
+        Move = self.env["account.move"]
+        domain = [
+            ("company_id", "in", self.company_ids.ids or self.env.companies.ids),
+            ("move_type", "in", ("out_invoice", "out_refund")),
+            ("date", ">=", self.date_from),
+            ("date", "<=", self.date_to),
+        ]
+        if self.posted_only:
+            domain.append(("state", "=", "posted"))
+        if "x_custom_coretax_kode_status" in Move._fields:
+            domain.append(("x_custom_coretax_kode_status", "not in", (False, "", "00", "0")))
+        elif "x_custom_coretax_status_code" in Move._fields:
+            domain.append(("x_custom_coretax_status_code", "not in", (False, "00")))
+        return domain
 
 
 class EkualisasiOmzetWizard(models.TransientModel):
@@ -94,6 +159,22 @@ class PphEqualisasiWizard(models.TransientModel):
     _report_code = "pph_equalisasi"
     _report_model = "custom.report.pph.equalisasi"
     _filename_prefix = "Ekualisasi_PPh"
+    _source_model = "account.move.line"
+
+    def _source_domain(self):
+        self.ensure_one()
+        domain = [
+            ("company_id", "in", self.company_ids.ids or self.env.companies.ids),
+            ("move_id.move_type", "in", ("in_invoice", "in_refund")),
+            ("display_type", "=", "product"),
+            ("date", ">=", self.date_from),
+            ("date", "<=", self.date_to),
+        ]
+        if self.posted_only:
+            domain.append(("parent_state", "=", "posted"))
+        if "x_custom_withholding_category_id" in self.env["product.template"]._fields:
+            domain.append(("product_id.product_tmpl_id.x_custom_withholding_category_id", "!=", False))
+        return domain
 
 
 class CoretaxSubmissionWizard(models.TransientModel):
@@ -103,6 +184,15 @@ class CoretaxSubmissionWizard(models.TransientModel):
     _report_code = "coretax_submission"
     _report_model = "custom.report.coretax.submission"
     _filename_prefix = "Monitoring_Submission_Coretax"
+    _source_model = "custom.coretax.transaction"
+
+    def _source_domain(self):
+        self.ensure_one()
+        return [
+            ("company_id", "in", self.company_ids.ids or self.env.companies.ids),
+            ("create_date", ">=", datetime.combine(self.date_from, time.min)),
+            ("create_date", "<=", datetime.combine(self.date_to, time.max)),
+        ]
 
 
 class PajakkuUsageWizard(models.TransientModel):
@@ -112,3 +202,12 @@ class PajakkuUsageWizard(models.TransientModel):
     _report_code = "pajakku_usage"
     _report_model = "custom.report.pajakku.usage"
     _filename_prefix = "Usage_Pajakku"
+    _source_model = "custom.coretax.pajakku.usage"
+
+    def _source_domain(self):
+        self.ensure_one()
+        return [
+            ("company_id", "in", self.company_ids.ids or self.env.companies.ids),
+            ("period", ">=", self.date_from),
+            ("period", "<=", self.date_to),
+        ]

@@ -352,6 +352,17 @@ class CustomReportEngine(models.AbstractModel):
         company = account.company_ids[:1] or self.env.company
         return account.with_company(company).code or ""
 
+    def _opt(self, record, field_name, default=""):
+        """Read ``field_name`` off ``record`` only when the field exists.
+
+        Lets tax reports enrich rows with optional fields from modules that may
+        not be installed (``custom_coretax`` / ``custom_tax_id``) without a hard
+        dependency — the value is ``default`` when the field is absent.
+        """
+        if record and field_name in record._fields:
+            return record[field_name] or default
+        return default
+
     # ------------------------------------------------------------------
     # Render-context helpers
     # ------------------------------------------------------------------

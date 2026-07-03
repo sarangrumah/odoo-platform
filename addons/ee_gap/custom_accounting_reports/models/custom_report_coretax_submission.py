@@ -84,19 +84,24 @@ class CustomReportCoretaxSubmission(models.AbstractModel):
 
         lines = []
         total = 0
+        total_retry = 0
         ordered = [s for s in _STATE_ORDER if s in buckets] + [s for s in buckets if s not in _STATE_ORDER]
         for state in ordered:
             group = buckets[state]
             for r in sorted(group, key=lambda r: r["name"]):
                 lines.append(r)
+            s_retry = sum(r["retry"] for r in group)
             lines.append(
                 {
                     "type": "subtotal",
-                    "name": "Subtotal %s" % _STATE_LABEL.get(state, state),
-                    "retry": len(group),
+                    "name": "Subtotal %s (%d transaksi)" % (_STATE_LABEL.get(state, state), len(group)),
+                    "retry": s_retry,
                 }
             )
             total += len(group)
+            total_retry += s_retry
 
-        lines.append({"type": "grand_total", "name": "TOTAL submission", "retry": total})
+        lines.append(
+            {"type": "grand_total", "name": "TOTAL: %d transaksi" % total, "retry": total_retry}
+        )
         return lines

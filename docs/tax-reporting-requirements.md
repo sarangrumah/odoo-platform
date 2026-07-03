@@ -309,10 +309,23 @@ P3/P4 (6): `test_dpp_nilai_lain`, `test_faktur_pengganti`,
 `test_coretax_submission_query`, `test_pajakku_usage` — dijalankan via
 `odoo -d <db> -u custom_accounting_reports --test-enable --test-tags=/custom_accounting_reports`.
 
-> Catatan: 2 test pre-existing yang **tidak terkait pajak**
-> (`test_aged_receivable_buckets`, `test_general_ledger_flat_layout`) masih
-> merah karena drift migrasi Odoo 19 di modul report lain (aged receivable &
-> GL flat layout) — di luar cakupan batch ini.
+> **Update:** seluruh suite `custom_accounting_reports` kini hijau (25 test, 0
+> gagal). 2 test pre-existing non-pajak yang sempat merah sudah diperbaiki:
+> `test_aged_receivable_buckets` (ekspektasi bucket usang setelah bucket
+> 181-365 ditambahkan) dan `test_general_ledger_flat_layout` (`_build_flat_lines`
+> kini `flush_all()` sebelum raw SQL agar `parent_state` yang baru di-post
+> terlihat).
+
+### Penyesuaian UI
+
+- **Submenu "Laporan Pajak":** 13 report dikelompokkan di
+  Accounting › Reporting › Reports › **Laporan Pajak** (terpisah dari report
+  keuangan umum).
+- **Drill-down "Lihat Transaksi":** tombol di tiap wizard (kecuali report
+  ringkasan SPT PPN & Ekualisasi Omzet) membuka transaksi sumbernya
+  (`account.move`, `account.move.line`, `custom.coretax.bukti.potong`,
+  `account.move.withholding.line`, `custom.coretax.transaction`,
+  `custom.coretax.pajakku.usage`, `res.partner`) sebagai list Odoo native.
 
 ### Sudah tercakup / di-defer
 

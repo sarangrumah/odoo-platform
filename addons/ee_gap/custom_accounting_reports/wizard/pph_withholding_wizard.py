@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from datetime import date
 
-from odoo import fields, models
+from odoo import _, fields, models
+from odoo.exceptions import UserError
 
 
 class PphWithholdingWizard(models.TransientModel):
@@ -66,3 +67,25 @@ class PphWithholdingWizard(models.TransientModel):
         }
         filename = "Rekap_PPh_%s_%s_%s.xlsx" % (self.pph_kind, self.date_from, self.date_to)
         return self.env["custom.report.pph.withholding"]._xlsx_action(options, filename)
+
+    def action_view_source(self):
+        self.ensure_one()
+        if "account.move.withholding.line" not in self.env:
+            raise UserError(_("Modul PPh (custom_tax_id) belum terpasang."))
+        domain = [
+            ("company_id", "in", self.company_ids.ids or self.env.companies.ids),
+            ("move_id.date", ">=", self.date_from),
+            ("move_id.date", "<=", self.date_to),
+        ]
+        if self.posted_only:
+            domain.append(("move_id.state", "=", "posted"))
+        if self.pph_kind != "all":
+            domain.append(("pph_kind", "=", self.pph_kind))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Baris Pemotongan PPh"),
+            "res_model": "account.move.withholding.line",
+            "view_mode": "list,form",
+            "domain": domain,
+            "target": "current",
+        }
