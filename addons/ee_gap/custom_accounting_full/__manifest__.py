@@ -29,6 +29,11 @@ Features
 - **Branch dimension** — ``account.analytic.account`` extended with
   ``branch_code`` + ``is_branch_root`` for cost-centre reporting by
   legal branch / kantor cabang.
+- **Unique vendor bill reference** — escalates Odoo CE's soft
+  ``duplicated_ref_ids`` warning into a hard block: posting a vendor
+  bill whose Bill Reference is already used by the same vendor
+  (same company, non-cancelled) raises a ``UserError``. Applies to
+  every tenant, since this module ships in all industry packs.
 
 The reports honour the active Odoo user's allowed_company_ids — a
 consolidator user must have access to *all* subsidiaries for figures
@@ -44,7 +49,7 @@ elimination journal entry is written to ``pdp.audit_log`` via the
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.2.0",
+    "version": "19.0.0.3.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",

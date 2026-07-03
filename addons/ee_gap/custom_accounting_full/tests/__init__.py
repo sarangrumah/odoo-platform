@@ -7,3 +7,4 @@ from . import test_reconcile_rule
 from . import test_credit_limit
 from . import test_followup
 from . import test_3way_match
+from . import test_bill_ref_guard

@@ -87,6 +87,40 @@
                                       t-options="{'widget': 'monetary', 'display_currency': currency}"/>
                             </td>
                         </tr>
+                        <tr t-if="line.get('type') == 'reconciliation_header'"
+                            class="table-info">
+                            <td colspan="5"><strong t-esc="line['label']"/></td>
+                        </tr>
+                        <tr t-if="line.get('type') == 'reconciliation_header'"
+                            class="table-light fw-bold">
+                            <td colspan="2">Akun PPN</td>
+                            <td class="text-end">Mutasi via Faktur Pajak</td>
+                            <td class="text-end">Mutasi Buku Besar</td>
+                            <td class="text-end">Selisih</td>
+                        </tr>
+                        <tr t-if="line.get('type') == 'reconciliation'">
+                            <td colspan="2" t-esc="line['account']"/>
+                            <td class="text-end">
+                                <span t-esc="line['tax_movement']"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="line['gl_movement']"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="line['selisih']"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                        </tr>
+                        <tr t-if="line.get('type') == 'reconciliation_total'"
+                            class="table-secondary fw-bold">
+                            <td colspan="4" t-esc="line['label']"/>
+                            <td class="text-end">
+                                <span t-esc="line['selisih']"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                        </tr>
                     </t>
                 </tbody>
             </table>
