@@ -128,7 +128,7 @@ class CustomReportPartnerLedger(models.AbstractModel):
                 {
                     "date": ml.date,
                     "move_name": ml.move_id.name or ml.move_id.display_name,
-                    "account_code": ml.account_id.code,
+                    "account_code": self._account_code(ml.account_id),
                     "label": ml.name or "",
                     "debit": ml.debit,
                     "credit": ml.credit,

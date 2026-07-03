@@ -61,7 +61,7 @@ class CustomReportBookMixin(models.AbstractModel):
                     "date": ml.date,
                     "journal_code": ml.journal_id.code,
                     "move_name": ml.move_id.name or ml.move_id.display_name,
-                    "account_code": ml.account_id.code,
+                    "account_code": self._account_code(ml.account_id),
                     "partner": ml.partner_id.display_name or "",
                     "label": ml.name or "",
                     "debit": ml.debit,

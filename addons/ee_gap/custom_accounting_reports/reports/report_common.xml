@@ -43,6 +43,51 @@
                         <t t-elif="report_code == 'tax'">
                             <t t-call="custom_accounting_reports.report_tax"/>
                         </t>
+                        <t t-elif="report_code == 'faktur_pajak'">
+                            <t t-call="custom_accounting_reports.report_faktur_pajak"/>
+                        </t>
+                        <t t-elif="report_code == 'bupot'">
+                            <t t-call="custom_accounting_reports.report_bupot"/>
+                        </t>
+                        <t t-elif="report_code == 'spt_ppn'">
+                            <t t-call="custom_accounting_reports.report_spt_ppn"/>
+                        </t>
+                        <t t-elif="report_code == 'pph_withholding'">
+                            <t t-call="custom_accounting_reports.report_pph_withholding"/>
+                        </t>
+                        <t t-elif="report_code == 'nsfp_monitoring'">
+                            <t t-call="custom_accounting_reports.report_nsfp_monitoring"/>
+                        </t>
+                        <t t-elif="report_code == 'npwp_quality'">
+                            <t t-call="custom_accounting_reports.report_npwp_quality"/>
+                        </t>
+                        <t t-elif="report_code == 'dpp_nilai_lain'">
+                            <t t-call="custom_accounting_reports.report_dpp_nilai_lain"/>
+                        </t>
+                        <t t-elif="report_code == 'faktur_pengganti'">
+                            <t t-call="custom_accounting_reports.report_faktur_pengganti"/>
+                        </t>
+                        <t t-elif="report_code == 'ekualisasi_omzet'">
+                            <t t-call="custom_accounting_reports.report_ekualisasi_omzet"/>
+                        </t>
+                        <t t-elif="report_code == 'pph_equalisasi'">
+                            <t t-call="custom_accounting_reports.report_pph_equalisasi"/>
+                        </t>
+                        <t t-elif="report_code == 'coretax_submission'">
+                            <t t-call="custom_accounting_reports.report_coretax_submission"/>
+                        </t>
+                        <t t-elif="report_code == 'pajakku_usage'">
+                            <t t-call="custom_accounting_reports.report_pajakku_usage"/>
+                        </t>
+                        <t t-elif="report_code == 'pph_reconciliation'">
+                            <t t-call="custom_accounting_reports.report_pph_reconciliation"/>
+                        </t>
+                        <t t-elif="report_code == 'pph25'">
+                            <t t-call="custom_accounting_reports.report_pph25"/>
+                        </t>
+                        <t t-elif="report_code == 'tax_audit'">
+                            <t t-call="custom_accounting_reports.report_tax_audit"/>
+                        </t>
                         <t t-elif="report_code == 'day_book'">
                             <t t-call="custom_accounting_reports.report_day_book"/>
                         </t>

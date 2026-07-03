@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_accounting_full
-manifest_version: 19.0.0.2.0
+manifest_version: 19.0.0.3.0
 ---
 
 # custom_accounting_full
@@ -23,6 +23,7 @@ This is the umbrella accounting module — anything described in a BRD as "inter
 - **Bank auto-reconcile cron**: `custom.reconcile.rule._cron_auto_reconcile` walks unmatched `account.bank.statement.line` per company; each line calls `_custom_apply_reconcile_rules` → for each applicable `custom.reconcile.rule`, `_candidate_move_lines` searches receivable/payable AMLs within `match_date_window_days`, filtered by `_line_matches` (amount within `amount_tolerance`, regex match on `payment_ref/ref/narration`). Best candidate auto-reconciles when `rule.auto_validate=True`.
 - **Customer credit limit**: `sale.order.action_confirm` is overridden to call `_custom_credit_check`; reads `partner.custom_credit_limit` + `custom_outstanding_amount`; if `projected > limit` and `method=='block'` raises `UserError`, if `'warn'` posts a chatter warning. Every check writes a `custom.credit.check.log` row.
 - **Follow-up ladder**: `custom.followup.level._cron_apply_followup` queries partners with posted unreconciled receivable lines past `date_maturity`; per partner `_custom_advance_followup_level` bumps `custom_followup_level_id` to the highest matching `delay_days`, and `_custom_send_followup_email_if_due` dispatches `email_template_id` respecting `custom_followup_next_date` throttle (`max(7, delay_days/2)` days).
+- **Unique vendor bill reference**: `account.move._post` for `in_invoice`/`in_refund` runs `_custom_find_duplicate_bill_ref` per move; if another non-cancelled move for the same `commercial_partner_id` + `company_id` + `move_type` already carries the same (stripped) `ref`, it raises `UserError`. This hard-blocks what Odoo CE only surfaces as the soft `duplicated_ref_ids` banner. Empty refs are never duplicates. Search runs in `sudo()` so a duplicate hidden by record rules still triggers the block.
 - **3-way match**: `account.move._post` for `in_invoice` runs `_custom_run_three_way_match`. Per bill line with a `purchase_line_id`, computes qty variance vs `qty_received` and price variance vs PO `price_unit`; line `status` is `pass`/`qty_variance`/`price_variance`/`both`. Overall result stored on `custom.match.result` + `custom.match.line.result`. `policy.on_qty_mismatch` / `on_price_mismatch` ∈ {`warn`,`block`} — `block` raises `UserError` and prevents posting.
 - **Analytic branch dim**: `account.analytic.account.x_custom_branch_code` + `x_custom_is_branch_root` + `x_custom_parent_id` + computed `x_custom_branch_root_id` (recursive) for kantor-cabang reporting (Odoo 19 no longer ships `account.analytic.account.parent_id`).
 
@@ -68,7 +69,8 @@ This is the umbrella accounting module — anything described in a BRD as "inter
 - `account.analytic.account.x_custom_branch_root_id` (M2o, recursive compute) — entire branch subtree resolution.
 
 ## Public Methods
-- `account.move._post(soft=True)` — overridden to run `_custom_run_three_way_match` (before super, can raise) and `_custom_run_intercompany_mirror` (after super, never blocks).
+- `account.move._post(soft=True)` — overridden in two classes: `account_move_bill_ref.py` runs `_custom_find_duplicate_bill_ref` (before super, raises on duplicate ref) and `account_move_match.py` runs `_custom_run_three_way_match` (before super, can raise) + `_custom_run_intercompany_mirror` (after super, never blocks). Both chain via `super()`.
+- `account.move._custom_find_duplicate_bill_ref()` — returns other non-cancelled vendor bills sharing this Bill Reference for the same vendor/company; empty result for non-vendor-bills or blank refs.
 - `account.move._custom_run_intercompany_mirror()` / `_custom_find_intercompany_rule()` / `_custom_create_intercompany_mirror(rule)`.
 - `account.intercompany.rule._map_account(src_account)` — explicit mapping → same-code lookup → empty.
 - `account.consolidation.config.build_trial_balance(date_from, date_to)` — pivoted consolidated TB.
@@ -99,6 +101,7 @@ This is the umbrella accounting module — anything described in a BRD as "inter
 - **Intercompany mirror is best-effort.** Failure in `_custom_create_intercompany_mirror` is caught, posted to chatter, and the source move stays posted. Operators must reconcile manually. No retry queue.
 - **Mirror lookup keys on `res.company.partner_id`.** A partner must be set as a company's partner for the rule to fire; this is brittle if partners are merged or companies are recreated.
 - **3-way match runs BEFORE `super()._post`** — a `block` policy raises `UserError` and prevents posting. Match is also recomputed each post (`unlink` of old result), so audit history is lost on re-post.
+- **Duplicate bill-ref block has no escape hatch.** The check in `account_move_bill_ref.py` is unconditional (no per-company toggle) — every tenant gets it because this module ships in all industry packs. If a vendor legitimately reuses a reference, the only ways through are changing the ref or cancelling the prior bill. Add a `res.company` boolean guard here if a tenant needs to opt out. Two `_post` overrides now exist on `account.move` in this module; both call `super()`, order follows `models/__init__.py` import order (bill-ref check registered after match).
 - **`account.move.line.balance` is used in `_compute_balances`** — `read_group` of `debit:sum`/`credit:sum`, then `debit - credit`; this matches stored convention but does NOT honour FX revaluation moves separately.
 - **Elimination amount uses `min(|a|,|b|)`** — the residual is left on whichever side is larger; no warning if the imbalance is material (only `threshold_amount` is exposed on the rule, but proposal.action_compute does not consult it).
 - **`custom.followup.stat.by.partner` SQL view guards init** — checks `res_partner.custom_followup_level_id` exists before `CREATE VIEW`; on first install the view is empty until the second registry load.

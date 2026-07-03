@@ -82,6 +82,57 @@ class TestWithholdingApply(TaxIdCommon):
         bill._custom_apply_withholding()
         self.assertEqual(len(bill.x_custom_withholding_line_ids), 1)
 
+    def _ensure_general_journal(self):
+        journal = self.Journal.search(
+            [("type", "=", "general"), ("company_id", "=", self.company.id)], limit=1
+        )
+        if not journal:
+            journal = self.Journal.create(
+                {"name": "Misc (test)", "type": "general", "code": "MISC-T", "company_id": self.company.id}
+            )
+        return journal
+
+    def test_post_books_withholding_to_gl(self):
+        self._ensure_general_journal()
+        bill = self._make_vendor_bill(self.vendor_npwp, 1_000_000)
+        bill.action_post()
+        je = bill.x_custom_withholding_move_id
+        self.assertTrue(je, "A withholding GL entry must be posted.")
+        self.assertEqual(je.state, "posted")
+        # Cr Hutang PPh 23 = 20,000 (owed to the state).
+        hutang = je.line_ids.filtered(lambda l: l.account_id == self.hutang_pph_23)
+        self.assertAlmostEqual(sum(hutang.mapped("credit")), 20_000, places=2)
+        # Dr Utang Usaha (AP) = 20,000 (reduce vendor payable).
+        ap = je.line_ids.filtered(lambda l: l.account_id.account_type == "liability_payable")
+        self.assertAlmostEqual(sum(ap.mapped("debit")), 20_000, places=2)
+        # Entry balances.
+        self.assertAlmostEqual(
+            sum(je.line_ids.mapped("debit")), sum(je.line_ids.mapped("credit")), places=2
+        )
+
+    def test_withholding_gl_idempotent(self):
+        self._ensure_general_journal()
+        bill = self._make_vendor_bill(self.vendor_npwp, 1_000_000)
+        bill.action_post()
+        je = bill.x_custom_withholding_move_id
+        self.assertTrue(je)
+        bill._custom_post_withholding_entry()  # re-trigger
+        self.assertEqual(bill.x_custom_withholding_move_id, je, "Must not create a 2nd entry.")
+
+    def test_withholding_gl_can_be_disabled(self):
+        self.env["ir.config_parameter"].sudo().set_param(
+            "custom_tax_id.withholding_gl_posting", "0"
+        )
+        try:
+            bill = self._make_vendor_bill(self.vendor_npwp, 1_000_000)
+            bill.action_post()
+            self.assertFalse(bill.x_custom_withholding_move_id, "No GL entry when disabled.")
+            self.assertEqual(len(bill.x_custom_withholding_line_ids), 1, "Line still created.")
+        finally:
+            self.env["ir.config_parameter"].sudo().set_param(
+                "custom_tax_id.withholding_gl_posting", "1"
+            )
+
     def test_sales_invoice_does_not_trigger_withholding(self):
         sale = self.Move.create(
             {

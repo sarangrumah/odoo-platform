@@ -46,7 +46,7 @@ class CustomReportTrialBalance(models.AbstractModel):
         total_d = total_c = 0.0
         total_cl_d = total_cl_c = 0.0
 
-        for acc in sorted(accounts, key=lambda a: a.code or ""):
+        for acc in sorted(accounts, key=lambda a: self._account_code(a)):
             o = opening.get(acc.id, {})
             p = period.get(acc.id, {})
             opening_balance = o.get("balance", 0.0)
@@ -75,7 +75,7 @@ class CustomReportTrialBalance(models.AbstractModel):
                 {
                     "type": "account",
                     "account_id": acc.id,
-                    "account_code": acc.code,
+                    "account_code": self._account_code(acc),
                     "account_name": acc.name,
                     "account_type": acc.account_type,
                     "opening_debit": opening_debit,

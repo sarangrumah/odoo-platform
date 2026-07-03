@@ -11,4 +11,11 @@ from . import partner_card_wizard
 from . import advance_wizard
 from . import sales_wizard
 from . import tax_report_wizard
+from . import faktur_pajak_wizard
+from . import bupot_wizard
+from . import spt_ppn_wizard
+from . import pph_withholding_wizard
+from . import nsfp_monitoring_wizard
+from . import npwp_quality_wizard
+from . import p3p4_wizards
 from . import day_book_wizard

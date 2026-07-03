@@ -78,11 +78,107 @@
               action="action_sales_wizard"
               sequence="88"/>
 
-    <menuitem id="menu_custom_reports_tax"
-              name="Tax Report"
+    <!-- ===== Laporan Pajak (grouped submenu for the tax team) ===== -->
+    <menuitem id="menu_custom_reports_tax_root"
+              name="Laporan Pajak"
               parent="menu_custom_reports_root"
+              sequence="89"/>
+
+    <menuitem id="menu_custom_reports_tax"
+              name="Tax Report (PPN/PPh)"
+              parent="menu_custom_reports_tax_root"
               action="action_tax_report_wizard"
+              sequence="10"/>
+
+    <menuitem id="menu_custom_reports_faktur_pajak"
+              name="Rekap Faktur Pajak"
+              parent="menu_custom_reports_tax_root"
+              action="action_faktur_pajak_wizard"
+              sequence="20"/>
+
+    <menuitem id="menu_custom_reports_bupot"
+              name="Rekap Bukti Potong PPh"
+              parent="menu_custom_reports_tax_root"
+              action="action_bupot_wizard"
+              sequence="30"/>
+
+    <menuitem id="menu_custom_reports_spt_ppn"
+              name="SPT Masa PPN 1111"
+              parent="menu_custom_reports_tax_root"
+              action="action_spt_ppn_wizard"
+              sequence="40"/>
+
+    <menuitem id="menu_custom_reports_pph_withholding"
+              name="Rekap PPh Pemotongan"
+              parent="menu_custom_reports_tax_root"
+              action="action_pph_withholding_wizard"
+              sequence="50"/>
+
+    <menuitem id="menu_custom_reports_nsfp_monitoring"
+              name="Monitoring NSFP"
+              parent="menu_custom_reports_tax_root"
+              action="action_nsfp_monitoring_wizard"
+              sequence="60"/>
+
+    <menuitem id="menu_custom_reports_npwp_quality"
+              name="Data Quality NPWP/NIK"
+              parent="menu_custom_reports_tax_root"
+              action="action_npwp_quality_wizard"
+              sequence="70"/>
+
+    <menuitem id="menu_custom_reports_dpp_nilai_lain"
+              name="Laporan DPP Nilai Lain"
+              parent="menu_custom_reports_tax_root"
+              action="action_dpp_nilai_lain_wizard"
+              sequence="80"/>
+
+    <menuitem id="menu_custom_reports_faktur_pengganti"
+              name="Daftar Faktur Pengganti"
+              parent="menu_custom_reports_tax_root"
+              action="action_faktur_pengganti_wizard"
               sequence="90"/>
+
+    <menuitem id="menu_custom_reports_ekualisasi_omzet"
+              name="Ekualisasi Omzet (PPN vs GL)"
+              parent="menu_custom_reports_tax_root"
+              action="action_ekualisasi_omzet_wizard"
+              sequence="100"/>
+
+    <menuitem id="menu_custom_reports_pph_equalisasi"
+              name="Ekualisasi Biaya vs Objek PPh"
+              parent="menu_custom_reports_tax_root"
+              action="action_pph_equalisasi_wizard"
+              sequence="110"/>
+
+    <menuitem id="menu_custom_reports_coretax_submission"
+              name="Monitoring Submission Coretax"
+              parent="menu_custom_reports_tax_root"
+              action="action_coretax_submission_wizard"
+              sequence="120"/>
+
+    <menuitem id="menu_custom_reports_pajakku_usage"
+              name="Usage Meter Pajakku"
+              parent="menu_custom_reports_tax_root"
+              action="action_pajakku_usage_wizard"
+              sequence="130"/>
+
+    <menuitem id="menu_custom_reports_pph_reconciliation"
+              name="Rekonsiliasi PPh (Terutang vs Disetor)"
+              parent="menu_custom_reports_tax_root"
+              action="action_pph_reconciliation_wizard"
+              sequence="140"/>
+
+    <menuitem id="menu_custom_reports_pph25"
+              name="Monitoring Angsuran PPh 25"
+              parent="menu_custom_reports_tax_root"
+              action="action_pph25_wizard"
+              sequence="150"/>
+
+    <menuitem id="menu_custom_reports_tax_audit"
+              name="Jejak Audit Pajak"
+              parent="menu_custom_reports_tax_root"
+              action="action_tax_audit_wizard"
+              sequence="160"/>
 
     <menuitem id="menu_custom_reports_day_book"
               name="Day Book"

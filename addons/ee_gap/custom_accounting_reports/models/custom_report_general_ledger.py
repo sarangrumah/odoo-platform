@@ -239,7 +239,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
                 {
                     "type": "account",
                     "account_id": aid,
-                    "account_code": acc.code,
+                    "account_code": self._account_code(acc),
                     "account_name": acc.name,
                     "account_type": acc.account_type,
                     "opening": opening_by_account.get(aid, 0.0),
@@ -274,7 +274,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
             by_account[aid] = {
                 "type": "account",
                 "account_id": aid,
-                "account_code": acc.code,
+                "account_code": self._account_code(acc),
                 "account_name": acc.name,
                 "account_type": acc.account_type,
                 "opening": opening,
@@ -377,6 +377,11 @@ class CustomReportGeneralLedger(models.AbstractModel):
         return ", ".join(filter(None, cost)), ", ".join(filter(None, profit))
 
     def _build_flat_lines(self, filters):
+        # The flat query reads ``parent_state`` (a stored related of
+        # ``move_id.state``) via raw SQL. Flush pending ORM writes first so a
+        # move posted earlier in the same transaction — e.g. post-then-export
+        # in one server action, or a test — is visible to the SQL.
+        self.env.flush_all()
         query, params = self._flat_query(filters)
         self.env.cr.execute(query, params)
         rows = self.env.cr.dictfetchall()
@@ -428,7 +433,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
                 {
                     "date": r["date"],
                     "journal_code": journal.code if journal else "",
-                    "account_code": acc.code if acc else "",
+                    "account_code": self._account_code(acc),
                     "account_name": acc.name if acc else "",
                     "partner": partner.display_name if partner else "",
                     "label": r["label"] or "",
