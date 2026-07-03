@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Shared body for both Payment Voucher and Payment Receipt. -->
+    <template id="report_payment_document">
+        <t t-set="is_inbound" t-value="o.payment_type == 'inbound'"/>
+        <t t-set="partner_label" t-value="'Received From' if is_inbound else 'Paid To'"/>
+        <div class="page" style="font-size: 12px;">
+            <div style="text-align:center; margin-bottom: 12px;">
+                <h2 style="margin:0; letter-spacing:1px;" t-out="doc_title"/>
+                <div style="font-size: 13px; font-weight: bold;" t-out="o.name or 'Draft'"/>
+            </div>
+
+            <table style="width:100%; border-collapse:collapse; margin-bottom:14px;">
+                <tr>
+                    <td style="width:18%; padding:3px 5px; font-weight:bold;">Date</td>
+                    <td style="width:32%; padding:3px 5px;" t-out="o.date"
+                        t-options='{"widget": "date"}'/>
+                    <td style="width:18%; padding:3px 5px; font-weight:bold;">Journal</td>
+                    <td style="width:32%; padding:3px 5px;" t-out="o.journal_id.name"/>
+                </tr>
+                <tr>
+                    <td style="padding:3px 5px; font-weight:bold;" t-out="partner_label"/>
+                    <td style="padding:3px 5px;" t-out="o.partner_id.name or ''"/>
+                    <td style="padding:3px 5px; font-weight:bold;">Reference</td>
+                    <td style="padding:3px 5px;" t-out="o.payment_reference or o.memo or ''"/>
+                </tr>
+            </table>
+
+            <table style="width:100%; border-collapse:collapse; border:1px solid #b0b0b0; margin-bottom:10px;">
+                <tr>
+                    <td style="padding:6px 8px; border:1px solid #b0b0b0; font-weight:bold; background:#f3f3f3;">Amount</td>
+                    <td style="padding:6px 8px; border:1px solid #b0b0b0; text-align:right; font-size:14px; font-weight:bold;">
+                        <span t-out="o.amount"
+                              t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:6px 8px; border:1px solid #b0b0b0; font-weight:bold; background:#f3f3f3;">Amount in Words</td>
+                    <td style="padding:6px 8px; border:1px solid #b0b0b0; font-style:italic;"
+                        t-out="o.currency_id.amount_to_text(o.amount)"/>
+                </tr>
+                <tr t-if="o.memo">
+                    <td style="padding:6px 8px; border:1px solid #b0b0b0; font-weight:bold; background:#f3f3f3;">Description</td>
+                    <td style="padding:6px 8px; border:1px solid #b0b0b0;" t-out="o.memo"/>
+                </tr>
+            </table>
+
+            <table style="width:100%; border-collapse:collapse; margin-top:35px; text-align:center;">
+                <tr>
+                    <td style="width:33%; padding:5px;">Prepared By</td>
+                    <td style="width:33%; padding:5px;">Approved By</td>
+                    <td style="width:33%; padding:5px;" t-out="'Received By' if not is_inbound else 'Paid By'"/>
+                </tr>
+                <tr style="height:55px;"><td/><td/><td/></tr>
+                <tr>
+                    <td style="padding:5px; border-top:1px solid #333;">(&#160;&#160;&#160;&#160;&#160;&#160;)</td>
+                    <td style="padding:5px; border-top:1px solid #333;">(&#160;&#160;&#160;&#160;&#160;&#160;)</td>
+                    <td style="padding:5px; border-top:1px solid #333;">(&#160;&#160;&#160;&#160;&#160;&#160;)</td>
+                </tr>
+            </table>
+        </div>
+    </template>
+
+    <!-- Payment Voucher: vendor / outbound payments. -->
+    <template id="report_payment_voucher">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <t t-set="doc_title">PAYMENT VOUCHER</t>
+                    <t t-call="custom_levis_localization.report_payment_document"/>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
