@@ -19,8 +19,12 @@ services:
     volumes:
       - ./data/ollama:/root/.ollama
     environment:
-      OLLAMA_NUM_THREAD: "6"
-      OLLAMA_KEEP_ALIVE: "10m"
+      # Keep inference threads <= the CPU limit below so Ollama can't saturate
+      # the host. 8-core box: cap at 4, leaving headroom for Odoo/Postgres.
+      OLLAMA_NUM_THREAD: "4"
+      # Unload the model 30s after the last request to free ~5.3GB RAM quickly.
+      # Trade-off: first request after idle reloads the model from disk (+few s).
+      OLLAMA_KEEP_ALIVE: "30s"
     healthcheck:
       test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -31,4 +35,7 @@ services:
     deploy:
       resources:
         limits:
+          # Hard cap: Ollama CPU inference may use at most 4 of 8 cores, so a
+          # single generation request can no longer drive host CPU to ~99%.
+          cpus: "4.0"
           memory: 8g
