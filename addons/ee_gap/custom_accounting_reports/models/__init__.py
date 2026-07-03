@@ -25,5 +25,8 @@ from . import custom_report_ekualisasi_omzet
 from . import custom_report_pph_equalisasi
 from . import custom_report_coretax_submission
 from . import custom_report_pajakku_usage
+from . import custom_report_pph_reconciliation
+from . import custom_report_pph25
+from . import custom_report_tax_audit
 from . import custom_report_books
 from . import custom_report_dispatch

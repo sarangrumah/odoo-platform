@@ -211,3 +211,74 @@ class PajakkuUsageWizard(models.TransientModel):
             ("period", ">=", self.date_from),
             ("period", "<=", self.date_to),
         ]
+
+
+class PphReconciliationWizard(models.TransientModel):
+    _name = "custom.report.pph.reconciliation.wizard"
+    _inherit = "custom.report.tax.wizard.mixin"
+    _description = "Rekonsiliasi PPh Terutang vs Disetor Wizard"
+    _report_code = "pph_reconciliation"
+    _report_model = "custom.report.pph.reconciliation"
+    _filename_prefix = "Rekonsiliasi_PPh"
+    _source_model = "account.move.line"
+
+    def _source_domain(self):
+        self.ensure_one()
+        cids = self.company_ids.ids or self.env.companies.ids
+        accounts = self.env["account.account"].search(
+            [("account_type", "=", "liability_current"), ("name", "ilike", "pph"), ("company_ids", "in", cids)]
+        )
+        domain = [
+            ("account_id", "in", accounts.ids),
+            ("company_id", "in", cids),
+            ("date", ">=", self.date_from),
+            ("date", "<=", self.date_to),
+        ]
+        if self.posted_only:
+            domain.append(("parent_state", "=", "posted"))
+        return domain
+
+
+class Pph25Wizard(models.TransientModel):
+    _name = "custom.report.pph25.wizard"
+    _inherit = "custom.report.tax.wizard.mixin"
+    _description = "Monitoring Angsuran PPh 25 Wizard"
+    _report_code = "pph25"
+    _report_model = "custom.report.pph25"
+    _filename_prefix = "Angsuran_PPh25"
+    _source_model = "account.move.line"
+
+    def _source_domain(self):
+        self.ensure_one()
+        cids = self.company_ids.ids or self.env.companies.ids
+        accounts = self.env["custom.report.pph25"]._pph25_accounts(cids)
+        domain = [
+            ("account_id", "in", accounts.ids),
+            ("company_id", "in", cids),
+            ("date", ">=", self.date_from),
+            ("date", "<=", self.date_to),
+        ]
+        if self.posted_only:
+            domain.append(("parent_state", "=", "posted"))
+        return domain
+
+
+class TaxAuditWizard(models.TransientModel):
+    _name = "custom.report.tax.audit.wizard"
+    _inherit = "custom.report.tax.wizard.mixin"
+    _description = "Jejak Audit Pajak Wizard"
+    _report_code = "tax_audit"
+    _report_model = "custom.report.tax.audit"
+    _filename_prefix = "Jejak_Audit_Pajak"
+    _source_model = "pdp.audit.log"
+
+    def _source_domain(self):
+        self.ensure_one()
+        report = self.env["custom.report.tax.audit"]
+        return [
+            ("ts", ">=", datetime.combine(self.date_from, time.min)),
+            ("ts", "<=", datetime.combine(self.date_to, time.max)),
+            "|",
+            ("model_name", "in", report.TAX_MODELS),
+            ("action", "=", "pph_withholding_applied"),
+        ]

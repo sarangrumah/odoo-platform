@@ -327,18 +327,30 @@ P3/P4 (6): `test_dpp_nilai_lain`, `test_faktur_pengganti`,
   `account.move.withholding.line`, `custom.coretax.transaction`,
   `custom.coretax.pajakku.usage`, `res.partner`) sebagai list Odoo native.
 
-### Sudah tercakup / di-defer
+### Item yang tadinya di-defer — kini diimplementasi
 
-- **TAX-CR-01 Kredit Pajak (bukti potong diterima)** — sudah tercakup oleh
-  `custom.report.bupot` dengan arah **"Diterima"** (tidak dibuat report baru).
-- **TAX-REC-03 PPh Terutang vs Disetor** — **di-defer**: engine withholding
-  belum memposting jurnal ke GL (lihat komentar di
-  `custom_tax_id/models/account_move_inherit.py._post`), jadi sisi "disetor"
-  belum ada sumber data. Dibuka lagi setelah posting per-rule di-lock.
-- **TAX-CR-02 PPh 25 Angsuran** — **di-defer**: belum ada model angsuran PPh 25.
-- **TAX-MON-04 Audit Trail Pajak** — **di-defer**: data sudah terekam via
-  `pdp.audited.mixin` / `pdp.audit_log`; ekstraksi ke report tersendiri
-  bernilai marginal, dijadikan follow-up.
+Prasyaratnya (withholding posting ke GL) sudah dikerjakan lebih dulu:
+
+- **Withholding → GL posting** (`custom_tax_id`): saat vendor bill di-post,
+  selain membuat withholding line + bupot draft, kini juga di-post **jurnal
+  terpisah** `Dr Utang Usaha / Cr Hutang PPh` (`account.move` type entry,
+  tertaut via `account.move.x_custom_withholding_move_id`). Gated config param
+  `custom_tax_id.withholding_gl_posting` (default `1`), idempotent, tidak
+  auto-reconcile (netting saat pelunasan vendor). Ini mewujudkan janji manifest
+  ("pajak hutang is booked via balancing journal items").
+
+| Report | Model | Menu | Status |
+|---|---|---|---|
+| TAX-REC-03 Rekonsiliasi PPh Terutang vs Disetor | `custom.report.pph.reconciliation` | Rekonsiliasi PPh | ✅ Implemented (per akun Hutang PPh: saldo awal, terutang, disetor, saldo akhir) |
+| TAX-CR-02 Monitoring Angsuran PPh 25 | `custom.report.pph25` | Monitoring Angsuran PPh 25 | ✅ Implemented (mutasi akun PPh 25 prepaid auto-detect by name) |
+| TAX-MON-04 Jejak Audit Pajak | `custom.report.tax.audit` | Jejak Audit Pajak | ✅ Implemented (ekstraksi `pdp.audit.log` hash-chained utk model & aksi pajak) |
+
+- **TAX-CR-01 Kredit Pajak (bukti potong diterima)** — tetap tercakup oleh
+  `custom.report.bupot` arah **"Diterima"** (tidak dibuat report baru).
+
+Total kini **16 report tax** + ekstensi rekonsiliasi PPN. Verifikasi: suite
+`custom_accounting_reports` (28 test) & `custom_tax_id` (withholding-GL) hijau
+penuh, 0 gagal.
 
 ---
 

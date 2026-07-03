@@ -21,6 +21,7 @@
                     </field>
                     <group>
                         <field name="x_custom_total_withheld"/>
+                        <field name="x_custom_withholding_move_id" readonly="1"/>
                     </group>
                 </page>
                 <page string="Faktur Pengganti"

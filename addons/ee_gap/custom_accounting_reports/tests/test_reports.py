@@ -1188,6 +1188,49 @@ class TestCustomReports(TransactionCase):
         self.assertAlmostEqual(grand["api_calls"], 10, places=0)
         self.assertAlmostEqual(grand["faktur_submits"], 3, places=0)
 
+    # ------------------------------------------------------------------
+    # Deferred-batch reports (withholding GL reconciliation, PPh 25, audit).
+    # ------------------------------------------------------------------
+    def test_pph_reconciliation(self):
+        acc_hutang = self._mk_account("21320R", "Hutang PPh 23", "liability_current")
+        # Terutang: Cr Hutang PPh 20,000 (as booked by the withholding GL entry).
+        self._post_move(
+            [(self.acc_expense, 20000.0, 0.0), (acc_hutang, 0.0, 20000.0)], ref="terutang"
+        )
+        # Disetor: Dr Hutang PPh 15,000 (setoran/NTPN).
+        self._post_move(
+            [(acc_hutang, 15000.0, 0.0), (self.acc_cash, 0.0, 15000.0)], ref="setor"
+        )
+        rep = self.env["custom.report.pph.reconciliation"]
+        lines = rep._build_lines(self._filters())
+        row = next(
+            r for r in lines
+            if r.get("type") not in ("grand_total", "note") and "Hutang PPh 23" in (r.get("account") or "")
+        )
+        self.assertAlmostEqual(row["terutang"], 20000.0, places=2)
+        self.assertAlmostEqual(row["disetor"], 15000.0, places=2)
+        self.assertAlmostEqual(row["saldo_akhir"], 5000.0, places=2)
+
+    def test_pph25(self):
+        acc25 = self._mk_account("11630R", "PPh 25 Dibayar di Muka", "asset_current")
+        self._post_move(
+            [(acc25, 5000.0, 0.0), (self.acc_cash, 0.0, 5000.0)], ref="angsuran"
+        )
+        rep = self.env["custom.report.pph25"]
+        lines = rep._build_lines(self._filters())
+        detail = [l for l in lines if l.get("type") not in ("grand_total", "note")]
+        self.assertTrue(any(r["debit"] == 5000.0 for r in detail), "The PPh 25 installment must be listed.")
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(grand["debit"], 5000.0, places=2)
+        self.assertAlmostEqual(grand["saldo"], 5000.0, places=2)
+
+    def test_tax_audit_runs(self):
+        """The audit-trail query must run and always emit a total/note."""
+        rep = self.env["custom.report.tax.audit"]
+        lines = rep._build_lines(self._filters())
+        self.assertTrue(lines)
+        self.assertTrue(any(l.get("type") in ("grand_total", "note") for l in lines))
+
     def test_drill_down_actions(self):
         """Every 'Lihat Transaksi' button returns a valid act_window whose
         domain is accepted by the ORM."""
@@ -1202,6 +1245,9 @@ class TestCustomReports(TransactionCase):
             ("custom.report.pph.equalisasi.wizard", "account.move.line"),
             ("custom.report.coretax.submission.wizard", "custom.coretax.transaction"),
             ("custom.report.pajakku.usage.wizard", "custom.coretax.pajakku.usage"),
+            ("custom.report.pph.reconciliation.wizard", "account.move.line"),
+            ("custom.report.pph25.wizard", "account.move.line"),
+            ("custom.report.tax.audit.wizard", "pdp.audit.log"),
         ]
         for wizard_model, expected in cases:
             if expected not in self.env:

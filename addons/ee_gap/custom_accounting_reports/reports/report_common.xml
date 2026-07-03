@@ -79,6 +79,15 @@
                         <t t-elif="report_code == 'pajakku_usage'">
                             <t t-call="custom_accounting_reports.report_pajakku_usage"/>
                         </t>
+                        <t t-elif="report_code == 'pph_reconciliation'">
+                            <t t-call="custom_accounting_reports.report_pph_reconciliation"/>
+                        </t>
+                        <t t-elif="report_code == 'pph25'">
+                            <t t-call="custom_accounting_reports.report_pph25"/>
+                        </t>
+                        <t t-elif="report_code == 'tax_audit'">
+                            <t t-call="custom_accounting_reports.report_tax_audit"/>
+                        </t>
                         <t t-elif="report_code == 'day_book'">
                             <t t-call="custom_accounting_reports.report_day_book"/>
                         </t>

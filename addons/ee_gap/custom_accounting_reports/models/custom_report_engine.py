@@ -266,6 +266,10 @@ class CustomReportEngine(models.AbstractModel):
         ``account_domain`` is an optional extra ORM domain restricting
         the account set (resolved via a fast ``account.account`` search).
         """
+        # Flush pending ORM writes so this raw SQL sees moves posted earlier in
+        # the same transaction (post-then-report in one server action, or a
+        # test). Without this, the last unflushed post is silently missed.
+        self.env.flush_all()
         params = [
             filters["date_from"],
             filters["date_to"],

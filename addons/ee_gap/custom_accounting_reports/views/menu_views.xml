@@ -162,6 +162,24 @@
               action="action_pajakku_usage_wizard"
               sequence="130"/>
 
+    <menuitem id="menu_custom_reports_pph_reconciliation"
+              name="Rekonsiliasi PPh (Terutang vs Disetor)"
+              parent="menu_custom_reports_tax_root"
+              action="action_pph_reconciliation_wizard"
+              sequence="140"/>
+
+    <menuitem id="menu_custom_reports_pph25"
+              name="Monitoring Angsuran PPh 25"
+              parent="menu_custom_reports_tax_root"
+              action="action_pph25_wizard"
+              sequence="150"/>
+
+    <menuitem id="menu_custom_reports_tax_audit"
+              name="Jejak Audit Pajak"
+              parent="menu_custom_reports_tax_root"
+              action="action_tax_audit_wizard"
+              sequence="160"/>
+
     <menuitem id="menu_custom_reports_day_book"
               name="Day Book"
               parent="menu_custom_reports_root"
