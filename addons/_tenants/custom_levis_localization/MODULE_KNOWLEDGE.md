@@ -81,7 +81,9 @@ This module implements five specific requirements for the Levi's tenant: HS Code
 - **Models**: `purchase.order` (`l10n_purchase_type`, numbering, `_prepare_invoice`),
   `purchase.order.line` (`_compute_analytic_distribution` merges the store OU),
   `account.move` (`l10n_purchase_type`), `account.move.line` (`_compute_account_id`
-  remaps the payable per stream), `stock.picking` (`l10n_purchase_type`),
+  remaps the payable per stream AND fills a non-trade product line that resolved to
+  no account with `mapping.expense_account_id` — only when otherwise empty), 
+  `stock.picking` (`l10n_purchase_type`),
   `stock.move` (GR/IR routing + OU analytic on the GR journal),
   `stock.warehouse` (`l10n_ou_analytic_id`, `l10n_purchase_journal_id`),
   `levis.purchase.account.map` (config: payable + GR/IR + expense per company/type).

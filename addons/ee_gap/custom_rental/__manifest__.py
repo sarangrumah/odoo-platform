@@ -16,7 +16,7 @@ core rental.asset / rental.order skeleton with:
 """,
     "author": "Custom Platform",
     "category": "Sales/Rental",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.3.1",
     "license": "LGPL-3",
     "depends": [
         "custom_core",

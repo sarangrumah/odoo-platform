@@ -10,7 +10,7 @@ transfers and includes a barcoded pick slip QWeb report.
 """,
     "author": "Custom Platform",
     "category": "Inventory/Warehouse",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.1.1",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
