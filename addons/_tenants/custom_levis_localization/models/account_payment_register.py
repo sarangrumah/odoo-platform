@@ -36,7 +36,7 @@ class LevisPaymentRegisterFee(models.TransientModel):
         "account.account",
         string="Fee Account",
         required=True,
-        domain="[('deprecated', '=', False),"
+        domain="[('active', '=', True),"
         " ('account_type', 'not in', ('asset_receivable', 'liability_payable', 'off_balance')),"
         " ('company_ids', 'in', company_id)]",
     )

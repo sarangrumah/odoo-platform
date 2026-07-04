@@ -16,8 +16,10 @@ This module implements five specific requirements for the Levi's tenant: HS Code
    - Delivered as a `product.template` view that inherits `product.product_template_form_view` to surface the native `stock_delivery` `hs_code` field on the General Information tab (`views/product_template_views.xml:9-18`). There is no Python `product` override; the field itself comes from `stock_delivery`.
 2. **Receipt Quantity Validation**:
    - On confirming an incoming stock picking, if any line's done quantity exceeds its demand quantity (compared with `float_compare`), a `UserError` is raised listing the offending products.
-3. **Inventory Journal Skipping at Goods Receipt Confirmation**:
-   - For vendor goods receipts (moves from supplier locations), no GL journal entry is created, but the stock valuation layer still updates to maintain correct on-hand quantities and values. Outgoing/COGS and internal moves keep posting normally.
+3. **Inventory Journal at Goods Receipt & Vendor Return (opt-in switch)**:
+   - Governed by `ir.config_parameter` `custom_levis_localization.suppress_gr_journal` (default **OFF**). This build has no standard stock input/output interim accounts, so core real-time valuation posts nothing; the module books inventory GL directly via the category pair `property_stock_valuation_account_id` + `account_stock_variation_id` (same pair the Inventory Reconciliation tool uses).
+   - Switch OFF (default): on a vendor **goods receipt** (source = supplier) it posts `Dr Stock Valuation / Cr Stock Variation` for `move.value` (ref `GR-VAL:<move id>`); on a vendor **return / RTV** (destination = supplier) it posts the exact reverse `Dr Stock Variation / Cr Stock Valuation` (ref `GR-RET-VAL:<move id>`). Both are idempotent by `ref` and only fire for `real_time` categories with the accounts + a stock journal set.
+   - Switch ON (periodic): both receipt and return journals are suppressed; GL is trued up periodically by `levis.inventory.reconciliation`.
 4. **Payment Vouchers & Payment Receipts**:
    - Two branded PDF documents are generated for payments on `account.payment`: a *Payment Voucher* for vendor/outbound payments and a *Payment Receipt* for customer/inbound payments. Each renders only for its matching payment direction.
 5. **Periodic Inventory Reconciliation**:
@@ -48,8 +50,12 @@ This module implements five specific requirements for the Levi's tenant: HS Code
   - `difference`: Computed and stored, `stock_value − book_value`.
 
 - **stock.move**:
-  - `_is_levis_goods_receipt()`: Determines if a move is a vendor goods receipt.
-  - `_should_create_account_move()`: Returns `False` for vendor receipts, skipping GL journal entries.
+  - `_is_levis_goods_receipt()`: True when the move enters from a supplier location (`location_id.usage == 'supplier'`).
+  - `_is_levis_vendor_return()`: True when the move leaves to a supplier location (`location_dest_id.usage == 'supplier'`) — a vendor return / RTV.
+  - `_levis_suppress_gr_journal()`: Reads the `suppress_gr_journal` config switch (default OFF).
+  - `_should_create_account_move()`: Returns `False` for vendor receipts only when the suppress switch is ON; otherwise defers to core.
+  - `_action_done()`: After super, calls `_levis_post_gr_journal()` (receipts) and `_levis_post_return_journal()` (vendor returns).
+  - `_levis_book_valuation_entry(ref, label, incoming)`: Shared idempotent poster — `incoming=True` → Dr Valuation/Cr Variation; `incoming=False` → the reverse. No-op if already posted for `ref`, non-real-time category, missing accounts/journal, or zero `move.value`.
 
 - **stock.picking**:
   - `button_validate()`: Validates the done quantity against demand quantities on incoming stock pickings (via `float_compare`). Raises an error if any line exceeds its demand.
