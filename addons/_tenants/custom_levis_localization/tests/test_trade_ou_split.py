@@ -79,12 +79,29 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         })
 
         # --- Valuated storable product ----------------------------------
+        # Non-trade default expense account + a service product with NO expense
+        # account of its own, to exercise the fallback.
+        cls.nt_expense = Account.create({
+            "name": "Non-Trade Opex", "code": "NTEXP01", "account_type": "expense"})
+        cls.env["levis.purchase.account.map"]._get_map(
+            cls.company, "non_trade").expense_account_id = cls.nt_expense.id
+        cls.categ_no_exp = cls.env["product.category"].create({"name": "No-Expense"})
+        cls.categ_no_exp.property_account_expense_categ_id = False
+        cls.service_no_acct = cls.env["product.product"].create({
+            "name": "Opex Service", "type": "service", "purchase_ok": True,
+            "categ_id": cls.categ_no_exp.id})
+        cls.service_no_acct.property_account_expense_id = False
+
         cls.categ = cls.env["product.category"].create({
             "name": "Textile RT",
             "property_cost_method": "standard",
             "property_valuation": "real_time",
             "property_stock_valuation_account_id": cls.stock_valuation.id,
             "property_stock_journal": cls.stock_journal.id,
+            # Give the trade category its own expense account so trade bills do
+            # not depend on the company fallback (which we clear below to make the
+            # non-trade expense-fallback path reachable in test_07).
+            "property_account_expense_categ_id": cls.company_data["default_account_expense"].id,
         })
         cls.product = cls.env["product.product"].create({
             "name": "Levi's 501", "type": "consu", "is_storable": True,
@@ -94,6 +111,10 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         cls.env["ir.config_parameter"].sudo().set_param(
             "custom_levis_localization.suppress_gr_journal", "0"
         )
+        # Remove the company-level default expense so a product with no
+        # product/category expense account resolves to *no* account — the exact
+        # condition the non-trade expense fallback is meant to cover.
+        cls.company.expense_account_id = False
 
     # ------------------------------------------------------------------
     def _make_po(self, ptype, date_order=None, qty=5):
@@ -215,6 +236,24 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
             lambda l: str(self.ou_analytic.id) in self._dist_ids(l.analytic_distribution)
         )
         self.assertIn(bill.line_ids.filtered(lambda l: l.display_type == "product"), matched)
+
+    # ------------------------------------------------------------------
+    # 7. Non-trade expense fallback for products without an expense account
+    # ------------------------------------------------------------------
+    def test_07_non_trade_expense_fallback(self):
+        po = self.env["purchase.order"].create({
+            "partner_id": self.vendor.id,
+            "l10n_purchase_type": "non_trade",
+            "order_line": [Command.create({
+                "product_id": self.service_no_acct.id,
+                "name": self.service_no_acct.name,
+                "product_qty": 1, "price_unit": 500000.0})],
+        })
+        po.button_confirm()
+        bill = self._bill(po)
+        prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
+        self.assertEqual(bill.state, "posted")
+        self.assertEqual(prod_line.account_id, self.nt_expense)
 
     # ------------------------------------------------------------------
     # helpers

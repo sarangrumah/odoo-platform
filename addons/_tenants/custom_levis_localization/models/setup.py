@@ -25,7 +25,7 @@ OU_PLAN_NAME = "Operating Unit"
 # ``with_company``). Trade GR/IR stays per product category, so no code here.
 ACCOUNT_CODES = {
     "trade": {"payable": "2103100001"},
-    "non_trade": {"payable": "2103300001", "grir": "2103300008"},
+    "non_trade": {"payable": "2103300001", "grir": "2103300008", "expense": "6120010001"},
 }
 
 
@@ -136,6 +136,10 @@ def seed_trade_ou(env):
                 acc = _find_account(env, company, codes["grir"])
                 if acc:
                     vals["grir_account_id"] = acc.id
+            if not mapping.expense_account_id and codes.get("expense"):
+                acc = _find_account(env, company, codes["expense"])
+                if acc:
+                    vals["expense_account_id"] = acc.id
             if vals:
                 mapping.write(vals)
             # An AP control account must be payable-typed and reconcilable for

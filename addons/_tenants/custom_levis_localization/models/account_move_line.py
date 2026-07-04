@@ -24,13 +24,22 @@ class AccountMoveLine(models.Model):
         AccountMap = self.env["levis.purchase.account.map"]
         for line in self:
             move = line.move_id
-            if line.display_type != "payment_term":
-                continue
             if move.move_type not in ("in_invoice", "in_refund"):
                 continue
             ptype = move.l10n_purchase_type
             if not ptype:
                 continue
             mapping = AccountMap._get_map(move.company_id, ptype)
-            if mapping and mapping.payable_account_id:
-                line.account_id = mapping.payable_account_id.id
+            if not mapping:
+                continue
+            if line.display_type == "payment_term":
+                # Route the AP control account per stream (trade vs non-trade).
+                if mapping.payable_account_id:
+                    line.account_id = mapping.payable_account_id.id
+            elif line.display_type == "product" and not line.account_id:
+                # Non-trade opex products frequently have no expense account on
+                # their master, which would block bill posting. Fall back to the
+                # stream's default expense account — but ONLY when the line has no
+                # account yet, so a configured product/category account always wins.
+                if mapping.expense_account_id:
+                    line.account_id = mapping.expense_account_id.id
