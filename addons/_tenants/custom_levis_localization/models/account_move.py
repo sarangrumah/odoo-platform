@@ -13,13 +13,23 @@ declarative and never crashes on a DB where a field is absent.
 
 from __future__ import annotations
 
-from odoo import models
+from odoo import fields, models
 
 from .terbilang import terbilang_id
 
 
 class AccountMove(models.Model):
     _inherit = "account.move"
+
+    # Trade / Non-Trade stream, inherited from the source PO (feature #9). Drives
+    # the payable account routing done in ``account.move.line._compute_account_id``.
+    l10n_purchase_type = fields.Selection(
+        [("trade", "Trade"), ("non_trade", "Non-Trade")],
+        string="Purchase Type",
+        copy=False,
+        help="Trade / Non-Trade stream carried from the purchase order; selects "
+        "the payable account on this bill.",
+    )
 
     # ------------------------------------------------------------------
     # Small helpers

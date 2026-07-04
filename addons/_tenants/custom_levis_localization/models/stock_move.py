@@ -139,9 +139,22 @@ class StockMove(models.Model):
             return
         val_acc = categ.property_stock_valuation_account_id
         var_acc = categ.account_stock_variation_id
+        # Trade / Non-Trade (feature #9): route the GR/IR clearing (stock
+        # variation) account per purchase stream. The mapping supplies the
+        # non-trade GR/IR account; trade keeps the product category's own
+        # per-category GR/IR (mapping.grir_account_id left empty for trade).
+        ptype = self.picking_id.l10n_purchase_type
+        if ptype:
+            mapping = self.env["levis.purchase.account.map"]._get_map(company, ptype)
+            if mapping and mapping.grir_account_id:
+                var_acc = mapping.grir_account_id
         journal = categ.property_stock_journal or company.account_stock_journal_id
         if not (val_acc and var_acc and journal):
             return
+        # Operating-Unit analytic of the receiving store, stamped on both legs so
+        # the GR journal is sliceable per store.
+        ou = self.picking_id.picking_type_id.warehouse_id.l10n_ou_analytic_id
+        analytic = {str(ou.id): 100.0} if ou else False
         # move.value is the inventory value moved (net of recoverable tax on a
         # receipt; cost of goods returned on an RTV). Always a magnitude here.
         amount = self.value
@@ -165,11 +178,13 @@ class StockMove(models.Model):
                         "account_id": debit_acc.id, "name": label,
                         "debit": amount if amount > 0 else 0.0,
                         "credit": -amount if amount < 0 else 0.0,
+                        "analytic_distribution": analytic,
                     }),
                     (0, 0, {
                         "account_id": credit_acc.id, "name": label,
                         "debit": -amount if amount < 0 else 0.0,
                         "credit": amount if amount > 0 else 0.0,
+                        "analytic_distribution": analytic,
                     }),
                 ],
             }

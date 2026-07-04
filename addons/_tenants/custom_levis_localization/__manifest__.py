@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.5.0",
+    "version": "19.0.1.6.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -66,6 +66,21 @@ Bundles four tenant-specific requirements for the Levi's databases
    bill still reconciles in full. Fees ride the native write-off channel, so
    they also appear as journal items on the Payment Voucher/Receipt.
 
+9. **Trade / Non-Trade split + Operating-Unit dimension.** The purchase order
+   gains a ``Purchase Type`` (Trade / Non-Trade) that drives:
+   * **Numbering** — separate monthly-reset sequences
+     ``PO/T/EBR/YYYY/MM/#####`` (trade) and ``PO/NT/EBR/YYYY/MM/#####``
+     (non-trade).
+   * **COA mapping** (``levis.purchase.account.map``) — the vendor-bill payable
+     account (Trade Payables vs Non-Trade payable) and, for storable lines, the
+     GR/IR clearing account used by the goods-receipt valuation journal.
+   Each store (``stock.warehouse``) becomes a posted **Operating Unit**: it owns
+   an analytic account (in the "Operating Unit" plan) stamped on every PO / bill
+   / GR-journal line, and a dedicated **purchase journal** so bills, journals
+   and P&L separate per store. Provisioned idempotently by the module
+   ``post_init_hook`` (fresh installs) or ``scripts/tenants/levis/40_setup_trade_ou.py``
+   (already-installed DBs).
+
 TENANT-SCOPED: install only on the Levi's tenant databases.
 """,
     "author": "Custom Platform",
@@ -84,16 +99,20 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
     "data": [
         "security/ir.model.access.csv",
         "data/config_parameters.xml",
+        "data/po_sequences.xml",
         "data/inventory_reconciliation_data.xml",
         "views/product_template_views.xml",
         "views/inventory_reconciliation_views.xml",
         "views/account_payment_register_views.xml",
+        "views/purchase_order_views.xml",
+        "views/levis_purchase_account_map_views.xml",
         "reports/paperformat.xml",
         "reports/payment_report_actions.xml",
         "reports/payment_voucher_templates.xml",
         "reports/payment_receipt_templates.xml",
         "reports/journal_billing_templates.xml",
     ],
+    "post_init_hook": "post_init_hook",
     "installable": True,
     "auto_install": False,
     "application": False,

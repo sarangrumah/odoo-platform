@@ -77,7 +77,46 @@ This module implements five specific requirements for the Levi's tenant: HS Code
 - **External calls**: None.
 - **Cross-vertical**: The manifest names `prd_levis` / `rnd_levis` / `demo_levis` as the intended target databases, but nothing in the code enforces tenant scoping.
 
+## Feature 9 — Trade/Non-Trade split + Operating Unit
+- **Models**: `purchase.order` (`l10n_purchase_type`, numbering, `_prepare_invoice`),
+  `purchase.order.line` (`_compute_analytic_distribution` merges the store OU),
+  `account.move` (`l10n_purchase_type`), `account.move.line` (`_compute_account_id`
+  remaps the payable per stream), `stock.picking` (`l10n_purchase_type`),
+  `stock.move` (GR/IR routing + OU analytic on the GR journal),
+  `stock.warehouse` (`l10n_ou_analytic_id`, `l10n_purchase_journal_id`),
+  `levis.purchase.account.map` (config: payable + GR/IR + expense per company/type).
+- **Numbering**: `data/po_sequences.xml` defines `purchase.order.levis.trade`
+  (`PO/T/EBR/%(year)s/%(month)s/`) and `.nontrade` (`PO/NT/EBR/...`), both
+  `use_date_range` + `no_gap`. Native date ranges are yearly, so
+  `PurchaseOrder._levis_next_po_number` ensures a MONTHLY `ir.sequence.date_range`
+  before drawing the counter → per-month reset. Absent sequences (non-Levi's DB)
+  fall back to core `P` numbering.
+- **Seeding**: `models/setup.py::seed_trade_ou(env)` — idempotent; creates the
+  "Operating Unit" analytic plan + one analytic account & one purchase journal per
+  warehouse (guarded by the two `stock.warehouse` link fields), and the mapping
+  rows by account CODE (`with_company`, company-dependent). Run via
+  `post_init_hook` (install) or `scripts/tenants/levis/40_setup_trade_ou.py`
+  (existing DBs, since `-u` does not re-run post-init).
+- **EBR account codes**: trade payable `2103100001`, non-trade payable
+  `2103300001`, non-trade GR/IR `2103300008`. Trade GR/IR stays per product
+  category (`account_stock_variation_id`, e.g. `2103109121` textile).
+
 ## Gotchas
+- **AP account type coercion**: an AP control account used on a bill's
+  payment-term line MUST be `account_type = liability_payable` (core
+  `account.move.line._check_payable_receivable` on purchase documents:
+  `payment_term XOR liability_payable` must be False). The EBR CoA designates the
+  non-trade payable as payable, but demo_updated_levis imported `2103300001` as
+  `liability_current`, which broke non-trade bill posting. `seed_trade_ou`
+  therefore coerces every mapped payable account to `liability_payable` +
+  `reconcile=True` (logged). The GR/IR accounts are only used on `move_type=entry`
+  journals, which that constraint does NOT check, so they need no coercion.
+- Overriding a computed field's method re-declares `@api.depends` and REPLACES the
+  inherited deps: `purchase.order.line._compute_analytic_distribution` restates
+  the base deps (`product_id`, `order_id.partner_id`) plus `order_id.picking_type_id`.
+  `account.move.line._compute_account_id` has NO base `@api.depends` (precompute-at-
+  create), so the override adds none either and relies on `l10n_purchase_type` being
+  set on the move at create time (via `_prepare_invoice`).
 - Tenant scoping is a deployment convention only — the manifest documents the Levi's databases as intended targets, but there is no runtime check preventing installation elsewhere.
 - The `_cron_generate_drafts` cron is shipped with `active=False` (`data/inventory_reconciliation_data.xml:20`) and is monthly, so it does NOT run automatically unless a tenant enables it. When enabled it only creates DRAFT reconciliations/entries; it never posts.
 - The payment reports are direction-guarded: the Payment Voucher renders only for outbound payments and the Payment Receipt only for inbound payments.
