@@ -64,7 +64,7 @@
                     <td style="width: 13%; padding: 2px 4px; vertical-align: top;">Voucher Number</td>
                     <td style="width: 37%; padding: 2px 4px; vertical-align: top;">: <t t-out="o.name or 'Draft'"/></td>
                     <td style="width: 13%; padding: 2px 4px; vertical-align: top;">Bank Name</td>
-                    <td style="width: 37%; padding: 2px 4px; vertical-align: top;">: <t t-out="o.journal_id.name or ''"/></td>
+                    <td style="width: 37%; padding: 2px 4px; vertical-align: top;">: <t t-out="o.journal_id.bank_account_id.bank_id.name or o.journal_id.name or ''"/></td>
                 </tr>
                 <tr>
                     <td style="padding: 2px 4px; vertical-align: top;">Payment Date</td>
