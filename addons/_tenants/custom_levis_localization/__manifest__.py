@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.6.0",
+    "version": "19.0.1.7.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -45,6 +45,24 @@ Bundles four tenant-specific requirements for the Levi's databases
    line description, debit, credit) with a TOTAL row and Posted/Approved
    signatures. Optional-field lookups (l10n_id tax number, analytic "operating
    unit", linked PO) degrade gracefully when the source module is absent.
+
+10. **Scrap Batch (multiple products).** ``custom.scrap.batch`` (Inventory >
+   Operations > Scrap Batches) scraps several products in one action: each line
+   drives a real ``stock.scrap`` (on-hand qty + stock valuation layer stay
+   correct) and, on validation, ONE consolidated ``account.move`` is posted —
+   Dr Scrap Loss (P&L) / Cr Stock Valuation grouped per product category. The
+   scrap-loss account code comes from the system parameter
+   ``custom_levis_localization.scrap_loss_account_code``; the store's
+   Operating-Unit analytic is stamped on every line; the entry is idempotent
+   (``ref`` ``SCRAP-VAL:<id>`` + stored ``move_id``). Real-time categories only.
+
+11. **Card BIN / MDR configuration.** ``levis.mdr.bin`` (Accounting >
+   Configuration > Card BIN / MDR) maps card BIN ranges to an acquiring bank, an
+   MDR rate (percent + optional fixed fee) and an MDR expense account, with
+   effective dating. On an inbound customer card receipt, entering the *Card BIN*
+   on Register Payment resolves the mapping and nets the MDR off the settlement
+   via the admin-fee channel: Dr Bank (net) / Dr MDR expense / Cr Receivable, the
+   receivable still reconciling in full.
 
 5. **Periodic Inventory Reconciliation.** Because receipts/deliveries do not
    post inventory journals in this setup, GL inventory-asset accounts drift from
@@ -100,9 +118,12 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "security/ir.model.access.csv",
         "data/config_parameters.xml",
         "data/po_sequences.xml",
+        "data/scrap_batch_sequence.xml",
         "data/inventory_reconciliation_data.xml",
         "views/product_template_views.xml",
         "views/inventory_reconciliation_views.xml",
+        "views/scrap_batch_views.xml",
+        "views/levis_mdr_bin_views.xml",
         "views/account_payment_register_views.xml",
         "views/purchase_order_views.xml",
         "views/levis_purchase_account_map_views.xml",
