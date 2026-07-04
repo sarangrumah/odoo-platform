@@ -161,17 +161,22 @@
     </template>
 
     <!-- ============ Totals block ============ -->
-    <!-- Caller sets: vat_pct (string, e.g. '11.0'), show_balance (bool). -->
+    <!-- Caller sets: show_balance (bool).
+         Tax lines are broken out per tax group from o.tax_totals, so each group
+         (e.g. "PPN", "PPh") prints on its own line with the correct amount —
+         the group label follows the tax group name configured per tenant. -->
     <template id="totals_block">
         <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
             <tr>
                 <td style="text-align: right; padding: 2px 5px;">Subtotal</td>
                 <td style="text-align: right; padding: 2px 5px; width: 45%;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_untaxed"/></t></td>
             </tr>
-            <tr>
-                <td style="text-align: right; padding: 2px 5px;">VAT <t t-out="vat_pct"/>%</td>
-                <td style="text-align: right; padding: 2px 5px;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_tax"/></t></td>
-            </tr>
+            <t t-foreach="(o.tax_totals or {}).get('subtotals', [])" t-as="subtotal">
+                <tr t-foreach="subtotal.get('tax_groups', [])" t-as="tax_group">
+                    <td style="text-align: right; padding: 2px 5px;"><t t-out="tax_group['group_name']"/></td>
+                    <td style="text-align: right; padding: 2px 5px;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="tax_group['tax_amount_currency']"/></t></td>
+                </tr>
+            </t>
             <tr>
                 <td style="text-align: right; padding: 2px 5px; font-weight: bold; border-top: 2px solid #000;">TOTAL</td>
                 <td style="text-align: right; padding: 2px 5px; font-weight: bold; border-top: 2px solid #000;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="o.amount_total"/></t></td>

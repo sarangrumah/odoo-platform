@@ -448,6 +448,7 @@ class CustomReportEngine(models.AbstractModel):
             "filters": filters,
             "options": filters,
             "lines": lines,
+            "company": companies[:1],
             "company_names": ", ".join(companies.mapped("name")),
             "currency": currency,
             "date_from": filters["date_from"],
