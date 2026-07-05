@@ -821,18 +821,29 @@ class RetailImportExecutor(models.AbstractModel):
                         })
                     continue
                 qty = float(profile._parse_amount(r.get("net_qty")))
-                net = float(profile._parse_amount(r.get("net_amount")))
                 incl = float(profile._parse_amount(r.get("total_amount")))
                 gross = float(profile._parse_amount(r.get("gross_price")) or 0)
                 rate = str(r.get("tax_rate") or "").strip()
-                tax_ids = [tax.id] if (tax and rate not in ("", "None")) else []
+                taxed = bool(tax) and rate not in ("", "None")
+                # Derive the untaxed base from the PAID total and the tax rate so POS'
+                # tax recomputation grosses back to exactly ``incl`` (net*(1+rate)==incl).
+                # Using the source net_amount instead leaves a residual that POS plugs to
+                # "Cash Difference Loss" (the source total/net ratio is blended, not flat).
+                rate_val = (tax.amount / 100.0) if taxed else 0.0
+                gl_net = incl / (1.0 + rate_val)
+                tax_ids = [tax.id] if taxed else []
+                # The sale tax is PRICE-INCLUDED, so POS extracts net from price_unit and
+                # ignores a forced price_subtotal. price_unit must therefore carry the
+                # tax-INCLUSIVE amount (the paid ``incl``) — POS then derives net = incl/(1+rate)
+                # and recognised incl == incl == tender, so nothing plugs to Cash Difference.
+                unit = incl / qty if qty else incl
                 line_cmds.append((0, 0, {
                     "product_id": prod.id, "qty": qty,
-                    "price_unit": gross or (net / qty if qty else 0.0), "discount": 0.0,
+                    "price_unit": unit, "discount": 0.0,
                     "tax_ids": [(6, 0, tax_ids)],
-                    "price_subtotal": net, "price_subtotal_incl": incl,
+                    "price_subtotal": gl_net, "price_subtotal_incl": incl,
                 }))
-                order_net += net
+                order_net += gl_net
                 order_incl += incl
 
             if not line_cmds:
@@ -922,12 +933,26 @@ class RetailImportExecutor(models.AbstractModel):
                         _logger.error("x24 POST: %s", msg)
                         errors.append((None, msg))
                     elif s.move_id:
-                        # NOTE: the session GL move posts at close date (POS re-applies its
-                        # own accounting date on _post, so backdating to the order date does
-                        # not stick). Auto-close is off by default; for in-period historical
-                        # GL, close via the POS UI / period-close process instead.
-                        _logger.info("x24 POST: session %s closed, journal %s (no stock moves)",
-                                     s.id, s.move_id.name)
+                        # Period-correct GL: POS dates the close move at ``context_today``
+                        # and re-applies it on _post, so ORM backdating does not stick.
+                        # Re-stamp the posted move + its lines to the latest order date via
+                        # SQL — safe within the same fiscal year (annual sequence stays valid).
+                        try:
+                            dates = [d for d in s.order_ids.mapped("date_order") if d]
+                            mv = s.move_id
+                            if dates and mv.date and max(dates).date().year == mv.date.year:
+                                gl = max(dates).date()
+                                self.env.cr.execute(
+                                    "UPDATE account_move SET date=%s WHERE id=%s", (gl, mv.id))
+                                self.env.cr.execute(
+                                    "UPDATE account_move_line SET date=%s WHERE move_id=%s",
+                                    (gl, mv.id))
+                                mv.invalidate_recordset(["date"])
+                                mv.line_ids.invalidate_recordset(["date"])
+                        except Exception as be:
+                            _logger.warning("x24 POST: session %s backdate skipped: %s", s.id, be)
+                        _logger.info("x24 POST: session %s closed, journal %s dated %s (no stock moves)",
+                                     s.id, s.move_id.name, s.move_id.date)
                 except Exception as e:
                     errors.append((None, f"session {s.id} close failed: {e}"))
 
@@ -1090,10 +1115,14 @@ class RetailImportExecutor(models.AbstractModel):
         })
 
     def _x24_ensure_method_gl_split(self):
-        """Give every POS tender method its own receivable account so cash / card /
-        e-wallet settle on distinct GL lines instead of the single shared default
-        Trade Receivables. Auto per tender type (grouped by method name), reuse-first,
-        idempotent (skips methods already pointed at a non-default receivable).
+        """Give every non-cash POS tender method its own receivable account so card /
+        e-wallet settlements rest on distinct GL lines (awaiting bank settlement /
+        X70T reconciliation) instead of the single shared default Trade Receivables.
+
+        CASH is skipped on purpose: cash settles to its cash journal (Cash-on-hand) at
+        close, so forcing a receivable on a cash method leaves the cash receivable
+        uncleared and books a spurious Cash Difference. Auto per tender type
+        (grouped by method name), reuse-first, idempotent.
         """
         Method = self.env["pos.payment.method"].sudo()
         summary = {}
@@ -1101,6 +1130,12 @@ class RetailImportExecutor(models.AbstractModel):
             default_recv = company.account_default_pos_receivable_account_id
             acc_by_tender = {}
             for m in Method.search([("company_id", "=", company.id)]):
+                if m.is_cash_count:
+                    # Leave cash on the default POS receivable: POS' cash-control close
+                    # settles it via the cash statement, and pointing a cash method at its
+                    # own Cash-on-hand account instead makes the close hang in
+                    # closing_control (move unbalanced by the cash amount).
+                    continue
                 if m.receivable_account_id and m.receivable_account_id != default_recv:
                     continue  # already separated
                 tender = (m.name or "").strip() or "OTHER"
