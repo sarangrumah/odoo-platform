@@ -62,6 +62,7 @@ class RetailImportWizard(models.TransientModel):
             "res_model": self._name,
             "res_id": self.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "new",
         }
 
@@ -137,5 +138,6 @@ class RetailImportWizard(models.TransientModel):
             "res_model": "retail.import.log",
             "res_id": log.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "current",
         }
