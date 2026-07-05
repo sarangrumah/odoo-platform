@@ -94,4 +94,43 @@ env['account.account'].search_count([])                          # == CoA rows
 env['stock.warehouse'].search_count([])                          # 24
 sum(env['stock.quant'].search([]).mapped('quantity'))            # == X20 (store 14694) total
 ```
+
+## Reset transactions for a re-import trial — `20_reset_txn.py`
+Wipes **all transaction data** on a levis DB while **keeping master data** (CoA, taxes,
+journals, products, categories, `pos.config`, payment methods + their receivable split,
+partners, users, `posconfig_<store>` xids). Use it to re-run an import from a blank
+ledger without re-importing the slow ~30-min X101 product master.
+
+Wipes: `account.move`/lines/reconciles/payments/statements, POS orders/sessions/payments,
+stock moves/pickings/quants, purchase/sale orders, retail-import staging (log+line), the
+fixed-asset register, bank matching — **plus** the lazy X24 products (`x24prod_`) and the
+`posorder_`/`posreturn_`/`x31entry_` idempotency xids.
+
+**Always back up first** (destructive, wipes opening balances too):
+```
+docker exec odoo19-platform-postgres sh -lc 'PGPASSWORD=$POSTGRES_PASSWORD \
+  pg_dump -h localhost -U odoo -Fc -d <db>' > /opt/odoo-platform/backups/<db>_bak_$(date +%Y%m%d).dump
+```
+Preview (dry-run, default) then execute:
+```
+docker exec -i odoo19-platform-odoo bash -lc 'RESET_DRY=1 odoo shell -d <db> --no-http' < scripts/tenants/levis/20_reset_txn.py   # closure only
+docker exec -i odoo19-platform-odoo bash -lc 'RESET_DRY=0 odoo shell -d <db> --no-http' < scripts/tenants/levis/20_reset_txn.py   # execute
+```
+Safe by construction: it computes the transitive FK-closure of the core txn tables
+**excluding** a hard GUARD of master tables, deletes with
+`session_replication_role='replica'` (FK triggers off → no cascade into master), NULLs
+guarded back-refs (`res_company.account_opening_move_id` etc.), and prints a master
+before/after snapshot that MUST read `MASTER INTACT`. **Never** use `TRUNCATE … CASCADE`
+here — it bridges via `res_company`'s opening-move FK and wipes the whole DB.
+
+The reset does **not** touch the `retail_import.*_post_enabled` flags — set them to `0`
+separately if a trial turned them on. To also drop a one-off store mapping, delete the
+`posconfig_<code>` xid.
+
+## Phase-5+ posting status (Track B)
+X24 sales, X70D tenders, **X48 returns** (refund pos.orders) and **X31 discounts**
+(contra-revenue reclass) now **post** behind per-file flags
+`retail_import.{x24,x48,x31}_post_enabled` (+ `x24_close_sessions`), default off. GL is
+period-correct (SQL re-stamp), per-tender receivable split, balanced. See memory
+`x24-phase5-pos-posting` and `levis-txn-reset`.
 """
