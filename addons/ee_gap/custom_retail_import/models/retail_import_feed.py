@@ -35,6 +35,8 @@ import logging
 import os
 import shutil
 
+import pytz
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
@@ -177,16 +179,22 @@ class RetailImportFeed(models.Model):
             return self._poll_one_local()
         return self._poll_one_sftp()
 
+    # Local timezone used for the archive-filename prefix. Files are stamped
+    # with WIB (Asia/Jakarta) wall-clock time so the prefix matches what the
+    # Levi's operations team sees, regardless of the server's UTC clock.
+    _ARCHIVE_TZ = "Asia/Jakarta"
+
     def _archive_file(self, src_path, filename):
         """Move a processed source file into ``archive_dir`` with a timestamp prefix.
 
-        Prefix is the processing wall-clock time (UTC, matching Odoo's stored
-        datetimes) as ``YYYYMMDD_HHMMSS_``. A numeric suffix guards against
-        same-second name collisions. Returns the destination path.
+        Prefix is the processing wall-clock time in WIB (Asia/Jakarta) as
+        ``YYYYMMDDHHMMSS_``. A numeric suffix guards against same-second name
+        collisions. Returns the destination path.
         """
         self.ensure_one()
         os.makedirs(self.archive_dir, exist_ok=True)
-        ts = fields.Datetime.now().strftime("%Y%m%d_%H%M%S")
+        wib = pytz.utc.localize(fields.Datetime.now()).astimezone(pytz.timezone(self._ARCHIVE_TZ))
+        ts = wib.strftime("%Y%m%d%H%M%S")
         dest = os.path.join(self.archive_dir, "%s_%s" % (ts, filename))
         base, ext = os.path.splitext(dest)
         i = 1
