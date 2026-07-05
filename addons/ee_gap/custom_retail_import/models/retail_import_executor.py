@@ -720,8 +720,12 @@ class RetailImportExecutor(models.AbstractModel):
                 cfg_cache[store] = self.env["pos.config"].browse(cid) if cid else False
             return cfg_cache[store]
 
-        def get_session(cfg, date):
-            k = (cfg.id, date)
+        def get_session(cfg):
+            # ONE session per config for the whole import: Odoo forbids >1 open
+            # session per pos.config, so a multi-date file cannot open a session per
+            # (config, date). Orders keep their real date_order; the close move can be
+            # backdated to the latest order date.
+            k = cfg.id
             if k not in sess_cache:
                 s = self.env["pos.session"].create({"config_id": cfg.id, "user_id": self.env.uid})
                 if s.state != "opened":
@@ -749,7 +753,35 @@ class RetailImportExecutor(models.AbstractModel):
                     prod_dc[code] = Product.search([("default_code", "=", code)], limit=1)
                 if prod_dc[code]:
                     return prod_dc[code]
-            return Product.browse()
+            # Lazy-create a non-merchandise product (carrier bags, vouchers, etc. sold at
+            # POS but absent from the X101 master) so the order is complete and balances
+            # against the X70D tender. Idempotent by xid. Parity with legacy 8548b52.
+            key = code or ean
+            if not key:
+                return Product.browse()
+            xid = self._safe_xid("x24prod_", key)
+            pid = self._xid_get(ns, xid, "product.product")
+            if pid:
+                p = Product.browse(pid)
+            else:
+                tmpl = self.env["product.template"].with_context(
+                    tracking_disable=True, mail_create_nolog=True).create({
+                        "name": (str(r.get("item_description") or "").strip() or key)[:200],
+                        "default_code": code or False, "type": "consu", "sale_ok": True,
+                        "list_price": float(profile._parse_amount(r.get("retail_price")) or 0),
+                    })
+                p = tmpl.product_variant_id
+                if ean and not p.barcode and not Product.search_count([("barcode", "=", ean)]):
+                    try:
+                        p.barcode = ean
+                    except Exception:
+                        pass
+                self._xid_set(ns, xid, "product.product", p.id)
+            if code:
+                prod_dc[code] = p
+            if ean:
+                prod_bc[ean] = p
+            return p
 
         def map_method(cfg, tender_type):
             tt = self._X24_TENDER_FOLD.get(tender_type, tender_type)
@@ -822,8 +854,8 @@ class RetailImportExecutor(models.AbstractModel):
             d = profile._parse_date(date)
             dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
             # Session is created outside the per-order savepoint so a single bad
-            # order does not roll back the shared daily session.
-            sess = get_session(cfg, date)
+            # order does not roll back the shared session.
+            sess = get_session(cfg)
             try:
                 with self.env.cr.savepoint():
                     order = Order.create({
@@ -890,6 +922,10 @@ class RetailImportExecutor(models.AbstractModel):
                         _logger.error("x24 POST: %s", msg)
                         errors.append((None, msg))
                     elif s.move_id:
+                        # NOTE: the session GL move posts at close date (POS re-applies its
+                        # own accounting date on _post, so backdating to the order date does
+                        # not stick). Auto-close is off by default; for in-period historical
+                        # GL, close via the POS UI / period-close process instead.
                         _logger.info("x24 POST: session %s closed, journal %s (no stock moves)",
                                      s.id, s.move_id.name)
                 except Exception as e:
