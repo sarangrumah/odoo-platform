@@ -25,65 +25,15 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from psycopg2.extras import execute_values
-
-from odoo import _, fields, models
+from odoo import _, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
 BATCH = 200
-RAW_JSON_CAP = 8000
-
-# Size values that mean "one size" / no real size — treated as NO size so the
-# product stays plain (no Size attribute / no configurable variant). Mirrors how
-# inseam already maps "-" to "". Caps, backpacks, beanies etc. use "OS".
-ONE_SIZE_TOKENS = {"OS", "ONE SIZE", "ONESIZE", "O/S", "OSFA", "FREE", "F", "NS", "N/S", "-", ""}
-
-
-class _LineBuffer:
-    """Accumulate per-row log lines and flush them in bulk.
-
-    Flushing just ``create()``s the lines; the surrounding loader's existing
-    ``cr.commit()`` calls persist them. Flush is automatic every ``flush_every``
-    rows (to bound memory) and must be called once more at the end via ``flush()``.
-    ``raw_json`` is kept only for error/duplicate rows to bound storage.
-    """
-
-    def __init__(self, log, flush_every=2000, keep_statuses=None):
-        self.log = log
-        self.flush_every = flush_every
-        self.pending = []
-        self.counts = defaultdict(int)
-        # None -> store every row; a set -> store only those statuses (counts stay
-        # exact regardless). Used to skip created/updated rows on huge imports.
-        self.keep = keep_statuses
-
-    def add(self, status, row=0, ref_key=None, message=None, model_name=None, res_id=None, raw=None):
-        self.counts[status] += 1
-        if self.keep is not None and status not in self.keep:
-            return
-        vals = {"status": status, "row": int(row or 0)}
-        if ref_key:
-            vals["ref_key"] = str(ref_key)[:255]
-        if message:
-            vals["message"] = str(message)
-        if model_name:
-            vals["model_name"] = model_name
-        if res_id:
-            vals["res_id"] = res_id
-        if raw is not None and status in ("error", "duplicate"):
-            vals["raw_json"] = json.dumps(raw, default=str, ensure_ascii=False)[:RAW_JSON_CAP]
-        self.pending.append(vals)
-        if len(self.pending) >= self.flush_every:
-            self.flush()
-
-    def flush(self):
-        if self.pending:
-            self.log._log_lines(self.pending)
-            self.pending = []
+LINE_BATCH = 500
 
 
 class RetailImportExecutor(models.AbstractModel):
@@ -100,22 +50,15 @@ class RetailImportExecutor(models.AbstractModel):
         profile = log.profile_id
         file_b64 = log.source_b64()
         if not file_b64:
-            log.write(
-                {"state": "failed", "error_message": "No stored source file on log.",
-                 "finished_at": fields.Datetime.now()}
-            )
-            log._notify_failure()
+            log.write({"state": "failed", "error_message": "No stored source file on log."})
             return log
-        log.write({"state": "running", "started_at": fields.Datetime.now()})
-        self._checkpoint()
+        log.state = "running"
+        self.env.cr.commit()
         handler = getattr(self, f"_load_{profile.file_type}", None)
         if handler is None:
             log.write(
-                {"state": "failed", "error_message": f"No executor for file_type {profile.file_type!r}.",
-                 "finished_at": fields.Datetime.now()}
+                {"state": "failed", "error_message": f"No executor for file_type {profile.file_type!r}."}
             )
-            self._checkpoint()
-            log._notify_failure()
             return log
         try:
             handler(profile, file_b64, log)
@@ -125,59 +68,13 @@ class RetailImportExecutor(models.AbstractModel):
         except Exception as e:  # pragma: no cover - defensive
             self.env.cr.rollback()
             _logger.exception("Retail import failed (log %s)", log.id)
-            log.write(
-                {"state": "failed", "error_message": str(e), "finished_at": fields.Datetime.now()}
-            )
-            self._checkpoint()
-            log._notify_failure()
+            log.write({"state": "failed", "error_message": str(e)})
+            self.env.cr.commit()
             return log
         if log.state == "running":
             log.state = "partial" if log.error_count else "imported"
-        log.finished_at = fields.Datetime.now()
-        self._checkpoint()
+        self.env.cr.commit()
         return log
-
-    @staticmethod
-    def _tick(log, processed):
-        """Update the live row-progress counter (committed by the caller's commit)."""
-        log.processed_count = processed
-
-    # Statuses always worth storing as detail rows, even on huge imports.
-    _EXCEPTION_STATUSES = {"error", "duplicate", "skipped", "archived"}
-
-    def _line_buffer(self, log, n_rows):
-        """Build a line buffer; on large imports keep only exception rows.
-
-        Above ``retail_import.line_detail_threshold`` (default 20000) we stop
-        storing created/updated detail rows — they are the bulk of a master-data
-        file — and keep only errors/duplicates/skipped/archived. Headline counters
-        (records_created/updated/...) stay exact either way. Set the threshold to 0
-        to always store every row.
-        """
-        thr = self.env["ir.config_parameter"].sudo().get_param(
-            "retail_import.line_detail_threshold", "20000"
-        )
-        try:
-            thr = int(thr)
-        except (TypeError, ValueError):
-            thr = 20000
-        keep = None if (thr <= 0 or n_rows <= thr) else set(self._EXCEPTION_STATUSES)
-        return _LineBuffer(log, keep_statuses=keep)
-
-    def _checkpoint(self):
-        """Commit if allowed; inside a queue job (commits forbidden) flush instead.
-
-        The executor commits in batches (large X101 imports + live progress). Under
-        queue_job, commits are forbidden unless the job function has Allow Commit and
-        the worker honors it; to stay robust across workers/containers we fall back to
-        flushing. The work then stays in the job's single transaction, which queue_job
-        commits once at the end. In synchronous runs (wizard / sync feed) this is a
-        real commit, so batched progress remains visible.
-        """
-        try:
-            self.env.cr.commit()
-        except RuntimeError:
-            self.env.flush_all()
 
     # ------------------------------------------------------------------
     # External-ID helpers (idempotency)
@@ -197,57 +94,71 @@ class RetailImportExecutor(models.AbstractModel):
     def _safe_xid(prefix, value):
         return prefix + "".join(c if c.isalnum() else "_" for c in str(value)).upper()
 
+    # ------------------------------------------------------------------
+    # Row-level backtracking helpers
+    # ------------------------------------------------------------------
+    def _persist_lines(self, log, records):
+        """Create retail.import.line for every parsed row before aggregation.
+
+        Returns a {row_number: line_record} dict for post-load target linking.
+        Batched in LINE_BATCH creates to avoid ORM memory spikes on large files.
+        """
+        Line = self.env["retail.import.line"]
+        row_to_line = {}
+        for start in range(0, len(records), LINE_BATCH):
+            batch = records[start : start + LINE_BATCH]
+            created = Line.create([
+                {
+                    "log_id": log.id,
+                    "row_number": r.get("_row"),
+                    "raw_data_json": json.dumps(r, default=str),
+                }
+                for r in batch
+            ])
+            for r, ln in zip(batch, created):
+                row_to_line[r.get("_row")] = ln
+        return row_to_line
+
+    def _link_lines(self, row_to_line, row_nums, target_model, target_res_id, aggregate_key=None, state="ok"):
+        """Batch-write target linkage onto a group of source lines."""
+        line_ids = [row_to_line[rn].id for rn in row_nums if rn in row_to_line]
+        if not line_ids:
+            return
+        vals = {"state": state, "target_model": target_model, "target_res_id": target_res_id}
+        if aggregate_key is not None:
+            vals["aggregate_key"] = aggregate_key
+        self.env["retail.import.line"].browse(line_ids).write(vals)
+
     # ==================================================================
     # X101 — Products (categories / attributes / templates / variants)
     # ==================================================================
     def _load_x101(self, profile, file_b64, log):
         ns = profile.namespace
-        # Skip chatter/tracking/recompute overhead for the bulk product writes.
-        self = self.with_context(
-            tracking_disable=True,
-            mail_create_nolog=True,
-            mail_create_nosubscribe=True,
-            mail_notrack=True,
-        )
         data = profile.read_records(file_b64)
         records = data["records"]
         log.line_count = len(records)
-        buf = self._line_buffer(log, len(records))
+
+        row_to_line = self._persist_lines(log, records)
 
         # ---- aggregate (mirror of 01_extract_x101.py) ----
-        sku_best = {}  # sku -> (eff, dict)  (primary = latest by price_eff)
-        sku_first_row = {}  # sku -> source row of its first occurrence
-        sku_gtins = defaultdict(set)  # sku -> {all distinct GTINs seen for it}
-        seen_sku_gtin = set()  # (sku, gtin) pairs, for precise duplicate detection
+        sku_best = {}  # sku -> (eff, dict)
         tmpl_meta = {}  # code -> dict
         sizes, inseams = set(), set()
         tmpl_variants = defaultdict(set)
+        tmpl_rows = defaultdict(list)   # pc -> [row_nums] for post-load line linking
+        skipped_row_nums = []
         for r in records:
             pc = r.get("product_code")
             sku = r.get("sku")
+            row_num = r.get("_row")
             if not pc or not sku:
-                buf.add("skipped", row=r.get("_row"), ref_key=sku or pc,
-                        message="Missing product_code or sku")
+                if row_num is not None:
+                    skipped_row_nums.append(row_num)
                 continue
             size = (r.get("size") or "").strip()
-            if size.upper() in ONE_SIZE_TOKENS:
-                size = ""  # one-size (e.g. "OS") -> no Size attribute -> plain product
             inseam_raw = r.get("inseam")
             inseam = (str(inseam_raw).strip() if inseam_raw not in (None, "-", "") else "")
             gtin = str(r.get("gtin") or "").strip()
-            if sku not in sku_first_row:
-                sku_first_row[sku] = r.get("_row")
-            if gtin:
-                sku_gtins[sku].add(gtin)
-            # A row is a TRUE duplicate only when the same (SKU, GTIN) repeats. Same
-            # SKU with a DIFFERENT GTIN is an alternate barcode of the same variant,
-            # not a duplicate -> kept and stored as product.barcode below.
-            sg = (sku, gtin)
-            if sg in seen_sku_gtin:
-                buf.add("duplicate", row=r.get("_row"), ref_key=sku,
-                        message=f"Duplicate (same SKU+GTIN) of row {sku_first_row[sku]}", raw=r)
-            else:
-                seen_sku_gtin.add(sg)
             retail = float(profile._parse_amount(r.get("retail_price")))
             eff = profile._parse_date(r.get("price_eff")) or None
 
@@ -268,6 +179,7 @@ class RetailImportExecutor(models.AbstractModel):
                     "eff": eff,
                 }
             tmpl_variants[pc].add((size, inseam))
+            tmpl_rows[pc].append(row_num)
             if size:
                 sizes.add(size)
             if inseam:
@@ -318,7 +230,7 @@ class RetailImportExecutor(models.AbstractModel):
                 ).id
                 self._xid_set(ns, xid, "product.category", rid)
             xid_to_cat[xid] = rid
-        self._checkpoint()
+        self.env.cr.commit()
 
         # ---- attributes ----
         attr_by_name = {}
@@ -339,26 +251,19 @@ class RetailImportExecutor(models.AbstractModel):
                 if not av:
                     av = self.env["product.attribute.value"].create({"attribute_id": attr.id, "name": v})
                 attr_value_id[(attr_name, v)] = av.id
-        self._checkpoint()
+        self.env.cr.commit()
 
         # ---- templates ----
         tmpl_xid_to_id = {}
         for ext in self.env["ir.model.data"].search([("module", "=", ns), ("model", "=", "product.template")]):
             tmpl_xid_to_id[ext.name] = ext.res_id
         created = 0
-        created_txids = set()
         items = sorted(tmpl_meta.items())
-        n_items = max(1, len(items))
-        Template = self.env["product.template"]
-        IMD = self.env["ir.model.data"]
         for start in range(0, len(items), BATCH):
-            batch_vals, batch_txids = [], []
-            seen_in_batch = set()
             for pc, m in items[start:start + BATCH]:
                 txid = self._safe_xid("tmpl_", pc)
-                if txid in tmpl_xid_to_id or txid in seen_in_batch:
+                if txid in tmpl_xid_to_id:
                     continue
-                seen_in_batch.add(txid)
                 vset = tmpl_variants[pc]
                 t_sizes = sorted({s for s, _ in vset if s})
                 t_inseams = sorted({i for _, i in vset if i})
@@ -383,7 +288,6 @@ class RetailImportExecutor(models.AbstractModel):
                     "default_code": pc,
                     "list_price": m["retail"],
                     "type": "consu",
-                    "is_storable": True,  # track stock (X20 opening, X24 sales reduce on-hand)
                     "sale_ok": True,
                     "purchase_ok": True,
                 }
@@ -391,41 +295,12 @@ class RetailImportExecutor(models.AbstractModel):
                     vals["categ_id"] = categ_id
                 if attr_lines:
                     vals["attribute_line_ids"] = attr_lines
-                batch_vals.append(vals)
-                batch_txids.append(txid)
-            if batch_vals:
-                # Idempotency / concurrency guard: skip any external id already in the
-                # DB right now (created by a prior partial run or a parallel worker),
-                # not just the start-of-run snapshot. Prevents the unique-constraint
-                # crash on re-runs and lets an interrupted import resume cleanly.
-                existing = set(IMD.search([
-                    ("module", "=", ns), ("model", "=", "product.template"),
-                    ("name", "in", batch_txids),
-                ]).mapped("name"))
-                if existing:
-                    for ext in IMD.search([
-                        ("module", "=", ns), ("model", "=", "product.template"),
-                        ("name", "in", list(existing)),
-                    ]):
-                        tmpl_xid_to_id[ext.name] = ext.res_id
-                new = [(t, v) for t, v in zip(batch_txids, batch_vals) if t not in existing]
-                if new:
-                    tmpls = Template.create([v for _, v in new])
-                    imd_vals = []
-                    for (txid, _v), tmpl in zip(new, tmpls):
-                        tmpl_xid_to_id[txid] = tmpl.id
-                        created_txids.add(txid)
-                        imd_vals.append({
-                            "module": ns, "name": txid, "model": "product.template",
-                            "res_id": tmpl.id, "noupdate": True,
-                        })
-                    IMD.create(imd_vals)
-                    created += len(tmpls)
-            self._tick(log, int(log.line_count * 0.5 * min(1.0, (start + BATCH) / n_items)))
-            buf.flush()
-            self._checkpoint()
-        # records_created is set per-variant at the end (see below); ``created`` here
-        # counts product.template rows and is used only for logging.
+                tmpl = self.env["product.template"].create(vals)
+                self._xid_set(ns, txid, "product.template", tmpl.id)
+                tmpl_xid_to_id[txid] = tmpl.id
+                created += 1
+            self.env.cr.commit()
+        log.records_created = created
 
         # ---- variants: match auto-generated by (size, inseam) and set sku/barcode ----
         size_val_id = {v: i for (a, v), i in attr_value_id.items() if a == "Size"}
@@ -434,40 +309,21 @@ class RetailImportExecutor(models.AbstractModel):
         for _eff, v in sku_best.values():
             by_tmpl[self._safe_xid("tmpl_", v["tmpl_code"])].append(v)
         matched = unmatched = 0
-        alt_total = 0
-        uid = self.env.uid
         tkeys = list(by_tmpl.keys())
-        n_tkeys = max(1, len(tkeys))
         for start in range(0, len(tkeys), 100):
             batch_xids = tkeys[start:start + 100]
             tmpl_ids = [tmpl_xid_to_id[x] for x in batch_xids if x in tmpl_xid_to_id]
             if not tmpl_ids:
-                for x in batch_xids:
-                    for v in by_tmpl[x]:
-                        buf.add("skipped", row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
-                                message="No template for this SKU")
-                    unmatched += len(by_tmpl[x])
+                unmatched += sum(len(by_tmpl[x]) for x in batch_xids)
                 continue
             variants = self.env["product.product"].search([("product_tmpl_id", "in", tmpl_ids)])
             var_index = {}
-            cur_code, cur_bc = {}, {}
             for vp in variants:
                 combo = frozenset(vp.product_template_variant_value_ids.product_attribute_value_id.ids)
-                var_index[(vp.product_tmpl_id.id, combo)] = vp.id
-                cur_code[vp.id] = vp.default_code
-                cur_bc[vp.id] = vp.barcode
-            # Collect SKU/barcode assignments and apply them with ONE bulk SQL UPDATE
-            # per batch instead of ~160k per-variant ORM writes. Keyed by variant id
-            # (last write wins, matching the old per-row behavior).
-            var_updates = {}
-            alt_rows = set()  # {(variant_id, alt_gtin)} -> product.barcode upsert
+                var_index[(vp.product_tmpl_id.id, combo)] = vp
             for txid in batch_xids:
                 tid = tmpl_xid_to_id.get(txid)
-                is_new = txid in created_txids
                 if not tid:
-                    for v in by_tmpl[txid]:
-                        buf.add("skipped", row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
-                                message="No template for this SKU")
                     unmatched += len(by_tmpl[txid])
                     continue
                 for v in by_tmpl[txid]:
@@ -476,71 +332,39 @@ class RetailImportExecutor(models.AbstractModel):
                         wanted.add(size_val_id[v["size"]])
                     if v["inseam"] and inseam_val_id.get(v["inseam"]):
                         wanted.add(inseam_val_id[v["inseam"]])
-                    vid = var_index.get((tid, frozenset(wanted)))
-                    if not vid:
+                    vp = var_index.get((tid, frozenset(wanted)))
+                    if not vp:
                         unmatched += 1
-                        buf.add("skipped", row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
-                                message=f"No variant for size={v['size']!r} inseam={v['inseam']!r}")
                         continue
-                    bc = (v["gtin"] or None)
-                    code_change = cur_code.get(vid) != v["sku"]
-                    bc_change = bool(bc) and cur_bc.get(vid) != bc
-                    if code_change or bc_change:
-                        var_updates[vid] = (v["sku"], bc if bc_change else None)
+                    updates = {}
+                    if vp.default_code != v["sku"]:
+                        updates["default_code"] = v["sku"]
+                    if v["gtin"] and vp.barcode != v["gtin"]:
+                        updates["barcode"] = v["gtin"]
+                    if updates:
+                        try:
+                            vp.write(updates)
+                        except Exception:
+                            if "barcode" in updates:
+                                vp.write({k: x for k, x in updates.items() if k != "barcode"})
                     matched += 1
-                    buf.add("created" if is_new else "updated",
-                            row=sku_first_row.get(v["sku"]), ref_key=v["sku"],
-                            model_name="product.product", res_id=vid)
-                    # Extra GTINs of this SKU become scannable alternate barcodes on
-                    # the SAME variant (one shared inventory; see X32P analysis).
-                    for alt in sku_gtins.get(v["sku"], ()):
-                        if alt and alt != v["gtin"]:
-                            alt_rows.add((vid, alt))
-            if var_updates:
-                # barcode has no DB unique constraint (Python-only check); SQL is safe.
-                # COALESCE keeps the existing barcode when the new one is NULL.
-                execute_values(
-                    self.env.cr,
-                    "UPDATE product_product AS p SET "
-                    "default_code = d.code::varchar, "
-                    "barcode = COALESCE(d.barcode::varchar, p.barcode) "
-                    "FROM (VALUES %s) AS d(id, code, barcode) WHERE p.id = d.id::integer",
-                    [(vid, code, bc) for vid, (code, bc) in var_updates.items()],
-                )
-                self.env["product.product"].invalidate_model(["default_code", "barcode", "display_name"])
-            if alt_rows:
-                # Idempotent via the (product_id, barcode) unique index: re-imports
-                # don't duplicate. Set audit columns explicitly (raw INSERT).
-                execute_values(
-                    self.env.cr,
-                    "INSERT INTO product_barcode "
-                    "(product_id, barcode, active, create_uid, create_date, write_uid, write_date) "
-                    "VALUES %s ON CONFLICT (product_id, barcode) DO NOTHING",
-                    [(vid, alt, uid, uid) for (vid, alt) in alt_rows],
-                    template="(%s, %s, true, %s, now(), %s, now())",
-                )
-                alt_total += len(alt_rows)
-            self._tick(log, int(log.line_count * (0.5 + 0.5 * min(1.0, (start + 100) / n_tkeys))))
-            buf.flush()
-            self._checkpoint()
-        buf.flush()
-        # Report counters per *variant* (SKU) so they line up with the row table:
-        # a SKU under a newly-created template is "created", under a pre-existing
-        # template "updated". ``created`` (templates) is kept only for the log line.
-        log.records_created = buf.counts.get("created", 0)
-        log.records_updated = buf.counts.get("updated", 0)
-        log.records_matched = matched  # deprecated: total variants touched
+            self.env.cr.commit()
+        log.records_matched = matched
         log.records_skipped = unmatched
-        log.duplicate_count = buf.counts.get("duplicate", 0)
-        log.processed_count = log.line_count
-        if alt_total:
-            self.env["product.barcode"].invalidate_model()
-        self._checkpoint()
-        _logger.info(
-            "x101 done: templates=%s created=%s updated=%s unmatched=%s dup=%s alt_barcodes=%s",
-            created, buf.counts.get("created", 0), buf.counts.get("updated", 0),
-            unmatched, buf.counts.get("duplicate", 0), alt_total,
-        )
+        _logger.info("x101 done: created=%s matched=%s unmatched=%s", created, matched, unmatched)
+
+        # Link source rows to the product.template they contributed to
+        if row_to_line:
+            for pc, row_nums in tmpl_rows.items():
+                txid = self._safe_xid("tmpl_", pc)
+                tmpl_id = tmpl_xid_to_id.get(txid)
+                if tmpl_id:
+                    self._link_lines(row_to_line, row_nums, "product.template", tmpl_id, aggregate_key=pc)
+            if skipped_row_nums:
+                skip_ids = [row_to_line[rn].id for rn in skipped_row_nums if rn in row_to_line]
+                if skip_ids:
+                    self.env["retail.import.line"].browse(skip_ids).write({"state": "skipped"})
+            self.env.cr.commit()
 
     # ==================================================================
     # CoA — account.account
@@ -550,34 +374,32 @@ class RetailImportExecutor(models.AbstractModel):
         data = profile.read_records(file_b64)
         records = data["records"]
         log.line_count = len(records)
+        row_to_line = self._persist_lines(log, records)
         valid_types = dict(self.env["account.account"]._fields["account_type"].selection)
         company = profile.company_id
         created = skipped = 0
         errors = []
-        seen_codes = {}
-        buf = self._line_buffer(log, len(records))
         Account = self.env["account.account"]
-        for i, r in enumerate(records):
+        for r in records:
+            rn = r.get("_row")
             code = str(r.get("code") or "").strip()
             name = (r.get("account_name") or r.get("name") or "").strip()
             atype = str(r.get("account_type") or "").strip()
             if not code or not name:
-                buf.add("skipped", row=r.get("_row"), ref_key=code, message="Missing code or name")
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "skipped"})
                 continue
-            if code in seen_codes:
-                buf.add("duplicate", row=r.get("_row"), ref_key=code,
-                        message=f"Duplicate of row {seen_codes[code]}", raw=r)
-                continue
-            seen_codes[code] = r.get("_row")
             if atype not in valid_types:
-                errors.append((r.get("_row"), f"invalid account_type {atype!r} for {code}"))
-                buf.add("error", row=r.get("_row"), ref_key=code,
-                        message=f"Invalid account_type {atype!r}", raw=r)
+                errors.append((rn, f"invalid account_type {atype!r} for {code}"))
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": f"invalid account_type {atype!r}"})
                 continue
             xid = self._safe_xid("coa_", code)
-            if self._xid_get(ns, xid, "account.account"):
+            existing_id = self._xid_get(ns, xid, "account.account")
+            if existing_id:
                 skipped += 1
-                buf.add("skipped", row=r.get("_row"), ref_key=code, message="Already imported")
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "skipped", "aggregate_key": code, "target_model": "account.account", "target_res_id": existing_id})
                 continue
             existing = Account.with_company(company).search(
                 [("code", "=", code), ("company_ids", "in", company.id)], limit=1
@@ -585,8 +407,8 @@ class RetailImportExecutor(models.AbstractModel):
             if existing:
                 self._xid_set(ns, xid, "account.account", existing.id)
                 skipped += 1
-                buf.add("skipped", row=r.get("_row"), ref_key=code, message="Account already exists",
-                        model_name="account.account", res_id=existing.id)
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "skipped", "aggregate_key": code, "target_model": "account.account", "target_res_id": existing.id})
                 continue
             try:
                 acc = Account.with_company(company).create(
@@ -594,24 +416,16 @@ class RetailImportExecutor(models.AbstractModel):
                 )
                 self._xid_set(ns, xid, "account.account", acc.id)
                 created += 1
-                buf.add("created", row=r.get("_row"), ref_key=code,
-                        model_name="account.account", res_id=acc.id)
+                if rn in row_to_line:
+                    row_to_line[rn].write({"aggregate_key": code, "target_model": "account.account", "target_res_id": acc.id})
             except Exception as e:
-                errors.append((r.get("_row"), f"{code}: {e}"))
-                buf.add("error", row=r.get("_row"), ref_key=code, message=str(e), raw=r)
-            if (i + 1) % 200 == 0:
-                self._tick(log, i + 1)
-        buf.flush()
-        self._checkpoint()
+                errors.append((rn, f"{code}: {e}"))
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": f"{code}: {e}"})
+        self.env.cr.commit()
         log.records_created = created
         log.records_skipped = skipped
-        log.duplicate_count = buf.counts.get("duplicate", 0)
-        log.processed_count = log.line_count
-        # set_errors records error lines via _log_lines; CoA error lines were already
-        # added above, so only update the counter + legacy summary here.
-        log.error_count = len(errors)
-        if errors:
-            log.raw_payload = "\n".join(f"row {n}: {m}" for n, m in errors[:200])
+        log.set_errors(errors)
 
     # ==================================================================
     # Company — res.company / partner (SES legal entity)
@@ -652,13 +466,6 @@ class RetailImportExecutor(models.AbstractModel):
             company.write({k: v for k, v in vals.items() if k in ("name",)})
             company.partner_id.write({k: v for k, v in vals.items() if k != "name"})
             log.records_matched = 1
-            log.records_updated = 1
-            log._log_lines([
-                {"status": "updated", "row": 0, "ref_key": company.name,
-                 "message": "Company / partner fields updated: " + ", ".join(sorted(vals)),
-                 "model_name": "res.company", "res_id": company.id},
-            ])
-        log.processed_count = log.line_count
         log.set_errors([])
 
     # ==================================================================
@@ -669,6 +476,7 @@ class RetailImportExecutor(models.AbstractModel):
         data = profile.read_records(file_b64)
         records = data["records"]
         log.line_count = len(records)
+        row_to_line = self._persist_lines(log, records)
         Product = self.env["product.product"]
         Quant = self.env["stock.quant"]
         # store-code -> internal stock location (warehouse lot_stock_id), resolved by xid
@@ -685,25 +493,24 @@ class RetailImportExecutor(models.AbstractModel):
 
         prod_by_barcode = {}
         prod_by_code = {}
-        applied = skipped = error_count = 0
-        buf = self._line_buffer(log, len(records))
-        quant_vals = []  # (prod, loc, qty, row, key)
+        applied = skipped = 0
+        errors = []
+        quant_vals = []   # (prod, loc, qty, row_num, agg_key)
         for r in records:
+            rn = r.get("_row")
             store = r.get("store_code")
             ean = str(r.get("ean") or "").strip()
             item_id = str(r.get("item_id") or "").strip()
-            key = ean or item_id
             qty = float(profile._parse_amount(r.get("onhand_qty")))
             if not store or qty <= 0:
-                buf.add("skipped", row=r.get("_row"), ref_key=key,
-                        message="No store or qty <= 0")
-                skipped += 1
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "skipped"})
                 continue
             loc = resolve_location(store)
             if not loc:
-                buf.add("error", row=r.get("_row"), ref_key=store,
-                        message=f"Store {store} has no warehouse (run store loader first)", raw=r)
-                error_count += 1
+                errors.append((rn, f"store {store} -> no warehouse (run store loader first)"))
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": f"store {store}: no warehouse"})
                 continue
             prod = False
             if ean:
@@ -715,13 +522,12 @@ class RetailImportExecutor(models.AbstractModel):
                     prod_by_code[item_id] = Product.search([("default_code", "=", item_id)], limit=1)
                 prod = prod_by_code[item_id]
             if not prod:
-                # Row references a product that is not registered in the system.
-                buf.add("error", row=r.get("_row"), ref_key=key,
-                        message=_("Item produk tidak teregister: ean=%s item=%s") % (ean or "-", item_id or "-"),
-                        raw=r)
-                error_count += 1
+                errors.append((rn, f"no product for ean={ean!r} item={item_id!r}"))
+                skipped += 1
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": f"no product ean={ean!r} item={item_id!r}"})
                 continue
-            quant_vals.append((prod, loc, qty, r.get("_row"), key))
+            quant_vals.append((prod, loc, qty, rn, f"{store}|{item_id or ean}"))
 
         # Guard: refuse to re-apply if this profile already applied opening stock.
         prior = self.env["retail.import.log"].search(
@@ -734,428 +540,589 @@ class RetailImportExecutor(models.AbstractModel):
                 % (profile.code, prior.id)
             )
 
-        for i, (prod, loc, qty, row, key) in enumerate(quant_vals):
+        for i, (prod, loc, qty, rn, agg_key) in enumerate(quant_vals):
             try:
                 q = Quant.with_context(inventory_mode=True).create(
                     {"product_id": prod.id, "location_id": loc.id, "inventory_quantity": qty}
                 )
                 q.action_apply_inventory()
                 applied += 1
-                buf.add("created", row=row, ref_key=prod.default_code or key,
-                        model_name="stock.quant", res_id=q.id)
+                if rn in row_to_line:
+                    row_to_line[rn].write({
+                        "aggregate_key": agg_key,
+                        "target_model": "stock.quant",
+                        "target_res_id": q.id,
+                    })
             except Exception as e:
-                buf.add("error", row=row, ref_key=prod.default_code or key, message=str(e))
-                error_count += 1
+                errors.append((None, f"{prod.default_code}: {e}"))
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": str(e)})
             if (i + 1) % 500 == 0:
-                self._tick(log, len(records) - len(quant_vals) + i + 1)
-                buf.flush()
-                self._checkpoint()
-        buf.flush()
-        self._checkpoint()
+                self.env.cr.commit()
+        self.env.cr.commit()
         log.records_created = applied
         log.records_skipped = skipped
-        log.error_count = error_count
-        log.processed_count = log.line_count
+        log.set_errors(errors)
 
     # ==================================================================
-    # POS bootstrap + helpers (shared by X24 / X70D)
+    # X24 — Retail sales -> pos.order (financial, no stock move)
     # ==================================================================
-    def _pos_bootstrap_store(self, profile, store_code, store_name):
-        """Idempotently ensure POS infra for one store. Returns (config, ensure_pm)
-        where ensure_pm(tender_type) creates+links a pos.payment.method and returns id.
-        All artifacts are guarded by 'levis' external IDs so re-runs are no-ops."""
-        ns = profile.namespace
-        company = profile.company_id
-        env = self.env
-        # --- company-level (once) ---
-        if company.point_of_sale_update_stock_quantities != "closing":
-            company.point_of_sale_update_stock_quantities = "closing"
-        if not company.account_default_pos_receivable_account_id:
-            acc = env["account.account"].search(
-                [("account_type", "=", "asset_receivable"), ("company_ids", "in", company.id)], limit=1
-            )
-            if acc:
-                company.account_default_pos_receivable_account_id = acc.id
-        # --- pricelist ---
-        pl_id = self._xid_get(ns, "pricelist_idr", "product.pricelist")
-        if not pl_id:
-            pl = env["product.pricelist"].create(
-                {"name": "Public Pricelist (IDR)", "currency_id": company.currency_id.id, "company_id": company.id}
-            )
-            self._xid_set(ns, "pricelist_idr", "product.pricelist", pl.id)
-            pl_id = pl.id
-        # --- journals ---
-        cj_id = self._xid_get(ns, "journal_cash", "account.journal")
-        if not cj_id:
-            cj = env["account.journal"].search([("type", "=", "cash"), ("company_id", "=", company.id)], limit=1)
-            if not cj:
-                cj = env["account.journal"].create(
-                    {"name": "Cash (POS)", "type": "cash", "code": "CSHPS", "company_id": company.id}
-                )
-            self._xid_set(ns, "journal_cash", "account.journal", cj.id)
-            cj_id = cj.id
-        cash_journal = env["account.journal"].browse(cj_id)
-        bank_journal = env["account.journal"].search([("type", "=", "bank"), ("company_id", "=", company.id)], limit=1)
-        sale_journal = env["account.journal"].search([("type", "=", "sale"), ("company_id", "=", company.id)], limit=1)
-        # --- warehouse (shared with X20 via wh_<store>) ---
-        wh_xid = self._safe_xid("wh_", store_code)
-        wh_id = self._xid_get(ns, wh_xid, "stock.warehouse")
-        if not wh_id:
-            code = ("S" + "".join(c for c in str(store_code) if c.isalnum()))[:5].upper()
-            wh = env["stock.warehouse"].create(
-                {"name": (store_name or str(store_code))[:60], "code": code, "company_id": company.id}
-            )
-            self._xid_set(ns, wh_xid, "stock.warehouse", wh.id)
-            wh_id = wh.id
-        warehouse = env["stock.warehouse"].browse(wh_id)
+    # --- Phase-5 X24 configuration (see docs/PHASE5_X24_DESIGN.md) ---------
+    # Locked defaults (2026-07-05):
+    #   A: store->pos.config via ir.model.data xid ``posconfig_<STORE>``
+    #   B: no stock (import posts financial pos.order only; sessions may be closed)
+    #   C: one pos.session per (config, trans_date)
+    #   D: tender_type == pos.payment.method.name; OFFLINE_OTHER_CARD folds in
+    #   E: tax_rate 0.11 -> account.tax "12% (Non-Luxury Good)" (amount 11.0, sale)
+    #   F: one pos.order per (store, date, register, transnum)
+    _X24_TENDER_FOLD = {"OFFLINE_OTHER_CARD": "OFFLINE_OTHER_CREDITCARD"}
+    _X24_SEED_TENDERS = ("OFFLINE_AMEX", "OFFLINE_OVO", "SODEXO")
+    _X24_BALANCE_TOL = 1.0  # currency units; parks orders whose tenders != line total
 
-        # --- cash payment method (config needs >=1) ---
-        def _make_pm(tender):
-            xid = self._safe_xid("pm_", tender)
-            pid = self._xid_get(ns, xid, "pos.payment.method")
-            if not pid:
-                journal = cash_journal if str(tender).upper() == "CASH" else (bank_journal or cash_journal)
-                pm = env["pos.payment.method"].create(
-                    {"name": str(tender), "journal_id": journal.id, "company_id": company.id, "split_transactions": False}
-                )
-                self._xid_set(ns, xid, "pos.payment.method", pm.id)
-                pid = pm.id
-            return pid
+    def _x24_post_enabled(self):
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.x24_post_enabled", "0"
+        ) in ("1", "true", "True")
 
-        cash_pm_id = _make_pm("CASH")
-        # --- pos.config ---
-        cfg_xid = self._safe_xid("pos_cfg_", store_code)
-        cfg_id = self._xid_get(ns, cfg_xid, "pos.config")
-        if not cfg_id:
-            cfg = env["pos.config"].create(
-                {
-                    "name": store_name or ("Store %s" % store_code),
-                    "company_id": company.id,
-                    "journal_id": sale_journal.id,
-                    "invoice_journal_id": sale_journal.id,
-                    "picking_type_id": warehouse.out_type_id.id,
-                    "payment_method_ids": [(4, cash_pm_id)],
-                    "use_pricelist": True,
-                    "pricelist_id": pl_id,
-                    "available_pricelist_ids": [(6, 0, [pl_id])],
-                }
-            )
-            self._xid_set(ns, cfg_xid, "pos.config", cfg.id)
-            cfg_id = cfg.id
-        config = env["pos.config"].browse(cfg_id)
-
-        def ensure_pm(tender):
-            pid = _make_pm(tender)
-            if pid not in config.payment_method_ids.ids:
-                # pos.config.write blocks payment-method changes while a session is open;
-                # link directly via the m2m table (safe for this historical import).
-                env.cr.execute(
-                    "INSERT INTO pos_config_pos_payment_method_rel "
-                    "(pos_config_id, pos_payment_method_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                    (config.id, pid),
-                )
-                config.invalidate_recordset(["payment_method_ids"])
-            return pid
-
-        ensure_pm("CASH")
-        return config, ensure_pm, pl_id
-
-    def _x24_product(self, ns, item_code, ean, desc, price):
-        """Resolve an X24 line's product; lazy-create a non-merchandise product (carrier
-        bags, vouchers, etc. sold at POS but absent from the X101 master) so the order
-        is complete and its total balances against the X70D tender. Idempotent by xid."""
-        P = self.env["product.product"]
-        prod = (P._resolve_barcode(ean) if ean else P.browse())
-        if not prod and item_code:
-            prod = P.search([("default_code", "=", item_code)], limit=1)
-        if prod:
-            return prod
-        key = item_code or ean
-        xid = self._safe_xid("x24prod_", key)
-        pid = self._xid_get(ns, xid, "product.product")
-        if pid:
-            return P.browse(pid)
-        tmpl = self.env["product.template"].with_context(tracking_disable=True, mail_create_nolog=True).create(
-            {"name": (desc or key)[:200], "default_code": item_code or False,
-             "type": "consu", "list_price": price, "sale_ok": True}
-        )
-        prod = tmpl.product_variant_id
-        if ean and not prod.barcode and not P.search_count([("barcode", "=", ean)]):
-            try:
-                prod.barcode = ean
-            except Exception:
-                pass
-        self._xid_set(ns, xid, "product.product", prod.id)
-        return prod
-
-    def _pos_tax_for_rate(self, company, rate):
-        """Map an X24 tax_rate (e.g. 0.11) to a sale account.tax. None/0 -> empty list."""
-        try:
-            pct = round(float(rate or 0) * 100)
-        except (TypeError, ValueError):
-            pct = 0
-        if pct <= 0:
-            return self.env["account.tax"].browse()
-        return self.env["account.tax"].search(
-            [("type_tax_use", "=", "sale"), ("amount", "=", pct), ("company_id", "=", company.id)], limit=1
-        )
-
-    def _pos_session(self, profile, config, store_code):
-        """Get/create ONE open pos.session per store. Odoo forbids >1 open session per
-        config, so all of a store's historical orders share a single session; the GL
-        move is retargeted to the latest order date when the session is closed (X70D)."""
-        ns = profile.namespace
-        sxid = self._safe_xid("pos_sess_", str(store_code))
-        sid = self._xid_get(ns, sxid, "pos.session")
-        if sid:
-            return self.env["pos.session"].browse(sid)
-        session = self.env["pos.session"].create({"config_id": config.id})  # auto-opens
-        self._xid_set(ns, sxid, "pos.session", session.id)
-        return session
-
-    # ==================================================================
-    # X24 — Retail sales -> historical pos.order (draft; paid by X70D)
-    # ==================================================================
     def _load_x24(self, profile, file_b64, log):
-        ns = profile.namespace
-        company = profile.company_id
-        self = self.with_context(tracking_disable=True, mail_create_nolog=True, mail_create_nosubscribe=True)
-        orders = self._group_x24(profile, file_b64)
-        log.line_count = sum(len(v) for v in orders.values())
-        buf = self._line_buffer(log, log.line_count)
-        Order = self.env["pos.order"]
-        Product = self.env["product.product"]
-        cfg_cache, processed, created = {}, 0, 0
+        """Phase-5: post pos.order when ``retail_import.x24_post_enabled``, else stage.
 
-        # Pre-flight lock-date check on the earliest date.
-        days = sorted({profile._parse_date(k[1]) for k in orders if profile._parse_date(k[1])})
-        if days:
+        Staging (flag off, default) is the legacy behaviour: parse + persist lines
+        marked 'skipped' with a ``store|date|sku`` aggregate_key, no model writes.
+        Posting (flag on) creates one pos.order per (store,date,register,transnum)
+        with payments joined from X70D. See docs/PHASE5_X24_DESIGN.md.
+        """
+        data = profile.read_records(file_b64)
+        records = data["records"]
+        log.line_count = len(records)
+        if not records:
+            log.records_skipped = 0
+            return
+        row_to_line = self._persist_lines(log, records)
+        if self._x24_post_enabled():
+            self._post_x24(profile, records, log, row_to_line)
+        else:
+            self._stage_x24(profile, records, log, row_to_line)
+
+    def _stage_x24(self, profile, records, log, row_to_line):
+        log.records_skipped = len(records)
+        log.error_message = (
+            "X24DN POS sales: staged (Phase-5 gated — set retail_import.x24_post_enabled=1 to post)."
+        )
+        agg = self._aggregate_x24_by_sku_day(records)
+        for (store, date, sku), vals in agg.items():
+            agg_key = f"{store}|{date}|{sku}"
+            line_ids = [row_to_line[rn].id for rn in vals["row_nums"] if rn in row_to_line]
+            if line_ids:
+                self.env["retail.import.line"].browse(line_ids).write({
+                    "state": "skipped", "aggregate_key": agg_key,
+                })
+        self.env.cr.commit()
+        _logger.info("x24: %s rows -> %s daily-SKU aggregates (staged)", len(records), len(agg))
+
+    # ------------------------------------------------------------------
+    # Phase-5 posting helpers
+    # ------------------------------------------------------------------
+    def _x24_resolve_tax(self):
+        """account.tax for the X24 11% rate (Decision E). Configurable via param."""
+        icp = self.env["ir.config_parameter"].sudo()
+        tid = icp.get_param("retail_import.x24_tax_id")
+        Tax = self.env["account.tax"]
+        if tid and Tax.browse(int(tid)).exists():
+            return Tax.browse(int(tid))
+        return Tax.search(
+            [("type_tax_use", "=", "sale"), ("amount", "=", 11.0), ("amount_type", "=", "percent")],
+            limit=1,
+        )
+
+    def _x24_tender_index(self, profile):
+        """Build {(store,date,reg,txn): [(tender_type, amount)]} from staged X70D lines.
+
+        Sourced from the most recent imported X70D log so X70D must be synced before
+        X24 posting. Rows with a blank tender_type (file totals) are ignored.
+        """
+        Log = self.env["retail.import.log"].sudo()
+        x70d_profile = self.env["retail.import.profile"].search(
+            [("file_type", "=", "x70d"), ("company_id", "=", profile.company_id.id)], limit=1
+        )
+        idx = defaultdict(list)
+        if not x70d_profile:
+            return idx
+        log = Log.search([("profile_id", "=", x70d_profile.id)], order="id desc", limit=1)
+        if not log:
+            return idx
+        lines = self.env["retail.import.line"].sudo().search([("log_id", "=", log.id)])
+        for ln in lines:
             try:
-                violated = company._get_violated_lock_dates(days[0], False)
+                r = json.loads(ln.raw_data_json or "{}")
             except Exception:
-                violated = None
-            if violated:
-                raise UserError(
-                    _("Accounting is locked on/before %s — open the period (or clear the lock date) "
-                      "for the X24 history dates before importing.") % violated
-                )
+                continue
+            tt = str(r.get("tender_type") or "").strip()
+            if not tt:
+                continue
+            key = (
+                str(r.get("store_code") or "").strip(), str(r.get("trans_date") or "").strip(),
+                str(r.get("register") or "").strip(), str(r.get("transnum") or "").strip(),
+            )
+            try:
+                amt = float(r.get("tender_amount") or 0)
+            except Exception:
+                amt = 0.0
+            idx[key].append((tt, amt))
+        return idx
 
-        for (store_code, trans_date_raw, register, transnum), rows in orders.items():
-            day = profile._parse_date(trans_date_raw)
-            if not store_code or not day:
-                buf.add("skipped", ref_key=str(transnum), message="Missing store or date")
-                processed += len(rows)
+    def _x24_group_orders(self, records):
+        orders = defaultdict(list)
+        for r in records:
+            store = str(r.get("store_code") or "").strip()
+            txn = str(r.get("transnum") or "").strip()
+            if not store or not txn:
                 continue
-            store_name = (rows[0].get("store_name") or "").strip()
-            if store_code not in cfg_cache:
-                cfg_cache[store_code] = self._pos_bootstrap_store(profile, store_code, store_name)
-            config, _ensure_pm, pl_id = cfg_cache[store_code]
-            oref = "%s_%s_%s" % (store_code, register, transnum)
-            oxid = self._safe_xid("pos_", oref)
-            if self._xid_get(ns, oxid, "pos.order"):
-                buf.add("skipped", ref_key=oref, message="Order already imported")
-                processed += len(rows)
-                continue
-            # build lines
-            line_vals, amt_total, amt_tax, bad = [], 0.0, 0.0, None
+            key = (store, str(r.get("trans_date") or "").strip(),
+                   str(r.get("register") or "").strip(), txn)
+            orders[key].append(r)
+        return orders
+
+    def _post_x24(self, profile, records, log, row_to_line):
+        ns = profile.namespace
+        Product = self.env["product.product"]
+        Order = self.env["pos.order"]
+        Line = self.env["retail.import.line"]
+        icp = self.env["ir.config_parameter"].sudo()
+
+        # Whole-file idempotency guard (mirror _load_x20).
+        prior = self.env["retail.import.log"].search(
+            [("profile_id", "=", profile.id), ("state", "=", "imported"), ("id", "!=", log.id)], limit=1
+        )
+        if prior:
+            raise UserError(
+                _("X24 already posted (log #%s). Archive it before re-posting to avoid duplicate sales.")
+                % prior.id
+            )
+
+        # Ensure each tender method books to its own GL receivable account so the
+        # session-close journal splits cash / card / e-wallet instead of piling every
+        # tender into the single company-default Trade Receivables. Idempotent.
+        self._x24_ensure_method_gl_split()
+
+        tax = self._x24_resolve_tax()
+        tenders = self._x24_tender_index(profile)
+        orders = self._x24_group_orders(records)
+
+        cfg_cache, sess_cache, method_cache = {}, {}, {}
+        prod_bc, prod_dc = {}, {}
+        created = skipped = 0
+        errors = []
+
+        def resolve_config(store):
+            if store not in cfg_cache:
+                cid = self._xid_get(ns, self._safe_xid("posconfig_", store), "pos.config")
+                cfg_cache[store] = self.env["pos.config"].browse(cid) if cid else False
+            return cfg_cache[store]
+
+        def get_session(cfg, date):
+            k = (cfg.id, date)
+            if k not in sess_cache:
+                s = self.env["pos.session"].create({"config_id": cfg.id, "user_id": self.env.uid})
+                if s.state != "opened":
+                    # Proper opening (cash control) so the close can book cash to
+                    # Cash-on-hand instead of Cash Difference Loss.
+                    try:
+                        s.set_opening_control(0, None)
+                    except Exception:
+                        pass
+                    if s.state != "opened":
+                        s.write({"state": "opened"})
+                sess_cache[k] = s
+            return sess_cache[k]
+
+        def resolve_product(r):
+            ean = str(r.get("ean") or "").strip()
+            code = str(r.get("item_code") or "").strip()
+            if ean:
+                if ean not in prod_bc:
+                    prod_bc[ean] = Product.search([("barcode", "=", ean)], limit=1)
+                if prod_bc[ean]:
+                    return prod_bc[ean]
+            if code:
+                if code not in prod_dc:
+                    prod_dc[code] = Product.search([("default_code", "=", code)], limit=1)
+                if prod_dc[code]:
+                    return prod_dc[code]
+            return Product.browse()
+
+        def map_method(cfg, tender_type):
+            tt = self._X24_TENDER_FOLD.get(tender_type, tender_type)
+            k = (cfg.id, tt)
+            if k not in method_cache:
+                method_cache[k] = cfg.payment_method_ids.filtered(lambda m: (m.name or "") == tt)[:1]
+            return method_cache[k]
+
+        def fail_rows(rows, msg):
             for r in rows:
-                ean = str(r.get("ean") or "").strip()
-                item = str(r.get("item_code") or "").strip()
-                prod = self._x24_product(ns, item, ean, r.get("item_description"),
-                                         float(profile._parse_amount(r.get("retail_price")) or 0))
-                if not prod:
-                    bad = _("Item produk tidak teregister: ean=%s item=%s") % (ean or "-", item or "-")
-                    break
-                qty = float(profile._parse_amount(r.get("net_qty")) or 0)
-                net = float(profile._parse_amount(r.get("net_amount")) or 0)        # ex-tax base
-                total = float(profile._parse_amount(r.get("total_amount")) or 0)    # incl tax
-                tax_amt = float(profile._parse_amount(r.get("tax_amount")) or 0)
-                tax = self._pos_tax_for_rate(company, r.get("tax_rate"))
-                if abs((total - net) - tax_amt) > max(2.0, qty):
-                    bad = _("Line amounts inconsistent (net=%s total=%s tax=%s)") % (net, total, tax_amt)
-                    break
-                line_vals.append((0, 0, {
-                    "product_id": prod.id,
-                    "qty": qty,
-                    "price_unit": (net / qty) if qty else net,  # ex-tax (tax 28 is price-excluded)
-                    "discount": 0.0,
-                    "tax_ids": [(6, 0, tax.ids)],
-                    "price_subtotal": net,
-                    "price_subtotal_incl": total,
-                    "full_product_name": (r.get("item_description") or prod.display_name),
-                }))
-                amt_total += total
-                amt_tax += tax_amt
-            if bad:
-                buf.add("error", ref_key=oref, message=bad, raw=rows[0])
-                processed += len(rows)
+                rn = r.get("_row")
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": msg[:250]})
+            errors.append((rows[0].get("_row"), msg))
+
+        for key, rows in orders.items():
+            store, date, reg, txn = key
+            oxid = self._safe_xid("posorder_", f"{store}_{date}_{reg}_{txn}")
+            if self._xid_get(ns, oxid, "pos.order"):
+                continue  # already posted
+            cfg = resolve_config(store)
+            if not cfg:
+                fail_rows(rows, f"store {store}: no pos.config (map xid posconfig_{store})")
+                skipped += len(rows)
                 continue
-            session = self._pos_session(profile, config, store_code)
-            order = Order.create({
-                "company_id": company.id,
-                "session_id": session.id,
-                "config_id": config.id,
-                "pricelist_id": pl_id,
-                "partner_id": False,
-                "date_order": datetime.combine(day, datetime.min.time()).replace(hour=12),
-                "pos_reference": "Order %s" % oref,
-                "tracking_number": str(transnum),
-                "amount_tax": amt_tax,
-                "amount_total": amt_total,
-                "amount_paid": 0.0,
-                "amount_return": 0.0,
-                "lines": line_vals,
-                "state": "draft",
-                "to_invoice": False,
-            })
-            self._xid_set(ns, oxid, "pos.order", order.id)
-            buf.add("created", ref_key=oref, model_name="pos.order", res_id=order.id)
+
+            line_cmds, order_net, order_incl, missing = [], 0.0, 0.0, False
+            for r in rows:
+                prod = resolve_product(r)
+                if not prod:
+                    missing = True
+                    rn = r.get("_row")
+                    if rn in row_to_line:
+                        row_to_line[rn].write({
+                            "state": "error",
+                            "error_message": f"no product ean={r.get('ean')!r} code={r.get('item_code')!r}"[:250],
+                        })
+                    continue
+                qty = float(profile._parse_amount(r.get("net_qty")))
+                net = float(profile._parse_amount(r.get("net_amount")))
+                incl = float(profile._parse_amount(r.get("total_amount")))
+                gross = float(profile._parse_amount(r.get("gross_price")) or 0)
+                rate = str(r.get("tax_rate") or "").strip()
+                tax_ids = [tax.id] if (tax and rate not in ("", "None")) else []
+                line_cmds.append((0, 0, {
+                    "product_id": prod.id, "qty": qty,
+                    "price_unit": gross or (net / qty if qty else 0.0), "discount": 0.0,
+                    "tax_ids": [(6, 0, tax_ids)],
+                    "price_subtotal": net, "price_subtotal_incl": incl,
+                }))
+                order_net += net
+                order_incl += incl
+
+            if not line_cmds:
+                fail_rows(rows, f"store {store} txn {txn}: no resolvable product")
+                skipped += len(rows)
+                continue
+
+            tlist = tenders.get(key, [])
+            pay_total = sum(a for _, a in tlist)
+            if not tlist:
+                fail_rows(rows, f"store {store} txn {txn}: no X70D tender (sync X70D first)")
+                skipped += len(rows)
+                continue
+            if abs(pay_total - order_incl) > self._X24_BALANCE_TOL:
+                fail_rows(rows, f"store {store} txn {txn}: unbalanced lines={order_incl:.2f} tenders={pay_total:.2f}")
+                skipped += len(rows)
+                continue
+
+            d = profile._parse_date(date)
+            dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
+            # Session is created outside the per-order savepoint so a single bad
+            # order does not roll back the shared daily session.
+            sess = get_session(cfg, date)
+            try:
+                with self.env.cr.savepoint():
+                    order = Order.create({
+                        "session_id": sess.id, "company_id": cfg.company_id.id,
+                        "pricelist_id": cfg.pricelist_id.id or False, "date_order": dt,
+                        "pos_reference": f"{store}-{reg}-{txn}",
+                        "lines": line_cmds,
+                        "amount_tax": order_incl - order_net, "amount_total": order_incl,
+                        "amount_paid": 0.0, "amount_return": 0.0,
+                    })
+                    for tt, amt in tlist:
+                        m = map_method(cfg, tt)
+                        if not m:
+                            errors.append((rows[0].get("_row"), f"{store}/{txn}: no method for tender {tt}"))
+                            continue
+                        order.add_payment({
+                            "pos_order_id": order.id, "payment_method_id": m.id,
+                            "amount": amt, "payment_date": dt,
+                        })
+                    # ``pos.order.amount_paid`` is a plain stored field (no @api.depends)
+                    # in Odoo 19: writing pos.payment rows does NOT refresh it (the UI
+                    # relies on an onchange). Recompute from payments before the paid gate
+                    # so orders are actually marked paid (mirrors fix b68559b).
+                    order.invalidate_recordset(["payment_ids", "amount_paid"])
+                    order.amount_paid = sum(order.payment_ids.mapped("amount"))
+                    if order.amount_total > 0 and order.amount_paid >= order.amount_total:
+                        order.action_pos_order_paid()
+                    self._xid_set(ns, oxid, "pos.order", order.id)
+            except Exception as e:  # per-order savepoint rolled back; keep going
+                fail_rows(rows, f"store {store} txn {txn}: post failed: {e}")
+                skipped += len(rows)
+                continue
+            for r in rows:
+                rn = r.get("_row")
+                if rn in row_to_line:
+                    row_to_line[rn].write({
+                        "state": "ok", "target_model": "pos.order",
+                        "target_res_id": order.id, "aggregate_key": f"{store}|{date}|{txn}",
+                    })
             created += 1
-            processed += len(rows)
-            if created % 50 == 0:
-                self._tick(log, processed)
-                buf.flush()
-                self._checkpoint()
-        buf.flush()
+            if created % 200 == 0:
+                self.env.cr.commit()
+
+        if icp.get_param("retail_import.x24_close_sessions", "0") in ("1", "true", "True"):
+            for s in sess_cache.values():
+                try:
+                    # Proper UI-style close: register the counted cash = expected so
+                    # cash tenders post to Cash-on-hand (journal) and card tenders to
+                    # Outstanding Receipts, not a Cash Difference. Falls back to the
+                    # plain closing control if the UI API is unavailable.
+                    try:
+                        s.post_closing_cash_details(s.cash_register_balance_end)
+                        s.close_session_from_ui()
+                    except Exception:
+                        s.action_pos_session_closing_control()
+                    # Decision B guard: imported sales must not move stock (inventory is
+                    # owned by X20/X29; Levi's products are non-storable so POS creates no
+                    # picking). If that ever changes, surface it loudly instead of silently
+                    # double-counting inventory.
+                    moves = s.order_ids.picking_ids.mapped("move_ids")
+                    if moves:
+                        msg = (f"session {s.id}: UNEXPECTED {len(moves)} stock move(s) on close "
+                               f"(products became storable?) — inventory may be double-counted")
+                        _logger.error("x24 POST: %s", msg)
+                        errors.append((None, msg))
+                    elif s.move_id:
+                        _logger.info("x24 POST: session %s closed, journal %s (no stock moves)",
+                                     s.id, s.move_id.name)
+                except Exception as e:
+                    errors.append((None, f"session {s.id} close failed: {e}"))
+
+        self.env.cr.commit()
         log.records_created = created
-        log.records_skipped = buf.counts.get("skipped", 0)
-        log.error_count = buf.counts.get("error", 0)
-        log.processed_count = log.line_count
-        self._checkpoint()
-        _logger.info("x24 done: %s orders created across %s stores", created, len(cfg_cache))
+        log.records_skipped = skipped
+        log.set_errors(errors)
+        _logger.info("x24 POST: %s orders created, %s rows skipped, %s errors",
+                     created, skipped, len(errors))
+
+    # ------------------------------------------------------------------
+    # Decision A — store_code -> pos.config mapping (posconfig_<store> xids)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _norm_store_name(name):
+        """Normalise a store/config label to its bare mall name for matching.
+
+        Strips the outlet-type prefix ('OLS SES -', 'OLS SCU -', 'OLS -', 'OLS')
+        and collapses whitespace/case so 'OLS SES - TUNJUNGAN PLAZA 3' and
+        'OLS SCU - TUNJUNGAN PLAZA 3' both reduce to 'TUNJUNGAN PLAZA 3'.
+        """
+        s = " ".join(str(name or "").upper().split())
+        for pre in ("OLS SES -", "OLS SCU -", "OLS SES", "OLS SCU", "OLS -", "OLS"):
+            if s.startswith(pre):
+                s = s[len(pre):].strip()
+                break
+        return " ".join(s.split())
+
+    def _x24_stores_from_staged(self):
+        """Distinct {store_code: (sap, store_name)} from the latest staged X24 log."""
+        Prof = self.env["retail.import.profile"]
+        p24 = Prof.search([("file_type", "=", "x24")], limit=1)
+        Log = self.env["retail.import.log"].sudo()
+        log = Log.search([("profile_id", "=", p24.id)], order="id desc", limit=1) if p24 else Log
+        stores = {}
+        if not log:
+            return stores
+        for ln in self.env["retail.import.line"].sudo().search([("log_id", "=", log.id)]):
+            try:
+                r = json.loads(ln.raw_data_json or "{}")
+            except Exception:
+                continue
+            sc = str(r.get("store_code") or "").strip()
+            if not sc or not sc.isdigit():
+                continue
+            stores[sc] = (str(r.get("sap_store_code") or "").strip(),
+                          str(r.get("store_name") or "").strip())
+        return stores
+
+    def _x24_map_stores_to_configs(self, stores=None, commit=False):
+        """Map store codes to pos.config by normalised name; write posconfig_<code> xids.
+
+        Two-tier, correctness-first: (1) unique **exact** normalised-name match;
+        (2) unique **containment** match (one config whose bare name contains, or is
+        contained by, the store's) flagged 'fuzzy'; otherwise 'ambiguous'/'unmatched'
+        and left for a human. Returns a list of
+        (store_code, store_name, config_id, config_name, method). Writes xids only
+        for exact+fuzzy matches when ``commit`` (idempotent — skips existing).
+        """
+        p24 = self.env["retail.import.profile"].search([("file_type", "=", "x24")], limit=1)
+        ns = p24.namespace if p24 else "levis"
+        if stores is None:
+            stores = self._x24_stores_from_staged()
+        norm_cfg = defaultdict(list)
+        for c in self.env["pos.config"].search([]):
+            norm_cfg[self._norm_store_name(c.name)].append(c)
+
+        report, written = [], 0
+        for code in sorted(stores):
+            _sap, name = stores[code]
+            sn = self._norm_store_name(name)
+            cfg, method = False, "unmatched"
+            if sn and len(norm_cfg.get(sn, [])) == 1:
+                cfg, method = norm_cfg[sn][0], "exact"
+            elif sn:
+                cands = {c.id: c for nn, cs in norm_cfg.items() if nn
+                         and (nn.startswith(sn) or sn.startswith(nn)) for c in cs}
+                if len(cands) == 1:
+                    cfg, method = list(cands.values())[0], "fuzzy"
+                elif len(cands) > 1:
+                    method = "ambiguous"
+            report.append((code, name, cfg.id if cfg else None,
+                           cfg.name if cfg else None, method))
+            if commit and cfg:
+                xn = self._safe_xid("posconfig_", code)
+                if not self._xid_get(ns, xn, "pos.config"):
+                    self._xid_set(ns, xn, "pos.config", cfg.id)
+                    written += 1
+        if commit:
+            self.env.cr.commit()
+            _logger.info("x24 store->config: %s xids written", written)
+        return report
+
+    def _x24_seed_payment_methods(self):
+        """Idempotently create the 4 tender methods missing from the seed (Decision D).
+
+        Creates AMEX/OVO/SODEXO (+ folds OTHER_CARD into OFFLINE_OTHER_CREDITCARD) per
+        company that already has POS methods, and links them to that company's configs.
+        Returns a summary dict. Safe to call repeatedly.
+        """
+        Method = self.env["pos.payment.method"]
+        created = {}
+        companies = self.env["pos.config"].search([]).mapped("company_id")
+        for company in companies:
+            existing = Method.search([("company_id", "=", company.id)])
+            names = set(existing.mapped("name"))
+            template = existing.filtered(lambda m: m.name == "OFFLINE_OTHER_CREDITCARD")[:1] or existing[:1]
+            for tname in self._X24_SEED_TENDERS:
+                if tname in names:
+                    continue
+                vals = {"name": tname, "company_id": company.id}
+                if template and template.journal_id:
+                    vals["journal_id"] = template.journal_id.id
+                m = Method.create(vals)
+                created.setdefault(company.id, []).append(tname)
+                # attach to that company's configs so map_method finds it
+                cfgs = self.env["pos.config"].search([("company_id", "=", company.id)])
+                for c in cfgs:
+                    c.write({"payment_method_ids": [(4, m.id)]})
+        # newly-seeded methods must also get their own GL receivable
+        self._x24_ensure_method_gl_split()
+        return created
+
+    # ------------------------------------------------------------------
+    # GL payment separation — one receivable account per tender type
+    # ------------------------------------------------------------------
+    def _x24_next_free_account_code(self, company, base):
+        """First unused account code at/after ``base`` for ``company`` (codes are
+        company-dependent in Odoo 19, so search under with_company)."""
+        Account = self.env["account.account"].sudo().with_company(company)
+        try:
+            start = int(str(base)) + 100
+        except (TypeError, ValueError):
+            start = 1106000101
+        for i in range(start, start + 5000):
+            code = str(i)
+            if not Account.search([("code", "=", code)], limit=1):
+                return code
+        raise UserError(_("Could not allocate a free account code near %s") % base)
+
+    def _x24_recv_account_for(self, company, tender):
+        """Get/create a distinct POS-receivable account for a tender type (reuse-first).
+
+        Cloned from the company's default POS receivable (same account_type, reconcile)
+        so it behaves identically but keeps each tender on its own GL line.
+        """
+        Account = self.env["account.account"].sudo().with_company(company)
+        label = "POS Receivable - %s" % tender
+        acc = Account.search([("name", "=", label)], limit=1)
+        if acc:
+            return acc
+        default_recv = company.account_default_pos_receivable_account_id
+        base = default_recv.with_company(company).code if default_recv else "1106000001"
+        return Account.create({
+            "name": label,
+            "code": self._x24_next_free_account_code(company, base),
+            "account_type": (default_recv.account_type if default_recv else "asset_receivable"),
+            "reconcile": True,
+            "company_ids": [(4, company.id)],
+        })
+
+    def _x24_ensure_method_gl_split(self):
+        """Give every POS tender method its own receivable account so cash / card /
+        e-wallet settle on distinct GL lines instead of the single shared default
+        Trade Receivables. Auto per tender type (grouped by method name), reuse-first,
+        idempotent (skips methods already pointed at a non-default receivable).
+        """
+        Method = self.env["pos.payment.method"].sudo()
+        summary = {}
+        for company in self.env["pos.config"].search([]).mapped("company_id"):
+            default_recv = company.account_default_pos_receivable_account_id
+            acc_by_tender = {}
+            for m in Method.search([("company_id", "=", company.id)]):
+                if m.receivable_account_id and m.receivable_account_id != default_recv:
+                    continue  # already separated
+                tender = (m.name or "").strip() or "OTHER"
+                if tender not in acc_by_tender:
+                    acc_by_tender[tender] = self._x24_recv_account_for(company, tender)
+                m.receivable_account_id = acc_by_tender[tender].id
+                summary.setdefault(company.id, {})[tender] = \
+                    summary.get(company.id, {}).get(tender, 0) + 1
+        return summary
+
+    def _aggregate_x24_by_sku_day(self, records):
+        """Aggregate X24 rows to (store_code, closing_date, item_code) level.
+
+        Multiple transactions (different transnum) on the same day for the same SKU
+        are summed here. Returns a dict keyed by (store, date, sku) with aggregated
+        qty, amount, unit price, and the source row_numbers for backtracking.
+        """
+        agg = {}
+        for r in records:
+            store = str(r.get("store_code") or "").strip()
+            date = str(r.get("trans_date") or "").strip()
+            sku = str(r.get("item_code") or r.get("sku") or "").strip()
+            if not store or not sku:
+                continue
+            key = (store, date, sku)
+            if key not in agg:
+                agg[key] = {"qty": 0.0, "amount": 0.0, "unit_price": 0.0, "row_nums": []}
+            entry = agg[key]
+            qty = float(r.get("net_qty") or 0)
+            amt = float(r.get("net_amount") or 0)
+            entry["qty"] += qty
+            entry["amount"] += amt
+            if qty:
+                entry["unit_price"] = amt / qty   # last non-zero row wins; close enough for staging
+            entry["row_nums"].append(r.get("_row"))
+        return agg
 
     def _group_x24(self, profile, file_b64):
-        """Parse X24 and group rows into transactions (store, date, register, transnum)."""
+        """Parse X24 and group rows into individual transactions (Phase-5 internal use).
+
+        Returns {(store, date, register, transnum): [rows]} — one pos.order per key.
+        For line-level aggregation use _aggregate_x24_by_sku_day() instead.
+        """
         data = profile.read_records(file_b64)
         orders = defaultdict(list)
         for r in data["records"]:
-            if not r.get("store_code") or str(r.get("store_code")).strip().lower().startswith("grand"):
-                continue
             key = (r.get("store_code"), r.get("trans_date"), r.get("register"), r.get("transnum"))
             orders[key].append(r)
         return orders
 
-    def _group_x70d(self, profile, file_b64):
-        """Parse X70D and group tender rows by (store, date, register, transnum)."""
-        data = profile.read_records(file_b64)
-        groups = defaultdict(list)
-        for r in data["records"]:
-            if not r.get("store_code") or str(r.get("store_code")).strip().lower().startswith("grand"):
-                continue
-            key = (r.get("store_code"), r.get("trans_date"), r.get("register"), r.get("transnum"))
-            groups[key].append(r)
-        return groups
-
     # ==================================================================
-    # X70D — Tender detail -> pos.payment; then close the day's session (GL)
+    # X70D — Tender detail (Phase 5, staged until X24 is enabled)
     # ==================================================================
     def _load_x70d(self, profile, file_b64, log):
-        ns = profile.namespace
-        company = profile.company_id
-        self = self.with_context(tracking_disable=True, mail_create_nolog=True, mail_create_nosubscribe=True)
-        groups = self._group_x70d(profile, file_b64)
-        log.line_count = sum(len(v) for v in groups.values())
-        buf = self._line_buffer(log, log.line_count)
-        Payment = self.env["pos.payment"]
-        cfg_cache, touched, paid_n, processed = {}, set(), 0, 0
-
-        for (store_code, trans_date_raw, register, transnum), tenders in groups.items():
-            day = profile._parse_date(trans_date_raw)
-            oref = "%s_%s_%s" % (store_code, register, transnum)
-            oid = self._xid_get(ns, self._safe_xid("pos_", oref), "pos.order")
-            if not oid:
-                buf.add("error", ref_key=oref, message="No X24 order for this tender (upload X24 first)")
-                processed += len(tenders)
-                continue
-            order = self.env["pos.order"].browse(oid)
-            if store_code not in cfg_cache:
-                store_name = (tenders[0].get("store_name") or "").strip()
-                cfg_cache[store_code] = self._pos_bootstrap_store(profile, store_code, store_name)
-            config, ensure_pm, _pl = cfg_cache[store_code]
-            for seq, t in enumerate(tenders):
-                pmt_xid = self._safe_xid("pmt_", "%s_%s" % (oref, seq))
-                if self._xid_get(ns, pmt_xid, "pos.payment"):
-                    continue
-                tender_type = (t.get("tender_type") or "CASH").strip() or "CASH"
-                pm_id = ensure_pm(tender_type)
-                amount = float(profile._parse_amount(t.get("tender_amount")) or 0)
-                pay = Payment.create({
-                    "pos_order_id": order.id,
-                    "payment_method_id": pm_id,
-                    "amount": amount,
-                    "payment_date": order.date_order,
-                    "name": str(t.get("auth") or t.get("voucher") or ""),
-                })
-                self._xid_set(ns, pmt_xid, "pos.payment", pay.id)
-            # mark paid if balanced
-            if order.state == "draft":
-                order._compute_amount_all() if hasattr(order, "_compute_amount_all") else None
-                if abs((order.amount_paid or 0) - (order.amount_total or 0)) <= 1.0:
-                    try:
-                        order.action_pos_order_paid()
-                        buf.add("created", ref_key=oref, model_name="pos.order", res_id=order.id)
-                        paid_n += 1
-                    except Exception as e:
-                        buf.add("error", ref_key=oref, message="paid failed: %s" % e)
-                else:
-                    buf.add("error", ref_key=oref,
-                            message="Tenders %s != order total %s" % (order.amount_paid, order.amount_total))
-            touched.add(store_code)
-            processed += len(tenders)
-            if processed % 50 == 0:
-                self._tick(log, processed)
-                buf.flush()
-                self._checkpoint()
-
-        # close each store's session -> posts GL; retarget move date to latest order day
-        closed = 0
-        for store_code in sorted(touched, key=str):
-            sid = self._xid_get(ns, self._safe_xid("pos_sess_", str(store_code)), "pos.session")
-            if not sid:
-                continue
-            session = self.env["pos.session"].browse(sid)
-            if session.state in ("closed", "closing_control"):
-                continue
-            if any(o.state == "draft" for o in session.order_ids):
-                buf.add("skipped", ref_key=str(store_code),
-                        message="Session has unpaid orders; not closed")
-                continue
-            dates = [d for d in session.order_ids.mapped("date_order") if d]
-            gl_date = (max(dates).date() if dates else fields.Date.context_today(self))
-            try:
-                self._close_session_backdated(session, gl_date)
-                closed += 1
-            except Exception as e:
-                _logger.exception("session close failed store %s", store_code)
-                buf.add("error", ref_key=str(store_code), message="close failed: %s" % e)
-            self._checkpoint()
-
-        buf.flush()
-        log.records_created = paid_n
-        log.records_matched = closed  # sessions posted to GL
-        log.error_count = buf.counts.get("error", 0)
-        log.processed_count = log.line_count
-        self._checkpoint()
-        _logger.info("x70d done: %s orders paid, %s day-sessions closed", paid_n, closed)
-
-    def _close_session_backdated(self, session, day):
-        """Close an open POS session and re-stamp its GL move(s) to the historical day.
-        Odoo hardcodes the session move date to 'today', so we draft->rewrite date->post."""
-        session.action_pos_session_closing_control()  # cash_control off -> validates + posts
-        target = day
-        moves = session.move_id
-        for pk in session.picking_ids:
-            moves |= pk.move_ids.account_move
-        for m in moves:
-            if not m or m.state != "posted":
-                continue
-            m = m.with_context(check_move_validity=False)
-            m.button_draft()
-            m.write({"date": target})
-            if m.line_ids:
-                m.line_ids.write({"date": target})
-            m._post()
-        return True
+        self._stage_only(
+            profile, file_b64, log,
+            "X70D tender detail: staged (Phase-5 gated — depends on X24 enablement).",
+        )
 
     # ==================================================================
     # Staged / reference-only loaders (parse + count + keep attachment)
@@ -1166,11 +1133,12 @@ class RetailImportExecutor(models.AbstractModel):
         log.line_count = len(records)
         log.records_skipped = len(records)
         log.error_message = note
-        buf = self._line_buffer(log, len(records))
-        for r in records:
-            buf.add("skipped", row=r.get("_row"), message="Staged (no model writes)")
-        buf.flush()
-        log.processed_count = log.line_count
+        if records:
+            row_to_line = self._persist_lines(log, records)
+            line_ids = [ln.id for ln in row_to_line.values()]
+            if line_ids:
+                self.env["retail.import.line"].browse(line_ids).write({"state": "skipped"})
+            self.env.cr.commit()
         _logger.info("%s: staged %s rows (no model writes)", profile.file_type, len(records))
 
     def _load_x70t(self, profile, file_b64, log):
@@ -1188,3 +1156,27 @@ class RetailImportExecutor(models.AbstractModel):
             "Store Master: warehouse creation is handled by the Track A odoo-shell loader "
             "(header-wise store columns). This profile is for row-wise enrichment only.",
         )
+
+    def _load_x70(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X70 tender breakdown: staged for settlement reconciliation.")
+
+    def _load_x26(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X26 shipping: staged for transfer-order mapping.")
+
+    def _load_x29(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X29 inventory adjustment: staged for stock adjustment mapping.")
+
+    def _load_x48(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X48 customer return: staged for return order mapping.")
+
+    def _load_x53(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X53 RTV: staged for vendor return mapping.")
+
+    def _load_x53_ebr(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X53-EBR RTV (alternate format): staged for vendor return mapping.")
+
+    def _load_x21(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X21 payment summary: staged for payment reconciliation.")
+
+    def _load_x25n(self, profile, file_b64, log):
+        self._stage_only(profile, file_b64, log, "X25N receiving: staged for PO receipt mapping.")
