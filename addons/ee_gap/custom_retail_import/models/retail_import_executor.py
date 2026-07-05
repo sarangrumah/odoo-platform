@@ -910,51 +910,7 @@ class RetailImportExecutor(models.AbstractModel):
             if created % 200 == 0:
                 self.env.cr.commit()
 
-        if icp.get_param("retail_import.x24_close_sessions", "0") in ("1", "true", "True"):
-            for s in sess_cache.values():
-                try:
-                    # Proper UI-style close: register the counted cash = expected so
-                    # cash tenders post to Cash-on-hand (journal) and card tenders to
-                    # Outstanding Receipts, not a Cash Difference. Falls back to the
-                    # plain closing control if the UI API is unavailable.
-                    try:
-                        s.post_closing_cash_details(s.cash_register_balance_end)
-                        s.close_session_from_ui()
-                    except Exception:
-                        s.action_pos_session_closing_control()
-                    # Decision B guard: imported sales must not move stock (inventory is
-                    # owned by X20/X29; Levi's products are non-storable so POS creates no
-                    # picking). If that ever changes, surface it loudly instead of silently
-                    # double-counting inventory.
-                    moves = s.order_ids.picking_ids.mapped("move_ids")
-                    if moves:
-                        msg = (f"session {s.id}: UNEXPECTED {len(moves)} stock move(s) on close "
-                               f"(products became storable?) — inventory may be double-counted")
-                        _logger.error("x24 POST: %s", msg)
-                        errors.append((None, msg))
-                    elif s.move_id:
-                        # Period-correct GL: POS dates the close move at ``context_today``
-                        # and re-applies it on _post, so ORM backdating does not stick.
-                        # Re-stamp the posted move + its lines to the latest order date via
-                        # SQL — safe within the same fiscal year (annual sequence stays valid).
-                        try:
-                            dates = [d for d in s.order_ids.mapped("date_order") if d]
-                            mv = s.move_id
-                            if dates and mv.date and max(dates).date().year == mv.date.year:
-                                gl = max(dates).date()
-                                self.env.cr.execute(
-                                    "UPDATE account_move SET date=%s WHERE id=%s", (gl, mv.id))
-                                self.env.cr.execute(
-                                    "UPDATE account_move_line SET date=%s WHERE move_id=%s",
-                                    (gl, mv.id))
-                                mv.invalidate_recordset(["date"])
-                                mv.line_ids.invalidate_recordset(["date"])
-                        except Exception as be:
-                            _logger.warning("x24 POST: session %s backdate skipped: %s", s.id, be)
-                        _logger.info("x24 POST: session %s closed, journal %s dated %s (no stock moves)",
-                                     s.id, s.move_id.name, s.move_id.date)
-                except Exception as e:
-                    errors.append((None, f"session {s.id} close failed: {e}"))
+        self._pos_close_and_backdate(sess_cache.values(), errors, "x24")
 
         self.env.cr.commit()
         log.records_created = created
@@ -962,6 +918,48 @@ class RetailImportExecutor(models.AbstractModel):
         log.set_errors(errors)
         _logger.info("x24 POST: %s orders created, %s rows skipped, %s errors",
                      created, skipped, len(errors))
+
+    def _pos_close_and_backdate(self, sessions, errors, tag):
+        """Close each open POS session (cash-control aware) and re-stamp its GL move to
+        the latest order date. Gated by ``retail_import.x24_close_sessions``. Shared by
+        X24 sales and X48 refunds. POS dates the close move at ``context_today`` and
+        re-applies it on _post, so the backdate is done via SQL (safe within the same
+        fiscal year — the annual sequence stays valid). Guards against stock moves
+        (Decision B: imported POS must not touch inventory)."""
+        icp = self.env["ir.config_parameter"].sudo()
+        if icp.get_param("retail_import.x24_close_sessions", "0") not in ("1", "true", "True"):
+            return
+        for s in sessions:
+            try:
+                try:
+                    s.post_closing_cash_details(s.cash_register_balance_end)
+                    s.close_session_from_ui()
+                except Exception:
+                    s.action_pos_session_closing_control()
+                moves = s.order_ids.picking_ids.mapped("move_ids")
+                if moves:
+                    msg = (f"session {s.id}: UNEXPECTED {len(moves)} stock move(s) on close "
+                           f"(products became storable?) — inventory may be double-counted")
+                    _logger.error("%s POST: %s", tag, msg)
+                    errors.append((None, msg))
+                elif s.move_id:
+                    try:
+                        dates = [d for d in s.order_ids.mapped("date_order") if d]
+                        mv = s.move_id
+                        if dates and mv.date and max(dates).date().year == mv.date.year:
+                            gl = max(dates).date()
+                            self.env.cr.execute(
+                                "UPDATE account_move SET date=%s WHERE id=%s", (gl, mv.id))
+                            self.env.cr.execute(
+                                "UPDATE account_move_line SET date=%s WHERE move_id=%s", (gl, mv.id))
+                            mv.invalidate_recordset(["date"])
+                            mv.line_ids.invalidate_recordset(["date"])
+                    except Exception as be:
+                        _logger.warning("%s POST: session %s backdate skipped: %s", tag, s.id, be)
+                    _logger.info("%s POST: session %s closed, journal %s dated %s (no stock moves)",
+                                 tag, s.id, s.move_id.name, s.move_id.date)
+            except Exception as e:
+                errors.append((None, f"session {s.id} close failed: {e}"))
 
     # ------------------------------------------------------------------
     # Decision A — store_code -> pos.config mapping (posconfig_<store> xids)
@@ -1237,8 +1235,213 @@ class RetailImportExecutor(models.AbstractModel):
     def _load_x29(self, profile, file_b64, log):
         self._stage_only(profile, file_b64, log, "X29 inventory adjustment: staged for stock adjustment mapping.")
 
+    def _x48_post_enabled(self):
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.x48_post_enabled", "0"
+        ) in ("1", "true", "True")
+
     def _load_x48(self, profile, file_b64, log):
-        self._stage_only(profile, file_b64, log, "X48 customer return: staged for return order mapping.")
+        """Post X48 customer returns as refund pos.orders when
+        ``retail_import.x48_post_enabled``; otherwise stage (legacy default)."""
+        data = profile.read_records(file_b64)
+        records = data["records"]
+        log.line_count = len(records)
+        if not records:
+            log.records_skipped = 0
+            return
+        row_to_line = self._persist_lines(log, records)
+        if self._x48_post_enabled():
+            self._post_x48(profile, records, log, row_to_line)
+        else:
+            log.records_skipped = len(records)
+            log.error_message = (
+                "X48 customer return: staged (set retail_import.x48_post_enabled=1 to post refunds)."
+            )
+            self.env["retail.import.line"].search([("log_id", "=", log.id)]).write({"state": "skipped"})
+            self.env.cr.commit()
+
+    def _post_x48(self, profile, records, log, row_to_line):
+        """Post X48 customer returns as refund (negative) pos.orders, paid by a negative
+        cash refund. Mirrors _post_x24 (product resolution + lazy-create, price-included
+        tax, one session/config, close + backdate, idempotency). X48 carries no tender,
+        so the refund is booked to the store CASH method by default."""
+        ns = profile.namespace
+        Product = self.env["product.product"]
+        Order = self.env["pos.order"]
+
+        prior = self.env["retail.import.log"].search(
+            [("profile_id", "=", profile.id), ("state", "=", "imported"), ("id", "!=", log.id)], limit=1
+        )
+        if prior:
+            raise UserError(
+                _("X48 already posted (log #%s). Archive it before re-posting to avoid duplicate refunds.")
+                % prior.id
+            )
+
+        self._x24_ensure_method_gl_split()
+        tax = self._x24_resolve_tax()
+        orders = self._x24_group_orders(records)
+
+        cfg_cache, sess_cache, prod_bc, prod_dc = {}, {}, {}, {}
+        created = skipped = 0
+        errors = []
+
+        def resolve_config(store):
+            if store not in cfg_cache:
+                cid = self._xid_get(ns, self._safe_xid("posconfig_", store), "pos.config")
+                cfg_cache[store] = self.env["pos.config"].browse(cid) if cid else False
+            return cfg_cache[store]
+
+        def get_session(cfg):
+            if cfg.id not in sess_cache:
+                s = self.env["pos.session"].create({"config_id": cfg.id, "user_id": self.env.uid})
+                if s.state != "opened":
+                    try:
+                        s.set_opening_control(0, None)
+                    except Exception:
+                        pass
+                    if s.state != "opened":
+                        s.write({"state": "opened"})
+                sess_cache[cfg.id] = s
+            return sess_cache[cfg.id]
+
+        def resolve_product(r):
+            ean = str(r.get("ean") or "").strip()
+            code = str(r.get("product_code") or r.get("item_code") or "").strip()
+            if ean:
+                if ean not in prod_bc:
+                    prod_bc[ean] = Product.search([("barcode", "=", ean)], limit=1)
+                if prod_bc[ean]:
+                    return prod_bc[ean]
+            if code:
+                if code not in prod_dc:
+                    prod_dc[code] = Product.search([("default_code", "=", code)], limit=1)
+                if prod_dc[code]:
+                    return prod_dc[code]
+            key = code or ean
+            if not key:
+                return Product.browse()
+            xid = self._safe_xid("x24prod_", key)
+            pid = self._xid_get(ns, xid, "product.product")
+            if pid:
+                p = Product.browse(pid)
+            else:
+                tmpl = self.env["product.template"].with_context(
+                    tracking_disable=True, mail_create_nolog=True).create({
+                        "name": (str(r.get("item_description") or "").strip() or key)[:200],
+                        "default_code": code or False, "type": "consu", "sale_ok": True,
+                    })
+                p = tmpl.product_variant_id
+                if ean and not p.barcode and not Product.search_count([("barcode", "=", ean)]):
+                    try:
+                        p.barcode = ean
+                    except Exception:
+                        pass
+                self._xid_set(ns, xid, "product.product", p.id)
+            if code:
+                prod_dc[code] = p
+            if ean:
+                prod_bc[ean] = p
+            return p
+
+        def fail_rows(rows, msg):
+            for r in rows:
+                rn = r.get("_row")
+                if rn in row_to_line:
+                    row_to_line[rn].write({"state": "error", "error_message": msg[:250]})
+            errors.append((rows[0].get("_row"), msg))
+
+        rate_val = (tax.amount / 100.0) if tax else 0.0
+        for key, rows in orders.items():
+            store, date, reg, txn = key
+            oxid = self._safe_xid("posreturn_", f"{store}_{date}_{reg}_{txn}")
+            if self._xid_get(ns, oxid, "pos.order"):
+                continue
+            cfg = resolve_config(store)
+            if not cfg:
+                fail_rows(rows, f"store {store}: no pos.config (map xid posconfig_{store})")
+                skipped += len(rows)
+                continue
+            cash = cfg.payment_method_ids.filtered(lambda m: m.is_cash_count)[:1]
+            if not cash:
+                fail_rows(rows, f"store {store}: no cash method for refund")
+                skipped += len(rows)
+                continue
+
+            line_cmds, order_net, order_incl = [], 0.0, 0.0
+            for r in rows:
+                prod = resolve_product(r)
+                if not prod:
+                    rn = r.get("_row")
+                    if rn in row_to_line:
+                        row_to_line[rn].write({
+                            "state": "error",
+                            "error_message": f"no product ean={r.get('ean')!r} code={r.get('product_code')!r}"[:250],
+                        })
+                    continue
+                qty = float(profile._parse_amount(r.get("net_qty")))        # negative
+                incl = float(profile._parse_amount(r.get("total_amount")))  # negative (refund)
+                gl_net = incl / (1.0 + rate_val)
+                unit = incl / qty if qty else incl                          # positive unit price
+                line_cmds.append((0, 0, {
+                    "product_id": prod.id, "qty": qty,
+                    "price_unit": unit, "discount": 0.0,
+                    "tax_ids": [(6, 0, [tax.id] if tax else [])],
+                    "price_subtotal": gl_net, "price_subtotal_incl": incl,
+                }))
+                order_net += gl_net
+                order_incl += incl
+
+            if not line_cmds:
+                fail_rows(rows, f"store {store} txn {txn}: no resolvable product")
+                skipped += len(rows)
+                continue
+
+            d = profile._parse_date(date)
+            dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
+            sess = get_session(cfg)
+            try:
+                with self.env.cr.savepoint():
+                    order = Order.create({
+                        "session_id": sess.id, "company_id": cfg.company_id.id,
+                        "pricelist_id": cfg.pricelist_id.id or False, "date_order": dt,
+                        "pos_reference": f"RET-{store}-{reg}-{txn}",
+                        "lines": line_cmds,
+                        "amount_tax": order_incl - order_net, "amount_total": order_incl,
+                        "amount_paid": 0.0, "amount_return": 0.0,
+                    })
+                    order.add_payment({
+                        "pos_order_id": order.id, "payment_method_id": cash.id,
+                        "amount": order_incl, "payment_date": dt,
+                    })
+                    order.invalidate_recordset(["payment_ids", "amount_paid"])
+                    order.amount_paid = sum(order.payment_ids.mapped("amount"))
+                    if order.amount_total and abs(order.amount_paid - order.amount_total) <= self._X24_BALANCE_TOL:
+                        order.action_pos_order_paid()
+                    self._xid_set(ns, oxid, "pos.order", order.id)
+            except Exception as e:
+                fail_rows(rows, f"store {store} txn {txn}: refund post failed: {e}")
+                skipped += len(rows)
+                continue
+            for r in rows:
+                rn = r.get("_row")
+                if rn in row_to_line:
+                    row_to_line[rn].write({
+                        "state": "ok", "target_model": "pos.order",
+                        "target_res_id": order.id, "aggregate_key": f"RET|{store}|{date}|{txn}",
+                    })
+            created += 1
+            if created % 200 == 0:
+                self.env.cr.commit()
+
+        self._pos_close_and_backdate(sess_cache.values(), errors, "x48")
+
+        self.env.cr.commit()
+        log.records_created = created
+        log.records_skipped = skipped
+        log.set_errors(errors)
+        _logger.info("x48 POST: %s refund orders created, %s rows skipped, %s errors",
+                     created, skipped, len(errors))
 
     def _load_x53(self, profile, file_b64, log):
         self._stage_only(profile, file_b64, log, "X53 RTV: staged for vendor return mapping.")
