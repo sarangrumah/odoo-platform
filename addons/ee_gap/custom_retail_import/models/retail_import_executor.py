@@ -1213,8 +1213,183 @@ class RetailImportExecutor(models.AbstractModel):
     def _load_x70t(self, profile, file_b64, log):
         self._stage_only(profile, file_b64, log, "X70T settlement: staged for reconciliation (Phase 5 decision).")
 
+    def _x31_post_enabled(self):
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.x31_post_enabled", "0"
+        ) in ("1", "true", "True")
+
     def _load_x31(self, profile, file_b64, log):
-        self._stage_only(profile, file_b64, log, "X31 discount journal: staged for promo-accrual mapping (Phase 5).")
+        """Post X31 promo discounts as a contra-revenue reclassification when
+        ``retail_import.x31_post_enabled``; otherwise stage (legacy default)."""
+        data = profile.read_records(file_b64)
+        records = data["records"]
+        log.line_count = len(records)
+        if not records:
+            log.records_skipped = 0
+            return
+        row_to_line = self._persist_lines(log, records)
+        if self._x31_post_enabled():
+            self._post_x31(profile, records, log, row_to_line)
+        else:
+            log.records_skipped = len(records)
+            log.error_message = (
+                "X31 discount journal: staged (set retail_import.x31_post_enabled=1 to post)."
+            )
+            self.env["retail.import.line"].search([("log_id", "=", log.id)]).write({"state": "skipped"})
+            self.env.cr.commit()
+
+    def _x31_income_account(self, company, prod):
+        """The product's sale income account (the Gross Sales-<category> account X24
+        posts revenue to). Use the full POS/accounting resolution chain (product →
+        category → company fallback) via ``_get_product_accounts`` — the bare property
+        is often unset and relies on that fallback."""
+        p = prod.with_company(company)
+        acc = p.property_account_income_id or p.categ_id.property_account_income_categ_id
+        if not acc:
+            try:
+                acc = p._get_product_accounts().get("income")
+            except Exception:
+                acc = False
+        if not acc:
+            # Same generic fallback POS uses at close for products with no income
+            # account (Gross Sales - Others), so the reclass grosses up the account
+            # X24 actually credited.
+            Account = self.env["account.account"].sudo().with_company(company)
+            acc = (Account.search([("account_type", "=", "income"),
+                                   ("name", "ilike", "gross sales"), ("name", "ilike", "other")], limit=1)
+                   or Account.search([("account_type", "=", "income"),
+                                      ("name", "ilike", "gross sales")], limit=1))
+        return acc
+
+    def _x31_discount_account(self, company, income_acct):
+        """Category Sales-Discount contra account matching a Gross Sales income account
+        (textile / footwear / accessories / miscellaneous)."""
+        Account = self.env["account.account"].sudo().with_company(company)
+        nm = (income_acct.name or "").lower()
+        kw = ("textile" if "textile" in nm else
+              "footwear" if ("footwear" in nm or "shoe" in nm) else
+              "accessor" if "access" in nm else "misc")
+        return (Account.search([("name", "ilike", "sales discount"), ("name", "ilike", kw)], limit=1)
+                or Account.search([("name", "ilike", "sales discount"), ("name", "ilike", "misc")], limit=1)
+                or Account.search([("name", "ilike", "sales discount")], limit=1))
+
+    def _post_x31(self, profile, records, log, row_to_line):
+        """Post X31 promo discounts as a NET-NEUTRAL contra-revenue reclassification:
+        per category, Dr ``Sales Discount-<cat>`` / Cr ``Gross Sales-<cat>`` for the
+        ex-VAT discount. This grosses revenue back up to list price and books the
+        discount as a category contra-revenue, so the P&L shows gross sales + discounts
+        by category WITHOUT double-counting X24's net sales (X24 stays unchanged).
+        One journal entry per import, dated at the latest discount date; idempotent via
+        the whole-file guard + an ``x31entry_<log>`` xid."""
+        ns = profile.namespace
+        company = profile.company_id
+        Product = self.env["product.product"]
+
+        prior = self.env["retail.import.log"].search(
+            [("profile_id", "=", profile.id), ("state", "=", "imported"), ("id", "!=", log.id)], limit=1
+        )
+        if prior:
+            raise UserError(
+                _("X31 already posted (log #%s). Archive it before re-posting to avoid duplicate reclass.")
+                % prior.id
+            )
+        # Dedicated journal so the (period-dated) reclass is not bumped to today by
+        # Odoo's sequence-date monotonicity against unrelated later moves in MISC.
+        Journal = self.env["account.journal"].sudo()
+        journal = Journal.search([("code", "=", "RIADJ"), ("company_id", "=", company.id)], limit=1)
+        if not journal:
+            journal = Journal.create({
+                "name": "Retail Import Adjustments", "code": "RIADJ",
+                "type": "general", "company_id": company.id,
+            })
+        tax = self._x24_resolve_tax()
+        rate_val = (tax.amount / 100.0) if tax else 0.0
+
+        prod_cache, by_pair, dates, ok_rows, errors = {}, defaultdict(float), [], [], []
+        skipped = 0
+        for r in records:
+            code = str(r.get("product_code") or "").strip()
+            disc = float(profile._parse_amount(r.get("discount_amount")) or 0)
+            if not disc or not code:
+                skipped += 1
+                continue
+            if code not in prod_cache:
+                prod_cache[code] = Product.search([("default_code", "=", code)], limit=1)
+            prod = prod_cache[code]
+            inc = self._x31_income_account(company, prod) if prod else False
+            dacc = self._x31_discount_account(company, inc) if inc else False
+            if not prod or not inc or not dacc:
+                skipped += 1
+                rn = r.get("_row")
+                if rn in row_to_line:
+                    row_to_line[rn].write({
+                        "state": "error",
+                        "error_message": (f"X31: unpostable (product/income/discount acct) code={code}")[:250],
+                    })
+                errors.append((r.get("_row"), f"X31: no income/discount account for {code}"))
+                continue
+            by_pair[(inc.id, dacc.id)] += disc / (1.0 + rate_val)
+            raw_dt = str(r.get("trans_date") or "").strip()
+            d = profile._parse_date(raw_dt)
+            if not d and raw_dt:
+                try:
+                    d = datetime.strptime(raw_dt[:10], "%Y-%m-%d").date()
+                except ValueError:
+                    d = None
+            if d:
+                dates.append(d)
+            ok_rows.append(r.get("_row"))
+
+        if not by_pair:
+            log.records_skipped = len(records)
+            log.error_message = "X31: no postable discounts (no resolvable products / amounts)."
+            self.env.cr.commit()
+            return
+
+        line_ids = []
+        for (inc_id, dacc_id), amt in by_pair.items():
+            amt = round(amt, 2)
+            line_ids.append((0, 0, {"account_id": dacc_id, "debit": amt, "credit": 0.0,
+                                    "name": "POS promo discount (X31)"}))
+            line_ids.append((0, 0, {"account_id": inc_id, "debit": 0.0, "credit": amt,
+                                    "name": "POS promo discount gross-up (X31)"}))
+        gl_date = max(dates) if dates else datetime.now().date()
+        move = self.env["account.move"].create({
+            "move_type": "entry", "journal_id": journal.id, "date": gl_date,
+            "ref": f"X31 promo discount reclass (log {log.id})", "line_ids": line_ids,
+        })
+        move.action_post()
+        # Odoo bumps a past-dated entry to today on post (sequence-date monotonicity).
+        # Re-stamp the move + lines to the discount period via SQL within the same
+        # fiscal year, aligning the sequence name's month so it stays consistent.
+        try:
+            if gl_date and move.date and gl_date.year == move.date.year and gl_date != move.date:
+                newname = move.name
+                mtag = "/%02d/" % move.date.month
+                if newname and mtag in newname:
+                    cand = newname.replace(mtag, "/%02d/" % gl_date.month)
+                    if not self.env["account.move"].search_count(
+                        [("journal_id", "=", journal.id), ("name", "=", cand), ("id", "!=", move.id)]):
+                        newname = cand
+                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s",
+                                    (gl_date, newname, move.id))
+                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s",
+                                    (gl_date, move.id))
+                move.invalidate_recordset(["date", "name"])
+                move.line_ids.invalidate_recordset(["date"])
+        except Exception as be:
+            _logger.warning("x31 POST: backdate skipped: %s", be)
+        self._xid_set(ns, self._safe_xid("x31entry_", str(log.id)), "account.move", move.id)
+        for rn in ok_rows:
+            if rn in row_to_line:
+                row_to_line[rn].write({"state": "ok", "target_model": "account.move",
+                                       "target_res_id": move.id})
+        log.records_created = 1
+        log.records_skipped = skipped
+        log.set_errors(errors)
+        self.env.cr.commit()
+        _logger.info("x31 POST: reclass move %s posted (%s categories, %s rows, %s skipped)",
+                     move.name, len(by_pair), len(ok_rows), skipped)
 
     def _load_x32p(self, profile, file_b64, log):
         self._stage_only(profile, file_b64, log, "X32P stock movement: reference/audit only (not replayed; see plan).")
