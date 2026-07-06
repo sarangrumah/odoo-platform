@@ -75,6 +75,47 @@ docker exec -i odoo19-platform-odoo-mgmt odoo shell -d demo_levis --no-http < sc
 expense/valuation/variation/journal account to the right EBR branch (unknown roots →
 `misc`). Both re-runnable; `33` no-ops once every category is complete.
 
+### 6. EBR finance load (TB + GL) from the monthly "For Upload to Odoo" workbook
+Source: `YYYY-MM - EBR - TB and GL For Upload to Odoo.xlsx` (sheets: `CoA EBR`,
+`Trial Balance EBR 2026`, `GL EBR 2026`, plus subledgers). **Verified end-to-end on
+`rnd_levis` — all 101 TB accounts reconcile to the sheet's June ending balances (0 diff).**
+
+**a. Export the workbook to CSVs (HOST, needs openpyxl):**
+```
+python scripts/tenants/levis/59_export_ebr.py "<path>/2026-06 - EBR - TB and GL For Upload to Odoo.xlsx"
+# -> ebr_coa.csv, tb_ebr.csv, gl_ebr.csv  (next to the script)
+```
+`59` adds a small SUPPLEMENT for accounts the TB references but the CoA sheet omits
+(e.g. `1117400001` Tax Deposit).
+
+**b. Chart of accounts** — stage `ebr_coa.csv` as `/tmp/ebr_coa.csv` and run the
+existing reconciler (adds missing, preserves operational, aligns names):
+```
+docker cp scripts/tenants/levis/ebr_coa.csv odoo19-platform-odoo:/tmp/ebr_coa.csv
+docker exec -i odoo19-platform-odoo odoo shell -d rnd_levis --no-http < scripts/tenants/levis/30_fix_coa.py
+```
+
+**c. Trial balance (summary)** — opening move (2026-01-01) + one summary movement move
+per month, into a dedicated `EBRTB` journal. Idempotent; **auto-lifts and restores the
+company `fiscalyear_lock_date`** (which otherwise silently bumps backdated entries to today):
+```
+docker cp scripts/tenants/levis/tb_ebr.csv odoo19-platform-odoo:/tmp/levis/tb_ebr.csv
+docker exec -i -e TB_DRY=1 odoo19-platform-odoo odoo shell -d rnd_levis --no-http < scripts/tenants/levis/60_load_tb.py  # dry-run
+docker exec -i          odoo19-platform-odoo odoo shell -d rnd_levis --no-http < scripts/tenants/levis/60_load_tb.py  # commit
+```
+Flags: `TB_OPENING_ONLY=1` (opening move only, then go live natively), `TB_DRY=1` (roll back).
+
+**d. General ledger (detail)** — `61_load_gl.py` groups the GL by Document No into one
+balanced `account.move` per voucher (store→analytic, business partner, journal by
+Transaction Type). **BLOCKED:** the current `GL EBR 2026` sheet is *single-sided* (each
+row is one leg only, no contra account, <5% have a Document No) so no voucher balances —
+a `GL_DRY=1` run skips all 1461 rows. Needs a corrected **2-sided** export from the EBR/SAP
+team. Fallback `GL_ALLOW_FALLBACK=1` synthesizes contra legs from `CONTRA_MAP` per
+Transaction Type — **confirm the map with finance first.** Flags: `GL_DRY=1`, `GL_LIMIT=<n>`.
+
+Reconcile after (c): `sum(debit-credit)` per account (date ≤ month-end) must equal the
+sheet's Ending Balance column. Repeat the whole sequence on `prd_levis`, then `prd_detail_levis`.
+
 ## Track B (module) — Excel/CSV wizard + SFTP feed
 After adding `openpyxl`+`paramiko` to `odoo/requirements.txt` and rebuilding the
 image, install `custom_retail_import` on `levis`. Then:
