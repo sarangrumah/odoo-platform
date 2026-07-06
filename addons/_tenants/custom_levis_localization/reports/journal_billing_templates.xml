@@ -138,8 +138,14 @@
                 </tr>
                 <tr style="height: 55px;"><td/><td/></tr>
                 <tr>
-                    <td style="padding: 4px; border-top: 1px solid #000;" t-out="o.create_uid.name or ''"/>
-                    <td style="padding: 4px; border-top: 1px solid #000;">&#160;</td>
+                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;" t-out="o.create_uid.name or ''"/>
+                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">&#160;</td>
+                </tr>
+                <!-- Approval-matrix designation (feedback Finance-AP #2):
+                     Approved by = ASST MGR / MANAGER. -->
+                <tr style="font-size: 9px; color: #555;">
+                    <td style="padding: 0 4px 4px;">&#160;</td>
+                    <td style="padding: 0 4px 4px;">ASST MGR / MANAGER</td>
                 </tr>
             </table>
         </div>
