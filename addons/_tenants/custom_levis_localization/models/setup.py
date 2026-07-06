@@ -68,6 +68,30 @@ def _ensure_payable(account):
         account.write(fix)
 
 
+def _ensure_grir_current(account):
+    """Coerce a GR/IR clearing account to current-liability + reconcilable.
+
+    GR/IR clearing is used on vendor-bill product lines (Dr GR/IR / Cr AP) to net
+    the goods-receipt accrual. Core ``_check_payable_receivable`` forbids a
+    ``liability_payable`` account on an invoice line that has no due date, so a
+    clearing account imported as payable blocks bill posting. It must be a plain
+    current liability (it carries no due date) but stay reconcilable so the
+    receipt credit and the bill debit can be matched. Returns True if changed.
+    """
+    if not account:
+        return False
+    fix = {}
+    if account.account_type != "liability_current":
+        fix["account_type"] = "liability_current"
+    if not account.reconcile:
+        fix["reconcile"] = True
+    if fix:
+        _logger.info("Levi's Trade/OU: coercing GR/IR account %s -> %s", account.code, fix)
+        account.write(fix)
+        return True
+    return False
+
+
 def _ensure_ou_plan(env):
     Plan = env["account.analytic.plan"]
     plan = Plan.search([("name", "=", OU_PLAN_NAME)], limit=1)
@@ -280,8 +304,32 @@ def seed_trade_ou(env):
             # already-mapped accounts are also normalised.
             _ensure_payable(mapping.payable_account_id)
 
+    # GR/IR clearing accounts used on vendor-bill product lines must be current
+    # liabilities, not payable, or core's due-date rule blocks bill posting.
+    # Non-trade uses the mapping's grir account; trade uses each real-time
+    # product category's stock-variation account. The EBR CoA imported the
+    # per-category trade GR/IR accounts as payable — normalise them here. Runs
+    # every time so already-configured accounts are also corrected.
+    made_grir = 0
+    Category = env["product.category"]
+    for company in companies:
+        for mapping in AccountMap.search([("company_id", "=", company.id)]):
+            if _ensure_grir_current(mapping.grir_account_id):
+                made_grir += 1
+        seen = set()
+        cats = Category.with_company(company).search(
+            [("property_valuation", "=", "real_time")]
+        )
+        for categ in cats:
+            acc = categ.account_stock_variation_id
+            if acc and acc.id not in seen:
+                seen.add(acc.id)
+                if _ensure_grir_current(acc):
+                    made_grir += 1
+
     _logger.info(
-        "Levi's Trade/OU seeding: %d analytic, %d journals, %d mappings",
-        made_analytic, made_journal, made_map,
+        "Levi's Trade/OU seeding: %d analytic, %d journals, %d mappings, %d GR/IR normalised",
+        made_analytic, made_journal, made_map, made_grir,
     )
-    return {"analytic": made_analytic, "journals": made_journal, "mappings": made_map}
+    return {"analytic": made_analytic, "journals": made_journal,
+            "mappings": made_map, "grir_normalised": made_grir}

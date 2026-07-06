@@ -56,7 +56,14 @@ class AccountMoveLine(models.Model):
                 # set (non-trade), else the category's stock-variation account
                 # (trade keeps its per-category GR/IR).
                 grir_acc = self.browse()
-                if gr_accrual_active and line.product_id.is_storable:
+                # Gate on the SAME condition as the receipt-side GR journal
+                # (stock_move.py::_levis_book_valuation_entry): the product's
+                # category is real-time. NOT on ``is_storable`` — the imported
+                # Levi's catalog is entirely ``type='consu', is_storable=False``
+                # yet still real-time valued, so an ``is_storable`` gate never
+                # fired and the accrual never netted (bill hit COGS instead of
+                # GR/IR). Services carry no stock move / GR accrual, so exclude.
+                if gr_accrual_active and line.product_id.type == "consu":
                     categ = line.product_id.categ_id.with_company(move.company_id)
                     if categ.property_valuation == "real_time":
                         grir_acc = mapping.grir_account_id or categ.account_stock_variation_id
