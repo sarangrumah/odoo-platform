@@ -102,9 +102,9 @@ def _ensure_partner_bank(env, company, acc_number):
     return pb
 
 
-def _ensure_method_line(env, journal, code, payment_type, outstanding_account):
-    """Ensure ``journal`` offers the payment method ``code`` for ``payment_type``
-    and route its outstanding account. No-op if the method is not installed."""
+def _ensure_method_line(env, journal, code, payment_type):
+    """Ensure ``journal`` offers the payment method ``code`` for ``payment_type``.
+    No-op if the method is not installed."""
     method = env["account.payment.method"].search(
         [("code", "=", code), ("payment_type", "=", payment_type)], limit=1
     )
@@ -116,11 +116,19 @@ def _ensure_method_line(env, journal, code, payment_type, outstanding_account):
         limit=1,
     )
     if not line:
-        line = Line.create(
-            {"journal_id": journal.id, "payment_method_id": method.id}
-        )
-    if outstanding_account and line.payment_account_id != outstanding_account:
-        line.payment_account_id = outstanding_account.id
+        Line.create({"journal_id": journal.id, "payment_method_id": method.id})
+
+
+def _set_all_outstanding(journal, account):
+    """Point EVERY payment method line (both directions) of ``journal`` at
+    ``account`` so no line silently falls back to the company default outstanding
+    account. Keeps each bank journal internally consistent: the bank-out journal
+    stays direct-to-bank on any line, a bank-in journal stays on its clearing
+    account on any line."""
+    lines = journal.inbound_payment_method_line_ids | journal.outbound_payment_method_line_ids
+    for line in lines:
+        if line.payment_account_id != account:
+            line.payment_account_id = account.id
 
 
 def _ensure_bank_journal(env, company, name, mb_account, partner_bank, base_code):
@@ -167,7 +175,9 @@ def seed_bank_journals(env):
                 env, company, name, mb, pb, ("O" + BANK_OUT["bank"])[:5]
             )
             for code in OUT_METHODS:
-                _ensure_method_line(env, journal, code, "outbound", mb)
+                _ensure_method_line(env, journal, code, "outbound")
+            # Direct-to-bank on EVERY line (both directions): no outstanding suspense.
+            _set_all_outstanding(journal, mb)
             made += 1
 
         # Bank IN — receipts land in the per-bank IC clearing (suspense) account
@@ -182,7 +192,10 @@ def seed_bank_journals(env):
                 env, company, name, mb, pb, ("I" + entry["bank"])[:5]
             )
             for code in IN_METHODS:
-                _ensure_method_line(env, journal, code, "inbound", ic)
+                _ensure_method_line(env, journal, code, "inbound")
+            # Route EVERY line (both directions) to the per-bank IC clearing
+            # (suspense) account so a stray outbound line can't leak to a default.
+            _set_all_outstanding(journal, ic)
             made += 1
 
     _logger.info("Levi's bank journals seeded/verified: %d", made)
