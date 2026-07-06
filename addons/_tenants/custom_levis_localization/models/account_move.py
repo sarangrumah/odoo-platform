@@ -13,9 +13,16 @@ declarative and never crashes on a DB where a field is absent.
 
 from __future__ import annotations
 
-from odoo import fields, models
+from datetime import datetime, timedelta
+
+from dateutil.relativedelta import relativedelta
+
+from odoo import api, fields, models
 
 from .terbilang import terbilang_id
+
+BILL_TRADE_SEQ = "account.move.levis.bill.trade"
+BILL_NONTRADE_SEQ = "account.move.levis.bill.nontrade"
 
 
 class AccountMove(models.Model):
@@ -30,6 +37,85 @@ class AccountMove(models.Model):
         help="Trade / Non-Trade stream carried from the purchase order; selects "
         "the payable account on this bill.",
     )
+
+    # ------------------------------------------------------------------
+    # Trade / Non-Trade vendor-bill numbering (Finance-AP #8 / Accounting #16)
+    # ------------------------------------------------------------------
+    # Vendor bills carry an l10n_purchase_type and post to the store's shared
+    # purchase journal. To keep Trade and Non-Trade on separate, monthly-reset
+    # counters (BILL/EBR/... vs BILL/NT/EBR/...) we bypass the sequence.mixin and
+    # draw from our own ir.sequence, exactly like the PO numbering. On DBs where
+    # the tenant sequences are absent, or for moves without a purchase type
+    # (customer invoices, manual entries), core numbering is used unchanged.
+    def _levis_wants_bill_number(self):
+        self.ensure_one()
+        return (
+            self.move_type in ("in_invoice", "in_refund")
+            and bool(self.l10n_purchase_type)
+        )
+
+    def _levis_next_bill_number(self):
+        """Next monthly-reset bill number for this move's purchase type.
+
+        Mirrors ``purchase.order._levis_next_po_number``: native ir.sequence date
+        ranges are yearly, so a monthly ``ir.sequence.date_range`` is ensured for
+        the effective date before the counter is drawn. Returns ``False`` when the
+        tenant sequence is absent (non-Levi's DBs keep core numbering).
+        """
+        self.ensure_one()
+        code = BILL_TRADE_SEQ if self.l10n_purchase_type == "trade" else BILL_NONTRADE_SEQ
+        company = self.company_id or self.env.company
+        seq = self.env["ir.sequence"].sudo().search(
+            [("code", "=", code), ("company_id", "in", [company.id, False])],
+            order="company_id",
+            limit=1,
+        )
+        if not seq:
+            return False
+        dt = self.date or self.invoice_date or fields.Date.today()
+        if isinstance(dt, datetime):
+            dt = dt.date()
+        DateRange = self.env["ir.sequence.date_range"].sudo()
+        rng = DateRange.search(
+            [
+                ("sequence_id", "=", seq.id),
+                ("date_from", "<=", dt),
+                ("date_to", ">=", dt),
+            ],
+            limit=1,
+        )
+        if not rng:
+            first = dt.replace(day=1)
+            last = first + relativedelta(months=1) - timedelta(days=1)
+            DateRange.create(
+                {"sequence_id": seq.id, "date_from": first, "date_to": last}
+            )
+        return seq.next_by_id(sequence_date=dt)
+
+    # Re-declaring @api.depends REPLACES the inherited set, so mirror core's
+    # dependencies exactly (see account.move._compute_name) plus l10n_purchase_type.
+    @api.depends(
+        "posted_before", "state", "journal_id", "date", "move_type",
+        "origin_payment_id", "l10n_purchase_type",
+    )
+    def _compute_name(self):
+        # Assign the Levi's Trade/Non-Trade bill number for qualifying moves that
+        # are leaving draft without a name yet, then exclude them from core so the
+        # sequence.mixin (which would otherwise re-detect the format or reset the
+        # name to match the date) never touches a move we have numbered.
+        numbered = self.browse()
+        for move in self:
+            if (
+                move.state != "draft"
+                and (not move.name or move.name == "/")
+                and (move.date or move.invoice_date)
+                and move._levis_wants_bill_number()
+            ):
+                number = move._levis_next_bill_number()
+                if number:
+                    move.name = number
+                    numbered |= move
+        super(AccountMove, self - numbered)._compute_name()
 
     # ------------------------------------------------------------------
     # Small helpers

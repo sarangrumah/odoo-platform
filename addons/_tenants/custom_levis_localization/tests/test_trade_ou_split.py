@@ -28,10 +28,15 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
             "account_type": "liability_payable",
             "reconcile": True,
         })
+        # GR/IR clearing is a current-liability control account in the real EBR
+        # chart (e.g. "GR/IR clearing-Non Trade Payables", account_type
+        # liability_current, reconcilable) — NOT a liability_payable subtype, so
+        # product lines routed here on a bill don't trip the payable due-date rule.
         cls.grir_nontrade = Account.create({
             "name": "GR/IR Non Trade",
             "code": "NTGRIR01",
-            "account_type": "liability_payable",
+            "account_type": "liability_current",
+            "reconcile": True,
         })
 
         # --- Valuation wiring: valuation acct -> trade GR/IR variation ---
@@ -41,7 +46,7 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         })
         cls.grir_trade = Account.create({
             "name": "GR/IR Trade-textile", "code": "TGRIR01",
-            "account_type": "liability_payable",
+            "account_type": "liability_current", "reconcile": True,
         })
         cls.stock_valuation.account_stock_variation_id = cls.grir_trade.id
         cls.stock_journal = cls.env["account.journal"].create({
@@ -146,6 +151,14 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         po.action_create_invoice()
         bill = po.invoice_ids
         bill.invoice_date = fields.Date.context_today(bill)
+        bill.action_post()
+        return bill
+
+    def _bill_dated(self, po, date_str):
+        po.action_create_invoice()
+        bill = po.invoice_ids
+        # both the invoice date and the accounting date drive the monthly counter
+        bill.write({"invoice_date": date_str, "date": date_str})
         bill.action_post()
         return bill
 
@@ -254,6 +267,67 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
         self.assertEqual(bill.state, "posted")
         self.assertEqual(prod_line.account_id, self.nt_expense)
+
+    # ------------------------------------------------------------------
+    # 8. Vendor bill clears the GR/IR accrual (Dr GR/IR clearing / Cr AP)
+    #    — storable, real-time product. Bill must debit the SAME GR/IR
+    #    account the receipt credited so the accrual nets to zero, instead
+    #    of posting COGS/expense against AP (the reported bug).
+    # ------------------------------------------------------------------
+    def _grir_balance(self, account):
+        return sum(self.env["account.move.line"].search([
+            ("account_id", "=", account.id),
+            ("parent_state", "=", "posted"),
+        ]).mapped("balance"))
+
+    def test_08_bill_clears_grir_trade(self):
+        bill = self._bill(self._trade_po_received())
+        prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
+        # bill debits the same GR/IR account the receipt credited (per-category)
+        self.assertEqual(prod_line.account_id, self.grir_trade)
+        # GR/IR nets to zero across receipt (Cr) + bill (Dr)
+        self.assertAlmostEqual(self._grir_balance(self.grir_trade), 0.0, places=2)
+
+    def test_09_bill_clears_grir_nontrade(self):
+        bill = self._bill(self._nontrade_po_received())
+        prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
+        # non-trade routes to the mapping's GR/IR account on both legs
+        self.assertEqual(prod_line.account_id, self.grir_nontrade)
+        self.assertAlmostEqual(self._grir_balance(self.grir_nontrade), 0.0, places=2)
+
+    # ------------------------------------------------------------------
+    # 11. Vendor-bill numbering: BILL/EBR (trade) vs BILL/NT/EBR (non-trade),
+    #     monthly reset, independent counters. (Finance-AP #8 / Accounting #16)
+    # ------------------------------------------------------------------
+    def test_11_bill_numbering_prefixes_and_reset(self):
+        # Two trade bills in Jul, one non-trade in Jul, one trade in Aug.
+        t1 = self._bill_dated(self._trade_po_received(), "2026-07-05")
+        t2 = self._bill_dated(self._trade_po_received(), "2026-07-20")
+        nt1 = self._bill_dated(self._nontrade_po_received(), "2026-07-10")
+        aug = self._bill_dated(self._trade_po_received(), "2026-08-03")
+
+        self.assertTrue(t1.name.startswith("BILL/EBR/2026/07/"), t1.name)
+        self.assertTrue(nt1.name.startswith("BILL/NT/EBR/2026/07/"), nt1.name)
+        # 5-digit padding
+        self.assertEqual(len(t1.name.split("/")[-1]), 5)
+        # consecutive within the same month + stream, independent of non-trade
+        self.assertEqual(int(t1.name.split("/")[-1]) + 1, int(t2.name.split("/")[-1]))
+        # monthly reset for the trade stream
+        self.assertTrue(aug.name.startswith("BILL/EBR/2026/08/"), aug.name)
+        self.assertEqual(int(aug.name.split("/")[-1]), 1)
+
+    def test_10_periodic_mode_keeps_expense(self):
+        # suppress switch ON -> no per-receipt accrual, so the bill product line
+        # must NOT be routed to GR/IR (keeps native/category expense account).
+        self.env["ir.config_parameter"].sudo().set_param(
+            "custom_levis_localization.suppress_gr_journal", "1")
+        try:
+            bill = self._bill(self._trade_po_received())
+            prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
+            self.assertNotEqual(prod_line.account_id, self.grir_trade)
+        finally:
+            self.env["ir.config_parameter"].sudo().set_param(
+                "custom_levis_localization.suppress_gr_journal", "0")
 
     # ------------------------------------------------------------------
     # helpers
