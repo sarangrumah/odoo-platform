@@ -21,6 +21,23 @@ _logger = logging.getLogger(__name__)
 
 OU_PLAN_NAME = "Operating Unit"
 
+# --- Bank journals (feedback Finance-AP #4/#6/#7) ---------------------------
+# Resolved by company-dependent EBR account code (with_company). MB = the bank's
+# main GL account (journal default account). Bank-out posts DIRECT to the bank
+# account (no outstanding suspense); bank-in receipts land in the per-bank IC
+# clearing (suspense) account, cleared manually by Treasury.
+BANK_OUT = {"bank": "BCA", "rekening": "2687778282", "mb": "1103019320"}
+BANK_IN = [
+    {"bank": "BCA", "rekening": "2685151268", "mb": "1103019310", "ic": "1103019311"},
+    {"bank": "Mandiri", "rekening": "1680008812008", "mb": "1103019330", "ic": "1103019331"},
+    {"bank": "BNI", "rekening": "7898989920", "mb": "1103019340", "ic": "1103019341"},
+    {"bank": "BRI", "rekening": "001901888305302", "mb": "1103019350", "ic": "1103019351"},
+]
+# Methods offered per direction (CHECK = check_printing, only if that module is
+# installed; missing methods are skipped silently).
+OUT_METHODS = ("manual", "bank_transfer", "giro", "check_printing")
+IN_METHODS = ("manual", "bank_transfer", "giro")
+
 # Account codes in the EBR chart of accounts (company-dependent → resolve with
 # ``with_company``). Trade GR/IR stays per product category, so no code here.
 ACCOUNT_CODES = {
@@ -70,6 +87,106 @@ def _unique_journal_code(env, company, base):
         n += 1
         code = ("%s%d" % (base[:4], n))[:5]
     return code
+
+
+def _ensure_partner_bank(env, company, acc_number):
+    Bank = env["res.partner.bank"]
+    partner = company.partner_id
+    pb = Bank.search(
+        [("acc_number", "=", acc_number), ("partner_id", "=", partner.id)], limit=1
+    )
+    if not pb:
+        pb = Bank.create(
+            {"acc_number": acc_number, "partner_id": partner.id, "company_id": company.id}
+        )
+    return pb
+
+
+def _ensure_method_line(env, journal, code, payment_type, outstanding_account):
+    """Ensure ``journal`` offers the payment method ``code`` for ``payment_type``
+    and route its outstanding account. No-op if the method is not installed."""
+    method = env["account.payment.method"].search(
+        [("code", "=", code), ("payment_type", "=", payment_type)], limit=1
+    )
+    if not method:
+        return
+    Line = env["account.payment.method.line"]
+    line = Line.search(
+        [("journal_id", "=", journal.id), ("payment_method_id", "=", method.id)],
+        limit=1,
+    )
+    if not line:
+        line = Line.create(
+            {"journal_id": journal.id, "payment_method_id": method.id}
+        )
+    if outstanding_account and line.payment_account_id != outstanding_account:
+        line.payment_account_id = outstanding_account.id
+
+
+def _ensure_bank_journal(env, company, name, mb_account, partner_bank, base_code):
+    Journal = env["account.journal"]
+    journal = Journal.search(
+        [
+            ("type", "=", "bank"),
+            ("company_id", "=", company.id),
+            ("bank_account_id", "=", partner_bank.id),
+            ("name", "=", name),
+        ],
+        limit=1,
+    )
+    if not journal:
+        journal = Journal.create(
+            {
+                "name": name,
+                "type": "bank",
+                "code": _unique_journal_code(env, company, base_code),
+                "company_id": company.id,
+                "default_account_id": mb_account.id,
+                "bank_account_id": partner_bank.id,
+            }
+        )
+    return journal
+
+
+def seed_bank_journals(env):
+    """Create/configure the Levi's bank journals from the EBR chart.
+
+    Idempotent (guarded by journal name + bank account). One bank-out journal
+    (direct-to-bank) and one bank-in journal per rekening (IC suspense). Runs
+    from the post_init hook and ``scripts/tenants/levis/50_setup_bank_journals.py``.
+    """
+    companies = env["stock.warehouse"].search([]).mapped("company_id") or env.company
+    made = 0
+    for company in companies:
+        # Bank OUT — vendor payments post DIRECT to the bank account (no suspense)
+        mb = _find_account(env, company, BANK_OUT["mb"])
+        if mb:
+            pb = _ensure_partner_bank(env, company, BANK_OUT["rekening"])
+            name = "Bank %s - %s (Out)" % (BANK_OUT["bank"], BANK_OUT["rekening"])
+            journal = _ensure_bank_journal(
+                env, company, name, mb, pb, ("O" + BANK_OUT["bank"])[:5]
+            )
+            for code in OUT_METHODS:
+                _ensure_method_line(env, journal, code, "outbound", mb)
+            made += 1
+
+        # Bank IN — receipts land in the per-bank IC clearing (suspense) account
+        for entry in BANK_IN:
+            mb = _find_account(env, company, entry["mb"])
+            ic = _find_account(env, company, entry["ic"])
+            if not mb:
+                continue
+            pb = _ensure_partner_bank(env, company, entry["rekening"])
+            name = "Bank %s - %s" % (entry["bank"], entry["rekening"])
+            journal = _ensure_bank_journal(
+                env, company, name, mb, pb, ("I" + entry["bank"])[:5]
+            )
+            for code in IN_METHODS:
+                _ensure_method_line(env, journal, code, "inbound", ic)
+            made += 1
+
+    _logger.info("Levi's bank journals seeded/verified: %d", made)
+    return {"bank_journals": made}
 
 
 def seed_trade_ou(env):

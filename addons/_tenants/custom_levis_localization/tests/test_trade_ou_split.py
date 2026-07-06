@@ -316,6 +316,23 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         self.assertTrue(aug.name.startswith("BILL/EBR/2026/08/"), aug.name)
         self.assertEqual(int(aug.name.split("/")[-1]), 1)
 
+    # ------------------------------------------------------------------
+    # 12. Bank payment numbering: <last-4 of rekening>/YYYY/MM/### (Finance-AP #9)
+    # ------------------------------------------------------------------
+    def test_12_bank_payment_numbering(self):
+        partner_bank = self.env['res.partner.bank'].create({
+            'acc_number': '2687778282', 'partner_id': self.company.partner_id.id})
+        bankj = self.env['account.journal'].create({
+            'name': 'Bank Out Test', 'type': 'bank', 'code': 'BKOT',
+            'company_id': self.company.id, 'bank_account_id': partner_bank.id})
+        bill = self._bill(self._trade_po_received())
+        reg = self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=bill.ids).create({
+                'journal_id': bankj.id, 'payment_date': '2026-07-15'})
+        pay = reg._create_payments()
+        # last-4 of 2687778282 = 8282, monthly-reset 3-digit counter
+        self.assertRegex(pay.move_id.name or '', r'^8282/2026/07/\d{3}$')
+
     def test_10_periodic_mode_keeps_expense(self):
         # suppress switch ON -> no per-receipt accrual, so the bill product line
         # must NOT be routed to GR/IR (keeps native/category expense account).
