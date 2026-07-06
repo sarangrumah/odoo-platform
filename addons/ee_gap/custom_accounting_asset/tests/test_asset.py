@@ -507,6 +507,54 @@ class TestCustomFixedAsset(TransactionCase):
         self.assertAlmostEqual(surplus_line.credit, 1000.0, places=2)
         self.assertAlmostEqual(asset_line.debit, 4000.0, places=2)
 
+    def test_14_reverse_depreciation_line(self):
+        # Reverse a posted depreciation line: status flips to reversed/unposted,
+        # NBV recomputes, and the line is not re-posted by the schedule.
+        asset = self._make_asset()
+        asset.action_confirm()
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))  # 3 posted, NBV 9000
+        self.assertAlmostEqual(asset.net_book_value, 9000.0, places=2)
+        line = asset.depreciation_line_ids.filtered("posted").sorted("sequence")[-1]
+
+        line.action_reverse()
+        self.assertFalse(line.posted)
+        self.assertTrue(line.reversed)
+        # accumulated drops one month (2000) and NBV restored to 10000
+        self.assertAlmostEqual(asset.accumulated_depreciation, 2000.0, places=2)
+        self.assertAlmostEqual(asset.net_book_value, 10000.0, places=2)
+        # a later schedule run must NOT re-post the reversed line
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))
+        self.assertFalse(line.posted)
+        self.assertTrue(line.reversed)
+        # reversing an unposted line is rejected
+        with self.assertRaises(UserError):
+            line.action_reverse()
+
+    def test_15_external_move_delete_and_draft_self_heal(self):
+        # Deleting / drafting the depreciation entry directly in Accounting must
+        # un-post the line so NBV recomputes and the period can be re-posted
+        # (feedback Accounting #4/#20).
+        asset = self._make_asset()
+        asset.action_confirm()
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))  # 3 posted
+        line = asset.depreciation_line_ids.filtered("posted").sorted("sequence")[-1]
+        move = line.move_id
+
+        move.button_draft()
+        self.assertFalse(line.posted)  # draft self-heals
+        self.assertAlmostEqual(asset.accumulated_depreciation, 2000.0, places=2)
+
+        move.unlink()
+        self.assertFalse(line.posted)
+        self.assertFalse(line.move_id)
+        self.assertFalse(line.reversed)  # deletion -> repostable, not reversed
+
+        # schedule reposts the freed line and NBV returns to 9000
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))
+        self.assertTrue(line.posted)
+        self.assertTrue(line.move_id)
+        self.assertAlmostEqual(asset.accumulated_depreciation, 3000.0, places=2)
+
     def _mock_today(self, today):
         """Lightweight context manager that monkey-patches
         fields.Date.context_today for the duration of the with-block.

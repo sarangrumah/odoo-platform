@@ -23,7 +23,7 @@ Closes the EE 'account_asset' gap for Odoo CE. Provides:
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.4.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
