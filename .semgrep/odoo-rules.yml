@@ -16,6 +16,9 @@ rules:
           metavariable: $CR
           patterns:
             - pattern-regex: '^(cr|self\.env\.cr|self\.cr)$'
+      # Exclude the Odoo _auto=False report-view idiom: the only interpolation is
+      # {self._table}, the framework-controlled model table name (never user input).
+      - pattern-not-regex: 'CREATE OR REPLACE VIEW \{self\._table\}'
 
   - id: odoo-sql-injection-percent-format
     languages: [python]
@@ -24,6 +27,13 @@ rules:
       cr.execute() called with `%` string formatting — SQL injection risk.
     pattern: |
       $CR.execute("..." % ...)
+    # Dev/ops-only code paths: migrations and one-off tenant scripts run by admins
+    # with direct DB access, never on user input. Real request-path SQL still lives
+    # in addons/**/models and is fully covered.
+    paths:
+      exclude:
+        - "**/migrations/**"
+        - "scripts/**"
 
   - id: odoo-sudo-without-comment
     languages: [python]
