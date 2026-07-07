@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from . import res_company
 from . import levis_purchase_account_map
 from . import stock_warehouse
 from . import purchase_order

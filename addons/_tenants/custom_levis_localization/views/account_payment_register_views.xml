@@ -12,6 +12,13 @@
                     <field name="x_card_bin" placeholder="e.g. 400000"/>
                     <field name="x_mdr_bin_id" invisible="not x_mdr_bin_id"/>
                 </group>
+                <group string="Additional Info">
+                    <field name="l10n_ou_analytic_id" options="{'no_create': True}"/>
+                    <field name="l10n_override_outstanding_account_id"
+                           options="{'no_create': True}"/>
+                    <field name="l10n_note"/>
+                    <field name="l10n_remark"/>
+                </group>
                 <group string="Admin Fees"
                        invisible="not can_edit_wizard or (can_group_payments and not group_payment)">
                     <field name="admin_fee_line_ids" nolabel="1" colspan="2">

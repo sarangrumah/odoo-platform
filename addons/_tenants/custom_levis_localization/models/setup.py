@@ -226,6 +226,50 @@ def seed_bank_journals(env):
     return {"bank_journals": made}
 
 
+def _ensure_ho_analytic(env, company, plan):
+    """Ensure a Head-Office Operating-Unit analytic for ``company``.
+
+    Head Office is the company itself (no warehouse), so unlike the store OUs it
+    is keyed on the company. Idempotent: reuses the pointer or an existing
+    same-named analytic in the OU plan before creating one. Returns True if a new
+    analytic was created/linked.
+    """
+    if company.l10n_ho_analytic_id:
+        return False
+    Analytic = env["account.analytic.account"]
+    name = "%s - Head Office" % (company.name or "Head Office")
+    analytic = Analytic.search(
+        [("name", "=", name), ("plan_id", "=", plan.id),
+         ("company_id", "=", company.id)],
+        limit=1,
+    ) or Analytic.create({
+        "name": name,
+        "plan_id": plan.id,
+        "company_id": company.id,
+    })
+    company.l10n_ho_analytic_id = analytic.id
+    return True
+
+
+def _ensure_bill_sequence_prefix(env):
+    """Force the Trade vendor-bill sequence prefix to BILL/T/EBR/... on
+    already-installed DBs.
+
+    The sequence record is ``noupdate=1`` so the XML prefix change (BILL/EBR ->
+    BILL/T/EBR, symmetric with BILL/NT/EBR) does not reach existing levis DBs on
+    upgrade. Fix it here idempotently; the running counter is untouched.
+    """
+    seq = env["ir.sequence"].sudo().search(
+        [("code", "=", "account.move.levis.bill.trade")]
+    )
+    fixed = 0
+    for s in seq:
+        if s.prefix != "BILL/T/EBR/%(year)s/%(month)s/":
+            s.prefix = "BILL/T/EBR/%(year)s/%(month)s/"
+            fixed += 1
+    return fixed
+
+
 def seed_trade_ou(env):
     warehouses = env["stock.warehouse"].search([])
     if not warehouses:
@@ -233,6 +277,8 @@ def seed_trade_ou(env):
     plan = _ensure_ou_plan(env)
     Analytic = env["account.analytic.account"]
     Journal = env["account.journal"]
+
+    _ensure_bill_sequence_prefix(env)
 
     made_analytic = made_journal = 0
     for idx, wh in enumerate(warehouses, start=1):
@@ -272,6 +318,13 @@ def seed_trade_ou(env):
     # Trade / Non-Trade account mapping, one pair per company that has stores
     AccountMap = env["levis.purchase.account.map"]
     companies = warehouses.mapped("company_id") or env.company
+
+    # Head-Office Operating Unit — the company itself (no warehouse).
+    made_ho = 0
+    for company in companies:
+        if _ensure_ho_analytic(env, company, plan):
+            made_ho += 1
+
     made_map = 0
     for company in companies:
         for ptype, codes in ACCOUNT_CODES.items():
@@ -328,8 +381,10 @@ def seed_trade_ou(env):
                     made_grir += 1
 
     _logger.info(
-        "Levi's Trade/OU seeding: %d analytic, %d journals, %d mappings, %d GR/IR normalised",
-        made_analytic, made_journal, made_map, made_grir,
+        "Levi's Trade/OU seeding: %d analytic, %d HO, %d journals, %d mappings, "
+        "%d GR/IR normalised",
+        made_analytic, made_ho, made_journal, made_map, made_grir,
     )
-    return {"analytic": made_analytic, "journals": made_journal,
-            "mappings": made_map, "grir_normalised": made_grir}
+    return {"analytic": made_analytic, "head_office": made_ho,
+            "journals": made_journal, "mappings": made_map,
+            "grir_normalised": made_grir}
