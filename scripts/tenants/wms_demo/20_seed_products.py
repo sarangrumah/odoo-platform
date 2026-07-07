@@ -34,8 +34,7 @@ else:
     def xid_set(name, model, res_id):
         if IMD.search([("module", "=", NS), ("name", "=", name)], limit=1):
             return
-        IMD.create({"module": NS, "name": name, "model": model,
-                    "res_id": res_id, "noupdate": True})
+        IMD.create({"module": NS, "name": name, "model": model, "res_id": res_id, "noupdate": True})
 
     def xid_get(name):
         rec = IMD.search([("module", "=", NS), ("name", "=", name)], limit=1)
@@ -71,14 +70,14 @@ else:
     # Products. (name, default_code, brand, categ, abc, list_price, ean12, volume_m3)
     # ------------------------------------------------------------------
     PRODUCTS = [
-        ("Nike Air Zoom Pegasus",   "NK-PEG-42",  "NIKE",   cat_foot, "A", 1899000, "899000000001", 0.012),
-        ("Nike Court Vision Low",   "NK-CRT-41",  "NIKE",   cat_foot, "B", 1099000, "899000000002", 0.012),
-        ("Adidas Ultraboost 22",    "AD-ULT-42",  "ADIDAS", cat_foot, "A", 2799000, "899000000003", 0.012),
-        ("Adidas Samba OG",         "AD-SMB-43",  "ADIDAS", cat_foot, "B", 1599000, "899000000004", 0.012),
-        ("Puma RS-X",               "PM-RSX-42",  "PUMA",   cat_foot, "C", 1499000, "899000000005", 0.012),
-        ("Nike Dri-FIT Tee",        "NK-TEE-M",   "NIKE",   cat_appa, "B",  399000, "899000000006", 0.002),
-        ("Adidas Tiro Track Pant",  "AD-TIR-M",   "ADIDAS", cat_appa, "B",  699000, "899000000007", 0.003),
-        ("Puma Essentials Hoodie",  "PM-HOD-L",   "PUMA",   cat_appa, "C",  599000, "899000000008", 0.004),
+        ("Nike Air Zoom Pegasus", "NK-PEG-42", "NIKE", cat_foot, "A", 1899000, "899000000001", 0.012),
+        ("Nike Court Vision Low", "NK-CRT-41", "NIKE", cat_foot, "B", 1099000, "899000000002", 0.012),
+        ("Adidas Ultraboost 22", "AD-ULT-42", "ADIDAS", cat_foot, "A", 2799000, "899000000003", 0.012),
+        ("Adidas Samba OG", "AD-SMB-43", "ADIDAS", cat_foot, "B", 1599000, "899000000004", 0.012),
+        ("Puma RS-X", "PM-RSX-42", "PUMA", cat_foot, "C", 1499000, "899000000005", 0.012),
+        ("Nike Dri-FIT Tee", "NK-TEE-M", "NIKE", cat_appa, "B", 399000, "899000000006", 0.002),
+        ("Adidas Tiro Track Pant", "AD-TIR-M", "ADIDAS", cat_appa, "B", 699000, "899000000007", 0.003),
+        ("Puma Essentials Hoodie", "PM-HOD-L", "PUMA", cat_appa, "C", 599000, "899000000008", 0.004),
     ]
 
     created = 0
@@ -86,23 +85,25 @@ else:
         xid = "prod_" + code.lower().replace("-", "_")
         if xid_get(xid):
             continue
-        tmpl = Tmpl.create({
-            "name": name,
-            "default_code": code,
-            "barcode": ean13(ean12),
-            "categ_id": categ.id,
-            "type": "consu",
-            "is_storable": True,
-            "tracking": "lot",
-            "use_expiration_date": True,
-            "expiration_time": 720,   # informational shelf life (days)
-            "list_price": price,
-            "standard_price": round(price * 0.6),
-            "volume": vol,
-            "abc_class": abc,
-            # Brand (= storage section) is encoded in default_code prefix
-            # (NK-/AD-/PM-) and used by the putaway product_domain rules.
-        })
+        tmpl = Tmpl.create(
+            {
+                "name": name,
+                "default_code": code,
+                "barcode": ean13(ean12),
+                "categ_id": categ.id,
+                "type": "consu",
+                "is_storable": True,
+                "tracking": "lot",
+                "use_expiration_date": True,
+                "expiration_time": 720,  # informational shelf life (days)
+                "list_price": price,
+                "standard_price": round(price * 0.6),
+                "volume": vol,
+                "abc_class": abc,
+                # Brand (= storage section) is encoded in default_code prefix
+                # (NK-/AD-/PM-) and used by the putaway product_domain rules.
+            }
+        )
         xid_set(xid, "product.template", tmpl.id)
         created += 1
 

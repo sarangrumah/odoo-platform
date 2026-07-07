@@ -15,6 +15,4 @@ class TestRepairRework(TransactionCase):
         repair.action_set_rework()
         self.assertTrue(repair.x_returned)
         self.assertTrue(repair.x_return_date)
-        self.assertGreater(
-            len(repair.message_ids), msg_before, "a chatter message is posted"
-        )
+        self.assertGreater(len(repair.message_ids), msg_before, "a chatter message is posted")

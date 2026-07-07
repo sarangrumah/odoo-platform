@@ -26,8 +26,7 @@ class AgedReceivableWizard(models.TransientModel):
         string="Excel Detail",
         default="summary",
         required=True,
-        help="Detail = one row per open document (the PDF always prints the "
-        "per-partner summary).",
+        help="Detail = one row per open document (the PDF always prints the per-partner summary).",
     )
 
     def _build_filters(self):

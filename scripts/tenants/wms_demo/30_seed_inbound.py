@@ -26,8 +26,7 @@ MARKER = "wms_demo.inbound_seeded"
 
 
 def xid_get(name):
-    rec = env["ir.model.data"].search(
-        [("module", "=", NS), ("name", "=", name)], limit=1)
+    rec = env["ir.model.data"].search([("module", "=", NS), ("name", "=", name)], limit=1)
     return rec.res_id if rec else False
 
 
@@ -46,14 +45,17 @@ else:
     # Vendor -----------------------------------------------------------
     vendor = Partner.search([("name", "=", "PT Sport Global Distribusi")], limit=1)
     if not vendor:
-        vendor = Partner.create({
-            "name": "PT Sport Global Distribusi",
-            "company_type": "company",
-            "supplier_rank": 1,
-            "email": "vendor@sportglobal.example",
-        })
-        IMD.create({"module": NS, "name": "vendor_sport_global",
-                    "model": "res.partner", "res_id": vendor.id, "noupdate": True})
+        vendor = Partner.create(
+            {
+                "name": "PT Sport Global Distribusi",
+                "company_type": "company",
+                "supplier_rank": 1,
+                "email": "vendor@sportglobal.example",
+            }
+        )
+        IMD.create(
+            {"module": NS, "name": "vendor_sport_global", "model": "res.partner", "res_id": vendor.id, "noupdate": True}
+        )
         log("vendor created: PT Sport Global Distribusi")
 
     # Pick a handful of footwear products for the receipt --------------
@@ -65,22 +67,31 @@ else:
         if not tmpl:
             continue
         variant = tmpl.product_variant_id
-        lines.append((0, 0, {
-            "product_id": variant.id,
-            "product_qty": qtys[code],
-            "price_unit": tmpl.standard_price or 100000,
-        }))
+        lines.append(
+            (
+                0,
+                0,
+                {
+                    "product_id": variant.id,
+                    "product_qty": qtys[code],
+                    "price_unit": tmpl.standard_price or 100000,
+                },
+            )
+        )
 
-    po = PO.create({
-        "partner_id": vendor.id,
-        "picking_type_id": wh.in_type_id.id,
-        "order_line": lines,
-    })
-    IMD.create({"module": NS, "name": "po_gr_demo",
-                "model": "purchase.order", "res_id": po.id, "noupdate": True})
+    po = PO.create(
+        {
+            "partner_id": vendor.id,
+            "picking_type_id": wh.in_type_id.id,
+            "order_line": lines,
+        }
+    )
+    IMD.create({"module": NS, "name": "po_gr_demo", "model": "purchase.order", "res_id": po.id, "noupdate": True})
     po.button_confirm()
-    log("PO %s confirmed (%d lines) — receipt picking(s): %s"
-        % (po.name, len(lines), ", ".join(po.picking_ids.mapped("name")) or "none"))
+    log(
+        "PO %s confirmed (%d lines) — receipt picking(s): %s"
+        % (po.name, len(lines), ", ".join(po.picking_ids.mapped("name")) or "none")
+    )
 
     env["ir.config_parameter"].sudo().set_param(MARKER, "1")
     env.cr.commit()

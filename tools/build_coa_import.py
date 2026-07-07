@@ -11,6 +11,7 @@ menandai kepemilikan per-company. account_type template campur (kode teknis + la
 human) -> dipetakan ke selection value Odoo. File siap di-import via
 Accounting > Configuration > Chart of Accounts > (gear) Import records.
 """
+
 import os
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -70,10 +71,17 @@ def load_accounts():
         atype = map_type(raw_type, code)
         reconcile = bool(r[6]) if r[6] not in (None, "") else False
         a_ok, m_ok = applies_to(r[11] if len(r) > 11 else None)
-        accts.append({
-            "code": code, "name": name, "type": atype, "raw_type": raw_type,
-            "reconcile": reconcile, "arka": a_ok, "aim": m_ok,
-        })
+        accts.append(
+            {
+                "code": code,
+                "name": name,
+                "type": atype,
+                "raw_type": raw_type,
+                "reconcile": reconcile,
+                "arka": a_ok,
+                "aim": m_ok,
+            }
+        )
     return accts
 
 
@@ -98,18 +106,20 @@ def write_company_file(accts, company, out_name):
     headers = ["id", "code", "name", "account_type", "reconcile"]
     for j, h in enumerate(headers, 1):
         c = ws.cell(row=1, column=j, value=h)
-        c.fill = HEAD; c.font = HEADF; c.border = BORDER
+        c.fill = HEAD
+        c.font = HEADF
+        c.border = BORDER
     widths = [22, 14, 56, 22, 11]
     for j, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(j)].width = w
     for i, a in enumerate(rows):
         rr = i + 2
         is_bank = a["type"] == "asset_cash" and "Bank" in a["name"]
-        vals = [f"coa_{a['code']}", a["code"], a["name"], a["type"],
-                "TRUE" if a["reconcile"] else "FALSE"]
+        vals = [f"coa_{a['code']}", a["code"], a["name"], a["type"], "TRUE" if a["reconcile"] else "FALSE"]
         for j, v in enumerate(vals, 1):
             c = ws.cell(row=rr, column=j, value=v)
-            c.border = BORDER; c.font = Font(size=10)
+            c.border = BORDER
+            c.font = Font(size=10)
             c.alignment = WRAP
             if is_bank:
                 c.fill = BANKFILL
@@ -131,11 +141,17 @@ def write_company_file(accts, company, out_name):
         ("2. Buka Accounting > Configuration > Chart of Accounts.", False),
         ("3. Klik ikon gear/Favorites > Import records (atau Action > Import).", False),
         ("4. Upload file ini; sheet 'account.account' terbaca otomatis (header = nama field).", False),
-        ("5. Mapping: id->External ID, code->Code, name->Name, account_type->Type, reconcile->Allow Reconciliation.", False),
+        (
+            "5. Mapping: id->External ID, code->Code, name->Name, account_type->Type, reconcile->Allow Reconciliation.",
+            False,
+        ),
         ("6. Test, lalu Import.", False),
         ("", False),
         ("CATATAN account_type:", True),
-        ("- Label human di template (Expenses, Current Liabilities, dst) sudah dipetakan ke selection value Odoo.", False),
+        (
+            "- Label human di template (Expenses, Current Liabilities, dst) sudah dipetakan ke selection value Odoo.",
+            False,
+        ),
         ("- Akun bank perusahaan ini disorot oranye di sheet data.", False),
         ("", False),
         ("PERLU REVIEW (tipe template mungkin perlu disesuaikan utk fungsi Odoo) — lihat sheet REVIEW:", True),
@@ -150,7 +166,9 @@ def write_company_file(accts, company, out_name):
     rvh = ["Kode", "Nama", "Tipe (template)", "Tipe Odoo (dipakai)", "Catatan / Saran"]
     for j, h in enumerate(rvh, 1):
         c = rv.cell(row=1, column=j, value=h)
-        c.fill = HEAD; c.font = HEADF; c.border = BORDER
+        c.fill = HEAD
+        c.font = HEADF
+        c.border = BORDER
     for j, w in enumerate([14, 50, 20, 22, 60], 1):
         rv.column_dimensions[get_column_letter(j)].width = w
     flags = []
@@ -166,8 +184,10 @@ def write_company_file(accts, company, out_name):
             flags.append((a["code"], a["name"], str(a["raw_type"]), a["type"], note))
     for i, f in enumerate(flags, 2):
         for j, v in enumerate(f, 1):
-            c = rv.cell(row=i, column=j, value=v); c.border = BORDER
-            c.font = Font(size=10); c.alignment = WRAP
+            c = rv.cell(row=i, column=j, value=v)
+            c.border = BORDER
+            c.font = Font(size=10)
+            c.alignment = WRAP
 
     path = os.path.join(OUTDIR, out_name)
     wb.save(path)

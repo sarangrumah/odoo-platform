@@ -63,9 +63,7 @@ class SaleOrder(models.Model):
         self.ensure_one()
         rule = self.x_custom_ic_rule_id
         if not (rule and rule.spawn_rental_loan and rule.loan_asset_product_id):
-            raise UserError(
-                _("This sales order has no intercompany rule configured for asset loans.")
-            )
+            raise UserError(_("This sales order has no intercompany rule configured for asset loans."))
         if self.loan_order_ids.filtered(lambda l: l.loan_type == "preflight"):
             raise UserError(_("A pre-flight loan already exists for %s.") % self.name)
         loan = self._spawn_asset_loan(rule, "preflight")
@@ -80,20 +78,12 @@ class SaleOrder(models.Model):
     def _spawn_asset_loan(self, rule, loan_type):
         self.ensure_one()
         if not rule.loan_asset_product_id:
-            raise UserError(
-                _("Intercompany rule '%s' has no Loan Asset Product configured.") % rule.name
-            )
+            raise UserError(_("Intercompany rule '%s' has no Loan Asset Product configured.") % rule.name)
         if not rule.loan_on_loan_location_id:
-            raise UserError(
-                _("Intercompany rule '%s' has no On-Loan Location configured.") % rule.name
-            )
+            raise UserError(_("Intercompany rule '%s' has no On-Loan Location configured.") % rule.name)
         # Primary qty = qty of the loan service line on this SO.
         svc = rule.loan_service_product_id
-        primary_qty = int(
-            sum(
-                self.order_line.filtered(lambda l: l.product_id == svc).mapped("product_uom_qty")
-            )
-        ) or 1
+        primary_qty = int(sum(self.order_line.filtered(lambda l: l.product_id == svc).mapped("product_uom_qty"))) or 1
         pickup_dt = self.commitment_date or fields.Datetime.now()
         return_dt = pickup_dt + timedelta(days=1)
         loan = self.env["rental.order"].create(
@@ -114,8 +104,12 @@ class SaleOrder(models.Model):
             }
         )
         self.message_post(
-            body=_("Asset loan %(loan)s (%(type)s) created for %(qty)s unit(s).",
-                   loan=loan.name, type=loan_type, qty=primary_qty)
+            body=_(
+                "Asset loan %(loan)s (%(type)s) created for %(qty)s unit(s).",
+                loan=loan.name,
+                type=loan_type,
+                qty=primary_qty,
+            )
         )
         return loan
 

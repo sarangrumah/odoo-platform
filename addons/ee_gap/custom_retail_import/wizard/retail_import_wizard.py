@@ -75,8 +75,8 @@ class RetailImportWizard(models.TransientModel):
             dup = Log.find_duplicate(file_hash)
             if dup:
                 raise UserError(
-                    _("This exact file was already imported/queued (log #%s). "
-                      "Tick 'Force re-import' to override.") % dup.id
+                    _("This exact file was already imported/queued (log #%s). Tick 'Force re-import' to override.")
+                    % dup.id
                 )
         log = Log.create(
             {
@@ -89,8 +89,8 @@ class RetailImportWizard(models.TransientModel):
         log.store_source(self.file, self.filename)
         Executor = self.env["retail.import.executor"]
         if self.profile_id.file_type in ASYNC_TYPES:
-            channel = self.env["ir.config_parameter"].sudo().get_param(
-                "retail_import.queue_channel", "root.retail_import"
+            channel = (
+                self.env["ir.config_parameter"].sudo().get_param("retail_import.queue_channel", "root.retail_import")
             )
             try:
                 job = Executor.with_delay(

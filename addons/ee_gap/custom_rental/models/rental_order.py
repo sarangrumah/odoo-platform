@@ -120,8 +120,7 @@ class RentalOrder(models.Model):
         "stock.location",
         string="On-Loan Location",
         domain="[('usage', '=', 'internal')]",
-        help="Internal location the unit sits in while on loan. Used only when "
-        "Internal Asset Loan is enabled.",
+        help="Internal location the unit sits in while on loan. Used only when Internal Asset Loan is enabled.",
     )
 
     def _pdp_audit_classification(self):

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import base64
 import fnmatch
-import ftplib
+import ftplib  # nosec B402 - FTP/FTPS are explicit customer-feed protocols; FTPS (FTP_TLS + prot_p) is preferred, plaintext FTP is an opt-in per feed
 import io
 import logging
 import os
@@ -67,19 +67,14 @@ class RetailImportFeed(models.Model):
     )
     password_param = fields.Char(
         string="Password ir.config_parameter Key",
-        help="Fallback: key in ir.config_parameter that holds the password (used when "
-             "the Password field is empty).",
+        help="Fallback: key in ir.config_parameter that holds the password (used when the Password field is empty).",
     )
     private_key_path = fields.Char(help="SFTP only: path (inside the container) to the private key file.")
-    passive = fields.Boolean(
-        default=True, help="FTP/FTPS passive mode (recommended behind NAT/firewalls)."
-    )
+    passive = fields.Boolean(default=True, help="FTP/FTPS passive mode (recommended behind NAT/firewalls).")
 
     remote_dir = fields.Char(default="/", required=True)
     file_glob = fields.Char(default="*", required=True, help="e.g. 'X20_*.csv' or 'X24DN_*.xlsx'.")
-    run_async = fields.Boolean(
-        string="Process asynchronously", default=True, help="Hand each file to queue_job."
-    )
+    run_async = fields.Boolean(string="Process asynchronously", default=True, help="Hand each file to queue_job.")
     post_action = fields.Selection(
         [
             ("move", "Move to archive folder"),
@@ -90,8 +85,8 @@ class RetailImportFeed(models.Model):
         default="move",
         required=True,
         help="What to do with each remote file once it has been captured into Odoo. "
-             "The source file is always stored in Odoo (re-processable), so moving or "
-             "deleting it on the server is safe and prevents re-listing.",
+        "The source file is always stored in Odoo (re-processable), so moving or "
+        "deleting it on the server is safe and prevents re-listing.",
     )
     archive_dir = fields.Char(
         string="Archive Subfolder",
@@ -100,9 +95,7 @@ class RetailImportFeed(models.Model):
     )
 
     last_run = fields.Datetime(readonly=True)
-    last_status = fields.Selection(
-        [("ok", "OK"), ("error", "Error"), ("idle", "Idle")], default="idle", readonly=True
-    )
+    last_status = fields.Selection([("ok", "OK"), ("error", "Error"), ("idle", "Idle")], default="idle", readonly=True)
     last_message = fields.Text(readonly=True)
     files_imported = fields.Integer(default=0, readonly=True)
 
@@ -125,9 +118,7 @@ class RetailImportFeed(models.Model):
         return ""
 
     def _queue_channel(self):
-        return self.env["ir.config_parameter"].sudo().get_param(
-            "retail_import.queue_channel", "root.retail_import"
-        )
+        return self.env["ir.config_parameter"].sudo().get_param("retail_import.queue_channel", "root.retail_import")
 
     # ------------------------------------------------------------------
     # SFTP backend
@@ -339,9 +330,7 @@ class RetailImportFeed(models.Model):
                 if self.post_action != "keep" and (self.run_async or log.state in ("imported", "partial")):
                     self._archive_remote(name)
             except Exception:
-                _logger.exception(
-                    "Feed %s: post-import %s failed for %s", self.name, self.post_action, name
-                )
+                _logger.exception("Feed %s: post-import %s failed for %s", self.name, self.post_action, name)
         return imported
 
     def action_poll_now(self):

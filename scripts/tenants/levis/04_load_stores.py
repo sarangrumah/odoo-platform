@@ -27,17 +27,13 @@ def safe_xid(prefix, value):
 
 
 def xid_get(name, model):
-    ext = env["ir.model.data"].search(
-        [("module", "=", NS), ("name", "=", name), ("model", "=", model)], limit=1
-    )
+    ext = env["ir.model.data"].search([("module", "=", NS), ("name", "=", name), ("model", "=", model)], limit=1)
     return ext.res_id if ext else False
 
 
 def xid_set(name, model, res_id):
     if not xid_get(name, model):
-        env["ir.model.data"].create(
-            {"module": NS, "name": name, "model": model, "res_id": res_id, "noupdate": True}
-        )
+        env["ir.model.data"].create({"module": NS, "name": name, "model": model, "res_id": res_id, "noupdate": True})
 
 
 with open(os.path.join(CSV_DIR, "out_stores.csv"), encoding="utf-8") as f:
@@ -68,7 +64,5 @@ for idx, r in enumerate(rows, start=1):
             aliased += 1
             env.cr.commit()
 
-sys.stderr.write(
-    f"Warehouses: created={created} existing={existing} code_aliases_added={aliased} total={len(rows)}\n"
-)
+sys.stderr.write(f"Warehouses: created={created} existing={existing} code_aliases_added={aliased} total={len(rows)}\n")
 sys.stderr.flush()
