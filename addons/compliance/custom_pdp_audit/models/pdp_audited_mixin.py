@@ -59,30 +59,39 @@ class PdpAuditedMixin(models.AbstractModel):
                     req_id = request.httprequest.environ.get("HTTP_X_REQUEST_ID")
             except Exception:
                 pass
-            self.env.cr.execute(
-                """
-                INSERT INTO pdp.audit_log (
-                    actor_user_id, actor_login, tenant_db,
-                    model_name, res_id, action,
-                    field_changes, classification,
-                    ip_address, user_agent, request_id, reason
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s::inet, %s, %s, %s)
-                """,
-                (
-                    user.id if user else None,
-                    user.login if user else None,
-                    self.env.cr.dbname,
-                    self._name,
-                    res_id,
-                    action,
-                    json.dumps(field_changes or {}, default=str) if field_changes is not None else None,
-                    classif,
-                    ip,
-                    ua,
-                    req_id,
-                    reason,
-                ),
-            )
+            # Wrap the raw INSERT in a savepoint. Without it, a failed INSERT
+            # (missing pdp schema on a cloned DB, action CHECK violation, bad
+            # ::inet cast, append-only trigger error, ...) leaves the *whole*
+            # request transaction aborted. The except below would swallow the
+            # Python exception but every subsequent ORM query in the same
+            # request would then die with InFailedSqlTransaction. The savepoint
+            # confines the failure to this one statement so the business write
+            # (e.g. account.move posting) can proceed.
+            with self.env.cr.savepoint(flush=False):
+                self.env.cr.execute(
+                    """
+                    INSERT INTO pdp.audit_log (
+                        actor_user_id, actor_login, tenant_db,
+                        model_name, res_id, action,
+                        field_changes, classification,
+                        ip_address, user_agent, request_id, reason
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s::inet, %s, %s, %s)
+                    """,
+                    (
+                        user.id if user else None,
+                        user.login if user else None,
+                        self.env.cr.dbname,
+                        self._name,
+                        res_id,
+                        action,
+                        json.dumps(field_changes or {}, default=str) if field_changes is not None else None,
+                        classif,
+                        ip,
+                        ua,
+                        req_id,
+                        reason,
+                    ),
+                )
         except Exception as e:  # pragma: no cover - never block business write
             _logger.error("pdp.audit_log INSERT failed for %s/%s action=%s: %s", self._name, res_id, action, e)
 
