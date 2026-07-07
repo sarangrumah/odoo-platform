@@ -25,6 +25,8 @@ croniter==6.2.2               # cron-expression evaluator for backup schedule
 
 # --- custom_retail_import (Excel/CSV ingestion + SFTP feed) ---
 openpyxl==3.1.5               # read .xlsx master/transaction files in-container (xlsxwriter is write-only)
-paramiko==3.5.1               # SFTP pull for direct customer-FTP ingestion (preferred over unmaintained pysftp)
-                              # CVE-2026-44405 (SHA-1 in rsakey.py) is unpatched in 3.x/4.0.0 — only cleared by
-                              # 5.0.0 (two major bumps, breaking API). Deferred: needs SFTP-ingestion revalidation.
+paramiko==5.0.0               # SFTP pull for direct customer-FTP ingestion (preferred over unmaintained pysftp)
+                              # 5.0.0 clears CVE-2026-44405 (drops SHA-1/ssh-rsa signing). API surface used here
+                              # (Transport, RSAKey/Ed25519Key.from_private_key[_file], SFTPClient.from_transport,
+                              # SSHClient, AutoAddPolicy) is unchanged. Op note: legacy SFTP servers that only
+                              # offer ssh-rsa (SHA-1) host keys must move to rsa-sha2-256/512 or ed25519.
