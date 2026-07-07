@@ -35,9 +35,33 @@ class AccountMove(models.Model):
         [("trade", "Trade"), ("non_trade", "Non-Trade")],
         string="Purchase Type",
         copy=False,
-        help="Trade / Non-Trade stream carried from the purchase order; selects "
-        "the payable account on this bill.",
+        help="Trade / Non-Trade stream carried from the purchase order, or picked "
+        "directly on a manually-created bill. Selects the payable account and the "
+        "BILL/T vs BILL/NT numbering on this bill.",
     )
+
+    # Operating Unit (feature #9) — header convenience that cascades to the
+    # product lines. Each line carries its own l10n_ou_analytic_id (the source of
+    # truth for the analytic distribution); this header field just fills the
+    # lines in one click on a manual bill. No default so PO-derived bills (whose
+    # lines already carry the store OU) are left untouched.
+    l10n_ou_analytic_id = fields.Many2one(
+        "account.analytic.account",
+        string="Operating Unit",
+        copy=False,
+        domain="[('plan_id.name', '=', 'Operating Unit')]",
+        help="Head Office / Store this bill belongs to. Sets the Operating Unit "
+        "on every product line for per-OU P&L reporting.",
+    )
+
+    @api.onchange("l10n_ou_analytic_id")
+    def _onchange_l10n_ou_analytic_id(self):
+        """Cascade the header OU onto product lines that have none yet."""
+        if not self.l10n_ou_analytic_id:
+            return
+        for line in self.invoice_line_ids:
+            if line.display_type == "product" and not line.l10n_ou_analytic_id:
+                line.l10n_ou_analytic_id = self.l10n_ou_analytic_id
 
     # ------------------------------------------------------------------
     # Trade / Non-Trade vendor-bill numbering (Finance-AP #8 / Accounting #16)

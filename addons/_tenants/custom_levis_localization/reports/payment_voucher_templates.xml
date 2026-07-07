@@ -170,17 +170,17 @@
                 <tr style="height: 55px;"><td/><td/><td/><td/></tr>
                 <tr>
                     <td style="padding: 4px 4px 0; border-top: 1px solid #000;" t-out="o.create_uid.name or ''"/>
-                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">&#160;</td>
-                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">&#160;</td>
-                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">&#160;</td>
+                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">(________________)</td>
+                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">(________________)</td>
+                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">(________________)</td>
                 </tr>
-                <!-- Approval-matrix designations (feedback Finance-AP #5):
-                     Checked by = ASST MGR / MANAGER, Approved by = GM / VP. -->
+                <!-- Levi's has no approval engine: leave the approver names blank
+                     with fillable signature lines instead of designations. -->
                 <tr style="font-size: 9px; color: #555;">
-                    <td style="padding: 0 4px 4px;">&#160;</td>
-                    <td style="padding: 0 4px 4px;">ASST MGR / MANAGER</td>
-                    <td style="padding: 0 4px 4px;">GM / VP</td>
-                    <td style="padding: 0 4px 4px;">&#160;</td>
+                    <td style="padding: 0 4px 4px;"/>
+                    <td style="padding: 0 4px 4px;"/>
+                    <td style="padding: 0 4px 4px;"/>
+                    <td style="padding: 0 4px 4px;"/>
                 </tr>
             </table>
         </div>

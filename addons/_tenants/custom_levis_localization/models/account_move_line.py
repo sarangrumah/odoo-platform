@@ -8,11 +8,40 @@ Trade Payables vs Non-Trade payable. The accounts come from the per-company
 ``levis.purchase.account.map`` so no hard ids leak into code.
 """
 
-from odoo import models
+from odoo import api, fields, models
 
 
 class AccountMoveLine(models.Model):
     _inherit = "account.move.line"
+
+    # ------------------------------------------------------------------
+    # Operating Unit (feature #9) — user-picked on manual bill lines so P&L
+    # can be split Head Office vs Store. PO-derived lines get their OU from the
+    # PO analytic; this field lets a MANUAL bill line carry one too. The picked
+    # OU analytic is merged into the native ``analytic_distribution`` (its own
+    # plan), reusing ``purchase.order.line._levis_merge_ou_distribution``.
+    # ------------------------------------------------------------------
+    l10n_ou_analytic_id = fields.Many2one(
+        "account.analytic.account",
+        string="Operating Unit",
+        domain="[('plan_id.name', '=', 'Operating Unit')]",
+        help="Operating Unit (Head Office / Store) this line belongs to. Stamped "
+        "onto the line's analytic distribution for per-OU P&L reporting.",
+    )
+
+    # Preserve the base dependencies and add the OU field so picking/clearing it
+    # (or changing the product) re-stamps the distribution. Re-declaring
+    # @api.depends REPLACES the inherited set, so all base triggers are relisted.
+    @api.depends("account_id", "partner_id", "product_id", "l10n_ou_analytic_id")
+    def _compute_analytic_distribution(self):
+        super()._compute_analytic_distribution()
+        for line in self:
+            ou = line.l10n_ou_analytic_id
+            if not ou or line.display_type != "product":
+                continue
+            line.analytic_distribution = self.env[
+                "purchase.order.line"
+            ]._levis_merge_ou_distribution(line.analytic_distribution, ou.id)
 
     # Base ``_compute_account_id`` carries no @api.depends — it is a
     # precompute-at-create field. ``move_id.l10n_purchase_type`` is already set on
@@ -63,7 +92,16 @@ class AccountMoveLine(models.Model):
                 # yet still real-time valued, so an ``is_storable`` gate never
                 # fired and the accrual never netted (bill hit COGS instead of
                 # GR/IR). Services carry no stock move / GR accrual, so exclude.
-                if gr_accrual_active and line.product_id.type == "consu":
+                # Also require a PO link: a MANUALLY-created bill (no goods
+                # receipt) never posted a GR accrual, so routing its product line
+                # to GR/IR would leave the clearing account un-netted and would
+                # clobber the user's hand-picked expense account. Manual bills
+                # therefore keep AP-payable routing + numbering only.
+                if (
+                    gr_accrual_active
+                    and line.purchase_line_id
+                    and line.product_id.type == "consu"
+                ):
                     categ = line.product_id.categ_id.with_company(move.company_id)
                     if categ.property_valuation == "real_time":
                         grir_acc = mapping.grir_account_id or categ.account_stock_variation_id

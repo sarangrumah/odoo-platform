@@ -7,7 +7,7 @@
       marker so Trade and Non-Trade bills never share a running counter even
       though both post to the store's shared purchase journal:
 
-        Trade     -> BILL/EBR/YYYY/MM/00001
+        Trade     -> BILL/T/EBR/YYYY/MM/00001
         Non-Trade -> BILL/NT/EBR/YYYY/MM/00001
 
       account.move._compute_name draws these (bypassing the sequence.mixin) for
@@ -18,7 +18,7 @@
         <record id="seq_account_move_bill_trade" model="ir.sequence">
             <field name="name">Levi's Vendor Bill (Trade)</field>
             <field name="code">account.move.levis.bill.trade</field>
-            <field name="prefix">BILL/EBR/%(year)s/%(month)s/</field>
+            <field name="prefix">BILL/T/EBR/%(year)s/%(month)s/</field>
             <field name="padding">5</field>
             <field name="use_date_range" eval="True"/>
             <field name="implementation">no_gap</field>

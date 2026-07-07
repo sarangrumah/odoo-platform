@@ -72,6 +72,41 @@ class AccountPaymentRegister(models.TransientModel):
     x_mdr_bin_id = fields.Many2one(
         "levis.mdr.bin", string="MDR Mapping", readonly=True, copy=False)
 
+    # --- Extra payment dimensions (Payment #4) -------------------------------
+    # Propagated to the created account.payment. Memo is the native
+    # ``communication`` field; OU + override-outstanding change the posted GL,
+    # Note / Remark are informational.
+    l10n_ou_analytic_id = fields.Many2one(
+        "account.analytic.account",
+        string="Operating Unit",
+        domain="[('plan_id.name', '=', 'Operating Unit')]",
+        help="Head Office / Store this payment belongs to; stamped on the "
+        "payment's journal lines.",
+    )
+    l10n_override_outstanding_account_id = fields.Many2one(
+        "account.account",
+        string="Override Outstanding Account",
+        check_company=True,
+        help="Overrides the outstanding (liquidity) account on the posted payment.",
+    )
+    l10n_note = fields.Char(string="Note")
+    l10n_remark = fields.Char(string="Remark")
+
+    def _levis_payment_extra_vals(self):
+        """Extra account.payment vals carried from the wizard."""
+        self.ensure_one()
+        vals = {}
+        if self.l10n_ou_analytic_id:
+            vals["l10n_ou_analytic_id"] = self.l10n_ou_analytic_id.id
+        if self.l10n_override_outstanding_account_id:
+            vals["l10n_override_outstanding_account_id"] = \
+                self.l10n_override_outstanding_account_id.id
+        if self.l10n_note:
+            vals["l10n_note"] = self.l10n_note
+        if self.l10n_remark:
+            vals["l10n_remark"] = self.l10n_remark
+        return vals
+
     @api.depends("admin_fee_line_ids.amount")
     def _compute_admin_fee_total(self):
         for wizard in self:
@@ -167,7 +202,7 @@ class AccountPaymentRegister(models.TransientModel):
             if not fee.account_id or self.currency_id.is_zero(fee.amount):
                 continue
             amount_currency = sign * fee.amount
-            vals.append({
+            line_vals = {
                 "name": fee.name or _("Admin Fee"),
                 "account_id": fee.account_id.id,
                 "partner_id": self.partner_id.id,
@@ -179,7 +214,14 @@ class AccountPaymentRegister(models.TransientModel):
                     self.company_id,
                     self.payment_date,
                 ),
-            })
+            }
+            # Admin fees are the P&L side of the payment, so carry the OU there
+            # too for per-OU reporting.
+            if self.l10n_ou_analytic_id:
+                line_vals["analytic_distribution"] = self.env[
+                    "purchase.order.line"
+                ]._levis_merge_ou_distribution(None, self.l10n_ou_analytic_id.id)
+            vals.append(line_vals)
         return vals
 
     def _create_payment_vals_from_wizard(self, batch_result):
@@ -188,6 +230,7 @@ class AccountPaymentRegister(models.TransientModel):
             self._assert_admin_fee_balance()
             # Replace any native single-line write-off with our per-COA fees.
             vals["write_off_line_vals"] = self._prepare_admin_fee_write_off_vals()
+        vals.update(self._levis_payment_extra_vals())
         return vals
 
     def _create_payment_vals_from_batch(self, batch_result):
@@ -197,7 +240,9 @@ class AccountPaymentRegister(models.TransientModel):
             raise UserError(_(
                 "Admin fees are only supported for a single payment. Register "
                 "one bill at a time, or tick 'Group Payments' to combine them."))
-        return super()._create_payment_vals_from_batch(batch_result)
+        vals = super()._create_payment_vals_from_batch(batch_result)
+        vals.update(self._levis_payment_extra_vals())
+        return vals
 
     def _assert_admin_fee_balance(self):
         """Guard: cash-out must equal bill amount + admin fees.
