@@ -1,0 +1,108 @@
+code,pph_kind,bupot_object_code,coa_code,name,tarif,legal_basis
+Z5-AC,pph_23,24-101-01,2104100005,Deviden tidak termasuk deviden kepada Wajib Pajak orang pribadi dalam negeri,15.0,UU PPh Pasal 23
+Z5-AD,pph_23,24-102-01,2104100005,Bunga tidak termasuk bunga yang menjadi objek PPh Pasal 4 ayat (2),15.0,UU PPh Pasal 23
+Z5-AE,pph_23,24-103-01,2104100005,Royalti,15.0,UU PPh Pasal 23
+Z5-AA,pph_23,24-100-01,2104100005,"Hadiah, penghargaan, bonus dan lainnya selain yang telah dipotong PPh Pasal 21 ayat (1) huruf e UU PPh",15.0,UU PPh Pasal 23
+Z5-AB,pph_23,24-100-02,2104100005,Sewa dan penghasilan lain sehubungan dengan penggunaan harta kecuali sewa tanah dan bangunan yang telah dikenai PPh Pasal 4 ayat (2) UU PPh,2.0,UU PPh Pasal 23
+Z5-AF,pph_23,24-104-01,2104100005,Jasa Teknik,2.0,UU PPh Pasal 23
+Z5-AJ,pph_23,24-104-02,2104100005,Jasa Management,2.0,UU PPh Pasal 23
+Z5-AH,pph_23,24-104-03,2104100005,Jasa Konsultan,2.0,UU PPh Pasal 23
+Z5-AL,pph_23,24-104-04,2104100005,Jasa Penilai (Appraisal),2.0,UU PPh Pasal 23
+Z5-AM,pph_23,24-104-05,2104100005,Jasa Aktuaris,2.0,UU PPh Pasal 23
+Z5-AN,pph_23,24-104-06,2104100005,"Jasa Akuntansi, Pembukuan, dan Atestasi Laporan Keuangan",2.0,UU PPh Pasal 23
+Z5-AO,pph_23,24-104-07,2104100005,Jasa Hukum,2.0,UU PPh Pasal 23
+Z5-AP,pph_23,24-104-08,2104100005,Jasa Arsitektur,2.0,UU PPh Pasal 23
+Z5-AQ,pph_23,24-104-09,2104100005,Jasa perencanaan kota dan arsitektur landscape,2.0,UU PPh Pasal 23
+Z5-AR,pph_23,24-104-10,2104100005,Jasa Perancang (Design),2.0,UU PPh Pasal 23
+Z5-AS,pph_23,24-104-11,2104100005,Jasa Pengeboran (Drilling) Di Bidang Penambangan Minyak dan Gas Bumi (Migas) Kecuali Yang Dilakukan Oleh Badan Usaha Tetap (But),2.0,UU PPh Pasal 23
+Z5-AT,pph_23,24-104-12,2104100005,Jasa Penunjang Di Bidang Usaha Panas Bumi dan Penambangan Minyak dan Gas Bumi (Migas),2.0,UU PPh Pasal 23
+Z5-AU,pph_23,24-104-13,2104100005,Jasa Penambangan dan Jasa Penunjang Di Bidang Usaha Panas Bumi dan Penambangan Minyak dan Gas Bumi (Migas),2.0,UU PPh Pasal 23
+Z5-AV,pph_23,24-104-14,2104100005,Jasa Penunjang Di Bidang Penerbangan dan Bandar Udara,2.0,UU PPh Pasal 23
+Z5-AW,pph_23,24-104-15,2104100005,Jasa Penebangan Hutan,2.0,UU PPh Pasal 23
+Z5-AX,pph_23,24-104-16,2104100005,Jasa Pengolahan Limbah,2.0,UU PPh Pasal 23
+Z5-AY,pph_23,24-104-17,2104100005,Jasa Penyedia Tenaga Kerja dan/atau Tenaga Ahli (Outsourcing Services),2.0,UU PPh Pasal 23
+Z5-AZ,pph_23,24-104-18,2104100005,Jasa Perantara dan/atau Keagenan,2.0,UU PPh Pasal 23
+Z5-BA,pph_23,24-104-19,2104100005,"Jasa Bidang Perdagangan Surat-Surat Berharga, Kecuali Yang Dilakukan Bursa Efek, Kustodian Sentral Efek Indonesia (Ksei) dan Kliring Penjaminan Efek Indonesia (Kpei)",2.0,UU PPh Pasal 23
+Z5-BB,pph_23,24-104-20,2104100005,"Jasa Kustodian/Penyimpanan/Penitipan, Kecuali Yang Dilakukan Oleh Ksei",2.0,UU PPh Pasal 23
+Z5-BC,pph_23,24-104-21,2104100005,Jasa Pengisian Suara (Dubbing) dan/atau Sulih Suara,2.0,UU PPh Pasal 23
+Z5-BD,pph_23,24-104-22,2104100005,Jasa Mixing Film,2.0,UU PPh Pasal 23
+Z5-BE,pph_23,24-104-23,2104100005,"Jasa Pembuatan Sarana Promosi Film, Iklan, Poster, Foto, Slide, Klise, Banner, Pamphlet, Baliho dan Folder",2.0,UU PPh Pasal 23
+Z5-BF,pph_23,24-104-24,2104100005,"Jasa Sehubungan Dengan Software Atau Hardware Atau Sistem Komputer, Termasuk Perawatan, Pemeliharaan dan Perbaikan.",2.0,UU PPh Pasal 23
+Z5-BG,pph_23,24-104-25,2104100005,Jasa Pembuatan dan/atau Pengelolaan Website,2.0,UU PPh Pasal 23
+Z5-BH,pph_23,24-104-26,2104100005,Jasa Internet Termasuk Sambungannya,2.0,UU PPh Pasal 23
+Z5-BI,pph_23,24-104-27,2104100005,"Jasa Penyimpanan, Pengolahan dan/atau Penyaluran Data, Informasi, dan/atau Program",2.0,UU PPh Pasal 23
+Z5-BJ,pph_23,24-104-28,2104100005,"Jasa instalasi/pemasangan mesin, peralatan, listrik, telepon, air, gas, AC dan/atau TV Kabel, selain yang dilakukan oleh Wajib Pajak yang ruang lingkupnya di bidang konstruksi dan mempunyai izin dan/atau sertifikasi sebagai pengusaha konstruksi",2.0,UU PPh Pasal 23
+Z5-BK,pph_23,24-104-29,2104100005,"Jasa perawatan/perbaikan/pemeliharaan mesin, peralatan, listrik, telepon, air, gas, AC dan/atau TV kabel, selain yang dilakukan oleh Wajib Pajak yang ruang lingkupnya di bidang konstruksi dan mempunyai izin dan/atau sertifikasi sebagai pengusaha konstruks",2.0,UU PPh Pasal 23
+Z5-BL,pph_23,24-104-30,2104100005,Jasa Perawatan Kendaraan dan/atau Alat Transportasi Darat,2.0,UU PPh Pasal 23
+Z5-BM,pph_23,24-104-31,2104100005,Jasa Maklon,2.0,UU PPh Pasal 23
+Z5-BN,pph_23,24-104-32,2104100005,Jasa Penyelidikan dan Keamanan,2.0,UU PPh Pasal 23
+Z5-BO,pph_23,24-104-33,2104100005,Jasa Penyelenggara Kegiatan Atau Event Organizer,2.0,UU PPh Pasal 23
+Z5-BP,pph_23,24-104-34,2104100005,"Jasa Penyediaan Tempat dan/atau Waktu Dalam Media Massa, Media Luar Ruang Atau Media Lain Untuk Penyampaian Informasi, dan/atau Jasa Periklanan",2.0,UU PPh Pasal 23
+Z5-BQ,pph_23,24-104-35,2104100005,Jasa Pembasmian Hama,2.0,UU PPh Pasal 23
+Z5-BR,pph_23,24-104-36,2104100005,Jasa Kebersihan Atau Cleaning Service,2.0,UU PPh Pasal 23
+Z5-BS,pph_23,24-104-37,2104100005,Jasa Sedot Septic Tank,2.0,UU PPh Pasal 23
+Z5-BT,pph_23,24-104-38,2104100005,Jasa Pemeliharaan Kolam,2.0,UU PPh Pasal 23
+Z5-BU,pph_23,24-104-39,2104100005,Jasa Katering Atau Tata Boga,2.0,UU PPh Pasal 23
+Z5-BV,pph_23,24-104-40,2104100005,Jasa Freight Forwarding,2.0,UU PPh Pasal 23
+Z5-BW,pph_23,24-104-41,2104100005,Jasa Logistik,2.0,UU PPh Pasal 23
+Z5-BX,pph_23,24-104-42,2104100005,Jasa Pengurusan Dokumen,2.0,UU PPh Pasal 23
+Z5-BY,pph_23,24-104-43,2104100005,Jasa Pengepakan,2.0,UU PPh Pasal 23
+Z5-BZ,pph_23,24-104-44,2104100005,Jasa Loading dan Unloading,2.0,UU PPh Pasal 23
+Z5-CA,pph_23,24-104-45,2104100005,Jasa laboratorium dan/atau pengujian kecuali yang dilakukan oleh lembaga atau institusi pendidikan dalam rangka penelitian akademis,2.0,UU PPh Pasal 23
+Z5-CB,pph_23,24-104-46,2104100005,Jasa Pengelolaan Parkir,2.0,UU PPh Pasal 23
+Z5-CC,pph_23,24-104-47,2104100005,Jasa Penyondiran Tanah,2.0,UU PPh Pasal 23
+Z5-CD,pph_23,24-104-48,2104100005,Jasa Penyiapan dan/atau Pengolahan Lahan,2.0,UU PPh Pasal 23
+Z5-CE,pph_23,24-104-49,2104100005,Jasa Pembibitan dan/atau Penanaman Bibit,2.0,UU PPh Pasal 23
+Z5-CF,pph_23,24-104-50,2104100005,Jasa Pemeliharaan Tanaman,2.0,UU PPh Pasal 23
+Z5-CG,pph_23,24-104-51,2104100005,Jasa Permanenan,2.0,UU PPh Pasal 23
+Z5-CH,pph_23,24-104-52,2104100005,"Jasa pengolahan hasil pertanian, perkebunan, perikanan, peternakan dan/atau perhutanan",2.0,UU PPh Pasal 23
+Z5-CI,pph_23,24-104-53,2104100005,Jasa Dekorasi,2.0,UU PPh Pasal 23
+Z5-CJ,pph_23,24-104-54,2104100005,Jasa Pencetakan/Penerbitan,2.0,UU PPh Pasal 23
+Z5-CK,pph_23,24-104-55,2104100005,Jasa Penerjemahan,2.0,UU PPh Pasal 23
+Z5-CL,pph_23,24-104-56,2104100005,Jasa Pengangkutan/Ekspedisi Kecuali Yang Telah Diatur Dalam Pasal 15 Undang-Undang Pajak Penghasilan,2.0,UU PPh Pasal 23
+Z5-CM,pph_23,24-104-57,2104100005,Jasa Pelayanan Pelabuhan,2.0,UU PPh Pasal 23
+Z5-CN,pph_23,24-104-58,2104100005,Jasa Pengangkutan Melalui Jalur Pipa,2.0,UU PPh Pasal 23
+Z5-CO,pph_23,24-104-59,2104100005,Jasa Pengelolaan Penitipan Anak,2.0,UU PPh Pasal 23
+Z5-CP,pph_23,24-104-60,2104100005,Jasa Pelatihan dan/atau Kursus,2.0,UU PPh Pasal 23
+Z5-CQ,pph_23,24-104-61,2104100005,Jasa Pengiriman dan Pengisian Uang Ke Atm,2.0,UU PPh Pasal 23
+Z5-CR,pph_23,24-104-62,2104100005,Jasa Sertifikasi,2.0,UU PPh Pasal 23
+Z5-CS,pph_23,24-104-63,2104100005,Jasa Survey,2.0,UU PPh Pasal 23
+Z5-CT,pph_23,24-104-64,2104100005,Jasa Tester,2.0,UU PPh Pasal 23
+Z5-CU,pph_23,24-104-65,2104100005,Jasa Selain Jasa-Jasa Tersebut Di Atas Yang Pembayarannya Dibebankan Pada Apbn (Anggaran Pendapatan dan Belanja Negara) Atau Apbd (Anggaran Pendapatan dan Belanja Daerah).,2.0,UU PPh Pasal 23
+Z5-CV,pph_4_2,28-423-01,2104100001,Vendor memiliki SKB atas PP 23,0.5,UU PPh Pasal 4 ayat (2) - Final
+Z1-1G,pph_4_2,28-404-01,2104100001,Bunga Deposito/Tabungan Yang Ditempatkan Di Dalam Negeri,20.0,UU PPh Pasal 4 ayat (2) - Final
+Z1-1F,pph_4_2,28-403-02,2104100001,Persewaan Tanah dan/atau Bangunan,10.0,UU PPh Pasal 4 ayat (2) - Final
+Z1-1Q,pph_4_2,28-405-01,2104100001,Hadiah Undian,25.0,UU PPh Pasal 4 ayat (2) - Final
+Z1-1D,pph_4_2,28-409-08,2104100001,"Perencanaan Konstruksi (Dengan Kualifikasi Usaha), Pengawasan Konstruksi (Dengan Kualifikasi Usaha)",4.0,UU PPh Pasal 4 ayat (2) - Final
+Z1-1E,pph_4_2,28-409-09,2104100001,"Perencanaan Konstruksi (Tanpa Kualifikasi Usaha), Pengawasan Konstruksi (Tanpa Kualifikasi Usaha)",6.0,UU PPh Pasal 4 ayat (2) - Final
+Z1-1A,pph_4_2,28-409-10,2104100001,Pelaksanaan Konstruksi (Kualifikasi Usaha Kecil),2.0,UU PPh Pasal 4 ayat (2) - Final
+Z1-1B,pph_4_2,28-409-11,2104100001,Pelaksanaan Konstruksi (Kualifikasi Usaha Menengah dan Besar),3.0,UU PPh Pasal 4 ayat (2) - Final
+Z1-1C,pph_4_2,28-409-12,2104100001,Pelaksanaan Konstruksi (Tanpa Kualifikasi Usaha),4.0,UU PPh Pasal 4 ayat (2) - Final
+Z1-1R,pph_4_2,28-423-01,2104100001,Transaksi dengan Wajib Pajak yang menggunakan tarif Peraturan Pemerintah Nomor 23 Tahun 2018,0.5,UU PPh Pasal 4 ayat (2) - Final
+Z6-5W,pph_26,27-101-01,2104100008,DGT-Deviden,,UU PPh Pasal 26
+Z6-5X,pph_26,27-102-01,2104100008,DGT-Bunga,,UU PPh Pasal 26
+Z6-5Z,pph_26,27-103-01,2104100008,DGT-Royalti,,UU PPh Pasal 26
+Z6-5P,pph_26,27-100-01,2104100008,DGT-Sewa dan penghasilan lain sehubungan dengan penggunaan harta,,UU PPh Pasal 26
+Z6-6A,pph_26,27-104-01,2104100008,"DGT-Imbalan sehubungan dengan jasa, pekerjaan dan kegiatan",,UU PPh Pasal 26
+Z6-5Q,pph_26,27-100-02,2104100008,DGT-Hadiah dan penghargaan,,UU PPh Pasal 26
+Z6-5R,pph_26,27-100-03,2104100008,DGT-Pensiun dan pembayaran berkala lainnya,,UU PPh Pasal 26
+Z6-5Y,pph_26,27-102-02,2104100008,DGT-Premi swap atau transaksi lindung lainnya,,UU PPh Pasal 26
+Z6-5S,pph_26,27-100-04,2104100008,DGT-Keuntungan karena pembebasan utang,,UU PPh Pasal 26
+Z6-5T,pph_26,27-100-05,2104100008,DGT-Penjualan / pengalihan harta di Indonesia,,UU PPh Pasal 26
+Z6-5U,pph_26,27-100-06,2104100008,DGT-Premi asuransi / reasuransi,,UU PPh Pasal 26
+Z6-5V,pph_26,27-100-07,2104100008,DGT-Penghasilan dari penjualan atau pengalihan saham,,UU PPh Pasal 26
+Z6-6B,pph_26,27-105-01,2104100008,DGT-Penghasilan Kena Pajak BUT setelah pajak,,UU PPh Pasal 26
+Z6-5J,pph_26,27-101-01,2104100008,Non DGT - Dividen,20.0,UU PPh Pasal 26
+Z6-5K,pph_26,27-102-01,2104100008,Non DGT - Bunga,20.0,UU PPh Pasal 26
+Z6-5M,pph_26,27-103-01,2104100008,Non DGT - Royalti,20.0,UU PPh Pasal 26
+Z6-5C,pph_26,27-100-01,2104100008,Non DGT- Sewa dan Penghasilan Lain Sehubungan dengan Penggunaan Harta,20.0,UU PPh Pasal 26
+Z6-5N,pph_26,27-104-01,2104100008,"Non DGT - Imbalan Sehubungan dengan Jasa, Pekerjaan dan Kegiatan",20.0,UU PPh Pasal 26
+Z6-5D,pph_26,27-100-02,2104100008,Non DGT - Hadiah dan Penghargaan,20.0,UU PPh Pasal 26
+Z6-5E,pph_26,27-100-03,2104100008,Non DGT - Pensiun dan Pembayaran Berkala Lainnya,20.0,UU PPh Pasal 26
+Z6-5L,pph_26,27-102-02,2104100008,Non DGT - Premi Swap dan Transaksi Lindung Nilai Lainnya,20.0,UU PPh Pasal 26
+Z6-5F,pph_26,27-100-04,2104100008,Non DGT - Keuntungan Karena Pembebasan Utang,20.0,UU PPh Pasal 26
+Z6-5G,pph_26,27-100-05,2104100008,Non DGT - Penghasilan Dari Penjualan atau Pengalihan Harta di Indonesia,20.0,UU PPh Pasal 26
+Z6-5H,pph_26,27-100-06,2104100008,Non DGT - Premi Asuransi/Reasuransi,20.0,UU PPh Pasal 26
+Z6-5I,pph_26,27-100-07,2104100008,Non DGT - Penghasilan dari Penjualan/Pengalihan Saham,20.0,UU PPh Pasal 26
+Z6-5O,pph_26,27-105-01,2104100008,Non DGT - Penghasilan Kena Pajak BUT Setelah Pajak,20.0,UU PPh Pasal 26
+Z3-3I,pph_21,21-100-20,2104100003,NPWP-Bukan Pegawai - tidak berkesinambungan,,UU PPh Pasal 21
