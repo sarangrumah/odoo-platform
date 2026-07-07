@@ -37,7 +37,6 @@ cr.execute("DELETE FROM pos_order_line WHERE order_id IN (SELECT id FROM pos_ord
 for rel in ("stock_reference_pos_order_rel", "l10n_id_qris_transaction_pos_order_rel"):
     cr.execute("SELECT to_regclass(%s)", (rel,))
     if cr.fetchone()[0]:
-        # nosemgrep: odoo-sql-injection-percent-format - rel iterates a hardcoded table-name tuple, never user input
         cr.execute("DELETE FROM %s WHERE pos_order_id IN (SELECT id FROM pos_order)" % rel)
 cr.execute("DELETE FROM pos_order")
 cr.execute("DELETE FROM pos_session")
