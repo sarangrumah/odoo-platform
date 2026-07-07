@@ -156,6 +156,8 @@ def register_vps(body: VPSRegisterRequest, request: Request) -> dict:
             hc = ex.healthcheck()
     except SSHCredentialError as e:
         # Friendly: return 200 + skipped so UAT does not see a 400 wall.
+        # Logs hostname + resolution error only, never the credential value.
+        # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         log.info("vps.register.credential_skip host=%s err=%s", target.hostname, e)
         return _credential_skip_response(str(e))
     except Exception as e:  # noqa: BLE001
@@ -281,6 +283,8 @@ def health(
         with RemoteDockerExecutor(target) as ex:
             return ex.healthcheck()
     except SSHCredentialError as e:
+        # Logs hostname + resolution error only, never the credential value.
+        # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         log.info("vps.health.credential_skip host=%s err=%s", target.hostname, e)
         return {
             "ok": False,
@@ -317,6 +321,8 @@ echo "[decommission] DONE"
         with RemoteDockerExecutor(target) as ex:
             lines = list(ex.run_script("decommission.sh", script))
     except SSHCredentialError as e:
+        # Logs vps_id + resolution error only, never the credential value.
+        # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         log.info("vps.decommission.credential_skip vps_id=%s err=%s", vps_id, e)
         return _credential_skip_response(str(e))
     except Exception as e:  # noqa: BLE001

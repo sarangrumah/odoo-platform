@@ -12,6 +12,7 @@ Notes:
   record for traceability.
 """
 
+import math
 import secrets
 
 from odoo import http
@@ -71,8 +72,12 @@ class AttendanceKioskController(http.Controller):
             return request.redirect("/custom_attendance/kiosk?status=error&message=PIN+not+recognised")
 
         try:
+            # nosemgrep: python.flask.security.injection.nan-injection.nan-injection - non-finite (nan/inf) rejected by isfinite guard below
             lat_f = float(lat) if lat else None
+            # nosemgrep: python.flask.security.injection.nan-injection.nan-injection - non-finite (nan/inf) rejected by isfinite guard below
             lng_f = float(lng) if lng else None
+            if (lat_f is not None and not math.isfinite(lat_f)) or (lng_f is not None and not math.isfinite(lng_f)):
+                lat_f = lng_f = None
         except (TypeError, ValueError):
             lat_f = lng_f = None
 

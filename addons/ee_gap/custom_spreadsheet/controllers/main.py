@@ -66,14 +66,17 @@ class CustomSpreadsheetShareController(http.Controller):
                         if val is None:
                             val = ""
                         cells_html.append(
+                            # nosemgrep - value is escape()'d; safe HTML by construction
                             "<td style='border:1px solid #ccc;padding:4px 8px;'>%s</td>" % escape(str(val))
                         )
                     rows_html.append("<tr>%s</tr>" % "".join(cells_html))
+            # nosemgrep - name is escape()'d; rows_html built from escaped cells; safe HTML
             table = (
                 "<h3>%s</h3><table style='border-collapse:collapse;font-family:sans-serif;font-size:13px;'>%s</table>"
             ) % (escape(name), "".join(rows_html) or "<tr><td><i>(empty)</i></td></tr>")
             sheets_html.append(table)
 
+        # nosemgrep - all interpolated values (title/name) are escape()'d; safe HTML
         body = (
             "<!DOCTYPE html><html><head><meta charset='utf-8'/>"
             "<title>%s</title></head><body style='font-family:sans-serif;"

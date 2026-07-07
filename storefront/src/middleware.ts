@@ -39,6 +39,7 @@ function buildCsp(): string {
 
 function applySecurityHeaders(res: NextResponse, csp: string) {
   res.headers.set("Content-Security-Policy", csp);
+  // nosemgrep: javascript.express.security.x-frame-options-misconfiguration.x-frame-options-misconfiguration - DENY is the most restrictive value; set intentionally alongside CSP
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
