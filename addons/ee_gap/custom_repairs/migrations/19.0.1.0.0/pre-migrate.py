@@ -26,6 +26,7 @@ def migrate(cr, version):
     if not version:
         return
     for column in OBSOLETE_COLUMNS:
+        # nosemgrep: odoo-sql-injection-percent-format - column iterates the hardcoded OBSOLETE_COLUMNS constant, never user input
         cr.execute("ALTER TABLE repair_order DROP COLUMN IF EXISTS %s" % column)
     cr.execute("DROP TABLE IF EXISTS custom_repairs_warranty_matrix CASCADE")
     _logger.info(
