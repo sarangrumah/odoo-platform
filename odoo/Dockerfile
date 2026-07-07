@@ -15,7 +15,15 @@ FROM odoo:19.0@sha256:b81c76750665681327f0193afcc8a54ed0348e8cac3bdaef1b7f4abea5
 USER root
 
 # System deps for: git (OCA fetch), curl (healthcheck), gettext-base (envsubst),
-# xmlsec1 (Coretax XML signing), build deps for cryptography wheels
+# xmlsec1 (Coretax XML signing), build deps for cryptography wheels.
+#
+# The second apt call patches the OS openssl family to the distro's fixed build
+# (e.g. CVE-2026-45447, PKCS7_verify heap use-after-free). It's a targeted
+# `--only-upgrade` of just the flagged packages rather than a blanket
+# `apt-get upgrade`, so Odoo's pinned python3-* apt packages are left untouched.
+# This is compatible with the base-digest pin above: that pin protects the Odoo
+# application layer, not OS libraries. `--only-upgrade` skips any name that
+# isn't already installed, so the list is safe across base rebuilds.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       git \
@@ -25,6 +33,10 @@ RUN apt-get update \
       libxmlsec1-dev \
       libxmlsec1-openssl \
       ca-certificates \
+ && apt-get install -y --no-install-recommends --only-upgrade \
+      openssl \
+      libssl3t64 \
+      libssl-dev \
  && rm -rf /var/lib/apt/lists/* \
  && update-ca-certificates
 
