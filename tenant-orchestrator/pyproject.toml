@@ -17,7 +17,7 @@ dependencies = [
   "prometheus-client==0.21.0",
   "croniter==3.0.4",
   "apscheduler==3.10.4",
-  "paramiko==3.5.0",
+  "paramiko==5.0.0",  # 5.0 clears CVE-2026-44405 (SHA-1/ssh-rsa); provisioner_ssh uses SSHClient/Ed25519Key/RSAKey/AutoAddPolicy — unchanged in 5.x
 ]
 
 [project.optional-dependencies]
