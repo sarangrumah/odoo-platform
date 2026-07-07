@@ -50,9 +50,7 @@ class RetailImportLog(models.Model):
     records_created = fields.Integer(default=0)
     records_updated = fields.Integer(default=0)
     records_archived = fields.Integer(default=0)
-    records_matched = fields.Integer(
-        default=0, help="Deprecated: variant matches. Superseded by records_updated."
-    )
+    records_matched = fields.Integer(default=0, help="Deprecated: variant matches. Superseded by records_updated.")
     records_skipped = fields.Integer(default=0)
     duplicate_count = fields.Integer(default=0, help="Rows whose key repeats within the file.")
     error_count = fields.Integer(default=0)
@@ -180,12 +178,7 @@ class RetailImportLog(models.Model):
         if not errors:
             return
         self.raw_payload = "\n".join(f"row {n}: {m}" for n, m in errors[:200])
-        self._log_lines(
-            [
-                {"row": n or 0, "status": "error", "message": str(m)}
-                for n, m in errors
-            ]
-        )
+        self._log_lines([{"row": n or 0, "status": "error", "message": str(m)} for n, m in errors])
 
     def source_b64(self):
         """Return the stored source file as base64 (for reprocessing / async jobs)."""
@@ -229,8 +222,7 @@ class RetailImportLog(models.Model):
             "tag": "display_notification",
             "params": {
                 "title": _("Sync complete"),
-                "message": _("%(n)s new file(s) imported from %(m)s feed(s).")
-                % {"n": total, "m": len(feeds)},
+                "message": _("%(n)s new file(s) imported from %(m)s feed(s).") % {"n": total, "m": len(feeds)},
                 "type": "success",
                 "sticky": False,
                 "next": {
@@ -313,14 +305,10 @@ class RetailImportLog(models.Model):
         Executor = self.env["retail.import.executor"]
         # Lazy import to avoid a hard dependency cycle on the wizard module.
         async_types = {"x101", "x20", "x24", "x70d", "x32p"}
-        channel = self.env["ir.config_parameter"].sudo().get_param(
-            "retail_import.queue_channel", "root.retail_import"
-        )
+        channel = self.env["ir.config_parameter"].sudo().get_param("retail_import.queue_channel", "root.retail_import")
         if self.file_type in async_types:
             try:
-                job = Executor.with_delay(
-                    channel=channel, description=f"Reprocess {self.name}"
-                ).run(self)
+                job = Executor.with_delay(channel=channel, description=f"Reprocess {self.name}").run(self)
                 self.job_uuid = getattr(job, "uuid", False)
             except Exception:
                 _logger.warning("queue_job unavailable; reprocessing synchronously")
@@ -378,7 +366,9 @@ class RetailImportLog(models.Model):
             # missing service never breaks an import.
             _logger.error(
                 "Retail import FAILED: %s (profile %s): %s",
-                self.name, self.profile_id.code, self.error_message,
+                self.name,
+                self.profile_id.code,
+                self.error_message,
             )
         except Exception:  # pragma: no cover - defensive
             _logger.exception("Failure alert hook errored (log %s)", self.id)

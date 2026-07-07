@@ -50,8 +50,13 @@ class CustomReportBalanceSheet(models.AbstractModel):
         has_comp = any(line.get("comparison") is not None for line in ctx.get("lines", []))
         secondary = ("Prior Period", "comparison") if has_comp else None
         return self._xlsx_sectioned_body(
-            sheet, ctx, fmts, start_row,
-            amount_header="Balance", secondary=secondary, section_heading=False,
+            sheet,
+            ctx,
+            fmts,
+            start_row,
+            amount_header="Balance",
+            secondary=secondary,
+            section_heading=False,
         )
 
     def _default_filters(self):

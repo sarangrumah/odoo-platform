@@ -37,12 +37,14 @@ class CustomReportPartnerLedger(models.AbstractModel):
             ltype = line.get("type")
             if ltype == "partner":
                 sheet.merge_range(
-                    row, 0, row, ncol - 2,
-                    line.get("partner_name") or "", fmts["group_text"],
+                    row,
+                    0,
+                    row,
+                    ncol - 2,
+                    line.get("partner_name") or "",
+                    fmts["group_text"],
                 )
-                sheet.write_number(
-                    row, ncol - 1, float(line.get("opening") or 0.0), fmts["group_num"]
-                )
+                sheet.write_number(row, ncol - 1, float(line.get("opening") or 0.0), fmts["group_num"])
                 row += 1
                 for ml in line.get("lines", []):
                     sheet.write(row, 0, self._format_date_id(ml.get("date")), fmts["text"])
@@ -59,9 +61,7 @@ class CustomReportPartnerLedger(models.AbstractModel):
                 sheet.write_number(row, 6, float(line.get("closing") or 0.0), fmts["total_num"])
                 row += 1
             elif ltype == "grand_total":
-                sheet.merge_range(
-                    row, 0, row, 3, line.get("label") or "Grand Total", fmts["total_text"]
-                )
+                sheet.merge_range(row, 0, row, 3, line.get("label") or "Grand Total", fmts["total_text"])
                 sheet.write_number(row, 4, float(line.get("total_debit") or 0.0), fmts["total_num"])
                 sheet.write_number(row, 5, float(line.get("total_credit") or 0.0), fmts["total_num"])
                 sheet.write_number(row, 6, float(line.get("closing") or 0.0), fmts["total_num"])

@@ -21,9 +21,7 @@ class LevisInventoryReconciliation(models.Model):
     _order = "date desc, id desc"
 
     name = fields.Char(default="/", copy=False, readonly=True)
-    company_id = fields.Many2one(
-        "res.company", required=True, default=lambda self: self.env.company
-    )
+    company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company)
     date = fields.Date(
         required=True,
         default=fields.Date.context_today,
@@ -43,18 +41,14 @@ class LevisInventoryReconciliation(models.Model):
         "against. Defaults per line to the product category's Stock Variation "
         "account when it is set.",
     )
-    line_ids = fields.One2many(
-        "levis.inventory.reconciliation.line", "reconciliation_id", copy=False
-    )
+    line_ids = fields.One2many("levis.inventory.reconciliation.line", "reconciliation_id", copy=False)
     move_id = fields.Many2one("account.move", readonly=True, copy=False)
     state = fields.Selection(
         [("draft", "Draft"), ("computed", "Computed"), ("generated", "Generated")],
         default="draft",
         copy=False,
     )
-    total_difference = fields.Monetary(
-        compute="_compute_total_difference", currency_field="currency_id"
-    )
+    total_difference = fields.Monetary(compute="_compute_total_difference", currency_field="currency_id")
     currency_id = fields.Many2one(related="company_id.currency_id")
 
     @api.depends("line_ids.difference")
@@ -66,12 +60,7 @@ class LevisInventoryReconciliation(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get("name", "/") == "/":
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code(
-                        "levis.inventory.reconciliation"
-                    )
-                    or "/"
-                )
+                vals["name"] = self.env["ir.sequence"].next_by_code("levis.inventory.reconciliation") or "/"
         return super().create(vals_list)
 
     # ------------------------------------------------------------------
@@ -116,22 +105,16 @@ class LevisInventoryReconciliation(models.Model):
             ("parent_state", "=", "posted"),
             ("date", "<=", self.date),
         ]
-        grouped = self.env["account.move.line"]._read_group(
-            domain, ["account_id"], ["balance:sum"]
-        )
+        grouped = self.env["account.move.line"]._read_group(domain, ["account_id"], ["balance:sum"])
         return {account.id: balance for account, balance in grouped}
 
     def action_compute(self):
         for rec in self:
             if rec.move_id:
-                raise UserError(
-                    _("A journal entry was already generated for %s.", rec.name)
-                )
+                raise UserError(_("A journal entry was already generated for %s.", rec.name))
             rec.line_ids.unlink()
             stock_by_acc = rec._get_stock_value_by_account()
-            accounts = self.env["account.account"].browse(
-                [a.id for a in stock_by_acc]
-            )
+            accounts = self.env["account.account"].browse([a.id for a in stock_by_acc])
             gl_by_acc = rec._get_gl_balance(accounts)
             lines = []
             for account, (stock_value, var_account) in stock_by_acc.items():
@@ -142,9 +125,7 @@ class LevisInventoryReconciliation(models.Model):
                         {
                             "account_id": account.id,
                             "counterpart_account_id": (
-                                var_account.id
-                                if var_account
-                                else rec.counterpart_account_id.id
+                                var_account.id if var_account else rec.counterpart_account_id.id
                             ),
                             "book_value": gl_by_acc.get(account.id, 0.0),
                             "stock_value": stock_value,
@@ -167,9 +148,7 @@ class LevisInventoryReconciliation(models.Model):
         currency = self.company_id.currency_id
         move_lines = []
         for line in self.line_ids:
-            if float_is_zero(
-                line.difference, precision_rounding=currency.rounding
-            ):
+            if float_is_zero(line.difference, precision_rounding=currency.rounding):
                 continue
             counterpart = line.counterpart_account_id or self.counterpart_account_id
             if not counterpart:
@@ -208,9 +187,7 @@ class LevisInventoryReconciliation(models.Model):
                 )
             )
         if not move_lines:
-            raise UserError(
-                _("Nothing to reconcile — GL already matches the stock value.")
-            )
+            raise UserError(_("Nothing to reconcile — GL already matches the stock value."))
         move = self.env["account.move"].create(
             {
                 "move_type": "entry",
@@ -246,15 +223,10 @@ class LevisInventoryReconciliation(models.Model):
             )
             if not journal:
                 continue
-            rec = self.with_company(company).create(
-                {"company_id": company.id, "journal_id": journal.id}
-            )
+            rec = self.with_company(company).create({"company_id": company.id, "journal_id": journal.id})
             rec.action_compute()
             currency = company.currency_id
-            if any(
-                not float_is_zero(line.difference, precision_rounding=currency.rounding)
-                for line in rec.line_ids
-            ):
+            if any(not float_is_zero(line.difference, precision_rounding=currency.rounding) for line in rec.line_ids):
                 try:
                     rec.action_generate_move()
                 except UserError:
@@ -266,26 +238,14 @@ class LevisInventoryReconciliationLine(models.Model):
     _name = "levis.inventory.reconciliation.line"
     _description = "Periodic Inventory Reconciliation Line"
 
-    reconciliation_id = fields.Many2one(
-        "levis.inventory.reconciliation", required=True, ondelete="cascade"
-    )
+    reconciliation_id = fields.Many2one("levis.inventory.reconciliation", required=True, ondelete="cascade")
     company_id = fields.Many2one(related="reconciliation_id.company_id", store=True)
     currency_id = fields.Many2one(related="reconciliation_id.currency_id")
-    account_id = fields.Many2one(
-        "account.account", string="Valuation Account", required=True
-    )
-    counterpart_account_id = fields.Many2one(
-        "account.account", string="Variation Account"
-    )
-    book_value = fields.Monetary(
-        string="GL Balance", currency_field="currency_id"
-    )
-    stock_value = fields.Monetary(
-        string="Stock Value", currency_field="currency_id"
-    )
-    difference = fields.Monetary(
-        compute="_compute_difference", store=True, currency_field="currency_id"
-    )
+    account_id = fields.Many2one("account.account", string="Valuation Account", required=True)
+    counterpart_account_id = fields.Many2one("account.account", string="Variation Account")
+    book_value = fields.Monetary(string="GL Balance", currency_field="currency_id")
+    stock_value = fields.Monetary(string="Stock Value", currency_field="currency_id")
+    difference = fields.Monetary(compute="_compute_difference", store=True, currency_field="currency_id")
 
     @api.depends("stock_value", "book_value")
     def _compute_difference(self):

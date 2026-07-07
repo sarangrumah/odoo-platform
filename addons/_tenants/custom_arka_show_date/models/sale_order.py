@@ -23,9 +23,7 @@ class SaleOrder(models.Model):
     @api.depends("company_id", "company_id.x_custom_show_date_enabled")
     def _compute_x_custom_show_date_required(self):
         for order in self:
-            order.x_custom_show_date_required = bool(
-                order.company_id.x_custom_show_date_enabled
-            )
+            order.x_custom_show_date_required = bool(order.company_id.x_custom_show_date_enabled)
 
     def _confirmation_error_message(self):
         # Preserve core confirmation checks first.

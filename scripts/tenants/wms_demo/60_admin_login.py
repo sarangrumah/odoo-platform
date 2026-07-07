@@ -25,13 +25,15 @@ if not admin:
 if not admin:
     raise Exception("No admin user found in this database.")
 
-admin.write({
-    "name": NAME,
-    "login": LOGIN,
-    "email": LOGIN,
-    "password": PASSWORD,
-    "active": True,
-})
+admin.write(
+    {
+        "name": NAME,
+        "login": LOGIN,
+        "email": LOGIN,
+        "password": PASSWORD,
+        "active": True,
+    }
+)
 
 # Ensure full admin rights (Settings group implies the rest).
 grp_settings = env.ref("base.group_system", raise_if_not_found=False)

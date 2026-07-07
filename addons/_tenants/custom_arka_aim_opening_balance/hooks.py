@@ -52,33 +52,39 @@ def _ensure_missing_accounts(env):
         if not company:
             _logger.warning(
                 "opening_balance: company %r not found, skip account %s",
-                row["company_name"], row["code"],
+                row["company_name"],
+                row["code"],
             )
             continue
         if _resolve(env, row["code"], company):
             continue
-        env["account.account"].with_company(company).create({
-            "code": row["code"],
-            "name": row["name"],
-            "account_type": row["account_type"],
-            "reconcile": row["reconcile"].strip().lower() in _TRUE,
-            "company_ids": [Command.link(company.id)],
-        })
+        env["account.account"].with_company(company).create(
+            {
+                "code": row["code"],
+                "name": row["name"],
+                "account_type": row["account_type"],
+                "reconcile": row["reconcile"].strip().lower() in _TRUE,
+                "company_ids": [Command.link(company.id)],
+            }
+        )
         _logger.info(
             "opening_balance: created account %s (%s) for %s",
-            row["code"], row["account_type"], company.name,
+            row["code"],
+            row["account_type"],
+            company.name,
         )
 
 
 def _post_company_opening(env, company, relpath):
     Move = env["account.move"].with_company(company)
-    existing = Move.search(
-        [("ref", "=", REF), ("company_id", "=", company.id)], limit=1
-    )
+    existing = Move.search([("ref", "=", REF), ("company_id", "=", company.id)], limit=1)
     if existing:
         _logger.info(
             "opening_balance: move %r already exists for %s (id=%s, state=%s) -> skip",
-            REF, company.name, existing.id, existing.state,
+            REF,
+            company.name,
+            existing.id,
+            existing.state,
         )
         return
 
@@ -88,9 +94,7 @@ def _post_company_opening(env, company, relpath):
         .search([("type", "=", "general"), ("company_id", "=", company.id)], limit=1)
     )
     if not journal:
-        raise UserError(
-            f"opening_balance: no general (Miscellaneous) journal for {company.name}"
-        )
+        raise UserError(f"opening_balance: no general (Miscellaneous) journal for {company.name}")
 
     lines, unresolved = [], []
     for row in _read_csv(relpath):
@@ -98,29 +102,36 @@ def _post_company_opening(env, company, relpath):
         if not acc:
             unresolved.append(row["code"])
             continue
-        lines.append(Command.create({
-            "account_id": acc.id,
-            "name": "Saldo Awal " + row["code"],
-            "debit": float(row["debit"] or 0),
-            "credit": float(row["credit"] or 0),
-        }))
-    if unresolved:
-        raise UserError(
-            f"opening_balance: unresolved account codes for {company.name}: {unresolved}"
+        lines.append(
+            Command.create(
+                {
+                    "account_id": acc.id,
+                    "name": "Saldo Awal " + row["code"],
+                    "debit": float(row["debit"] or 0),
+                    "credit": float(row["credit"] or 0),
+                }
+            )
         )
+    if unresolved:
+        raise UserError(f"opening_balance: unresolved account codes for {company.name}: {unresolved}")
 
-    move = Move.create({
-        "move_type": "entry",
-        "journal_id": journal.id,
-        "date": OPEN_DATE,
-        "ref": REF,
-        "line_ids": lines,
-    })
+    move = Move.create(
+        {
+            "move_type": "entry",
+            "journal_id": journal.id,
+            "date": OPEN_DATE,
+            "ref": REF,
+            "line_ids": lines,
+        }
+    )
     move.action_post()
     total = sum(l[2]["debit"] for l in lines)
     _logger.info(
         "opening_balance: posted %s move id=%s lines=%s total=%.0f",
-        company.name, move.id, len(lines), total,
+        company.name,
+        move.id,
+        len(lines),
+        total,
     )
 
 
@@ -130,9 +141,7 @@ def post_init_hook(env):
     for company_name, relpath in COMPANY_FILES:
         company = Company.search([("name", "=", company_name)], limit=1)
         if not company:
-            _logger.warning(
-                "opening_balance: company %r not found, skip opening move", company_name
-            )
+            _logger.warning("opening_balance: company %r not found, skip opening move", company_name)
             continue
         _post_company_opening(env, company, relpath)
     _logger.info("opening_balance: post_init_hook done")

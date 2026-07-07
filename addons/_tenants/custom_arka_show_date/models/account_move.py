@@ -28,9 +28,7 @@ class AccountMove(models.Model):
     def _compute_needed_terms(self):
         # Anchored = flagged-company customer invoices that carry a show date.
         anchored = self.filtered(
-            lambda m: m.company_id.x_custom_show_date_enabled
-            and m.move_type == "out_invoice"
-            and m.x_custom_show_date
+            lambda m: m.company_id.x_custom_show_date_enabled and m.move_type == "out_invoice" and m.x_custom_show_date
         )
         rest = self - anchored
 

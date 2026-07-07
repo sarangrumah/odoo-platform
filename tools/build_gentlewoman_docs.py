@@ -63,16 +63,22 @@ def main() -> None:
 
         print(f"pandoc  {md_name} -> {html.name}")
         subprocess.run(
-            [pandoc, str(md), "-o", str(html), "--standalone",
-             "--metadata", f"title={title}", "-H", str(STYLE)],
+            [pandoc, str(md), "-o", str(html), "--standalone", "--metadata", f"title={title}", "-H", str(STYLE)],
             check=True,
         )
 
         print(f"chrome  {html.name} -> {pdf.name}")
         subprocess.run(
-            [chrome, "--headless", "--disable-gpu", "--no-pdf-header-footer",
-             f"--user-data-dir={profile}", "--virtual-time-budget=10000",
-             f"--print-to-pdf={pdf}", html.as_uri()],
+            [
+                chrome,
+                "--headless",
+                "--disable-gpu",
+                "--no-pdf-header-footer",
+                f"--user-data-dir={profile}",
+                "--virtual-time-budget=10000",
+                f"--print-to-pdf={pdf}",
+                html.as_uri(),
+            ],
             check=True,
         )
         size = pdf.stat().st_size if pdf.exists() else 0

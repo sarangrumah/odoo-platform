@@ -141,11 +141,7 @@ class AccountMove(models.Model):
             normalized = re.sub(r"[^0-9A-Za-z]", "", rec.x_custom_nsfp)
             if not _NSFP_RE.match(normalized):
                 raise ValidationError(
-                    _(
-                        "No. Faktur Pajak tidak valid (got: %s). Harus 10–25 "
-                        "karakter alfanumerik."
-                    )
-                    % rec.x_custom_nsfp
+                    _("No. Faktur Pajak tidak valid (got: %s). Harus 10–25 karakter alfanumerik.") % rec.x_custom_nsfp
                 )
 
     @api.constrains("x_custom_coretax_status", "x_custom_nsfp")
@@ -194,16 +190,12 @@ class AccountMove(models.Model):
         entry / CSV import always wins)."""
         confirmed_states = ("confirmed", "exported", "submitted", "approved")
         for rec in self:
-            bupots = rec.x_custom_bukti_potong_ids.filtered(
-                lambda b: b.state in confirmed_states
-            )
+            bupots = rec.x_custom_bukti_potong_ids.filtered(lambda b: b.state in confirmed_states)
             vals = {}
             if (rec.x_custom_bukti_potong_ids or bupots) and not rec.x_custom_has_bukti_potong:
                 vals["x_custom_has_bukti_potong"] = True
             if bupots:
-                primary = bupots.sorted(
-                    lambda b: (b.tanggal_bupot or fields.Date.today(), b.id), reverse=True
-                )[:1]
+                primary = bupots.sorted(lambda b: (b.tanggal_bupot or fields.Date.today(), b.id), reverse=True)[:1]
                 if not rec.x_custom_no_bukti_potong and primary.no_bupot:
                     vals["x_custom_no_bukti_potong"] = primary.no_bupot
                 if not rec.x_custom_tanggal_bukti_potong and primary.tanggal_bupot:

@@ -66,9 +66,7 @@ class AssetRegisterWizard(models.TransientModel):
             "doc_model": self._name,
             "options": self._options(),
         }
-        return self.env.ref(
-            "custom_accounting_asset.action_report_asset_register"
-        ).report_action(self, data=data)
+        return self.env.ref("custom_accounting_asset.action_report_asset_register").report_action(self, data=data)
 
     def action_export_xlsx(self):
         self.ensure_one()

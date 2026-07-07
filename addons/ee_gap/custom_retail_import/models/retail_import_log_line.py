@@ -27,9 +27,7 @@ class RetailImportLogLine(models.Model):
     _description = "Retail Import Log Line"
     _order = "log_id, row, id"
 
-    log_id = fields.Many2one(
-        "retail.import.log", required=True, ondelete="cascade", index=True
-    )
+    log_id = fields.Many2one("retail.import.log", required=True, ondelete="cascade", index=True)
     row = fields.Integer(string="Source Row", index=True, help="1-based row number in the source file.")
     status = fields.Selection(
         [

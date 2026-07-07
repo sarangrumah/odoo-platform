@@ -21,6 +21,5 @@ class RentalOrder(models.Model):
         [("preflight", "Pre-Flight Survey"), ("event", "Event")],
         string="Loan Cycle",
         copy=False,
-        help="Pre-flight and event handovers share one SO but are separate "
-        "physical pickup/return cycles.",
+        help="Pre-flight and event handovers share one SO but are separate physical pickup/return cycles.",
     )
