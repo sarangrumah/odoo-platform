@@ -1,0 +1,22 @@
+# Semgrep ignore list. NOTE: a project .semgrepignore replaces Semgrep's built-in
+# default, so the common defaults are re-listed here alongside our own excludes.
+
+# --- Our excludes: vendored / third-party code (mirrors ruff + pre-commit) ---
+# Owned by upstream repos (OCA modules, static libs); not ours to lint.
+addons/_vendor/
+**/static/lib/
+*.min.js
+*.min.css
+
+# --- Re-listed Semgrep defaults ---
+.git/
+node_modules/
+vendor/
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/

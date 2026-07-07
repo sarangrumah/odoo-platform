@@ -18,6 +18,7 @@ class CustomLeaveBalanceReport(models.Model):
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
+        # nosemgrep: odoo-sql-injection-fstring - self._table is the framework-controlled model table name (_auto=False view), never user input
         self.env.cr.execute(
             f"""
             CREATE OR REPLACE VIEW {self._table} AS
