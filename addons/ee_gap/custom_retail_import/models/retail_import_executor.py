@@ -1152,7 +1152,12 @@ class RetailImportExecutor(models.AbstractModel):
                     # so orders are actually marked paid (mirrors fix b68559b).
                     order.invalidate_recordset(["payment_ids", "amount_paid"])
                     order.amount_paid = sum(order.payment_ids.mapped("amount"))
-                    if order.amount_total > 0 and order.amount_paid >= order.amount_total:
+                    # Finalize whenever the tender matches the total — including a
+                    # zero-value giveaway (100% discount, TOTAL AMOUNT 0) or a net-negative
+                    # refund. POS refuses to CLOSE a session that still holds any 'draft'
+                    # order, so a 0/negative order left un-paid would silently block the
+                    # whole session's GL (close_session_from_ui returns successful=False).
+                    if abs(order.amount_paid - order.amount_total) < 0.01:
                         order.action_pos_order_paid()
                     self._xid_set(ns, oxid, "pos.order", order.id)
             except Exception as e:  # per-order savepoint rolled back; keep going
