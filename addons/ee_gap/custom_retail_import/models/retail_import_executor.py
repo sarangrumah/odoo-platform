@@ -178,6 +178,7 @@ class RetailImportExecutor(models.AbstractModel):
 
         # ---- aggregate (mirror of 01_extract_x101.py) ----
         sku_best = {}  # sku -> (eff, dict)
+        sku_gtins = defaultdict(set)  # sku -> {all GTINs} (a variant may have several)
         tmpl_meta = {}  # code -> dict
         sizes, inseams = set(), set()
         tmpl_variants = defaultdict(set)
@@ -195,6 +196,8 @@ class RetailImportExecutor(models.AbstractModel):
             inseam_raw = r.get("inseam")
             inseam = (str(inseam_raw).strip() if inseam_raw not in (None, "-", "") else "")
             gtin = str(r.get("gtin") or "").strip()
+            if gtin:
+                sku_gtins[sku].add(gtin)  # keep EVERY GTIN so all scanned codes resolve
             retail = float(profile._parse_amount(r.get("retail_price")))
             eff = profile._parse_date(r.get("price_eff")) or None
 
@@ -300,11 +303,16 @@ class RetailImportExecutor(models.AbstractModel):
         for start in range(0, len(items), BATCH):
             for pc, m in items[start:start + BATCH]:
                 txid = self._safe_xid("tmpl_", pc)
-                if txid in tmpl_xid_to_id:
-                    continue
                 vset = tmpl_variants[pc]
                 t_sizes = sorted({s for s, _ in vset if s})
                 t_inseams = sorted({i for _, i in vset if i})
+                if txid in tmpl_xid_to_id:
+                    # Fix B: template already registered — backfill any newly-appearing
+                    # size/inseam values so the missing variants get generated. The
+                    # variant-match loop below then assigns their default_code/barcode.
+                    self._x101_backfill_template_attrs(
+                        tmpl_xid_to_id[txid], t_sizes, t_inseams, attr_by_name, attr_value_id)
+                    continue
                 attr_lines = []
                 if t_sizes:
                     attr_lines.append((0, 0, {
@@ -396,6 +404,10 @@ class RetailImportExecutor(models.AbstractModel):
                         except Exception:
                             if "barcode" in updates:
                                 vp.write({k: x for k, x in updates.items() if k != "barcode"})
+                    # Fix A: register EVERY GTIN of this sku as an alternate barcode so a
+                    # POS scan of any of them resolves (the variant's single ``barcode``
+                    # field only holds one). Dedup against primary + existing aliases.
+                    self._x101_register_gtins(vp, sku_gtins.get(v["sku"], ()))
                     matched += 1
             self.env.cr.commit()
         log.records_matched = matched
@@ -431,6 +443,67 @@ class RetailImportExecutor(models.AbstractModel):
                 errors.append((rn, f"{pc}: {msg}"))
         log.set_errors(errors)
         self.env.cr.commit()
+
+    # ------------------------------------------------------------------
+    # X101 helpers — multi-GTIN (Fix A) + variant backfill (Fix B)
+    # ------------------------------------------------------------------
+    def _x101_register_gtins(self, variant, gtins):
+        """Register every GTIN of a sku as a product.barcode alternate on ``variant``.
+
+        The variant's single ``barcode`` field only holds one code; a Levi's SKU has
+        several GTINs and POS may scan any of them. Reuses custom_product_barcode's
+        ``product.barcode`` (resolved via ``product.product._resolve_barcode``). Dedup
+        against the primary barcode and existing aliases; idempotent + sudo (write on
+        product.barcode is group_system)."""
+        if not gtins:
+            return
+        Barcode = self.env["product.barcode"].sudo()
+        have = set(variant.barcode_ids.mapped("barcode"))
+        if variant.barcode:
+            have.add(variant.barcode)
+        for g in gtins:
+            g = (g or "").strip()
+            if not g or g in have:
+                continue
+            try:
+                Barcode.create({"product_id": variant.id, "barcode": g, "note": "X101 GTIN"})
+                have.add(g)
+            except Exception as e:  # unique(product_id,barcode) race / bad value
+                _logger.debug("x101 gtin alias skip %s on %s: %s", g, variant.id, e)
+
+    def _x101_backfill_template_attrs(self, tmpl_id, t_sizes, t_inseams, attr_by_name, attr_value_id):
+        """Add newly-appearing Size/Inseam values to an EXISTING template so Odoo
+        regenerates the missing variants (create_variant='always'). Only writes when
+        there is something to add, so re-runs are no-ops (idempotent).
+
+        Adding a value to an existing attribute line is safe (just more variants).
+        Creating a brand-new attribute line restructures the variant matrix — acceptable
+        here because imported POS is financial-only (no stock on these products)."""
+        tmpl = self.env["product.template"].browse(tmpl_id)
+        if not tmpl.exists():
+            return
+        want = {
+            "Size": [attr_value_id[("Size", s)] for s in t_sizes if ("Size", s) in attr_value_id],
+            "Inseam": [attr_value_id[("Inseam", i)] for i in t_inseams if ("Inseam", i) in attr_value_id],
+        }
+        for attr_name, wanted_ids in want.items():
+            if not wanted_ids:
+                continue
+            attr = attr_by_name[attr_name]
+            line = tmpl.attribute_line_ids.filtered(lambda l: l.attribute_id == attr)[:1]
+            if line:
+                missing = [i for i in wanted_ids if i not in line.value_ids.ids]
+                if missing:
+                    try:
+                        line.write({"value_ids": [(4, i) for i in missing]})
+                    except Exception as e:
+                        _logger.warning("x101 backfill add-value tmpl %s %s: %s", tmpl_id, attr_name, e)
+            else:
+                try:
+                    tmpl.write({"attribute_line_ids": [(0, 0, {
+                        "attribute_id": attr.id, "value_ids": [(6, 0, wanted_ids)]})]})
+                except Exception as e:
+                    _logger.warning("x101 backfill add-line tmpl %s %s: %s", tmpl_id, attr_name, e)
 
     # ==================================================================
     # CoA — account.account
@@ -581,7 +654,7 @@ class RetailImportExecutor(models.AbstractModel):
             prod = False
             if ean:
                 if ean not in prod_by_barcode:
-                    prod_by_barcode[ean] = Product.search([("barcode", "=", ean)], limit=1)
+                    prod_by_barcode[ean] = Product._resolve_barcode(ean)
                 prod = prod_by_barcode[ean]
             if not prod and item_id:
                 if item_id not in prod_by_code:
@@ -857,7 +930,7 @@ class RetailImportExecutor(models.AbstractModel):
             code = str(r.get("item_code") or "").strip()
             if ean:
                 if ean not in prod_bc:
-                    prod_bc[ean] = Product.search([("barcode", "=", ean)], limit=1)
+                    prod_bc[ean] = Product._resolve_barcode(ean)
                 if prod_bc[ean]:
                     return prod_bc[ean]
             if code:
@@ -1835,7 +1908,7 @@ class RetailImportExecutor(models.AbstractModel):
             code = str(r.get("product_code") or r.get("item_code") or "").strip()
             if ean:
                 if ean not in prod_bc:
-                    prod_bc[ean] = Product.search([("barcode", "=", ean)], limit=1)
+                    prod_bc[ean] = Product._resolve_barcode(ean)
                 if prod_bc[ean]:
                     return prod_bc[ean]
             if code:
