@@ -659,6 +659,22 @@ class RetailImportExecutor(models.AbstractModel):
             "retail_import.x24_strict_product", "0"
         ) in ("1", "true", "True")
 
+    def _x24_decouple_enabled(self):
+        """Decouple mode: post X24 sales fully paid against a POS Suspense Clearing
+        account (single SUSPENSE payment) instead of joining X70D tenders, so sales
+        post regardless of whether payment data exists yet. X70D, when imported, posts
+        a transfer entry (Dr per-tender receivable / Cr Suspense) and reconciles the
+        suspense lines. Gated (default OFF). Requires x24_close_sessions=1 (the GL is
+        only produced at session close)."""
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.x24_decouple_payment", "0"
+        ) in ("1", "true", "True")
+
+    def _x24_close_sessions_enabled(self):
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.x24_close_sessions", "0"
+        ) in ("1", "true", "True")
+
     def _load_x24(self, profile, file_b64, log):
         """Phase-5: post pos.order when ``retail_import.x24_post_enabled``, else stage.
 
@@ -780,8 +796,21 @@ class RetailImportExecutor(models.AbstractModel):
         # tender into the single company-default Trade Receivables. Idempotent.
         self._x24_ensure_method_gl_split()
 
+        # Decouple mode: post each order fully paid against a POS Suspense Clearing
+        # account (single SUSPENSE payment), ignoring X70D tenders. GL only forms at
+        # session close, so decouple requires x24_close_sessions=1.
+        decouple = self._x24_decouple_enabled()
+        suspense_method = None
+        if decouple:
+            if not self._x24_close_sessions_enabled():
+                raise UserError(_(
+                    "Decouple mode (retail_import.x24_decouple_payment=1) requires "
+                    "retail_import.x24_close_sessions=1 — the GL is only produced at "
+                    "POS session close."))
+            suspense_method = self._x24_ensure_suspense_method()
+
         tax = self._x24_resolve_tax()
-        tenders = self._x24_tender_index(profile)
+        tenders = {} if decouple else self._x24_tender_index(profile)
         orders = self._x24_group_orders(records)
         strict_products = self._x24_strict_product_enabled()
 
@@ -945,16 +974,17 @@ class RetailImportExecutor(models.AbstractModel):
                 skipped += len(rows)
                 continue
 
-            tlist = tenders.get(key, [])
-            pay_total = sum(a for _, a in tlist)
-            if not tlist:
-                fail_rows(rows, f"store {store} txn {txn}: no X70D tender (sync X70D first)")
-                skipped += len(rows)
-                continue
-            if abs(pay_total - order_incl) > self._X24_BALANCE_TOL:
-                fail_rows(rows, f"store {store} txn {txn}: unbalanced lines={order_incl:.2f} tenders={pay_total:.2f}")
-                skipped += len(rows)
-                continue
+            if not decouple:
+                tlist = tenders.get(key, [])
+                pay_total = sum(a for _, a in tlist)
+                if not tlist:
+                    fail_rows(rows, f"store {store} txn {txn}: no X70D tender (sync X70D first)")
+                    skipped += len(rows)
+                    continue
+                if abs(pay_total - order_incl) > self._X24_BALANCE_TOL:
+                    fail_rows(rows, f"store {store} txn {txn}: unbalanced lines={order_incl:.2f} tenders={pay_total:.2f}")
+                    skipped += len(rows)
+                    continue
 
             d = profile._parse_date(date)
             dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
@@ -971,15 +1001,24 @@ class RetailImportExecutor(models.AbstractModel):
                         "amount_tax": order_incl - order_net, "amount_total": order_incl,
                         "amount_paid": 0.0, "amount_return": 0.0,
                     })
-                    for tt, amt in tlist:
-                        m = map_method(cfg, tt)
-                        if not m:
-                            errors.append((rows[0].get("_row"), f"{store}/{txn}: no method for tender {tt}"))
-                            continue
+                    if decouple:
+                        # Pay the full amount to the POS Suspense Clearing method; X70D
+                        # reconciliation later transfers it to the real tender receivables.
                         order.add_payment({
-                            "pos_order_id": order.id, "payment_method_id": m.id,
-                            "amount": amt, "payment_date": dt,
+                            "pos_order_id": order.id,
+                            "payment_method_id": suspense_method[cfg.company_id.id].id,
+                            "amount": order_incl, "payment_date": dt,
                         })
+                    else:
+                        for tt, amt in tlist:
+                            m = map_method(cfg, tt)
+                            if not m:
+                                errors.append((rows[0].get("_row"), f"{store}/{txn}: no method for tender {tt}"))
+                                continue
+                            order.add_payment({
+                                "pos_order_id": order.id, "payment_method_id": m.id,
+                                "amount": amt, "payment_date": dt,
+                            })
                     # ``pos.order.amount_paid`` is a plain stored field (no @api.depends)
                     # in Odoo 19: writing pos.payment rows does NOT refresh it (the UI
                     # relies on an onchange). Recompute from payments before the paid gate
@@ -1238,6 +1277,61 @@ class RetailImportExecutor(models.AbstractModel):
                     summary.get(company.id, {}).get(tender, 0) + 1
         return summary
 
+    # ------------------------------------------------------------------
+    # Decouple mode — POS Suspense Clearing (sales posted before payment)
+    # ------------------------------------------------------------------
+    _X24_SUSPENSE_METHOD = "SUSPENSE"
+    _X24_SUSPENSE_LABEL = "POS Suspense Clearing"
+
+    def _x24_suspense_account(self, company):
+        """Get/create the reconcilable POS Suspense Clearing account for a company.
+
+        Sales in decouple mode book Dr Suspense / Cr Revenue+Tax at session close; the
+        later X70D transfer credits it back per tender and reconciles. Cloned from the
+        default POS receivable (same account_type, reconcile=True). Reuse-first by name.
+        Mirrors _x24_recv_account_for."""
+        Account = self.env["account.account"].sudo().with_company(company)
+        acc = Account.search([("name", "=", self._X24_SUSPENSE_LABEL)], limit=1)
+        if acc:
+            return acc
+        default_recv = company.account_default_pos_receivable_account_id
+        base = default_recv.with_company(company).code if default_recv else "1106000001"
+        return Account.create({
+            "name": self._X24_SUSPENSE_LABEL,
+            "code": self._x24_next_free_account_code(company, base),
+            "account_type": (default_recv.account_type if default_recv else "asset_receivable"),
+            "reconcile": True,
+            "company_ids": [(4, company.id)],
+        })
+
+    def _x24_ensure_suspense_method(self):
+        """Get/create a non-cash SUSPENSE pos.payment.method per company, backed by the
+        POS Suspense Clearing account, attached to every config. Idempotent. Mirrors
+        _x24_seed_payment_methods. Must NOT be is_cash_count (else the cash-control
+        close misbehaves and _x24_ensure_method_gl_split would skip it)."""
+        Method = self.env["pos.payment.method"].sudo()
+        by_company = {}
+        for company in self.env["pos.config"].search([]).mapped("company_id"):
+            m = Method.search([("company_id", "=", company.id),
+                               ("name", "=", self._X24_SUSPENSE_METHOD)], limit=1)
+            if not m:
+                existing = Method.search([("company_id", "=", company.id)])
+                template = existing.filtered(
+                    lambda x: x.name == "OFFLINE_OTHER_CREDITCARD")[:1] or existing[:1]
+                vals = {"name": self._X24_SUSPENSE_METHOD, "company_id": company.id}
+                if template and template.journal_id:
+                    vals["journal_id"] = template.journal_id.id
+                m = Method.create(vals)
+            # Non-cash + own reconcilable suspense receivable.
+            susp = self._x24_suspense_account(company)
+            if m.receivable_account_id != susp:
+                m.receivable_account_id = susp.id
+            for c in self.env["pos.config"].search([("company_id", "=", company.id)]):
+                if m not in c.payment_method_ids:
+                    c.write({"payment_method_ids": [(4, m.id)]})
+            by_company[company.id] = m
+        return by_company
+
     def _aggregate_x24_by_sku_day(self, records):
         """Aggregate X24 rows to (store_code, closing_date, item_code) level.
 
@@ -1282,10 +1376,167 @@ class RetailImportExecutor(models.AbstractModel):
     # X70D — Tender detail (Phase 5, staged until X24 is enabled)
     # ==================================================================
     def _load_x70d(self, profile, file_b64, log):
-        self._stage_only(
-            profile, file_b64, log,
-            "X70D tender detail: staged (Phase-5 gated — depends on X24 enablement).",
+        # Decouple mode: X70D drives the settlement — post the tender transfer
+        # (Dr per-tender receivable / Cr Suspense) and reconcile the suspense lines.
+        if self._x24_decouple_enabled():
+            self._post_x70d_reconcile(profile, file_b64, log)
+        else:
+            self._stage_only(
+                profile, file_b64, log,
+                "X70D tender detail: staged (Phase-5 gated — depends on X24 enablement).",
+            )
+
+    def _post_x70d_reconcile(self, profile, file_b64, log):
+        """Decouple-mode settlement: transfer POS Suspense Clearing to the real per-tender
+        receivables and reconcile the suspense lines against the session-close debits.
+
+        Prereq: X24 was posted in decouple mode (sales already sit on Suspense). Posts one
+        RIREC ``account.move`` (Dr per-tender receivable / Cr Suspense) dated at the latest
+        tender date, then reconciles all open suspense lines. Residual on the suspense
+        account = sales whose payment never arrived (surfaced in the log note)."""
+        ns = profile.namespace
+        company = profile.company_id
+        AML = self.env["account.move.line"].sudo()
+
+        # Whole-file idempotency guard (mirror _post_x24 / _post_x31): refuse to re-run a
+        # second X70D transfer over the same suspense balance — archive the prior first.
+        prior = self.env["retail.import.log"].search(
+            [("profile_id", "=", profile.id), ("state", "=", "imported"), ("id", "!=", log.id)], limit=1
         )
+        if prior:
+            raise UserError(
+                _("X70D already reconciled (log #%s). Archive it before re-posting to "
+                  "avoid double-crediting the suspense account.") % prior.id
+            )
+
+        # Stage the rows (audit trail) exactly like _stage_only, without the early return.
+        data = profile.read_records(file_b64)
+        records = data["records"]
+        log.line_count = len(records)
+        row_to_line = self._persist_lines(log, records) if records else {}
+        if row_to_line:
+            self.env["retail.import.line"].browse(
+                [ln.id for ln in row_to_line.values()]).write({"state": "skipped"})
+        self.env.cr.commit()
+
+        susp = self._x24_suspense_account(company)
+        by_tender = defaultdict(float)
+        dates = []
+        x70d_keys = set()
+        for r in records:
+            tt = str(r.get("tender_type") or "").strip()
+            if not tt:
+                continue  # blank tender_type = file total, not a payment
+            tt = self._X24_TENDER_FOLD.get(tt, tt)
+            try:
+                amt = float(profile._parse_amount(r.get("tender_amount")) or 0)
+            except Exception:
+                amt = 0.0
+            by_tender[tt] += amt
+            d = profile._parse_date(r.get("trans_date"))
+            if d:
+                dates.append(d)
+            x70d_keys.add(self._safe_xid("posorder_", "%s_%s_%s_%s" % (
+                str(r.get("store_code") or "").strip(), str(r.get("trans_date") or "").strip(),
+                str(r.get("register") or "").strip(), str(r.get("transnum") or "").strip())))
+
+        by_tender = {t: round(a, 2) for t, a in by_tender.items() if round(a, 2)}
+        if not by_tender:
+            log.records_skipped = len(records)
+            log.error_message = "X70D: no postable tenders (empty/zero amounts)."
+            self.env.cr.commit()
+            return
+
+        # Transfer entry: Dr each per-tender receivable / Cr Suspense (total). RIREC journal.
+        Journal = self.env["account.journal"].sudo()
+        journal = Journal.search([("code", "=", "RIREC"), ("company_id", "=", company.id)], limit=1)
+        if not journal:
+            journal = Journal.create({
+                "name": "Retail Import Reconciliation", "code": "RIREC",
+                "type": "general", "company_id": company.id,
+            })
+        total = round(sum(by_tender.values()), 2)
+        line_ids = []
+        for tender, amt in sorted(by_tender.items()):
+            recv = self._x24_recv_account_for(company, tender)
+            line_ids.append((0, 0, {"account_id": recv.id, "debit": amt, "credit": 0.0,
+                                    "partner_id": False, "name": f"X70D settlement {tender}"}))
+        line_ids.append((0, 0, {"account_id": susp.id, "debit": 0.0, "credit": total,
+                                "partner_id": False, "name": "X70D settlement (Suspense clearing)"}))
+        gl_date = max(dates) if dates else datetime.now().date()
+        move = self.env["account.move"].sudo().create({
+            "move_type": "entry", "journal_id": journal.id, "date": gl_date,
+            "company_id": company.id,
+            "ref": f"X70D settlement transfer (log {log.id})", "line_ids": line_ids,
+        })
+        move.action_post()
+        # Odoo bumps a past-dated entry to today on post; re-stamp within the same FY.
+        try:
+            if gl_date and move.date and gl_date.year == move.date.year and gl_date != move.date:
+                newname = move.name
+                mtag = "/%02d/" % move.date.month
+                if newname and mtag in newname:
+                    cand = newname.replace(mtag, "/%02d/" % gl_date.month)
+                    if not self.env["account.move"].search_count(
+                        [("journal_id", "=", journal.id), ("name", "=", cand), ("id", "!=", move.id)]):
+                        newname = cand
+                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s",
+                                    (gl_date, newname, move.id))
+                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s",
+                                    (gl_date, move.id))
+                move.invalidate_recordset(["date", "name"])
+                move.line_ids.invalidate_recordset(["date"])
+        except Exception as be:
+            _logger.warning("x70d reconcile: backdate skipped: %s", be)
+        self._xid_set(ns, self._safe_xid("x70dreconcile_", str(log.id)), "account.move", move.id)
+
+        # Reconcile all open suspense lines (session-close debits + this credit). Group by
+        # partner because reconcile requires a single partner per receivable batch; POS
+        # close lines are normally partner-less, matching our partner_id=False credit.
+        open_lines = AML.search([
+            ("account_id", "=", susp.id), ("company_id", "=", company.id),
+            ("parent_state", "=", "posted"), ("reconciled", "=", False),
+        ])
+        by_partner = defaultdict(lambda: AML.browse())
+        for ln in open_lines:
+            by_partner[ln.partner_id.id] += ln
+        reconciled_groups = 0
+        for grp in by_partner.values():
+            if len(grp) > 1:
+                try:
+                    grp.reconcile()
+                    reconciled_groups += 1
+                except Exception as re:
+                    _logger.warning("x70d reconcile: group reconcile skipped: %s", re)
+
+        # Per-transaction "sales without payment" report: posted X24 orders whose txn key
+        # has no matching X70D tender (both sides run through the same _safe_xid transform).
+        posted_xids = set(self.env["ir.model.data"].sudo().search([
+            ("module", "=", ns), ("model", "=", "pos.order"),
+            ("name", "=like", "posorder_%"),
+        ]).mapped("name"))
+        unpaid = posted_xids - x70d_keys
+        # Re-read post-reconcile: fully-matched lines drop out; the sum of remaining
+        # residuals is the true net open balance on the suspense account.
+        still_open = AML.search([
+            ("account_id", "=", susp.id), ("company_id", "=", company.id),
+            ("parent_state", "=", "posted"), ("reconciled", "=", False),
+        ])
+        residual = round(sum(still_open.mapped("amount_residual")), 2)
+
+        log.records_created = 1
+        log.records_skipped = len(records)
+        note = (f"X70D settlement: transfer move {move.name} posted "
+                f"(Dr {len(by_tender)} tender receivables {total:.2f} / Cr Suspense); "
+                f"reconciled {reconciled_groups} suspense group(s); "
+                f"suspense residual {residual:.2f}.")
+        if unpaid:
+            note += (f" WARNING: {len(unpaid)} posted X24 sale(s) have no matching X70D "
+                     f"tender (unpaid/unreconciled).")
+        log.error_message = note
+        self.env.cr.commit()
+        _logger.info("x70d reconcile: move %s, %s tenders, total %.2f, residual %.2f, %s unpaid",
+                     move.name, len(by_tender), total, residual, len(unpaid))
 
     # ==================================================================
     # Staged / reference-only loaders (parse + count + keep attachment)
