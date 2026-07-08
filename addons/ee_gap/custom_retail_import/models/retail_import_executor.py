@@ -95,6 +95,42 @@ class RetailImportExecutor(models.AbstractModel):
         return prefix + "".join(c if c.isalnum() else "_" for c in str(value)).upper()
 
     # ------------------------------------------------------------------
+    # X101 product-type classification
+    # ------------------------------------------------------------------
+    def _x101_service_matchers(self):
+        """Config-driven markers that flag an X101 row as a *service* (e.g. the
+        "Original cut" tailoring/alteration item) rather than storable
+        merchandise. Editable as data via ir.config_parameter, no code change:
+
+          retail_import.service_category_keywords  (comma-sep, matched as a
+              case-insensitive substring against category/class/subclass/name)
+          retail_import.service_product_codes      (comma-sep, exact product code)
+
+        Default keyword list is EMPTY on purpose: substring keywords like "TAILOR"
+        false-match real merchandise ("TAILORED BUSTIER", "TAILORED CLASSIC" shirts,
+        jeans named "…TAILOR"). Everything is storable merchandise by default; pin
+        the actual "Original cut" tailoring service by exact code (or a carefully
+        chosen keyword) via the config parameters above once its marker is known.
+        """
+        icp = self.env["ir.config_parameter"].sudo()
+        kw_raw = icp.get_param("retail_import.service_category_keywords", "")
+        code_raw = icp.get_param("retail_import.service_product_codes", "")
+        keywords = [k.strip().upper() for k in (kw_raw or "").split(",") if k.strip()]
+        codes = {c.strip().upper() for c in (code_raw or "").split(",") if c.strip()}
+        return keywords, codes
+
+    def _x101_is_service(self, meta, keywords, codes):
+        """True when an X101 template should be a non-storable service product."""
+        if codes and str(meta.get("code") or "").strip().upper() in codes:
+            return True
+        if not keywords:
+            return False
+        haystack = " ".join(
+            str(meta.get(k) or "") for k in ("cat", "cls", "subcls", "name")
+        ).upper()
+        return any(kw in haystack for kw in keywords)
+
+    # ------------------------------------------------------------------
     # Row-level backtracking helpers
     # ------------------------------------------------------------------
     def _persist_lines(self, log, records):
@@ -258,6 +294,8 @@ class RetailImportExecutor(models.AbstractModel):
         for ext in self.env["ir.model.data"].search([("module", "=", ns), ("model", "=", "product.template")]):
             tmpl_xid_to_id[ext.name] = ext.res_id
         created = 0
+        svc_keywords, svc_codes = self._x101_service_matchers()
+        bad_quality = defaultdict(list)  # pc -> [data-quality messages] for line flagging
         items = sorted(tmpl_meta.items())
         for start in range(0, len(items), BATCH):
             for pc, m in items[start:start + BATCH]:
@@ -283,14 +321,25 @@ class RetailImportExecutor(models.AbstractModel):
                     or xid_to_cat.get(cls_xid(m["cat"], m["cls"]))
                     or xid_to_cat.get(cat_xid(m["cat"]))
                 )
+                # Data-quality flags (surface bad source rows in the import log).
+                if not categ_id:
+                    bad_quality[pc].append("missing category")
+                if not m["retail"] or m["retail"] <= 0:
+                    bad_quality[pc].append("invalid/zero price")
+                # Merchandise (jeans, tops, paperbag, ...) is storable & qty-tracked;
+                # the "Original cut" tailoring/alteration item is a service. Odoo 19
+                # carries the distinction on is_storable, not on type.
+                is_service = self._x101_is_service(m, svc_keywords, svc_codes)
                 vals = {
                     "name": m["name"] or pc,
                     "default_code": pc,
                     "list_price": m["retail"],
-                    "type": "consu",
+                    "type": "service" if is_service else "consu",
                     "sale_ok": True,
                     "purchase_ok": True,
                 }
+                if not is_service:
+                    vals["is_storable"] = True
                 if categ_id:
                     vals["categ_id"] = categ_id
                 if attr_lines:
@@ -365,6 +414,23 @@ class RetailImportExecutor(models.AbstractModel):
                 if skip_ids:
                     self.env["retail.import.line"].browse(skip_ids).write({"state": "skipped"})
             self.env.cr.commit()
+
+        # Flag data-quality issues on the contributing source lines (runs AFTER
+        # linking so it overrides the "ok" state set above). Bumps error_count,
+        # which marks the log "partial" so the user reviews it.
+        errors = []
+        for pc, msgs in bad_quality.items():
+            msg = "; ".join(sorted(set(msgs)))
+            row_nums = tmpl_rows.get(pc, [])
+            line_ids = [row_to_line[rn].id for rn in row_nums if rn in row_to_line]
+            if line_ids:
+                self.env["retail.import.line"].browse(line_ids).write(
+                    {"state": "error", "error_message": msg}
+                )
+            for rn in row_nums:
+                errors.append((rn, f"{pc}: {msg}"))
+        log.set_errors(errors)
+        self.env.cr.commit()
 
     # ==================================================================
     # CoA — account.account
@@ -728,6 +794,13 @@ class RetailImportExecutor(models.AbstractModel):
             k = cfg.id
             if k not in sess_cache:
                 s = self.env["pos.session"].create({"config_id": cfg.id, "user_id": self.env.uid})
+                # Decision B: imported POS is financial-only and must NOT move stock.
+                # Merchandise is now storable (is_storable=True), so without this the
+                # close would create pickings/stock moves and double-count on-hand
+                # (the X20 snapshot already sets opening quantities). pos.session.create
+                # forces this flag from company config, so override it post-create.
+                if s.update_stock_at_closing:
+                    s.update_stock_at_closing = False
                 if s.state != "opened":
                     # Proper opening (cash control) so the close can book cash to
                     # Cash-on-hand instead of Cash Difference Loss.
@@ -1470,6 +1543,10 @@ class RetailImportExecutor(models.AbstractModel):
         def get_session(cfg):
             if cfg.id not in sess_cache:
                 s = self.env["pos.session"].create({"config_id": cfg.id, "user_id": self.env.uid})
+                # Decision B: imported refunds are financial-only, no stock move
+                # (matches X24). Override the company-derived flag post-create.
+                if s.update_stock_at_closing:
+                    s.update_stock_at_closing = False
                 if s.state != "opened":
                     try:
                         s.set_opening_control(0, None)
