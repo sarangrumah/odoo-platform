@@ -375,9 +375,13 @@ class RetailImportExecutor(models.AbstractModel):
                 continue
             variants = self.env["product.product"].search([("product_tmpl_id", "in", tmpl_ids)])
             var_index = {}
+            var_by_tmpl = defaultdict(list)
+            used_by_tmpl = defaultdict(set)  # attribute-value ids that actually distinguish variants
             for vp in variants:
-                combo = frozenset(vp.product_template_variant_value_ids.product_attribute_value_id.ids)
-                var_index[(vp.product_tmpl_id.id, combo)] = vp
+                ids = vp.product_template_variant_value_ids.product_attribute_value_id.ids
+                var_index[(vp.product_tmpl_id.id, frozenset(ids))] = vp
+                var_by_tmpl[vp.product_tmpl_id.id].append(vp)
+                used_by_tmpl[vp.product_tmpl_id.id].update(ids)
             for txid in batch_xids:
                 tid = tmpl_xid_to_id.get(txid)
                 if not tid:
@@ -389,10 +393,21 @@ class RetailImportExecutor(models.AbstractModel):
                         wanted.add(size_val_id[v["size"]])
                     if v["inseam"] and inseam_val_id.get(v["inseam"]):
                         wanted.add(inseam_val_id[v["inseam"]])
-                    vp = var_index.get((tid, frozenset(wanted)))
+                    # Odoo omits SINGLE-value attributes from a variant's combo (e.g. a
+                    # jeans template with one inseam "32", or an "OS" accessory). Restrict
+                    # ``wanted`` to the values that actually distinguish this template's
+                    # variants so the size-only / empty combo still resolves.
+                    wanted_eff = frozenset(wanted & used_by_tmpl.get(tid, set()))
+                    vp = var_index.get((tid, wanted_eff))
                     if not vp:
-                        unmatched += 1
-                        continue
+                        # Last resort: a lone-variant template that contributes a single
+                        # sku — assign it directly.
+                        tvars = var_by_tmpl.get(tid, [])
+                        if len(tvars) == 1 and len(by_tmpl[txid]) == 1:
+                            vp = tvars[0]
+                        else:
+                            unmatched += 1
+                            continue
                     updates = {}
                     if vp.default_code != v["sku"]:
                         updates["default_code"] = v["sku"]
