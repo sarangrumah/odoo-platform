@@ -67,7 +67,7 @@
         <field name="data_start_row">2</field>
         <field name="date_format">%Y-%m-%d</field>
         <field name="company_id" ref="base.main_company"/>
-        <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "item_code": 14, "waist": 15, "inseam": 16, "item_description": 17, "ean": 22, "retail_price": 23, "gross_price": 24, "net_qty": 25, "net_discount": 26, "net_amount": 27, "tax_rate": 28, "tax_amount": 29, "total_amount": 30}</field>
+        <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "item_code": 14, "waist": 15, "inseam": 16, "item_description": 17, "category": 19, "ean": 22, "retail_price": 23, "gross_price": 24, "net_qty": 25, "net_discount": 26, "net_amount": 27, "tax_rate": 28, "tax_amount": 29, "total_amount": 30}</field>
     </record>
 
     <!-- X70D — Tender Detail (payments). Header row 1, data row 2. Staged (Phase-5 gated). -->

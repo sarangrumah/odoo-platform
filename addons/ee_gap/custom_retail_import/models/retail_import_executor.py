@@ -763,6 +763,30 @@ class RetailImportExecutor(models.AbstractModel):
             "retail_import.x24_close_sessions", "0"
         ) in ("1", "true", "True")
 
+    @staticmethod
+    def _x24_codepart(v):
+        """Normalise a WAIST/INSEAM cell for composing the sized variant code.
+
+        Numeric cells come back as ``34.0``/``10.0`` floats from the xlsx reader;
+        the default_code is built from the integer text (``34``/``10``). A ``-`` or
+        blank inseam contributes nothing.
+        """
+        if v is None:
+            return ""
+        if isinstance(v, float) and v.is_integer():
+            v = int(v)
+        s = str(v).strip()
+        return "" if s in ("", "-") else s
+
+    def _x24_is_non_merch(self, r):
+        """True for ancillary POS lines that never appear in the X101 garment
+        master (paid carrier bags, tailoring services) — flagged by CATEGORY == 'NP'.
+
+        These must not park the whole transaction under strict-product mode; they
+        fall through to the lazy-create path so the sale posts and balances.
+        """
+        return str(r.get("category") or "").strip().upper() == "NP"
+
     def _load_x24(self, profile, file_b64, log):
         """Phase-5: post pos.order when ``retail_import.x24_post_enabled``, else stage.
 
@@ -953,9 +977,24 @@ class RetailImportExecutor(models.AbstractModel):
                     prod_dc[code] = Product.search([("default_code", "=", code)], limit=1)
                 if prod_dc[code]:
                     return prod_dc[code]
-            # Strict mode: refuse to invent a product for an unregistered SKU — return
-            # empty so the caller parks the whole transaction until X101 is synced.
-            if strict_products:
+            # X24 carries the *base* article code plus WAIST/INSEAM in separate columns,
+            # but X101 stores the full sized variant as default_code (base+waist+inseam,
+            # e.g. 000YB00010 + 34 + 10 -> 000YB000103410). Reconstruct and retry so a
+            # registered garment is not falsely flagged "belum teregister di master X101".
+            w = self._x24_codepart(r.get("waist"))
+            ins = self._x24_codepart(r.get("inseam"))
+            for comp in (code + w + ins, code + w):
+                if comp and comp != code:
+                    if comp not in prod_dc:
+                        prod_dc[comp] = Product.search([("default_code", "=", comp)], limit=1)
+                    if prod_dc[comp]:
+                        return prod_dc[comp]
+            # Strict mode: refuse to invent a *merchandise* product for an unregistered
+            # garment — return empty so the caller parks the whole transaction until X101
+            # is synced. Non-merchandise lines (category "NP": carrier bags, tailoring
+            # services) never live in the X101 garment master, so let them fall through to
+            # the lazy-create path below instead of detonating the entire sale.
+            if strict_products and not self._x24_is_non_merch(r):
                 return Product.browse()
             # Lazy-create a non-merchandise product (carrier bags, vouchers, etc. sold at
             # POS but absent from the X101 master) so the order is complete and balances
