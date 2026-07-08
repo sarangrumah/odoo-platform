@@ -650,6 +650,15 @@ class RetailImportExecutor(models.AbstractModel):
             "retail_import.x24_post_enabled", "0"
         ) in ("1", "true", "True")
 
+    def _x24_strict_product_enabled(self):
+        """Strict mode: never lazy-create a product for an X24/X48 row whose SKU is
+        absent from the X101 master. The transaction is parked instead, forcing the
+        team to register the product via X101 first. Gated (default OFF) so other
+        tenants keep the legacy auto-stub behaviour."""
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.x24_strict_product", "0"
+        ) in ("1", "true", "True")
+
     def _load_x24(self, profile, file_b64, log):
         """Phase-5: post pos.order when ``retail_import.x24_post_enabled``, else stage.
 
@@ -774,6 +783,7 @@ class RetailImportExecutor(models.AbstractModel):
         tax = self._x24_resolve_tax()
         tenders = self._x24_tender_index(profile)
         orders = self._x24_group_orders(records)
+        strict_products = self._x24_strict_product_enabled()
 
         cfg_cache, sess_cache, method_cache = {}, {}, {}
         prod_bc, prod_dc = {}, {}
@@ -826,6 +836,10 @@ class RetailImportExecutor(models.AbstractModel):
                     prod_dc[code] = Product.search([("default_code", "=", code)], limit=1)
                 if prod_dc[code]:
                     return prod_dc[code]
+            # Strict mode: refuse to invent a product for an unregistered SKU — return
+            # empty so the caller parks the whole transaction until X101 is synced.
+            if strict_products:
+                return Product.browse()
             # Lazy-create a non-merchandise product (carrier bags, vouchers, etc. sold at
             # POS but absent from the X101 master) so the order is complete and balances
             # against the X70D tender. Idempotent by xid. Parity with legacy 8548b52.
@@ -881,16 +895,16 @@ class RetailImportExecutor(models.AbstractModel):
                 skipped += len(rows)
                 continue
 
-            line_cmds, order_net, order_incl, missing = [], 0.0, 0.0, False
+            line_cmds, order_net, order_incl, missing = [], 0.0, 0.0, []
             for r in rows:
                 prod = resolve_product(r)
                 if not prod:
-                    missing = True
+                    missing.append(str(r.get("item_code") or r.get("ean") or "?"))
                     rn = r.get("_row")
                     if rn in row_to_line:
                         row_to_line[rn].write({
                             "state": "error",
-                            "error_message": f"no product ean={r.get('ean')!r} code={r.get('item_code')!r}"[:250],
+                            "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('item_code')!r}"[:250],
                         })
                     continue
                 qty = float(profile._parse_amount(r.get("net_qty")))
@@ -919,6 +933,13 @@ class RetailImportExecutor(models.AbstractModel):
                 order_net += gl_net
                 order_incl += incl
 
+            # Strict mode / any unresolved line: park the WHOLE transaction rather than
+            # posting a partial order (which would later fail the tender-balance check).
+            if missing:
+                sku_list = ", ".join(sorted(set(missing))[:10])
+                fail_rows(rows, f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu")
+                skipped += len(rows)
+                continue
             if not line_cmds:
                 fail_rows(rows, f"store {store} txn {txn}: no resolvable product")
                 skipped += len(rows)
@@ -1533,6 +1554,7 @@ class RetailImportExecutor(models.AbstractModel):
         cfg_cache, sess_cache, prod_bc, prod_dc = {}, {}, {}, {}
         created = skipped = 0
         errors = []
+        strict_products = self._x24_strict_product_enabled()
 
         def resolve_config(store):
             if store not in cfg_cache:
@@ -1570,6 +1592,10 @@ class RetailImportExecutor(models.AbstractModel):
                     prod_dc[code] = Product.search([("default_code", "=", code)], limit=1)
                 if prod_dc[code]:
                     return prod_dc[code]
+            # Strict mode: refuse to invent a product for an unregistered SKU — return
+            # empty so the caller parks the whole refund until X101 is synced.
+            if strict_products:
+                return Product.browse()
             key = code or ean
             if not key:
                 return Product.browse()
@@ -1620,15 +1646,16 @@ class RetailImportExecutor(models.AbstractModel):
                 skipped += len(rows)
                 continue
 
-            line_cmds, order_net, order_incl = [], 0.0, 0.0
+            line_cmds, order_net, order_incl, missing = [], 0.0, 0.0, []
             for r in rows:
                 prod = resolve_product(r)
                 if not prod:
+                    missing.append(str(r.get("product_code") or r.get("item_code") or r.get("ean") or "?"))
                     rn = r.get("_row")
                     if rn in row_to_line:
                         row_to_line[rn].write({
                             "state": "error",
-                            "error_message": f"no product ean={r.get('ean')!r} code={r.get('product_code')!r}"[:250],
+                            "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('product_code')!r}"[:250],
                         })
                     continue
                 qty = float(profile._parse_amount(r.get("net_qty")))        # negative
@@ -1644,6 +1671,13 @@ class RetailImportExecutor(models.AbstractModel):
                 order_net += gl_net
                 order_incl += incl
 
+            # Strict mode / any unresolved line: park the WHOLE refund rather than
+            # posting a partial return.
+            if missing:
+                sku_list = ", ".join(sorted(set(missing))[:10])
+                fail_rows(rows, f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu")
+                skipped += len(rows)
+                continue
             if not line_cmds:
                 fail_rows(rows, f"store {store} txn {txn}: no resolvable product")
                 skipped += len(rows)
