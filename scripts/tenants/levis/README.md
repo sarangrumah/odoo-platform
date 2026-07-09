@@ -84,6 +84,20 @@ explicit old → new map built from `pos.config`. Chatter (`mail_message`,
 `mail_tracking_value`) is left alone on purpose — it records what a record was called at
 the time.
 
+`44_fix_cash_journal_accounts.py` repairs the cash **accounts** those journals post into.
+The EBR chart has no per-store cash account, so `point_of_sale` auto-created one per store
+by walking the `1102` code block — and the walk collided with six genuine EBR accounts
+(`Cash on hand IDR/USD/MYR/SGD`, `Cash on hand - RA`, `Cash clearing acc`), which six store
+journals then adopted as their default. `Petty Cash` had the same defect. `44` gives each a
+dedicated account at the next free `1102` code, reclasses the few already-posted lines off
+the EBR accounts (unreconciled only, debit/credit untouched, moves stay balanced), and
+archives the two unused `Cash (POS) (copy)` accounts. Run it after `43`, since the target
+account name is the journal name.
+
+The new codes differ per database (`1102000027–32` where a `Petty Cash` account already
+occupied `…24`, `1102000024–29` elsewhere) — they are new accounts with no TB counterpart,
+so nothing maps to them by code.
+
 `42` stamps the OU analytic on POS revenue that was posted before
 `custom_levis_localization` started doing it at source (`pos.session._get_sale_vals`).
 Only `display_type='product'` lines of each `pos.session.move_id` are touched — tax,
