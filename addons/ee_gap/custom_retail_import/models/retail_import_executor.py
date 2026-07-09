@@ -56,9 +56,7 @@ class RetailImportExecutor(models.AbstractModel):
         self.env.cr.commit()
         handler = getattr(self, f"_load_{profile.file_type}", None)
         if handler is None:
-            log.write(
-                {"state": "failed", "error_message": f"No executor for file_type {profile.file_type!r}."}
-            )
+            log.write({"state": "failed", "error_message": f"No executor for file_type {profile.file_type!r}."})
             return log
         try:
             handler(profile, file_b64, log)
@@ -125,9 +123,7 @@ class RetailImportExecutor(models.AbstractModel):
             return True
         if not keywords:
             return False
-        haystack = " ".join(
-            str(meta.get(k) or "") for k in ("cat", "cls", "subcls", "name")
-        ).upper()
+        haystack = " ".join(str(meta.get(k) or "") for k in ("cat", "cls", "subcls", "name")).upper()
         return any(kw in haystack for kw in keywords)
 
     # ------------------------------------------------------------------
@@ -143,14 +139,16 @@ class RetailImportExecutor(models.AbstractModel):
         row_to_line = {}
         for start in range(0, len(records), LINE_BATCH):
             batch = records[start : start + LINE_BATCH]
-            created = Line.create([
-                {
-                    "log_id": log.id,
-                    "row_number": r.get("_row"),
-                    "raw_data_json": json.dumps(r, default=str),
-                }
-                for r in batch
-            ])
+            created = Line.create(
+                [
+                    {
+                        "log_id": log.id,
+                        "row_number": r.get("_row"),
+                        "raw_data_json": json.dumps(r, default=str),
+                    }
+                    for r in batch
+                ]
+            )
             for r, ln in zip(batch, created):
                 row_to_line[r.get("_row")] = ln
         return row_to_line
@@ -182,7 +180,7 @@ class RetailImportExecutor(models.AbstractModel):
         tmpl_meta = {}  # code -> dict
         sizes, inseams = set(), set()
         tmpl_variants = defaultdict(set)
-        tmpl_rows = defaultdict(list)   # pc -> [row_nums] for post-load line linking
+        tmpl_rows = defaultdict(list)  # pc -> [row_nums] for post-load line linking
         skipped_row_nums = []
         for r in records:
             pc = r.get("product_code")
@@ -194,7 +192,7 @@ class RetailImportExecutor(models.AbstractModel):
                 continue
             size = (r.get("size") or "").strip()
             inseam_raw = r.get("inseam")
-            inseam = (str(inseam_raw).strip() if inseam_raw not in (None, "-", "") else "")
+            inseam = str(inseam_raw).strip() if inseam_raw not in (None, "-", "") else ""
             gtin = str(r.get("gtin") or "").strip()
             if gtin:
                 sku_gtins[sku].add(gtin)  # keep EVERY GTIN so all scanned codes resolve
@@ -226,7 +224,11 @@ class RetailImportExecutor(models.AbstractModel):
 
         _logger.info(
             "x101: %s rows -> %s templates, %s skus, %s sizes, %s inseams",
-            len(records), len(tmpl_meta), len(sku_best), len(sizes), len(inseams),
+            len(records),
+            len(tmpl_meta),
+            len(sku_best),
+            len(sizes),
+            len(inseams),
         )
 
         # ---- categories (3-level) ----
@@ -255,18 +257,18 @@ class RetailImportExecutor(models.AbstractModel):
             xid = cls_xid(cat, cls)
             rid = self._xid_get(ns, xid, "product.category")
             if not rid:
-                rid = self.env["product.category"].create(
-                    {"name": cls, "parent_id": xid_to_cat.get(cat_xid(cat))}
-                ).id
+                rid = self.env["product.category"].create({"name": cls, "parent_id": xid_to_cat.get(cat_xid(cat))}).id
                 self._xid_set(ns, xid, "product.category", rid)
             xid_to_cat[xid] = rid
         for cat, cls, sub in sorted(l3):
             xid = sub_xid(cat, cls, sub)
             rid = self._xid_get(ns, xid, "product.category")
             if not rid:
-                rid = self.env["product.category"].create(
-                    {"name": sub, "parent_id": xid_to_cat.get(cls_xid(cat, cls))}
-                ).id
+                rid = (
+                    self.env["product.category"]
+                    .create({"name": sub, "parent_id": xid_to_cat.get(cls_xid(cat, cls))})
+                    .id
+                )
                 self._xid_set(ns, xid, "product.category", rid)
             xid_to_cat[xid] = rid
         self.env.cr.commit()
@@ -301,7 +303,7 @@ class RetailImportExecutor(models.AbstractModel):
         bad_quality = defaultdict(list)  # pc -> [data-quality messages] for line flagging
         items = sorted(tmpl_meta.items())
         for start in range(0, len(items), BATCH):
-            for pc, m in items[start:start + BATCH]:
+            for pc, m in items[start : start + BATCH]:
                 txid = self._safe_xid("tmpl_", pc)
                 vset = tmpl_variants[pc]
                 t_sizes = sorted({s for s, _ in vset if s})
@@ -311,19 +313,32 @@ class RetailImportExecutor(models.AbstractModel):
                     # size/inseam values so the missing variants get generated. The
                     # variant-match loop below then assigns their default_code/barcode.
                     self._x101_backfill_template_attrs(
-                        tmpl_xid_to_id[txid], t_sizes, t_inseams, attr_by_name, attr_value_id)
+                        tmpl_xid_to_id[txid], t_sizes, t_inseams, attr_by_name, attr_value_id
+                    )
                     continue
                 attr_lines = []
                 if t_sizes:
-                    attr_lines.append((0, 0, {
-                        "attribute_id": attr_by_name["Size"].id,
-                        "value_ids": [(6, 0, [attr_value_id[("Size", s)] for s in t_sizes])],
-                    }))
+                    attr_lines.append(
+                        (
+                            0,
+                            0,
+                            {
+                                "attribute_id": attr_by_name["Size"].id,
+                                "value_ids": [(6, 0, [attr_value_id[("Size", s)] for s in t_sizes])],
+                            },
+                        )
+                    )
                 if t_inseams:
-                    attr_lines.append((0, 0, {
-                        "attribute_id": attr_by_name["Inseam"].id,
-                        "value_ids": [(6, 0, [attr_value_id[("Inseam", i)] for i in t_inseams])],
-                    }))
+                    attr_lines.append(
+                        (
+                            0,
+                            0,
+                            {
+                                "attribute_id": attr_by_name["Inseam"].id,
+                                "value_ids": [(6, 0, [attr_value_id[("Inseam", i)] for i in t_inseams])],
+                            },
+                        )
+                    )
                 categ_id = (
                     xid_to_cat.get(sub_xid(m["cat"], m["cls"], m["subcls"]))
                     or xid_to_cat.get(cls_xid(m["cat"], m["cls"]))
@@ -368,7 +383,7 @@ class RetailImportExecutor(models.AbstractModel):
         matched = unmatched = 0
         tkeys = list(by_tmpl.keys())
         for start in range(0, len(tkeys), 100):
-            batch_xids = tkeys[start:start + 100]
+            batch_xids = tkeys[start : start + 100]
             tmpl_ids = [tmpl_xid_to_id[x] for x in batch_xids if x in tmpl_xid_to_id]
             if not tmpl_ids:
                 unmatched += sum(len(by_tmpl[x]) for x in batch_xids)
@@ -451,9 +466,7 @@ class RetailImportExecutor(models.AbstractModel):
             row_nums = tmpl_rows.get(pc, [])
             line_ids = [row_to_line[rn].id for rn in row_nums if rn in row_to_line]
             if line_ids:
-                self.env["retail.import.line"].browse(line_ids).write(
-                    {"state": "error", "error_message": msg}
-                )
+                self.env["retail.import.line"].browse(line_ids).write({"state": "error", "error_message": msg})
             for rn in row_nums:
                 errors.append((rn, f"{pc}: {msg}"))
         log.set_errors(errors)
@@ -515,8 +528,9 @@ class RetailImportExecutor(models.AbstractModel):
                         _logger.warning("x101 backfill add-value tmpl %s %s: %s", tmpl_id, attr_name, e)
             else:
                 try:
-                    tmpl.write({"attribute_line_ids": [(0, 0, {
-                        "attribute_id": attr.id, "value_ids": [(6, 0, wanted_ids)]})]})
+                    tmpl.write(
+                        {"attribute_line_ids": [(0, 0, {"attribute_id": attr.id, "value_ids": [(6, 0, wanted_ids)]})]}
+                    )
                 except Exception as e:
                     _logger.warning("x101 backfill add-line tmpl %s %s: %s", tmpl_id, attr_name, e)
 
@@ -553,7 +567,14 @@ class RetailImportExecutor(models.AbstractModel):
             if existing_id:
                 skipped += 1
                 if rn in row_to_line:
-                    row_to_line[rn].write({"state": "skipped", "aggregate_key": code, "target_model": "account.account", "target_res_id": existing_id})
+                    row_to_line[rn].write(
+                        {
+                            "state": "skipped",
+                            "aggregate_key": code,
+                            "target_model": "account.account",
+                            "target_res_id": existing_id,
+                        }
+                    )
                 continue
             existing = Account.with_company(company).search(
                 [("code", "=", code), ("company_ids", "in", company.id)], limit=1
@@ -562,7 +583,14 @@ class RetailImportExecutor(models.AbstractModel):
                 self._xid_set(ns, xid, "account.account", existing.id)
                 skipped += 1
                 if rn in row_to_line:
-                    row_to_line[rn].write({"state": "skipped", "aggregate_key": code, "target_model": "account.account", "target_res_id": existing.id})
+                    row_to_line[rn].write(
+                        {
+                            "state": "skipped",
+                            "aggregate_key": code,
+                            "target_model": "account.account",
+                            "target_res_id": existing.id,
+                        }
+                    )
                 continue
             try:
                 acc = Account.with_company(company).create(
@@ -571,7 +599,9 @@ class RetailImportExecutor(models.AbstractModel):
                 self._xid_set(ns, xid, "account.account", acc.id)
                 created += 1
                 if rn in row_to_line:
-                    row_to_line[rn].write({"aggregate_key": code, "target_model": "account.account", "target_res_id": acc.id})
+                    row_to_line[rn].write(
+                        {"aggregate_key": code, "target_model": "account.account", "target_res_id": acc.id}
+                    )
             except Exception as e:
                 errors.append((rn, f"{code}: {e}"))
                 if rn in row_to_line:
@@ -593,10 +623,14 @@ class RetailImportExecutor(models.AbstractModel):
         # SES sheet is a key/value layout; the profile maps a 'label'/'value' pair
         # OR direct fields. Support both: if a record carries 'field'/'value', set by label.
         label_to_field = {
-            "nama": "name", "name": "name",
-            "npwp": "vat", "vat": "vat",
-            "alamat": "street", "address": "street",
-            "telepon": "phone", "phone": "phone",
+            "nama": "name",
+            "name": "name",
+            "npwp": "vat",
+            "vat": "vat",
+            "alamat": "street",
+            "address": "street",
+            "telepon": "phone",
+            "phone": "phone",
             "email": "email",
         }
         for r in records:
@@ -612,8 +646,13 @@ class RetailImportExecutor(models.AbstractModel):
                 if f and str(raw_value).strip():
                     vals[f] = str(raw_value).strip()
             else:
-                for src, dst in (("name", "name"), ("vat", "vat"), ("street", "street"),
-                                 ("phone", "phone"), ("email", "email")):
+                for src, dst in (
+                    ("name", "name"),
+                    ("vat", "vat"),
+                    ("street", "street"),
+                    ("phone", "phone"),
+                    ("email", "email"),
+                ):
                     if r.get(src):
                         vals[dst] = str(r.get(src)).strip()
         if vals:
@@ -649,7 +688,7 @@ class RetailImportExecutor(models.AbstractModel):
         prod_by_code = {}
         applied = skipped = 0
         errors = []
-        quant_vals = []   # (prod, loc, qty, row_num, agg_key)
+        quant_vals = []  # (prod, loc, qty, row_num, agg_key)
         for r in records:
             rn = r.get("_row")
             store = r.get("store_code")
@@ -679,7 +718,9 @@ class RetailImportExecutor(models.AbstractModel):
                 errors.append((rn, f"no product for ean={ean!r} item={item_id!r}"))
                 skipped += 1
                 if rn in row_to_line:
-                    row_to_line[rn].write({"state": "error", "error_message": f"no product ean={ean!r} item={item_id!r}"})
+                    row_to_line[rn].write(
+                        {"state": "error", "error_message": f"no product ean={ean!r} item={item_id!r}"}
+                    )
                 continue
             quant_vals.append((prod, loc, qty, rn, f"{store}|{item_id or ean}"))
 
@@ -689,8 +730,10 @@ class RetailImportExecutor(models.AbstractModel):
         )
         if prior:
             raise UserError(
-                _("Opening stock for profile %s was already applied (log #%s). "
-                  "Re-applying would double the on-hand. Archive the prior log to override.")
+                _(
+                    "Opening stock for profile %s was already applied (log #%s). "
+                    "Re-applying would double the on-hand. Archive the prior log to override."
+                )
                 % (profile.code, prior.id)
             )
 
@@ -702,11 +745,13 @@ class RetailImportExecutor(models.AbstractModel):
                 q.action_apply_inventory()
                 applied += 1
                 if rn in row_to_line:
-                    row_to_line[rn].write({
-                        "aggregate_key": agg_key,
-                        "target_model": "stock.quant",
-                        "target_res_id": q.id,
-                    })
+                    row_to_line[rn].write(
+                        {
+                            "aggregate_key": agg_key,
+                            "target_model": "stock.quant",
+                            "target_res_id": q.id,
+                        }
+                    )
             except Exception as e:
                 errors.append((None, f"{prod.default_code}: {e}"))
                 if rn in row_to_line:
@@ -734,18 +779,22 @@ class RetailImportExecutor(models.AbstractModel):
     _X24_BALANCE_TOL = 1.0  # currency units; parks orders whose tenders != line total
 
     def _x24_post_enabled(self):
-        return self.env["ir.config_parameter"].sudo().get_param(
-            "retail_import.x24_post_enabled", "0"
-        ) in ("1", "true", "True")
+        return self.env["ir.config_parameter"].sudo().get_param("retail_import.x24_post_enabled", "0") in (
+            "1",
+            "true",
+            "True",
+        )
 
     def _x24_strict_product_enabled(self):
         """Strict mode: never lazy-create a product for an X24/X48 row whose SKU is
         absent from the X101 master. The transaction is parked instead, forcing the
         team to register the product via X101 first. Gated (default OFF) so other
         tenants keep the legacy auto-stub behaviour."""
-        return self.env["ir.config_parameter"].sudo().get_param(
-            "retail_import.x24_strict_product", "0"
-        ) in ("1", "true", "True")
+        return self.env["ir.config_parameter"].sudo().get_param("retail_import.x24_strict_product", "0") in (
+            "1",
+            "true",
+            "True",
+        )
 
     def _x24_decouple_enabled(self):
         """Decouple mode: post X24 sales fully paid against a POS Suspense Clearing
@@ -754,14 +803,18 @@ class RetailImportExecutor(models.AbstractModel):
         a transfer entry (Dr per-tender receivable / Cr Suspense) and reconciles the
         suspense lines. Gated (default OFF). Requires x24_close_sessions=1 (the GL is
         only produced at session close)."""
-        return self.env["ir.config_parameter"].sudo().get_param(
-            "retail_import.x24_decouple_payment", "0"
-        ) in ("1", "true", "True")
+        return self.env["ir.config_parameter"].sudo().get_param("retail_import.x24_decouple_payment", "0") in (
+            "1",
+            "true",
+            "True",
+        )
 
     def _x24_close_sessions_enabled(self):
-        return self.env["ir.config_parameter"].sudo().get_param(
-            "retail_import.x24_close_sessions", "0"
-        ) in ("1", "true", "True")
+        return self.env["ir.config_parameter"].sudo().get_param("retail_import.x24_close_sessions", "0") in (
+            "1",
+            "true",
+            "True",
+        )
 
     @staticmethod
     def _x24_codepart(v):
@@ -807,8 +860,7 @@ class RetailImportExecutor(models.AbstractModel):
         raw = icp.get_param("retail_import.x24_np_service_prefixes", self._X24_NP_SERVICE_PREFIXES)
         prefixes = tuple(p.strip().upper() for p in (raw or "").split(",") if p.strip())
         is_service = bool(prefixes) and str(code or "").strip().upper().startswith(prefixes)
-        param = ("retail_import.x24_np_service_category_id" if is_service
-                 else "retail_import.x24_np_category_id")
+        param = "retail_import.x24_np_service_category_id" if is_service else "retail_import.x24_np_category_id"
         Categ = self.env["product.category"]
         cid = int(icp.get_param(param, 0) or 0)
         if cid and Categ.browse(cid).exists():
@@ -837,17 +889,18 @@ class RetailImportExecutor(models.AbstractModel):
 
     def _stage_x24(self, profile, records, log, row_to_line):
         log.records_skipped = len(records)
-        log.error_message = (
-            "X24DN POS sales: staged (Phase-5 gated — set retail_import.x24_post_enabled=1 to post)."
-        )
+        log.error_message = "X24DN POS sales: staged (Phase-5 gated — set retail_import.x24_post_enabled=1 to post)."
         agg = self._aggregate_x24_by_sku_day(records)
         for (store, date, sku), vals in agg.items():
             agg_key = f"{store}|{date}|{sku}"
             line_ids = [row_to_line[rn].id for rn in vals["row_nums"] if rn in row_to_line]
             if line_ids:
-                self.env["retail.import.line"].browse(line_ids).write({
-                    "state": "skipped", "aggregate_key": agg_key,
-                })
+                self.env["retail.import.line"].browse(line_ids).write(
+                    {
+                        "state": "skipped",
+                        "aggregate_key": agg_key,
+                    }
+                )
         self.env.cr.commit()
         _logger.info("x24: %s rows -> %s daily-SKU aggregates (staged)", len(records), len(agg))
 
@@ -892,8 +945,10 @@ class RetailImportExecutor(models.AbstractModel):
             if not tt:
                 continue
             key = (
-                str(r.get("store_code") or "").strip(), str(r.get("trans_date") or "").strip(),
-                str(r.get("register") or "").strip(), str(r.get("transnum") or "").strip(),
+                str(r.get("store_code") or "").strip(),
+                str(r.get("trans_date") or "").strip(),
+                str(r.get("register") or "").strip(),
+                str(r.get("transnum") or "").strip(),
             )
             try:
                 amt = float(r.get("tender_amount") or 0)
@@ -909,8 +964,7 @@ class RetailImportExecutor(models.AbstractModel):
             txn = str(r.get("transnum") or "").strip()
             if not store or not txn:
                 continue
-            key = (store, str(r.get("trans_date") or "").strip(),
-                   str(r.get("register") or "").strip(), txn)
+            key = (store, str(r.get("trans_date") or "").strip(), str(r.get("register") or "").strip(), txn)
             orders[key].append(r)
         return orders
 
@@ -927,8 +981,7 @@ class RetailImportExecutor(models.AbstractModel):
         )
         if prior:
             raise UserError(
-                _("X24 already posted (log #%s). Archive it before re-posting to avoid duplicate sales.")
-                % prior.id
+                _("X24 already posted (log #%s). Archive it before re-posting to avoid duplicate sales.") % prior.id
             )
 
         # Ensure each tender method books to its own GL receivable account so the
@@ -943,10 +996,13 @@ class RetailImportExecutor(models.AbstractModel):
         suspense_method = None
         if decouple:
             if not self._x24_close_sessions_enabled():
-                raise UserError(_(
-                    "Decouple mode (retail_import.x24_decouple_payment=1) requires "
-                    "retail_import.x24_close_sessions=1 — the GL is only produced at "
-                    "POS session close."))
+                raise UserError(
+                    _(
+                        "Decouple mode (retail_import.x24_decouple_payment=1) requires "
+                        "retail_import.x24_close_sessions=1 — the GL is only produced at "
+                        "POS session close."
+                    )
+                )
             suspense_method = self._x24_ensure_suspense_method()
 
         tax = self._x24_resolve_tax()
@@ -1037,7 +1093,9 @@ class RetailImportExecutor(models.AbstractModel):
             else:
                 tmpl_vals = {
                     "name": (str(r.get("item_description") or "").strip() or key)[:200],
-                    "default_code": code or False, "type": "consu", "sale_ok": True,
+                    "default_code": code or False,
+                    "type": "consu",
+                    "sale_ok": True,
                     "list_price": float(profile._parse_amount(r.get("retail_price")) or 0),
                 }
                 # Only genuine non-merchandise gets a revenue bucket. With strict mode off
@@ -1047,8 +1105,11 @@ class RetailImportExecutor(models.AbstractModel):
                     np_categ = self._x24_np_category(code)
                     if np_categ:
                         tmpl_vals["categ_id"] = np_categ.id
-                tmpl = self.env["product.template"].with_context(
-                    tracking_disable=True, mail_create_nolog=True).create(tmpl_vals)
+                tmpl = (
+                    self.env["product.template"]
+                    .with_context(tracking_disable=True, mail_create_nolog=True)
+                    .create(tmpl_vals)
+                )
                 p = tmpl.product_variant_id
                 if ean and not p.barcode and not Product.search_count([("barcode", "=", ean)]):
                     try:
@@ -1094,10 +1155,14 @@ class RetailImportExecutor(models.AbstractModel):
                     missing.append(str(r.get("item_code") or r.get("ean") or "?"))
                     rn = r.get("_row")
                     if rn in row_to_line:
-                        row_to_line[rn].write({
-                            "state": "error",
-                            "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('item_code')!r}"[:250],
-                        })
+                        row_to_line[rn].write(
+                            {
+                                "state": "error",
+                                "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('item_code')!r}"[
+                                    :250
+                                ],
+                            }
+                        )
                     continue
                 qty = float(profile._parse_amount(r.get("net_qty")))
                 incl = float(profile._parse_amount(r.get("total_amount")))
@@ -1116,12 +1181,21 @@ class RetailImportExecutor(models.AbstractModel):
                 # tax-INCLUSIVE amount (the paid ``incl``) — POS then derives net = incl/(1+rate)
                 # and recognised incl == incl == tender, so nothing plugs to Cash Difference.
                 unit = incl / qty if qty else incl
-                line_cmds.append((0, 0, {
-                    "product_id": prod.id, "qty": qty,
-                    "price_unit": unit, "discount": 0.0,
-                    "tax_ids": [(6, 0, tax_ids)],
-                    "price_subtotal": gl_net, "price_subtotal_incl": incl,
-                }))
+                line_cmds.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": prod.id,
+                            "qty": qty,
+                            "price_unit": unit,
+                            "discount": 0.0,
+                            "tax_ids": [(6, 0, tax_ids)],
+                            "price_subtotal": gl_net,
+                            "price_subtotal_incl": incl,
+                        },
+                    )
+                )
                 order_net += gl_net
                 order_incl += incl
 
@@ -1129,7 +1203,10 @@ class RetailImportExecutor(models.AbstractModel):
             # posting a partial order (which would later fail the tender-balance check).
             if missing:
                 sku_list = ", ".join(sorted(set(missing))[:10])
-                fail_rows(rows, f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu")
+                fail_rows(
+                    rows,
+                    f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu",
+                )
                 skipped += len(rows)
                 continue
             if not line_cmds:
@@ -1145,7 +1222,9 @@ class RetailImportExecutor(models.AbstractModel):
                     skipped += len(rows)
                     continue
                 if abs(pay_total - order_incl) > self._X24_BALANCE_TOL:
-                    fail_rows(rows, f"store {store} txn {txn}: unbalanced lines={order_incl:.2f} tenders={pay_total:.2f}")
+                    fail_rows(
+                        rows, f"store {store} txn {txn}: unbalanced lines={order_incl:.2f} tenders={pay_total:.2f}"
+                    )
                     skipped += len(rows)
                     continue
 
@@ -1156,32 +1235,45 @@ class RetailImportExecutor(models.AbstractModel):
             sess = get_session(cfg)
             try:
                 with self.env.cr.savepoint():
-                    order = Order.create({
-                        "session_id": sess.id, "company_id": cfg.company_id.id,
-                        "pricelist_id": cfg.pricelist_id.id or False, "date_order": dt,
-                        "pos_reference": f"{store}-{reg}-{txn}",
-                        "lines": line_cmds,
-                        "amount_tax": order_incl - order_net, "amount_total": order_incl,
-                        "amount_paid": 0.0, "amount_return": 0.0,
-                    })
+                    order = Order.create(
+                        {
+                            "session_id": sess.id,
+                            "company_id": cfg.company_id.id,
+                            "pricelist_id": cfg.pricelist_id.id or False,
+                            "date_order": dt,
+                            "pos_reference": f"{store}-{reg}-{txn}",
+                            "lines": line_cmds,
+                            "amount_tax": order_incl - order_net,
+                            "amount_total": order_incl,
+                            "amount_paid": 0.0,
+                            "amount_return": 0.0,
+                        }
+                    )
                     if decouple:
                         # Pay the full amount to the POS Suspense Clearing method; X70D
                         # reconciliation later transfers it to the real tender receivables.
-                        order.add_payment({
-                            "pos_order_id": order.id,
-                            "payment_method_id": suspense_method[cfg.company_id.id].id,
-                            "amount": order_incl, "payment_date": dt,
-                        })
+                        order.add_payment(
+                            {
+                                "pos_order_id": order.id,
+                                "payment_method_id": suspense_method[cfg.company_id.id].id,
+                                "amount": order_incl,
+                                "payment_date": dt,
+                            }
+                        )
                     else:
                         for tt, amt in tlist:
                             m = map_method(cfg, tt)
                             if not m:
                                 errors.append((rows[0].get("_row"), f"{store}/{txn}: no method for tender {tt}"))
                                 continue
-                            order.add_payment({
-                                "pos_order_id": order.id, "payment_method_id": m.id,
-                                "amount": amt, "payment_date": dt,
-                            })
+                            order.add_payment(
+                                {
+                                    "pos_order_id": order.id,
+                                    "payment_method_id": m.id,
+                                    "amount": amt,
+                                    "payment_date": dt,
+                                }
+                            )
                     # ``pos.order.amount_paid`` is a plain stored field (no @api.depends)
                     # in Odoo 19: writing pos.payment rows does NOT refresh it (the UI
                     # relies on an onchange). Recompute from payments before the paid gate
@@ -1203,10 +1295,14 @@ class RetailImportExecutor(models.AbstractModel):
             for r in rows:
                 rn = r.get("_row")
                 if rn in row_to_line:
-                    row_to_line[rn].write({
-                        "state": "ok", "target_model": "pos.order",
-                        "target_res_id": order.id, "aggregate_key": f"{store}|{date}|{txn}",
-                    })
+                    row_to_line[rn].write(
+                        {
+                            "state": "ok",
+                            "target_model": "pos.order",
+                            "target_res_id": order.id,
+                            "aggregate_key": f"{store}|{date}|{txn}",
+                        }
+                    )
             created += 1
             if created % 200 == 0:
                 self.env.cr.commit()
@@ -1217,8 +1313,7 @@ class RetailImportExecutor(models.AbstractModel):
         log.records_created = created
         log.records_skipped = skipped
         log.set_errors(errors)
-        _logger.info("x24 POST: %s orders created, %s rows skipped, %s errors",
-                     created, skipped, len(errors))
+        _logger.info("x24 POST: %s orders created, %s rows skipped, %s errors", created, skipped, len(errors))
 
     def _pos_close_and_backdate(self, sessions, errors, tag):
         """Close each open POS session (cash-control aware) and re-stamp its GL move to
@@ -1239,8 +1334,10 @@ class RetailImportExecutor(models.AbstractModel):
                     s.action_pos_session_closing_control()
                 moves = s.order_ids.picking_ids.mapped("move_ids")
                 if moves:
-                    msg = (f"session {s.id}: UNEXPECTED {len(moves)} stock move(s) on close "
-                           f"(products became storable?) — inventory may be double-counted")
+                    msg = (
+                        f"session {s.id}: UNEXPECTED {len(moves)} stock move(s) on close "
+                        f"(products became storable?) — inventory may be double-counted"
+                    )
                     _logger.error("%s POST: %s", tag, msg)
                     errors.append((None, msg))
                 elif s.move_id:
@@ -1249,16 +1346,19 @@ class RetailImportExecutor(models.AbstractModel):
                         mv = s.move_id
                         if dates and mv.date and max(dates).date().year == mv.date.year:
                             gl = max(dates).date()
-                            self.env.cr.execute(
-                                "UPDATE account_move SET date=%s WHERE id=%s", (gl, mv.id))
-                            self.env.cr.execute(
-                                "UPDATE account_move_line SET date=%s WHERE move_id=%s", (gl, mv.id))
+                            self.env.cr.execute("UPDATE account_move SET date=%s WHERE id=%s", (gl, mv.id))
+                            self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s", (gl, mv.id))
                             mv.invalidate_recordset(["date"])
                             mv.line_ids.invalidate_recordset(["date"])
                     except Exception as be:
                         _logger.warning("%s POST: session %s backdate skipped: %s", tag, s.id, be)
-                    _logger.info("%s POST: session %s closed, journal %s dated %s (no stock moves)",
-                                 tag, s.id, s.move_id.name, s.move_id.date)
+                    _logger.info(
+                        "%s POST: session %s closed, journal %s dated %s (no stock moves)",
+                        tag,
+                        s.id,
+                        s.move_id.name,
+                        s.move_id.date,
+                    )
             except Exception as e:
                 errors.append((None, f"session {s.id} close failed: {e}"))
 
@@ -1276,7 +1376,7 @@ class RetailImportExecutor(models.AbstractModel):
         s = " ".join(str(name or "").upper().split())
         for pre in ("OLS SES -", "OLS SCU -", "OLS SES", "OLS SCU", "OLS -", "OLS"):
             if s.startswith(pre):
-                s = s[len(pre):].strip()
+                s = s[len(pre) :].strip()
                 break
         return " ".join(s.split())
 
@@ -1297,8 +1397,7 @@ class RetailImportExecutor(models.AbstractModel):
             sc = str(r.get("store_code") or "").strip()
             if not sc or not sc.isdigit():
                 continue
-            stores[sc] = (str(r.get("sap_store_code") or "").strip(),
-                          str(r.get("store_name") or "").strip())
+            stores[sc] = (str(r.get("sap_store_code") or "").strip(), str(r.get("store_name") or "").strip())
         return stores
 
     def _x24_map_stores_to_configs(self, stores=None, commit=False):
@@ -1327,14 +1426,17 @@ class RetailImportExecutor(models.AbstractModel):
             if sn and len(norm_cfg.get(sn, [])) == 1:
                 cfg, method = norm_cfg[sn][0], "exact"
             elif sn:
-                cands = {c.id: c for nn, cs in norm_cfg.items() if nn
-                         and (nn.startswith(sn) or sn.startswith(nn)) for c in cs}
+                cands = {
+                    c.id: c
+                    for nn, cs in norm_cfg.items()
+                    if nn and (nn.startswith(sn) or sn.startswith(nn))
+                    for c in cs
+                }
                 if len(cands) == 1:
                     cfg, method = list(cands.values())[0], "fuzzy"
                 elif len(cands) > 1:
                     method = "ambiguous"
-            report.append((code, name, cfg.id if cfg else None,
-                           cfg.name if cfg else None, method))
+            report.append((code, name, cfg.id if cfg else None, cfg.name if cfg else None, method))
             if commit and cfg:
                 xn = self._safe_xid("posconfig_", code)
                 if not self._xid_get(ns, xn, "pos.config"):
@@ -1405,13 +1507,15 @@ class RetailImportExecutor(models.AbstractModel):
             return acc
         default_recv = company.account_default_pos_receivable_account_id
         base = default_recv.with_company(company).code if default_recv else "1106000001"
-        return Account.create({
-            "name": label,
-            "code": self._x24_next_free_account_code(company, base),
-            "account_type": (default_recv.account_type if default_recv else "asset_receivable"),
-            "reconcile": True,
-            "company_ids": [(4, company.id)],
-        })
+        return Account.create(
+            {
+                "name": label,
+                "code": self._x24_next_free_account_code(company, base),
+                "account_type": (default_recv.account_type if default_recv else "asset_receivable"),
+                "reconcile": True,
+                "company_ids": [(4, company.id)],
+            }
+        )
 
     def _x24_ensure_method_gl_split(self):
         """Give every non-cash POS tender method its own receivable account so card /
@@ -1441,8 +1545,7 @@ class RetailImportExecutor(models.AbstractModel):
                 if tender not in acc_by_tender:
                     acc_by_tender[tender] = self._x24_recv_account_for(company, tender)
                 m.receivable_account_id = acc_by_tender[tender].id
-                summary.setdefault(company.id, {})[tender] = \
-                    summary.get(company.id, {}).get(tender, 0) + 1
+                summary.setdefault(company.id, {})[tender] = summary.get(company.id, {}).get(tender, 0) + 1
         return summary
 
     # ------------------------------------------------------------------
@@ -1464,13 +1567,15 @@ class RetailImportExecutor(models.AbstractModel):
             return acc
         default_recv = company.account_default_pos_receivable_account_id
         base = default_recv.with_company(company).code if default_recv else "1106000001"
-        return Account.create({
-            "name": self._X24_SUSPENSE_LABEL,
-            "code": self._x24_next_free_account_code(company, base),
-            "account_type": (default_recv.account_type if default_recv else "asset_receivable"),
-            "reconcile": True,
-            "company_ids": [(4, company.id)],
-        })
+        return Account.create(
+            {
+                "name": self._X24_SUSPENSE_LABEL,
+                "code": self._x24_next_free_account_code(company, base),
+                "account_type": (default_recv.account_type if default_recv else "asset_receivable"),
+                "reconcile": True,
+                "company_ids": [(4, company.id)],
+            }
+        )
 
     def _x24_ensure_suspense_method(self):
         """Get/create a non-cash SUSPENSE pos.payment.method per company, backed by the
@@ -1480,12 +1585,10 @@ class RetailImportExecutor(models.AbstractModel):
         Method = self.env["pos.payment.method"].sudo()
         by_company = {}
         for company in self.env["pos.config"].search([]).mapped("company_id"):
-            m = Method.search([("company_id", "=", company.id),
-                               ("name", "=", self._X24_SUSPENSE_METHOD)], limit=1)
+            m = Method.search([("company_id", "=", company.id), ("name", "=", self._X24_SUSPENSE_METHOD)], limit=1)
             if not m:
                 existing = Method.search([("company_id", "=", company.id)])
-                template = existing.filtered(
-                    lambda x: x.name == "OFFLINE_OTHER_CREDITCARD")[:1] or existing[:1]
+                template = existing.filtered(lambda x: x.name == "OFFLINE_OTHER_CREDITCARD")[:1] or existing[:1]
                 vals = {"name": self._X24_SUSPENSE_METHOD, "company_id": company.id}
                 if template and template.journal_id:
                     vals["journal_id"] = template.journal_id.id
@@ -1523,7 +1626,7 @@ class RetailImportExecutor(models.AbstractModel):
             entry["qty"] += qty
             entry["amount"] += amt
             if qty:
-                entry["unit_price"] = amt / qty   # last non-zero row wins; close enough for staging
+                entry["unit_price"] = amt / qty  # last non-zero row wins; close enough for staging
             entry["row_nums"].append(r.get("_row"))
         return agg
 
@@ -1550,7 +1653,9 @@ class RetailImportExecutor(models.AbstractModel):
             self._post_x70d_reconcile(profile, file_b64, log)
         else:
             self._stage_only(
-                profile, file_b64, log,
+                profile,
+                file_b64,
+                log,
                 "X70D tender detail: staged (Phase-5 gated — depends on X24 enablement).",
             )
 
@@ -1573,8 +1678,11 @@ class RetailImportExecutor(models.AbstractModel):
         )
         if prior:
             raise UserError(
-                _("X70D already reconciled (log #%s). Archive it before re-posting to "
-                  "avoid double-crediting the suspense account.") % prior.id
+                _(
+                    "X70D already reconciled (log #%s). Archive it before re-posting to "
+                    "avoid double-crediting the suspense account."
+                )
+                % prior.id
             )
 
         # Stage the rows (audit trail) exactly like _stage_only, without the early return.
@@ -1583,8 +1691,7 @@ class RetailImportExecutor(models.AbstractModel):
         log.line_count = len(records)
         row_to_line = self._persist_lines(log, records) if records else {}
         if row_to_line:
-            self.env["retail.import.line"].browse(
-                [ln.id for ln in row_to_line.values()]).write({"state": "skipped"})
+            self.env["retail.import.line"].browse([ln.id for ln in row_to_line.values()]).write({"state": "skipped"})
         self.env.cr.commit()
 
         susp = self._x24_suspense_account(company)
@@ -1604,9 +1711,18 @@ class RetailImportExecutor(models.AbstractModel):
             d = profile._parse_date(r.get("trans_date"))
             if d:
                 dates.append(d)
-            x70d_keys.add(self._safe_xid("posorder_", "%s_%s_%s_%s" % (
-                str(r.get("store_code") or "").strip(), str(r.get("trans_date") or "").strip(),
-                str(r.get("register") or "").strip(), str(r.get("transnum") or "").strip())))
+            x70d_keys.add(
+                self._safe_xid(
+                    "posorder_",
+                    "%s_%s_%s_%s"
+                    % (
+                        str(r.get("store_code") or "").strip(),
+                        str(r.get("trans_date") or "").strip(),
+                        str(r.get("register") or "").strip(),
+                        str(r.get("transnum") or "").strip(),
+                    ),
+                )
+            )
 
         by_tender = {t: round(a, 2) for t, a in by_tender.items() if round(a, 2)}
         if not by_tender:
@@ -1619,24 +1735,59 @@ class RetailImportExecutor(models.AbstractModel):
         Journal = self.env["account.journal"].sudo()
         journal = Journal.search([("code", "=", "RIREC"), ("company_id", "=", company.id)], limit=1)
         if not journal:
-            journal = Journal.create({
-                "name": "Retail Import Reconciliation", "code": "RIREC",
-                "type": "general", "company_id": company.id,
-            })
+            journal = Journal.create(
+                {
+                    "name": "Retail Import Reconciliation",
+                    "code": "RIREC",
+                    "type": "general",
+                    "company_id": company.id,
+                }
+            )
         total = round(sum(by_tender.values()), 2)
         line_ids = []
         for tender, amt in sorted(by_tender.items()):
             recv = self._x24_recv_account_for(company, tender)
-            line_ids.append((0, 0, {"account_id": recv.id, "debit": amt, "credit": 0.0,
-                                    "partner_id": False, "name": f"X70D settlement {tender}"}))
-        line_ids.append((0, 0, {"account_id": susp.id, "debit": 0.0, "credit": total,
-                                "partner_id": False, "name": "X70D settlement (Suspense clearing)"}))
+            line_ids.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": recv.id,
+                        "debit": amt,
+                        "credit": 0.0,
+                        "partner_id": False,
+                        "name": f"X70D settlement {tender}",
+                    },
+                )
+            )
+        line_ids.append(
+            (
+                0,
+                0,
+                {
+                    "account_id": susp.id,
+                    "debit": 0.0,
+                    "credit": total,
+                    "partner_id": False,
+                    "name": "X70D settlement (Suspense clearing)",
+                },
+            )
+        )
         gl_date = max(dates) if dates else datetime.now().date()
-        move = self.env["account.move"].sudo().create({
-            "move_type": "entry", "journal_id": journal.id, "date": gl_date,
-            "company_id": company.id,
-            "ref": f"X70D settlement transfer (log {log.id})", "line_ids": line_ids,
-        })
+        move = (
+            self.env["account.move"]
+            .sudo()
+            .create(
+                {
+                    "move_type": "entry",
+                    "journal_id": journal.id,
+                    "date": gl_date,
+                    "company_id": company.id,
+                    "ref": f"X70D settlement transfer (log {log.id})",
+                    "line_ids": line_ids,
+                }
+            )
+        )
         move.action_post()
         # Odoo bumps a past-dated entry to today on post; re-stamp within the same FY.
         try:
@@ -1646,12 +1797,11 @@ class RetailImportExecutor(models.AbstractModel):
                 if newname and mtag in newname:
                     cand = newname.replace(mtag, "/%02d/" % gl_date.month)
                     if not self.env["account.move"].search_count(
-                        [("journal_id", "=", journal.id), ("name", "=", cand), ("id", "!=", move.id)]):
+                        [("journal_id", "=", journal.id), ("name", "=", cand), ("id", "!=", move.id)]
+                    ):
                         newname = cand
-                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s",
-                                    (gl_date, newname, move.id))
-                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s",
-                                    (gl_date, move.id))
+                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s", (gl_date, newname, move.id))
+                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s", (gl_date, move.id))
                 move.invalidate_recordset(["date", "name"])
                 move.line_ids.invalidate_recordset(["date"])
         except Exception as be:
@@ -1661,10 +1811,14 @@ class RetailImportExecutor(models.AbstractModel):
         # Reconcile all open suspense lines (session-close debits + this credit). Group by
         # partner because reconcile requires a single partner per receivable batch; POS
         # close lines are normally partner-less, matching our partner_id=False credit.
-        open_lines = AML.search([
-            ("account_id", "=", susp.id), ("company_id", "=", company.id),
-            ("parent_state", "=", "posted"), ("reconciled", "=", False),
-        ])
+        open_lines = AML.search(
+            [
+                ("account_id", "=", susp.id),
+                ("company_id", "=", company.id),
+                ("parent_state", "=", "posted"),
+                ("reconciled", "=", False),
+            ]
+        )
         by_partner = defaultdict(lambda: AML.browse())
         for ln in open_lines:
             by_partner[ln.partner_id.id] += ln
@@ -1679,32 +1833,51 @@ class RetailImportExecutor(models.AbstractModel):
 
         # Per-transaction "sales without payment" report: posted X24 orders whose txn key
         # has no matching X70D tender (both sides run through the same _safe_xid transform).
-        posted_xids = set(self.env["ir.model.data"].sudo().search([
-            ("module", "=", ns), ("model", "=", "pos.order"),
-            ("name", "=like", "posorder_%"),
-        ]).mapped("name"))
+        posted_xids = set(
+            self.env["ir.model.data"]
+            .sudo()
+            .search(
+                [
+                    ("module", "=", ns),
+                    ("model", "=", "pos.order"),
+                    ("name", "=like", "posorder_%"),
+                ]
+            )
+            .mapped("name")
+        )
         unpaid = posted_xids - x70d_keys
         # Re-read post-reconcile: fully-matched lines drop out; the sum of remaining
         # residuals is the true net open balance on the suspense account.
-        still_open = AML.search([
-            ("account_id", "=", susp.id), ("company_id", "=", company.id),
-            ("parent_state", "=", "posted"), ("reconciled", "=", False),
-        ])
+        still_open = AML.search(
+            [
+                ("account_id", "=", susp.id),
+                ("company_id", "=", company.id),
+                ("parent_state", "=", "posted"),
+                ("reconciled", "=", False),
+            ]
+        )
         residual = round(sum(still_open.mapped("amount_residual")), 2)
 
         log.records_created = 1
         log.records_skipped = len(records)
-        note = (f"X70D settlement: transfer move {move.name} posted "
-                f"(Dr {len(by_tender)} tender receivables {total:.2f} / Cr Suspense); "
-                f"reconciled {reconciled_groups} suspense group(s); "
-                f"suspense residual {residual:.2f}.")
+        note = (
+            f"X70D settlement: transfer move {move.name} posted "
+            f"(Dr {len(by_tender)} tender receivables {total:.2f} / Cr Suspense); "
+            f"reconciled {reconciled_groups} suspense group(s); "
+            f"suspense residual {residual:.2f}."
+        )
         if unpaid:
-            note += (f" WARNING: {len(unpaid)} posted X24 sale(s) have no matching X70D "
-                     f"tender (unpaid/unreconciled).")
+            note += f" WARNING: {len(unpaid)} posted X24 sale(s) have no matching X70D tender (unpaid/unreconciled)."
         log.error_message = note
         self.env.cr.commit()
-        _logger.info("x70d reconcile: move %s, %s tenders, total %.2f, residual %.2f, %s unpaid",
-                     move.name, len(by_tender), total, residual, len(unpaid))
+        _logger.info(
+            "x70d reconcile: move %s, %s tenders, total %.2f, residual %.2f, %s unpaid",
+            move.name,
+            len(by_tender),
+            total,
+            residual,
+            len(unpaid),
+        )
 
     # ==================================================================
     # Staged / reference-only loaders (parse + count + keep attachment)
@@ -1727,9 +1900,11 @@ class RetailImportExecutor(models.AbstractModel):
         self._stage_only(profile, file_b64, log, "X70T settlement: staged for reconciliation (Phase 5 decision).")
 
     def _x31_post_enabled(self):
-        return self.env["ir.config_parameter"].sudo().get_param(
-            "retail_import.x31_post_enabled", "0"
-        ) in ("1", "true", "True")
+        return self.env["ir.config_parameter"].sudo().get_param("retail_import.x31_post_enabled", "0") in (
+            "1",
+            "true",
+            "True",
+        )
 
     def _load_x31(self, profile, file_b64, log):
         """Post X31 promo discounts as a contra-revenue reclassification when
@@ -1745,9 +1920,7 @@ class RetailImportExecutor(models.AbstractModel):
             self._post_x31(profile, records, log, row_to_line)
         else:
             log.records_skipped = len(records)
-            log.error_message = (
-                "X31 discount journal: staged (set retail_import.x31_post_enabled=1 to post)."
-            )
+            log.error_message = "X31 discount journal: staged (set retail_import.x31_post_enabled=1 to post)."
             self.env["retail.import.line"].search([("log_id", "=", log.id)]).write({"state": "skipped"})
             self.env.cr.commit()
 
@@ -1768,10 +1941,9 @@ class RetailImportExecutor(models.AbstractModel):
             # account (Gross Sales - Others), so the reclass grosses up the account
             # X24 actually credited.
             Account = self.env["account.account"].sudo().with_company(company)
-            acc = (Account.search([("account_type", "=", "income"),
-                                   ("name", "ilike", "gross sales"), ("name", "ilike", "other")], limit=1)
-                   or Account.search([("account_type", "=", "income"),
-                                      ("name", "ilike", "gross sales")], limit=1))
+            acc = Account.search(
+                [("account_type", "=", "income"), ("name", "ilike", "gross sales"), ("name", "ilike", "other")], limit=1
+            ) or Account.search([("account_type", "=", "income"), ("name", "ilike", "gross sales")], limit=1)
         return acc
 
     def _x31_discount_account(self, company, income_acct):
@@ -1779,12 +1951,20 @@ class RetailImportExecutor(models.AbstractModel):
         (textile / footwear / accessories / miscellaneous)."""
         Account = self.env["account.account"].sudo().with_company(company)
         nm = (income_acct.name or "").lower()
-        kw = ("textile" if "textile" in nm else
-              "footwear" if ("footwear" in nm or "shoe" in nm) else
-              "accessor" if "access" in nm else "misc")
-        return (Account.search([("name", "ilike", "sales discount"), ("name", "ilike", kw)], limit=1)
-                or Account.search([("name", "ilike", "sales discount"), ("name", "ilike", "misc")], limit=1)
-                or Account.search([("name", "ilike", "sales discount")], limit=1))
+        kw = (
+            "textile"
+            if "textile" in nm
+            else "footwear"
+            if ("footwear" in nm or "shoe" in nm)
+            else "accessor"
+            if "access" in nm
+            else "misc"
+        )
+        return (
+            Account.search([("name", "ilike", "sales discount"), ("name", "ilike", kw)], limit=1)
+            or Account.search([("name", "ilike", "sales discount"), ("name", "ilike", "misc")], limit=1)
+            or Account.search([("name", "ilike", "sales discount")], limit=1)
+        )
 
     def _post_x31(self, profile, records, log, row_to_line):
         """Post X31 promo discounts as a NET-NEUTRAL contra-revenue reclassification:
@@ -1803,18 +1983,21 @@ class RetailImportExecutor(models.AbstractModel):
         )
         if prior:
             raise UserError(
-                _("X31 already posted (log #%s). Archive it before re-posting to avoid duplicate reclass.")
-                % prior.id
+                _("X31 already posted (log #%s). Archive it before re-posting to avoid duplicate reclass.") % prior.id
             )
         # Dedicated journal so the (period-dated) reclass is not bumped to today by
         # Odoo's sequence-date monotonicity against unrelated later moves in MISC.
         Journal = self.env["account.journal"].sudo()
         journal = Journal.search([("code", "=", "RIADJ"), ("company_id", "=", company.id)], limit=1)
         if not journal:
-            journal = Journal.create({
-                "name": "Retail Import Adjustments", "code": "RIADJ",
-                "type": "general", "company_id": company.id,
-            })
+            journal = Journal.create(
+                {
+                    "name": "Retail Import Adjustments",
+                    "code": "RIADJ",
+                    "type": "general",
+                    "company_id": company.id,
+                }
+            )
         tax = self._x24_resolve_tax()
         rate_val = (tax.amount / 100.0) if tax else 0.0
 
@@ -1835,10 +2018,12 @@ class RetailImportExecutor(models.AbstractModel):
                 skipped += 1
                 rn = r.get("_row")
                 if rn in row_to_line:
-                    row_to_line[rn].write({
-                        "state": "error",
-                        "error_message": (f"X31: unpostable (product/income/discount acct) code={code}")[:250],
-                    })
+                    row_to_line[rn].write(
+                        {
+                            "state": "error",
+                            "error_message": (f"X31: unpostable (product/income/discount acct) code={code}")[:250],
+                        }
+                    )
                 errors.append((r.get("_row"), f"X31: no income/discount account for {code}"))
                 continue
             by_pair[(inc.id, dacc.id)] += disc / (1.0 + rate_val)
@@ -1862,15 +2047,22 @@ class RetailImportExecutor(models.AbstractModel):
         line_ids = []
         for (inc_id, dacc_id), amt in by_pair.items():
             amt = round(amt, 2)
-            line_ids.append((0, 0, {"account_id": dacc_id, "debit": amt, "credit": 0.0,
-                                    "name": "POS promo discount (X31)"}))
-            line_ids.append((0, 0, {"account_id": inc_id, "debit": 0.0, "credit": amt,
-                                    "name": "POS promo discount gross-up (X31)"}))
+            line_ids.append(
+                (0, 0, {"account_id": dacc_id, "debit": amt, "credit": 0.0, "name": "POS promo discount (X31)"})
+            )
+            line_ids.append(
+                (0, 0, {"account_id": inc_id, "debit": 0.0, "credit": amt, "name": "POS promo discount gross-up (X31)"})
+            )
         gl_date = max(dates) if dates else datetime.now().date()
-        move = self.env["account.move"].create({
-            "move_type": "entry", "journal_id": journal.id, "date": gl_date,
-            "ref": f"X31 promo discount reclass (log {log.id})", "line_ids": line_ids,
-        })
+        move = self.env["account.move"].create(
+            {
+                "move_type": "entry",
+                "journal_id": journal.id,
+                "date": gl_date,
+                "ref": f"X31 promo discount reclass (log {log.id})",
+                "line_ids": line_ids,
+            }
+        )
         move.action_post()
         # Odoo bumps a past-dated entry to today on post (sequence-date monotonicity).
         # Re-stamp the move + lines to the discount period via SQL within the same
@@ -1882,12 +2074,11 @@ class RetailImportExecutor(models.AbstractModel):
                 if newname and mtag in newname:
                     cand = newname.replace(mtag, "/%02d/" % gl_date.month)
                     if not self.env["account.move"].search_count(
-                        [("journal_id", "=", journal.id), ("name", "=", cand), ("id", "!=", move.id)]):
+                        [("journal_id", "=", journal.id), ("name", "=", cand), ("id", "!=", move.id)]
+                    ):
                         newname = cand
-                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s",
-                                    (gl_date, newname, move.id))
-                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s",
-                                    (gl_date, move.id))
+                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s", (gl_date, newname, move.id))
+                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s", (gl_date, move.id))
                 move.invalidate_recordset(["date", "name"])
                 move.line_ids.invalidate_recordset(["date"])
         except Exception as be:
@@ -1895,21 +2086,27 @@ class RetailImportExecutor(models.AbstractModel):
         self._xid_set(ns, self._safe_xid("x31entry_", str(log.id)), "account.move", move.id)
         for rn in ok_rows:
             if rn in row_to_line:
-                row_to_line[rn].write({"state": "ok", "target_model": "account.move",
-                                       "target_res_id": move.id})
+                row_to_line[rn].write({"state": "ok", "target_model": "account.move", "target_res_id": move.id})
         log.records_created = 1
         log.records_skipped = skipped
         log.set_errors(errors)
         self.env.cr.commit()
-        _logger.info("x31 POST: reclass move %s posted (%s categories, %s rows, %s skipped)",
-                     move.name, len(by_pair), len(ok_rows), skipped)
+        _logger.info(
+            "x31 POST: reclass move %s posted (%s categories, %s rows, %s skipped)",
+            move.name,
+            len(by_pair),
+            len(ok_rows),
+            skipped,
+        )
 
     def _load_x32p(self, profile, file_b64, log):
         self._stage_only(profile, file_b64, log, "X32P stock movement: reference/audit only (not replayed; see plan).")
 
     def _load_store_master(self, profile, file_b64, log):
         self._stage_only(
-            profile, file_b64, log,
+            profile,
+            file_b64,
+            log,
             "Store Master: warehouse creation is handled by the Track A odoo-shell loader "
             "(header-wise store columns). This profile is for row-wise enrichment only.",
         )
@@ -1924,9 +2121,11 @@ class RetailImportExecutor(models.AbstractModel):
         self._stage_only(profile, file_b64, log, "X29 inventory adjustment: staged for stock adjustment mapping.")
 
     def _x48_post_enabled(self):
-        return self.env["ir.config_parameter"].sudo().get_param(
-            "retail_import.x48_post_enabled", "0"
-        ) in ("1", "true", "True")
+        return self.env["ir.config_parameter"].sudo().get_param("retail_import.x48_post_enabled", "0") in (
+            "1",
+            "true",
+            "True",
+        )
 
     def _load_x48(self, profile, file_b64, log):
         """Post X48 customer returns as refund pos.orders when
@@ -1942,9 +2141,7 @@ class RetailImportExecutor(models.AbstractModel):
             self._post_x48(profile, records, log, row_to_line)
         else:
             log.records_skipped = len(records)
-            log.error_message = (
-                "X48 customer return: staged (set retail_import.x48_post_enabled=1 to post refunds)."
-            )
+            log.error_message = "X48 customer return: staged (set retail_import.x48_post_enabled=1 to post refunds)."
             self.env["retail.import.line"].search([("log_id", "=", log.id)]).write({"state": "skipped"})
             self.env.cr.commit()
 
@@ -1962,8 +2159,7 @@ class RetailImportExecutor(models.AbstractModel):
         )
         if prior:
             raise UserError(
-                _("X48 already posted (log #%s). Archive it before re-posting to avoid duplicate refunds.")
-                % prior.id
+                _("X48 already posted (log #%s). Archive it before re-posting to avoid duplicate refunds.") % prior.id
             )
 
         self._x24_ensure_method_gl_split()
@@ -2025,7 +2221,9 @@ class RetailImportExecutor(models.AbstractModel):
             else:
                 tmpl_vals = {
                     "name": (str(r.get("item_description") or "").strip() or key)[:200],
-                    "default_code": code or False, "type": "consu", "sale_ok": True,
+                    "default_code": code or False,
+                    "type": "consu",
+                    "sale_ok": True,
                 }
                 # Only genuine non-merchandise gets a revenue bucket. With strict mode off
                 # this same path also lazy-creates unmatched *garments*, and filing those
@@ -2034,8 +2232,11 @@ class RetailImportExecutor(models.AbstractModel):
                     np_categ = self._x24_np_category(code)
                     if np_categ:
                         tmpl_vals["categ_id"] = np_categ.id
-                tmpl = self.env["product.template"].with_context(
-                    tracking_disable=True, mail_create_nolog=True).create(tmpl_vals)
+                tmpl = (
+                    self.env["product.template"]
+                    .with_context(tracking_disable=True, mail_create_nolog=True)
+                    .create(tmpl_vals)
+                )
                 p = tmpl.product_variant_id
                 if ean and not p.barcode and not Product.search_count([("barcode", "=", ean)]):
                     try:
@@ -2080,21 +2281,34 @@ class RetailImportExecutor(models.AbstractModel):
                     missing.append(str(r.get("product_code") or r.get("item_code") or r.get("ean") or "?"))
                     rn = r.get("_row")
                     if rn in row_to_line:
-                        row_to_line[rn].write({
-                            "state": "error",
-                            "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('product_code')!r}"[:250],
-                        })
+                        row_to_line[rn].write(
+                            {
+                                "state": "error",
+                                "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('product_code')!r}"[
+                                    :250
+                                ],
+                            }
+                        )
                     continue
-                qty = float(profile._parse_amount(r.get("net_qty")))        # negative
+                qty = float(profile._parse_amount(r.get("net_qty")))  # negative
                 incl = float(profile._parse_amount(r.get("total_amount")))  # negative (refund)
                 gl_net = incl / (1.0 + rate_val)
-                unit = incl / qty if qty else incl                          # positive unit price
-                line_cmds.append((0, 0, {
-                    "product_id": prod.id, "qty": qty,
-                    "price_unit": unit, "discount": 0.0,
-                    "tax_ids": [(6, 0, [tax.id] if tax else [])],
-                    "price_subtotal": gl_net, "price_subtotal_incl": incl,
-                }))
+                unit = incl / qty if qty else incl  # positive unit price
+                line_cmds.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": prod.id,
+                            "qty": qty,
+                            "price_unit": unit,
+                            "discount": 0.0,
+                            "tax_ids": [(6, 0, [tax.id] if tax else [])],
+                            "price_subtotal": gl_net,
+                            "price_subtotal_incl": incl,
+                        },
+                    )
+                )
                 order_net += gl_net
                 order_incl += incl
 
@@ -2102,7 +2316,10 @@ class RetailImportExecutor(models.AbstractModel):
             # posting a partial return.
             if missing:
                 sku_list = ", ".join(sorted(set(missing))[:10])
-                fail_rows(rows, f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu")
+                fail_rows(
+                    rows,
+                    f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu",
+                )
                 skipped += len(rows)
                 continue
             if not line_cmds:
@@ -2115,18 +2332,28 @@ class RetailImportExecutor(models.AbstractModel):
             sess = get_session(cfg)
             try:
                 with self.env.cr.savepoint():
-                    order = Order.create({
-                        "session_id": sess.id, "company_id": cfg.company_id.id,
-                        "pricelist_id": cfg.pricelist_id.id or False, "date_order": dt,
-                        "pos_reference": f"RET-{store}-{reg}-{txn}",
-                        "lines": line_cmds,
-                        "amount_tax": order_incl - order_net, "amount_total": order_incl,
-                        "amount_paid": 0.0, "amount_return": 0.0,
-                    })
-                    order.add_payment({
-                        "pos_order_id": order.id, "payment_method_id": cash.id,
-                        "amount": order_incl, "payment_date": dt,
-                    })
+                    order = Order.create(
+                        {
+                            "session_id": sess.id,
+                            "company_id": cfg.company_id.id,
+                            "pricelist_id": cfg.pricelist_id.id or False,
+                            "date_order": dt,
+                            "pos_reference": f"RET-{store}-{reg}-{txn}",
+                            "lines": line_cmds,
+                            "amount_tax": order_incl - order_net,
+                            "amount_total": order_incl,
+                            "amount_paid": 0.0,
+                            "amount_return": 0.0,
+                        }
+                    )
+                    order.add_payment(
+                        {
+                            "pos_order_id": order.id,
+                            "payment_method_id": cash.id,
+                            "amount": order_incl,
+                            "payment_date": dt,
+                        }
+                    )
                     order.invalidate_recordset(["payment_ids", "amount_paid"])
                     order.amount_paid = sum(order.payment_ids.mapped("amount"))
                     if order.amount_total and abs(order.amount_paid - order.amount_total) <= self._X24_BALANCE_TOL:
@@ -2139,10 +2366,14 @@ class RetailImportExecutor(models.AbstractModel):
             for r in rows:
                 rn = r.get("_row")
                 if rn in row_to_line:
-                    row_to_line[rn].write({
-                        "state": "ok", "target_model": "pos.order",
-                        "target_res_id": order.id, "aggregate_key": f"RET|{store}|{date}|{txn}",
-                    })
+                    row_to_line[rn].write(
+                        {
+                            "state": "ok",
+                            "target_model": "pos.order",
+                            "target_res_id": order.id,
+                            "aggregate_key": f"RET|{store}|{date}|{txn}",
+                        }
+                    )
             created += 1
             if created % 200 == 0:
                 self.env.cr.commit()
@@ -2153,8 +2384,7 @@ class RetailImportExecutor(models.AbstractModel):
         log.records_created = created
         log.records_skipped = skipped
         log.set_errors(errors)
-        _logger.info("x48 POST: %s refund orders created, %s rows skipped, %s errors",
-                     created, skipped, len(errors))
+        _logger.info("x48 POST: %s refund orders created, %s rows skipped, %s errors", created, skipped, len(errors))
 
     def _load_x53(self, profile, file_b64, log):
         self._stage_only(profile, file_b64, log, "X53 RTV: staged for vendor return mapping.")

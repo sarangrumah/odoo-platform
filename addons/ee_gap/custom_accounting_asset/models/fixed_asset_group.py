@@ -48,8 +48,7 @@ class CustomFixedAssetGroup(models.Model):
         comodel_name="account.account",
         string="Default Revaluation Loss Account",
         domain="[('company_ids', 'in', company_id)]",
-        help="P&L expense account debited for a downward revaluation not covered "
-        "by an existing surplus.",
+        help="P&L expense account debited for a downward revaluation not covered by an existing surplus.",
     )
     default_revaluation_income_account_id = fields.Many2one(
         comodel_name="account.account",

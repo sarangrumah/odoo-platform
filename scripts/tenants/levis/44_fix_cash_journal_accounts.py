@@ -118,8 +118,12 @@ def _reclass(journal, old_account, new_account):
         )
         log.append(
             "  RECLASS %d line(s) %s -> %s (via %s)"
-            % (len(movable), old_account.with_company(journal.company_id).code,
-               new_account.with_company(journal.company_id).code, journal.name)
+            % (
+                len(movable),
+                old_account.with_company(journal.company_id).code,
+                new_account.with_company(journal.company_id).code,
+                journal.name,
+            )
         )
     if stuck:
         out.write(
@@ -138,10 +142,7 @@ def _repoint(journal, target_name):
     target = _find_or_create(company, target_name)
     if current:
         _reclass(journal, current, target)
-    log.append(
-        "  %-42s %s -> %s"
-        % (journal.name, current.display_name if current else "(none)", target.display_name)
-    )
+    log.append("  %-42s %s -> %s" % (journal.name, current.display_name if current else "(none)", target.display_name))
     journal.default_account_id = target.id
     return True
 
@@ -163,8 +164,8 @@ for config in env["pos.config"].with_context(active_test=False).search([]).sorte
 # 2. Petty Cash journal -> the Petty Cash account
 # --------------------------------------------------------------------------
 log.append("== Petty Cash ==")
-for journal in env["account.journal"].with_context(active_test=False).search(
-    [("type", "=", "cash"), ("name", "=", "Petty Cash")]
+for journal in (
+    env["account.journal"].with_context(active_test=False).search([("type", "=", "cash"), ("name", "=", "Petty Cash")])
 ):
     _repoint(journal, "Petty Cash")
 
@@ -198,14 +199,16 @@ env.invalidate_all()
 out.write("\n".join(log) + "\n\n")
 out.write("Cash journals after the fix:\n")
 bad = 0
-for journal in env["account.journal"].with_context(active_test=False).search(
-    [("type", "=", "cash")], order="id"
-):
+for journal in env["account.journal"].with_context(active_test=False).search([("type", "=", "cash")], order="id"):
     account = journal.default_account_id
     code = account.with_company(journal.company_id).code if account else "-"
-    shared = env["account.journal"].with_context(active_test=False).search_count(
-        [("type", "=", "cash"), ("default_account_id", "=", account.id)]
-    ) if account else 0
+    shared = (
+        env["account.journal"]
+        .with_context(active_test=False)
+        .search_count([("type", "=", "cash"), ("default_account_id", "=", account.id)])
+        if account
+        else 0
+    )
     flag = ""
     if not account or account.name != journal.name:
         flag = "   <-- NOT DEDICATED"

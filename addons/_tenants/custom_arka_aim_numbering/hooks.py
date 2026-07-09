@@ -49,9 +49,7 @@ def _upsert_sequence(env, code, name, prefix, company):
         "x_monthly_reset": True,
         "company_id": company.id,
     }
-    existing = Seq.search(
-        [("code", "=", code), ("company_id", "=", company.id)], limit=1
-    )
+    existing = Seq.search([("code", "=", code), ("company_id", "=", company.id)], limit=1)
     if existing:
         existing.write(vals)
         return existing
@@ -70,11 +68,7 @@ def _setup_delivery_order(env):
         "DO/AIM/" + _MONTH_TAIL,
         aim,
     )
-    picking_types = (
-        env["stock.picking.type"]
-        .sudo()
-        .search([("code", "=", "outgoing"), ("company_id", "=", aim.id)])
-    )
+    picking_types = env["stock.picking.type"].sudo().search([("code", "=", "outgoing"), ("company_id", "=", aim.id)])
     if picking_types:
         picking_types.write({"sequence_id": seq.id})
         _logger.info(

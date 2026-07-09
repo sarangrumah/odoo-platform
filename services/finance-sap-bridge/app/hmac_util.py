@@ -7,6 +7,7 @@ Matches:
   * custom_core.controllers.secure_endpoint._verify_hmac   (Odoo inbound)
   * custom_adapter_framework.BaseAdapter._sign_request     (Odoo outbound)
 """
+
 from __future__ import annotations
 
 import hashlib

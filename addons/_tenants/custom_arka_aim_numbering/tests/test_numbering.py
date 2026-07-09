@@ -11,9 +11,7 @@ class TestArkaAimNumbering(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.company = cls.env["res.company"].create(
-            {"name": "Test Numbering Co", "x_doc_code": "TST"}
-        )
+        cls.company = cls.env["res.company"].create({"name": "Test Numbering Co", "x_doc_code": "TST"})
         cls.env.user.company_ids = [(4, cls.company.id)]
         # Quotation (sale.order) + Sales Order sequences for this company.
         _upsert_sequence(
@@ -32,11 +30,7 @@ class TestArkaAimNumbering(TransactionCase):
         )
 
     def _next(self, code, dt):
-        return (
-            self.env["ir.sequence"]
-            .with_company(self.company)
-            .next_by_code(code, sequence_date=dt)
-        )
+        return self.env["ir.sequence"].with_company(self.company).next_by_code(code, sequence_date=dt)
 
     def test_monthly_reset(self):
         """Counter restarts at 001 in a new month and matches the date range."""
@@ -50,9 +44,7 @@ class TestArkaAimNumbering(TransactionCase):
     def test_quotation_then_sales_order_renumber(self):
         """Quotation reads SQ/...; confirming re-numbers to SO/... and keeps SQ."""
         partner = self.env["res.partner"].create({"name": "Cust"})
-        product = self.env["product.product"].create(
-            {"name": "Svc", "type": "service", "list_price": 100.0}
-        )
+        product = self.env["product.product"].create({"name": "Svc", "type": "service", "list_price": 100.0})
         order = (
             self.env["sale.order"]
             .with_company(self.company)

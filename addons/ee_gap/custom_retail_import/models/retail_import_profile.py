@@ -39,10 +39,19 @@ _ENCODING_REPL = {"�": "®"}
 # names, SKUs and barcodes (a real product.category literally named "#N/A" was
 # observed). Treat them as empty so downstream blank-handling / validation kicks
 # in. Matched case-insensitively against the whole stripped cell.
-_ERROR_SENTINELS = frozenset({
-    "#N/A", "N/A", "#REF!", "#VALUE!", "#DIV/0!",
-    "#NAME?", "#NUM!", "#NULL!", "NULL",
-})
+_ERROR_SENTINELS = frozenset(
+    {
+        "#N/A",
+        "N/A",
+        "#REF!",
+        "#VALUE!",
+        "#DIV/0!",
+        "#NAME?",
+        "#NUM!",
+        "#NULL!",
+        "NULL",
+    }
+)
 
 FILE_TYPES = [
     ("x101", "X101 — Material Master (products)"),

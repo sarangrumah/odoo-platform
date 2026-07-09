@@ -14,7 +14,6 @@ from odoo.tests import tagged
 
 @tagged("post_install", "-at_install")
 class TestCogsRun(AccountTestInvoicingCommon):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -24,51 +23,78 @@ class TestCogsRun(AccountTestInvoicingCommon):
         cls.env.user.group_ids |= cls.env.ref("point_of_sale.group_pos_manager")
         Account = cls.env["account.account"]
 
-        cls.cogs_textile = Account.create({
-            "name": "COGS-textile", "code": "COGSTX",
-            "account_type": "expense_direct_cost",
-        })
-        cls.inv_textile = Account.create({
-            "name": "Inventories-textile", "code": "INVTX",
-            "account_type": "asset_current",
-        })
-        cls.cogs_acc = Account.create({
-            "name": "COGS-accessories", "code": "COGSAC",
-            "account_type": "expense_direct_cost",
-        })
-        cls.inv_acc = Account.create({
-            "name": "Inventories-accessories", "code": "INVAC",
-            "account_type": "asset_current",
-        })
+        cls.cogs_textile = Account.create(
+            {
+                "name": "COGS-textile",
+                "code": "COGSTX",
+                "account_type": "expense_direct_cost",
+            }
+        )
+        cls.inv_textile = Account.create(
+            {
+                "name": "Inventories-textile",
+                "code": "INVTX",
+                "account_type": "asset_current",
+            }
+        )
+        cls.cogs_acc = Account.create(
+            {
+                "name": "COGS-accessories",
+                "code": "COGSAC",
+                "account_type": "expense_direct_cost",
+            }
+        )
+        cls.inv_acc = Account.create(
+            {
+                "name": "Inventories-accessories",
+                "code": "INVAC",
+                "account_type": "asset_current",
+            }
+        )
 
-        cls.categ_textile = cls.env["product.category"].create({
-            "name": "Textile",
-            "property_account_expense_categ_id": cls.cogs_textile.id,
-            "property_stock_valuation_account_id": cls.inv_textile.id,
-        })
-        cls.categ_acc = cls.env["product.category"].create({
-            "name": "Accessories",
-            "property_account_expense_categ_id": cls.cogs_acc.id,
-            "property_stock_valuation_account_id": cls.inv_acc.id,
-        })
+        cls.categ_textile = cls.env["product.category"].create(
+            {
+                "name": "Textile",
+                "property_account_expense_categ_id": cls.cogs_textile.id,
+                "property_stock_valuation_account_id": cls.inv_textile.id,
+            }
+        )
+        cls.categ_acc = cls.env["product.category"].create(
+            {
+                "name": "Accessories",
+                "property_account_expense_categ_id": cls.cogs_acc.id,
+                "property_stock_valuation_account_id": cls.inv_acc.id,
+            }
+        )
 
         cls.ou_plan = cls.env["account.analytic.plan"].create({"name": "Operating Unit"})
-        cls.journal = cls.env["account.journal"].create({
-            "name": "COGS Journal", "type": "general", "code": "COGSJ",
-            "company_id": cls.company.id,
-        })
+        cls.journal = cls.env["account.journal"].create(
+            {
+                "name": "COGS Journal",
+                "type": "general",
+                "code": "COGSJ",
+                "company_id": cls.company.id,
+            }
+        )
 
         # Two stores, each a warehouse + OU analytic + pos.config.
-        cls.wh1 = cls.env["stock.warehouse"].search(
-            [("company_id", "=", cls.company.id)], limit=1
+        cls.wh1 = cls.env["stock.warehouse"].search([("company_id", "=", cls.company.id)], limit=1)
+        cls.wh2 = cls.env["stock.warehouse"].create(
+            {
+                "name": "Store 2",
+                "code": "ST2",
+                "company_id": cls.company.id,
+            }
         )
-        cls.wh2 = cls.env["stock.warehouse"].create({
-            "name": "Store 2", "code": "ST2", "company_id": cls.company.id,
-        })
         cls.ou1, cls.ou2 = [
-            cls.env["account.analytic.account"].create({
-                "name": name, "plan_id": cls.ou_plan.id, "company_id": cls.company.id,
-            }) for name in ("Store 1", "Store 2")
+            cls.env["account.analytic.account"].create(
+                {
+                    "name": name,
+                    "plan_id": cls.ou_plan.id,
+                    "company_id": cls.company.id,
+                }
+            )
+            for name in ("Store 1", "Store 2")
         ]
         cls.wh1.l10n_ou_analytic_id = cls.ou1.id
         cls.wh2.l10n_ou_analytic_id = cls.ou2.id
@@ -88,18 +114,26 @@ class TestCogsRun(AccountTestInvoicingCommon):
         picking_type = cls.env["stock.picking.type"].search(
             [("warehouse_id", "=", warehouse.id), ("code", "=", "outgoing")], limit=1
         )
-        return cls.env["pos.config"].create({
-            "name": name,
-            "company_id": cls.company.id,
-            "picking_type_id": picking_type.id,
-        })
+        return cls.env["pos.config"].create(
+            {
+                "name": name,
+                "company_id": cls.company.id,
+                "picking_type_id": picking_type.id,
+            }
+        )
 
     @classmethod
     def _make_product(cls, name, categ, cost):
-        product = cls.env["product.product"].create({
-            "name": name, "type": "consu", "is_storable": True,
-            "categ_id": categ.id, "available_in_pos": True, "lst_price": cost * 3,
-        })
+        product = cls.env["product.product"].create(
+            {
+                "name": name,
+                "type": "consu",
+                "is_storable": True,
+                "categ_id": categ.id,
+                "available_in_pos": True,
+                "lst_price": cost * 3,
+            }
+        )
         product.with_company(cls.company).standard_price = cost
         return product
 
@@ -109,9 +143,7 @@ class TestCogsRun(AccountTestInvoicingCommon):
         Odoo forbids more than one open session per pos.config, so successive
         sales at the same store share one — exactly what the retail import does.
         """
-        session = self.env["pos.session"].search(
-            [("config_id", "=", config.id), ("state", "!=", "closed")], limit=1
-        )
+        session = self.env["pos.session"].search([("config_id", "=", config.id), ("state", "!=", "closed")], limit=1)
         if not session:
             session = self.env["pos.session"].create({"config_id": config.id})
             session.update_stock_at_closing = False
@@ -120,37 +152,46 @@ class TestCogsRun(AccountTestInvoicingCommon):
     def _sell(self, config, lines, date="2026-06-15"):
         """One POS order of ``[(product, qty)]`` at ``config``."""
         session = self._session(config)
-        order = self.env["pos.order"].create({
-            "company_id": self.company.id,
-            "session_id": session.id,
-            "date_order": "%s 10:00:00" % date,
-            "amount_tax": 0.0,
-            "amount_total": 0.0,
-            "amount_paid": 0.0,
-            "amount_return": 0.0,
-            "lines": [(0, 0, {
-                "product_id": product.id,
-                "qty": qty,
-                "price_unit": product.lst_price,
-                "price_subtotal": product.lst_price * qty,
-                "price_subtotal_incl": product.lst_price * qty,
-            }) for product, qty in lines],
-        })
+        order = self.env["pos.order"].create(
+            {
+                "company_id": self.company.id,
+                "session_id": session.id,
+                "date_order": "%s 10:00:00" % date,
+                "amount_tax": 0.0,
+                "amount_total": 0.0,
+                "amount_paid": 0.0,
+                "amount_return": 0.0,
+                "lines": [
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": product.id,
+                            "qty": qty,
+                            "price_unit": product.lst_price,
+                            "price_subtotal": product.lst_price * qty,
+                            "price_subtotal_incl": product.lst_price * qty,
+                        },
+                    )
+                    for product, qty in lines
+                ],
+            }
+        )
         order.write({"state": "done"})
         return order
 
     def _run(self, date_from="2026-06-01", date_to="2026-06-30"):
-        return self.env["levis.cogs.run"].create({
-            "company_id": self.company.id,
-            "date_from": date_from,
-            "date_to": date_to,
-            "journal_id": self.journal.id,
-        })
+        return self.env["levis.cogs.run"].create(
+            {
+                "company_id": self.company.id,
+                "date_from": date_from,
+                "date_to": date_to,
+                "journal_id": self.journal.id,
+            }
+        )
 
     def _line(self, run, warehouse, categ):
-        return run.line_ids.filtered(
-            lambda l: l.warehouse_id == warehouse and l.product_categ_id == categ
-        )
+        return run.line_ids.filtered(lambda l: l.warehouse_id == warehouse and l.product_categ_id == categ)
 
     # ------------------------------------------------------------------
 
@@ -164,10 +205,8 @@ class TestCogsRun(AccountTestInvoicingCommon):
         self.assertEqual(self._line(run, self.wh1, self.categ_acc).amount, 80.0)
         self.assertEqual(self._line(run, self.wh2, self.categ_textile).amount, 500.0)
         # Each line carries its store's Operating Unit.
-        self.assertEqual(
-            self._line(run, self.wh1, self.categ_textile).analytic_account_id, self.ou1)
-        self.assertEqual(
-            self._line(run, self.wh2, self.categ_textile).analytic_account_id, self.ou2)
+        self.assertEqual(self._line(run, self.wh1, self.categ_textile).analytic_account_id, self.ou1)
+        self.assertEqual(self._line(run, self.wh2, self.categ_textile).analytic_account_id, self.ou2)
         self.assertEqual(run.total_cogs, 880.0)
 
     def test_02_refund_lines_reduce_cogs(self):
@@ -182,8 +221,8 @@ class TestCogsRun(AccountTestInvoicingCommon):
         run = self._run()
         run.action_compute()
         line = self._line(run, self.wh1, self.categ_textile)
-        self.assertEqual(line.amount, 100.0)      # only the costed unit
-        self.assertEqual(line.quantity, 5.0)      # but both were sold
+        self.assertEqual(line.amount, 100.0)  # only the costed unit
+        self.assertEqual(line.quantity, 5.0)  # but both were sold
         self.assertEqual(line.zero_cost_qty, 4.0)
         self.assertEqual(run.zero_cost_qty, 4.0)
 

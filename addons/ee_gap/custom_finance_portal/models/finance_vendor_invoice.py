@@ -77,8 +77,7 @@ class FinanceVendorInvoice(models.Model):
         for rec in self:
             if rec.invoice_subtype == "po_non_trade" and not rec.po_number:
                 raise UserError(
-                    _("A PO Number is required for a PO Non-Trade vendor invoice (%s).")
-                    % (rec.name or "?")
+                    _("A PO Number is required for a PO Non-Trade vendor invoice (%s).") % (rec.name or "?")
                 )
 
     def _finance_sap_payload(self) -> dict:

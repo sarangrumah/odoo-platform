@@ -8,7 +8,6 @@ queue_job, so we track ``job_uuid`` and per-stage record counters.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 
 from odoo import _, fields, models

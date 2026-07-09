@@ -38,18 +38,22 @@ if _orig_lock:
 
 try:
     Log = env["retail.import.log"].sudo()
-    rec = Log.create({
-        "profile_id": profile.id,
-        "filename": os.path.basename(PATH),
-        "file_hash": Log.compute_hash(raw),
-        "state": "queued",
-    })
+    rec = Log.create(
+        {
+            "profile_id": profile.id,
+            "filename": os.path.basename(PATH),
+            "file_hash": Log.compute_hash(raw),
+            "state": "queued",
+        }
+    )
     rec.store_source(base64.b64encode(raw), os.path.basename(PATH))
     env.cr.commit()
     log_("log #%s created, running executor synchronously ..." % rec.id)
     env["retail.import.executor"].run(rec)
-    log_("log #%s state=%s lines=%s skipped=%s errors=%s"
-         % (rec.id, rec.state, rec.line_count, rec.records_skipped, rec.error_count))
+    log_(
+        "log #%s state=%s lines=%s skipped=%s errors=%s"
+        % (rec.id, rec.state, rec.line_count, rec.records_skipped, rec.error_count)
+    )
     if rec.error_message:
         log_("error_message: %s" % rec.error_message[:300])
 finally:

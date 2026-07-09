@@ -50,9 +50,7 @@ class FinanceTravelSettlement(models.Model):
         string="Settled via Cash Advance",
         domain="[('ca_type', '=', 'travel')]",
     )
-    reimbursement_id = fields.Many2one(
-        "finance.reimbursement", string="Settled via Reimbursement"
-    )
+    reimbursement_id = fields.Many2one("finance.reimbursement", string="Settled via Reimbursement")
     settlement_state = fields.Selection(
         selection=[
             ("unsettled", "Unsettled"),

@@ -35,9 +35,9 @@ id_token + JWKS validation; the override and sync here are unchanged. See
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     "depends": [
-        "custom_core",   # custom.ir.config encryption helpers + Settings anchor
-        "auth_oauth",    # Odoo 19 CE core — the auth foundation
-        "hr",            # hr.employee / hr.department / hr.job
+        "custom_core",  # custom.ir.config encryption helpers + Settings anchor
+        "auth_oauth",  # Odoo 19 CE core — the auth foundation
+        "hr",  # hr.employee / hr.department / hr.job
     ],
     "capability_tags": ["hr", "sso", "keycloak", "oidc", "multi-tenant"],
     "data": [

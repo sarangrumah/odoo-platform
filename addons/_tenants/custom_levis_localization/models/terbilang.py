@@ -13,8 +13,18 @@ fall back to English). Verified against the sample vouchers:
 from __future__ import annotations
 
 _SATUAN = [
-    "", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan",
-    "sembilan", "sepuluh", "sebelas",
+    "",
+    "satu",
+    "dua",
+    "tiga",
+    "empat",
+    "lima",
+    "enam",
+    "tujuh",
+    "delapan",
+    "sembilan",
+    "sepuluh",
+    "sebelas",
 ]
 
 
@@ -37,7 +47,11 @@ def _spell(x: int) -> str:
         return _spell(x // 1_000_000) + " juta" + ((" " + _spell(x % 1_000_000)) if x % 1_000_000 else "")
     if x < 1_000_000_000_000:
         return _spell(x // 1_000_000_000) + " miliar" + ((" " + _spell(x % 1_000_000_000)) if x % 1_000_000_000 else "")
-    return _spell(x // 1_000_000_000_000) + " triliun" + ((" " + _spell(x % 1_000_000_000_000)) if x % 1_000_000_000_000 else "")
+    return (
+        _spell(x // 1_000_000_000_000)
+        + " triliun"
+        + ((" " + _spell(x % 1_000_000_000_000)) if x % 1_000_000_000_000 else "")
+    )
 
 
 def terbilang_id(amount, suffix: str = "Rupiah") -> str:

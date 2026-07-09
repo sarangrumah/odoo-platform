@@ -30,12 +30,12 @@ import sys
 env = env  # noqa: F821  (injected by `odoo shell`)
 log = lambda m: sys.stderr.write("[wht] " + m + "\n") or sys.stderr.flush()
 
-CSV = os.path.join(os.path.dirname(__file__) if "__file__" in dir() else
-                   "scripts/tenants/levis", "withholding_codes.csv")
+CSV = os.path.join(
+    os.path.dirname(__file__) if "__file__" in dir() else "scripts/tenants/levis", "withholding_codes.csv"
+)
 # `odoo shell` reads the script from stdin, so __file__ is unset -> use the path
 # the file was piped from. Fall back to /tmp if mounted there.
-for cand in (CSV, "/tmp/withholding_codes.csv",
-             "scripts/tenants/levis/withholding_codes.csv"):
+for cand in (CSV, "/tmp/withholding_codes.csv", "scripts/tenants/levis/withholding_codes.csv"):
     if os.path.exists(cand):
         CSV = cand
         break
@@ -75,8 +75,14 @@ for r in rows:
     tarif = 0.0 if flexible else float(tarif_raw)
 
     cat = Category.search([("code", "=", code)], limit=1)
-    cvals = {"code": code, "pph_kind": kind, "bupot_object_code": obj,
-             "name": name, "legal_basis": legal, "active": True}
+    cvals = {
+        "code": code,
+        "pph_kind": kind,
+        "bupot_object_code": obj,
+        "name": name,
+        "legal_basis": legal,
+        "active": True,
+    }
     if cat:
         cat.write(cvals)
         cat_updated += 1
@@ -84,23 +90,28 @@ for r in rows:
         cat = Category.create(cvals)
         cat_created += 1
 
-    note = ("Tarif fleksibel — isi manual per transaksi (P3B/DGT)."
-            if flexible else "")
+    note = "Tarif fleksibel — isi manual per transaksi (P3B/DGT)." if flexible else ""
 
     # One rule per company (account_id domain is company-scoped).
     for comp in companies:
-        acc = env["account.account"].with_company(comp).search(
-            [("code", "=", r["coa_code"].strip()),
-             ("company_ids", "in", comp.id)], limit=1)
+        acc = (
+            env["account.account"]
+            .with_company(comp)
+            .search([("code", "=", r["coa_code"].strip()), ("company_ids", "in", comp.id)], limit=1)
+        )
         if not acc:
-            log("SKIP rule %s/%s: COA %s missing in %s"
-                % (code, comp.name, r["coa_code"], comp.name))
+            log("SKIP rule %s/%s: COA %s missing in %s" % (code, comp.name, r["coa_code"], comp.name))
             continue
-        rule = Rule.search([("category_id", "=", cat.id),
-                            ("company_id", "=", comp.id)], limit=1)
-        rvals = {"category_id": cat.id, "company_id": comp.id,
-                 "name": name, "tarif": tarif, "account_id": acc.id,
-                 "notes": note, "active": True}
+        rule = Rule.search([("category_id", "=", cat.id), ("company_id", "=", comp.id)], limit=1)
+        rvals = {
+            "category_id": cat.id,
+            "company_id": comp.id,
+            "name": name,
+            "tarif": tarif,
+            "account_id": acc.id,
+            "notes": note,
+            "active": True,
+        }
         if rule:
             rule.write(rvals)
             rule_updated += 1

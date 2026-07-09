@@ -307,9 +307,7 @@ class CustomFixedAsset(models.Model):
             posted = asset.depreciation_line_ids.filtered("posted")
             accum = sum(posted.mapped("amount"))
             asset.accumulated_depreciation = accum
-            asset.net_book_value = (
-                (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0) - accum
-            )
+            asset.net_book_value = (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0) - accum
 
     def _compute_revaluation_count(self):
         for asset in self:
@@ -356,9 +354,7 @@ class CustomFixedAsset(models.Model):
 
         # Drop unposted lines so we can rebuild from current parameters. Reversed
         # lines are kept for audit (posted=False but excluded from scheduling).
-        self.depreciation_line_ids.filtered(
-            lambda l: not l.posted and not l.reversed
-        ).unlink()
+        self.depreciation_line_ids.filtered(lambda l: not l.posted and not l.reversed).unlink()
         posted_amount = sum(self.depreciation_line_ids.filtered("posted").mapped("amount"))
         remaining = max(0.0, base - posted_amount)
         if remaining <= 0:

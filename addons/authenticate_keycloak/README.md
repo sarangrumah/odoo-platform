@@ -8,7 +8,7 @@ So this addon is using authorization type code, this is some setup on your keycl
 - set Authorization on
 - set Standard Flow on
 - setup client credential to get client_secret
-Then you have realm, client_id and client secret to set on apps configuration 
+Then you have realm, client_id and client secret to set on apps configuration
 
 
 
@@ -22,7 +22,7 @@ This addon using this method, so you need to create .env file and access it from
 from dotenv import load_dotenv
 load_dotenv()
 ```
-Then on your .env 
+Then on your .env
 ```bash
 KEYCLOAK_REALM=master
 KEYCLOAK_CLIENT_ID=myclientid
@@ -69,6 +69,3 @@ print(secret_data['secret_key'])  # Output: supersecret123
 ```
 
 but you need to inherit or change on this addon to use other method other than default
-
-
-

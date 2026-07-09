@@ -55,8 +55,9 @@ class FinanceSyncLog(models.Model):
 
     # ------------------------------------------------------------------
     @api.model
-    def _record(self, direction, operation, status, message=None, res_model=None,
-                res_id=None, record_count=None, payload=None):
+    def _record(
+        self, direction, operation, status, message=None, res_model=None, res_id=None, record_count=None, payload=None
+    ):
         vals = {
             "direction": direction,
             "operation": operation,
@@ -195,8 +196,8 @@ class FinanceSyncLog(models.Model):
     def _upsert_budgets(self, records):
         n = 0
         for r in records:
-            division = self.env["finance.vertical"].sudo().search(
-                [("x_sap_external_id", "=", r.get("division_id"))], limit=1
+            division = (
+                self.env["finance.vertical"].sudo().search([("x_sap_external_id", "=", r.get("division_id"))], limit=1)
             )
             if not division:
                 continue
@@ -220,9 +221,7 @@ class FinanceSyncLog(models.Model):
             ext = r.get("id")
             if not ext:
                 continue
-            emp = self.env["hr.employee"].sudo().search(
-                [("identification_id", "=", r.get("nik"))], limit=1
-            )
+            emp = self.env["hr.employee"].sudo().search([("identification_id", "=", r.get("nik"))], limit=1)
             vals = {
                 "name": r.get("reference") or ext,
                 "requester_id": emp.id if emp else False,
@@ -245,12 +244,16 @@ class FinanceSyncLog(models.Model):
         """Apply a SAP status callback onto the referenced document."""
         model = payload.get("doc_model")
         ref = payload.get("doc_ref")
-        if model not in (
-            "finance.cash.advance",
-            "finance.cash.advance.realization",
-            "finance.reimbursement",
-            "finance.vendor.invoice",
-        ) or not ref:
+        if (
+            model
+            not in (
+                "finance.cash.advance",
+                "finance.cash.advance.realization",
+                "finance.reimbursement",
+                "finance.vendor.invoice",
+            )
+            or not ref
+        ):
             self._record("status", "status_in", "error", "Bad doc_model/doc_ref", payload=payload)
             return False
         doc = self.env[model].sudo().search([("name", "=", ref)], limit=1)

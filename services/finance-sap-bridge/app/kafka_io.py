@@ -5,6 +5,7 @@ be exercised before the real bus exists.
 Idempotency and DLQ are sketched here as the integration points a production
 build fills in (a real store + a dead-letter topic).
 """
+
 from __future__ import annotations
 
 import json

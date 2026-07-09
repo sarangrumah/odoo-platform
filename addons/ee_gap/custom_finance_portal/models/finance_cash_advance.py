@@ -44,9 +44,7 @@ class FinanceCashAdvance(models.Model):
     note = fields.Text()
 
     line_ids = fields.One2many("finance.cash.advance.line", "advance_id", string="Detail")
-    realization_ids = fields.One2many(
-        "finance.cash.advance.realization", "advance_id", string="Realizations"
-    )
+    realization_ids = fields.One2many("finance.cash.advance.realization", "advance_id", string="Realizations")
     realization_count = fields.Integer(compute="_compute_realization_count")
 
     # Override the mixin's plain amount → computed from lines.
@@ -141,9 +139,7 @@ class FinanceCashAdvanceRealization(models.Model):
     )
     realization_date = fields.Date(string="Realization Date")
     note = fields.Text()
-    line_ids = fields.One2many(
-        "finance.cash.advance.realization.line", "realization_id", string="Detail"
-    )
+    line_ids = fields.One2many("finance.cash.advance.realization.line", "realization_id", string="Detail")
 
     advance_amount = fields.Monetary(
         string="CA Amount",
@@ -175,10 +171,7 @@ class FinanceCashAdvanceRealization(models.Model):
     def _check_advance_approved(self):
         for rec in self:
             if rec.advance_id and rec.advance_id.state in ("draft", "rejected", "cancelled"):
-                raise UserError(
-                    _("Cannot realize a Cash Advance that is not yet approved (%s).")
-                    % rec.advance_id.name
-                )
+                raise UserError(_("Cannot realize a Cash Advance that is not yet approved (%s).") % rec.advance_id.name)
 
 
 class FinanceCashAdvanceRealizationLine(models.Model):
@@ -186,9 +179,7 @@ class FinanceCashAdvanceRealizationLine(models.Model):
     _description = "Cash Advance Realization Detail Line"
     _order = "realization_id, sequence, id"
 
-    realization_id = fields.Many2one(
-        "finance.cash.advance.realization", required=True, ondelete="cascade"
-    )
+    realization_id = fields.Many2one("finance.cash.advance.realization", required=True, ondelete="cascade")
     sequence = fields.Integer(default=10)
     name = fields.Char(string="Description", required=True)
     item_id = fields.Many2one("finance.item.submission", string="Item")

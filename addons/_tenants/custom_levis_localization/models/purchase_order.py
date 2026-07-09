@@ -60,10 +60,14 @@ class PurchaseOrder(models.Model):
         """
         code = TRADE_SEQ if purchase_type == "trade" else NONTRADE_SEQ
         company = self.company_id or self.env.company
-        seq = self.env["ir.sequence"].sudo().search(
-            [("code", "=", code), ("company_id", "in", [company.id, False])],
-            order="company_id",
-            limit=1,
+        seq = (
+            self.env["ir.sequence"]
+            .sudo()
+            .search(
+                [("code", "=", code), ("company_id", "in", [company.id, False])],
+                order="company_id",
+                limit=1,
+            )
         )
         if not seq:
             return False
@@ -82,9 +86,7 @@ class PurchaseOrder(models.Model):
         if not rng:
             first = dt.replace(day=1)
             last = first + relativedelta(months=1) - timedelta(days=1)
-            DateRange.create(
-                {"sequence_id": seq.id, "date_from": first, "date_to": last}
-            )
+            DateRange.create({"sequence_id": seq.id, "date_from": first, "date_to": last})
         return seq.next_by_id(sequence_date=dt)
 
     @api.model_create_multi
@@ -96,9 +98,7 @@ class PurchaseOrder(models.Model):
             ptype = vals.get("l10n_purchase_type") or "trade"
             seq_date = None
             if vals.get("date_order"):
-                seq_date = fields.Datetime.context_timestamp(
-                    self, fields.Datetime.to_datetime(vals["date_order"])
-                )
+                seq_date = fields.Datetime.context_timestamp(self, fields.Datetime.to_datetime(vals["date_order"]))
             number = self.with_company(company_id)._levis_next_po_number(ptype, seq_date)
             if number:
                 vals["name"] = number
@@ -131,9 +131,7 @@ class PurchaseOrderLine(models.Model):
             ou = line.order_id._levis_ou_analytic()
             if not ou:
                 continue
-            line.analytic_distribution = line._levis_merge_ou_distribution(
-                line.analytic_distribution, ou.id
-            )
+            line.analytic_distribution = line._levis_merge_ou_distribution(line.analytic_distribution, ou.id)
 
     @staticmethod
     def _levis_merge_ou_distribution(distribution, ou_id):

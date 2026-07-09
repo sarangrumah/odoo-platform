@@ -17,7 +17,7 @@ lookup (see ``custom_levis_localization`` post-init hook / setup script) and can
 be adjusted from Accounting ▸ Configuration ▸ Trade/Non-Trade Accounts.
 """
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class LevisPurchaseAccountMap(models.Model):
@@ -67,7 +67,10 @@ class LevisPurchaseAccountMap(models.Model):
 
     def name_get(self):
         labels = dict(self._fields["purchase_type"]._description_selection(self.env))
-        return [(rec.id, "%s / %s" % (rec.company_id.name, labels.get(rec.purchase_type, rec.purchase_type))) for rec in self]
+        return [
+            (rec.id, "%s / %s" % (rec.company_id.name, labels.get(rec.purchase_type, rec.purchase_type)))
+            for rec in self
+        ]
 
     @api.model
     def _get_map(self, company, purchase_type):

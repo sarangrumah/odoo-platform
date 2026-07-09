@@ -24,7 +24,6 @@ _logger = logging.getLogger(__name__)
 
 
 class FinanceSapWebhook(http.Controller):
-
     @http.route("/finance/sap/status", type="http", auth="public", methods=["POST"], csrf=False)
     @secure_endpoint("finance_sap")
     def sap_status(self, **kwargs):

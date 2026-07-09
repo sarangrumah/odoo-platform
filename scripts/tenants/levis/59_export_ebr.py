@@ -54,10 +54,10 @@ with open(out, "w", newline="") as f:
     w.writerow(["code", "name", "account_type"])
     seen = set()
     n = 0
-    for r in rows[2:]:               # header at row index 1
+    for r in rows[2:]:  # header at row index 1
         if not s(r[0]):
             continue
-        w.writerow([s(r[0]), s(r[1]), s(r[2])])   # strip trailing/leading spaces (e.g. ' asset_current')
+        w.writerow([s(r[0]), s(r[1]), s(r[2])])  # strip trailing/leading spaces (e.g. ' asset_current')
         seen.add(s(r[0]))
         n += 1
     for code, name, at in SUPPLEMENT:
@@ -78,13 +78,13 @@ with open(out, "w", newline="") as f:
     head += ["ending_ytd", "diff"]
     w.writerow(head)
     n = 0
-    for r in rows[6:]:               # header at row index 5, data from 6
+    for r in rows[6:]:  # header at row index 5, data from 6
         acc = s(r[0])
         if not acc.replace(".", "", 1).isdigit():
             continue
         row = [acc, s(r[1]), s(r[2])]
         for m in range(12):
-            base = 6 + 4 * m          # Beginning,D,C,Ending blocks start at col 6
+            base = 6 + 4 * m  # Beginning,D,C,Ending blocks start at col 6
             row += [num(r[base]), num(r[base + 1]), num(r[base + 2]), num(r[base + 3])]
         row += [num(r[54]), num(r[55])]
         w.writerow(row)
@@ -95,14 +95,31 @@ print("[export] tb_ebr.csv      : %d accounts" % n)
 ws = wb["GL EBR 2026"]
 rows = list(ws.iter_rows(values_only=True))
 out = os.path.join(HERE, "gl_ebr.csv")
-GL_COLS = ["no", "year", "period", "txn_type", "doc_no", "invoice_ref", "doc_date",
-           "posting_date", "account", "account_desc", "d", "c", "amount", "notes",
-           "bank_mapping", "business_partner", "store", "remarks"]
+GL_COLS = [
+    "no",
+    "year",
+    "period",
+    "txn_type",
+    "doc_no",
+    "invoice_ref",
+    "doc_date",
+    "posting_date",
+    "account",
+    "account_desc",
+    "d",
+    "c",
+    "amount",
+    "notes",
+    "bank_mapping",
+    "business_partner",
+    "store",
+    "remarks",
+]
 with open(out, "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(GL_COLS)
     n = 0
-    for r in rows[6:]:               # header at row index 5
+    for r in rows[6:]:  # header at row index 5
         if r[1] in (None, "") or not str(r[1]).replace(".", "", 1).isdigit():
             continue
         w.writerow([s(x) for x in r[1:19]])

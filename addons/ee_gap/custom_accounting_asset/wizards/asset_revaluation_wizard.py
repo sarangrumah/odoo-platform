@@ -86,8 +86,7 @@ class CustomFixedAssetRevaluationWizard(models.TransientModel):
         comodel_name="account.account",
         string="Revaluation Loss Account",
         default=_default_loss_account,
-        help="P&L expense account debited for the part of a downward revaluation "
-        "not covered by an existing surplus.",
+        help="P&L expense account debited for the part of a downward revaluation not covered by an existing surplus.",
     )
     income_account_id = fields.Many2one(
         comodel_name="account.account",
@@ -153,9 +152,7 @@ class CustomFixedAssetRevaluationWizard(models.TransientModel):
         if from_surplus > 0 and not self.surplus_account_id:
             raise UserError(_("A revaluation surplus account is required to offset the existing surplus."))
         if income_amt > 0 and not self.income_account_id:
-            raise UserError(
-                _("A revaluation income account is required to reverse the prior downward revaluation.")
-            )
+            raise UserError(_("A revaluation income account is required to reverse the prior downward revaluation."))
         if to_pl > 0 and not self.loss_account_id:
             raise UserError(_("A revaluation loss account is required for the P&L part of the decrease."))
 
@@ -232,9 +229,7 @@ class CustomFixedAssetRevaluationWizard(models.TransientModel):
         lines = []
 
         def _line(account, debit, credit, name):
-            lines.append(
-                (0, 0, {"name": name, "account_id": account.id, "debit": debit, "credit": credit})
-            )
+            lines.append((0, 0, {"name": name, "account_id": account.id, "debit": debit, "credit": credit}))
 
         if increment > 0:
             _line(asset.asset_account_id, increment, 0.0, _("Revaluation increase %(name)s", name=asset.name))

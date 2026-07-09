@@ -33,7 +33,7 @@ class PosSession(models.Model):
         # ``l10n_ou_analytic_id`` trigger: ``analytic_distribution`` is a stored
         # computed field with readonly=False, so a value supplied at create time
         # wins and the result stays deterministic.
-        vals["analytic_distribution"] = self.env[
-            "purchase.order.line"
-        ]._levis_merge_ou_distribution(vals.get("analytic_distribution"), ou.id)
+        vals["analytic_distribution"] = self.env["purchase.order.line"]._levis_merge_ou_distribution(
+            vals.get("analytic_distribution"), ou.id
+        )
         return vals

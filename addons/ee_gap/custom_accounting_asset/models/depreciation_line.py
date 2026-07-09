@@ -66,17 +66,19 @@ class CustomFixedAssetDepreciationLine(models.Model):
         """
         for line in self:
             if not line.posted:
-                raise UserError(
-                    _("Depreciation line #%(seq)s is not posted; nothing to reverse.",
-                      seq=line.sequence)
-                )
+                raise UserError(_("Depreciation line #%(seq)s is not posted; nothing to reverse.", seq=line.sequence))
             move = line.move_id
             if move and move.state == "posted":
                 # Full reversal reconciled against the original entry.
                 move._reverse_moves(
-                    [{"date": fields.Date.context_today(line), "ref": _(
-                        "Reversal of Depreciation %(code)s #%(seq)s",
-                        code=line.asset_id.code, seq=line.sequence)}],
+                    [
+                        {
+                            "date": fields.Date.context_today(line),
+                            "ref": _(
+                                "Reversal of Depreciation %(code)s #%(seq)s", code=line.asset_id.code, seq=line.sequence
+                            ),
+                        }
+                    ],
                     cancel=True,
                 )
             line.write({"posted": False, "reversed": True})

@@ -2,8 +2,7 @@
 {
     "name": "ARKA-AIM Document Numbering",
     "version": "19.0.1.0.0",
-    "summary": "Per-company document numbering (SQ/SO/PO/INV/DO/BAST) with "
-    "monthly reset for the ARKA-AIM tenant.",
+    "summary": "Per-company document numbering (SQ/SO/PO/INV/DO/BAST) with monthly reset for the ARKA-AIM tenant.",
     "description": """
 ARKA-AIM Document Numbering
 ===========================

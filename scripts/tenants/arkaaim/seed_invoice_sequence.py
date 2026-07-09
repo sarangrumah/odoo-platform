@@ -33,11 +33,11 @@ SEED_CODE / SEED_YEAR / SEED_MONTH / SEED_MOVE_ID as needed.
 """
 
 # ----- knobs -------------------------------------------------------------
-SEED_CODE = "ARKA"      # res.company.x_doc_code to seed
-SEED_YEAR = None        # int year, or None = current month's year
-SEED_MONTH = None       # int month, or None = current month
-SEED_MOVE_ID = None     # specific draft out_invoice id, or None = auto-pick earliest draft in the period
-SEED_COMMIT = False     # True to persist; False = preview only
+SEED_CODE = "ARKA"  # res.company.x_doc_code to seed
+SEED_YEAR = None  # int year, or None = current month's year
+SEED_MONTH = None  # int month, or None = current month
+SEED_MOVE_ID = None  # specific draft out_invoice id, or None = auto-pick earliest draft in the period
+SEED_COMMIT = False  # True to persist; False = preview only
 # -------------------------------------------------------------------------
 
 from datetime import date  # noqa: E402
@@ -52,9 +52,7 @@ year = SEED_YEAR or today.year
 month = SEED_MONTH or today.month
 seed_name = "INV/%s/%04d/%02d/001" % (SEED_CODE, year, month)
 
-journals = env["account.journal"].search(
-    [("type", "=", "sale"), ("company_id", "=", company.id)]
-)
+journals = env["account.journal"].search([("type", "=", "sale"), ("company_id", "=", company.id)])
 period_start = date(year, month, 1)
 period_end = date(year + (month // 12), (month % 12) + 1, 1)
 
@@ -93,8 +91,10 @@ print("Target period  :", "%04d-%02d" % (year, month))
 print("Seed name      :", seed_name)
 print("Posted already :", already, "customer invoice(s) this month (want 0)")
 if not target:
-    print("RESULT: no DRAFT customer invoice found in the period. Create the first "
-          "invoice as a draft, then re-run (or set SEED_MOVE_ID).")
+    print(
+        "RESULT: no DRAFT customer invoice found in the period. Create the first "
+        "invoice as a draft, then re-run (or set SEED_MOVE_ID)."
+    )
 else:
     print("Target move    : id=%s current name=%r date=%s" % (target.id, target.name, target.invoice_date))
     if target.name and target.name.startswith("INV/%s/" % SEED_CODE):
@@ -102,8 +102,9 @@ else:
     elif SEED_COMMIT:
         target.name = seed_name
         env.cr.commit()
-        print("RESULT: COMMITTED. Set move %s name -> %s. Post it; later invoices "
-              "will continue %s/.../NNN monthly." % (target.id, seed_name, "INV/%s/%04d/%02d" % (SEED_CODE, year, month)))
+        print(
+            "RESULT: COMMITTED. Set move %s name -> %s. Post it; later invoices "
+            "will continue %s/.../NNN monthly." % (target.id, seed_name, "INV/%s/%04d/%02d" % (SEED_CODE, year, month))
+        )
     else:
-        print("RESULT: PREVIEW ONLY. Set SEED_COMMIT = True to write name=%r onto move %s."
-              % (seed_name, target.id))
+        print("RESULT: PREVIEW ONLY. Set SEED_COMMIT = True to write name=%r onto move %s." % (seed_name, target.id))
