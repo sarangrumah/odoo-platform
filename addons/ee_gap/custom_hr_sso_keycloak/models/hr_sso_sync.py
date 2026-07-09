@@ -152,11 +152,11 @@ class HrSsoSync(models.AbstractModel):
             resp.raise_for_status()
             payload = resp.json()
             if not payload.get("status"):
-                _logger.error(
-                    "HR SSO: HC API error for employee %s: %s",
-                    employee.id,
-                    payload.get("message", "unknown"),
-                )
+                # The HC API echoes the request (which carries the NIK and the
+                # API key) back in its error message, so the remote text is not
+                # safe to log. Identify the row instead; the API's own logs hold
+                # the detail.
+                _logger.error("HR SSO: HC API reported failure for employee %s", employee.id)
                 return
 
             data = payload.get("data") or {}

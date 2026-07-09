@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # HOST script (needs openpyxl). Extracts the EBR finance workbook into loader CSVs.
 #
 #   python scripts/tenants/levis/59_export_ebr.py "<path to 2026-06 - EBR - TB and GL ....xlsx>"
