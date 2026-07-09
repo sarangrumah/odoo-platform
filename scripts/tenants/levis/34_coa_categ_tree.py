@@ -117,7 +117,7 @@ for cat in Categ.search([]):
         "property_account_income_categ_id": acc(m["inc"]).id,
         "property_account_expense_categ_id": acc(m["exp"]).id,
     }
-    # Only present once custom_retail_import >= 19.0.0.6.0 is installed.
+    # Only present once custom_retail_import >= 19.0.0.10.0 is installed.
     if "property_account_sales_discount_categ_id" in Categ._fields:
         vals["property_account_sales_discount_categ_id"] = acc(m["disc"]).id
         vals["property_account_sales_return_categ_id"] = acc(m["ret"]).id

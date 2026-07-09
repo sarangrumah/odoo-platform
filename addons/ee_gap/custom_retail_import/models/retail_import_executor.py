@@ -95,6 +95,28 @@ class RetailImportExecutor(models.AbstractModel):
         return prefix + "".join(c if c.isalnum() else "_" for c in str(value)).upper()
 
     # ------------------------------------------------------------------
+    # Source-file footer rows
+    # ------------------------------------------------------------------
+    _RI_FOOTER_MARKERS = ("grand total", "total", "sub total", "subtotal")
+
+    @classmethod
+    def _ri_drop_footer_rows(cls, records, sku_fields=("item_code", "product_code")):
+        """Drop the trailing summary row the EBR reports append.
+
+        X24DN's last row carries ``STORE CODE = 'Grand Total'`` and an **empty-string**
+        ITEM CODE — an ``is None`` guard lets it through, and it then becomes a bogus
+        parked transaction whose amounts double the file's totals.
+        """
+        out = []
+        for r in records:
+            store = str(r.get("store_code") or "").strip().lower()
+            has_sku = any(str(r.get(f) or "").strip() for f in sku_fields)
+            if store in cls._RI_FOOTER_MARKERS or not has_sku:
+                continue
+            out.append(r)
+        return out
+
+    # ------------------------------------------------------------------
     # X101 product-type classification
     # ------------------------------------------------------------------
     def _x101_service_matchers(self):
@@ -738,6 +760,24 @@ class RetailImportExecutor(models.AbstractModel):
             "retail_import.x24_post_enabled", "0"
         ) in ("1", "true", "True")
 
+    def _x24_discount_reclass_enabled(self):
+        """Book X24DN's NET DISCOUNT AMOUNT as a per-category contra-revenue reclass
+        (Dr Sales Discount-<cat> / Cr Gross Sales-<cat>) after the POS sessions close.
+
+        Mutually exclusive with ``retail_import.x31_post_enabled`` — X24DN covers every
+        X31 discount, so enabling both grosses revenue up twice. Gated (default OFF)."""
+        return self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.x24_discount_reclass", "0"
+        ) in ("1", "true", "True")
+
+    def _ri_assert_single_discount_source(self):
+        if self._x24_discount_reclass_enabled() and self._x31_post_enabled():
+            raise UserError(_(
+                "retail_import.x24_discount_reclass and retail_import.x31_post_enabled are "
+                "both on. X24DN's NET DISCOUNT AMOUNT already covers every X31 discount, so "
+                "posting both would gross Gross Sales up twice. Turn one off."
+            ))
+
     def _x24_strict_product_enabled(self):
         """Strict mode: never lazy-create a product for an X24/X48 row whose SKU is
         absent from the X101 master. The transaction is parked instead, forcing the
@@ -823,8 +863,9 @@ class RetailImportExecutor(models.AbstractModel):
         Posting (flag on) creates one pos.order per (store,date,register,transnum)
         with payments joined from X70D. See docs/PHASE5_X24_DESIGN.md.
         """
+        self._ri_assert_single_discount_source()
         data = profile.read_records(file_b64)
-        records = data["records"]
+        records = self._ri_drop_footer_rows(data["records"])
         log.line_count = len(records)
         if not records:
             log.records_skipped = 0
@@ -865,6 +906,66 @@ class RetailImportExecutor(models.AbstractModel):
             [("type_tax_use", "=", "sale"), ("amount", "=", 11.0), ("amount_type", "=", "percent")],
             limit=1,
         )
+
+    def _ri_pos_configs(self, domain=()):
+        """Every pos.config, **including archived ones**.
+
+        Stores that closed mid-period (OLS SES - GRAND INDONESIA, PACIFIC PLACE MALL,
+        PASKAL BANDUNG) are archived but still carry transactions in the source files,
+        and ``resolve_config`` reaches them by xid regardless of ``active``. A plain
+        ``search([])`` skips them, so they never received the seeded tender methods nor
+        the SUSPENSE method — their orders then died with "The payment method selected
+        is not allowed in the config of the POS session."
+        """
+        return self.env["pos.config"].with_context(active_test=False).search(list(domain))
+
+    def _ri_assert_stores_postable(self, configs):
+        """Fail fast when a store the file still transacts against is archived.
+
+        ``resolve_config`` reaches a pos.config by xid regardless of ``active``, so an
+        archived store happily accepts orders — but its session cannot close: Odoo
+        refuses to post an entry against the store's (also archived) analytic account,
+        leaving the session in ``closing_control`` with NO general-ledger entry. The
+        import would then look successful while that store's revenue and VAT silently
+        never reached the books. Better to stop and have the operator unarchive.
+        """
+        blocked = []
+        for cfg in configs:
+            reasons = []
+            if not cfg.active:
+                reasons.append("pos.config archived")
+            # The Operating-Unit analytic reaches the close move via
+            # pos.session._get_sale_vals (custom_levis_localization); an archived one
+            # makes account.move._post refuse the entry.
+            warehouse = cfg.warehouse_id
+            if warehouse and "l10n_ou_analytic_id" in warehouse._fields:
+                analytic = warehouse.with_context(active_test=False).l10n_ou_analytic_id
+                if analytic and not analytic.active:
+                    reasons.append("Operating-Unit analytic %r archived" % analytic.name)
+            if reasons:
+                blocked.append("  - %s: %s" % (cfg.name, ", ".join(reasons)))
+        if blocked:
+            raise UserError(_(
+                "These stores still have transactions in the source file but are archived, "
+                "so their POS session could never post to the general ledger:\n\n%s\n\n"
+                "Unarchive the pos.config and its analytic account (Operating Unit), then "
+                "re-run the import.", "\n".join(blocked)))
+
+    def _ri_src_line_vals(self, net, tax, discount=0.0, is_return=False):
+        """pos.order.line values carrying the source file's own net/tax/discount.
+
+        The fields live in the optional ``custom_retail_import_pos`` bridge (this module
+        must not depend on point_of_sale — trn_arkaaim runs the importer without POS),
+        so return an empty dict when the model or the fields are absent.
+        """
+        if "pos.order.line" not in self.env:
+            return {}
+        if "ri_src_tax" not in self.env["pos.order.line"]._fields:
+            return {}
+        return {
+            "ri_src_net": net, "ri_src_tax": tax,
+            "ri_src_discount": discount, "ri_is_return": is_return,
+        }
 
     def _x24_tender_index(self, profile):
         """Build {(store,date,reg,txn): [(tender_type, amount)]} from staged X70D lines.
@@ -958,6 +1059,8 @@ class RetailImportExecutor(models.AbstractModel):
         prod_bc, prod_dc = {}, {}
         created = skipped = 0
         errors = []
+        # (product, discount, date) for every posted line carrying a NET DISCOUNT AMOUNT.
+        posted_disc = []
 
         def resolve_config(store):
             if store not in cfg_cache:
@@ -1076,6 +1179,11 @@ class RetailImportExecutor(models.AbstractModel):
                     row_to_line[rn].write({"state": "error", "error_message": msg[:250]})
             errors.append((rows[0].get("_row"), msg))
 
+        # Preflight: an archived store accepts orders but its session can never post.
+        self._ri_assert_stores_postable({
+            cfg for cfg in (resolve_config(k[0]) for k in orders) if cfg
+        })
+
         for key, rows in orders.items():
             store, date, reg, txn = key
             oxid = self._safe_xid("posorder_", f"{store}_{date}_{reg}_{txn}")
@@ -1088,6 +1196,7 @@ class RetailImportExecutor(models.AbstractModel):
                 continue
 
             line_cmds, order_net, order_incl, missing = [], 0.0, 0.0, []
+            order_disc = []
             for r in rows:
                 prod = resolve_product(r)
                 if not prod:
@@ -1104,26 +1213,40 @@ class RetailImportExecutor(models.AbstractModel):
                 gross = float(profile._parse_amount(r.get("gross_price")) or 0)
                 rate = str(r.get("tax_rate") or "").strip()
                 taxed = bool(tax) and rate not in ("", "None")
-                # Derive the untaxed base from the PAID total and the tax rate so POS'
-                # tax recomputation grosses back to exactly ``incl`` (net*(1+rate)==incl).
-                # Using the source net_amount instead leaves a residual that POS plugs to
-                # "Cash Difference Loss" (the source total/net ratio is blended, not flat).
-                rate_val = (tax.amount / 100.0) if taxed else 0.0
-                gl_net = incl / (1.0 + rate_val)
+                # X24DN is the source of truth: NET SOLD AMOUNT / TAX AMOUNT are taken
+                # verbatim. The file truncates net to whole rupiah per line
+                # (net = trunc(total/1.11), tax = total - net) whereas Odoo rounds the
+                # tax globally per order, so recomputing here drifts by ~1 rupiah on more
+                # than half the lines. ``ri_src_*`` carries the file's figures through to
+                # session close via pos.order.line._prepare_base_line_for_taxes_computation
+                # (custom_retail_import_pos).
+                src_net = float(profile._parse_amount(r.get("net_amount")) or 0)
+                src_tax = float(profile._parse_amount(r.get("tax_amount")) or 0)
+                src_disc = float(profile._parse_amount(r.get("net_discount")) or 0)
+                if not (src_net or src_tax):
+                    # Older extracts without the net/tax columns: fall back to deriving.
+                    rate_val = (tax.amount / 100.0) if taxed else 0.0
+                    src_net, src_tax = incl / (1.0 + rate_val), incl - incl / (1.0 + rate_val)
+                gl_net = src_net
                 tax_ids = [tax.id] if taxed else []
                 # The sale tax is PRICE-INCLUDED, so POS extracts net from price_unit and
                 # ignores a forced price_subtotal. price_unit must therefore carry the
-                # tax-INCLUSIVE amount (the paid ``incl``) — POS then derives net = incl/(1+rate)
-                # and recognised incl == incl == tender, so nothing plugs to Cash Difference.
+                # tax-INCLUSIVE amount (the paid ``incl``) so the order total matches the
+                # tender exactly and nothing plugs to Cash Difference.
                 unit = incl / qty if qty else incl
-                line_cmds.append((0, 0, {
+                line_cmds.append((0, 0, dict({
                     "product_id": prod.id, "qty": qty,
                     "price_unit": unit, "discount": 0.0,
                     "tax_ids": [(6, 0, tax_ids)],
                     "price_subtotal": gl_net, "price_subtotal_incl": incl,
-                }))
+                }, **self._ri_src_line_vals(net=src_net, tax=src_tax, discount=src_disc))))
                 order_net += gl_net
                 order_incl += incl
+                if src_disc:
+                    # Carry the RESOLVED product: the discount reclass must not re-look-up
+                    # by bare item_code — X101 variants are keyed on code+waist+inseam, so
+                    # a default_code search misses most rows.
+                    order_disc.append((prod, src_disc))
 
             # Strict mode / any unresolved line: park the WHOLE transaction rather than
             # posting a partial order (which would later fail the tender-balance check).
@@ -1151,6 +1274,7 @@ class RetailImportExecutor(models.AbstractModel):
 
             d = profile._parse_date(date)
             dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
+            order_date = d
             # Session is created outside the per-order savepoint so a single bad
             # order does not roll back the shared session.
             sess = get_session(cfg)
@@ -1207,11 +1331,15 @@ class RetailImportExecutor(models.AbstractModel):
                         "state": "ok", "target_model": "pos.order",
                         "target_res_id": order.id, "aggregate_key": f"{store}|{date}|{txn}",
                     })
+            posted_disc.extend((p, d, order_date) for p, d in order_disc)
             created += 1
             if created % 200 == 0:
                 self.env.cr.commit()
 
         self._pos_close_and_backdate(sess_cache.values(), errors, "x24")
+
+        if self._x24_discount_reclass_enabled():
+            self._post_x24_discount_reclass(profile, records, posted_disc, log)
 
         self.env.cr.commit()
         log.records_created = created
@@ -1235,7 +1363,13 @@ class RetailImportExecutor(models.AbstractModel):
                 try:
                     s.post_closing_cash_details(s.cash_register_balance_end)
                     s.close_session_from_ui()
-                except Exception:
+                except Exception as ce:
+                    # Never swallow silently: a session left in `closing_control` produces
+                    # NO GL at all, so its whole store's revenue/VAT would vanish from the
+                    # books while the import still reports "imported".
+                    _logger.error("%s POST: session %s (%s) close failed: %s",
+                                  tag, s.id, s.config_id.name, ce)
+                    errors.append((None, f"session {s.id} ({s.config_id.name}) close failed: {ce}"))
                     s.action_pos_session_closing_control()
                 moves = s.order_ids.picking_ids.mapped("move_ids")
                 if moves:
@@ -1316,7 +1450,7 @@ class RetailImportExecutor(models.AbstractModel):
         if stores is None:
             stores = self._x24_stores_from_staged()
         norm_cfg = defaultdict(list)
-        for c in self.env["pos.config"].search([]):
+        for c in self._ri_pos_configs():
             norm_cfg[self._norm_store_name(c.name)].append(c)
 
         report, written = [], 0
@@ -1354,7 +1488,7 @@ class RetailImportExecutor(models.AbstractModel):
         """
         Method = self.env["pos.payment.method"]
         created = {}
-        companies = self.env["pos.config"].search([]).mapped("company_id")
+        companies = self._ri_pos_configs().mapped("company_id")
         for company in companies:
             existing = Method.search([("company_id", "=", company.id)])
             names = set(existing.mapped("name"))
@@ -1368,7 +1502,7 @@ class RetailImportExecutor(models.AbstractModel):
                 m = Method.create(vals)
                 created.setdefault(company.id, []).append(tname)
                 # attach to that company's configs so map_method finds it
-                cfgs = self.env["pos.config"].search([("company_id", "=", company.id)])
+                cfgs = self._ri_pos_configs([("company_id", "=", company.id)])
                 for c in cfgs:
                     c.write({"payment_method_ids": [(4, m.id)]})
         # newly-seeded methods must also get their own GL receivable
@@ -1425,7 +1559,7 @@ class RetailImportExecutor(models.AbstractModel):
         """
         Method = self.env["pos.payment.method"].sudo()
         summary = {}
-        for company in self.env["pos.config"].search([]).mapped("company_id"):
+        for company in self._ri_pos_configs().mapped("company_id"):
             default_recv = company.account_default_pos_receivable_account_id
             acc_by_tender = {}
             for m in Method.search([("company_id", "=", company.id)]):
@@ -1479,7 +1613,7 @@ class RetailImportExecutor(models.AbstractModel):
         close misbehaves and _x24_ensure_method_gl_split would skip it)."""
         Method = self.env["pos.payment.method"].sudo()
         by_company = {}
-        for company in self.env["pos.config"].search([]).mapped("company_id"):
+        for company in self._ri_pos_configs().mapped("company_id"):
             m = Method.search([("company_id", "=", company.id),
                                ("name", "=", self._X24_SUSPENSE_METHOD)], limit=1)
             if not m:
@@ -1494,7 +1628,7 @@ class RetailImportExecutor(models.AbstractModel):
             susp = self._x24_suspense_account(company)
             if m.receivable_account_id != susp:
                 m.receivable_account_id = susp.id
-            for c in self.env["pos.config"].search([("company_id", "=", company.id)]):
+            for c in self._ri_pos_configs([("company_id", "=", company.id)]):
                 if m not in c.payment_method_ids:
                     c.write({"payment_method_ids": [(4, m.id)]})
             by_company[company.id] = m
@@ -1734,8 +1868,9 @@ class RetailImportExecutor(models.AbstractModel):
     def _load_x31(self, profile, file_b64, log):
         """Post X31 promo discounts as a contra-revenue reclassification when
         ``retail_import.x31_post_enabled``; otherwise stage (legacy default)."""
+        self._ri_assert_single_discount_source()
         data = profile.read_records(file_b64)
-        records = data["records"]
+        records = self._ri_drop_footer_rows(data["records"])
         log.line_count = len(records)
         if not records:
             log.records_skipped = 0
@@ -1751,7 +1886,7 @@ class RetailImportExecutor(models.AbstractModel):
             self.env["retail.import.line"].search([("log_id", "=", log.id)]).write({"state": "skipped"})
             self.env.cr.commit()
 
-    def _x31_income_account(self, company, prod):
+    def _ri_income_account(self, company, prod):
         """The product's sale income account (the Gross Sales-<category> account X24
         posts revenue to). Use the full POS/accounting resolution chain (product →
         category → company fallback) via ``_get_product_accounts`` — the bare property
@@ -1774,26 +1909,296 @@ class RetailImportExecutor(models.AbstractModel):
                                       ("name", "ilike", "gross sales")], limit=1))
         return acc
 
-    def _x31_discount_account(self, company, income_acct):
-        """Category Sales-Discount contra account matching a Gross Sales income account
-        (textile / footwear / accessories / miscellaneous)."""
+    # Keyword fallback for tenants whose product categories carry no explicit
+    # discount/return account (the Levi's COA is seeded by 34_coa_categ_tree.py).
+    _RI_CONTRA_KIND = {
+        "discount": "sales discount",
+        "return": "sales return",
+    }
+    # Matched in order against the income account's name; first hit wins. "other" has to
+    # be tried before the generic "misc" tail, otherwise an uncategorised product — whose
+    # income resolves to "Gross Sales-Others" — reclassifies to Miscellaneous.
+    _RI_CONTRA_KEYWORDS = (
+        ("textile", "textile"),
+        ("footwear", "footwear"),
+        ("shoe", "footwear"),
+        ("access", "accessor"),
+        ("labor", "labor"),
+        ("service", "labor"),
+        ("merchandise", "merchandise"),
+        ("wholesale", "wholesale"),
+        ("e-commerce", "e-commerce"),
+        ("clearance", "clearance"),
+        ("distributor", "distributor"),
+        ("other", "other"),
+        ("misc", "misc"),
+    )
+
+    def _ri_contra_account_fallback(self, company, income_acct, kind):
+        """Category contra account matched by name against a Gross Sales income account.
+
+        Only reached when the product's category carries no explicit contra account.
+        """
         Account = self.env["account.account"].sudo().with_company(company)
+        label = self._RI_CONTRA_KIND[kind]
         nm = (income_acct.name or "").lower()
-        kw = ("textile" if "textile" in nm else
-              "footwear" if ("footwear" in nm or "shoe" in nm) else
-              "accessor" if "access" in nm else "misc")
-        return (Account.search([("name", "ilike", "sales discount"), ("name", "ilike", kw)], limit=1)
-                or Account.search([("name", "ilike", "sales discount"), ("name", "ilike", "misc")], limit=1)
-                or Account.search([("name", "ilike", "sales discount")], limit=1))
+        for needle, kw in self._RI_CONTRA_KEYWORDS:
+            if needle in nm:
+                match = Account.search(
+                    [("name", "ilike", label), ("name", "ilike", kw)], limit=1)
+                if match:
+                    return match
+                break
+        return (Account.search([("name", "ilike", label), ("name", "ilike", "misc")], limit=1)
+                or Account.search([("name", "ilike", label)], limit=1))
+
+    def _ri_category_account(self, company, prod, kind):
+        """Resolve the ``Sales Discount-<cat>`` / ``Sales Return-<cat>`` contra account
+        for a product, per its product category.
+
+        ``kind`` is ``'discount'`` or ``'return'``. Resolution order:
+        the category's explicit property (seeded from the COA bucket table), then its
+        parent chain, then a name-keyword fallback against the income account so
+        tenants without the seeded properties keep working.
+        """
+        field = "property_account_sales_%s_categ_id" % kind
+        categ = prod.with_company(company).categ_id
+        while categ:
+            acc = categ[field]
+            if acc:
+                return acc
+            categ = categ.parent_id
+        income = self._ri_income_account(company, prod)
+        if not income:
+            return self.env["account.account"].browse()
+        return self._ri_contra_account_fallback(company, income, kind)
+
+    def _ri_adjustment_journal(self, company):
+        """Dedicated journal so a period-dated reclass is not bumped to today by Odoo's
+        sequence-date monotonicity against unrelated later moves in MISC."""
+        Journal = self.env["account.journal"].sudo()
+        journal = Journal.search([("code", "=", "RIADJ"), ("company_id", "=", company.id)], limit=1)
+        if not journal:
+            journal = Journal.create({
+                "name": "Retail Import Adjustments", "code": "RIADJ",
+                "type": "general", "company_id": company.id,
+            })
+        return journal
+
+    def _ri_backdate_move(self, move, gl_date, tag):
+        """Odoo bumps a past-dated entry to today on post (sequence-date monotonicity).
+        Re-stamp the move + lines to the source period via SQL within the same fiscal
+        year, aligning the sequence name's month so it stays consistent."""
+        try:
+            if gl_date and move.date and gl_date.year == move.date.year and gl_date != move.date:
+                newname = move.name
+                mtag = "/%02d/" % move.date.month
+                if newname and mtag in newname:
+                    cand = newname.replace(mtag, "/%02d/" % gl_date.month)
+                    if not self.env["account.move"].search_count(
+                        [("journal_id", "=", move.journal_id.id), ("name", "=", cand),
+                         ("id", "!=", move.id)]):
+                        newname = cand
+                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s",
+                                    (gl_date, newname, move.id))
+                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s",
+                                    (gl_date, move.id))
+                move.invalidate_recordset(["date", "name"])
+                move.line_ids.invalidate_recordset(["date"])
+        except Exception as be:
+            _logger.warning("%s POST: backdate skipped: %s", tag, be)
+
+    def _ri_post_discount_reclass(self, company, journal, by_pair, gl_date, ref, tag):
+        """Post the net-neutral contra-revenue reclass:
+        per category, Dr ``Sales Discount-<cat>`` / Cr ``Gross Sales-<cat>``.
+
+        ``by_pair`` maps ``(income_account_id, discount_account_id)`` to the discount
+        amount **taken verbatim from the source file**. Both legs carry the identical
+        figure, so the entry balances exactly and no rounding selisih is introduced.
+        """
+        line_ids = []
+        for (inc_id, dacc_id), amt in by_pair.items():
+            amt = round(amt, 2)
+            line_ids.append((0, 0, {"account_id": dacc_id, "debit": amt, "credit": 0.0,
+                                    "name": "POS discount (%s)" % tag.upper()}))
+            line_ids.append((0, 0, {"account_id": inc_id, "debit": 0.0, "credit": amt,
+                                    "name": "POS discount gross-up (%s)" % tag.upper()}))
+        move = self.env["account.move"].create({
+            "move_type": "entry", "journal_id": journal.id, "date": gl_date,
+            "ref": ref, "line_ids": line_ids,
+        })
+        move.action_post()
+        self._ri_backdate_move(move, gl_date, tag)
+        return move
+
+    # ------------------------------------------------------------------
+    # X24DN discount: validation against X31, then per-category reclass
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _ri_discount_key(store, date, txn, code, waist, inseam):
+        def norm(v):
+            if v is None:
+                return ""
+            if isinstance(v, float) and v == int(v):
+                v = int(v)
+            return str(v).strip()
+        return (norm(store), norm(date)[:10], norm(txn), norm(code), norm(waist), norm(inseam))
+
+    def _ri_x31_discount_index(self, profile):
+        """{key: discount_amount} from the most recent staged/imported X31 log."""
+        x31_profile = self.env["retail.import.profile"].search(
+            [("file_type", "=", "x31"), ("company_id", "=", profile.company_id.id)], limit=1
+        )
+        idx = defaultdict(float)
+        if not x31_profile:
+            return idx
+        log = self.env["retail.import.log"].sudo().search(
+            [("profile_id", "=", x31_profile.id)], order="id desc", limit=1)
+        if not log:
+            return idx
+        for ln in self.env["retail.import.line"].sudo().search([("log_id", "=", log.id)]):
+            try:
+                r = json.loads(ln.raw_data_json or "{}")
+            except Exception:
+                continue
+            code = str(r.get("product_code") or "").strip()
+            if not code:
+                continue
+            key = self._ri_discount_key(r.get("store_code"), r.get("trans_date"),
+                                        r.get("transnum"), code, r.get("waist"), r.get("inseam"))
+            try:
+                idx[key] += float(r.get("discount_amount") or 0)
+            except Exception:
+                continue
+        return idx
+
+    def _ri_validate_discounts(self, profile, records):
+        """Cross-check X24DN's NET DISCOUNT AMOUNT against the X31 Discount Journal.
+
+        Returns a summary dict. X31 is expected to cover every discounted X24 line;
+        anything else (an X24-only discount, a large per-key delta, X31 rows with no
+        X24 counterpart) means the two extracts disagree and the reclass must not post
+        blind. Per-key rounding of +/-1 rupiah is normal and absorbed by the tolerance.
+        """
+        icp = self.env["ir.config_parameter"].sudo()
+        tol = float(icp.get_param("retail_import.discount_validation_tolerance", "1.0"))
+
+        x31 = self._ri_x31_discount_index(profile)
+        x24 = defaultdict(float)
+        for r in records:
+            disc = float(profile._parse_amount(r.get("net_discount")) or 0)
+            if not disc:
+                continue
+            key = self._ri_discount_key(r.get("store_code"), r.get("trans_date"),
+                                        r.get("transnum"), r.get("item_code"),
+                                        r.get("waist"), r.get("inseam"))
+            x24[key] += disc
+
+        matched = [k for k in x24 if k in x31]
+        over_tol = [k for k in matched if abs(x24[k] - x31[k]) > tol]
+        x24_only = [k for k in x24 if k not in x31]
+        x31_only = [k for k in x31 if k not in x24 and x31[k]]
+        return {
+            "x24_total": sum(x24.values()),
+            "x31_total": sum(x31.values()),
+            "matched": len(matched),
+            "over_tolerance": len(over_tol),
+            "over_tolerance_delta": sum(x24[k] - x31[k] for k in over_tol),
+            "x24_only": len(x24_only),
+            "x24_only_total": sum(x24[k] for k in x24_only),
+            "x31_only": len(x31_only),
+            "x31_only_total": sum(x31[k] for k in x31_only),
+            "tolerance": tol,
+            "x31_available": bool(x31),
+        }
+
+    @staticmethod
+    def _ri_format_discount_validation(v):
+        if not v["x31_available"]:
+            return "X31 not imported — X24DN discounts posted without cross-validation."
+        return (
+            "X24DN vs X31 discount validation: X24={x24_total:,.2f} X31={x31_total:,.2f} "
+            "delta={delta:,.2f} | matched={matched} within +/-{tolerance:g} "
+            "(over tolerance: {over_tolerance}, delta {over_tolerance_delta:,.2f}) | "
+            "X24-only={x24_only} ({x24_only_total:,.2f}) | "
+            "X31-only={x31_only} ({x31_only_total:,.2f})"
+        ).format(delta=v["x24_total"] - v["x31_total"], **v)
+
+    def _post_x24_discount_reclass(self, profile, records, posted_disc, log):
+        """Dr Sales Discount-<cat> / Cr Gross Sales-<cat> for X24DN's NET DISCOUNT AMOUNT,
+        taken verbatim from the file (no ex-VAT conversion, no rounding).
+
+        ``posted_disc`` is a list of ``(product, discount, date)`` for the lines that
+        actually posted, carrying the product resolved by ``_post_x24``'s full
+        EAN/composite matcher. Validated against X31 first; the summary is appended to
+        the log either way.
+        """
+        company = profile.company_id
+        icp = self.env["ir.config_parameter"].sudo()
+
+        verdict = self._ri_validate_discounts(profile, records)
+        summary = self._ri_format_discount_validation(verdict)
+        _logger.info("x24 discount reclass: %s", summary)
+
+        max_delta = icp.get_param("retail_import.discount_validation_max_delta")
+        if verdict["x31_available"] and max_delta:
+            delta = abs(verdict["x24_total"] - verdict["x31_total"])
+            if delta > float(max_delta):
+                raise UserError(_(
+                    "X24DN/X31 discount totals differ by %(delta)s, above "
+                    "retail_import.discount_validation_max_delta (%(max)s). "
+                    "Reconcile the two extracts before posting.\n\n%(summary)s",
+                    delta="{:,.2f}".format(delta), max=max_delta, summary=summary,
+                ))
+
+        acct_cache, by_pair, dates = {}, defaultdict(float), []
+        skipped = skipped_amount = 0.0
+        for prod, disc, d in posted_disc:
+            if prod.id not in acct_cache:
+                inc = self._ri_income_account(company, prod)
+                dacc = self._ri_category_account(company, prod, "discount")
+                acct_cache[prod.id] = (inc, dacc) if (inc and dacc) else None
+            pair = acct_cache[prod.id]
+            if not pair:
+                skipped += 1
+                skipped_amount += disc
+                continue
+            inc, dacc = pair
+            by_pair[(inc.id, dacc.id)] += disc
+            if d:
+                dates.append(d)
+
+        if skipped:
+            summary += ("\nWARNING: %d discounted line(s) worth %s had no income/discount "
+                        "account and were NOT reclassified." % (skipped, "{:,.2f}".format(skipped_amount)))
+            _logger.warning("x24 discount reclass: %d lines (%.2f) unmapped", skipped, skipped_amount)
+        log.error_message = "\n".join(filter(None, [log.error_message, summary]))
+        if not by_pair:
+            _logger.info("x24 discount reclass: nothing to post (%s lines unmapped)", skipped)
+            return
+
+        journal = self._ri_adjustment_journal(company)
+        gl_date = max(dates) if dates else datetime.now().date()
+        move = self._ri_post_discount_reclass(
+            company, journal, by_pair, gl_date,
+            ref=f"X24DN discount reclass (log {log.id})", tag="x24",
+        )
+        self._xid_set(profile.namespace, self._safe_xid("x24discount_", str(log.id)),
+                      "account.move", move.id)
+        _logger.info("x24 discount reclass: move %s posted (%s categories, %s rows unmapped)",
+                     move.name, len(by_pair), skipped)
 
     def _post_x31(self, profile, records, log, row_to_line):
         """Post X31 promo discounts as a NET-NEUTRAL contra-revenue reclassification:
         per category, Dr ``Sales Discount-<cat>`` / Cr ``Gross Sales-<cat>`` for the
-        ex-VAT discount. This grosses revenue back up to list price and books the
-        discount as a category contra-revenue, so the P&L shows gross sales + discounts
-        by category WITHOUT double-counting X24's net sales (X24 stays unchanged).
-        One journal entry per import, dated at the latest discount date; idempotent via
-        the whole-file guard + an ``x31entry_<log>`` xid."""
+        source DISCOUNT AMOUNT, booked verbatim. This grosses revenue back up and books
+        the discount as a category contra-revenue, so the P&L shows gross sales +
+        discounts by category WITHOUT double-counting X24's net sales.
+
+        Mutually exclusive with ``retail_import.x24_discount_reclass``: X24DN's
+        NET DISCOUNT AMOUNT covers every X31 discount, so posting both would gross
+        revenue up twice. One journal entry per import, dated at the latest discount
+        date; idempotent via the whole-file guard + an ``x31entry_<log>`` xid."""
         ns = profile.namespace
         company = profile.company_id
         Product = self.env["product.product"]
@@ -1806,17 +2211,7 @@ class RetailImportExecutor(models.AbstractModel):
                 _("X31 already posted (log #%s). Archive it before re-posting to avoid duplicate reclass.")
                 % prior.id
             )
-        # Dedicated journal so the (period-dated) reclass is not bumped to today by
-        # Odoo's sequence-date monotonicity against unrelated later moves in MISC.
-        Journal = self.env["account.journal"].sudo()
-        journal = Journal.search([("code", "=", "RIADJ"), ("company_id", "=", company.id)], limit=1)
-        if not journal:
-            journal = Journal.create({
-                "name": "Retail Import Adjustments", "code": "RIADJ",
-                "type": "general", "company_id": company.id,
-            })
-        tax = self._x24_resolve_tax()
-        rate_val = (tax.amount / 100.0) if tax else 0.0
+        journal = self._ri_adjustment_journal(company)
 
         prod_cache, by_pair, dates, ok_rows, errors = {}, defaultdict(float), [], [], []
         skipped = 0
@@ -1829,8 +2224,8 @@ class RetailImportExecutor(models.AbstractModel):
             if code not in prod_cache:
                 prod_cache[code] = Product.search([("default_code", "=", code)], limit=1)
             prod = prod_cache[code]
-            inc = self._x31_income_account(company, prod) if prod else False
-            dacc = self._x31_discount_account(company, inc) if inc else False
+            inc = self._ri_income_account(company, prod) if prod else False
+            dacc = self._ri_category_account(company, prod, "discount") if prod else False
             if not prod or not inc or not dacc:
                 skipped += 1
                 rn = r.get("_row")
@@ -1841,7 +2236,10 @@ class RetailImportExecutor(models.AbstractModel):
                     })
                 errors.append((r.get("_row"), f"X31: no income/discount account for {code}"))
                 continue
-            by_pair[(inc.id, dacc.id)] += disc / (1.0 + rate_val)
+            # DISCOUNT AMOUNT is booked verbatim — never divided by (1 + tax rate).
+            # Both legs of the reclass carry the same figure, so it balances exactly and
+            # ``Sales Discount-<cat>`` ties to the source workbook to the rupiah.
+            by_pair[(inc.id, dacc.id)] += disc
             raw_dt = str(r.get("trans_date") or "").strip()
             d = profile._parse_date(raw_dt)
             if not d and raw_dt:
@@ -1859,39 +2257,11 @@ class RetailImportExecutor(models.AbstractModel):
             self.env.cr.commit()
             return
 
-        line_ids = []
-        for (inc_id, dacc_id), amt in by_pair.items():
-            amt = round(amt, 2)
-            line_ids.append((0, 0, {"account_id": dacc_id, "debit": amt, "credit": 0.0,
-                                    "name": "POS promo discount (X31)"}))
-            line_ids.append((0, 0, {"account_id": inc_id, "debit": 0.0, "credit": amt,
-                                    "name": "POS promo discount gross-up (X31)"}))
         gl_date = max(dates) if dates else datetime.now().date()
-        move = self.env["account.move"].create({
-            "move_type": "entry", "journal_id": journal.id, "date": gl_date,
-            "ref": f"X31 promo discount reclass (log {log.id})", "line_ids": line_ids,
-        })
-        move.action_post()
-        # Odoo bumps a past-dated entry to today on post (sequence-date monotonicity).
-        # Re-stamp the move + lines to the discount period via SQL within the same
-        # fiscal year, aligning the sequence name's month so it stays consistent.
-        try:
-            if gl_date and move.date and gl_date.year == move.date.year and gl_date != move.date:
-                newname = move.name
-                mtag = "/%02d/" % move.date.month
-                if newname and mtag in newname:
-                    cand = newname.replace(mtag, "/%02d/" % gl_date.month)
-                    if not self.env["account.move"].search_count(
-                        [("journal_id", "=", journal.id), ("name", "=", cand), ("id", "!=", move.id)]):
-                        newname = cand
-                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s",
-                                    (gl_date, newname, move.id))
-                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s",
-                                    (gl_date, move.id))
-                move.invalidate_recordset(["date", "name"])
-                move.line_ids.invalidate_recordset(["date"])
-        except Exception as be:
-            _logger.warning("x31 POST: backdate skipped: %s", be)
+        move = self._ri_post_discount_reclass(
+            company, journal, by_pair, gl_date,
+            ref=f"X31 promo discount reclass (log {log.id})", tag="x31",
+        )
         self._xid_set(ns, self._safe_xid("x31entry_", str(log.id)), "account.move", move.id)
         for rn in ok_rows:
             if rn in row_to_line:
@@ -1932,7 +2302,7 @@ class RetailImportExecutor(models.AbstractModel):
         """Post X48 customer returns as refund pos.orders when
         ``retail_import.x48_post_enabled``; otherwise stage (legacy default)."""
         data = profile.read_records(file_b64)
-        records = data["records"]
+        records = self._ri_drop_footer_rows(data["records"])
         log.line_count = len(records)
         if not records:
             log.records_skipped = 0
@@ -2056,6 +2426,11 @@ class RetailImportExecutor(models.AbstractModel):
                     row_to_line[rn].write({"state": "error", "error_message": msg[:250]})
             errors.append((rows[0].get("_row"), msg))
 
+        # Preflight: an archived store accepts orders but its session can never post.
+        self._ri_assert_stores_postable({
+            cfg for cfg in (resolve_config(k[0]) for k in orders) if cfg
+        })
+
         rate_val = (tax.amount / 100.0) if tax else 0.0
         for key, rows in orders.items():
             store, date, reg, txn = key
@@ -2087,14 +2462,22 @@ class RetailImportExecutor(models.AbstractModel):
                     continue
                 qty = float(profile._parse_amount(r.get("net_qty")))        # negative
                 incl = float(profile._parse_amount(r.get("total_amount")))  # negative (refund)
-                gl_net = incl / (1.0 + rate_val)
+                # X48 carries NET SOLD AMOUNT / TAX AMOUNT (both negative) but no TAX RATE
+                # column, so a line is taxed iff it has a tax amount. As with X24, the
+                # file's own figures win over a recomputation.
+                src_net = float(profile._parse_amount(r.get("net_amount")) or 0)
+                src_tax = float(profile._parse_amount(r.get("tax_amount")) or 0)
+                if not (src_net or src_tax):
+                    src_net, src_tax = incl / (1.0 + rate_val), incl - incl / (1.0 + rate_val)
+                taxed = bool(tax) and bool(src_tax)
+                gl_net = src_net
                 unit = incl / qty if qty else incl                          # positive unit price
-                line_cmds.append((0, 0, {
+                line_cmds.append((0, 0, dict({
                     "product_id": prod.id, "qty": qty,
                     "price_unit": unit, "discount": 0.0,
-                    "tax_ids": [(6, 0, [tax.id] if tax else [])],
+                    "tax_ids": [(6, 0, [tax.id] if taxed else [])],
                     "price_subtotal": gl_net, "price_subtotal_incl": incl,
-                }))
+                }, **self._ri_src_line_vals(net=src_net, tax=src_tax, is_return=True))))
                 order_net += gl_net
                 order_incl += incl
 

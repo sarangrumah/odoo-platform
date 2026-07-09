@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from . import product_category
 from . import retail_import_profile
 from . import retail_import_line
 from . import retail_import_log
