@@ -30,8 +30,11 @@ can be archived.
 Archived stores are renamed and wired up exactly like live ones first, so they
 can be reactivated later without any further configuration.
 
-Existing POS/stock/accounting documents keep the names they were issued under —
-those are document references (``OLS SCU - .../00090``), not configuration.
+This script stops at the configuration boundary. The per-store POS **cash journal**,
+its check-number sequence and the already-issued POS documents (``pos.session``,
+``pos.order`` and the accounting ``ref``/``memo`` fields that copied a session name)
+still carry the seed-time names. Run ``43_align_pos_naming.py`` afterwards to bring
+those in line.
 """
 
 import os

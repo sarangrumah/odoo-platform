@@ -53,14 +53,17 @@ docker exec -i odoo19-platform-odoo-mgmt odoo shell -d levis --no-http < scripts
 Creates 24 warehouses keyed by name; adds `wh_<CODE>` aliases where codes are known.
 **Re-run `04` after the customer supplies the missing 23 store codes** (idempotent — just adds aliases).
 
-### 3b. Operating-Unit normalisation — `41_normalize_ou.py` + `42_backfill_ou_analytic.py`
+### 3b. Operating-Unit normalisation — `41_normalize_ou.py` + `42_backfill_ou_analytic.py` + `43_align_pos_naming.py`
 ```
 RUN_DRY=0 docker exec -i -e RUN_DRY=0 odoo19-platform-odoo-mgmt odoo shell -d <db> --no-http \
     < scripts/tenants/levis/41_normalize_ou.py
 RUN_DRY=0 docker exec -i -e RUN_DRY=0 odoo19-platform-odoo-mgmt odoo shell -d <db> --no-http \
     < scripts/tenants/levis/42_backfill_ou_analytic.py
+RUN_DRY=0 docker exec -i -e RUN_DRY=0 odoo19-platform-odoo-mgmt odoo shell -d <db> --no-http \
+    < scripts/tenants/levis/43_align_pos_naming.py
 ```
-Both are idempotent and **dry-run by default** (`RUN_DRY=1`); run `40_setup_trade_ou.py` first.
+All three are idempotent and **dry-run by default** (`RUN_DRY=1`); run `40_setup_trade_ou.py` first,
+and `43` after `41` (it reads the `pos.config` names `41` writes).
 
 `41` leaves the "Operating Unit" analytic plan holding exactly 21 active accounts —
 `EBR - HEAD OFFICE` plus the 20 live stores, all named `OLS SES - <MALL>`. Stores are
@@ -70,6 +73,16 @@ journal (`Pembelian - <store>`) and its `pos.config`; core cascades it to the ro
 rules and stock sequences. `GRAND INDONESIA`, `PACIFIC PLACE MALL` and `PASKAL BANDUNG`
 (no POS orders) are configured like live stores, then archived, as is the stray `PI021`
 warehouse and the duplicate `My Company` OU.
+
+`43` finishes the job on the POS side, which `41` does not reach: the per-store cash
+journal (`Cash - <store>`), its default account when that account mirrored the journal
+name, every journal's `…: Check Number Sequence`, and the already-issued documents —
+`pos.session.name`, `pos.order.name` and the `ref`/`memo` fields the accounting entries
+copied a session name into. It never matches on `LIKE '%OLS %'` (real product names such
+as `GRAPHIC CREWNECK TEE TOOLS PEWTER` contain that substring); renames are driven by an
+explicit old → new map built from `pos.config`. Chatter (`mail_message`,
+`mail_tracking_value`) is left alone on purpose — it records what a record was called at
+the time.
 
 `42` stamps the OU analytic on POS revenue that was posted before
 `custom_levis_localization` started doing it at source (`pos.session._get_sale_vals`).
