@@ -24,12 +24,7 @@ def send_backup_failure_alert(slug: str, kind: str, error: str) -> None:
         log.warning("alert.skipped_misconfigured", reason="missing baileys secret/recipient/session")
         return
 
-    text = (
-        "⚠️ Backup GAGAL\n"
-        f"Tenant: {slug}\n"
-        f"Jenis: {kind}\n"
-        f"Error: {error[:400]}"
-    )
+    text = f"⚠️ Backup GAGAL\nTenant: {slug}\nJenis: {kind}\nError: {error[:400]}"
     url = f"{s.baileys_url.rstrip('/')}/sessions/{s.alert_whatsapp_session}/messages"
     try:
         r = httpx.post(

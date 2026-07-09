@@ -214,6 +214,7 @@ class IdPaymentWebhookController(http.Controller):
         provided = request.httprequest.headers.get("x-callback-token", "")
         expected = provider.x_id_webhook_secret or ""
         if not XenditAdapter.verify_callback_token(provided, expected):
+            # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure - logs external_id, never the token value
             _logger.warning("Xendit webhook: callback token mismatch for %s", external_id)
             return request.make_response("bad token", status=400)
 

@@ -38,8 +38,7 @@ else:
         if existing:
             existing.res_id = res_id
             return
-        IMD.create({"module": NS, "name": name, "model": model,
-                    "res_id": res_id, "noupdate": True})
+        IMD.create({"module": NS, "name": name, "model": model, "res_id": res_id, "noupdate": True})
 
     def xid_get(name):
         rec = IMD.search([("module", "=", NS), ("name", "=", name)], limit=1)
@@ -67,21 +66,23 @@ else:
         rid = xid_get(xid)
         if rid:
             return Loc.browse(rid)
-        loc = Loc.create({
-            "name": name,
-            "location_id": parent_id,
-            "usage": kind,
-            "barcode": barcode or False,
-            "volume_capacity_m3": vol,
-        })
+        loc = Loc.create(
+            {
+                "name": name,
+                "location_id": parent_id,
+                "usage": kind,
+                "barcode": barcode or False,
+                "volume_capacity_m3": vol,
+            }
+        )
         xid_set(xid, "stock.location", loc.id)
         return loc
 
     zones = {
-        "GR":   ("GR Dock (Goods Receipt)",       "zone_gr"),
-        "HD":   ("HD Palletised Racking",         "zone_hd"),
-        "PICK": ("Forward Pick Area",             "zone_pick"),
-        "PACK": ("Pack & Ship Staging",           "zone_pack"),
+        "GR": ("GR Dock (Goods Receipt)", "zone_gr"),
+        "HD": ("HD Palletised Racking", "zone_hd"),
+        "PICK": ("Forward Pick Area", "zone_pick"),
+        "PACK": ("Pack & Ship Staging", "zone_pack"),
     }
     zone_locs = {}
     for code, (label, xid) in zones.items():
@@ -94,8 +95,7 @@ else:
     sections = {"NIKE": "sec_nike", "ADIDAS": "sec_adidas", "PUMA": "sec_puma"}
     section_locs = {}
     for brand, xid in sections.items():
-        section_locs[brand] = ensure_loc(
-            brand, zone_locs["PICK"].id, xid, barcode=f"JDC-PICK-{brand}")
+        section_locs[brand] = ensure_loc(brand, zone_locs["PICK"].id, xid, barcode=f"JDC-PICK-{brand}")
     log("storage sections (brands) under PICK: %s" % ", ".join(sections))
 
     # ------------------------------------------------------------------
@@ -106,15 +106,14 @@ else:
     # HD pallet bins: HD-A-01 .. HD-A-06 (palletised, big capacity)
     for i in range(1, 7):
         code = f"HD-A-{i:02d}"
-        ensure_loc(code, zone_locs["HD"].id, f"bin_{code.lower().replace('-', '_')}",
-                   barcode=f"JDC-{code}", vol=2.0)
+        ensure_loc(code, zone_locs["HD"].id, f"bin_{code.lower().replace('-', '_')}", barcode=f"JDC-{code}", vol=2.0)
     # PICK shelf bins per brand: <BRAND>-01 .. <BRAND>-04
     for brand in sections:
         for i in range(1, 5):
             code = f"{brand[:3]}-{i:02d}"
-            ensure_loc(code, section_locs[brand].id,
-                       f"bin_{code.lower().replace('-', '_')}",
-                       barcode=f"JDC-{code}", vol=0.25)
+            ensure_loc(
+                code, section_locs[brand].id, f"bin_{code.lower().replace('-', '_')}", barcode=f"JDC-{code}", vol=0.25
+            )
     # GR staging bin + PACK staging bin
     ensure_loc("GR-IN-01", zone_locs["GR"].id, "bin_gr_in_01", barcode="JDC-GR-IN-01", vol=5.0)
     ensure_loc("PACK-01", zone_locs["PACK"].id, "bin_pack_01", barcode="JDC-PACK-01", vol=5.0)

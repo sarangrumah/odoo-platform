@@ -41,9 +41,7 @@ class StockPicking(models.Model):
             offending = []
             for move in picking.move_ids:
                 rounding = move.product_uom.rounding
-                if float_compare(
-                    move.quantity, move.product_uom_qty, precision_rounding=rounding
-                ) > 0:
+                if float_compare(move.quantity, move.product_uom_qty, precision_rounding=rounding) > 0:
                     offending.append(
                         _(
                             "- %(product)s: received %(done)s > demand %(demand)s",
@@ -55,8 +53,7 @@ class StockPicking(models.Model):
             if offending:
                 raise UserError(
                     _(
-                        "Received quantity cannot exceed the demand quantity on a "
-                        "goods receipt.\n\n%(lines)s",
+                        "Received quantity cannot exceed the demand quantity on a goods receipt.\n\n%(lines)s",
                         lines="\n".join(offending),
                     )
                 )

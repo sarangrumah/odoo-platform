@@ -43,6 +43,8 @@ ignore = [
 "**/migrations/**" = ["F401", "F811"]
 
 # Run inside `odoo shell`, where `env` (and other globals) are injected into
-# the script namespace by Odoo — ruff cannot see that binding.
+# the script namespace by Odoo — ruff cannot see that binding (F821). These
+# one-off seed/config scripts also favour terse lambdas (E731) and interleaved
+# imports (E402) over module structure; that's fine for throwaway tooling.
 "scripts/gentlewoman/seed_shopper_taxonomy.py" = ["F821"]
-"scripts/tenants/era_busana_retailindo/02_import_to_odoo.py" = ["F821"]
+"scripts/tenants/**" = ["F821", "E731", "E402"]

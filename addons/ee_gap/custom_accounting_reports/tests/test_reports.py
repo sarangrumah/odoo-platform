@@ -524,16 +524,22 @@ class TestCustomReports(TransactionCase):
         self.assertEqual(lines[-1].get("type"), "grand_total")
 
         # No optional columns selected -> 9 core columns only.
-        gl_core = self.env["custom.report.general.ledger"].with_context(
-            gl_layout="flat", gl_columns=[]
-        )
+        gl_core = self.env["custom.report.general.ledger"].with_context(gl_layout="flat", gl_columns=[])
         self.assertEqual(len(gl_core._xlsx_columns()), 9)
         # All optional columns selected -> 9 core + 10 optional = 19.
         gl_full = self.env["custom.report.general.ledger"].with_context(
             gl_layout="flat",
             gl_columns=[
-                "doc_no", "reference", "tax", "clearing", "cost_center",
-                "profit_center", "currency", "amount_currency", "due_date", "user",
+                "doc_no",
+                "reference",
+                "tax",
+                "clearing",
+                "cost_center",
+                "profit_center",
+                "currency",
+                "amount_currency",
+                "due_date",
+                "user",
             ],
         )
         self.assertEqual(len(gl_full._xlsx_columns()), 19)

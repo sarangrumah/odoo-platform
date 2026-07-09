@@ -71,5 +71,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=20s --timeout=5s --retries=5 --start-period=15s \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)"
 
+# nosemgrep: dockerfile.security.missing-user-entrypoint.missing-user-entrypoint - runs as root by design (needs docker.sock); container is internal-only + HMAC-authed, see rationale above
 ENTRYPOINT ["/usr/bin/tini","--"]
+# nosemgrep: dockerfile.security.missing-user.missing-user - runs as root by design (needs docker.sock); container is internal-only + HMAC-authed, see rationale above
 CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8080"]

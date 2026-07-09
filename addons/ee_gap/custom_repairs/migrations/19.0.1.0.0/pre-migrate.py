@@ -26,9 +26,7 @@ def migrate(cr, version):
     if not version:
         return
     for column in OBSOLETE_COLUMNS:
-        cr.execute(
-            "ALTER TABLE repair_order DROP COLUMN IF EXISTS %s" % column
-        )
+        cr.execute("ALTER TABLE repair_order DROP COLUMN IF EXISTS %s" % column)
     cr.execute("DROP TABLE IF EXISTS custom_repairs_warranty_matrix CASCADE")
     _logger.info(
         "custom_repairs: dropped obsolete columns %s and warranty matrix table",

@@ -268,7 +268,14 @@ def _sign(secret: str, body: bytes) -> tuple[str, str]:
 
 
 def call_ai_gateway(
-    *, system: str, user: str, base_url: str, secret: str, quality: str = "fast", max_tokens: int = 4000, timeout: int = 600
+    *,
+    system: str,
+    user: str,
+    base_url: str,
+    secret: str,
+    quality: str = "fast",
+    max_tokens: int = 4000,
+    timeout: int = 600,
 ) -> str:
     body_dict = {
         "messages": [{"role": "user", "content": user}],
@@ -349,7 +356,12 @@ def main() -> int:
         help="Model tier: 'fast' = Sonnet 4.6 (~Rp 1-2rb/modul), 'high' = Opus 4.7 (~Rp 5-10rb/modul). Default 'fast'.",
     )
     ap.add_argument("--sleep", type=float, default=2.0, help="Seconds to sleep between calls (default 2.0).")
-    ap.add_argument("--timeout", type=int, default=600, help="Per-call HTTP timeout in seconds (default 600). Raise for slow local models.")
+    ap.add_argument(
+        "--timeout",
+        type=int,
+        default=600,
+        help="Per-call HTTP timeout in seconds (default 600). Raise for slow local models.",
+    )
     args = ap.parse_args()
 
     if not args.dry_run and not args.secret:
@@ -394,7 +406,12 @@ def main() -> int:
             continue
         try:
             body = call_ai_gateway(
-                system=SYSTEM_PROMPT, user=user, base_url=args.gateway, secret=args.secret, quality=args.quality, timeout=args.timeout
+                system=SYSTEM_PROMPT,
+                user=user,
+                base_url=args.gateway,
+                secret=args.secret,
+                quality=args.quality,
+                timeout=args.timeout,
             )
         except urllib.error.HTTPError as e:
             err_body = ""

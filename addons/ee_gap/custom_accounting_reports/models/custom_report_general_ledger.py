@@ -104,7 +104,12 @@ class CustomReportGeneralLedger(models.AbstractModel):
             "cost_center": {"header": "Cost Center", "field": "cost_center", "kind": "text", "width": 18},
             "profit_center": {"header": "Profit Center", "field": "profit_center", "kind": "text", "width": 18},
             "currency": {"header": "Doc Currency", "field": "currency", "kind": "text", "width": 10},
-            "amount_currency": {"header": "Amount (Doc Curr.)", "field": "amount_currency", "kind": "number", "width": 16},
+            "amount_currency": {
+                "header": "Amount (Doc Curr.)",
+                "field": "amount_currency",
+                "kind": "number",
+                "width": 16,
+            },
             "due_date": {"header": "Due Date", "field": "due_date", "kind": "date", "width": 12},
             "user": {"header": "User", "field": "user", "kind": "text", "width": 18},
             "debit": {"header": "Debit", "field": "debit", "kind": "number", "width": 16},
@@ -159,9 +164,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
                     line.get("account_name") or "",
                 )
                 sheet.merge_range(row, 0, row, ncol - 2, heading, fmts["group_text"])
-                sheet.write_number(
-                    row, ncol - 1, float(line.get("opening") or 0.0), fmts["group_num"]
-                )
+                sheet.write_number(row, ncol - 1, float(line.get("opening") or 0.0), fmts["group_num"])
                 row += 1
                 for ml in line.get("lines", []):
                     sheet.write(row, 0, self._format_date_id(ml.get("date")), fmts["text"])
@@ -173,7 +176,10 @@ class CustomReportGeneralLedger(models.AbstractModel):
                     sheet.write_number(row, 6, float(ml.get("balance") or 0.0), fmts["num"])
                     row += 1
                 sheet.merge_range(
-                    row, 0, row, 3,
+                    row,
+                    0,
+                    row,
+                    3,
                     "Total %s" % (line.get("account_code") or ""),
                     fmts["total_text"],
                 )
@@ -182,9 +188,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
                 sheet.write_number(row, 6, float(line.get("closing") or 0.0), fmts["total_num"])
                 row += 1
             elif ltype == "grand_total":
-                sheet.merge_range(
-                    row, 0, row, 3, line.get("label") or "Grand Total", fmts["total_text"]
-                )
+                sheet.merge_range(row, 0, row, 3, line.get("label") or "Grand Total", fmts["total_text"])
                 sheet.write_number(row, 4, float(line.get("total_debit") or 0.0), fmts["total_num"])
                 sheet.write_number(row, 5, float(line.get("total_credit") or 0.0), fmts["total_num"])
                 sheet.write_number(row, 6, float(line.get("closing") or 0.0), fmts["total_num"])
@@ -406,14 +410,8 @@ class CustomReportGeneralLedger(models.AbstractModel):
                     part = part.strip()
                     if part.isdigit():
                         analytic_ids.add(int(part))
-        analytics = {
-            a.id: a
-            for a in self.env["account.analytic.account"].browse(sorted(analytic_ids))
-        }
-        plan_is_profit = {
-            a.plan_id.id: "profit" in (a.plan_id.name or "").lower()
-            for a in analytics.values()
-        }
+        analytics = {a.id: a for a in self.env["account.analytic.account"].browse(sorted(analytic_ids))}
+        plan_is_profit = {a.plan_id.id: "profit" in (a.plan_id.name or "").lower() for a in analytics.values()}
 
         lines = []
         total_d = total_c = total_b = 0.0
@@ -426,9 +424,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
             user = users.get(r["create_uid"])
             tax = taxes.get(r["tax_line_id"])
             rec = recs.get(r["full_reconcile_id"])
-            cost, profit = self._split_analytic(
-                r.get("analytic_distribution"), analytics, plan_is_profit
-            )
+            cost, profit = self._split_analytic(r.get("analytic_distribution"), analytics, plan_is_profit)
             lines.append(
                 {
                     "date": r["date"],

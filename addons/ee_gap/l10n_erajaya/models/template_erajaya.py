@@ -6,6 +6,7 @@ Bulk data (accounts, account groups, tax groups, taxes) is shipped as CSV under
 module supplies the root metadata, company defaults, journals and fiscal
 positions in Python.
 """
+
 from odoo import models
 from odoo.addons.account.models.chart_template import template
 

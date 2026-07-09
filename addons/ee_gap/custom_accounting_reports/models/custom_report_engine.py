@@ -321,12 +321,7 @@ class CustomReportEngine(models.AbstractModel):
         # JSONB). Resolve them through the ORM so per-company codes and the
         # active language are honoured -- mirroring how the rest of this
         # module reads ``account_id.code``.
-        accounts = {
-            acc.id: acc
-            for acc in self.env["account.account"].browse(
-                [row["account_id"] for row in rows]
-            )
-        }
+        accounts = {acc.id: acc for acc in self.env["account.account"].browse([row["account_id"] for row in rows])}
         result = {}
         for row in rows:
             acc = accounts.get(row["account_id"])
@@ -476,8 +471,7 @@ class CustomReportEngine(models.AbstractModel):
         """
         raise NotImplementedError(
             _(
-                "Report %(code)s does not support XLSX export "
-                "(override _xlsx_columns()).",
+                "Report %(code)s does not support XLSX export (override _xlsx_columns()).",
                 code=self._report_code or self._name,
             )
         )
@@ -485,9 +479,7 @@ class CustomReportEngine(models.AbstractModel):
     def _xlsx_formats(self, workbook):
         """Reusable cell formats shared by every report's XLSX body."""
         return {
-            "title": workbook.add_format(
-                {"bold": True, "font_size": 14, "align": "center"}
-            ),
+            "title": workbook.add_format({"bold": True, "font_size": 14, "align": "center"}),
             "meta": workbook.add_format({"align": "center", "font_size": 10}),
             "header": workbook.add_format(
                 {
@@ -501,9 +493,7 @@ class CustomReportEngine(models.AbstractModel):
             ),
             "text": workbook.add_format({"border": 1}),
             "num": workbook.add_format({"border": 1, "num_format": "#,##0.00"}),
-            "total_text": workbook.add_format(
-                {"border": 1, "bold": True, "bg_color": "#F2F2F2"}
-            ),
+            "total_text": workbook.add_format({"border": 1, "bold": True, "bg_color": "#F2F2F2"}),
             "total_num": workbook.add_format(
                 {
                     "border": 1,
@@ -513,9 +503,7 @@ class CustomReportEngine(models.AbstractModel):
                 }
             ),
             # Hierarchical reports (GL group headers, BS section headers).
-            "group_text": workbook.add_format(
-                {"border": 1, "bold": True, "bg_color": "#EDEDED"}
-            ),
+            "group_text": workbook.add_format({"border": 1, "bold": True, "bg_color": "#EDEDED"}),
             "group_num": workbook.add_format(
                 {
                     "border": 1,
@@ -524,9 +512,7 @@ class CustomReportEngine(models.AbstractModel):
                     "num_format": "#,##0.00",
                 }
             ),
-            "section": workbook.add_format(
-                {"bold": True, "font_size": 11, "bg_color": "#FCE4D6"}
-            ),
+            "section": workbook.add_format({"bold": True, "font_size": 11, "bg_color": "#FCE4D6"}),
         }
 
     def _xlsx_export(self, filters=None):
@@ -609,8 +595,14 @@ class CustomReportEngine(models.AbstractModel):
         return row
 
     def _xlsx_sectioned_body(
-        self, sheet, ctx, fmts, start_row,
-        amount_header="Amount", secondary=None, section_heading=False,
+        self,
+        sheet,
+        ctx,
+        fmts,
+        start_row,
+        amount_header="Amount",
+        secondary=None,
+        section_heading=False,
     ):
         """Render reports whose lines are header/section/total rows
         (Balance Sheet, P&L, Cash Flow).
@@ -675,10 +667,7 @@ class CustomReportEngine(models.AbstractModel):
                 "name": filename,
                 "type": "binary",
                 "datas": base64.b64encode(content),
-                "mimetype": (
-                    "application/vnd.openxmlformats-officedocument"
-                    ".spreadsheetml.sheet"
-                ),
+                "mimetype": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
             }
         )
         return {
