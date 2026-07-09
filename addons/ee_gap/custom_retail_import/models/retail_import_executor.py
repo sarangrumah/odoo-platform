@@ -1040,9 +1040,13 @@ class RetailImportExecutor(models.AbstractModel):
                     "default_code": code or False, "type": "consu", "sale_ok": True,
                     "list_price": float(profile._parse_amount(r.get("retail_price")) or 0),
                 }
-                np_categ = self._x24_np_category(code)
-                if np_categ:
-                    tmpl_vals["categ_id"] = np_categ.id
+                # Only genuine non-merchandise gets a revenue bucket. With strict mode off
+                # this same path also lazy-creates unmatched *garments*, and filing those
+                # under "Others" would misstate their revenue, COGS and valuation.
+                if self._x24_is_non_merch(r):
+                    np_categ = self._x24_np_category(code)
+                    if np_categ:
+                        tmpl_vals["categ_id"] = np_categ.id
                 tmpl = self.env["product.template"].with_context(
                     tracking_disable=True, mail_create_nolog=True).create(tmpl_vals)
                 p = tmpl.product_variant_id
@@ -2023,9 +2027,13 @@ class RetailImportExecutor(models.AbstractModel):
                     "name": (str(r.get("item_description") or "").strip() or key)[:200],
                     "default_code": code or False, "type": "consu", "sale_ok": True,
                 }
-                np_categ = self._x24_np_category(code)
-                if np_categ:
-                    tmpl_vals["categ_id"] = np_categ.id
+                # Only genuine non-merchandise gets a revenue bucket. With strict mode off
+                # this same path also lazy-creates unmatched *garments*, and filing those
+                # under "Others" would misstate their revenue, COGS and valuation.
+                if self._x24_is_non_merch(r):
+                    np_categ = self._x24_np_category(code)
+                    if np_categ:
+                        tmpl_vals["categ_id"] = np_categ.id
                 tmpl = self.env["product.template"].with_context(
                     tracking_disable=True, mail_create_nolog=True).create(tmpl_vals)
                 p = tmpl.product_variant_id

@@ -130,33 +130,58 @@ log("categories (re)mapped: %d" % fixed)
 # ---- 4. file the lazy-created X24 non-merchandise products ----------------------
 # Identified by their xid namespace (module 'levis', name 'x24prod_*'); they are created
 # without a categ_id, which is exactly what routes their revenue to Gross Sales-Others.
-# Scope strictly to the x24prod_ xid namespace. Other uncategorised templates exist
-# (mis-parsed "OLS SES - <store>" rows, PROXY placeholders, manual purchase products);
-# they are never sold at POS, so guessing a revenue bucket for them would be wrong --
-# they are reported below instead.
+# Scope strictly to the x24prod_ xid namespace AND to codes we can positively identify as
+# non-merchandise. When strict-product mode is off the same lazy-create path also invents
+# products for unmatched *garments* (rnd_levis has ~578 of them), and filing those under
+# "Others" would misstate their revenue/COGS/valuation. Anything we cannot classify is left
+# alone and reported. Other uncategorised templates (mis-parsed "OLS SES - <store>" rows,
+# PROXY placeholders, manual purchase products) are likewise untouched.
+SERVICE_PREFIXES = ("TS",)      # tailoring: Original Cut, hemming, repair, patches
+OTHER_PREFIXES = ("BGNM",)      # paid carrier bags
+
 xids = env["ir.model.data"].search([
     ("module", "=", "levis"), ("name", "like", "x24prod_%"), ("model", "=", "product.product"),
 ])
 prods = env["product.product"].browse(xids.mapped("res_id")).exists()
 filed = {"Labor (Service)": 0, "Others": 0}
+unclassified = []
 for p in prods:
     code = (p.default_code or "").strip().upper()
-    bucket = "Labor (Service)" if code.startswith("TS") else "Others"
+    if code.startswith(SERVICE_PREFIXES):
+        bucket = "Labor (Service)"
+    elif code.startswith(OTHER_PREFIXES):
+        bucket = "Others"
+    else:
+        unclassified.append(code or p.display_name)
+        continue
     if p.product_tmpl_id.categ_id.id != roots[bucket].id:
         p.product_tmpl_id.categ_id = roots[bucket].id
     filed[bucket] += 1
 log("x24 non-merch products filed: %s" % filed)
+if unclassified:
+    log("x24 lazy products NOT classified (left as-is, likely unmatched garments): %d"
+        % len(unclassified))
+    log("  sample: %s" % ", ".join(unclassified[:8]))
 
 # ---- verify ---------------------------------------------------------------------
 log("==== VERIFY ====")
-unmapped = Categ.search_count([("property_account_income_categ_id", "=", False)])
-log("categories without income account: %d" % unmapped)
+unmapped = Categ.search([("property_account_income_categ_id", "=", False)])
+log("categories without income account: %d %s"
+    % (len(unmapped), [c.complete_name for c in unmapped[:8]]))
 orphans = env["product.template"].search([("categ_id", "=", False)])
-log("templates still without category: %d (never sold at POS; left untouched)" % len(orphans))
-for t in orphans[:8]:
+log("templates still without category: %d (left untouched)" % len(orphans))
+for t in orphans[:5]:
     log("  orphan: %-36s %s" % ((t.default_code or "-")[:36], (t.name or "")[:40]))
+# A sold product with no category books its revenue to the company fallback income
+# account. Script 34 cannot fix that -- those SKUs need to be matched to the X101
+# master (or strict-product mode enabled) -- so surface it loudly rather than guess.
 sold_orphan = env["pos.order.line"].search_count([("product_id.categ_id", "=", False)])
-log("POS lines pointing at an uncategorised product: %d (must be 0)" % sold_orphan)
+if sold_orphan:
+    log("WARNING: %d POS lines point at an uncategorised product -> their revenue falls back "
+        "to the company income account. Match those SKUs to X101; do NOT bucket them here."
+        % sold_orphan)
+else:
+    log("POS lines pointing at an uncategorised product: 0")
 for name, r in sorted(roots.items()):
     n = Categ.search_count([("id", "child_of", r.id)])
     pr = env["product.template"].search_count([("categ_id", "child_of", r.id)])
