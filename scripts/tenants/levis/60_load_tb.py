@@ -10,6 +10,9 @@
 #
 # Env flags:
 #   TB_OPENING_ONLY=1   -> post only the opening move (then go live natively in Odoo)
+#   TB_MAX_MONTH=5      -> stop after May; use when later months are already represented
+#                          by detailed transactions (e.g. the X24 June sales import) and
+#                          replaying the TB summary would double-count them
 #   TB_DRY=1            -> build & report, roll back instead of committing
 import calendar
 import csv
@@ -24,13 +27,14 @@ COMPANY_ID = 1
 JOURNAL_CODE = "EBRTB"
 JOURNAL_NAME = "EBR TB Load"
 OPENING_ONLY = os.environ.get("TB_OPENING_ONLY") == "1"
+MAX_MONTH = int(os.environ.get("TB_MAX_MONTH", "12"))
 DRY = os.environ.get("TB_DRY") == "1"
 
 company = env["res.company"].browse(COMPANY_ID)
 Acc = env["account.account"].with_company(company)
 rounding = company.currency_id.rounding or 0.01
-log("company=%s currency=%s rounding=%s dry=%s opening_only=%s"
-    % (company.name, company.currency_id.name, rounding, DRY, OPENING_ONLY))
+log("company=%s currency=%s rounding=%s dry=%s opening_only=%s max_month=%s"
+    % (company.name, company.currency_id.name, rounding, DRY, OPENING_ONLY, MAX_MONTH))
 
 # The TB is backdated (Jan-Jun 2026). A fiscalyear lock date silently bumps backdated
 # entries to today, so temporarily lift it and ALWAYS restore the original value.
@@ -119,7 +123,7 @@ post_move("EBR-TB-OPEN-2026", date(2026, 1, 1), opening_legs)
 if OPENING_ONLY:
     log("TB_OPENING_ONLY=1 -> skipping monthly movement moves")
 else:
-    for m in range(1, 13):
+    for m in range(1, MAX_MONTH + 1):
         legs = []
         for row in tb:
             d = float(row["m%d_d" % m]); c = float(row["m%d_c" % m])

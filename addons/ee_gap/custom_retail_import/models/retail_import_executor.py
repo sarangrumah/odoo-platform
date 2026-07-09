@@ -787,6 +787,34 @@ class RetailImportExecutor(models.AbstractModel):
         """
         return str(r.get("category") or "").strip().upper() == "NP"
 
+    _X24_NP_SERVICE_PREFIXES = "TS"
+
+    def _x24_np_category(self, code):
+        """product.category for a lazy-created non-merchandise product.
+
+        Without one the template is created with no ``categ_id`` and Odoo resolves its
+        revenue against the company fallback income account (Gross Sales-Others) instead
+        of the labour/other bucket finance expects. Tailoring codes (``TS…``: Original
+        Cut, hemming, repair, patches) book to Gross Sales-Labor; the rest (paid carrier
+        bags) to Gross Sales-Others. Both the prefix list and the two target categories
+        are config data:
+
+          retail_import.x24_np_service_prefixes    (comma-sep, default "TS")
+          retail_import.x24_np_service_category_id (int, else category "Labor (Service)")
+          retail_import.x24_np_category_id         (int, else category "Others")
+        """
+        icp = self.env["ir.config_parameter"].sudo()
+        raw = icp.get_param("retail_import.x24_np_service_prefixes", self._X24_NP_SERVICE_PREFIXES)
+        prefixes = tuple(p.strip().upper() for p in (raw or "").split(",") if p.strip())
+        is_service = bool(prefixes) and str(code or "").strip().upper().startswith(prefixes)
+        param = ("retail_import.x24_np_service_category_id" if is_service
+                 else "retail_import.x24_np_category_id")
+        Categ = self.env["product.category"]
+        cid = int(icp.get_param(param, 0) or 0)
+        if cid and Categ.browse(cid).exists():
+            return Categ.browse(cid)
+        return Categ.search([("name", "=", "Labor (Service)" if is_service else "Others")], limit=1)
+
     def _load_x24(self, profile, file_b64, log):
         """Phase-5: post pos.order when ``retail_import.x24_post_enabled``, else stage.
 
@@ -1007,12 +1035,16 @@ class RetailImportExecutor(models.AbstractModel):
             if pid:
                 p = Product.browse(pid)
             else:
+                tmpl_vals = {
+                    "name": (str(r.get("item_description") or "").strip() or key)[:200],
+                    "default_code": code or False, "type": "consu", "sale_ok": True,
+                    "list_price": float(profile._parse_amount(r.get("retail_price")) or 0),
+                }
+                np_categ = self._x24_np_category(code)
+                if np_categ:
+                    tmpl_vals["categ_id"] = np_categ.id
                 tmpl = self.env["product.template"].with_context(
-                    tracking_disable=True, mail_create_nolog=True).create({
-                        "name": (str(r.get("item_description") or "").strip() or key)[:200],
-                        "default_code": code or False, "type": "consu", "sale_ok": True,
-                        "list_price": float(profile._parse_amount(r.get("retail_price")) or 0),
-                    })
+                    tracking_disable=True, mail_create_nolog=True).create(tmpl_vals)
                 p = tmpl.product_variant_id
                 if ean and not p.barcode and not Product.search_count([("barcode", "=", ean)]):
                     try:
@@ -1987,11 +2019,15 @@ class RetailImportExecutor(models.AbstractModel):
             if pid:
                 p = Product.browse(pid)
             else:
+                tmpl_vals = {
+                    "name": (str(r.get("item_description") or "").strip() or key)[:200],
+                    "default_code": code or False, "type": "consu", "sale_ok": True,
+                }
+                np_categ = self._x24_np_category(code)
+                if np_categ:
+                    tmpl_vals["categ_id"] = np_categ.id
                 tmpl = self.env["product.template"].with_context(
-                    tracking_disable=True, mail_create_nolog=True).create({
-                        "name": (str(r.get("item_description") or "").strip() or key)[:200],
-                        "default_code": code or False, "type": "consu", "sale_ok": True,
-                    })
+                    tracking_disable=True, mail_create_nolog=True).create(tmpl_vals)
                 p = tmpl.product_variant_id
                 if ean and not p.barcode and not Product.search_count([("barcode", "=", ean)]):
                     try:

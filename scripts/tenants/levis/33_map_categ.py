@@ -27,10 +27,21 @@ def root_name(cat):
         c = c.parent_id
     return (c.name or '').upper()
 
+# After 34_coa_categ_tree.py the root IS the COA bucket, so read it directly. The
+# name-sniffing fallback below only fires on trees that predate that script.
+COA_ROOTS = {'TEXTILE': 'textile', 'FOOTWEAR': 'footwear',
+             'ACCESSORIES': 'accessories', 'MISCELLANEOUS': 'misc'}
+# X101 roots that carry no MENS/WOMENS/BOYS prefix.
+TEXTILE_ROOTS = ('DRESSES', 'SKIRTS', 'SWEATERS', 'SWEATSHIRTS')
+ACCESSORY_ROOTS = ('BAGS', 'BELTS', 'HEADGEAR')
+
 def branch(rn):
+    if rn in COA_ROOTS: return COA_ROOTS[rn]
     if 'FOOTWEAR' in rn: return 'footwear'
     if 'ACCESSORIES' in rn: return 'accessories'
     if 'BOTTOMS' in rn or 'TOPS' in rn: return 'textile'
+    if rn in TEXTILE_ROOTS: return 'textile'
+    if rn in ACCESSORY_ROOTS: return 'accessories'
     return 'misc'
 
 def incomplete(cc):
