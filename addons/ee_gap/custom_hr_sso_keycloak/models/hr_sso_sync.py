@@ -29,6 +29,18 @@ from odoo import api, models
 
 _logger = logging.getLogger(__name__)
 
+
+def _scrub(exc, nik):
+    """Exception text with the NIK masked.
+
+    The HC API endpoint embeds the NIK in its path, so ``requests`` exceptions
+    quote it back verbatim. NIK is regulated personal data (UU PDP) and must not
+    reach the log in clear text.
+    """
+    text = str(exc)
+    return text.replace(nik, "<nik>") if nik else text
+
+
 NIK_RE = re.compile(r"\d{16}")
 NIK_FIELD = "x_custom_nik"
 
@@ -109,9 +121,7 @@ class HrSsoSync(models.AbstractModel):
             if self._valid_nik(nik_claim):
                 vals[NIK_FIELD] = nik_claim.strip()
             else:
-                _logger.warning(
-                    "HR SSO: NIK claim %r for %s is not 16 digits; skipping", nik_claim, user.login
-                )
+                _logger.warning("HR SSO: NIK claim for %s is not 16 digits; skipping", user.login)
         if department and not employee.department_id:
             vals["department_id"] = department.id
 
@@ -143,7 +153,9 @@ class HrSsoSync(models.AbstractModel):
             payload = resp.json()
             if not payload.get("status"):
                 _logger.error(
-                    "HR SSO: HC API error for NIK %s: %s", nik, payload.get("message", "unknown")
+                    "HR SSO: HC API error for employee %s: %s",
+                    employee.id,
+                    payload.get("message", "unknown"),
                 )
                 return
 
@@ -157,9 +169,7 @@ class HrSsoSync(models.AbstractModel):
             job_title = data.get("job_title")
             if job_title and not employee.job_id:
                 Job = self.env["hr.job"].sudo()
-                job = Job.search([("name", "ilike", job_title)], limit=1) or Job.create(
-                    {"name": job_title}
-                )
+                job = Job.search([("name", "ilike", job_title)], limit=1) or Job.create({"name": job_title})
                 vals["job_id"] = job.id
 
             superior = data.get("superior") or {}
@@ -169,14 +179,20 @@ class HrSsoSync(models.AbstractModel):
                 if sup and sup.id != employee.id:
                     vals["parent_id"] = sup.id
                 else:
-                    _logger.warning(
-                        "HR SSO: superior %s not found (or self) for NIK %s", sup_email, nik
-                    )
+                    _logger.warning("HR SSO: superior not found (or self) for employee %s", employee.id)
 
             if vals:
                 employee.write(vals)
                 _logger.info("HR SSO: synced employee %s from HC API: %s", employee.id, vals)
         except requests.exceptions.RequestException as exc:
-            _logger.error("HR SSO: HC API request failed for NIK %s: %s", nik, exc)
+            _logger.error(
+                "HR SSO: HC API request failed for employee %s: %s",
+                employee.id,
+                _scrub(exc, nik),
+            )
         except Exception as exc:
-            _logger.error("HR SSO: unexpected error syncing NIK %s: %s", nik, exc)
+            _logger.error(
+                "HR SSO: unexpected error syncing employee %s: %s",
+                employee.id,
+                _scrub(exc, nik),
+            )
