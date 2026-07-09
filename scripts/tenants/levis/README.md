@@ -53,6 +53,30 @@ docker exec -i odoo19-platform-odoo-mgmt odoo shell -d levis --no-http < scripts
 Creates 24 warehouses keyed by name; adds `wh_<CODE>` aliases where codes are known.
 **Re-run `04` after the customer supplies the missing 23 store codes** (idempotent — just adds aliases).
 
+### 3b. Operating-Unit normalisation — `41_normalize_ou.py` + `42_backfill_ou_analytic.py`
+```
+RUN_DRY=0 docker exec -i -e RUN_DRY=0 odoo19-platform-odoo-mgmt odoo shell -d <db> --no-http \
+    < scripts/tenants/levis/41_normalize_ou.py
+RUN_DRY=0 docker exec -i -e RUN_DRY=0 odoo19-platform-odoo-mgmt odoo shell -d <db> --no-http \
+    < scripts/tenants/levis/42_backfill_ou_analytic.py
+```
+Both are idempotent and **dry-run by default** (`RUN_DRY=1`); run `40_setup_trade_ou.py` first.
+
+`41` leaves the "Operating Unit" analytic plan holding exactly 21 active accounts —
+`EBR - HEAD OFFICE` plus the 20 live stores, all named `OLS SES - <MALL>`. Stores are
+keyed by `stock.warehouse.code` (the store number the retail import joins on); codes are
+never touched. The name is rewritten on the warehouse, its OU analytic, its purchase
+journal (`Pembelian - <store>`) and its `pos.config`; core cascades it to the routes,
+rules and stock sequences. `GRAND INDONESIA`, `PACIFIC PLACE MALL` and `PASKAL BANDUNG`
+(no POS orders) are configured like live stores, then archived, as is the stray `PI021`
+warehouse and the duplicate `My Company` OU.
+
+`42` stamps the OU analytic on POS revenue that was posted before
+`custom_levis_localization` started doing it at source (`pos.session._get_sale_vals`).
+Only `display_type='product'` lines of each `pos.session.move_id` are touched — tax,
+receivable and bank lines are balance sheet. Sanity check: the analytic-ledger total must
+equal the net POS income.
+
 ### 4. Opening stock (X20) — store 14694 only, until full data arrives
 ```
 docker cp "docs/levis/X20_Current_Onhand_Inventory_Report- For current inventory.csv" odoo19-platform-odoo-mgmt:/tmp/levis/X20.csv

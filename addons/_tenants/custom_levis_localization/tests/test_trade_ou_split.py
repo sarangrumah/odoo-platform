@@ -296,7 +296,7 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         self.assertAlmostEqual(self._grir_balance(self.grir_nontrade), 0.0, places=2)
 
     # ------------------------------------------------------------------
-    # 11. Vendor-bill numbering: BILL/EBR (trade) vs BILL/NT/EBR (non-trade),
+    # 11. Vendor-bill numbering: BILL/T/EBR (trade) vs BILL/NT/EBR (non-trade),
     #     monthly reset, independent counters. (Finance-AP #8 / Accounting #16)
     # ------------------------------------------------------------------
     def test_11_bill_numbering_prefixes_and_reset(self):
@@ -306,14 +306,14 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         nt1 = self._bill_dated(self._nontrade_po_received(), "2026-07-10")
         aug = self._bill_dated(self._trade_po_received(), "2026-08-03")
 
-        self.assertTrue(t1.name.startswith("BILL/EBR/2026/07/"), t1.name)
+        self.assertTrue(t1.name.startswith("BILL/T/EBR/2026/07/"), t1.name)
         self.assertTrue(nt1.name.startswith("BILL/NT/EBR/2026/07/"), nt1.name)
         # 5-digit padding
         self.assertEqual(len(t1.name.split("/")[-1]), 5)
         # consecutive within the same month + stream, independent of non-trade
         self.assertEqual(int(t1.name.split("/")[-1]) + 1, int(t2.name.split("/")[-1]))
         # monthly reset for the trade stream
-        self.assertTrue(aug.name.startswith("BILL/EBR/2026/08/"), aug.name)
+        self.assertTrue(aug.name.startswith("BILL/T/EBR/2026/08/"), aug.name)
         self.assertEqual(int(aug.name.split("/")[-1]), 1)
 
     # ------------------------------------------------------------------

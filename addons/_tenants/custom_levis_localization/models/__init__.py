@@ -13,3 +13,4 @@ from . import account_payment
 from . import account_payment_method
 from . import levis_mdr_bin
 from . import account_payment_register
+from . import pos_session
