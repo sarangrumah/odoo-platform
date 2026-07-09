@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.14.0",
+    "version": "19.0.1.15.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -99,6 +99,20 @@ Bundles four tenant-specific requirements for the Levi's databases
    ``post_init_hook`` (fresh installs) or ``scripts/tenants/levis/40_setup_trade_ou.py``
    (already-installed DBs).
 
+12. **Periodic COGS per Operating Unit.** Levi's imports its POS backlog long
+   before the purchase data exists, so at the moment of sale no unit cost is
+   known. Odoo 19 cannot fix that later — ``stock.move.value`` is written once at
+   ``_action_done`` and the ``_run_fifo_vacuum`` that used to revalue past
+   outgoing moves is gone, so a sale made against empty stock stays valued at
+   zero forever. ``levis.cogs.run`` (Accounting > Accounting > Periodic COGS)
+   therefore recognises COGS *periodically*: once the purchases are in and each
+   product carries a cost, it multiplies the quantity sold at each store by that
+   cost, aggregates per (Operating Unit, product category), and generates a DRAFT
+   Dr COGS-<category> / Cr Inventories-<category> entry with the store's OU
+   analytic on both legs. Quantities whose product still has no cost are counted
+   and shown rather than silently contributing zero. No stock moves are created,
+   so the X20 on-hand snapshot stays intact.
+
 TENANT-SCOPED: install only on the Levi's tenant databases.
 """,
     "author": "Custom Platform",
@@ -123,8 +137,10 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "data/payment_methods.xml",
         "data/scrap_batch_sequence.xml",
         "data/inventory_reconciliation_data.xml",
+        "data/cogs_run_data.xml",
         "views/product_template_views.xml",
         "views/inventory_reconciliation_views.xml",
+        "views/cogs_run_views.xml",
         "views/scrap_batch_views.xml",
         "views/levis_mdr_bin_views.xml",
         "views/account_payment_register_views.xml",
