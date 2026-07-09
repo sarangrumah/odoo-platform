@@ -46,10 +46,15 @@ _logger = logging.getLogger(__name__)
 class RetailImportFeed(models.Model):
     _name = "retail.import.feed"
     _description = "Retail Import SFTP Feed"
-    _order = "name"
+    _order = "sequence, name"
     _inherit = ["mail.thread"]
 
     name = fields.Char(required=True, index=True)
+    sequence = fields.Integer(
+        default=50,
+        help="Poll order. Matters once posting is enabled: X24 creates the POS suspense "
+        "entries that X70D reconciles against, so X24 must run first.",
+    )
     active = fields.Boolean(default=True)
     profile_id = fields.Many2one("retail.import.profile", required=True, ondelete="restrict")
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company, required=True)
@@ -324,7 +329,7 @@ class RetailImportFeed(models.Model):
             )
 
     def _cron_poll_feeds(self):
-        """ir.cron entry point: poll every active feed."""
-        for feed in self.search([("active", "=", True)]):
+        """ir.cron entry point: poll every active feed, in ``sequence`` order."""
+        for feed in self.search([("active", "=", True)], order="sequence, name"):
             feed._run_feed()
         return True

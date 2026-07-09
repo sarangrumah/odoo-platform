@@ -131,6 +131,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # Retail import: IMAP mailbox that receives the nightly Levi's X-center reports.
+      # Read by retail.import.mailbox._password(); keeps the secret out of the database.
+      LEVIS_MAIL_PASSWORD: ${LEVIS_MAIL_PASSWORD:-}
       # AI gateway
       AI_GATEWAY_URL: http://ai-gateway:8080
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
