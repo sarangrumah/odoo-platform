@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.15.0",
+    "version": "19.0.1.16.1",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -113,6 +113,13 @@ Bundles four tenant-specific requirements for the Levi's databases
    and shown rather than silently contributing zero. No stock moves are created,
    so the X20 on-hand snapshot stays intact.
 
+13. **Indonesian bank master data.** ``res.bank`` gains ``l10n_id_bi_code``
+   (*Kode BI*) — the 7-digit Bank Indonesia clearing/RTGS participant code, or
+   *sandi bank* — shown on the bank form/list and searchable. The module seeds 181
+   banks (name + SWIFT/BIC + Kode BI) from ``data/res.bank.csv``. Kode BI is the
+   unique key: BIC cannot be, since every BI branch office shares ``INDOIDJA``.
+   Feeds the *Acquiring Bank* on the Card BIN / MDR mapping above.
+
 TENANT-SCOPED: install only on the Levi's tenant databases.
 """,
     "author": "Custom Platform",
@@ -131,6 +138,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/res.bank.csv",
         "data/config_parameters.xml",
         "data/po_sequences.xml",
         "data/bill_sequences.xml",
@@ -138,6 +146,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "data/scrap_batch_sequence.xml",
         "data/inventory_reconciliation_data.xml",
         "data/cogs_run_data.xml",
+        "views/res_bank_views.xml",
         "views/product_template_views.xml",
         "views/inventory_reconciliation_views.xml",
         "views/cogs_run_views.xml",
