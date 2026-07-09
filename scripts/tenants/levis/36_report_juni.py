@@ -66,6 +66,38 @@ lines = q("""
 """, (str(COMPANY_ID), COMPANY_ID, D_FROM, D_TO, str(COMPANY_ID)))
 log("june journal lines: %d" % len(lines))
 
+# ---- transaction-level detail -----------------------------------------------------
+# The 20 INV entries above are POS session-close summaries. Finance also needs to see the
+# underlying orders and lines, and which revenue account each line actually resolves to.
+INCOME = ("COALESCE((pt.property_account_income_id->>'1')::int, "
+          "(pc.property_account_income_categ_id->>'1')::int)")
+order_rows = q("""
+    SELECT cfg.name, o.date_order::date, o.name, o.pos_reference,
+           count(l.id), sum(l.qty), o.amount_total, o.amount_tax
+    FROM pos_order o
+    JOIN pos_session s ON s.id = o.session_id
+    JOIN pos_config cfg ON cfg.id = s.config_id
+    LEFT JOIN pos_order_line l ON l.order_id = o.id
+    GROUP BY cfg.name, o.date_order, o.name, o.pos_reference, o.amount_total, o.amount_tax
+    ORDER BY cfg.name, o.date_order, o.name
+""")
+line_rows = q("""
+    SELECT cfg.name, o.date_order::date, o.name,
+           pt.default_code, pt.name->>'en_US', pc.complete_name,
+           l.qty, l.price_unit, l.price_subtotal, l.price_subtotal_incl,
+           a.code_store->>'%s', a.name->>'en_US'
+    FROM pos_order_line l
+    JOIN pos_order o ON o.id = l.order_id
+    JOIN pos_session s ON s.id = o.session_id
+    JOIN pos_config cfg ON cfg.id = s.config_id
+    JOIN product_product pp ON pp.id = l.product_id
+    JOIN product_template pt ON pt.id = pp.product_tmpl_id
+    LEFT JOIN product_category pc ON pc.id = pt.categ_id
+    LEFT JOIN account_account a ON a.id = %s
+    ORDER BY cfg.name, o.date_order, o.name, pt.default_code
+""" % (COMPANY_ID, INCOME))
+log("detail: %d orders, %d lines" % (len(order_rows), len(line_rows)))
+
 pos_orders = q("SELECT count(*) FROM pos_order")[0][0]
 n_moves = q("""SELECT count(*) FROM account_move
                WHERE state='posted' AND company_id=%s AND date>=%s AND date<=%s""",
@@ -164,6 +196,68 @@ for i in range(7):
     ws.write(r, i, "TOTAL" if i == 0 else "", f_totl)
 ws.write_number(r, 7, jd, f_tot); ws.write_number(r, 8, jc, f_tot)
 
+# ---- Detail Order Juni ------------------------------------------------------------
+ws = wb.add_worksheet("Detail Order Juni")
+ws.write(0, 0, "Detail Order Juni 2026 (pos.order)", f_title)
+ws.write(1, 0, "%d order" % len(order_rows), f_sub)
+for i, h in enumerate(["Toko", "Tanggal", "No. Order", "Ref. POS", "Jml Baris",
+                       "Total Qty", "Total (incl. pajak)", "Pajak"]):
+    ws.write(3, i, h, f_hdr)
+ws.set_column(0, 0, 36); ws.set_column(1, 1, 12); ws.set_column(2, 3, 24)
+ws.set_column(4, 5, 12); ws.set_column(6, 7, 20)
+ws.freeze_panes(4, 0)
+ws.autofilter(3, 0, 3 + len(order_rows), 7)
+r = 4
+ot = oq = 0.0
+for store, dt, oname, oref, nl, qty, tot, tax in order_rows:
+    ws.write(r, 0, store or "", f_txt); ws.write(r, 1, str(dt), f_txt)
+    ws.write(r, 2, oname or "", f_txt); ws.write(r, 3, oref or "", f_txt)
+    ws.write_number(r, 4, int(nl or 0), f_txt)
+    ws.write_number(r, 5, float(qty or 0), f_num)
+    ws.write_number(r, 6, float(tot or 0), f_num)
+    ws.write_number(r, 7, float(tax or 0), f_num)
+    ot += float(tot or 0); oq += float(qty or 0)
+    r += 1
+for i in range(5):
+    ws.write(r, i, "TOTAL" if i == 0 else "", f_totl)
+ws.write_number(r, 5, oq, f_tot); ws.write_number(r, 6, ot, f_tot)
+ws.write(r, 7, "", f_totl)
+
+# ---- Detail Baris Juni -------------------------------------------------------------
+ws = wb.add_worksheet("Detail Baris Juni")
+ws.write(0, 0, "Detail Baris Penjualan Juni 2026 (pos.order.line)", f_title)
+ws.write(1, 0, "%d baris — kolom Akun Revenue menunjukkan COA yang benar-benar dipakai tiap baris"
+         % len(line_rows), f_sub)
+for i, h in enumerate(["Toko", "Tanggal", "No. Order", "Kode Produk", "Nama Produk", "Kategori",
+                       "Qty", "Harga Satuan", "Subtotal (excl. pajak)", "Subtotal (incl. pajak)",
+                       "Kode Akun Revenue", "Nama Akun Revenue"]):
+    ws.write(3, i, h, f_hdr)
+ws.set_column(0, 0, 36); ws.set_column(1, 1, 12); ws.set_column(2, 2, 22)
+ws.set_column(3, 3, 16); ws.set_column(4, 4, 40); ws.set_column(5, 5, 38)
+ws.set_column(6, 9, 18); ws.set_column(10, 10, 18); ws.set_column(11, 11, 30)
+ws.freeze_panes(4, 0)
+ws.autofilter(3, 0, 3 + len(line_rows), 11)
+r = 4
+lq = lsub = lincl = 0.0
+for store, dt, oname, pcode, pname, categ, qty, pu, sub, incl, acode, aname in line_rows:
+    ws.write(r, 0, store or "", f_txt); ws.write(r, 1, str(dt), f_txt)
+    ws.write(r, 2, oname or "", f_txt); ws.write(r, 3, pcode or "", f_txt)
+    ws.write(r, 4, (pname or "")[:120], f_txt); ws.write(r, 5, categ or "(tanpa kategori)", f_txt)
+    ws.write_number(r, 6, float(qty or 0), f_num)
+    ws.write_number(r, 7, float(pu or 0), f_num)
+    ws.write_number(r, 8, float(sub or 0), f_num)
+    ws.write_number(r, 9, float(incl or 0), f_num)
+    ws.write(r, 10, acode or "(fallback perusahaan)", f_txt)
+    ws.write(r, 11, aname or "", f_txt)
+    lq += float(qty or 0); lsub += float(sub or 0); lincl += float(incl or 0)
+    r += 1
+for i in range(6):
+    ws.write(r, i, "TOTAL" if i == 0 else "", f_totl)
+ws.write_number(r, 6, lq, f_tot)
+ws.write(r, 7, "", f_totl)
+ws.write_number(r, 8, lsub, f_tot); ws.write_number(r, 9, lincl, f_tot)
+ws.write(r, 10, "", f_totl); ws.write(r, 11, "", f_totl)
+
 # ---- Saldo Akhir Juni: opening + movement + closing -------------------------------
 ws = wb.add_worksheet("Saldo Akhir Juni")
 ws.write(0, 0, "Saldo Akhir Juni 2026 (per 30-Jun-2026)", f_title)
@@ -233,6 +327,9 @@ rows = [
     ("Jurnal sales Juni — total Debit", jd),
     ("Jurnal sales Juni — total Kredit", jc),
     ("pos.order terimport", pos_orders),
+    ("Detail baris penjualan (pos.order.line)", len(line_rows)),
+    ("Detail — subtotal excl. pajak", lsub),
+    ("Detail — subtotal incl. pajak", lincl),
     ("", ""),
     ("Saldo Akhir Juni — total Debit", close_d),
     ("Saldo Akhir Juni — total Kredit", close_c),
