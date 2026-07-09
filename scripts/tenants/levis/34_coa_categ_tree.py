@@ -49,18 +49,24 @@ STJ = env["account.journal"].search([("code", "=", "STJ")], limit=1) or \
 # ---- 1. COA revenue buckets -> root category definition -------------------------
 # val/grir are None for the service bucket: labour has no inventory and no COA
 # counterpart (there is no 6117/1113…17/21031091…17 account).
+#
+# disc/ret are the contra-revenue accounts the retail import books X24DN's
+# NET DISCOUNT AMOUNT and X48's customer returns to (custom_retail_import).
+# The COA has no per-channel discount account for wholesale / e-commerce /
+# clearance / distributor / others, so those share the generic
+# 5220000000 "sales discounts & rebates allowed-Sports & Apparel".
 BUCKETS = {
-    "Textile":                     dict(inc="5120010001", exp="6120010001", val="1113100021", grir="2103109121"),
-    "Footwear":                    dict(inc="5120010002", exp="6120010002", val="1113100022", grir="2103109122"),
-    "Accessories":                 dict(inc="5120010003", exp="6120010003", val="1113100023", grir="2103109123"),
-    "Miscellaneous":               dict(inc="5120010004", exp="6120010004", val="1113100024", grir="2103109124"),
-    "Wholesale":                   dict(inc="5120020000", exp="6120020000", val="1113100025", grir="2103109125"),
-    "E-commerce":                  dict(inc="5120030000", exp="6120030000", val="1113100026", grir="2103109126"),
-    "Clearance":                   dict(inc="5120040000", exp="6120040000", val="1113100027", grir="2103109127"),
-    "Distributor":                 dict(inc="5120050000", exp="6120050000", val="1113100028", grir="2103109128"),
-    "Merchandise (non-commercial)": dict(inc="5198000000", exp="6198000000", val="1113100098", grir="2103109198"),
-    "Others":                      dict(inc="5199000000", exp="6199000000", val="1113100099", grir="2103109199"),
-    "Labor (Service)":             dict(inc="5117000000", exp="6199000000", val=None, grir=None),
+    "Textile":                     dict(inc="5120010001", exp="6120010001", val="1113100021", grir="2103109121", disc="5220000001", ret="5320010001"),
+    "Footwear":                    dict(inc="5120010002", exp="6120010002", val="1113100022", grir="2103109122", disc="5220000002", ret="5320010002"),
+    "Accessories":                 dict(inc="5120010003", exp="6120010003", val="1113100023", grir="2103109123", disc="5220000003", ret="5320010003"),
+    "Miscellaneous":               dict(inc="5120010004", exp="6120010004", val="1113100024", grir="2103109124", disc="5220000004", ret="5320010004"),
+    "Wholesale":                   dict(inc="5120020000", exp="6120020000", val="1113100025", grir="2103109125", disc="5220000000", ret="5320020000"),
+    "E-commerce":                  dict(inc="5120030000", exp="6120030000", val="1113100026", grir="2103109126", disc="5220000000", ret="5320030000"),
+    "Clearance":                   dict(inc="5120040000", exp="6120040000", val="1113100027", grir="2103109127", disc="5220000000", ret="5320040000"),
+    "Distributor":                 dict(inc="5120050000", exp="6120050000", val="1113100028", grir="2103109128", disc="5220000000", ret="5320050000"),
+    "Merchandise (non-commercial)": dict(inc="5198000000", exp="6198000000", val="1113100098", grir="2103109198", disc="5298000000", ret="5398000000"),
+    "Others":                      dict(inc="5199000000", exp="6199000000", val="1113100099", grir="2103109199", disc="5220000000", ret="5399000000"),
+    "Labor (Service)":             dict(inc="5117000000", exp="6199000000", val=None, grir=None, disc="5217000000", ret="5317000000"),
 }
 
 roots = {}
@@ -111,6 +117,10 @@ for cat in Categ.search([]):
         "property_account_income_categ_id": acc(m["inc"]).id,
         "property_account_expense_categ_id": acc(m["exp"]).id,
     }
+    # Only present once custom_retail_import >= 19.0.0.6.0 is installed.
+    if "property_account_sales_discount_categ_id" in Categ._fields:
+        vals["property_account_sales_discount_categ_id"] = acc(m["disc"]).id
+        vals["property_account_sales_return_categ_id"] = acc(m["ret"]).id
     if m["val"]:
         vals.update({
             "property_valuation": "real_time",
@@ -139,24 +149,33 @@ log("categories (re)mapped: %d" % fixed)
 SERVICE_PREFIXES = ("TS",)      # tailoring: Original Cut, hemming, repair, patches
 OTHER_PREFIXES = ("BGNM",)      # paid carrier bags
 
+# The non-service bucket is config, not a constant: custom_retail_import resolves the same
+# ir.config_parameter when it lazy-creates the product, so hardcoding "Others" here would
+# silently re-file on the next run whatever the importer had just filed elsewhere.
+icp = env["ir.config_parameter"].sudo()
+_other_id = int(icp.get_param("retail_import.x24_np_category_id", 0) or 0)
+other_root = Categ.browse(_other_id) if _other_id and Categ.browse(_other_id).exists() else roots["Others"]
+service_root = roots["Labor (Service)"]
+log("x24 non-merch buckets: service=%s other=%s" % (service_root.complete_name, other_root.complete_name))
+
 xids = env["ir.model.data"].search([
     ("module", "=", "levis"), ("name", "like", "x24prod_%"), ("model", "=", "product.product"),
 ])
 prods = env["product.product"].browse(xids.mapped("res_id")).exists()
-filed = {"Labor (Service)": 0, "Others": 0}
+filed = {service_root.complete_name: 0, other_root.complete_name: 0}
 unclassified = []
 for p in prods:
     code = (p.default_code or "").strip().upper()
     if code.startswith(SERVICE_PREFIXES):
-        bucket = "Labor (Service)"
+        target = service_root
     elif code.startswith(OTHER_PREFIXES):
-        bucket = "Others"
+        target = other_root
     else:
         unclassified.append(code or p.display_name)
         continue
-    if p.product_tmpl_id.categ_id.id != roots[bucket].id:
-        p.product_tmpl_id.categ_id = roots[bucket].id
-    filed[bucket] += 1
+    if p.product_tmpl_id.categ_id.id != target.id:
+        p.product_tmpl_id.categ_id = target.id
+    filed[target.complete_name] += 1
 log("x24 non-merch products filed: %s" % filed)
 if unclassified:
     log("x24 lazy products NOT classified (left as-is, likely unmatched garments): %d"
