@@ -13,9 +13,7 @@ class ProductProduct(models.Model):
     # btree on is_favorite is not usable for the sort. Postgres defaults
     # (DESC -> NULLS FIRST, ASC -> NULLS LAST) already match what Odoo emits,
     # which spells out NULLS only when the order string does.
-    _levis_list_order_index = models.Index(
-        "(COALESCE(is_favorite, FALSE) DESC, default_code, id) WHERE active IS TRUE"
-    )
+    _levis_list_order_index = models.Index("(COALESCE(is_favorite, FALSE) DESC, default_code, id) WHERE active IS TRUE")
 
     def init(self):
         super().init()
