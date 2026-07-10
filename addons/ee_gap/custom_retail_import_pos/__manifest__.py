@@ -25,11 +25,18 @@ What it does
     ``manual_tax_amounts`` hook removes the resulting per-line 1-rupiah drift.
   - Customer-return lines are re-pointed from ``Gross Sales-<category>`` to
     ``Sales Return-<category>`` so returns are reported on their own COA.
+* Appends the source ``NET DISCOUNT AMOUNT`` reclass (Dr ``Sales Discount-<cat>`` /
+  Cr ``Gross Sales-<cat>``) to the store's own POS closing entry while it is still
+  draft, instead of posting a separate summary journal that no store could tie to.
+* Keeps the source workbook's descriptive columns on the posted records: the
+  cashier (``ri_staff_id`` / ``ri_staff_name``), the four discount slots folded
+  into ``ri_discount_type`` / ``ri_discount_code`` / ``ri_discount_description``,
+  and the transaction's member / notes / Omni order id on ``pos.order``.
 """,
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Retail",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.4.0",
     "license": "LGPL-3",
     "depends": [
         "custom_retail_import",

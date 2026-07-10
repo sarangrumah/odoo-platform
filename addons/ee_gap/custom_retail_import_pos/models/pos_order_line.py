@@ -35,8 +35,41 @@ class PosOrderLine(models.Model):
     )
     ri_is_return = fields.Boolean(
         string="Imported Customer Return", readonly=True,
-        help="Set on X48 refund lines so revenue is booked to Sales Return-<category> "
-             "instead of reversing Gross Sales-<category>.",
+        help="Set on X48 refund lines and on X24DN lines with a negative NET SOLD "
+             "QUANTITY (in-store exchange), so the amount is booked to "
+             "Sales Return-<category> instead of reversing Gross Sales-<category>.",
+    )
+
+    # --- Source columns kept for traceability (no GL effect) ------------------
+    # X24DN carries who sold the line and, in up to four slots, why it was
+    # discounted. None of it reached Odoo before, so a discounted POS line could
+    # not be traced back to its promo without reopening the workbook.
+    ri_staff_id = fields.Char(
+        string="Source Staff ID", readonly=True,
+        help="STAFF ID as it appears in the source retail workbook (X24DN).",
+    )
+    ri_staff_name = fields.Char(
+        string="Source Staff Name", readonly=True,
+        help="STAFF NAME as it appears in the source retail workbook (X24DN).",
+    )
+    ri_discount_type = fields.Char(
+        string="Source Discount Type", readonly=True,
+        help="DISCOUNT TYPE of every populated discount slot, ' | '-joined "
+             "(e.g. TRANSACTION_DISCOUNT).",
+    )
+    ri_discount_code = fields.Char(
+        string="Source Discount Code", readonly=True,
+        help="DISCOUNT CODE of every populated discount slot, ' | '-joined. Used to "
+             "label the discount reclass journal lines.",
+    )
+    ri_discount_description = fields.Char(
+        string="Source Discount Description", readonly=True,
+        help="DISCOUNT DESCRIPTION of every populated discount slot, ' | '-joined "
+             "(e.g. CRM-VIP DISCOUNT).",
+    )
+    ri_line_comment = fields.Char(
+        string="Source Line Comment", readonly=True,
+        help="LINE ITEM - COMMENTS as it appears in the source retail workbook.",
     )
 
     def _ri_return_account(self):

@@ -29,6 +29,7 @@ from datetime import datetime
 
 from odoo import _, models
 from odoo.exceptions import UserError
+from odoo.tools import config
 
 _logger = logging.getLogger(__name__)
 
@@ -374,7 +375,15 @@ class RetailImportExecutor(models.AbstractModel):
                     vals["categ_id"] = categ_id
                 if attr_lines:
                     vals["attribute_line_ids"] = attr_lines
-                tmpl = self.env["product.template"].create(vals)
+                # Odoo generates the whole Size x Inseam variant matrix inside this
+                # create(); without the mail context each variant logs a creation
+                # message and subscribes a follower, which on a full X101 run is
+                # ~350k mail_message rows.
+                tmpl = self.env["product.template"].with_context(
+                    tracking_disable=True,
+                    mail_create_nolog=True,
+                    mail_create_nosubscribe=True,
+                ).create(vals)
                 self._xid_set(ns, txid, "product.template", tmpl.id)
                 tmpl_xid_to_id[txid] = tmpl.id
                 created += 1
@@ -450,6 +459,7 @@ class RetailImportExecutor(models.AbstractModel):
         log.records_matched = matched
         log.records_skipped = unmatched
         _logger.info("x101 done: created=%s matched=%s unmatched=%s", created, matched, unmatched)
+        self._sweep_orphan_product_values()
 
         # Link source rows to the product.template they contributed to
         if row_to_line:
@@ -508,6 +518,36 @@ class RetailImportExecutor(models.AbstractModel):
             except Exception as e:  # unique(product_id,barcode) race / bad value
                 _logger.debug("x101 gtin alias skip %s on %s: %s", g, variant.id, e)
 
+    def _sweep_orphan_product_values(self):
+        """Drop the zero-value product.value rows left behind by variant deletes.
+
+        Core writes one product.value per product.product create ("Price update
+        from None to 0.0"). Its FK is ON DELETE SET NULL, so every re-import that
+        restructures the Size x Inseam matrix orphans a row that nothing will ever
+        read again. Left alone these accumulate into the hundreds of thousands and
+        turn _get_last_product_value into a full table scan.
+
+        Opt-in: the first run on an existing database clears the whole backlog,
+        which is a mass delete nobody asked for at import time. Enable with
+        ``retail_import.sweep_orphan_product_values=1`` once the backlog has been
+        purged (and reviewed) out of band.
+        """
+        enabled = self.env["ir.config_parameter"].sudo().get_param(
+            "retail_import.sweep_orphan_product_values", "0")
+        if enabled not in ("1", "True", "true"):
+            return
+        self.env.cr.execute(
+            """
+            DELETE FROM product_value
+            WHERE product_id IS NULL AND move_id IS NULL AND lot_id IS NULL AND value = 0
+            """
+        )
+        removed = self.env.cr.rowcount
+        if removed:
+            _logger.info("swept %s orphaned product.value rows", removed)
+        if not config["test_enable"]:
+            self.env.cr.commit()
+
     def _x101_backfill_template_attrs(self, tmpl_id, t_sizes, t_inseams, attr_by_name, attr_value_id):
         """Add newly-appearing Size/Inseam values to an EXISTING template so Odoo
         regenerates the missing variants (create_variant='always'). Only writes when
@@ -516,7 +556,13 @@ class RetailImportExecutor(models.AbstractModel):
         Adding a value to an existing attribute line is safe (just more variants).
         Creating a brand-new attribute line restructures the variant matrix — acceptable
         here because imported POS is financial-only (no stock on these products)."""
-        tmpl = self.env["product.template"].browse(tmpl_id)
+        # Adding attribute values below regenerates variants, so carry the same
+        # mail context the create path uses.
+        tmpl = self.env["product.template"].with_context(
+            tracking_disable=True,
+            mail_create_nolog=True,
+            mail_create_nosubscribe=True,
+        ).browse(tmpl_id)
         if not tmpl.exists():
             return
         want = {
@@ -827,6 +873,38 @@ class RetailImportExecutor(models.AbstractModel):
         """
         return str(r.get("category") or "").strip().upper() == "NP"
 
+    # X24DN records up to four stacked discounts per line, each as its own
+    # TYPE / CODE / DESCRIPTION / AMOUNT / PERCENTAGE quintet.
+    _X24_DISCOUNT_SLOTS = 4
+
+    def _x24_discount_slots(self, profile, r):
+        """The populated discount slots of one X24DN row, in file order."""
+        slots = []
+        for i in range(1, self._X24_DISCOUNT_SLOTS + 1):
+            slot = {
+                "type": str(r.get("discount_type_%d" % i) or "").strip(),
+                "code": str(r.get("discount_code_%d" % i) or "").strip(),
+                "description": str(r.get("discount_description_%d" % i) or "").strip(),
+                "amount": float(profile._parse_amount(r.get("discount_amount_%d" % i)) or 0),
+                "percentage": float(profile._parse_amount(r.get("discount_percentage_%d" % i)) or 0),
+            }
+            if any((slot["type"], slot["code"], slot["description"], slot["amount"])):
+                slots.append(slot)
+        return slots
+
+    @staticmethod
+    def _x24_join_slots(slots, key, limit=120):
+        """' | '-join one attribute of the discount slots, de-duplicated, order kept."""
+        values = [s[key] for s in slots if s.get(key)]
+        joined = " | ".join(dict.fromkeys(values))
+        return joined[:limit] or False
+
+    @staticmethod
+    def _x24_cell(r, key, limit=120):
+        """A trimmed, length-capped source cell, or False when blank."""
+        value = str(r.get(key) or "").strip()
+        return value[:limit] or False
+
     _X24_NP_SERVICE_PREFIXES = "TS"
 
     def _x24_np_category(self, code):
@@ -951,21 +1029,67 @@ class RetailImportExecutor(models.AbstractModel):
                 "Unarchive the pos.config and its analytic account (Operating Unit), then "
                 "re-run the import.", "\n".join(blocked)))
 
-    def _ri_src_line_vals(self, net, tax, discount=0.0, is_return=False):
-        """pos.order.line values carrying the source file's own net/tax/discount.
+    def _ri_bridge_vals(self, model, vals):
+        """Keep only the ``ri_*`` keys ``model`` actually defines.
 
         The fields live in the optional ``custom_retail_import_pos`` bridge (this module
         must not depend on point_of_sale — trn_arkaaim runs the importer without POS),
-        so return an empty dict when the model or the fields are absent.
+        so return an empty dict when the model or the fields are absent. Filtering per
+        field also lets a tenant sit on an older bridge without the importer exploding.
         """
-        if "pos.order.line" not in self.env:
+        if model not in self.env:
             return {}
-        if "ri_src_tax" not in self.env["pos.order.line"]._fields:
-            return {}
-        return {
+        fields_ = self.env[model]._fields
+        return {k: v for k, v in vals.items() if k in fields_}
+
+    def _ri_src_line_vals(self, net, tax, discount=0.0, is_return=False, source=None):
+        """pos.order.line values carrying the source file's own net/tax/discount, plus
+        the descriptive columns (cashier, discount slots, line comment) in ``source``."""
+        vals = {
             "ri_src_net": net, "ri_src_tax": tax,
             "ri_src_discount": discount, "ri_is_return": is_return,
         }
+        vals.update(source or {})
+        return self._ri_bridge_vals("pos.order.line", vals)
+
+    def _ri_src_order_vals(self, source):
+        """pos.order values carrying the source file's transaction-level columns."""
+        return self._ri_bridge_vals("pos.order", source or {})
+
+    # ------------------------------------------------------------------
+    # Operating Unit — the per-store analytic every posted line should carry
+    # ------------------------------------------------------------------
+    def _ri_config_ou(self, cfg):
+        """Operating-Unit analytic of a pos.config's store, when the tenant defines one.
+
+        ``l10n_ou_analytic_id`` comes from ``custom_levis_localization``; on a tenant
+        without it this returns an empty recordset and every OU stamp below no-ops.
+        """
+        Empty = self.env["account.analytic.account"].browse()
+        warehouse = cfg.warehouse_id if cfg else False
+        if warehouse and "l10n_ou_analytic_id" in warehouse._fields:
+            return warehouse.with_context(active_test=False).l10n_ou_analytic_id
+        return Empty
+
+    def _ri_ou_line_vals(self, ou):
+        """account.move.line values stamping ``ou`` as the line's Operating Unit.
+
+        The POS closing entry gets its OU from ``pos.session._get_sale_vals`` and
+        friends, but the reclass / settlement entries this module posts by hand build
+        their lines from scratch — without this they land outside the per-OU reporting
+        exactly like the VAT and suspense lines used to.
+        """
+        if not ou:
+            return {}
+        POL = self.env["purchase.order.line"] if "purchase.order.line" in self.env else None
+        if POL is not None and hasattr(POL, "_levis_merge_ou_distribution"):
+            distribution = POL._levis_merge_ou_distribution(False, ou.id)
+        else:
+            distribution = {str(ou.id): 100.0}
+        vals = {"analytic_distribution": distribution}
+        if "l10n_ou_analytic_id" in self.env["account.move.line"]._fields:
+            vals["l10n_ou_analytic_id"] = ou.id
+        return vals
 
     def _x24_tender_index(self, profile):
         """Build {(store,date,reg,txn): [(tender_type, amount)]} from staged X70D lines.
@@ -1002,6 +1126,32 @@ class RetailImportExecutor(models.AbstractModel):
                 amt = 0.0
             idx[key].append((tt, amt))
         return idx
+
+    def _x24_per_date_sessions_enabled(self):
+        """Whether each trading day gets its own POS session (hence its own GL entry).
+
+        Odoo refuses a second non-closed session on the same pos.config, so a day's
+        sessions must close before the next day's open — which only happens when
+        ``retail_import.x24_close_sessions`` is on. With closing off there is no GL to
+        date anyway, so the import keeps the legacy one-session-per-store shape.
+        """
+        return self._x24_close_sessions_enabled()
+
+    def _x24_day_batches(self, profile, orders):
+        """``orders`` split into ``(trans_date, {key: rows})`` batches, oldest day first.
+
+        Grouping the whole import into one session per store dated every entry — sales,
+        VAT, suspense, discounts — on the file's *last* trans date. Batching per day puts
+        each day's journal entry on the day it belongs to.
+        """
+        if not self._x24_per_date_sessions_enabled():
+            return [(None, orders)]
+        per_date = defaultdict(dict)
+        for key, rows in orders.items():
+            per_date[key[1]][key] = rows
+        # Unparseable dates sort last; their orders fall back to ``now`` as before.
+        return sorted(per_date.items(),
+                      key=lambda kv: profile._parse_date(kv[0]) or datetime.max.date())
 
     def _x24_group_orders(self, records):
         orders = defaultdict(list)
@@ -1057,9 +1207,10 @@ class RetailImportExecutor(models.AbstractModel):
 
         cfg_cache, sess_cache, method_cache = {}, {}, {}
         prod_bc, prod_dc = {}, {}
-        created = skipped = 0
+        created = skipped = disc_slot_mismatch = 0
         errors = []
-        # (product, discount, date) for every posted line carrying a NET DISCOUNT AMOUNT.
+        # One dict per posted line carrying a NET DISCOUNT AMOUNT: the resolved product,
+        # the amount, the trading day, the store's config and the source discount slots.
         posted_disc = []
 
         def resolve_config(store):
@@ -1069,10 +1220,10 @@ class RetailImportExecutor(models.AbstractModel):
             return cfg_cache[store]
 
         def get_session(cfg):
-            # ONE session per config for the whole import: Odoo forbids >1 open
-            # session per pos.config, so a multi-date file cannot open a session per
-            # (config, date). Orders keep their real date_order; the close move can be
-            # backdated to the latest order date.
+            # One session per config **within the current day batch**: Odoo forbids >1
+            # non-closed session per pos.config, so the caller closes a day's sessions
+            # before the next day opens its own. ``_pos_close_and_backdate`` then stamps
+            # each closing entry with that day's date.
             k = cfg.id
             if k not in sess_cache:
                 s = self.env["pos.session"].create({"config_id": cfg.id, "user_id": self.env.uid})
@@ -1184,159 +1335,206 @@ class RetailImportExecutor(models.AbstractModel):
             cfg for cfg in (resolve_config(k[0]) for k in orders) if cfg
         })
 
-        for key, rows in orders.items():
-            store, date, reg, txn = key
-            oxid = self._safe_xid("posorder_", f"{store}_{date}_{reg}_{txn}")
-            if self._xid_get(ns, oxid, "pos.order"):
-                continue  # already posted
-            cfg = resolve_config(store)
-            if not cfg:
-                fail_rows(rows, f"store {store}: no pos.config (map xid posconfig_{store})")
-                skipped += len(rows)
-                continue
+        # One batch of orders per trading day, oldest first. Each batch opens its own
+        # sessions and closes them before the next day starts, so the closing entry
+        # (Gross Sales + VAT + POS Suspense / tender receivable) is dated on the day the
+        # sale happened rather than on the last date of the whole file.
+        for _batch_date, batch_orders in self._x24_day_batches(profile, orders):
+            sess_cache = {}
+            for key, rows in batch_orders.items():
+                store, date, reg, txn = key
+                oxid = self._safe_xid("posorder_", f"{store}_{date}_{reg}_{txn}")
+                if self._xid_get(ns, oxid, "pos.order"):
+                    continue  # already posted
+                cfg = resolve_config(store)
+                if not cfg:
+                    fail_rows(rows, f"store {store}: no pos.config (map xid posconfig_{store})")
+                    skipped += len(rows)
+                    continue
 
-            line_cmds, order_net, order_incl, missing = [], 0.0, 0.0, []
-            order_disc = []
-            for r in rows:
-                prod = resolve_product(r)
-                if not prod:
-                    missing.append(str(r.get("item_code") or r.get("ean") or "?"))
+                line_cmds, order_net, order_incl, missing = [], 0.0, 0.0, []
+                order_disc = []
+                for r in rows:
+                    prod = resolve_product(r)
+                    if not prod:
+                        missing.append(str(r.get("item_code") or r.get("ean") or "?"))
+                        rn = r.get("_row")
+                        if rn in row_to_line:
+                            row_to_line[rn].write({
+                                "state": "error",
+                                "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('item_code')!r}"[:250],
+                            })
+                        continue
+                    qty = float(profile._parse_amount(r.get("net_qty")))
+                    incl = float(profile._parse_amount(r.get("total_amount")))
+                    rate = str(r.get("tax_rate") or "").strip()
+                    taxed = bool(tax) and rate not in ("", "None")
+                    # X24DN is the source of truth: NET SOLD AMOUNT / TAX AMOUNT are taken
+                    # verbatim. The file truncates net to whole rupiah per line
+                    # (net = trunc(total/1.11), tax = total - net) whereas Odoo rounds the
+                    # tax globally per order, so recomputing here drifts by ~1 rupiah on more
+                    # than half the lines. ``ri_src_*`` carries the file's figures through to
+                    # session close via pos.order.line._prepare_base_line_for_taxes_computation
+                    # (custom_retail_import_pos).
+                    src_net = float(profile._parse_amount(r.get("net_amount")) or 0)
+                    src_tax = float(profile._parse_amount(r.get("tax_amount")) or 0)
+                    src_disc = float(profile._parse_amount(r.get("net_discount")) or 0)
+                    if not (src_net or src_tax):
+                        # Older extracts without the net/tax columns: fall back to deriving.
+                        rate_val = (tax.amount / 100.0) if taxed else 0.0
+                        src_net, src_tax = incl / (1.0 + rate_val), incl - incl / (1.0 + rate_val)
+                    gl_net = src_net
+                    tax_ids = [tax.id] if taxed else []
+                    # NET DISCOUNT AMOUNT stays the GL figure, but the four slots explain it:
+                    # they name the promo (code + description) that the reclass entry labels
+                    # its lines with. A slot total that disagrees with NET DISCOUNT AMOUNT means
+                    # the extract is inconsistent — surfaced in the log, never silently fixed.
+                    slots = self._x24_discount_slots(profile, r)
+                    if slots and round(sum(s["amount"] for s in slots), 2) != round(src_disc, 2):
+                        disc_slot_mismatch += 1
+                    # A negative NET SOLD QUANTITY inside a sale transaction is a return:
+                    # X24DN books an in-store exchange as a qty=-1 line paired with a qty=+1
+                    # one. It belongs on Sales Return-<category> (53xxxxx), not as a debit
+                    # against Gross Sales-<category> — same treatment as an X48 refund. The
+                    # bridge repoints the account off ``ri_is_return``.
+                    is_return = qty < 0
+                    # The sale tax is PRICE-INCLUDED, so POS extracts net from price_unit and
+                    # ignores a forced price_subtotal. price_unit must therefore carry the
+                    # tax-INCLUSIVE amount (the paid ``incl``) so the order total matches the
+                    # tender exactly and nothing plugs to Cash Difference.
+                    unit = incl / qty if qty else incl
+                    line_cmds.append((0, 0, dict({
+                        "product_id": prod.id, "qty": qty,
+                        "price_unit": unit, "discount": 0.0,
+                        "tax_ids": [(6, 0, tax_ids)],
+                        "price_subtotal": gl_net, "price_subtotal_incl": incl,
+                    }, **self._ri_src_line_vals(
+                        net=src_net, tax=src_tax, discount=src_disc, is_return=is_return,
+                        source={
+                            "ri_staff_id": self._x24_cell(r, "staff_id", 64),
+                            "ri_staff_name": self._x24_cell(r, "staff_name"),
+                            "ri_discount_type": self._x24_join_slots(slots, "type"),
+                            "ri_discount_code": self._x24_join_slots(slots, "code"),
+                            "ri_discount_description": self._x24_join_slots(slots, "description"),
+                            "ri_line_comment": self._x24_cell(r, "line_comment"),
+                        },
+                    ))))
+                    order_net += gl_net
+                    order_incl += incl
+                    if src_disc:
+                        # Carry the RESOLVED product: the discount reclass must not re-look-up
+                        # by bare item_code — X101 variants are keyed on code+waist+inseam, so
+                        # a default_code search misses most rows.
+                        order_disc.append((prod, src_disc, slots))
+
+                # Strict mode / any unresolved line: park the WHOLE transaction rather than
+                # posting a partial order (which would later fail the tender-balance check).
+                if missing:
+                    sku_list = ", ".join(sorted(set(missing))[:10])
+                    fail_rows(rows, f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu")
+                    skipped += len(rows)
+                    continue
+                if not line_cmds:
+                    fail_rows(rows, f"store {store} txn {txn}: no resolvable product")
+                    skipped += len(rows)
+                    continue
+
+                if not decouple:
+                    tlist = tenders.get(key, [])
+                    pay_total = sum(a for _, a in tlist)
+                    if not tlist:
+                        fail_rows(rows, f"store {store} txn {txn}: no X70D tender (sync X70D first)")
+                        skipped += len(rows)
+                        continue
+                    if abs(pay_total - order_incl) > self._X24_BALANCE_TOL:
+                        fail_rows(rows, f"store {store} txn {txn}: unbalanced lines={order_incl:.2f} tenders={pay_total:.2f}")
+                        skipped += len(rows)
+                        continue
+
+                d = profile._parse_date(date)
+                dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
+                order_date = d
+                # Session is created outside the per-order savepoint so a single bad
+                # order does not roll back the shared session.
+                sess = get_session(cfg)
+                try:
+                    with self.env.cr.savepoint():
+                        order = Order.create(dict({
+                            "session_id": sess.id, "company_id": cfg.company_id.id,
+                            "pricelist_id": cfg.pricelist_id.id or False, "date_order": dt,
+                            "pos_reference": f"{store}-{reg}-{txn}",
+                            "lines": line_cmds,
+                            "amount_tax": order_incl - order_net, "amount_total": order_incl,
+                            "amount_paid": 0.0, "amount_return": 0.0,
+                        }, **self._ri_src_order_vals({
+                            # X24DN repeats these on every line of the transaction.
+                            "ri_staff_id": self._x24_cell(rows[0], "staff_id", 64),
+                            "ri_staff_name": self._x24_cell(rows[0], "staff_name"),
+                            "ri_member_id": self._x24_cell(rows[0], "member_id", 64),
+                            "ri_member_type": self._x24_cell(rows[0], "member_type", 64),
+                            "ri_customer_phone": self._x24_cell(rows[0], "customer_phone", 64),
+                            "ri_transaction_note": self._x24_cell(rows[0], "transaction_note", 250),
+                            "ri_omni_order_id": self._x24_cell(rows[0], "omni_order_id", 64),
+                        })))
+                        if decouple:
+                            # Pay the full amount to the POS Suspense Clearing method; X70D
+                            # reconciliation later transfers it to the real tender receivables.
+                            order.add_payment({
+                                "pos_order_id": order.id,
+                                "payment_method_id": suspense_method[cfg.company_id.id].id,
+                                "amount": order_incl, "payment_date": dt,
+                            })
+                        else:
+                            for tt, amt in tlist:
+                                m = map_method(cfg, tt)
+                                if not m:
+                                    errors.append((rows[0].get("_row"), f"{store}/{txn}: no method for tender {tt}"))
+                                    continue
+                                order.add_payment({
+                                    "pos_order_id": order.id, "payment_method_id": m.id,
+                                    "amount": amt, "payment_date": dt,
+                                })
+                        # ``pos.order.amount_paid`` is a plain stored field (no @api.depends)
+                        # in Odoo 19: writing pos.payment rows does NOT refresh it (the UI
+                        # relies on an onchange). Recompute from payments before the paid gate
+                        # so orders are actually marked paid (mirrors fix b68559b).
+                        order.invalidate_recordset(["payment_ids", "amount_paid"])
+                        order.amount_paid = sum(order.payment_ids.mapped("amount"))
+                        # Finalize whenever the tender matches the total — including a
+                        # zero-value giveaway (100% discount, TOTAL AMOUNT 0) or a net-negative
+                        # refund. POS refuses to CLOSE a session that still holds any 'draft'
+                        # order, so a 0/negative order left un-paid would silently block the
+                        # whole session's GL (close_session_from_ui returns successful=False).
+                        if abs(order.amount_paid - order.amount_total) < 0.01:
+                            order.action_pos_order_paid()
+                        self._xid_set(ns, oxid, "pos.order", order.id)
+                except Exception as e:  # per-order savepoint rolled back; keep going
+                    fail_rows(rows, f"store {store} txn {txn}: post failed: {e}")
+                    skipped += len(rows)
+                    continue
+                for r in rows:
                     rn = r.get("_row")
                     if rn in row_to_line:
                         row_to_line[rn].write({
-                            "state": "error",
-                            "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('item_code')!r}"[:250],
+                            "state": "ok", "target_model": "pos.order",
+                            "target_res_id": order.id, "aggregate_key": f"{store}|{date}|{txn}",
                         })
-                    continue
-                qty = float(profile._parse_amount(r.get("net_qty")))
-                incl = float(profile._parse_amount(r.get("total_amount")))
-                gross = float(profile._parse_amount(r.get("gross_price")) or 0)
-                rate = str(r.get("tax_rate") or "").strip()
-                taxed = bool(tax) and rate not in ("", "None")
-                # X24DN is the source of truth: NET SOLD AMOUNT / TAX AMOUNT are taken
-                # verbatim. The file truncates net to whole rupiah per line
-                # (net = trunc(total/1.11), tax = total - net) whereas Odoo rounds the
-                # tax globally per order, so recomputing here drifts by ~1 rupiah on more
-                # than half the lines. ``ri_src_*`` carries the file's figures through to
-                # session close via pos.order.line._prepare_base_line_for_taxes_computation
-                # (custom_retail_import_pos).
-                src_net = float(profile._parse_amount(r.get("net_amount")) or 0)
-                src_tax = float(profile._parse_amount(r.get("tax_amount")) or 0)
-                src_disc = float(profile._parse_amount(r.get("net_discount")) or 0)
-                if not (src_net or src_tax):
-                    # Older extracts without the net/tax columns: fall back to deriving.
-                    rate_val = (tax.amount / 100.0) if taxed else 0.0
-                    src_net, src_tax = incl / (1.0 + rate_val), incl - incl / (1.0 + rate_val)
-                gl_net = src_net
-                tax_ids = [tax.id] if taxed else []
-                # The sale tax is PRICE-INCLUDED, so POS extracts net from price_unit and
-                # ignores a forced price_subtotal. price_unit must therefore carry the
-                # tax-INCLUSIVE amount (the paid ``incl``) so the order total matches the
-                # tender exactly and nothing plugs to Cash Difference.
-                unit = incl / qty if qty else incl
-                line_cmds.append((0, 0, dict({
-                    "product_id": prod.id, "qty": qty,
-                    "price_unit": unit, "discount": 0.0,
-                    "tax_ids": [(6, 0, tax_ids)],
-                    "price_subtotal": gl_net, "price_subtotal_incl": incl,
-                }, **self._ri_src_line_vals(net=src_net, tax=src_tax, discount=src_disc))))
-                order_net += gl_net
-                order_incl += incl
-                if src_disc:
-                    # Carry the RESOLVED product: the discount reclass must not re-look-up
-                    # by bare item_code — X101 variants are keyed on code+waist+inseam, so
-                    # a default_code search misses most rows.
-                    order_disc.append((prod, src_disc))
+                posted_disc.extend(
+                    {"product": p, "amount": amount, "date": order_date,
+                     "config": cfg, "slots": slots}
+                    for p, amount, slots in order_disc
+                )
+                created += 1
+                if created % 200 == 0:
+                    self.env.cr.commit()
 
-            # Strict mode / any unresolved line: park the WHOLE transaction rather than
-            # posting a partial order (which would later fail the tender-balance check).
-            if missing:
-                sku_list = ", ".join(sorted(set(missing))[:10])
-                fail_rows(rows, f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu")
-                skipped += len(rows)
-                continue
-            if not line_cmds:
-                fail_rows(rows, f"store {store} txn {txn}: no resolvable product")
-                skipped += len(rows)
-                continue
+            # Close this day's sessions before the next day opens one on the same
+            # pos.config — Odoo allows a single non-closed session per config.
+            self._pos_close_and_backdate(sess_cache.values(), errors, "x24")
 
-            if not decouple:
-                tlist = tenders.get(key, [])
-                pay_total = sum(a for _, a in tlist)
-                if not tlist:
-                    fail_rows(rows, f"store {store} txn {txn}: no X70D tender (sync X70D first)")
-                    skipped += len(rows)
-                    continue
-                if abs(pay_total - order_incl) > self._X24_BALANCE_TOL:
-                    fail_rows(rows, f"store {store} txn {txn}: unbalanced lines={order_incl:.2f} tenders={pay_total:.2f}")
-                    skipped += len(rows)
-                    continue
-
-            d = profile._parse_date(date)
-            dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
-            order_date = d
-            # Session is created outside the per-order savepoint so a single bad
-            # order does not roll back the shared session.
-            sess = get_session(cfg)
-            try:
-                with self.env.cr.savepoint():
-                    order = Order.create({
-                        "session_id": sess.id, "company_id": cfg.company_id.id,
-                        "pricelist_id": cfg.pricelist_id.id or False, "date_order": dt,
-                        "pos_reference": f"{store}-{reg}-{txn}",
-                        "lines": line_cmds,
-                        "amount_tax": order_incl - order_net, "amount_total": order_incl,
-                        "amount_paid": 0.0, "amount_return": 0.0,
-                    })
-                    if decouple:
-                        # Pay the full amount to the POS Suspense Clearing method; X70D
-                        # reconciliation later transfers it to the real tender receivables.
-                        order.add_payment({
-                            "pos_order_id": order.id,
-                            "payment_method_id": suspense_method[cfg.company_id.id].id,
-                            "amount": order_incl, "payment_date": dt,
-                        })
-                    else:
-                        for tt, amt in tlist:
-                            m = map_method(cfg, tt)
-                            if not m:
-                                errors.append((rows[0].get("_row"), f"{store}/{txn}: no method for tender {tt}"))
-                                continue
-                            order.add_payment({
-                                "pos_order_id": order.id, "payment_method_id": m.id,
-                                "amount": amt, "payment_date": dt,
-                            })
-                    # ``pos.order.amount_paid`` is a plain stored field (no @api.depends)
-                    # in Odoo 19: writing pos.payment rows does NOT refresh it (the UI
-                    # relies on an onchange). Recompute from payments before the paid gate
-                    # so orders are actually marked paid (mirrors fix b68559b).
-                    order.invalidate_recordset(["payment_ids", "amount_paid"])
-                    order.amount_paid = sum(order.payment_ids.mapped("amount"))
-                    # Finalize whenever the tender matches the total — including a
-                    # zero-value giveaway (100% discount, TOTAL AMOUNT 0) or a net-negative
-                    # refund. POS refuses to CLOSE a session that still holds any 'draft'
-                    # order, so a 0/negative order left un-paid would silently block the
-                    # whole session's GL (close_session_from_ui returns successful=False).
-                    if abs(order.amount_paid - order.amount_total) < 0.01:
-                        order.action_pos_order_paid()
-                    self._xid_set(ns, oxid, "pos.order", order.id)
-            except Exception as e:  # per-order savepoint rolled back; keep going
-                fail_rows(rows, f"store {store} txn {txn}: post failed: {e}")
-                skipped += len(rows)
-                continue
-            for r in rows:
-                rn = r.get("_row")
-                if rn in row_to_line:
-                    row_to_line[rn].write({
-                        "state": "ok", "target_model": "pos.order",
-                        "target_res_id": order.id, "aggregate_key": f"{store}|{date}|{txn}",
-                    })
-            posted_disc.extend((p, d, order_date) for p, d in order_disc)
-            created += 1
-            if created % 200 == 0:
-                self.env.cr.commit()
-
-        self._pos_close_and_backdate(sess_cache.values(), errors, "x24")
+        if disc_slot_mismatch:
+            errors.append((None, f"{disc_slot_mismatch} line(s): DISCOUNT AMOUNT 1..4 do not "
+                                 f"add up to NET DISCOUNT AMOUNT; the latter was booked"))
 
         if self._x24_discount_reclass_enabled():
             self._post_x24_discount_reclass(profile, records, posted_disc, log)
@@ -1383,12 +1581,14 @@ class RetailImportExecutor(models.AbstractModel):
                         mv = s.move_id
                         if dates and mv.date and max(dates).date().year == mv.date.year:
                             gl = max(dates).date()
+                            self._ri_restamp_move_date(mv, gl)
+                            # The session itself is opened "now", so its own dates would
+                            # keep pointing at the import day in the POS session list.
                             self.env.cr.execute(
-                                "UPDATE account_move SET date=%s WHERE id=%s", (gl, mv.id))
-                            self.env.cr.execute(
-                                "UPDATE account_move_line SET date=%s WHERE move_id=%s", (gl, mv.id))
-                            mv.invalidate_recordset(["date"])
-                            mv.line_ids.invalidate_recordset(["date"])
+                                "UPDATE pos_session SET start_at=%s, stop_at=%s WHERE id=%s",
+                                (datetime(gl.year, gl.month, gl.day, 8, 0, 0),
+                                 datetime(gl.year, gl.month, gl.day, 22, 0, 0), s.id))
+                            s.invalidate_recordset(["start_at", "stop_at"])
                     except Exception as be:
                         _logger.warning("%s POST: session %s backdate skipped: %s", tag, s.id, be)
                     _logger.info("%s POST: session %s closed, journal %s dated %s (no stock moves)",
@@ -1610,20 +1810,26 @@ class RetailImportExecutor(models.AbstractModel):
         """Get/create a non-cash SUSPENSE pos.payment.method per company, backed by the
         POS Suspense Clearing account, attached to every config. Idempotent. Mirrors
         _x24_seed_payment_methods. Must NOT be is_cash_count (else the cash-control
-        close misbehaves and _x24_ensure_method_gl_split would skip it)."""
+        close misbehaves and _x24_ensure_method_gl_split would skip it).
+
+        journal_id MUST stay empty: pos.payment.method.type is computed from the
+        journal type, and a bank journal makes pos.session._create_bank_payment_moves
+        emit an account.payment (Dr Outstanding Receipts / Cr Suspense) at close,
+        draining the suspense the same second X24 fills it -- and dated today, not in
+        the sales period. With no journal the method is 'pay_later': close only writes
+        the suspense receivable line, which is exactly what X70D later transfers and
+        reconciles."""
         Method = self.env["pos.payment.method"].sudo()
         by_company = {}
         for company in self._ri_pos_configs().mapped("company_id"):
             m = Method.search([("company_id", "=", company.id),
                                ("name", "=", self._X24_SUSPENSE_METHOD)], limit=1)
             if not m:
-                existing = Method.search([("company_id", "=", company.id)])
-                template = existing.filtered(
-                    lambda x: x.name == "OFFLINE_OTHER_CREDITCARD")[:1] or existing[:1]
-                vals = {"name": self._X24_SUSPENSE_METHOD, "company_id": company.id}
-                if template and template.journal_id:
-                    vals["journal_id"] = template.journal_id.id
-                m = Method.create(vals)
+                m = Method.create({"name": self._X24_SUSPENSE_METHOD,
+                                   "company_id": company.id, "journal_id": False})
+            elif m.journal_id:
+                # Heal methods created before this was understood.
+                m.journal_id = False
             # Non-cash + own reconcilable suspense receivable.
             susp = self._x24_suspense_account(company)
             if m.receivable_account_id != susp:
@@ -1693,9 +1899,11 @@ class RetailImportExecutor(models.AbstractModel):
         receivables and reconcile the suspense lines against the session-close debits.
 
         Prereq: X24 was posted in decouple mode (sales already sit on Suspense). Posts one
-        RIREC ``account.move`` (Dr per-tender receivable / Cr Suspense) dated at the latest
-        tender date, then reconciles all open suspense lines. Residual on the suspense
-        account = sales whose payment never arrived (surfaced in the log note)."""
+        RIREC ``account.move`` **per tender date** (Dr per-tender receivable / Cr Suspense)
+        so the payment lands on the same day as the sale whose suspense it clears, then
+        reconciles all open suspense lines. Both legs carry the store's Operating Unit
+        analytic. Residual on the suspense account = sales whose payment never arrived
+        (surfaced in the log note)."""
         ns = profile.namespace
         company = profile.company_id
         AML = self.env["account.move.line"].sudo()
@@ -1722,9 +1930,19 @@ class RetailImportExecutor(models.AbstractModel):
         self.env.cr.commit()
 
         susp = self._x24_suspense_account(company)
-        by_tender = defaultdict(float)
-        dates = []
+        # (trading day) -> (tender, operating-unit id) -> amount. The store code resolves
+        # to its pos.config (and thus its OU) through the same xid X24 posts against.
+        by_day = defaultdict(lambda: defaultdict(float))
+        cfg_cache, ou_cache = {}, {}
         x70d_keys = set()
+
+        def resolve_config(store):
+            if store not in cfg_cache:
+                cid = self._xid_get(ns, self._safe_xid("posconfig_", store), "pos.config")
+                cfg_cache[store] = (self.env["pos.config"].with_context(active_test=False)
+                                    .browse(cid) if cid else False)
+            return cfg_cache[store]
+
         for r in records:
             tt = str(r.get("tender_type") or "").strip()
             if not tt:
@@ -1734,22 +1952,24 @@ class RetailImportExecutor(models.AbstractModel):
                 amt = float(profile._parse_amount(r.get("tender_amount")) or 0)
             except Exception:
                 amt = 0.0
-            by_tender[tt] += amt
+            store = str(r.get("store_code") or "").strip()
+            if store not in ou_cache:
+                ou_cache[store] = self._ri_config_ou(resolve_config(store))
+            ou = ou_cache[store]
             d = profile._parse_date(r.get("trans_date"))
-            if d:
-                dates.append(d)
+            by_day[d][(tt, ou.id if ou else False)] += amt
             x70d_keys.add(self._safe_xid("posorder_", "%s_%s_%s_%s" % (
-                str(r.get("store_code") or "").strip(), str(r.get("trans_date") or "").strip(),
+                store, str(r.get("trans_date") or "").strip(),
                 str(r.get("register") or "").strip(), str(r.get("transnum") or "").strip())))
 
-        by_tender = {t: round(a, 2) for t, a in by_tender.items() if round(a, 2)}
-        if not by_tender:
+        posted, total = 0, 0.0
+        if not any(round(a, 2) for day in by_day.values() for a in day.values()):
             log.records_skipped = len(records)
             log.error_message = "X70D: no postable tenders (empty/zero amounts)."
             self.env.cr.commit()
             return
 
-        # Transfer entry: Dr each per-tender receivable / Cr Suspense (total). RIREC journal.
+        # One transfer entry per day: Dr each per-tender receivable / Cr Suspense. RIREC.
         Journal = self.env["account.journal"].sudo()
         journal = Journal.search([("code", "=", "RIREC"), ("company_id", "=", company.id)], limit=1)
         if not journal:
@@ -1757,40 +1977,44 @@ class RetailImportExecutor(models.AbstractModel):
                 "name": "Retail Import Reconciliation", "code": "RIREC",
                 "type": "general", "company_id": company.id,
             })
-        total = round(sum(by_tender.values()), 2)
-        line_ids = []
-        for tender, amt in sorted(by_tender.items()):
-            recv = self._x24_recv_account_for(company, tender)
-            line_ids.append((0, 0, {"account_id": recv.id, "debit": amt, "credit": 0.0,
-                                    "partner_id": False, "name": f"X70D settlement {tender}"}))
-        line_ids.append((0, 0, {"account_id": susp.id, "debit": 0.0, "credit": total,
-                                "partner_id": False, "name": "X70D settlement (Suspense clearing)"}))
-        gl_date = max(dates) if dates else datetime.now().date()
-        move = self.env["account.move"].sudo().create({
-            "move_type": "entry", "journal_id": journal.id, "date": gl_date,
-            "company_id": company.id,
-            "ref": f"X70D settlement transfer (log {log.id})", "line_ids": line_ids,
-        })
-        move.action_post()
-        # Odoo bumps a past-dated entry to today on post; re-stamp within the same FY.
-        try:
-            if gl_date and move.date and gl_date.year == move.date.year and gl_date != move.date:
-                newname = move.name
-                mtag = "/%02d/" % move.date.month
-                if newname and mtag in newname:
-                    cand = newname.replace(mtag, "/%02d/" % gl_date.month)
-                    if not self.env["account.move"].search_count(
-                        [("journal_id", "=", journal.id), ("name", "=", cand), ("id", "!=", move.id)]):
-                        newname = cand
-                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s",
-                                    (gl_date, newname, move.id))
-                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s",
-                                    (gl_date, move.id))
-                move.invalidate_recordset(["date", "name"])
-                move.line_ids.invalidate_recordset(["date"])
-        except Exception as be:
-            _logger.warning("x70d reconcile: backdate skipped: %s", be)
-        self._xid_set(ns, self._safe_xid("x70dreconcile_", str(log.id)), "account.move", move.id)
+        AnalyticAccount = self.env["account.analytic.account"]
+        fallback = datetime.now().date()
+        for day in sorted(by_day, key=lambda d: d or fallback):
+            gl_date = day or fallback
+            by_tender = {k: round(a, 2) for k, a in by_day[day].items() if round(a, 2)}
+            if not by_tender:
+                continue
+            line_ids = []
+            # Credit the suspense per OU as well, so the entry balances *within* each
+            # Operating Unit instead of leaving one store debited and another credited.
+            susp_by_ou = defaultdict(float)
+            for (tender, ou_id), amt in sorted(by_tender.items()):
+                ou = AnalyticAccount.browse(ou_id) if ou_id else AnalyticAccount
+                recv = self._x24_recv_account_for(company, tender)
+                line_ids.append((0, 0, dict(
+                    self._ri_ou_line_vals(ou), account_id=recv.id, debit=amt, credit=0.0,
+                    partner_id=False, name=f"X70D settlement {tender}")))
+                susp_by_ou[ou_id] += amt
+            for ou_id, amt in sorted(susp_by_ou.items(), key=lambda kv: kv[0] or 0):
+                ou = AnalyticAccount.browse(ou_id) if ou_id else AnalyticAccount
+                line_ids.append((0, 0, dict(
+                    self._ri_ou_line_vals(ou), account_id=susp.id, debit=0.0, credit=round(amt, 2),
+                    partner_id=False, name="X70D settlement (Suspense clearing)")))
+            move = self.env["account.move"].sudo().create({
+                "move_type": "entry", "journal_id": journal.id, "date": gl_date,
+                "company_id": company.id,
+                "ref": f"X70D settlement transfer {gl_date} (log {log.id})", "line_ids": line_ids,
+            })
+            move.action_post()
+            # Odoo bumps a past-dated entry to today on post; re-stamp within the same FY.
+            self._ri_backdate_move(move, gl_date, "x70d")
+            self._xid_set(ns, self._safe_xid("x70dreconcile_", f"{log.id}_{gl_date}"),
+                          "account.move", move.id)
+            posted += 1
+            total += sum(by_tender.values())
+            _logger.info("x70d reconcile: move %s dated %s (%s tender lines)",
+                         move.name, gl_date, len(by_tender))
+        total = round(total, 2)
 
         # Reconcile all open suspense lines (session-close debits + this credit). Group by
         # partner because reconcile requires a single partner per receivable batch; POS
@@ -1826,10 +2050,10 @@ class RetailImportExecutor(models.AbstractModel):
         ])
         residual = round(sum(still_open.mapped("amount_residual")), 2)
 
-        log.records_created = 1
+        log.records_created = posted
         log.records_skipped = len(records)
-        note = (f"X70D settlement: transfer move {move.name} posted "
-                f"(Dr {len(by_tender)} tender receivables {total:.2f} / Cr Suspense); "
+        note = (f"X70D settlement: {posted} daily transfer move(s) posted "
+                f"(Dr tender receivables {total:.2f} / Cr Suspense); "
                 f"reconciled {reconciled_groups} suspense group(s); "
                 f"suspense residual {residual:.2f}.")
         if unpaid:
@@ -1837,8 +2061,8 @@ class RetailImportExecutor(models.AbstractModel):
                      f"tender (unpaid/unreconciled).")
         log.error_message = note
         self.env.cr.commit()
-        _logger.info("x70d reconcile: move %s, %s tenders, total %.2f, residual %.2f, %s unpaid",
-                     move.name, len(by_tender), total, residual, len(unpaid))
+        _logger.info("x70d reconcile: %s daily move(s), total %.2f, residual %.2f, %s unpaid",
+                     posted, total, residual, len(unpaid))
 
     # ==================================================================
     # Staged / reference-only loaders (parse + count + keep attachment)
@@ -1985,10 +2209,29 @@ class RetailImportExecutor(models.AbstractModel):
             })
         return journal
 
+    def _ri_restamp_move_date(self, move, gl_date):
+        """Force ``move`` and everything derived from it onto ``gl_date`` via SQL.
+
+        Three tables, not one. ``account.analytic.line`` is the one that keeps being
+        forgotten: ``account.move.line._create_analytic_lines`` copies the line's date at
+        **post** time, so an entry posted today and backdated afterwards leaves its
+        Analytic Items dated today — the per-OU P&L then reports the whole import in the
+        wrong period even though the journal entry looks right.
+        """
+        self.env.cr.execute("UPDATE account_move SET date=%s WHERE id=%s", (gl_date, move.id))
+        self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s",
+                            (gl_date, move.id))
+        self.env.cr.execute(
+            "UPDATE account_analytic_line SET date=%s WHERE move_line_id IN "
+            "(SELECT id FROM account_move_line WHERE move_id=%s)", (gl_date, move.id))
+        move.invalidate_recordset(["date"])
+        move.line_ids.invalidate_recordset(["date"])
+        move.line_ids.analytic_line_ids.invalidate_recordset(["date"])
+
     def _ri_backdate_move(self, move, gl_date, tag):
         """Odoo bumps a past-dated entry to today on post (sequence-date monotonicity).
-        Re-stamp the move + lines to the source period via SQL within the same fiscal
-        year, aligning the sequence name's month so it stays consistent."""
+        Re-stamp the move + lines + analytic items to the source period via SQL within the
+        same fiscal year, aligning the sequence name's month so it stays consistent."""
         try:
             if gl_date and move.date and gl_date.year == move.date.year and gl_date != move.date:
                 newname = move.name
@@ -1999,12 +2242,10 @@ class RetailImportExecutor(models.AbstractModel):
                         [("journal_id", "=", move.journal_id.id), ("name", "=", cand),
                          ("id", "!=", move.id)]):
                         newname = cand
-                self.env.cr.execute("UPDATE account_move SET date=%s, name=%s WHERE id=%s",
-                                    (gl_date, newname, move.id))
-                self.env.cr.execute("UPDATE account_move_line SET date=%s WHERE move_id=%s",
-                                    (gl_date, move.id))
-                move.invalidate_recordset(["date", "name"])
-                move.line_ids.invalidate_recordset(["date"])
+                self._ri_restamp_move_date(move, gl_date)
+                self.env.cr.execute("UPDATE account_move SET name=%s WHERE id=%s",
+                                    (newname, move.id))
+                move.invalidate_recordset(["name"])
         except Exception as be:
             _logger.warning("%s POST: backdate skipped: %s", tag, be)
 
@@ -2012,17 +2253,38 @@ class RetailImportExecutor(models.AbstractModel):
         """Post the net-neutral contra-revenue reclass:
         per category, Dr ``Sales Discount-<cat>`` / Cr ``Gross Sales-<cat>``.
 
-        ``by_pair`` maps ``(income_account_id, discount_account_id)`` to the discount
-        amount **taken verbatim from the source file**. Both legs carry the identical
-        figure, so the entry balances exactly and no rounding selisih is introduced.
+        ``by_pair`` maps a key to the discount amount **taken verbatim from the source
+        file**. Both legs carry the identical figure, so the entry balances exactly and
+        no rounding selisih is introduced.
+
+        The key is ``(income_account_id, discount_account_id)`` optionally extended with
+        ``(operating_unit_id, discount_code, discount_description)``: X24DN knows which
+        store granted the discount and under which promo, so both legs can carry the OU
+        analytic and name the promo. X31 has neither and passes the bare 2-tuple.
+
+        Returns an empty recordset when every amount rounds to zero (a day whose
+        discounts and their reversals cancel out): Odoo refuses to post a line-less move.
         """
+        AnalyticAccount = self.env["account.analytic.account"]
         line_ids = []
-        for (inc_id, dacc_id), amt in by_pair.items():
+        for key, amt in by_pair.items():
             amt = round(amt, 2)
-            line_ids.append((0, 0, {"account_id": dacc_id, "debit": amt, "credit": 0.0,
-                                    "name": "POS discount (%s)" % tag.upper()}))
-            line_ids.append((0, 0, {"account_id": inc_id, "debit": 0.0, "credit": amt,
-                                    "name": "POS discount gross-up (%s)" % tag.upper()}))
+            if not amt:
+                continue
+            inc_id, dacc_id = key[0], key[1]
+            ou = AnalyticAccount.browse(key[2]) if len(key) > 2 and key[2] else AnalyticAccount
+            label = " ".join(filter(None, key[3:5])) if len(key) > 3 else ""
+            suffix = " — %s" % label if label else ""
+            # Each line gets its own vals dict (the analytic distribution is a mutable
+            # Json value, never share one across two create commands).
+            line_ids.append((0, 0, dict(
+                self._ri_ou_line_vals(ou), account_id=dacc_id, debit=amt, credit=0.0,
+                name=("POS discount (%s)%s" % (tag.upper(), suffix))[:200])))
+            line_ids.append((0, 0, dict(
+                self._ri_ou_line_vals(ou), account_id=inc_id, debit=0.0, credit=amt,
+                name=("POS discount gross-up (%s)%s" % (tag.upper(), suffix))[:200])))
+        if not line_ids:
+            return self.env["account.move"]
         move = self.env["account.move"].create({
             "move_type": "entry", "journal_id": journal.id, "date": gl_date,
             "ref": ref, "line_ids": line_ids,
@@ -2125,13 +2387,19 @@ class RetailImportExecutor(models.AbstractModel):
         ).format(delta=v["x24_total"] - v["x31_total"], **v)
 
     def _post_x24_discount_reclass(self, profile, records, posted_disc, log):
-        """Dr Sales Discount-<cat> / Cr Gross Sales-<cat> for X24DN's NET DISCOUNT AMOUNT,
-        taken verbatim from the file (no ex-VAT conversion, no rounding).
+        """Validate X24DN's NET DISCOUNT AMOUNT against X31 and report it on the log.
 
-        ``posted_disc`` is a list of ``(product, discount, date)`` for the lines that
-        actually posted, carrying the product resolved by ``_post_x24``'s full
-        EAN/composite matcher. Validated against X31 first; the summary is appended to
-        the log either way.
+        The reclass itself (Dr Sales Discount-<cat> / Cr Gross Sales-<cat>, verbatim) is
+        **no longer a separate journal entry**. ``pos.session._create_account_move`` in
+        ``custom_retail_import_pos`` appends the two legs to the store's own closing entry
+        while it is still draft, so the discount sits next to the Gross Sales, VAT and
+        Suspense lines of the same store on the same trading day, carrying that store's
+        Operating Unit. A summary RIADJ move could never be tied back to a store.
+
+        ``posted_disc`` holds one dict per posted discounted line — the product resolved
+        by ``_post_x24``'s full EAN/composite matcher, the amount, the trading day, the
+        store's pos.config and the source discount slots. It is used here only to report
+        the discount that reached no income/discount account and was therefore dropped.
         """
         company = profile.company_id
         icp = self.env["ir.config_parameter"].sudo()
@@ -2151,42 +2419,28 @@ class RetailImportExecutor(models.AbstractModel):
                     delta="{:,.2f}".format(delta), max=max_delta, summary=summary,
                 ))
 
-        acct_cache, by_pair, dates = {}, defaultdict(float), []
+        # The reclass lines were written into each session's closing entry. All that is
+        # left is to warn about discount that never reached an account: the session hook
+        # silently skips a product whose category resolves no income/discount pair.
+        acct_cache = {}
         skipped = skipped_amount = 0.0
-        for prod, disc, d in posted_disc:
+        for item in posted_disc:
+            prod, disc = item["product"], item["amount"]
             if prod.id not in acct_cache:
                 inc = self._ri_income_account(company, prod)
                 dacc = self._ri_category_account(company, prod, "discount")
-                acct_cache[prod.id] = (inc, dacc) if (inc and dacc) else None
-            pair = acct_cache[prod.id]
-            if not pair:
+                acct_cache[prod.id] = bool(inc and dacc)
+            if not acct_cache[prod.id]:
                 skipped += 1
                 skipped_amount += disc
-                continue
-            inc, dacc = pair
-            by_pair[(inc.id, dacc.id)] += disc
-            if d:
-                dates.append(d)
 
         if skipped:
             summary += ("\nWARNING: %d discounted line(s) worth %s had no income/discount "
                         "account and were NOT reclassified." % (skipped, "{:,.2f}".format(skipped_amount)))
             _logger.warning("x24 discount reclass: %d lines (%.2f) unmapped", skipped, skipped_amount)
         log.error_message = "\n".join(filter(None, [log.error_message, summary]))
-        if not by_pair:
-            _logger.info("x24 discount reclass: nothing to post (%s lines unmapped)", skipped)
-            return
-
-        journal = self._ri_adjustment_journal(company)
-        gl_date = max(dates) if dates else datetime.now().date()
-        move = self._ri_post_discount_reclass(
-            company, journal, by_pair, gl_date,
-            ref=f"X24DN discount reclass (log {log.id})", tag="x24",
-        )
-        self._xid_set(profile.namespace, self._safe_xid("x24discount_", str(log.id)),
-                      "account.move", move.id)
-        _logger.info("x24 discount reclass: move %s posted (%s categories, %s rows unmapped)",
-                     move.name, len(by_pair), skipped)
+        _logger.info("x24 discount reclass: booked inside the POS closing entries "
+                     "(%s discounted lines, %s unmapped)", len(posted_disc), skipped)
 
     def _post_x31(self, profile, records, log, row_to_line):
         """Post X31 promo discounts as a NET-NEUTRAL contra-revenue reclassification:
@@ -2262,6 +2516,11 @@ class RetailImportExecutor(models.AbstractModel):
             company, journal, by_pair, gl_date,
             ref=f"X31 promo discount reclass (log {log.id})", tag="x31",
         )
+        if not move:
+            log.records_skipped = len(records)
+            log.error_message = "X31: every discount cancelled out to zero; nothing posted."
+            self.env.cr.commit()
+            return
         self._xid_set(ns, self._safe_xid("x31entry_", str(log.id)), "account.move", move.id)
         for rn in ok_rows:
             if rn in row_to_line:
@@ -2432,105 +2691,109 @@ class RetailImportExecutor(models.AbstractModel):
         })
 
         rate_val = (tax.amount / 100.0) if tax else 0.0
-        for key, rows in orders.items():
-            store, date, reg, txn = key
-            oxid = self._safe_xid("posreturn_", f"{store}_{date}_{reg}_{txn}")
-            if self._xid_get(ns, oxid, "pos.order"):
-                continue
-            cfg = resolve_config(store)
-            if not cfg:
-                fail_rows(rows, f"store {store}: no pos.config (map xid posconfig_{store})")
-                skipped += len(rows)
-                continue
-            cash = cfg.payment_method_ids.filtered(lambda m: m.is_cash_count)[:1]
-            if not cash:
-                fail_rows(rows, f"store {store}: no cash method for refund")
-                skipped += len(rows)
-                continue
+        # Same per-day batching as _post_x24: a return posts to a closing entry dated on
+        # the day it was returned, not on the file's last date.
+        for _batch_date, batch_orders in self._x24_day_batches(profile, orders):
+            sess_cache = {}
+            for key, rows in batch_orders.items():
+                store, date, reg, txn = key
+                oxid = self._safe_xid("posreturn_", f"{store}_{date}_{reg}_{txn}")
+                if self._xid_get(ns, oxid, "pos.order"):
+                    continue
+                cfg = resolve_config(store)
+                if not cfg:
+                    fail_rows(rows, f"store {store}: no pos.config (map xid posconfig_{store})")
+                    skipped += len(rows)
+                    continue
+                cash = cfg.payment_method_ids.filtered(lambda m: m.is_cash_count)[:1]
+                if not cash:
+                    fail_rows(rows, f"store {store}: no cash method for refund")
+                    skipped += len(rows)
+                    continue
 
-            line_cmds, order_net, order_incl, missing = [], 0.0, 0.0, []
-            for r in rows:
-                prod = resolve_product(r)
-                if not prod:
-                    missing.append(str(r.get("product_code") or r.get("item_code") or r.get("ean") or "?"))
+                line_cmds, order_net, order_incl, missing = [], 0.0, 0.0, []
+                for r in rows:
+                    prod = resolve_product(r)
+                    if not prod:
+                        missing.append(str(r.get("product_code") or r.get("item_code") or r.get("ean") or "?"))
+                        rn = r.get("_row")
+                        if rn in row_to_line:
+                            row_to_line[rn].write({
+                                "state": "error",
+                                "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('product_code')!r}"[:250],
+                            })
+                        continue
+                    qty = float(profile._parse_amount(r.get("net_qty")))        # negative
+                    incl = float(profile._parse_amount(r.get("total_amount")))  # negative (refund)
+                    # X48 carries NET SOLD AMOUNT / TAX AMOUNT (both negative) but no TAX RATE
+                    # column, so a line is taxed iff it has a tax amount. As with X24, the
+                    # file's own figures win over a recomputation.
+                    src_net = float(profile._parse_amount(r.get("net_amount")) or 0)
+                    src_tax = float(profile._parse_amount(r.get("tax_amount")) or 0)
+                    if not (src_net or src_tax):
+                        src_net, src_tax = incl / (1.0 + rate_val), incl - incl / (1.0 + rate_val)
+                    taxed = bool(tax) and bool(src_tax)
+                    gl_net = src_net
+                    unit = incl / qty if qty else incl                          # positive unit price
+                    line_cmds.append((0, 0, dict({
+                        "product_id": prod.id, "qty": qty,
+                        "price_unit": unit, "discount": 0.0,
+                        "tax_ids": [(6, 0, [tax.id] if taxed else [])],
+                        "price_subtotal": gl_net, "price_subtotal_incl": incl,
+                    }, **self._ri_src_line_vals(net=src_net, tax=src_tax, is_return=True))))
+                    order_net += gl_net
+                    order_incl += incl
+
+                # Strict mode / any unresolved line: park the WHOLE refund rather than
+                # posting a partial return.
+                if missing:
+                    sku_list = ", ".join(sorted(set(missing))[:10])
+                    fail_rows(rows, f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu")
+                    skipped += len(rows)
+                    continue
+                if not line_cmds:
+                    fail_rows(rows, f"store {store} txn {txn}: no resolvable product")
+                    skipped += len(rows)
+                    continue
+
+                d = profile._parse_date(date)
+                dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
+                sess = get_session(cfg)
+                try:
+                    with self.env.cr.savepoint():
+                        order = Order.create({
+                            "session_id": sess.id, "company_id": cfg.company_id.id,
+                            "pricelist_id": cfg.pricelist_id.id or False, "date_order": dt,
+                            "pos_reference": f"RET-{store}-{reg}-{txn}",
+                            "lines": line_cmds,
+                            "amount_tax": order_incl - order_net, "amount_total": order_incl,
+                            "amount_paid": 0.0, "amount_return": 0.0,
+                        })
+                        order.add_payment({
+                            "pos_order_id": order.id, "payment_method_id": cash.id,
+                            "amount": order_incl, "payment_date": dt,
+                        })
+                        order.invalidate_recordset(["payment_ids", "amount_paid"])
+                        order.amount_paid = sum(order.payment_ids.mapped("amount"))
+                        if order.amount_total and abs(order.amount_paid - order.amount_total) <= self._X24_BALANCE_TOL:
+                            order.action_pos_order_paid()
+                        self._xid_set(ns, oxid, "pos.order", order.id)
+                except Exception as e:
+                    fail_rows(rows, f"store {store} txn {txn}: refund post failed: {e}")
+                    skipped += len(rows)
+                    continue
+                for r in rows:
                     rn = r.get("_row")
                     if rn in row_to_line:
                         row_to_line[rn].write({
-                            "state": "error",
-                            "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('product_code')!r}"[:250],
+                            "state": "ok", "target_model": "pos.order",
+                            "target_res_id": order.id, "aggregate_key": f"RET|{store}|{date}|{txn}",
                         })
-                    continue
-                qty = float(profile._parse_amount(r.get("net_qty")))        # negative
-                incl = float(profile._parse_amount(r.get("total_amount")))  # negative (refund)
-                # X48 carries NET SOLD AMOUNT / TAX AMOUNT (both negative) but no TAX RATE
-                # column, so a line is taxed iff it has a tax amount. As with X24, the
-                # file's own figures win over a recomputation.
-                src_net = float(profile._parse_amount(r.get("net_amount")) or 0)
-                src_tax = float(profile._parse_amount(r.get("tax_amount")) or 0)
-                if not (src_net or src_tax):
-                    src_net, src_tax = incl / (1.0 + rate_val), incl - incl / (1.0 + rate_val)
-                taxed = bool(tax) and bool(src_tax)
-                gl_net = src_net
-                unit = incl / qty if qty else incl                          # positive unit price
-                line_cmds.append((0, 0, dict({
-                    "product_id": prod.id, "qty": qty,
-                    "price_unit": unit, "discount": 0.0,
-                    "tax_ids": [(6, 0, [tax.id] if taxed else [])],
-                    "price_subtotal": gl_net, "price_subtotal_incl": incl,
-                }, **self._ri_src_line_vals(net=src_net, tax=src_tax, is_return=True))))
-                order_net += gl_net
-                order_incl += incl
+                created += 1
+                if created % 200 == 0:
+                    self.env.cr.commit()
 
-            # Strict mode / any unresolved line: park the WHOLE refund rather than
-            # posting a partial return.
-            if missing:
-                sku_list = ", ".join(sorted(set(missing))[:10])
-                fail_rows(rows, f"store {store} txn {txn}: produk belum teregister di master X101 ({sku_list}) — sync X101 dulu")
-                skipped += len(rows)
-                continue
-            if not line_cmds:
-                fail_rows(rows, f"store {store} txn {txn}: no resolvable product")
-                skipped += len(rows)
-                continue
-
-            d = profile._parse_date(date)
-            dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
-            sess = get_session(cfg)
-            try:
-                with self.env.cr.savepoint():
-                    order = Order.create({
-                        "session_id": sess.id, "company_id": cfg.company_id.id,
-                        "pricelist_id": cfg.pricelist_id.id or False, "date_order": dt,
-                        "pos_reference": f"RET-{store}-{reg}-{txn}",
-                        "lines": line_cmds,
-                        "amount_tax": order_incl - order_net, "amount_total": order_incl,
-                        "amount_paid": 0.0, "amount_return": 0.0,
-                    })
-                    order.add_payment({
-                        "pos_order_id": order.id, "payment_method_id": cash.id,
-                        "amount": order_incl, "payment_date": dt,
-                    })
-                    order.invalidate_recordset(["payment_ids", "amount_paid"])
-                    order.amount_paid = sum(order.payment_ids.mapped("amount"))
-                    if order.amount_total and abs(order.amount_paid - order.amount_total) <= self._X24_BALANCE_TOL:
-                        order.action_pos_order_paid()
-                    self._xid_set(ns, oxid, "pos.order", order.id)
-            except Exception as e:
-                fail_rows(rows, f"store {store} txn {txn}: refund post failed: {e}")
-                skipped += len(rows)
-                continue
-            for r in rows:
-                rn = r.get("_row")
-                if rn in row_to_line:
-                    row_to_line[rn].write({
-                        "state": "ok", "target_model": "pos.order",
-                        "target_res_id": order.id, "aggregate_key": f"RET|{store}|{date}|{txn}",
-                    })
-            created += 1
-            if created % 200 == 0:
-                self.env.cr.commit()
-
-        self._pos_close_and_backdate(sess_cache.values(), errors, "x48")
+            self._pos_close_and_backdate(sess_cache.values(), errors, "x48")
 
         self.env.cr.commit()
         log.records_created = created
