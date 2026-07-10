@@ -135,9 +135,7 @@ class TestRequestLifecycle(ApprovalTestCommon):
         po.invalidate_recordset()
         self.assertEqual(po.x_custom_approval_request_id, req)
         self.assertEqual(
-            self.Request.search_count(
-                [("res_model", "=", "purchase.order"), ("res_id", "=", po.id)]
-            ),
+            self.Request.search_count([("res_model", "=", "purchase.order"), ("res_id", "=", po.id)]),
             1,
         )
 
@@ -161,9 +159,7 @@ class TestRequestLifecycle(ApprovalTestCommon):
             # Tolerate core errors (e.g. empty order lines) but never approval.
             self.assertNotIn("approval", str(e).lower())
         self.assertFalse(
-            self.Request.search(
-                [("res_model", "=", "purchase.order"), ("res_id", "=", po.id)]
-            ),
+            self.Request.search([("res_model", "=", "purchase.order"), ("res_id", "=", po.id)]),
             "No matrix → no approval request should be created",
         )
 

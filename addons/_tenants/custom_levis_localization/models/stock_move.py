@@ -161,9 +161,7 @@ class StockMove(models.Model):
         currency = company.currency_id
         if not amount or currency.is_zero(amount):
             return
-        if AccountMove.search_count(
-            [("ref", "=", ref), ("company_id", "=", company.id)]
-        ):
+        if AccountMove.search_count([("ref", "=", ref), ("company_id", "=", company.id)]):
             return  # already posted for this move
         debit_acc, credit_acc = (val_acc, var_acc) if incoming else (var_acc, val_acc)
         AccountMove.create(
@@ -174,18 +172,28 @@ class StockMove(models.Model):
                 "date": fields.Date.context_today(self),
                 "ref": ref,
                 "line_ids": [
-                    (0, 0, {
-                        "account_id": debit_acc.id, "name": label,
-                        "debit": amount if amount > 0 else 0.0,
-                        "credit": -amount if amount < 0 else 0.0,
-                        "analytic_distribution": analytic,
-                    }),
-                    (0, 0, {
-                        "account_id": credit_acc.id, "name": label,
-                        "debit": -amount if amount < 0 else 0.0,
-                        "credit": amount if amount > 0 else 0.0,
-                        "analytic_distribution": analytic,
-                    }),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": debit_acc.id,
+                            "name": label,
+                            "debit": amount if amount > 0 else 0.0,
+                            "credit": -amount if amount < 0 else 0.0,
+                            "analytic_distribution": analytic,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": credit_acc.id,
+                            "name": label,
+                            "debit": -amount if amount < 0 else 0.0,
+                            "credit": amount if amount > 0 else 0.0,
+                            "analytic_distribution": analytic,
+                        },
+                    ),
                 ],
             }
         ).action_post()

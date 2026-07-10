@@ -86,9 +86,7 @@ log = []
 
 
 def _wh(code):
-    return env["stock.warehouse"].with_context(active_test=False).search(
-        [("code", "=", code)], limit=1
-    )
+    return env["stock.warehouse"].with_context(active_test=False).search([("code", "=", code)], limit=1)
 
 
 def _rename(record, field, value):
@@ -113,9 +111,7 @@ def _rename_store(wh, name):
         _rename(wh.pos_type_id.sequence_id.sudo(), "name", "%s Picking POS" % name)
     _rename(wh.l10n_ou_analytic_id, "name", name)
     _rename(wh.l10n_purchase_journal_id, "name", "Pembelian - %s" % name)
-    for config in env["pos.config"].with_context(active_test=False).search(
-        [("warehouse_id", "=", wh.id)]
-    ):
+    for config in env["pos.config"].with_context(active_test=False).search([("warehouse_id", "=", wh.id)]):
         _rename(config, "name", name)
 
 
@@ -141,9 +137,7 @@ def _archive_warehouse(wh, parking_type):
     back. The config keeps its full configuration and its own operation type, so
     reactivating the store later is a pure un-archive.
     """
-    configs = env["pos.config"].with_context(active_test=False).search(
-        [("warehouse_id", "=", wh.id)]
-    )
+    configs = env["pos.config"].with_context(active_test=False).search([("warehouse_id", "=", wh.id)])
     original = {c.id: c.picking_type_id.id for c in configs}
     for config in configs:
         _archive(config)

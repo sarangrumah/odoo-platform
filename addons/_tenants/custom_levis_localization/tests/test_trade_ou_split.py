@@ -13,7 +13,6 @@ from odoo.tests import tagged
 
 @tagged("post_install", "-at_install")
 class TestTradeOuSplit(AccountTestInvoicingCommon):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -22,100 +21,133 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
 
         # --- Payable + GR/IR accounts for each stream -------------------
         cls.trade_payable = cls.company_data["default_account_payable"]
-        cls.nontrade_payable = Account.create({
-            "name": "Non Trade Payable - Third parties",
-            "code": "NTPAY01",
-            "account_type": "liability_payable",
-            "reconcile": True,
-        })
+        cls.nontrade_payable = Account.create(
+            {
+                "name": "Non Trade Payable - Third parties",
+                "code": "NTPAY01",
+                "account_type": "liability_payable",
+                "reconcile": True,
+            }
+        )
         # GR/IR clearing is a current-liability control account in the real EBR
         # chart (e.g. "GR/IR clearing-Non Trade Payables", account_type
         # liability_current, reconcilable) — NOT a liability_payable subtype, so
         # product lines routed here on a bill don't trip the payable due-date rule.
-        cls.grir_nontrade = Account.create({
-            "name": "GR/IR Non Trade",
-            "code": "NTGRIR01",
-            "account_type": "liability_current",
-            "reconcile": True,
-        })
+        cls.grir_nontrade = Account.create(
+            {
+                "name": "GR/IR Non Trade",
+                "code": "NTGRIR01",
+                "account_type": "liability_current",
+                "reconcile": True,
+            }
+        )
 
         # --- Valuation wiring: valuation acct -> trade GR/IR variation ---
-        cls.stock_valuation = Account.create({
-            "name": "Inventories-textile", "code": "STKVAL01",
-            "account_type": "asset_current",
-        })
-        cls.grir_trade = Account.create({
-            "name": "GR/IR Trade-textile", "code": "TGRIR01",
-            "account_type": "liability_current", "reconcile": True,
-        })
+        cls.stock_valuation = Account.create(
+            {
+                "name": "Inventories-textile",
+                "code": "STKVAL01",
+                "account_type": "asset_current",
+            }
+        )
+        cls.grir_trade = Account.create(
+            {
+                "name": "GR/IR Trade-textile",
+                "code": "TGRIR01",
+                "account_type": "liability_current",
+                "reconcile": True,
+            }
+        )
         cls.stock_valuation.account_stock_variation_id = cls.grir_trade.id
-        cls.stock_journal = cls.env["account.journal"].create({
-            "name": "Inventory Valuation", "type": "general", "code": "STJX",
-            "company_id": cls.company.id,
-        })
+        cls.stock_journal = cls.env["account.journal"].create(
+            {
+                "name": "Inventory Valuation",
+                "type": "general",
+                "code": "STJX",
+                "company_id": cls.company.id,
+            }
+        )
 
         # --- Operating-Unit analytic + per-store purchase journal --------
         cls.ou_plan = cls.env["account.analytic.plan"].create({"name": "Operating Unit"})
-        cls.ou_analytic = cls.env["account.analytic.account"].create({
-            "name": "Store 1", "plan_id": cls.ou_plan.id, "company_id": cls.company.id,
-        })
-        cls.store_journal = cls.env["account.journal"].create({
-            "name": "Pembelian - Store 1", "type": "purchase", "code": "PB001",
-            "company_id": cls.company.id,
-        })
-        cls.warehouse = cls.env["stock.warehouse"].search(
-            [("company_id", "=", cls.company.id)], limit=1
+        cls.ou_analytic = cls.env["account.analytic.account"].create(
+            {
+                "name": "Store 1",
+                "plan_id": cls.ou_plan.id,
+                "company_id": cls.company.id,
+            }
         )
-        cls.warehouse.write({
-            "l10n_ou_analytic_id": cls.ou_analytic.id,
-            "l10n_purchase_journal_id": cls.store_journal.id,
-        })
+        cls.store_journal = cls.env["account.journal"].create(
+            {
+                "name": "Pembelian - Store 1",
+                "type": "purchase",
+                "code": "PB001",
+                "company_id": cls.company.id,
+            }
+        )
+        cls.warehouse = cls.env["stock.warehouse"].search([("company_id", "=", cls.company.id)], limit=1)
+        cls.warehouse.write(
+            {
+                "l10n_ou_analytic_id": cls.ou_analytic.id,
+                "l10n_purchase_journal_id": cls.store_journal.id,
+            }
+        )
 
         # --- Account mapping --------------------------------------------
         Map = cls.env["levis.purchase.account.map"]
-        Map.create({
-            "company_id": cls.company.id, "purchase_type": "trade",
-            "payable_account_id": cls.trade_payable.id,
-        })
-        Map.create({
-            "company_id": cls.company.id, "purchase_type": "non_trade",
-            "payable_account_id": cls.nontrade_payable.id,
-            "grir_account_id": cls.grir_nontrade.id,
-        })
+        Map.create(
+            {
+                "company_id": cls.company.id,
+                "purchase_type": "trade",
+                "payable_account_id": cls.trade_payable.id,
+            }
+        )
+        Map.create(
+            {
+                "company_id": cls.company.id,
+                "purchase_type": "non_trade",
+                "payable_account_id": cls.nontrade_payable.id,
+                "grir_account_id": cls.grir_nontrade.id,
+            }
+        )
 
         # --- Valuated storable product ----------------------------------
         # Non-trade default expense account + a service product with NO expense
         # account of its own, to exercise the fallback.
-        cls.nt_expense = Account.create({
-            "name": "Non-Trade Opex", "code": "NTEXP01", "account_type": "expense"})
-        cls.env["levis.purchase.account.map"]._get_map(
-            cls.company, "non_trade").expense_account_id = cls.nt_expense.id
+        cls.nt_expense = Account.create({"name": "Non-Trade Opex", "code": "NTEXP01", "account_type": "expense"})
+        cls.env["levis.purchase.account.map"]._get_map(cls.company, "non_trade").expense_account_id = cls.nt_expense.id
         cls.categ_no_exp = cls.env["product.category"].create({"name": "No-Expense"})
         cls.categ_no_exp.property_account_expense_categ_id = False
-        cls.service_no_acct = cls.env["product.product"].create({
-            "name": "Opex Service", "type": "service", "purchase_ok": True,
-            "categ_id": cls.categ_no_exp.id})
+        cls.service_no_acct = cls.env["product.product"].create(
+            {"name": "Opex Service", "type": "service", "purchase_ok": True, "categ_id": cls.categ_no_exp.id}
+        )
         cls.service_no_acct.property_account_expense_id = False
 
-        cls.categ = cls.env["product.category"].create({
-            "name": "Textile RT",
-            "property_cost_method": "standard",
-            "property_valuation": "real_time",
-            "property_stock_valuation_account_id": cls.stock_valuation.id,
-            "property_stock_journal": cls.stock_journal.id,
-            # Give the trade category its own expense account so trade bills do
-            # not depend on the company fallback (which we clear below to make the
-            # non-trade expense-fallback path reachable in test_07).
-            "property_account_expense_categ_id": cls.company_data["default_account_expense"].id,
-        })
-        cls.product = cls.env["product.product"].create({
-            "name": "Levi's 501", "type": "consu", "is_storable": True,
-            "categ_id": cls.categ.id, "standard_price": 100.0, "list_price": 150.0,
-        })
-        cls.vendor = cls.partner_a
-        cls.env["ir.config_parameter"].sudo().set_param(
-            "custom_levis_localization.suppress_gr_journal", "0"
+        cls.categ = cls.env["product.category"].create(
+            {
+                "name": "Textile RT",
+                "property_cost_method": "standard",
+                "property_valuation": "real_time",
+                "property_stock_valuation_account_id": cls.stock_valuation.id,
+                "property_stock_journal": cls.stock_journal.id,
+                # Give the trade category its own expense account so trade bills do
+                # not depend on the company fallback (which we clear below to make the
+                # non-trade expense-fallback path reachable in test_07).
+                "property_account_expense_categ_id": cls.company_data["default_account_expense"].id,
+            }
         )
+        cls.product = cls.env["product.product"].create(
+            {
+                "name": "Levi's 501",
+                "type": "consu",
+                "is_storable": True,
+                "categ_id": cls.categ.id,
+                "standard_price": 100.0,
+                "list_price": 150.0,
+            }
+        )
+        cls.vendor = cls.partner_a
+        cls.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.suppress_gr_journal", "0")
         # Remove the company-level default expense so a product with no
         # product/category expense account resolves to *no* account — the exact
         # condition the non-trade expense fallback is meant to cover.
@@ -126,12 +158,16 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         vals = {
             "partner_id": self.vendor.id,
             "l10n_purchase_type": ptype,
-            "order_line": [Command.create({
-                "product_id": self.product.id,
-                "name": self.product.name,
-                "product_qty": qty,
-                "price_unit": 100.0,
-            })],
+            "order_line": [
+                Command.create(
+                    {
+                        "product_id": self.product.id,
+                        "name": self.product.name,
+                        "product_qty": qty,
+                        "price_unit": 100.0,
+                    }
+                )
+            ],
         }
         if date_order:
             vals["date_order"] = date_order
@@ -217,22 +253,18 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         # GR journal line
         gr = self.env["account.move"].search([("ref", "like", "GR-VAL:")], limit=1)
         self.assertTrue(gr, "GR valuation journal not posted")
-        self.assertTrue(all(
-            ou_key in self._dist_ids(l.analytic_distribution) for l in gr.line_ids
-        ))
+        self.assertTrue(all(ou_key in self._dist_ids(l.analytic_distribution) for l in gr.line_ids))
 
     # ------------------------------------------------------------------
     # 5. GR/IR routing: trade -> per-category; non-trade -> mapping
     # ------------------------------------------------------------------
     def test_05_grir_routing(self):
         self._trade_po_received()
-        gr_trade = self.env["account.move"].search(
-            [("ref", "like", "GR-VAL:")], order="id desc", limit=1)
+        gr_trade = self.env["account.move"].search([("ref", "like", "GR-VAL:")], order="id desc", limit=1)
         self.assertIn(self.grir_trade, gr_trade.line_ids.account_id)
 
         self._nontrade_po_received()
-        gr_nt = self.env["account.move"].search(
-            [("ref", "like", "GR-VAL:")], order="id desc", limit=1)
+        gr_nt = self.env["account.move"].search([("ref", "like", "GR-VAL:")], order="id desc", limit=1)
         self.assertIn(self.grir_nontrade, gr_nt.line_ids.account_id)
         self.assertNotIn(self.grir_trade, gr_nt.line_ids.account_id)
 
@@ -241,27 +273,35 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
     # ------------------------------------------------------------------
     def test_06_pnl_by_operating_unit(self):
         bill = self._bill(self._trade_po_received())
-        lines = self.env["account.move.line"].search([
-            ("company_id", "=", self.company.id),
-            ("analytic_distribution", "!=", False),
-        ])
-        matched = lines.filtered(
-            lambda l: str(self.ou_analytic.id) in self._dist_ids(l.analytic_distribution)
+        lines = self.env["account.move.line"].search(
+            [
+                ("company_id", "=", self.company.id),
+                ("analytic_distribution", "!=", False),
+            ]
         )
+        matched = lines.filtered(lambda l: str(self.ou_analytic.id) in self._dist_ids(l.analytic_distribution))
         self.assertIn(bill.line_ids.filtered(lambda l: l.display_type == "product"), matched)
 
     # ------------------------------------------------------------------
     # 7. Non-trade expense fallback for products without an expense account
     # ------------------------------------------------------------------
     def test_07_non_trade_expense_fallback(self):
-        po = self.env["purchase.order"].create({
-            "partner_id": self.vendor.id,
-            "l10n_purchase_type": "non_trade",
-            "order_line": [Command.create({
-                "product_id": self.service_no_acct.id,
-                "name": self.service_no_acct.name,
-                "product_qty": 1, "price_unit": 500000.0})],
-        })
+        po = self.env["purchase.order"].create(
+            {
+                "partner_id": self.vendor.id,
+                "l10n_purchase_type": "non_trade",
+                "order_line": [
+                    Command.create(
+                        {
+                            "product_id": self.service_no_acct.id,
+                            "name": self.service_no_acct.name,
+                            "product_qty": 1,
+                            "price_unit": 500000.0,
+                        }
+                    )
+                ],
+            }
+        )
         po.button_confirm()
         bill = self._bill(po)
         prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
@@ -275,10 +315,16 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
     #    of posting COGS/expense against AP (the reported bug).
     # ------------------------------------------------------------------
     def _grir_balance(self, account):
-        return sum(self.env["account.move.line"].search([
-            ("account_id", "=", account.id),
-            ("parent_state", "=", "posted"),
-        ]).mapped("balance"))
+        return sum(
+            self.env["account.move.line"]
+            .search(
+                [
+                    ("account_id", "=", account.id),
+                    ("parent_state", "=", "posted"),
+                ]
+            )
+            .mapped("balance")
+        )
 
     def test_08_bill_clears_grir_trade(self):
         bill = self._bill(self._trade_po_received())
@@ -320,31 +366,38 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
     # 12. Bank payment numbering: <last-4 of rekening>/YYYY/MM/### (Finance-AP #9)
     # ------------------------------------------------------------------
     def test_12_bank_payment_numbering(self):
-        partner_bank = self.env['res.partner.bank'].create({
-            'acc_number': '2687778282', 'partner_id': self.company.partner_id.id})
-        bankj = self.env['account.journal'].create({
-            'name': 'Bank Out Test', 'type': 'bank', 'code': 'BKOT',
-            'company_id': self.company.id, 'bank_account_id': partner_bank.id})
+        partner_bank = self.env["res.partner.bank"].create(
+            {"acc_number": "2687778282", "partner_id": self.company.partner_id.id}
+        )
+        bankj = self.env["account.journal"].create(
+            {
+                "name": "Bank Out Test",
+                "type": "bank",
+                "code": "BKOT",
+                "company_id": self.company.id,
+                "bank_account_id": partner_bank.id,
+            }
+        )
         bill = self._bill(self._trade_po_received())
-        reg = self.env['account.payment.register'].with_context(
-            active_model='account.move', active_ids=bill.ids).create({
-                'journal_id': bankj.id, 'payment_date': '2026-07-15'})
+        reg = (
+            self.env["account.payment.register"]
+            .with_context(active_model="account.move", active_ids=bill.ids)
+            .create({"journal_id": bankj.id, "payment_date": "2026-07-15"})
+        )
         pay = reg._create_payments()
         # last-4 of 2687778282 = 8282, monthly-reset 3-digit counter
-        self.assertRegex(pay.move_id.name or '', r'^8282/2026/07/\d{3}$')
+        self.assertRegex(pay.move_id.name or "", r"^8282/2026/07/\d{3}$")
 
     def test_10_periodic_mode_keeps_expense(self):
         # suppress switch ON -> no per-receipt accrual, so the bill product line
         # must NOT be routed to GR/IR (keeps native/category expense account).
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_levis_localization.suppress_gr_journal", "1")
+        self.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.suppress_gr_journal", "1")
         try:
             bill = self._bill(self._trade_po_received())
             prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
             self.assertNotEqual(prod_line.account_id, self.grir_trade)
         finally:
-            self.env["ir.config_parameter"].sudo().set_param(
-                "custom_levis_localization.suppress_gr_journal", "0")
+            self.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.suppress_gr_journal", "0")
 
     # ------------------------------------------------------------------
     # helpers
@@ -352,7 +405,7 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
     @staticmethod
     def _dist_ids(distribution):
         ids = set()
-        for key in (distribution or {}):
+        for key in distribution or {}:
             ids.update(key.split(","))
         return ids
 

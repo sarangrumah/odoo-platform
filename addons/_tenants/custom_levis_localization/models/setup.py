@@ -47,11 +47,7 @@ ACCOUNT_CODES = {
 
 
 def _find_account(env, company, code):
-    return (
-        env["account.account"]
-        .with_company(company)
-        .search([("code", "=", code)], limit=1)
-    )
+    return env["account.account"].with_company(company).search([("code", "=", code)], limit=1)
 
 
 def _ensure_payable(account):
@@ -105,9 +101,7 @@ def _unique_journal_code(env, company, base):
     Journal = env["account.journal"]
     code = base[:5]
     n = 0
-    while Journal.search_count(
-        [("code", "=", code), ("company_id", "=", company.id)]
-    ):
+    while Journal.search_count([("code", "=", code), ("company_id", "=", company.id)]):
         n += 1
         code = ("%s%d" % (base[:4], n))[:5]
     return code
@@ -116,22 +110,16 @@ def _unique_journal_code(env, company, base):
 def _ensure_partner_bank(env, company, acc_number):
     Bank = env["res.partner.bank"]
     partner = company.partner_id
-    pb = Bank.search(
-        [("acc_number", "=", acc_number), ("partner_id", "=", partner.id)], limit=1
-    )
+    pb = Bank.search([("acc_number", "=", acc_number), ("partner_id", "=", partner.id)], limit=1)
     if not pb:
-        pb = Bank.create(
-            {"acc_number": acc_number, "partner_id": partner.id, "company_id": company.id}
-        )
+        pb = Bank.create({"acc_number": acc_number, "partner_id": partner.id, "company_id": company.id})
     return pb
 
 
 def _ensure_method_line(env, journal, code, payment_type):
     """Ensure ``journal`` offers the payment method ``code`` for ``payment_type``.
     No-op if the method is not installed."""
-    method = env["account.payment.method"].search(
-        [("code", "=", code), ("payment_type", "=", payment_type)], limit=1
-    )
+    method = env["account.payment.method"].search([("code", "=", code), ("payment_type", "=", payment_type)], limit=1)
     if not method:
         return
     Line = env["account.payment.method.line"]
@@ -195,9 +183,7 @@ def seed_bank_journals(env):
         if mb:
             pb = _ensure_partner_bank(env, company, BANK_OUT["rekening"])
             name = "Bank %s - %s (Out)" % (BANK_OUT["bank"], BANK_OUT["rekening"])
-            journal = _ensure_bank_journal(
-                env, company, name, mb, pb, ("O" + BANK_OUT["bank"])[:5]
-            )
+            journal = _ensure_bank_journal(env, company, name, mb, pb, ("O" + BANK_OUT["bank"])[:5])
             for code in OUT_METHODS:
                 _ensure_method_line(env, journal, code, "outbound")
             # Direct-to-bank on EVERY line (both directions): no outstanding suspense.
@@ -212,9 +198,7 @@ def seed_bank_journals(env):
                 continue
             pb = _ensure_partner_bank(env, company, entry["rekening"])
             name = "Bank %s - %s" % (entry["bank"], entry["rekening"])
-            journal = _ensure_bank_journal(
-                env, company, name, mb, pb, ("I" + entry["bank"])[:5]
-            )
+            journal = _ensure_bank_journal(env, company, name, mb, pb, ("I" + entry["bank"])[:5])
             for code in IN_METHODS:
                 _ensure_method_line(env, journal, code, "inbound")
             # Route EVERY line (both directions) to the per-bank IC clearing
@@ -239,14 +223,15 @@ def _ensure_ho_analytic(env, company, plan):
     Analytic = env["account.analytic.account"]
     name = "%s - Head Office" % (company.name or "Head Office")
     analytic = Analytic.search(
-        [("name", "=", name), ("plan_id", "=", plan.id),
-         ("company_id", "=", company.id)],
+        [("name", "=", name), ("plan_id", "=", plan.id), ("company_id", "=", company.id)],
         limit=1,
-    ) or Analytic.create({
-        "name": name,
-        "plan_id": plan.id,
-        "company_id": company.id,
-    })
+    ) or Analytic.create(
+        {
+            "name": name,
+            "plan_id": plan.id,
+            "company_id": company.id,
+        }
+    )
     company.l10n_ho_analytic_id = analytic.id
     return True
 
@@ -259,9 +244,7 @@ def _ensure_bill_sequence_prefix(env):
     BILL/T/EBR, symmetric with BILL/NT/EBR) does not reach existing levis DBs on
     upgrade. Fix it here idempotently; the running counter is untouched.
     """
-    seq = env["ir.sequence"].sudo().search(
-        [("code", "=", "account.move.levis.bill.trade")]
-    )
+    seq = env["ir.sequence"].sudo().search([("code", "=", "account.move.levis.bill.trade")])
     fixed = 0
     for s in seq:
         if s.prefix != "BILL/T/EBR/%(year)s/%(month)s/":
@@ -288,14 +271,15 @@ def seed_trade_ou(env):
         # Operating-Unit analytic account
         if not wh.l10n_ou_analytic_id:
             analytic = Analytic.search(
-                [("name", "=", wh_name), ("plan_id", "=", plan.id),
-                 ("company_id", "=", company.id)],
+                [("name", "=", wh_name), ("plan_id", "=", plan.id), ("company_id", "=", company.id)],
                 limit=1,
-            ) or Analytic.create({
-                "name": wh_name,
-                "plan_id": plan.id,
-                "company_id": company.id,
-            })
+            ) or Analytic.create(
+                {
+                    "name": wh_name,
+                    "plan_id": plan.id,
+                    "company_id": company.id,
+                }
+            )
             wh.l10n_ou_analytic_id = analytic.id
             made_analytic += 1
 
@@ -303,15 +287,16 @@ def seed_trade_ou(env):
         if not wh.l10n_purchase_journal_id:
             code = _unique_journal_code(env, company, wh.code or ("P%03d" % idx))
             journal = Journal.search(
-                [("type", "=", "purchase"), ("company_id", "=", company.id),
-                 ("name", "=", "Pembelian - %s" % wh_name)],
+                [("type", "=", "purchase"), ("company_id", "=", company.id), ("name", "=", "Pembelian - %s" % wh_name)],
                 limit=1,
-            ) or Journal.create({
-                "name": "Pembelian - %s" % wh_name,
-                "type": "purchase",
-                "code": code,
-                "company_id": company.id,
-            })
+            ) or Journal.create(
+                {
+                    "name": "Pembelian - %s" % wh_name,
+                    "type": "purchase",
+                    "code": code,
+                    "company_id": company.id,
+                }
+            )
             wh.l10n_purchase_journal_id = journal.id
             made_journal += 1
 
@@ -330,9 +315,7 @@ def seed_trade_ou(env):
         for ptype, codes in ACCOUNT_CODES.items():
             mapping = AccountMap._get_map(company, ptype)
             if not mapping:
-                mapping = AccountMap.create(
-                    {"company_id": company.id, "purchase_type": ptype}
-                )
+                mapping = AccountMap.create({"company_id": company.id, "purchase_type": ptype})
                 made_map += 1
             vals = {}
             if not mapping.payable_account_id:
@@ -370,9 +353,7 @@ def seed_trade_ou(env):
             if _ensure_grir_current(mapping.grir_account_id):
                 made_grir += 1
         seen = set()
-        cats = Category.with_company(company).search(
-            [("property_valuation", "=", "real_time")]
-        )
+        cats = Category.with_company(company).search([("property_valuation", "=", "real_time")])
         for categ in cats:
             acc = categ.account_stock_variation_id
             if acc and acc.id not in seen:
@@ -381,10 +362,17 @@ def seed_trade_ou(env):
                     made_grir += 1
 
     _logger.info(
-        "Levi's Trade/OU seeding: %d analytic, %d HO, %d journals, %d mappings, "
-        "%d GR/IR normalised",
-        made_analytic, made_ho, made_journal, made_map, made_grir,
+        "Levi's Trade/OU seeding: %d analytic, %d HO, %d journals, %d mappings, %d GR/IR normalised",
+        made_analytic,
+        made_ho,
+        made_journal,
+        made_map,
+        made_grir,
     )
-    return {"analytic": made_analytic, "head_office": made_ho,
-            "journals": made_journal, "mappings": made_map,
-            "grir_normalised": made_grir}
+    return {
+        "analytic": made_analytic,
+        "head_office": made_ho,
+        "journals": made_journal,
+        "mappings": made_map,
+        "grir_normalised": made_grir,
+    }

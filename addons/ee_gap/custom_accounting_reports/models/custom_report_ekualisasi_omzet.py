@@ -39,9 +39,7 @@ class CustomReportEkualisasiOmzet(models.AbstractModel):
             omzet_ppn = -1.0 * (rows[0][0] or 0.0) if rows else 0.0
 
         # Omzet menurut Buku Besar = saldo akun pendapatan (credit positive).
-        gl = self._sum_by_account(
-            filters, account_domain=[("account_type", "in", ("income", "income_other"))]
-        )
+        gl = self._sum_by_account(filters, account_domain=[("account_type", "in", ("income", "income_other"))])
         omzet_gl = sum(-(r.get("balance") or 0.0) for r in gl.values())
 
         selisih = omzet_gl - omzet_ppn

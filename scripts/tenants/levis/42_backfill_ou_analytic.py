@@ -36,15 +36,12 @@ out = sys.stderr
 hard_locked = env["res.company"].search([("hard_lock_date", "!=", False)])
 if hard_locked:
     out.write(
-        "!! hard_lock_date set on %s — journal items are immutable, aborting.\n"
-        % ", ".join(hard_locked.mapped("name"))
+        "!! hard_lock_date set on %s — journal items are immutable, aborting.\n" % ", ".join(hard_locked.mapped("name"))
     )
     raise SystemExit(1)
 
 Merge = env["purchase.order.line"]._levis_merge_ou_distribution
-sessions = env["pos.session"].with_context(active_test=False).search(
-    [("move_id", "!=", False)]
-)
+sessions = env["pos.session"].with_context(active_test=False).search([("move_id", "!=", False)])
 
 stamped = skipped_no_ou = already = 0
 no_ou = set()
@@ -77,9 +74,7 @@ if no_ou:
 # non-stored helper and cannot be grouped on.
 plan = env["account.analytic.plan"].search([("name", "=", "Operating Unit")], limit=1)
 column = plan._column_name()
-rows = env["account.analytic.line"]._read_group(
-    [(column, "!=", False)], [column], ["amount:sum"]
-)
+rows = env["account.analytic.line"]._read_group([(column, "!=", False)], [column], ["amount:sum"])
 out.write("\nAnalytic ledger by Operating Unit (%d):\n" % len(rows))
 for account, amount in sorted(rows, key=lambda r: r[0].name):
     out.write("  %-40s %15.2f\n" % (account.name, amount))

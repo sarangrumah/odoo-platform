@@ -227,11 +227,7 @@ class CustomReportTax(models.AbstractModel):
         # PPN vs GL reconciliation (TAX-PPN-04). Appended AFTER grand_total so
         # the category/grand-total invariant (sum of category subtotals ==
         # grand tax_amount) is untouched.
-        ppn_tax_ids = [
-            t["tax_id"]
-            for cat in ("output", "input")
-            for t in groups.get(cat, {}).get("taxes", [])
-        ]
+        ppn_tax_ids = [t["tax_id"] for cat in ("output", "input") for t in groups.get(cat, {}).get("taxes", [])]
         lines += self._ppn_reconciliation(filters, ppn_tax_ids)
         return lines
 

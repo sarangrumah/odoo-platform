@@ -23,9 +23,7 @@ class AccountMove(models.Model):
         """Depreciation lines whose journal entry is in ``self``."""
         if not self:
             return self.env["custom.fixed.asset.depreciation.line"]
-        return self.env["custom.fixed.asset.depreciation.line"].search(
-            [("move_id", "in", self.ids)]
-        )
+        return self.env["custom.fixed.asset.depreciation.line"].search([("move_id", "in", self.ids)])
 
     def button_draft(self):
         res = super().button_draft()

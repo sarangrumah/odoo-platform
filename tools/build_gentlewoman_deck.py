@@ -290,7 +290,10 @@ add(
         "title": "Odoo Backend Responsibilities",
         "headers": ["Module / Service", "Tanggung Jawab"],
         "rows": [
-            ["custom_storefront_api", "API publik/JWT/HMAC, cart/checkout, content, store locator, PII-at-rest, guest checkout"],
+            [
+                "custom_storefront_api",
+                "API publik/JWT/HMAC, cart/checkout, content, store locator, PII-at-rest, guest checkout",
+            ],
             ["custom_affiliate", "Master afiliasi, link/klik/konversi/payout, atribusi order, cron harian"],
             ["custom_core", "Platform: HMAC secure-endpoint, Fernet field encryption helpers"],
             ["custom_ecommerce", "Kurir Indonesia (JNE/JNT/SiCepat/AnterAja…) + rate shipment"],
@@ -460,10 +463,16 @@ add(
         "title": "Risks & Mitigations",
         "headers": ["Risk", "Mitigation"],
         "rows": [
-            ["Payment Eraspace tertunda (API vendor)", "Checkout sampai pembuatan order di belakang interface + feature flag; aktif begitu API tersedia"],
+            [
+                "Payment Eraspace tertunda (API vendor)",
+                "Checkout sampai pembuatan order di belakang interface + feature flag; aktif begitu API tersedia",
+            ],
             ["Biaya AI membengkak", "Prompt caching + rate limit per tenant + fallback Ollama lokal"],
             ["Kebocoran data antar-tenant", "DB-per-tenant + HMAC + tenant allow-list + header X-Odoo-Database"],
-            ["Scope creep menggeser mandays", "BRD freeze sebelum build · change request via approval engine · re-baseline"],
+            [
+                "Scope creep menggeser mandays",
+                "BRD freeze sebelum build · change request via approval engine · re-baseline",
+            ],
             ["Rate-limiter in-memory (single instance)", "Pindah ke Redis saat scale multi-instance"],
         ],
         "col_widths": [3.5, 5.5],

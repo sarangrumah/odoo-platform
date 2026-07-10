@@ -81,27 +81,20 @@ class CustomPoReturn(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals["name"] == _("New"):
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code("custom.po.return")
-                    or _("New")
-                )
+                vals["name"] = self.env["ir.sequence"].next_by_code("custom.po.return") or _("New")
         return super().create(vals_list)
 
     @api.depends("allocation_ids.currency_id", "company_id")
     def _compute_currency_id(self):
         for rec in self:
-            rec.currency_id = (
-                rec.allocation_ids[:1].currency_id or rec.company_id.currency_id
-            )
+            rec.currency_id = rec.allocation_ids[:1].currency_id or rec.company_id.currency_id
 
     @api.depends("allocation_ids.amount")
     def _compute_amount_total(self):
         for rec in self:
             rec.amount_total = sum(rec.allocation_ids.mapped("amount"))
 
-    @api.depends(
-        "allocation_ids.return_picking_id", "allocation_ids.credit_note_id"
-    )
+    @api.depends("allocation_ids.return_picking_id", "allocation_ids.credit_note_id")
     def _compute_documents(self):
         for rec in self:
             pickings = rec.allocation_ids.return_picking_id
@@ -124,9 +117,7 @@ class CustomPoReturn(models.Model):
         for ret in move.returned_move_ids.filtered(lambda m: m.state != "cancel"):
             ret_qty = ret.quantity if ret.state == "done" else ret.product_uom_qty
             returned += ret.product_uom._compute_quantity(ret_qty, move.product_uom)
-        available = move.product_uom._compute_quantity(
-            move.quantity - returned, move.product_id.uom_id
-        )
+        available = move.product_uom._compute_quantity(move.quantity - returned, move.product_id.uom_id)
         domain = [
             ("move_id", "=", move.id),
             ("return_id.state", "in", ("draft", "allocated")),
@@ -142,9 +133,7 @@ class CustomPoReturn(models.Model):
     def action_compute_allocation(self):
         for rec in self:
             if rec.state != "draft":
-                raise UserError(
-                    _("Allocation can only be computed on draft returns.")
-                )
+                raise UserError(_("Allocation can only be computed on draft returns."))
             if not rec.line_ids:
                 raise UserError(_("Add at least one product line first."))
             rec.allocation_ids.unlink()
@@ -154,8 +143,7 @@ class CustomPoReturn(models.Model):
             if len(currencies) > 1:
                 raise UserError(
                     _(
-                        "The allocated purchase orders use different currencies "
-                        "(%s). Split the return per currency.",
+                        "The allocated purchase orders use different currencies (%s). Split the return per currency.",
                         ", ".join(currencies.mapped("name")),
                     )
                 )
@@ -188,20 +176,18 @@ class CustomPoReturn(models.Model):
         remaining = line.qty_to_return
         returnable_by_po = {}
         for pol in self._get_candidate_purchase_lines(line):
-            price_unit = pol.product_uom_id._compute_price(
-                pol.price_unit, line.product_id.uom_id
-            )
+            price_unit = pol.product_uom_id._compute_price(pol.price_unit, line.product_id.uom_id)
             in_moves = pol.move_ids.filtered(
-                lambda m: m.state == "done"
-                and not m._is_purchase_return()
-                and not m.origin_returned_move_id
-                and m.product_id == line.product_id
+                lambda m: (
+                    m.state == "done"
+                    and not m._is_purchase_return()
+                    and not m.origin_returned_move_id
+                    and m.product_id == line.product_id
+                )
             ).sorted(key=lambda m: (m.date, m.id))
             for move in in_moves:
                 returnable = self._get_move_returnable_qty(move)
-                returnable_by_po[pol.order_id] = (
-                    returnable_by_po.get(pol.order_id, 0.0) + max(returnable, 0.0)
-                )
+                returnable_by_po[pol.order_id] = returnable_by_po.get(pol.order_id, 0.0) + max(returnable, 0.0)
                 if line.product_id.uom_id.compare(remaining, 0) <= 0:
                     continue
                 take = min(remaining, returnable)
@@ -222,12 +208,8 @@ class CustomPoReturn(models.Model):
         if line.product_id.uom_id.compare(remaining, 0) > 0:
             breakdown_lines = []
             for po, qty in returnable_by_po.items():
-                breakdown_lines.append(
-                    _("- %(po)s: %(qty)s returnable", po=po.name, qty=qty)
-                )
-            breakdown = "\n".join(breakdown_lines) or _(
-                "- (no received purchase order found)"
-            )
+                breakdown_lines.append(_("- %(po)s: %(qty)s returnable", po=po.name, qty=qty))
+            breakdown = "\n".join(breakdown_lines) or _("- (no received purchase order found)")
             raise UserError(
                 _(
                     "Not enough returnable quantity for %(product)s: requested "
@@ -249,9 +231,7 @@ class CustomPoReturn(models.Model):
             if not rec.allocation_ids:
                 raise UserError(_("Nothing to return: no allocations."))
             for alloc in rec.allocation_ids:
-                available = rec._get_move_returnable_qty(
-                    alloc.move_id, ignore_return=rec
-                )
+                available = rec._get_move_returnable_qty(alloc.move_id, ignore_return=rec)
                 if alloc.product_id.uom_id.compare(available, alloc.qty) < 0:
                     raise UserError(
                         _(
@@ -294,9 +274,7 @@ class CustomPoReturn(models.Model):
             for wline in wizard.product_return_moves:
                 alloc = alloc_by_move.get(wline.move_id.id)
                 if alloc:
-                    wline.quantity = alloc.product_id.uom_id._compute_quantity(
-                        alloc.qty, wline.uom_id
-                    )
+                    wline.quantity = alloc.product_id.uom_id._compute_quantity(alloc.qty, wline.uom_id)
                     wline.to_refund = True
                 else:
                     wline.quantity = 0
@@ -324,9 +302,7 @@ class CustomPoReturn(models.Model):
             bills = alloc.purchase_line_id.invoice_lines.move_id.filtered(
                 lambda m: m.move_type == "in_invoice" and m.state == "posted"
             )
-            bill = bills.sorted(
-                key=lambda m: (m.invoice_date or m.date, m.id)
-            )[:1]
+            bill = bills.sorted(key=lambda m: (m.invoice_date or m.date, m.id))[:1]
             alloc.source_bill_id = bill
             groups.setdefault(bill, self.env["custom.po.return.allocation"])
             groups[bill] |= alloc
@@ -358,19 +334,13 @@ class CustomPoReturn(models.Model):
                             "product_uom_id": alloc.product_id.uom_id.id,
                             "price_unit": alloc.price_unit,
                             "purchase_line_id": alloc.purchase_line_id.id,
-                            "tax_ids": [
-                                Command.set(alloc.purchase_line_id.tax_ids.ids)
-                            ],
+                            "tax_ids": [Command.set(alloc.purchase_line_id.tax_ids.ids)],
                         }
                     )
                     for alloc in allocs
                 ],
             }
-            credit_note = (
-                self.env["account.move"]
-                .with_company(self.company_id)
-                .create(move_vals)
-            )
+            credit_note = self.env["account.move"].with_company(self.company_id).create(move_vals)
             allocs.credit_note_id = credit_note
 
     # ------------------------------------------------------------------
@@ -379,9 +349,7 @@ class CustomPoReturn(models.Model):
     def action_reset_to_draft(self):
         for rec in self:
             if rec.state not in ("allocated", "cancel"):
-                raise UserError(
-                    _("Only allocated or cancelled returns can be reset to draft.")
-                )
+                raise UserError(_("Only allocated or cancelled returns can be reset to draft."))
             rec.allocation_ids.unlink()
             rec.state = "draft"
         return True
@@ -470,9 +438,7 @@ class CustomPoReturnLine(models.Model):
     def _check_qty_to_return(self):
         for line in self:
             if line.product_id.uom_id.compare(line.qty_to_return, 0) <= 0:
-                raise ValidationError(
-                    _("Quantity to return must be positive.")
-                )
+                raise ValidationError(_("Quantity to return must be positive."))
 
     @api.depends("allocation_ids.qty", "allocation_ids.amount")
     def _compute_allocated(self):
@@ -511,9 +477,7 @@ class CustomPoReturnAllocation(models.Model):
         store=True,
         string="Purchase Order",
     )
-    currency_id = fields.Many2one(
-        related="purchase_line_id.order_id.currency_id"
-    )
+    currency_id = fields.Many2one(related="purchase_line_id.order_id.currency_id")
     move_id = fields.Many2one(
         comodel_name="stock.move",
         required=True,

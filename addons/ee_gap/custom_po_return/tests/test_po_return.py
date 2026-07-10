@@ -37,10 +37,7 @@ class TestPoReturn(PurchaseTestCommon):
         return self.env["custom.po.return"].create(
             {
                 "partner_id": (partner or self.vendor).id,
-                "line_ids": [
-                    (0, 0, {"product_id": product.id, "qty_to_return": qty})
-                    for product, qty in lines
-                ],
+                "line_ids": [(0, 0, {"product_id": product.id, "qty_to_return": qty}) for product, qty in lines],
             }
         )
 
@@ -82,9 +79,7 @@ class TestPoReturn(PurchaseTestCommon):
         # validation -- not auto-completed. Stock and qty_received are untouched
         # until the warehouse validates each picking.
         self.assertEqual(len(ret.return_picking_ids), 3)
-        self.assertTrue(
-            all(p.state not in ("done", "cancel") for p in ret.return_picking_ids)
-        )
+        self.assertTrue(all(p.state not in ("done", "cancel") for p in ret.return_picking_ids))
         self.assertEqual(self.product.qty_available, qty_before)
         self.assertEqual(po1.order_line.qty_received, 20)
         self.assertEqual(po2.order_line.qty_received, 30)
@@ -93,9 +88,7 @@ class TestPoReturn(PurchaseTestCommon):
         # Validating the return pickings moves the stock and nets qty_received
         # per PO through the standard to_refund mechanism.
         self._validate_pickings(ret.return_picking_ids)
-        self.assertTrue(
-            all(p.state == "done" for p in ret.return_picking_ids)
-        )
+        self.assertTrue(all(p.state == "done" for p in ret.return_picking_ids))
         self.assertEqual(self.product.qty_available, qty_before - 55)
         self.assertEqual(po1.order_line.qty_received, 0)
         self.assertEqual(po2.order_line.qty_received, 0)
@@ -108,19 +101,13 @@ class TestPoReturn(PurchaseTestCommon):
 
         # Credit notes: one per original bill + one standalone for PO3
         self.assertEqual(len(ret.credit_note_ids), 3)
-        by_reversed = {
-            cn.reversed_entry_id: cn for cn in ret.credit_note_ids
-        }
+        by_reversed = {cn.reversed_entry_id: cn for cn in ret.credit_note_ids}
         self.assertEqual(by_reversed[bill1].amount_total, 2000000)
         self.assertEqual(by_reversed[bill2].amount_total, 3600000)
         standalone = by_reversed[self.env["account.move"]]
         self.assertEqual(standalone.amount_total, 550000)
-        self.assertTrue(
-            all(cn.move_type == "in_refund" for cn in ret.credit_note_ids)
-        )
-        self.assertTrue(
-            all(cn.state == "draft" for cn in ret.credit_note_ids)
-        )
+        self.assertTrue(all(cn.move_type == "in_refund" for cn in ret.credit_note_ids))
+        self.assertTrue(all(cn.state == "draft" for cn in ret.credit_note_ids))
 
     def test_second_return_capped_by_previous_return(self):
         _, _, po3, _, _ = self._setup_example_scenario()
@@ -141,9 +128,7 @@ class TestPoReturn(PurchaseTestCommon):
 
         # PO3 received 10, returned 5 + 5 across both returns; qty_received nets
         # to 0 only once both draft return pickings are validated.
-        self._validate_pickings(
-            first.return_picking_ids | second.return_picking_ids
-        )
+        self._validate_pickings(first.return_picking_ids | second.return_picking_ids)
         self.assertEqual(po3.order_line.qty_received, 0)
 
     def test_over_return_raises(self):
@@ -221,12 +206,8 @@ class TestPoReturn(PurchaseTestCommon):
         ret = self._make_return([(self.product, 4), (product2, 2)])
         ret.action_compute_allocation()
         self.assertEqual(len(ret.allocation_ids), 2)
-        alloc_a = ret.allocation_ids.filtered(
-            lambda a: a.product_id == self.product
-        )
-        alloc_b = ret.allocation_ids.filtered(
-            lambda a: a.product_id == product2
-        )
+        alloc_a = ret.allocation_ids.filtered(lambda a: a.product_id == self.product)
+        alloc_b = ret.allocation_ids.filtered(lambda a: a.product_id == product2)
         self.assertEqual(alloc_a.order_id, po_a)
         self.assertEqual((alloc_a.qty, alloc_a.amount), (4, 4000))
         self.assertEqual(alloc_b.order_id, po_b)
@@ -242,8 +223,6 @@ class TestPoReturn(PurchaseTestCommon):
         credit_note = ret.credit_note_ids
         self.assertEqual(len(credit_note), 1)
         self.assertFalse(credit_note.reversed_entry_id)
-        self.assertEqual(
-            credit_note.invoice_line_ids.purchase_line_id, po.order_line
-        )
+        self.assertEqual(credit_note.invoice_line_ids.purchase_line_id, po.order_line)
         credit_note.action_post()
         self.assertEqual(po.order_line.qty_invoiced, -5)

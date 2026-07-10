@@ -112,8 +112,7 @@ log.append("  %d/%d sessions to rename" % (len(renames), len(sessions)))
 for old, new in renames.items():
     for table, column in SESSION_REF_COLUMNS:
         cr.execute(
-            "UPDATE %s SET %s = replace(%s, %%s, %%s) WHERE %s LIKE %%s"
-            % (table, column, column, column),
+            "UPDATE %s SET %s = replace(%s, %%s, %%s) WHERE %s LIKE %%s" % (table, column, column, column),
             (old, new, "%" + old + "%"),
         )
         if cr.rowcount:

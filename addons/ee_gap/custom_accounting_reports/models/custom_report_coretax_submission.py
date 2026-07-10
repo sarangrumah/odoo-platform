@@ -101,7 +101,5 @@ class CustomReportCoretaxSubmission(models.AbstractModel):
             total += len(group)
             total_retry += s_retry
 
-        lines.append(
-            {"type": "grand_total", "name": "TOTAL: %d transaksi" % total, "retry": total_retry}
-        )
+        lines.append({"type": "grand_total", "name": "TOTAL: %d transaksi" % total, "retry": total_retry})
         return lines

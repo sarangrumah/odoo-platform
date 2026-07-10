@@ -126,17 +126,13 @@ class AccountMove(models.Model):
             return
         if self.x_custom_withholding_move_id:
             return
-        enabled = self.env["ir.config_parameter"].sudo().get_param(
-            "custom_tax_id.withholding_gl_posting", "1"
-        )
+        enabled = self.env["ir.config_parameter"].sudo().get_param("custom_tax_id.withholding_gl_posting", "1")
         if str(enabled).lower() not in ("1", "true"):
             return
         if not self.x_custom_withholding_line_ids:
             return
 
-        ap_line = self.line_ids.filtered(
-            lambda l: l.account_id.account_type == "liability_payable"
-        )[:1]
+        ap_line = self.line_ids.filtered(lambda l: l.account_id.account_type == "liability_payable")[:1]
         if not ap_line:
             return
 
@@ -156,8 +152,7 @@ class AccountMove(models.Model):
         )
         if not journal:
             _logger.warning(
-                "custom_tax_id: no general journal for company %s; skipping "
-                "withholding GL entry for %s",
+                "custom_tax_id: no general journal for company %s; skipping withholding GL entry for %s",
                 self.company_id.id,
                 self.name,
             )

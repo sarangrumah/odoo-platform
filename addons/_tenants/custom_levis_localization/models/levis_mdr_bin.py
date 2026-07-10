@@ -8,6 +8,7 @@ P&L account the fee is booked to, and exposes helpers the payment flow uses to
 resolve the rate and compute the fee. Written generically so a bank-recon or POS
 hook can reuse ``_match_bin`` / ``_compute_mdr`` later.
 """
+
 from __future__ import annotations
 
 from odoo import api, fields, models
@@ -21,9 +22,7 @@ class LevisMdrBin(models.Model):
     name = fields.Char(string="Label", required=True)
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
-    company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, required=True
-    )
+    company_id = fields.Many2one("res.company", default=lambda self: self.env.company, required=True)
     currency_id = fields.Many2one(related="company_id.currency_id")
     card_scheme = fields.Selection(
         selection=[
@@ -90,8 +89,12 @@ class LevisMdrBin(models.Model):
         candidates = self.search(
             [
                 ("company_id", "=", company.id),
-                "|", ("date_start", "=", False), ("date_start", "<=", date),
-                "|", ("date_end", "=", False), ("date_end", ">=", date),
+                "|",
+                ("date_start", "=", False),
+                ("date_start", "<=", date),
+                "|",
+                ("date_end", "=", False),
+                ("date_end", ">=", date),
             ]
         )
         best = self.browse()

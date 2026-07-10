@@ -11,7 +11,7 @@ class ProductCategory(models.Model):
         string="Sales Discount Account",
         domain="[('account_type', '=', 'income'), ('deprecated', '=', False)]",
         help="Contra-revenue account this category's discounts are booked to "
-             "(e.g. Sales Discount-Textile). Used by the retail import discount reclass.",
+        "(e.g. Sales Discount-Textile). Used by the retail import discount reclass.",
     )
     property_account_sales_return_categ_id = fields.Many2one(
         "account.account",
@@ -19,5 +19,5 @@ class ProductCategory(models.Model):
         string="Sales Return Account",
         domain="[('account_type', '=', 'income'), ('deprecated', '=', False)]",
         help="Contra-revenue account this category's customer returns are booked to "
-             "(e.g. Sales Return-textile). Used by the retail import X48 refund posting.",
+        "(e.g. Sales Return-textile). Used by the retail import X48 refund posting.",
     )

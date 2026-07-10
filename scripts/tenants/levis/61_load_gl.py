@@ -19,7 +19,7 @@
 #   GL_LIMIT=<n>          -> only process the first n vouchers (smoke test)
 import csv
 import os
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict
 from datetime import datetime
 
 env = env  # noqa: F821  (injected by odoo shell)
@@ -48,11 +48,11 @@ DEFAULT_JOURNAL = "MISC"
 # Fallback contra account CODE per Transaction Type (only used with GL_ALLOW_FALLBACK=1).
 # CONFIRM WITH FINANCE before enabling.
 CONTRA_MAP = {
-    "Sales Invoice": "4101000001",        # revenue  (credit side of a receivable debit)
-    "Sales Receipt": "1106000001",        # trade receivable (credit side of a bank debit)
+    "Sales Invoice": "4101000001",  # revenue  (credit side of a receivable debit)
+    "Sales Receipt": "1106000001",  # trade receivable (credit side of a bank debit)
     "Purchase Invoice Non-Trade": "2103300001",  # non-trade payable
-    "Purchase Payment": "1103019320",     # main bank
-    "Cash & Bank": "1103019320",          # main bank
+    "Purchase Payment": "1103019320",  # main bank
+    "Cash & Bank": "1103019320",  # main bank
 }
 
 company = env["res.company"].browse(COMPANY_ID)
@@ -60,8 +60,7 @@ Acc = env["account.account"].with_company(company)
 rounding = company.currency_id.rounding or 0.01
 _code2acc = {a.code: a for a in Acc.search([]) if a.code}
 _journals = {j.code: j for j in env["account.journal"].search([("company_id", "=", company.id)])}
-log("accounts=%d journals=%s dry=%s fallback=%s"
-    % (len(_code2acc), sorted(_journals), DRY, ALLOW_FALLBACK))
+log("accounts=%d journals=%s dry=%s fallback=%s" % (len(_code2acc), sorted(_journals), DRY, ALLOW_FALLBACK))
 
 
 def resolve_acc(code):
@@ -156,61 +155,79 @@ for key, glines in items:
     txn_type = glines[0].get("txn_type", "")
     mdate = parse_date(glines[0].get("posting_date")) or parse_date(glines[0].get("doc_date"))
     if not mdate:
-        log("SKIP %s: no posting date" % ref); skipped += 1; continue
+        log("SKIP %s: no posting date" % ref)
+        skipped += 1
+        continue
     if env["account.move"].search_count([("ref", "=", ref), ("company_id", "=", company.id)]):
-        skipped += 1; continue
+        skipped += 1
+        continue
 
-    legs = []          # (account_id, name, signed_amount, analytic_id, partner_id)
+    legs = []  # (account_id, name, signed_amount, analytic_id, partner_id)
     total = 0.0
     try:
         for row in glines:
             amt = r(row.get("d")) - r(row.get("c"))
             if amt == 0:
                 continue
-            legs.append([
-                resolve_acc(row["account"]).id,
-                (row.get("notes") or row.get("account_desc") or "")[:200],
-                amt,
-                resolve_analytic(row.get("store")),
-                resolve_partner(row.get("business_partner")),
-            ])
+            legs.append(
+                [
+                    resolve_acc(row["account"]).id,
+                    (row.get("notes") or row.get("account_desc") or "")[:200],
+                    amt,
+                    resolve_analytic(row.get("store")),
+                    resolve_partner(row.get("business_partner")),
+                ]
+            )
             total += amt
     except KeyError as e:
-        log("SKIP %s: %s" % (ref, e)); skipped += 1; continue
+        log("SKIP %s: %s" % (ref, e))
+        skipped += 1
+        continue
 
     total = r(total)
     if total != 0:
         if ALLOW_FALLBACK and txn_type in CONTRA_MAP:
-            legs.append([resolve_acc(CONTRA_MAP[txn_type]).id,
-                         "Contra (%s)" % txn_type, -total, None, False])
+            legs.append([resolve_acc(CONTRA_MAP[txn_type]).id, "Contra (%s)" % txn_type, -total, None, False])
             fallback_used += 1
         else:
-            log("SKIP %s: unbalanced by %s (txn=%r; set GL_ALLOW_FALLBACK=1 to synthesize)"
-                % (ref, total, txn_type))
+            log("SKIP %s: unbalanced by %s (txn=%r; set GL_ALLOW_FALLBACK=1 to synthesize)" % (ref, total, txn_type))
             skipped += 1
             continue
 
     line_ids = []
     for acc_id, name, amt, an_id, pid in legs:
-        vals = {"account_id": acc_id, "name": name or "/",
-                "debit": amt if amt > 0 else 0.0, "credit": -amt if amt < 0 else 0.0}
+        vals = {
+            "account_id": acc_id,
+            "name": name or "/",
+            "debit": amt if amt > 0 else 0.0,
+            "credit": -amt if amt < 0 else 0.0,
+        }
         if pid:
             vals["partner_id"] = pid
         if an_id:
             vals["analytic_distribution"] = {str(an_id): 100.0}
         line_ids.append((0, 0, vals))
 
-    move = env["account.move"].create({
-        "journal_id": resolve_journal(txn_type).id, "date": mdate, "ref": ref,
-        "company_id": company.id, "move_type": "entry", "line_ids": line_ids,
-    })
+    move = env["account.move"].create(
+        {
+            "journal_id": resolve_journal(txn_type).id,
+            "date": mdate,
+            "ref": ref,
+            "company_id": company.id,
+            "move_type": "entry",
+            "line_ids": line_ids,
+        }
+    )
     move.action_post()
     posted += 1
     if posted % 200 == 0:
-        env.cr.commit(); log("... posted %d" % posted)
+        env.cr.commit()
+        log("... posted %d" % posted)
 
 log("==== SUMMARY: posted=%d skipped=%d fallback_contra=%d ====" % (posted, skipped, fallback_used))
 if DRY:
-    env.cr.rollback(); log("GL_DRY=1 -> rolled back")
+    env.cr.rollback()
+    log("GL_DRY=1 -> rolled back")
 else:
-    env.cr.commit(); log("committed")
+    env.cr.commit()
+    log("committed")

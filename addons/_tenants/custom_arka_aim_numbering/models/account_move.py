@@ -19,13 +19,7 @@ class AccountMove(models.Model):
         """
         self.ensure_one()
         code = self.company_id.x_doc_code
-        if (
-            code
-            and self.move_type == "out_invoice"
-            and self.journal_id.type == "sale"
-        ):
-            move_date = (
-                self.date or self.invoice_date or fields.Date.context_today(self)
-            )
+        if code and self.move_type == "out_invoice" and self.journal_id.type == "sale":
+            move_date = self.date or self.invoice_date or fields.Date.context_today(self)
             return "INV/%s/%04d/%02d/000" % (code, move_date.year, move_date.month)
         return super()._get_starting_sequence()

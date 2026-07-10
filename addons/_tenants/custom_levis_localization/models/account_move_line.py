@@ -39,9 +39,9 @@ class AccountMoveLine(models.Model):
             ou = line.l10n_ou_analytic_id
             if not ou or line.display_type != "product":
                 continue
-            line.analytic_distribution = self.env[
-                "purchase.order.line"
-            ]._levis_merge_ou_distribution(line.analytic_distribution, ou.id)
+            line.analytic_distribution = self.env["purchase.order.line"]._levis_merge_ou_distribution(
+                line.analytic_distribution, ou.id
+            )
 
     # Base ``_compute_account_id`` carries no @api.depends — it is a
     # precompute-at-create field. ``move_id.l10n_purchase_type`` is already set on
@@ -56,8 +56,8 @@ class AccountMoveLine(models.Model):
         # accrual is trued up by Inventory Reconciliation, not per bill, so the
         # bill keeps its native/expense account. The switch is the same
         # ir.config_parameter read by stock.move._levis_suppress_gr_journal.
-        suppress = self.env["ir.config_parameter"].sudo().get_param(
-            "custom_levis_localization.suppress_gr_journal", "0"
+        suppress = (
+            self.env["ir.config_parameter"].sudo().get_param("custom_levis_localization.suppress_gr_journal", "0")
         )
         gr_accrual_active = str(suppress).strip().lower() in ("0", "false", "", "none")
         for line in self:
@@ -97,11 +97,7 @@ class AccountMoveLine(models.Model):
                 # to GR/IR would leave the clearing account un-netted and would
                 # clobber the user's hand-picked expense account. Manual bills
                 # therefore keep AP-payable routing + numbering only.
-                if (
-                    gr_accrual_active
-                    and line.purchase_line_id
-                    and line.product_id.type == "consu"
-                ):
+                if gr_accrual_active and line.purchase_line_id and line.product_id.type == "consu":
                     categ = line.product_id.categ_id.with_company(move.company_id)
                     if categ.property_valuation == "real_time":
                         grir_acc = mapping.grir_account_id or categ.account_stock_variation_id

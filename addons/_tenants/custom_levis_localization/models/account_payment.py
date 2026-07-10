@@ -92,27 +92,27 @@ class AccountPayment(models.Model):
         move = self.move_id
         if not move:
             return rows
-        lines = move.line_ids.filtered(
-            lambda l: l.display_type not in ("line_section", "line_note")
-        )
+        lines = move.line_ids.filtered(lambda l: l.display_type not in ("line_section", "line_note"))
         for line in lines:
             src = self._edo_line_source_doc(line)
             orig = abs(line.amount_currency) if line.amount_currency else abs(line.balance)
             rate = 1.0
             if line.amount_currency and line.balance:
                 rate = abs(line.balance) / abs(line.amount_currency)
-            rows.append({
-                "coa": line.account_id.name or line.name or "",
-                "desc": line.name or "",
-                "doc_ap": (src.name if src else self.name) or "",
-                "ref_vendor": (src.ref if src else (self.payment_reference or self.memo or "")) or "",
-                "vendor": (line.partner_id or self.partner_id).name or "",
-                "currency": self.currency_id.name or "",
-                "orig_amount": orig,
-                "rate": rate,
-                "debit": line.debit,
-                "credit": line.credit,
-            })
+            rows.append(
+                {
+                    "coa": line.account_id.name or line.name or "",
+                    "desc": line.name or "",
+                    "doc_ap": (src.name if src else self.name) or "",
+                    "ref_vendor": (src.ref if src else (self.payment_reference or self.memo or "")) or "",
+                    "vendor": (line.partner_id or self.partner_id).name or "",
+                    "currency": self.currency_id.name or "",
+                    "orig_amount": orig,
+                    "rate": rate,
+                    "debit": line.debit,
+                    "credit": line.credit,
+                }
+            )
         return rows
 
     # ------------------------------------------------------------------

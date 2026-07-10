@@ -6,6 +6,7 @@ also identifies a bank by its *sandi bank* — the 7-digit Bank Indonesia
 clearing/RTGS participant code. BIC is not a usable key here: every BI branch
 office shares ``INDOIDJA``, so the BI code is what uniquely identifies a row.
 """
+
 from __future__ import annotations
 
 from odoo import fields, models

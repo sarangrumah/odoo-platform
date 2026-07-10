@@ -145,18 +145,13 @@ class CustomScrapBatch(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals["name"] == _("New"):
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code("custom.scrap.batch")
-                    or _("New")
-                )
+                vals["name"] = self.env["ir.sequence"].next_by_code("custom.scrap.batch") or _("New")
         return super().create(vals_list)
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_done(self):
         if any(rec.state == "done" for rec in self):
-            raise UserError(
-                _("You cannot delete a scrap batch that has been validated.")
-            )
+            raise UserError(_("You cannot delete a scrap batch that has been validated."))
 
     # ------------------------------------------------------------------
     # Validation
@@ -175,9 +170,7 @@ class CustomScrapBatch(models.Model):
         Scrap = self.env["stock.scrap"]
         for line in self.line_ids:
             if line.scrap_qty <= 0:
-                raise UserError(
-                    _("Quantity for '%s' must be positive.", line.product_id.display_name)
-                )
+                raise UserError(_("Quantity for '%s' must be positive.", line.product_id.display_name))
             scrap = Scrap.create(line._prepare_scrap_vals())
             result = scrap.action_validate()
             if isinstance(result, dict):
@@ -185,8 +178,7 @@ class CustomScrapBatch(models.Model):
                 scrap.unlink()
                 raise UserError(
                     _(
-                        "Not enough on-hand quantity to scrap '%(product)s' "
-                        "(%(qty)s %(uom)s) at %(loc)s.",
+                        "Not enough on-hand quantity to scrap '%(product)s' (%(qty)s %(uom)s) at %(loc)s.",
                         product=line.product_id.display_name,
                         qty=line.scrap_qty,
                         uom=line.product_uom_id.name,
@@ -210,12 +202,7 @@ class CustomScrapBatch(models.Model):
         """Resolve the P&L scrap-loss account for ``company`` from the configured
         account code (company-dependent). Returns an ``account.account`` or raises.
         """
-        code = (
-            self.env["ir.config_parameter"]
-            .sudo()
-            .get_param(self._SCRAP_LOSS_PARAM, "")
-            .strip()
-        )
+        code = self.env["ir.config_parameter"].sudo().get_param(self._SCRAP_LOSS_PARAM, "").strip()
         if not code:
             raise UserError(
                 _(
@@ -224,16 +211,11 @@ class CustomScrapBatch(models.Model):
                     self._SCRAP_LOSS_PARAM,
                 )
             )
-        account = (
-            self.env["account.account"]
-            .with_company(company)
-            .search([("code", "=", code)], limit=1)
-        )
+        account = self.env["account.account"].with_company(company).search([("code", "=", code)], limit=1)
         if not account:
             raise UserError(
                 _(
-                    "Scrap-loss account code '%(code)s' was not found in company "
-                    "%(company)s.",
+                    "Scrap-loss account code '%(code)s' was not found in company %(company)s.",
                     code=code,
                     company=company.display_name,
                 )
@@ -252,9 +234,7 @@ class CustomScrapBatch(models.Model):
         currency = company.currency_id
         AccountMove = self.env["account.move"]
         ref = self._JOURNAL_REF % self.id
-        if self.move_id or AccountMove.search_count(
-            [("ref", "=", ref), ("company_id", "=", company.id)]
-        ):
+        if self.move_id or AccountMove.search_count([("ref", "=", ref), ("company_id", "=", company.id)]):
             return
 
         # Sum the scrapped value per stock-valuation account (real-time only).
@@ -278,9 +258,7 @@ class CustomScrapBatch(models.Model):
         if not total or currency.is_zero(total):
             return  # nothing valued to post (physical scrap still happened)
         if not journal:
-            raise UserError(
-                _("No stock journal is configured on the company to post the scrap.")
-            )
+            raise UserError(_("No stock journal is configured on the company to post the scrap."))
 
         scrap_loss_acc = self._scrap_loss_account(company)
         ou = self.warehouse_id.l10n_ou_analytic_id
@@ -289,24 +267,32 @@ class CustomScrapBatch(models.Model):
 
         line_ids = [
             # Dr Scrap Loss (aggregate)
-            (0, 0, {
-                "account_id": scrap_loss_acc.id,
-                "name": label,
-                "debit": total,
-                "credit": 0.0,
-                "analytic_distribution": analytic,
-            })
+            (
+                0,
+                0,
+                {
+                    "account_id": scrap_loss_acc.id,
+                    "name": label,
+                    "debit": total,
+                    "credit": 0.0,
+                    "analytic_distribution": analytic,
+                },
+            )
         ]
         # Cr Stock Valuation per category account
         for val_acc, amount in value_by_account.items():
             line_ids.append(
-                (0, 0, {
-                    "account_id": val_acc.id,
-                    "name": label,
-                    "debit": 0.0,
-                    "credit": amount,
-                    "analytic_distribution": analytic,
-                })
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": val_acc.id,
+                        "name": label,
+                        "debit": 0.0,
+                        "credit": amount,
+                        "analytic_distribution": analytic,
+                    },
+                )
             )
 
         move = AccountMove.create(

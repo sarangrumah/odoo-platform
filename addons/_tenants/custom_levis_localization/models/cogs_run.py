@@ -48,9 +48,7 @@ class LevisCogsRun(models.Model):
     _order = "date_to desc, id desc"
 
     name = fields.Char(default="/", copy=False, readonly=True)
-    company_id = fields.Many2one(
-        "res.company", required=True, default=lambda self: self.env.company
-    )
+    company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company)
     date_from = fields.Date(required=True)
     date_to = fields.Date(required=True)
     journal_id = fields.Many2one(
@@ -67,9 +65,7 @@ class LevisCogsRun(models.Model):
         copy=False,
     )
     currency_id = fields.Many2one(related="company_id.currency_id")
-    total_cogs = fields.Monetary(
-        compute="_compute_totals", currency_field="currency_id"
-    )
+    total_cogs = fields.Monetary(compute="_compute_totals", currency_field="currency_id")
     zero_cost_qty = fields.Float(
         compute="_compute_totals",
         digits="Product Unit of Measure",
@@ -95,9 +91,7 @@ class LevisCogsRun(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get("name", "/") == "/":
-                vals["name"] = (
-                    self.env["ir.sequence"].next_by_code("levis.cogs.run") or "/"
-                )
+                vals["name"] = self.env["ir.sequence"].next_by_code("levis.cogs.run") or "/"
         return super().create(vals_list)
 
     # ------------------------------------------------------------------
@@ -110,9 +104,7 @@ class LevisCogsRun(models.Model):
         their own. Returns ``{product: qty}``.
         """
         self.ensure_one()
-        configs = self.env["pos.config"].with_context(active_test=False).search(
-            [("warehouse_id", "=", warehouse.id)]
-        )
+        configs = self.env["pos.config"].with_context(active_test=False).search([("warehouse_id", "=", warehouse.id)])
         if not configs:
             return {}
         # date_order is a Datetime: bounding it with a bare Date would resolve
@@ -145,9 +137,7 @@ class LevisCogsRun(models.Model):
             if not product.is_storable:
                 continue
             categ = product.categ_id.with_company(company)
-            bucket = result.setdefault(
-                categ, {"qty": 0.0, "amount": 0.0, "zero_cost_qty": 0.0}
-            )
+            bucket = result.setdefault(categ, {"qty": 0.0, "amount": 0.0, "zero_cost_qty": 0.0})
             bucket["qty"] += qty
             cost = product.with_company(company).standard_price
             if not cost:
@@ -159,28 +149,30 @@ class LevisCogsRun(models.Model):
     def action_compute(self):
         for run in self:
             if run.move_id:
-                raise UserError(
-                    _("A journal entry was already generated for %s.", run.name)
-                )
+                raise UserError(_("A journal entry was already generated for %s.", run.name))
             run.line_ids.unlink()
             company = run.company_id
-            warehouses = self.env["stock.warehouse"].search(
-                [("company_id", "=", company.id)]
-            )
+            warehouses = self.env["stock.warehouse"].search([("company_id", "=", company.id)])
             lines = []
             for warehouse in warehouses:
                 ou = warehouse.l10n_ou_analytic_id
                 for categ, bucket in run._cogs_by_category(warehouse).items():
-                    lines.append((0, 0, {
-                        "warehouse_id": warehouse.id,
-                        "analytic_account_id": ou.id if ou else False,
-                        "product_categ_id": categ.id,
-                        "expense_account_id": categ.property_account_expense_categ_id.id,
-                        "valuation_account_id": categ.property_stock_valuation_account_id.id,
-                        "quantity": bucket["qty"],
-                        "zero_cost_qty": bucket["zero_cost_qty"],
-                        "amount": bucket["amount"],
-                    }))
+                    lines.append(
+                        (
+                            0,
+                            0,
+                            {
+                                "warehouse_id": warehouse.id,
+                                "analytic_account_id": ou.id if ou else False,
+                                "product_categ_id": categ.id,
+                                "expense_account_id": categ.property_account_expense_categ_id.id,
+                                "valuation_account_id": categ.property_stock_valuation_account_id.id,
+                                "quantity": bucket["qty"],
+                                "zero_cost_qty": bucket["zero_cost_qty"],
+                                "amount": bucket["amount"],
+                            },
+                        )
+                    )
             run.line_ids = lines
             run.state = "computed"
         return True
@@ -201,46 +193,61 @@ class LevisCogsRun(models.Model):
             if float_is_zero(line.amount, precision_rounding=currency.rounding):
                 continue
             if not (line.expense_account_id and line.valuation_account_id):
-                raise UserError(_(
-                    "Category %(categ)s has no COGS and/or inventory account. Set "
-                    "them on the product category before generating the entry.",
-                    categ=line.product_categ_id.display_name,
-                ))
+                raise UserError(
+                    _(
+                        "Category %(categ)s has no COGS and/or inventory account. Set "
+                        "them on the product category before generating the entry.",
+                        categ=line.product_categ_id.display_name,
+                    )
+                )
             # The OU rides on BOTH legs, exactly as the goods-receipt journal
             # does (stock_move._levis_book_valuation_entry), so inventory stays
             # sliceable per store and not just the P&L.
-            analytic = (
-                {str(line.analytic_account_id.id): 100.0}
-                if line.analytic_account_id else False
-            )
+            analytic = {str(line.analytic_account_id.id): 100.0} if line.analytic_account_id else False
             amount = line.amount
-            move_lines.append((0, 0, {
-                "account_id": line.expense_account_id.id,
-                "name": label,
-                "debit": amount if amount > 0 else 0.0,
-                "credit": -amount if amount < 0 else 0.0,
-                "analytic_distribution": analytic,
-            }))
-            move_lines.append((0, 0, {
-                "account_id": line.valuation_account_id.id,
-                "name": label,
-                "debit": -amount if amount < 0 else 0.0,
-                "credit": amount if amount > 0 else 0.0,
-                "analytic_distribution": analytic,
-            }))
+            move_lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": line.expense_account_id.id,
+                        "name": label,
+                        "debit": amount if amount > 0 else 0.0,
+                        "credit": -amount if amount < 0 else 0.0,
+                        "analytic_distribution": analytic,
+                    },
+                )
+            )
+            move_lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": line.valuation_account_id.id,
+                        "name": label,
+                        "debit": -amount if amount < 0 else 0.0,
+                        "credit": amount if amount > 0 else 0.0,
+                        "analytic_distribution": analytic,
+                    },
+                )
+            )
         if not move_lines:
-            raise UserError(_(
-                "Nothing to book — no costed sales in this period. If sales exist, "
-                "their products still carry no cost; load the purchases first."
-            ))
-        move = self.env["account.move"].create({
-            "move_type": "entry",
-            "journal_id": self.journal_id.id,
-            "company_id": self.company_id.id,
-            "date": self.date_to,
-            "ref": label,
-            "line_ids": move_lines,
-        })
+            raise UserError(
+                _(
+                    "Nothing to book — no costed sales in this period. If sales exist, "
+                    "their products still carry no cost; load the purchases first."
+                )
+            )
+        move = self.env["account.move"].create(
+            {
+                "move_type": "entry",
+                "journal_id": self.journal_id.id,
+                "company_id": self.company_id.id,
+                "date": self.date_to,
+                "ref": label,
+                "line_ids": move_lines,
+            }
+        )
         self.move_id = move.id
         self.state = "generated"
         return True
@@ -264,14 +271,10 @@ class LevisCogsRunLine(models.Model):
     company_id = fields.Many2one(related="run_id.company_id", store=True)
     currency_id = fields.Many2one(related="run_id.currency_id")
     warehouse_id = fields.Many2one("stock.warehouse", required=True)
-    analytic_account_id = fields.Many2one(
-        "account.analytic.account", string="Operating Unit"
-    )
+    analytic_account_id = fields.Many2one("account.analytic.account", string="Operating Unit")
     product_categ_id = fields.Many2one("product.category", required=True)
     expense_account_id = fields.Many2one("account.account", string="COGS Account")
     valuation_account_id = fields.Many2one("account.account", string="Inventory Account")
     quantity = fields.Float(digits="Product Unit of Measure")
-    zero_cost_qty = fields.Float(
-        digits="Product Unit of Measure", string="Qty Without Cost"
-    )
+    zero_cost_qty = fields.Float(digits="Product Unit of Measure", string="Qty Without Cost")
     amount = fields.Monetary(currency_field="currency_id", string="COGS")

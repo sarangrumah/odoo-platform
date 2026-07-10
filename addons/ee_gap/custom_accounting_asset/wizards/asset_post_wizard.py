@@ -10,8 +10,7 @@ class CustomFixedAssetPostWizard(models.TransientModel):
         string="Post Up To",
         required=True,
         default=fields.Date.context_today,
-        help="Every running asset's depreciation lines dated on or before this "
-        "date will be posted.",
+        help="Every running asset's depreciation lines dated on or before this date will be posted.",
     )
     group_id = fields.Many2one(
         comodel_name="custom.fixed.asset.group",

@@ -41,8 +41,7 @@ def migrate(cr, version):
     try:
         columns = json.loads(profile.column_map_json or "{}")
     except ValueError:
-        _logger.warning("custom_retail_import: profile_levis_x48 has an unparseable "
-                        "column_map_json; leaving it alone")
+        _logger.warning("custom_retail_import: profile_levis_x48 has an unparseable column_map_json; leaving it alone")
         return
 
     added = {k: v for k, v in _X48_NEW_COLUMNS.items() if k not in columns}

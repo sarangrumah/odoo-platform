@@ -42,9 +42,7 @@ class TestHrSync(TransactionCase):
         dept_before = emp.department_id
         self.Sync.sync_for_login(login, {"email": login, "nik": NIK, "dept": "Finance"})
         self.assertEqual(emp.department_id, dept_before)
-        self.assertEqual(
-            self.env["hr.department"].search_count([("name", "=", "Finance")]), 1
-        )
+        self.assertEqual(self.env["hr.department"].search_count([("name", "=", "Finance")]), 1)
 
     def test_invalid_nik_skipped(self):
         login = "erin@example.com"

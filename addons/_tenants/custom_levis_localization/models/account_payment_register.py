@@ -17,6 +17,7 @@ The fees ride Odoo's native payment *write-off* channel, so the counterpart
 full. As a bonus the fee lines are ordinary journal items, so they surface on
 the Payment Voucher / Receipt without any extra work.
 """
+
 from __future__ import annotations
 
 from odoo import _, api, fields, models
@@ -27,8 +28,7 @@ class LevisPaymentRegisterFee(models.TransientModel):
     _name = "levis.payment.register.fee"
     _description = "Admin Fee Line on Payment Registration"
 
-    wizard_id = fields.Many2one(
-        "account.payment.register", required=True, ondelete="cascade")
+    wizard_id = fields.Many2one("account.payment.register", required=True, ondelete="cascade")
     company_id = fields.Many2one(related="wizard_id.company_id")
     currency_id = fields.Many2one(related="wizard_id.currency_id")
     name = fields.Char(string="Label", default="Admin Fee")
@@ -40,8 +40,7 @@ class LevisPaymentRegisterFee(models.TransientModel):
         " ('account_type', 'not in', ('asset_receivable', 'liability_payable', 'off_balance')),"
         " ('company_ids', 'in', company_id)]",
     )
-    amount = fields.Monetary(
-        string="Amount", currency_field="currency_id", required=True)
+    amount = fields.Monetary(string="Amount", currency_field="currency_id", required=True)
     is_mdr = fields.Boolean(
         string="MDR",
         help="Auto-generated card MDR deduction (negative amount = netted off "
@@ -52,8 +51,7 @@ class LevisPaymentRegisterFee(models.TransientModel):
 class AccountPaymentRegister(models.TransientModel):
     _inherit = "account.payment.register"
 
-    admin_fee_line_ids = fields.One2many(
-        "levis.payment.register.fee", "wizard_id", string="Admin Fees")
+    admin_fee_line_ids = fields.One2many("levis.payment.register.fee", "wizard_id", string="Admin Fees")
     admin_fee_total = fields.Monetary(
         string="Total Admin Fees",
         currency_field="currency_id",
@@ -69,8 +67,7 @@ class AccountPaymentRegister(models.TransientModel):
         help="Leading digits of the customer's card. Resolves the acquirer and "
         "MDR rate; the MDR fee is then netted off this receipt.",
     )
-    x_mdr_bin_id = fields.Many2one(
-        "levis.mdr.bin", string="MDR Mapping", readonly=True, copy=False)
+    x_mdr_bin_id = fields.Many2one("levis.mdr.bin", string="MDR Mapping", readonly=True, copy=False)
 
     # --- Extra payment dimensions (Payment #4) -------------------------------
     # Propagated to the created account.payment. Memo is the native
@@ -80,8 +77,7 @@ class AccountPaymentRegister(models.TransientModel):
         "account.analytic.account",
         string="Operating Unit",
         domain="[('plan_id.name', '=', 'Operating Unit')]",
-        help="Head Office / Store this payment belongs to; stamped on the "
-        "payment's journal lines.",
+        help="Head Office / Store this payment belongs to; stamped on the payment's journal lines.",
     )
     l10n_override_outstanding_account_id = fields.Many2one(
         "account.account",
@@ -99,8 +95,7 @@ class AccountPaymentRegister(models.TransientModel):
         if self.l10n_ou_analytic_id:
             vals["l10n_ou_analytic_id"] = self.l10n_ou_analytic_id.id
         if self.l10n_override_outstanding_account_id:
-            vals["l10n_override_outstanding_account_id"] = \
-                self.l10n_override_outstanding_account_id.id
+            vals["l10n_override_outstanding_account_id"] = self.l10n_override_outstanding_account_id.id
         if self.l10n_note:
             vals["l10n_note"] = self.l10n_note
         if self.l10n_remark:
@@ -155,15 +150,23 @@ class AccountPaymentRegister(models.TransientModel):
             mdr = wizard.currency_id.round(mapping._compute_mdr(base))
             wizard.x_mdr_bin_id = mapping.id
             if not wizard.currency_id.is_zero(mdr):
-                label = _("MDR %(pct)s%% - %(bank)s",
-                          pct=mapping.mdr_percent,
-                          bank=mapping.acquirer_bank_id.name or mapping.name)
-                wizard.admin_fee_line_ids = [(0, 0, {
-                    "name": label,
-                    "account_id": mapping.mdr_account_id.id,
-                    "amount": -mdr,  # negative: netted off the settlement
-                    "is_mdr": True,
-                })]
+                label = _(
+                    "MDR %(pct)s%% - %(bank)s",
+                    pct=mapping.mdr_percent,
+                    bank=mapping.acquirer_bank_id.name or mapping.name,
+                )
+                wizard.admin_fee_line_ids = [
+                    (
+                        0,
+                        0,
+                        {
+                            "name": label,
+                            "account_id": mapping.mdr_account_id.id,
+                            "amount": -mdr,  # negative: netted off the settlement
+                            "is_mdr": True,
+                        },
+                    )
+                ]
             self._recompute_amount_with_fees(wizard)
 
     @staticmethod
@@ -177,8 +180,12 @@ class AccountPaymentRegister(models.TransientModel):
     # "payment difference" write-off; hide that UI to avoid a confusing double
     # entry (depends mirror the core method's + admin_fee_line_ids).
     @api.depends(
-        "early_payment_discount_mode", "can_edit_wizard", "can_group_payments",
-        "group_payment", "payment_method_line_id", "admin_fee_line_ids",
+        "early_payment_discount_mode",
+        "can_edit_wizard",
+        "can_group_payments",
+        "group_payment",
+        "payment_method_line_id",
+        "admin_fee_line_ids",
     )
     def _compute_show_payment_difference(self):
         super()._compute_show_payment_difference()
@@ -218,9 +225,9 @@ class AccountPaymentRegister(models.TransientModel):
             # Admin fees are the P&L side of the payment, so carry the OU there
             # too for per-OU reporting.
             if self.l10n_ou_analytic_id:
-                line_vals["analytic_distribution"] = self.env[
-                    "purchase.order.line"
-                ]._levis_merge_ou_distribution(None, self.l10n_ou_analytic_id.id)
+                line_vals["analytic_distribution"] = self.env["purchase.order.line"]._levis_merge_ou_distribution(
+                    None, self.l10n_ou_analytic_id.id
+                )
             vals.append(line_vals)
         return vals
 
@@ -237,9 +244,12 @@ class AccountPaymentRegister(models.TransientModel):
         # This path runs for multi-partner / ungrouped registration, where the
         # editable amount + fee lines are not shown, so fees cannot be applied.
         if self.admin_fee_line_ids:
-            raise UserError(_(
-                "Admin fees are only supported for a single payment. Register "
-                "one bill at a time, or tick 'Group Payments' to combine them."))
+            raise UserError(
+                _(
+                    "Admin fees are only supported for a single payment. Register "
+                    "one bill at a time, or tick 'Group Payments' to combine them."
+                )
+            )
         vals = super()._create_payment_vals_from_batch(batch_result)
         vals.update(self._levis_payment_extra_vals())
         return vals
@@ -255,9 +265,11 @@ class AccountPaymentRegister(models.TransientModel):
         self.ensure_one()
         drift = self.currency_id.round(self.payment_difference + self.admin_fee_total)
         if not self.currency_id.is_zero(drift):
-            raise UserError(_(
-                "The payment amount must equal the bill amount plus the admin "
-                "fees (%(fees)s). Set the Amount to %(expected)s.",
-                fees=self.admin_fee_total,
-                expected=self.amount + drift,
-            ))
+            raise UserError(
+                _(
+                    "The payment amount must equal the bill amount plus the admin "
+                    "fees (%(fees)s). Set the Amount to %(expected)s.",
+                    fees=self.admin_fee_total,
+                    expected=self.amount + drift,
+                )
+            )

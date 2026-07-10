@@ -74,10 +74,7 @@ class AccountMove(models.Model):
     # (customer invoices, manual entries), core numbering is used unchanged.
     def _levis_wants_bill_number(self):
         self.ensure_one()
-        return (
-            self.move_type in ("in_invoice", "in_refund")
-            and bool(self.l10n_purchase_type)
-        )
+        return self.move_type in ("in_invoice", "in_refund") and bool(self.l10n_purchase_type)
 
     def _levis_effective_date(self):
         self.ensure_one()
@@ -103,9 +100,7 @@ class AccountMove(models.Model):
         if not rng:
             first = dt.replace(day=1)
             last = first + relativedelta(months=1) - timedelta(days=1)
-            DateRange.create(
-                {"sequence_id": seq.id, "date_from": first, "date_to": last}
-            )
+            DateRange.create({"sequence_id": seq.id, "date_from": first, "date_to": last})
         return seq.next_by_id(sequence_date=dt)
 
     def _levis_next_bill_number(self):
@@ -117,10 +112,14 @@ class AccountMove(models.Model):
         self.ensure_one()
         code = BILL_TRADE_SEQ if self.l10n_purchase_type == "trade" else BILL_NONTRADE_SEQ
         company = self.company_id or self.env.company
-        seq = self.env["ir.sequence"].sudo().search(
-            [("code", "=", code), ("company_id", "in", [company.id, False])],
-            order="company_id",
-            limit=1,
+        seq = (
+            self.env["ir.sequence"]
+            .sudo()
+            .search(
+                [("code", "=", code), ("company_id", "in", [company.id, False])],
+                order="company_id",
+                limit=1,
+            )
         )
         if not seq:
             return False
@@ -177,8 +176,13 @@ class AccountMove(models.Model):
     # Re-declaring @api.depends REPLACES the inherited set, so mirror core's
     # dependencies exactly (see account.move._compute_name) plus l10n_purchase_type.
     @api.depends(
-        "posted_before", "state", "journal_id", "date", "move_type",
-        "origin_payment_id", "l10n_purchase_type",
+        "posted_before",
+        "state",
+        "journal_id",
+        "date",
+        "move_type",
+        "origin_payment_id",
+        "l10n_purchase_type",
     )
     def _compute_name(self):
         # Assign the Levi's number (Trade/Non-Trade bill, or per-rekening payment)
@@ -187,11 +191,7 @@ class AccountMove(models.Model):
         # format or reset the name to match the date) never touches them.
         numbered = self.browse()
         for move in self:
-            if not (
-                move.state != "draft"
-                and (not move.name or move.name == "/")
-                and (move.date or move.invoice_date)
-            ):
+            if not (move.state != "draft" and (not move.name or move.name == "/") and (move.date or move.invoice_date)):
                 continue
             number = False
             if move._levis_wants_bill_number():
@@ -218,9 +218,7 @@ class AccountMove(models.Model):
     def _edo_gl_lines(self):
         """Journal items shown in the GL table (excludes section/note rows)."""
         self.ensure_one()
-        return self.line_ids.filtered(
-            lambda l: l.display_type not in ("line_section", "line_note")
-        )
+        return self.line_ids.filtered(lambda l: l.display_type not in ("line_section", "line_note"))
 
     # ------------------------------------------------------------------
     # Header meta
@@ -242,17 +240,16 @@ class AccountMove(models.Model):
         ``custom_coretax``); the l10n_id names are kept as fallbacks so the
         report still works on a DB without Coretax.
         """
-        return self._edo_first_field(
-            "x_custom_nsfp", "l10n_id_tax_number", "l10n_id_kode_transaksi", default=""
-        )
+        return self._edo_first_field("x_custom_nsfp", "l10n_id_tax_number", "l10n_id_kode_transaksi", default="")
 
     def _edo_tax_date(self):
         """Tax point date — Coretax "Tanggal Faktur Pajak" (``x_custom_tanggal_
         faktur_pajak``), then any l10n_id tax date, finally the invoice date."""
         self.ensure_one()
-        return self._edo_first_field(
-            "x_custom_tanggal_faktur_pajak", "l10n_id_tax_date", default=False
-        ) or self.invoice_date
+        return (
+            self._edo_first_field("x_custom_tanggal_faktur_pajak", "l10n_id_tax_date", default=False)
+            or self.invoice_date
+        )
 
     def _edo_exchange_rate(self):
         """Rate of the bill currency against the company currency (1.0 when equal)."""
@@ -272,7 +269,7 @@ class AccountMove(models.Model):
         return orders.mapped("picking_type_id.warehouse_id")
 
     def _edo_operating_unit(self, line):
-        """"Operating Unit" = the warehouse/store from the source document.
+        """ "Operating Unit" = the warehouse/store from the source document.
 
         Uses the warehouse of the PO behind this specific line; lines without a
         PO link (tax, payable) fall back to the bill's warehouse, and finally to

@@ -29,9 +29,7 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         cls.term30 = cls.env["account.payment.term"].create(
             {
                 "name": "30 Days After (test)",
-                "line_ids": [
-                    (0, 0, {"value": "percent", "value_amount": 100.0, "nb_days": 30})
-                ],
+                "line_ids": [(0, 0, {"value": "percent", "value_amount": 100.0, "nb_days": 30})],
             }
         )
         cls.show = date(2026, 9, 1)
@@ -49,9 +47,7 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
                     "company_id": self.company.id,
                     "payment_term_id": self.term30.id,
                     "x_custom_show_date": show_date,
-                    "order_line": [
-                        (0, 0, {"product_id": self.product.id, "product_uom_qty": 1})
-                    ],
+                    "order_line": [(0, 0, {"product_id": self.product.id, "product_uom_qty": 1})],
                 }
             )
         )
@@ -82,9 +78,7 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         invoice.invoice_date = date(2026, 6, 1)  # deliberately != show date
         # 30 days after SHOW date (2026-09-01) => 2026-10-01, NOT 2026-07-01.
         self.assertEqual(invoice.invoice_date_due, date(2026, 10, 1))
-        receivable = invoice.line_ids.filtered(
-            lambda line: line.account_id.account_type == "asset_receivable"
-        )
+        receivable = invoice.line_ids.filtered(lambda line: line.account_id.account_type == "asset_receivable")
         self.assertEqual(receivable.date_maturity, date(2026, 10, 1))
 
     # (4) flag off -> standard behaviour (anchored to invoice_date)

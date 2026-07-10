@@ -51,7 +51,9 @@ class CustomReportDppNilaiLain(models.AbstractModel):
                 ("company_id", "in", list(filters["company_ids"])),
             ]
         )
-        category_labels = dict(Tax._fields["x_custom_dpp_category"].selection) if "x_custom_dpp_category" in Tax._fields else {}
+        category_labels = (
+            dict(Tax._fields["x_custom_dpp_category"].selection) if "x_custom_dpp_category" in Tax._fields else {}
+        )
 
         AML = self.env["account.move.line"]
         base_domain = self._base_move_line_domain(filters)

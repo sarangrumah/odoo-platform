@@ -19,25 +19,29 @@ class PosOrderLine(models.Model):
     _inherit = "pos.order.line"
 
     ri_src_net = fields.Monetary(
-        string="Source Net Amount", readonly=True,
+        string="Source Net Amount",
+        readonly=True,
         help="NET SOLD AMOUNT as it appears in the source retail workbook (X24DN/X48). "
-             "Signed as in the file (negative for returns).",
+        "Signed as in the file (negative for returns).",
     )
     ri_src_tax = fields.Monetary(
-        string="Source Tax Amount", readonly=True,
+        string="Source Tax Amount",
+        readonly=True,
         help="TAX AMOUNT as it appears in the source retail workbook. Booked verbatim, "
-             "since the file truncates net per line while Odoo rounds tax per order.",
+        "since the file truncates net per line while Odoo rounds tax per order.",
     )
     ri_src_discount = fields.Monetary(
-        string="Source Discount Amount", readonly=True,
+        string="Source Discount Amount",
+        readonly=True,
         help="NET DISCOUNT AMOUNT as it appears in the source workbook. Consumed by the "
-             "discount reclass; never recomputed.",
+        "discount reclass; never recomputed.",
     )
     ri_is_return = fields.Boolean(
-        string="Imported Customer Return", readonly=True,
+        string="Imported Customer Return",
+        readonly=True,
         help="Set on X48 refund lines and on X24DN lines with a negative NET SOLD "
-             "QUANTITY (in-store exchange), so the amount is booked to "
-             "Sales Return-<category> instead of reversing Gross Sales-<category>.",
+        "QUANTITY (in-store exchange), so the amount is booked to "
+        "Sales Return-<category> instead of reversing Gross Sales-<category>.",
     )
 
     # --- Source columns kept for traceability (no GL effect) ------------------
@@ -45,30 +49,34 @@ class PosOrderLine(models.Model):
     # discounted. None of it reached Odoo before, so a discounted POS line could
     # not be traced back to its promo without reopening the workbook.
     ri_staff_id = fields.Char(
-        string="Source Staff ID", readonly=True,
+        string="Source Staff ID",
+        readonly=True,
         help="STAFF ID as it appears in the source retail workbook (X24DN).",
     )
     ri_staff_name = fields.Char(
-        string="Source Staff Name", readonly=True,
+        string="Source Staff Name",
+        readonly=True,
         help="STAFF NAME as it appears in the source retail workbook (X24DN).",
     )
     ri_discount_type = fields.Char(
-        string="Source Discount Type", readonly=True,
-        help="DISCOUNT TYPE of every populated discount slot, ' | '-joined "
-             "(e.g. TRANSACTION_DISCOUNT).",
+        string="Source Discount Type",
+        readonly=True,
+        help="DISCOUNT TYPE of every populated discount slot, ' | '-joined (e.g. TRANSACTION_DISCOUNT).",
     )
     ri_discount_code = fields.Char(
-        string="Source Discount Code", readonly=True,
+        string="Source Discount Code",
+        readonly=True,
         help="DISCOUNT CODE of every populated discount slot, ' | '-joined. Used to "
-             "label the discount reclass journal lines.",
+        "label the discount reclass journal lines.",
     )
     ri_discount_description = fields.Char(
-        string="Source Discount Description", readonly=True,
-        help="DISCOUNT DESCRIPTION of every populated discount slot, ' | '-joined "
-             "(e.g. CRM-VIP DISCOUNT).",
+        string="Source Discount Description",
+        readonly=True,
+        help="DISCOUNT DESCRIPTION of every populated discount slot, ' | '-joined (e.g. CRM-VIP DISCOUNT).",
     )
     ri_line_comment = fields.Char(
-        string="Source Line Comment", readonly=True,
+        string="Source Line Comment",
+        readonly=True,
         help="LINE ITEM - COMMENTS as it appears in the source retail workbook.",
     )
 
@@ -76,9 +84,7 @@ class PosOrderLine(models.Model):
         """Sales Return-<category> account for this line, or an empty recordset."""
         self.ensure_one()
         company = self.order_id.company_id
-        return self.env["retail.import.executor"]._ri_category_account(
-            company, self.product_id, "return"
-        )
+        return self.env["retail.import.executor"]._ri_category_account(company, self.product_id, "return")
 
     def _prepare_base_line_for_taxes_computation(self):
         base_line = super()._prepare_base_line_for_taxes_computation()
@@ -93,7 +99,8 @@ class PosOrderLine(models.Model):
                 _logger.warning(
                     "retail import: no Sales Return account for product %s (category %s); "
                     "refund stays on the income account",
-                    self.product_id.display_name, self.product_id.categ_id.display_name,
+                    self.product_id.display_name,
+                    self.product_id.categ_id.display_name,
                 )
 
         taxes = self.tax_ids_after_fiscal_position

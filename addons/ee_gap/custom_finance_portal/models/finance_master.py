@@ -94,8 +94,7 @@ class FinanceInvoiceRoutineType(models.Model):
 
     is_routine = fields.Boolean(
         string="Routine",
-        help="Routine transactions submit on a monthly basis "
-        "(e.g. internet provider, land loan).",
+        help="Routine transactions submit on a monthly basis (e.g. internet provider, land loan).",
     )
 
 
@@ -129,8 +128,7 @@ class FinanceLimitation(models.Model):
     pr_required_above = fields.Monetary(
         string="PR Required Above",
         currency_field="currency_id",
-        help="When a submission amount exceeds this, a PR number is mandatory. "
-        "Defaults to Rp 1.000.000 when unset.",
+        help="When a submission amount exceeds this, a PR number is mandatory. Defaults to Rp 1.000.000 when unset.",
     )
     max_amount = fields.Monetary(
         string="Max Submission Amount",

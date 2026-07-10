@@ -82,7 +82,7 @@ This module implements five specific requirements for the Levi's tenant: HS Code
   `purchase.order.line` (`_compute_analytic_distribution` merges the store OU),
   `account.move` (`l10n_purchase_type`), `account.move.line` (`_compute_account_id`
   remaps the payable per stream AND fills a non-trade product line that resolved to
-  no account with `mapping.expense_account_id` — only when otherwise empty), 
+  no account with `mapping.expense_account_id` — only when otherwise empty),
   `stock.picking` (`l10n_purchase_type`),
   `stock.move` (GR/IR routing + OU analytic on the GR journal),
   `stock.warehouse` (`l10n_ou_analytic_id`, `l10n_purchase_journal_id`),
@@ -103,7 +103,35 @@ This module implements five specific requirements for the Levi's tenant: HS Code
   `2103300001`, non-trade GR/IR `2103300008`. Trade GR/IR stays per product
   category (`account_stock_variation_id`, e.g. `2103109121` textile).
 
+## Feature 13 — Indonesian bank master data (Kode BI)
+- **Field**: `res.bank.l10n_id_bi_code` ("Kode BI") — the 7-digit Bank Indonesia
+  clearing/RTGS participant code, a.k.a. *sandi bank* (`models/res_bank.py`).
+  Surfaced on the core bank form/list and made searchable
+  (`views/res_bank_views.xml`, inheriting `base.view_res_bank_form`,
+  `base.view_res_bank_tree`, `base.res_bank_view_search`).
+- **Seeding**: `data/res.bank.csv` ships 181 banks (name + SWIFT/BIC + Kode BI),
+  external IDs `res_bank_<kodeBI>`, so re-running `-u` updates rather than
+  duplicates. Loaded on install/upgrade; no separate script.
+- **Kode BI is the unique key, not BIC.** Roughly 46 Bank Indonesia branch offices
+  all share the BIC `INDOIDJA`, so BIC cannot identify a row. A `models.Constraint`
+  enforces `unique(l10n_id_bi_code)`; NULL is allowed many times over, which is why
+  the stock "Reserve" placeholder bank (no Kode BI) does not collide.
+- **Consumer**: `levis.mdr.bin.acquirer_bank_id` — the Card BIN / MDR mapping's
+  *Acquiring Bank* dropdown, which was effectively empty before this seed.
+- **Data provenance**: 180 rows come from the customer's (EBR) list; its Kode BI
+  column had lost leading zeros to Excel, so 29 are re-padded to 7 digits and
+  `CITIBANK, NA` (`00310305`, 8 digits) is corrected to `0310305`. Bank Central
+  Asia (`CENAIDJA` / `0140397`) was absent from that list and added separately —
+  **its two values are not verified against the official BI participant list.**
+
 ## Gotchas
+- **Odoo 19 silently ignores `_sql_constraints`.** The classic list-of-tuples form
+  produces only a `WARNING ... no longer supported` line at upgrade and creates NO
+  constraint. Use the `models.Constraint` class attribute instead (as
+  `res_bank.py` does) and verify with
+  `SELECT conname FROM pg_constraint WHERE conrelid='<table>'::regclass;` — a clean
+  upgrade log proves nothing. `levis_mdr_bin.py` still uses the deprecated form, so
+  its `bin_range_order` CHECK is **not enforced in the database**.
 - **AP account type coercion**: an AP control account used on a bill's
   payment-term line MUST be `account_type = liability_payable` (core
   `account.move.line._check_payable_receivable` on purchase documents:

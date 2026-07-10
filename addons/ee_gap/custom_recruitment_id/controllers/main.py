@@ -39,6 +39,7 @@ def _verify_signature(source: str, raw_body: bytes, provided: str) -> bool:
     secret = request.env["ir.config_parameter"].sudo().get_param("custom_recruitment_id.webhook_secret_%s" % source, "")
     if not secret:
         # Without a configured secret, reject — fail closed.
+        # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure - logs source name, never the secret value
         _logger.warning(
             "custom_recruitment_id: missing webhook secret for source=%s",
             source,

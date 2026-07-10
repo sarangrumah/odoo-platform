@@ -127,8 +127,12 @@ class CustomReportAgedReceivable(models.AbstractModel):
                 row += 1
             # Partner subtotal
             sheet.merge_range(
-                row, 0, row, bucket_start - 1,
-                "Subtotal %s" % (grp.get("partner_name") or ""), fmts["total_text"],
+                row,
+                0,
+                row,
+                bucket_start - 1,
+                "Subtotal %s" % (grp.get("partner_name") or ""),
+                fmts["total_text"],
             )
             _write_amounts(grp, grp.get("subtotal", {}), fmts["total_num"])
             row += 1

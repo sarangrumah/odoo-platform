@@ -28,9 +28,7 @@ class FinanceBudget(models.Model):
     division_id = fields.Many2one("finance.vertical", string="Division", required=True)
     cost_center_code = fields.Char(string="Cost Center")
     company_id = fields.Many2one("res.company", default=lambda self: self.env.company)
-    currency_id = fields.Many2one(
-        "res.currency", default=lambda self: self.env.company.currency_id
-    )
+    currency_id = fields.Many2one("res.currency", default=lambda self: self.env.company.currency_id)
     budget_year = fields.Integer(
         string="Budget Year",
         required=True,
@@ -93,12 +91,8 @@ class FinanceBudget(models.Model):
 
     def _compute_consumption(self):
         for rec in self:
-            committed = rec._consumed(
-                rec.division_id, rec.budget_year, rec.company_id, COMMITTED_STATES
-            )
-            pipeline = rec._consumed(
-                rec.division_id, rec.budget_year, rec.company_id, PIPELINE_STATES
-            )
+            committed = rec._consumed(rec.division_id, rec.budget_year, rec.company_id, COMMITTED_STATES)
+            pipeline = rec._consumed(rec.division_id, rec.budget_year, rec.company_id, PIPELINE_STATES)
             rec.committed_amount = committed
             rec.pipeline_amount = pipeline
             rec.remaining_amount = (rec.budget_amount or 0.0) - committed

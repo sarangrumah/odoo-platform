@@ -49,10 +49,14 @@ icp = env["ir.config_parameter"].sudo()
 # EMPTY default: substring keywords like "TAILOR" false-match merchandise
 # ("TAILORED BUSTIER", "TAILORED CLASSIC" shirts). Everything is storable
 # merchandise unless an exact service code/keyword is configured.
-KEYWORDS = [k.strip().upper() for k in
-            (icp.get_param("retail_import.service_category_keywords", "") or "").split(",") if k.strip()]
-CODES = {c.strip().upper() for c in
-         (icp.get_param("retail_import.service_product_codes", "") or "").split(",") if c.strip()}
+KEYWORDS = [
+    k.strip().upper()
+    for k in (icp.get_param("retail_import.service_category_keywords", "") or "").split(",")
+    if k.strip()
+]
+CODES = {
+    c.strip().upper() for c in (icp.get_param("retail_import.service_product_codes", "") or "").split(",") if c.strip()
+}
 
 
 def is_service(tmpl):
@@ -70,8 +74,7 @@ def commit():
 
 
 # ---- collect the X101 templates by external ID (module=NS, name=tmpl_*) ----
-imd_rows = IMD.search([("module", "=", NS), ("model", "=", "product.template"),
-                       ("name", "=like", "tmpl\\_%")])
+imd_rows = IMD.search([("module", "=", NS), ("model", "=", "product.template"), ("name", "=like", "tmpl\\_%")])
 x101_ids = imd_rows.mapped("res_id")
 x101 = Template.browse(x101_ids).exists()
 log("X101 templates found via %s.tmpl_*: %d" % (NS, len(x101)))
@@ -83,8 +86,8 @@ to_storable = to_service = 0
 # Bucket first, then bulk-write per batch (31k per-record commits is far too slow).
 svc_ids = [t.id for t in x101 if is_service(t) and t.type != "service"]
 merch = x101.filtered(lambda t: not is_service(t) and not t.is_storable)
-merch_consu = [t.id for t in merch if t.type == "consu"]        # just flip is_storable
-merch_other = [t.id for t in merch if t.type != "consu"]        # also coerce type
+merch_consu = [t.id for t in merch if t.type == "consu"]  # just flip is_storable
+merch_other = [t.id for t in merch if t.type != "consu"]  # also coerce type
 to_service = len(svc_ids)
 to_storable = len(merch)
 
@@ -95,7 +98,7 @@ def _bulk(ids, vals, label):
     if not APPLY:
         return
     for i in range(0, len(ids), 500):
-        chunk = env["product.template"].browse(ids[i:i + 500])
+        chunk = env["product.template"].browse(ids[i : i + 500])
         try:
             chunk.write(vals)
             env.cr.commit()
@@ -113,8 +116,7 @@ def _bulk(ids, vals, label):
 _bulk(merch_consu, {"is_storable": True}, "STORABLE")
 _bulk(merch_other, {"is_storable": True, "type": "consu"}, "STORABLE")
 _bulk(svc_ids, {"type": "service"}, "SERVICE")
-log("storable: %d flipped to is_storable=True | service: %d set to type=service"
-    % (to_storable, to_service))
+log("storable: %d flipped to is_storable=True | service: %d set to type=service" % (to_storable, to_service))
 
 # ==================================================================
 # 2. #N/A (sentinel) CATEGORIES
@@ -159,8 +161,7 @@ elif bad_cats:
                 env.cr.rollback()
                 log("  CATEG FAIL %s: %s" % (nm, e))
         commit()
-log("categories: products_reassigned=%d deleted=%d archived=%d"
-    % (reassigned, cdeleted, carchived))
+log("categories: products_reassigned=%d deleted=%d archived=%d" % (reassigned, cdeleted, carchived))
 
 # ==================================================================
 # 3. ZERO / MISSING PRICE  (report only)
@@ -176,7 +177,6 @@ if len(zero_price) > 50:
 log("==== SUMMARY (%s) ====" % ("APPLIED" if APPLY else "DRY-RUN — nothing written"))
 log("  storable flipped     : %d" % to_storable)
 log("  service reclassified : %d" % to_service)
-log("  sentinel cats        : reassigned=%d deleted=%d archived=%d"
-    % (reassigned, cdeleted, carchived))
+log("  sentinel cats        : reassigned=%d deleted=%d archived=%d" % (reassigned, cdeleted, carchived))
 log("  zero-price to review : %d" % len(zero_price))
 log("==== DONE ====")

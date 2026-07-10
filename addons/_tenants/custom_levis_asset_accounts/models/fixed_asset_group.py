@@ -7,10 +7,10 @@ _logger = logging.getLogger(__name__)
 
 # IAS 16 revaluation role -> Erajaya chart account code.
 ERAJAYA_REVALUATION_CODE_MAP = {
-    "default_revaluation_surplus_account_id": "3005200004",   # OCI Current - Fixed Assets
-    "default_revaluation_loss_account_id": "7706000000",      # Loss on impairment of Fixed Assets
-    "default_revaluation_income_account_id": "8300000004",    # OCI - Fixed assets (income_other)
-    "default_retained_earnings_account_id": "3006100001",     # Retained earnings - beginning
+    "default_revaluation_surplus_account_id": "3005200004",  # OCI Current - Fixed Assets
+    "default_revaluation_loss_account_id": "7706000000",  # Loss on impairment of Fixed Assets
+    "default_revaluation_income_account_id": "8300000004",  # OCI - Fixed assets (income_other)
+    "default_retained_earnings_account_id": "3006100001",  # Retained earnings - beginning
 }
 
 # The 6 EBR fixed-asset categories -> Erajaya chart codes. Codes verified against
@@ -61,6 +61,7 @@ class CustomFixedAssetGroup(models.Model):
         Account = self.env["account.account"]
         seeded = 0
         for company in self.env["res.company"].search([]):
+
             def _acc(code):
                 if not code:
                     return False

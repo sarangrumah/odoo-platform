@@ -29,8 +29,13 @@ class CustomReportProfitLoss(models.AbstractModel):
 
     def _xlsx_body(self, sheet, ctx, columns, fmts, start_row):
         return self._xlsx_sectioned_body(
-            sheet, ctx, fmts, start_row,
-            amount_header="Period", secondary=("YTD", "ytd"), section_heading=True,
+            sheet,
+            ctx,
+            fmts,
+            start_row,
+            amount_header="Period",
+            secondary=("YTD", "ytd"),
+            section_heading=True,
         )
 
     def _section(self, label, type_codes, balances, flip_sign):

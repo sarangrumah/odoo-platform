@@ -53,7 +53,5 @@ class TestAuthOAuthSignin(TransactionCase):
         self.ICP.set_param("custom_hr_sso_keycloak.jit_create", "1")
         self.assertTrue(self.Users._hr_sso_jit_enabled())
         self.assertIsNone(
-            self.Users._hr_sso_adopt_existing_user(
-                self.provider.id, {"user_id": "kc-x", "email": "nobody@example.com"}
-            )
+            self.Users._hr_sso_adopt_existing_user(self.provider.id, {"user_id": "kc-x", "email": "nobody@example.com"})
         )

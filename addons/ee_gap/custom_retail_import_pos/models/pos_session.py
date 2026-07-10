@@ -61,15 +61,18 @@ class PosSession(models.Model):
                 unmapped += line.ri_src_discount
                 continue
             income, discount = pair
-            by_key[(income.id, discount.id,
-                    line.ri_discount_code or "",
-                    line.ri_discount_description or "")] += line.ri_src_discount
+            by_key[(income.id, discount.id, line.ri_discount_code or "", line.ri_discount_description or "")] += (
+                line.ri_src_discount
+            )
 
         if unmapped:
             _logger.warning(
                 "retail import: session %s (%s) has %s of discount on products with no "
                 "income/discount account; NOT reclassified",
-                self.id, self.config_id.name, unmapped)
+                self.id,
+                self.config_id.name,
+                unmapped,
+            )
 
         vals = []
         for (income_id, discount_id, code, description), amount in by_key.items():
@@ -85,14 +88,26 @@ class PosSession(models.Model):
                 amount = -amount
             # A fresh vals dict per line: ``analytic_distribution`` is a mutable Json
             # value and must never be shared between two create commands.
-            vals.append(dict(Executor._ri_ou_line_vals(ou),
-                             move_id=self.move_id.id, account_id=debit_account,
-                             debit=amount, credit=0.0,
-                             name=("POS discount%s" % suffix)[:200]))
-            vals.append(dict(Executor._ri_ou_line_vals(ou),
-                             move_id=self.move_id.id, account_id=credit_account,
-                             debit=0.0, credit=amount,
-                             name=("POS discount gross-up%s" % suffix)[:200]))
+            vals.append(
+                dict(
+                    Executor._ri_ou_line_vals(ou),
+                    move_id=self.move_id.id,
+                    account_id=debit_account,
+                    debit=amount,
+                    credit=0.0,
+                    name=("POS discount%s" % suffix)[:200],
+                )
+            )
+            vals.append(
+                dict(
+                    Executor._ri_ou_line_vals(ou),
+                    move_id=self.move_id.id,
+                    account_id=credit_account,
+                    debit=0.0,
+                    credit=amount,
+                    name=("POS discount gross-up%s" % suffix)[:200],
+                )
+            )
         return vals
 
     def _create_account_move(self, *args, **kwargs):
@@ -102,8 +117,11 @@ class PosSession(models.Model):
         data = super()._create_account_move(*args, **kwargs)
         vals = self._ri_discount_reclass_line_vals()
         if vals:
-            self.env["account.move.line"].with_context(
-                check_move_validity=False).create(vals)
-            _logger.info("retail import: session %s discount reclass -> %s line(s) in %s",
-                         self.id, len(vals), self.move_id.name or self.move_id.id)
+            self.env["account.move.line"].with_context(check_move_validity=False).create(vals)
+            _logger.info(
+                "retail import: session %s discount reclass -> %s line(s) in %s",
+                self.id,
+                len(vals),
+                self.move_id.name or self.move_id.id,
+            )
         return data

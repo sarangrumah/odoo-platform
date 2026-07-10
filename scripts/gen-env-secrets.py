@@ -16,6 +16,7 @@ Usage:
   python3 scripts/gen-env-secrets.py [path/to/.env]   # default: ./.env
 A timestamped backup (<file>.bak-YYYYmmdd_HHMMSS) is written before changes.
 """
+
 from __future__ import annotations
 
 import base64
