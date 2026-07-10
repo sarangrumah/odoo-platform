@@ -124,7 +124,42 @@ This module implements five specific requirements for the Levi's tenant: HS Code
   Asia (`CENAIDJA` / `0140397`) was absent from that list and added separately —
   **its two values are not verified against the official BI participant list.**
 
+## Feature 14 — Product-catalogue indexes (large variant counts)
+
+The Levi's catalogues carry ~32k templates / ~348k variants (Size × Inseam is
+`create_variant='always'`, so Odoo materialises the full matrix). Two hot paths
+were unindexed. `models/product_product.py` fixes both.
+
+- **Product Variants list.** `product.product_product_tree_view` declares
+  `default_order="is_favorite desc, default_code, name, id"`. `name` is an
+  `_inherits` field on `product_template`, so ordering by it forced a LEFT JOIN
+  plus a top-N sort over the whole catalogue (~280 ms for one 80-row page).
+  `views/product_product_views.xml` drops `name` from the order, and
+  `_levis_list_order_index` covers what remains. Page 1 is now sub-millisecond.
+- **Valuation.** Core `product.value` (`stock_account`, Odoo 19's replacement for
+  `stock.valuation.layer`) ships with a primary key and no other index, while
+  `product.product._compute_value` → `_get_last_product_value` filters on
+  `product_id / company_id / move_id / lot_id` and sorts by `date DESC`. Two
+  indexes are created from `product_product.init()` — see the gotcha below for
+  why they are NOT declared on a `product.value` model.
+
 ## Gotchas
+- **Never `_inherit "product.value"` from this module.** Doing so pulls
+  `product.value` into the module's `init_models()` pass, and
+  `registry.check_foreign_keys()` then re-creates any *missing* core foreign key
+  (`if spec is None: add_foreign_key(...)`). `prd_levis_begbal` and `rnd_levis`
+  have lost `product_value_product_id_fkey` and still hold ~187k rows whose
+  `product_id` no longer resolves, so the `ALTER TABLE` raises
+  `ForeignKeyViolation` and rolls the whole upgrade back. The `product.value`
+  indexes are therefore created with raw `CREATE INDEX IF NOT EXISTS` DDL inside
+  `ProductProduct.init()`, which keeps that model out of the pass entirely.
+  The same crash still awaits `-u stock_account` on those two databases until the
+  dangling rows are removed.
+- **Odoo renders `is_favorite desc` as `COALESCE("is_favorite", FALSE) DESC`.**
+  A plain btree on `is_favorite` is therefore unusable for that sort; the index
+  must be on the same expression. Odoo only emits `NULLS FIRST/LAST` when the
+  order string spells it out (`odoo/orm/models.py:~2178`), so Postgres' defaults
+  (DESC → NULLS FIRST, ASC → NULLS LAST) already match.
 - **Odoo 19 silently ignores `_sql_constraints`.** The classic list-of-tuples form
   produces only a `WARNING ... no longer supported` line at upgrade and creates NO
   constraint. Use the `models.Constraint` class attribute instead (as
