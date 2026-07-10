@@ -1682,6 +1682,33 @@ class RetailImportExecutor(models.AbstractModel):
         log.set_errors(errors)
         _logger.info("x24 POST: %s orders created, %s rows skipped, %s errors", created, skipped, len(errors))
 
+    def _ri_backdate_session_payments(self, session, gl_date, tag):
+        """Re-stamp the settlement records the POS close emits alongside its own entry.
+
+        With ``x24_decouple_payment`` OFF the orders are tendered against the real payment
+        methods, so ``pos.session._create_account_move`` also emits an ``account.payment``
+        per bank tender and an ``account.bank.statement.line`` per cash tender. Both are
+        dated at close — i.e. the import day — while the sale they settle is dated on its
+        trading day, which leaves the bank/cash journals in the wrong period. Both models
+        carry ``pos_session_id``, so they are reachable from here.
+
+        Decouple mode never reaches this: its SUSPENSE method is ``pay_later``, so the
+        close writes no payment and no statement line.
+        """
+        env = self.env
+        if "account.payment" in env:
+            payments = env["account.payment"].sudo().search([("pos_session_id", "=", session.id)])
+            for pay in payments:
+                if pay.move_id:
+                    self._ri_backdate_move(pay.move_id, gl_date, tag)
+            if payments:
+                env.cr.execute("UPDATE account_payment SET date=%s WHERE id = ANY(%s)", (gl_date, payments.ids))
+                payments.invalidate_recordset(["date"])
+        if "statement_line_ids" in session._fields:
+            for line in session.statement_line_ids:
+                if line.move_id:
+                    self._ri_backdate_move(line.move_id, gl_date, tag)
+
     def _pos_close_and_backdate(self, sessions, errors, tag):
         """Close each open POS session (cash-control aware) and re-stamp its GL move to
         the latest order date. Gated by ``retail_import.x24_close_sessions``. Shared by
@@ -1730,6 +1757,7 @@ class RetailImportExecutor(models.AbstractModel):
                                 ),
                             )
                             s.invalidate_recordset(["start_at", "stop_at"])
+                            self._ri_backdate_session_payments(s, gl, tag)
                     except Exception as be:
                         _logger.warning("%s POST: session %s backdate skipped: %s", tag, s.id, be)
                     _logger.info(
