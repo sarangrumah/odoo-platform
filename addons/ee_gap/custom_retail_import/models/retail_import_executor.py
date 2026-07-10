@@ -977,18 +977,30 @@ class RetailImportExecutor(models.AbstractModel):
         Without one the template is created with no ``categ_id`` and Odoo resolves its
         revenue against the company fallback income account (Gross Sales-Others) instead
         of the labour/other bucket finance expects. Tailoring codes (``TS…``: Original
-        Cut, hemming, repair, patches) book to Gross Sales-Labor; the rest (paid carrier
-        bags) to Gross Sales-Others. Both the prefix list and the two target categories
-        are config data:
+        Cut, hemming, repair) book to Gross Sales-Labor; the rest (paid carrier bags) to
+        Gross Sales-Others.
+
+        The prefix alone is not enough: Levi's issues ``TS…`` codes to sold *goods* too
+        (Fodable Cup, Levi's Pin, TAB, patches, buttons), which are merchandise and must
+        not land in the labour bucket. ``x24_np_goods_codes`` lists those exceptions.
+        All of it is config data:
 
           retail_import.x24_np_service_prefixes    (comma-sep, default "TS")
+          retail_import.x24_np_goods_codes         (comma-sep exact codes that keep the
+                                                    service prefix but are goods)
           retail_import.x24_np_service_category_id (int, else category "Labor (Service)")
           retail_import.x24_np_category_id         (int, else category "Others")
         """
         icp = self.env["ir.config_parameter"].sudo()
         raw = icp.get_param("retail_import.x24_np_service_prefixes", self._X24_NP_SERVICE_PREFIXES)
         prefixes = tuple(p.strip().upper() for p in (raw or "").split(",") if p.strip())
-        is_service = bool(prefixes) and str(code or "").strip().upper().startswith(prefixes)
+        goods = {
+            c.strip().upper()
+            for c in (icp.get_param("retail_import.x24_np_goods_codes", "") or "").split(",")
+            if c.strip()
+        }
+        code_up = str(code or "").strip().upper()
+        is_service = bool(prefixes) and code_up.startswith(prefixes) and code_up not in goods
         param = "retail_import.x24_np_service_category_id" if is_service else "retail_import.x24_np_category_id"
         Categ = self.env["product.category"]
         cid = int(icp.get_param(param, 0) or 0)
