@@ -1,0 +1,36 @@
+flowchart TB
+  classDef r fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef m fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef a fill:#FDE8E8,stroke:#C0392B,color:#7B241C
+
+  ROOT["PT Era Busana Retailindo (EBR)<br/>1 Head Office + 20 Toko OLS SES"]:::m
+
+  subgraph ST["TOKO / STORE"]
+    R1["Store Staff / Kasir<br/><i>Point of Sale — User</i>"]:::r
+    R2["Store Supervisor<br/><i>Point of Sale — Manager</i>"]:::r
+  end
+
+  subgraph WH["GUDANG / WAREHOUSE (DC)"]
+    R3["Warehouse Staff<br/><i>Inventory — User</i>"]:::r
+    R4["Warehouse Manager<br/><i>Inventory — Manager</i>"]:::r
+  end
+
+  subgraph PU["PENGADAAN / PROCUREMENT"]
+    R5["Purchasing Officer<br/><i>Purchase — User</i>"]:::r
+    R6["Purchasing Manager<br/><i>Purchase — Manager</i> + Approver"]:::r
+  end
+
+  subgraph FI["KEUANGAN / FINANCE"]
+    R7["AP Officer<br/><i>Invoicing — Billing</i>"]:::r
+    R8["Accountant / GL<br/><i>Invoicing — Billing</i>"]:::r
+    R9["Finance Manager<br/><i>Invoicing — Administrator</i>"]:::r
+    R10["Tax Officer<br/><i>Invoicing — Billing</i> + Coretax"]:::r
+    R11["Asset Officer<br/><i>Asset User / Asset Manager</i>"]:::r
+  end
+
+  subgraph IT["IT / SISTEM"]
+    R12["Ops / Data Admin<br/><i>Retail Import — Manager</i>"]:::a
+    R13["System Administrator<br/><i>Settings / Technical</i>"]:::a
+  end
+
+  ROOT --> ST & WH & PU & FI & IT

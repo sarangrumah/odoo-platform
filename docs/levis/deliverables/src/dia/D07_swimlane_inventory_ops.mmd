@@ -1,0 +1,52 @@
+flowchart LR
+  classDef l3 fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef l2 fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef l4 fill:#F0EAF7,stroke:#7D4FA8,color:#4A2A66
+  classDef l5 fill:#FDE8E8,stroke:#C0392B,color:#7B241C
+  classDef dec fill:#FFFFFF,stroke:#555,color:#222
+
+  subgraph W["① WAREHOUSE STAFF"]
+    direction TB
+    W1["Temukan barang rusak /<br/>hilang / kadaluarsa"]:::l3
+    W2["Buat <b>Scrap Batch</b><br/>Inventory ▸ Operations ▸ Scrap Batches ▸ New<br/>Nomor: SCRAP/2026/xxx"]:::l3
+    W3["Tambah banyak produk<br/>dalam satu batch<br/>(qty + Lot/Serial)"]:::l3
+    W4["Pilih Warehouse, Source Location,<br/>Scrap Location"]:::l3
+  end
+
+  subgraph M["② WAREHOUSE MANAGER"]
+    direction TB
+    M1{"Setujui<br/>penghapusan?"}:::dec
+    M2["Batal / Cancel"]:::l5
+    M3["Klik <b>Validate</b>"]:::l2
+  end
+
+  subgraph S["③ SISTEM"]
+    direction TB
+    S1{"Parameter<br/>scrap_loss_account_code<br/>sudah diisi?"}:::dec
+    S2["<b>GAGAL</b> — posting scrap ditolak.<br/>Admin harus set System Parameter<br/>(lihat §Konfigurasi Wajib)"]:::l5
+    S3["Buat stock.scrap per baris<br/>+ SATU jurnal valuasi konsolidasi:<br/>Dr Kerugian Scrap (P&amp;L)<br/>Cr Persediaan / Stock Valuation"]:::l3
+    S4["Stok berkurang di lokasi asal"]:::l3
+  end
+
+  subgraph C["④ CYCLE COUNT (paralel)"]
+    direction TB
+    C1["Cycle Count Plan dijadwalkan<br/>per zona / kategori"]:::l3
+    C2["Session: hitung fisik<br/>vs sistem"]:::l3
+    C3{"Ada<br/>selisih?"}:::dec
+    C4["Adjustment diajukan<br/>→ approval Manager"]:::l2
+    C5["Stok disesuaikan<br/>+ jurnal selisih"]:::l4
+  end
+
+  subgraph A["⑤ ACCOUNTANT"]
+    direction TB
+    A1["Verifikasi jurnal scrap &amp;<br/>adjustment di GL"]:::l4
+  end
+
+  W1 --> W2 --> W3 --> W4 --> M1
+  M1 -- "Tidak" --> M2
+  M1 -- "Ya" --> M3 --> S1
+  S1 -- "Belum" --> S2
+  S1 -- "Sudah" --> S3 --> S4 --> A1
+  C1 --> C2 --> C3
+  C3 -- "Tidak" --> C6["Session ditutup"]:::l3
+  C3 -- "Ya" --> C4 --> C5 --> A1

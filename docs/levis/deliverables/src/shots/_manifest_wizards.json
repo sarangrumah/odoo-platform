@@ -1,0 +1,70 @@
+[
+  {
+    "name": "B03_retail_import_wizard",
+    "modal": true
+  },
+  {
+    "name": "G08_asset_register_wizard",
+    "modal": true
+  },
+  {
+    "name": "H01_trial_balance",
+    "modal": true
+  },
+  {
+    "name": "H02_general_ledger",
+    "modal": true
+  },
+  {
+    "name": "H03_balance_sheet",
+    "modal": true
+  },
+  {
+    "name": "H04_profit_loss",
+    "modal": true
+  },
+  {
+    "name": "H05_cash_flow",
+    "modal": true
+  },
+  {
+    "name": "H06_gl_analysis",
+    "modal": false
+  },
+  {
+    "name": "H07_aged_receivable",
+    "modal": true
+  },
+  {
+    "name": "H08_aged_payable",
+    "modal": true
+  },
+  {
+    "name": "H09_kartu_utang",
+    "modal": true
+  },
+  {
+    "name": "H10_kartu_piutang",
+    "modal": true
+  },
+  {
+    "name": "H11_rekap_faktur_pajak",
+    "modal": true
+  },
+  {
+    "name": "H12_rekap_bupot",
+    "modal": true
+  },
+  {
+    "name": "H13_ekualisasi_omzet",
+    "modal": true
+  },
+  {
+    "name": "I04_faktur_pengganti",
+    "modal": true
+  },
+  {
+    "name": "I05_pre_export_validation",
+    "modal": true
+  }
+]

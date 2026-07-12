@@ -1,0 +1,186 @@
+@page {
+  size: A4;
+  margin: 18mm 16mm 20mm 16mm;
+}
+@page :first { margin: 0; }
+
+:root{
+  --ink:#1B2430;
+  --muted:#5A6472;
+  --line:#D8DCE3;
+  --brand:#1B3F6B;
+  --brand2:#2E6DB4;
+  --accent:#C0392B;
+  --ok:#1D5C39;
+  --warn:#7A5308;
+  --bg-soft:#F5F7FA;
+}
+
+*{ box-sizing:border-box; }
+
+body{
+  font-family:"Inter","Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size:10pt;
+  line-height:1.55;
+  color:var(--ink);
+  margin:0;
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
+
+/* ---------- Cover ---------- */
+.cover{
+  height:297mm; width:210mm;
+  page-break-after:always;
+  background:linear-gradient(150deg,#12263F 0%,#1B3F6B 45%,#2E6DB4 100%);
+  color:#fff;
+  padding:32mm 22mm;
+  display:flex; flex-direction:column;
+}
+.cover .kicker{
+  font-size:10pt; letter-spacing:.28em; text-transform:uppercase;
+  opacity:.75; margin-bottom:6mm;
+}
+.cover h1{
+  font-size:34pt; line-height:1.12; font-weight:700; margin:0 0 4mm 0;
+}
+.cover h2{
+  font-size:15pt; font-weight:400; margin:0; opacity:.92;
+  color:#fff;                 /* must beat the global h2 rule */
+  page-break-after:auto;
+}
+.cover .rule{
+  width:34mm; height:3px; background:#fff; opacity:.85; margin:9mm 0;
+}
+.cover .lead{
+  font-size:11pt; line-height:1.7; opacity:.92; max-width:120mm;
+}
+.cover .spacer{ flex:1; }
+.cover .meta{
+  border-top:1px solid rgba(255,255,255,.28);
+  padding-top:6mm;
+  display:grid; grid-template-columns:1fr 1fr; gap:4mm 8mm;
+  font-size:9pt;
+}
+.cover .meta b{ display:block; opacity:.65; font-weight:500; letter-spacing:.06em; text-transform:uppercase; font-size:7.5pt; margin-bottom:1mm; }
+
+/* ---------- Headings ---------- */
+h1.chap{
+  font-size:20pt; color:var(--brand); margin:0 0 2mm 0; padding-top:2mm;
+  page-break-before:always; page-break-after:avoid;
+}
+h1.chap .num{ color:var(--brand2); }
+h1.chap + .sub{ color:var(--muted); font-size:10.5pt; margin:0 0 7mm 0; padding-bottom:3mm; border-bottom:2px solid var(--line); }
+
+h2{ font-size:13pt; color:var(--brand); margin:9mm 0 3mm; page-break-after:avoid; }
+h3{ font-size:11pt; color:var(--ink); margin:6mm 0 2mm; page-break-after:avoid; }
+h4{ font-size:10pt; color:var(--muted); margin:4mm 0 1.5mm; text-transform:uppercase; letter-spacing:.06em; page-break-after:avoid; }
+
+p{ margin:0 0 3mm; }
+ul,ol{ margin:0 0 3mm; padding-left:5mm; }
+li{ margin-bottom:1.2mm; }
+
+code{ font-family:"SFMono-Regular",Consolas,monospace; font-size:8.6pt; background:var(--bg-soft); border:1px solid var(--line); border-radius:3px; padding:0 1mm; }
+
+/* ---------- Tables ---------- */
+/* Long tables may split across pages; individual rows may not. Repeat the header
+   on every page the table spills onto. */
+table{ width:100%; border-collapse:collapse; margin:0 0 4mm; font-size:8.8pt; page-break-inside:auto; }
+tr{ page-break-inside:avoid; page-break-after:auto; }
+thead{ display:table-header-group; }
+thead th{
+  background:var(--brand); color:#fff; text-align:left; font-weight:600;
+  padding:2mm 2.5mm; border:1px solid var(--brand);
+}
+tbody td{ padding:1.8mm 2.5mm; border:1px solid var(--line); vertical-align:top; }
+tbody tr:nth-child(even){ background:#FAFBFC; }
+table.tight td, table.tight th{ font-size:8.2pt; }
+
+/* T-account / journal table — always short, keep whole */
+table.jrn{ page-break-inside:avoid; }
+table.jrn thead th{ background:#2E8B57; border-color:#2E8B57; }
+table.jrn td.dr{ color:#1D5C39; }
+table.jrn td.cr{ color:#7B241C; }
+table.jrn td.amt{ text-align:right; font-variant-numeric:tabular-nums; }
+/* the two money columns are always last — right-align their headers to match */
+table.jrn thead th:last-child,
+table.jrn thead th:nth-last-child(2){ text-align:right; }
+
+/* ---------- Callouts ---------- */
+.box{ border-left:4px solid var(--brand2); background:#F2F6FC; padding:3mm 4mm; margin:0 0 4mm; page-break-inside:avoid; border-radius:0 4px 4px 0; }
+.box.warn{ border-left-color:#C98A16; background:#FFF8EC; }
+.box.danger{ border-left-color:var(--accent); background:#FDF1F0; }
+.box.ok{ border-left-color:#2E8B57; background:#EFF8F2; }
+.box .t{ font-weight:700; display:block; margin-bottom:1mm; }
+.box p:last-child{ margin-bottom:0; }
+
+/* ---------- Figures / diagrams ---------- */
+figure{ margin:0 0 6mm; page-break-inside:avoid; }
+/* Wide diagrams fill the text column; tall ones are capped by page height so they
+   never overflow. Never set both width:100% and a height cap — that squashes them. */
+figure.dia img{
+  max-width:100%; max-height:232mm;
+  width:auto; height:auto;
+  display:block; margin:0 auto;
+}
+figcaption{
+  font-size:8.4pt; color:var(--muted); margin-top:2mm;
+  border-top:1px solid var(--line); padding-top:1.5mm;
+}
+figcaption b{ color:var(--brand); }
+
+/* Screenshots */
+figure.shot img{
+  width:100%; height:auto; display:block;
+  border:1px solid var(--line); border-radius:4px;
+}
+figure.shot{ page-break-inside:avoid; }
+
+/* Steps */
+ol.steps{ counter-reset:s; list-style:none; padding-left:0; margin:0 0 5mm; }
+ol.steps > li{
+  counter-increment:s; position:relative; padding-left:9mm; margin-bottom:2.5mm;
+  page-break-inside:avoid;
+}
+ol.steps > li::before{
+  content:counter(s);
+  position:absolute; left:0; top:0.2mm;
+  width:6mm; height:6mm; border-radius:50%;
+  background:var(--brand2); color:#fff;
+  font-size:8pt; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* Menu path breadcrumb */
+.path{
+  display:inline-block; background:var(--bg-soft); border:1px solid var(--line);
+  border-radius:4px; padding:.6mm 2mm; font-size:8.6pt; font-weight:600; color:var(--brand);
+}
+
+/* Role chips */
+.chip{
+  display:inline-block; border-radius:10px; padding:.4mm 2.2mm; font-size:7.6pt;
+  font-weight:600; margin-right:1.5mm; border:1px solid;
+}
+.chip.store{ background:#FDE8E8; border-color:#C0392B; color:#7B241C; }
+.chip.wh{ background:#EAF7EE; border-color:#2E8B57; color:#1D5C39; }
+.chip.buy{ background:#E8F1FD; border-color:#2E6DB4; color:#1B3F6B; }
+.chip.fin{ background:#F0EAF7; border-color:#7D4FA8; color:#4A2A66; }
+.chip.tax{ background:#FFF4E0; border-color:#C98A16; color:#7A5308; }
+.chip.it{ background:#ECEFF3; border-color:#5A6472; color:#2A313B; }
+
+/* TOC */
+.toc{ page-break-after:always; }
+.toc h1{ font-size:20pt; color:var(--brand); margin:0 0 5mm; padding-bottom:2.5mm; border-bottom:2px solid var(--line); }
+.toc ol{ list-style:none; padding:0; margin:0; counter-reset:t; }
+.toc > ol > li{ counter-increment:t; margin-bottom:1.2mm; font-weight:600; color:var(--brand); font-size:9.6pt; }
+.toc > ol > li::before{ content:counter(t) ". "; }
+.toc ol ol{ counter-reset:u; padding-left:6mm; margin:.5mm 0 1.5mm; font-weight:400; color:var(--ink); }
+.toc ol ol li{ counter-increment:u; margin-bottom:.2mm; font-size:8.6pt; line-height:1.4; }
+.toc ol ol li::before{ content:counter(t) "." counter(u) " "; color:var(--muted); }
+
+.pb{ page-break-before:always; }
+.avoid{ page-break-inside:avoid; }
+.two{ display:grid; grid-template-columns:1fr 1fr; gap:0 6mm; }
+.small{ font-size:8.6pt; color:var(--muted); }
+.en{ color:var(--muted); font-style:italic; }
