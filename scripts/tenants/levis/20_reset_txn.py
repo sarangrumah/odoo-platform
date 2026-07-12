@@ -16,6 +16,9 @@
 #   RESET_DRY=0             actually execute (default 1 = report only)
 #   RESET_KEEP_JOURNALS     comma-separated account.journal codes whose moves survive,
 #                           e.g. "EBRTB" to keep loaded opening balances / trial balances.
+#                           A code that does not exist here aborts the run (likely a typo);
+#                           a code that exists but holds no moves is fine. Omit the flag on
+#                           a DB with nothing to preserve (e.g. demo_levis has no EBRTB).
 import os
 
 env = env  # provided by odoo shell
@@ -169,8 +172,20 @@ if leaks:
         log("    %-52s %d" % (t, n))
 
 # ---- rows to preserve (RESET_KEEP_JOURNALS) -------------------------------------
+# Two different situations must NOT be conflated:
+#   * a journal CODE that does not exist in this DB  -> almost certainly a typo. Wiping
+#     would destroy the very moves the operator asked to keep, so abort -- LOUDLY.
+#   * a journal that exists but holds no moves       -> nothing to preserve. Perfectly
+#     normal (demo_levis has no EBRTB), so just say so and carry on.
+# The old code aborted on the second case too, and did it via `raise SystemExit("msg")`
+# whose message `odoo shell` swallows -- the script stopped dead with no explanation and
+# the reset looked like a silent no-op. Always report through log() (plain stdout).
 KEEP_MOVE, KEEP_AML = set(), set()
 if KEEP_JOURNALS:
+    cr.execute("SELECT DISTINCT code FROM account_journal WHERE code = ANY(%s)", (KEEP_JOURNALS,))
+    known = {r[0] for r in cr.fetchall()}
+    unknown = [c for c in KEEP_JOURNALS if c not in known]
+
     cr.execute(
         "SELECT m.id FROM account_move m JOIN account_journal j ON j.id=m.journal_id WHERE j.code = ANY(%s)",
         (KEEP_JOURNALS,),
@@ -180,8 +195,21 @@ if KEEP_JOURNALS:
         cr.execute("SELECT id FROM account_move_line WHERE move_id = ANY(%s)", (list(KEEP_MOVE),))
         KEEP_AML = {r[0] for r in cr.fetchall()}
     log("keep journals %s -> %d moves / %d lines preserved" % (KEEP_JOURNALS, len(KEEP_MOVE), len(KEEP_AML)))
+
+    if unknown:
+        cr.execute("SELECT DISTINCT code FROM account_journal ORDER BY code")
+        available = ", ".join(r[0] for r in cr.fetchall()) or "(none)"
+        log("")
+        log("!!! ABORT -- RESET_KEEP_JOURNALS names journal code(s) that do NOT exist here:")
+        log("!!!     %s" % ", ".join(unknown))
+        log("!!! Journal codes in this database: %s" % available)
+        log("!!! Nothing was deleted. Fix the code (typo?), or omit RESET_KEEP_JOURNALS")
+        log("!!! entirely to wipe every journal.")
+        raise SystemExit(1)
+
     if not KEEP_MOVE:
-        raise SystemExit("RESET_KEEP_JOURNALS=%s matched no journal -- refusing to run" % ",".join(KEEP_JOURNALS))
+        log("note: journal(s) %s exist but hold no moves -- nothing to preserve, continuing."
+            % ",".join(KEEP_JOURNALS))
 
 # FK columns of every closure table that point at account_move / account_move_line.
 cr.execute(
