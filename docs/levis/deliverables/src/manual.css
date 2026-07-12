@@ -1,0 +1,26 @@
+/* Manual-specific overrides, layered on top of style.css */
+
+/* Warmer cover so the two deliverables are distinguishable on a desk */
+.cover-m{
+  background:linear-gradient(150deg,#3B1F2B 0%,#7B2D3B 45%,#C0392B 100%);
+}
+
+/* Screenshots are the main content here, so give them room and a soft frame */
+figure.shot{ margin:0 0 6mm; }
+figure.shot img{
+  width:100%; height:auto; display:block;
+  border:1px solid var(--line);
+  border-radius:5px;
+  box-shadow:0 1px 4px rgba(27,36,48,.10);
+}
+figure.shot figcaption{
+  font-size:8.4pt; color:var(--muted);
+  margin-top:2mm; border-top:1px solid var(--line); padding-top:1.5mm;
+}
+
+/* Side-by-side screenshot pairs must not overflow their column */
+.two figure.shot img{ width:100%; }
+.two figure.shot figcaption{ font-size:7.8pt; }
+
+/* The role banner under each chapter title */
+h1.chap + .sub .chip{ vertical-align:middle; }

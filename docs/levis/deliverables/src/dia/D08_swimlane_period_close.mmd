@@ -1,0 +1,54 @@
+flowchart LR
+  classDef l3 fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef l4 fill:#F0EAF7,stroke:#7D4FA8,color:#4A2A66
+  classDef l2 fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef dec fill:#FFFFFF,stroke:#555,color:#222
+
+  subgraph O["① OPS ADMIN"]
+    direction TB
+    O1["Pastikan semua file periode<br/>sudah terimpor:<br/>X24DN · X70D · X31 · X48"]:::l3
+    O2["Cek Retail Import ▸ Imports<br/>tidak ada status <i>partial/failed</i>"]:::l3
+  end
+
+  subgraph W["② WAREHOUSE"]
+    direction TB
+    W1["Semua Receipt &amp; Delivery<br/>sudah di-Validate"]:::l3
+    W2["Scrap Batch &amp; Cycle Count<br/>periode ini selesai"]:::l3
+  end
+
+  subgraph A["③ AP / AR OFFICER"]
+    direction TB
+    A1["Semua Vendor Bill di-Post"]:::l4
+    A2["Cek Aged Payable &amp;<br/>Kartu Utang"]:::l4
+  end
+
+  subgraph G["④ ACCOUNTANT — Penutupan"]
+    direction TB
+    G1["Jalankan <b>Periodic COGS</b><br/>Invoicing ▸ Accounting ▸ Periodic COGS<br/>Nomor: COGS/2026/xxx"]:::l4
+    G2["Sistem hitung COGS per<br/>(Operating Unit × Kategori Produk)<br/>Dr COGS / Cr Persediaan"]:::l4
+    G3{"Ada qty<br/>berbiaya nol?<br/>(zero_cost_qty)"}:::dec
+    G4["Investigasi: penjualan mendahului<br/>pembelian → harga pokok belum ada"]:::l2
+    G5["Jalankan <b>Inventory Reconciliation</b><br/>Invoicing ▸ Accounting ▸ Inventory Reconciliation<br/>Nomor: INVREC/2026/xxx"]:::l4
+    G6["Bandingkan GL Balance vs Stock Value<br/>per akun valuasi → Difference"]:::l4
+    G7{"Difference<br/>= 0?"}:::dec
+    G8["Generate jurnal penyesuaian<br/>Dr/Cr Stock Valuation<br/>vs Stock Variation"]:::l4
+    G9["Jalankan Depresiasi Aktiva Tetap<br/>(cron harian / manual Post Depreciation)"]:::l4
+  end
+
+  subgraph F["⑤ FINANCE MANAGER"]
+    direction TB
+    F1["Terbitkan laporan:<br/>Trial Balance · Balance Sheet<br/>Profit &amp; Loss · Cash Flow<br/>GL Analysis per Operating Unit"]:::l2
+    F2{"Laporan<br/>sesuai?"}:::dec
+    F3["Set <b>Lock Date</b><br/>periode terkunci"]:::l2
+  end
+
+  O1 --> O2 --> W1
+  W1 --> W2 --> A1 --> A2 --> G1 --> G2 --> G3
+  G3 -- "Ya" --> G4 --> G5
+  G3 -- "Tidak" --> G5
+  G5 --> G6 --> G7
+  G7 -- "Tidak" --> G8 --> G9
+  G7 -- "Ya" --> G9
+  G9 --> F1 --> F2
+  F2 -- "Tidak" --> G5
+  F2 -- "Ya" --> F3

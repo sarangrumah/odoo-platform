@@ -1,0 +1,55 @@
+flowchart LR
+  classDef l4 fill:#F0EAF7,stroke:#7D4FA8,color:#4A2A66
+  classDef l2 fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef l3 fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef dec fill:#FFFFFF,stroke:#555,color:#222
+
+  subgraph A["① AP OFFICER"]
+    direction TB
+    A1["Post Vendor Bill"]:::l4
+  end
+
+  subgraph S["② SISTEM — Deteksi Otomatis PPh"]
+    direction TB
+    S1{"Vendor / produk<br/>objek PPh?"}:::dec
+    S2{"Vendor<br/>luar negeri?"}:::dec
+    S3["<b>PPh 26</b> — tarif 20%<br/>(atau tarif tax-treaty / DGT)"]:::l3
+    S4{"Vendor punya<br/>NPWP?"}:::dec
+    S5["<b>PPh 23</b> tarif normal 2%"]:::l3
+    S6["<b>PPh 23</b> tarif naik <b>4%</b><br/>(tanpa NPWP)"]:::l3
+    S7["Buat Withholding Line<br/>Cr Hutang PPh<br/>+ draft <b>Bukti Potong</b>"]:::l3
+  end
+
+  subgraph T["③ TAX OFFICER — PPh"]
+    direction TB
+    T1["Review Withholding Lines<br/>Invoicing ▸ Pajak Indonesia ▸ Withholding Lines"]:::l2
+    T2["Lengkapi Bukti Potong Unifikasi<br/>(kode objek dari 107 kode EBR)"]:::l2
+    T3["Export XML → upload Coretax DJP<br/>lalu isi nomor Bupot dari DJP"]:::l2
+  end
+
+  subgraph V["④ TAX OFFICER — PPN"]
+    direction TB
+    V1["Kelola NSFP (Nomor Seri Faktur Pajak)"]:::l2
+    V2["Terbitkan / import e-Faktur"]:::l2
+    V3{"Perlu Faktur<br/>Pengganti?"}:::dec
+    V4["Wizard Issue Faktur Pengganti<br/>(kode status 01/02, relink NSFP)"]:::l2
+    V5["Pre-Export Validation<br/>cek NPWP/NIK/DPP/Sertel"]:::l2
+  end
+
+  subgraph R["⑤ PELAPORAN"]
+    direction TB
+    R1["Laporan Pajak:<br/>Rekap Faktur Pajak · Rekap Bukti Potong<br/>SPT Masa PPN 1111 · Monitoring NSFP<br/>Ekualisasi Omzet (PPN vs GL)<br/>Ekualisasi Biaya vs Objek PPh"]:::l2
+  end
+
+  A1 --> S1
+  S1 -- "Tidak" --> X["Selesai — tanpa potongan"]:::l4
+  S1 -- "Ya" --> S2
+  S2 -- "Ya" --> S3 --> S7
+  S2 -- "Tidak" --> S4
+  S4 -- "Ya" --> S5 --> S7
+  S4 -- "Tidak" --> S6 --> S7
+  S7 --> T1 --> T2 --> T3 --> R1
+  A1 --> V1 --> V2 --> V3
+  V3 -- "Ya" --> V4 --> V5
+  V3 -- "Tidak" --> V5
+  V5 --> R1

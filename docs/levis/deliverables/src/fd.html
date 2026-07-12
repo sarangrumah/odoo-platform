@@ -1,0 +1,1145 @@
+<link rel="stylesheet" href="style.css">
+<title>Functional Document — Levi's / EBR Odoo 19</title>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="kicker">Functional Document</div>
+  <h1>Dokumen Fungsional<br>Implementasi Odoo 19</h1>
+  <h2>Levi's Indonesia — PT Era Busana Retailindo (EBR)<br>
+      <span style="opacity:.75">PT Sinar Eka Selaras (SES) — 1 Head Office + 20 Toko</span></h2>
+  <div class="rule"></div>
+  <div class="lead">
+    Dokumen ini menguraikan seluruh cakupan fungsional solusi Odoo 19 untuk Levi's:
+    arsitektur modul, peran pengguna, alur proses bisnis lengkap dengan
+    <i>swimlane flowchart</i> per peran, diagram status dokumen, dampak jurnal
+    akuntansi, serta katalog fitur per modul.
+  </div>
+  <div class="spacer"></div>
+  <div class="meta">
+    <div><b>Dokumen</b>Functional Document (FD)</div>
+    <div><b>Versi</b>1.0</div>
+    <div><b>Tanggal</b>13 Juli 2026</div>
+    <div><b>Platform</b>Odoo 19 Community + 29 modul kustom</div>
+    <div><b>Basis Data Acuan</b>prd_levis_begbal</div>
+    <div><b>Status</b>For Review</div>
+  </div>
+</div>
+
+<!-- ============ TOC ============ -->
+<div class="toc">
+  <h1>Daftar Isi</h1>
+  <ol>
+    <li>Pendahuluan
+      <ol>
+        <li>Tujuan &amp; Cakupan Dokumen</li>
+        <li>Entitas Legal &amp; Struktur Operasi</li>
+        <li>Konvensi Bahasa &amp; Glosarium</li>
+      </ol>
+    </li>
+    <li>Arsitektur Solusi
+      <ol>
+        <li>Diagram Arsitektur Menyeluruh</li>
+        <li>Daftar Modul Standar Odoo</li>
+        <li>Daftar Modul Kustom</li>
+      </ol>
+    </li>
+    <li>Peran Pengguna &amp; Hak Akses
+      <ol>
+        <li>Peta Peran Organisasi</li>
+        <li>Matriks Peran → Grup Akses → Menu</li>
+      </ol>
+    </li>
+    <li>Dimensi Operating Unit (OU)</li>
+    <li>Proses Bisnis &amp; Swimlane per Peran
+      <ol>
+        <li>Retail Sales-to-Cash (Impor Data Toko)</li>
+        <li>Procure-to-Pay — Trade</li>
+        <li>Konsep GR/IR Clearing</li>
+        <li>Procure-to-Pay — Non-Trade</li>
+        <li>Retur Pembelian (RTV)</li>
+        <li>Operasi Gudang: Scrap &amp; Cycle Count</li>
+        <li>Aktiva Tetap</li>
+        <li>Perpajakan: PPN &amp; PPh</li>
+        <li>Penutupan Periode</li>
+      </ol>
+    </li>
+    <li>Siklus Hidup Status Dokumen</li>
+    <li>Katalog Fitur per Modul
+      <ol>
+        <li>custom_levis_localization</li>
+        <li>custom_retail_import (+ POS Bridge)</li>
+        <li>custom_po_return</li>
+        <li>custom_accounting_asset + custom_levis_asset_accounts</li>
+        <li>custom_accounting_reports</li>
+        <li>Modul Perpajakan &amp; Kepatuhan</li>
+        <li>Modul Pendukung</li>
+      </ol>
+    </li>
+    <li>Konfigurasi Sistem
+      <ol>
+        <li>Parameter Sistem (Feature Flags)</li>
+        <li>Penomoran Dokumen (Sequences)</li>
+        <li>Daftar Jurnal</li>
+        <li>Tugas Terjadwal (Scheduled Actions)</li>
+      </ol>
+    </li>
+    <li>Konfigurasi Wajib yang Belum Selesai</li>
+    <li>Batasan, Risiko &amp; Catatan Teknis</li>
+    <li>Lampiran</li>
+  </ol>
+</div>
+
+<!-- ============ 1 ============ -->
+<h1 class="chap"><span class="num">1.</span> Pendahuluan</h1>
+<div class="sub">Introduction — tujuan dokumen, entitas, dan konvensi istilah</div>
+
+<h2>1.1 Tujuan &amp; Cakupan Dokumen</h2>
+<p>
+  Dokumen Fungsional <span class="en">(Functional Document / FD)</span> ini adalah acuan tunggal yang
+  menjelaskan <b>apa</b> yang dilakukan sistem Odoo 19 untuk Levi's Indonesia, <b>siapa</b> yang
+  melakukannya, dan <b>bagaimana</b> setiap proses berdampak pada buku besar
+  <span class="en">(General Ledger)</span>.
+</p>
+<p>Cakupan dokumen:</p>
+<ul>
+  <li><b>Seluruh modul kustom</b> yang terpasang pada basis data Levi's — 29 modul.</li>
+  <li><b>Modul standar Odoo</b> yang menjadi tulang punggung proses (Purchase, Inventory, Point of Sale, Invoicing/Accounting), sejauh proses tersebut disentuh atau diubah oleh lapisan kustom.</li>
+  <li><b>Alur proses bisnis</b> dalam bentuk <i>swimlane</i> per peran pengguna, ditambah <i>flowchart</i> detail per fitur.</li>
+  <li><b>Dampak akuntansi</b> setiap transaksi kustom, disajikan sebagai tabel jurnal Debit/Kredit.</li>
+  <li><b>Konfigurasi</b> aktual — parameter sistem, penomoran, jurnal, dan <i>scheduled action</i>.</li>
+</ul>
+<div class="box">
+  <span class="t">Dokumen pendamping</span>
+  <p>Panduan langkah-demi-langkah beserta tangkapan layar disajikan terpisah pada
+  <b>Manual Guide — Levi's / EBR Odoo 19</b>. FD menjawab <i>"apa dan mengapa"</i>;
+  Manual Guide menjawab <i>"bagaimana caranya"</i>.</p>
+</div>
+
+<h2>1.2 Entitas Legal &amp; Struktur Operasi</h2>
+<table>
+  <thead><tr><th style="width:26%">Entitas / Objek</th><th>Keterangan</th></tr></thead>
+  <tbody>
+    <tr><td><b>PT Era Busana Retailindo (EBR)</b></td><td>Entitas pemilik <i>Chart of Accounts</i> dan pelaporan keuangan. Perusahaan (<code>res.company</code>) tunggal di dalam basis data: <b>PT. ERA Busana Retailindo</b>.</td></tr>
+    <tr><td><b>PT Sinar Eka Selaras (SES)</b></td><td>Entitas operasional toko. Muncul di sistem sebagai penamaan Operating Unit toko: <code>OLS SES - &lt;NAMA MALL&gt;</code>.</td></tr>
+    <tr><td><b>Head Office</b></td><td>Satu Operating Unit: <b>EBR - HEAD OFFICE</b>. Menjadi OU bawaan untuk transaksi non-toko (pembelian kantor pusat, aset, dsb.).</td></tr>
+    <tr><td><b>Toko / Outlet</b></td><td>20 Operating Unit aktif, masing-masing memiliki: 1 <i>warehouse</i>, 1 jurnal pembelian, 1 jurnal kas dengan akun kas <code>1102…</code> tersendiri, dan 1 konfigurasi Point of Sale.</td></tr>
+    <tr><td><b>Distribution Center (DC)</b></td><td>Gudang pusat. Menjadi titik penerimaan barang dagangan (<i>Trade</i>) dan asal pengiriman ke toko.</td></tr>
+  </tbody>
+</table>
+
+<h2>1.3 Konvensi Bahasa &amp; Glosarium</h2>
+<p>
+  Narasi menggunakan <b>Bahasa Indonesia</b>. Istilah antarmuka Odoo dipertahankan dalam
+  <b>Bahasa Inggris</b> agar sama persis dengan yang tampil di layar — misalnya
+  <i>Vendor Bill</i>, bukan "Faktur Pemasok". Padanan istilah:
+</p>
+<table class="tight">
+  <thead><tr><th style="width:30%">Istilah di Layar (EN)</th><th style="width:30%">Padanan Indonesia</th><th>Makna</th></tr></thead>
+  <tbody>
+    <tr><td>Purchase Order (PO)</td><td>Pesanan Pembelian</td><td>Dokumen pemesanan barang/jasa ke vendor.</td></tr>
+    <tr><td>Goods Receipt (GR) / Receipt</td><td>Penerimaan Barang</td><td>Dokumen serah-terima barang fisik dari vendor.</td></tr>
+    <tr><td>Vendor Bill</td><td>Faktur Pembelian / Tagihan Vendor</td><td>Tagihan resmi dari vendor yang menimbulkan hutang.</td></tr>
+    <tr><td>GR/IR Clearing</td><td>Akun Antara Terima–Tagih</td><td><i>Goods Received, Not Invoiced</i> — barang sudah diterima, faktur belum masuk.</td></tr>
+    <tr><td>Journal Entry</td><td>Jurnal / Entri Buku Besar</td><td>Baris pencatatan Debit–Kredit di GL.</td></tr>
+    <tr><td>Trade / Non-Trade</td><td>Dagangan / Non-Dagangan</td><td>Pemisahan pembelian barang dagangan vs operasional.</td></tr>
+    <tr><td>Operating Unit (OU)</td><td>Unit Operasi</td><td>Dimensi analitik: Head Office atau salah satu toko.</td></tr>
+    <tr><td>Scrap</td><td>Penghapusan Stok</td><td>Barang rusak/hilang dikeluarkan dari persediaan.</td></tr>
+    <tr><td>Cycle Count</td><td>Stok Opname Berkala</td><td>Perhitungan fisik sebagian stok secara terjadwal.</td></tr>
+    <tr><td>Fixed Asset</td><td>Aktiva Tetap</td><td>Aset berumur panjang yang disusutkan.</td></tr>
+    <tr><td>Depreciation</td><td>Depresiasi / Penyusutan</td><td>Pembebanan nilai aset secara berkala.</td></tr>
+    <tr><td>Revaluation</td><td>Revaluasi</td><td>Penyesuaian nilai aset ke nilai wajar (PSAK 16 / IAS 16).</td></tr>
+    <tr><td>Credit Note</td><td>Nota Kredit</td><td>Pengurang tagihan — dipakai pada retur pembelian.</td></tr>
+    <tr><td>Withholding Tax</td><td>PPh Potong-Pungut</td><td>Pajak yang dipotong dari pembayaran ke vendor.</td></tr>
+    <tr><td>Bukti Potong (Bupot)</td><td>—</td><td>Bukti pemotongan PPh yang diserahkan ke vendor &amp; DJP.</td></tr>
+    <tr><td>Trial Balance</td><td>Neraca Saldo</td><td>Ringkasan saldo seluruh akun.</td></tr>
+    <tr><td>Aged Payable / Receivable</td><td>Umur Hutang / Piutang</td><td>Pengelompokan saldo berdasarkan umur.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ 2 ============ -->
+<h1 class="chap"><span class="num">2.</span> Arsitektur Solusi</h1>
+<div class="sub">Solution architecture — dari file sumber EBR sampai laporan keuangan</div>
+
+<h2>2.1 Diagram Arsitektur Menyeluruh</h2>
+<p>
+  Solusi Levi's terdiri dari empat lapisan. <b>(1)</b> Data operasional toko lahir di sistem EBR/SAP dan
+  di-<i>export</i> sebagai berkas "X" (X101, X24DN, X70D, dst.). <b>(2)</b> Lapisan
+  <i>adapter</i> <code>custom_retail_import</code> menarik berkas tersebut dan mengubahnya menjadi
+  record Odoo. <b>(3)</b> Odoo Core mencatat produk, POS, stok, dan jurnal. <b>(4)</b> Lapisan
+  lokalisasi Levi's menyisipkan aturan bisnis khas EBR — Trade/Non-Trade, GR/IR, Operating Unit,
+  COGS periodik — sebelum akhirnya menghasilkan laporan dan dokumen PDF.
+</p>
+<figure class="dia">
+  <img src="svg/D01_arsitektur.svg" alt="Diagram arsitektur solusi Levi's">
+  <figcaption><b>Gambar 1.</b> Arsitektur solusi Levi's — enam lapisan, dari berkas sumber EBR/SAP hingga laporan dan dokumen PDF. Perhatikan bahwa <code>custom_retail_import</code> sengaja <i>tidak</i> bergantung pada modul Point of Sale; perilaku POS diletakkan pada modul jembatan <code>custom_retail_import_pos</code> yang ter-install otomatis.</figcaption>
+</figure>
+
+<h2>2.2 Daftar Modul Standar Odoo</h2>
+<p>Modul bawaan Odoo 19 Community yang menjadi fondasi dan disentuh oleh lapisan kustom:</p>
+<table class="tight">
+  <thead><tr><th style="width:18%">Modul</th><th style="width:20%">Menu Utama</th><th>Peran dalam Solusi Levi's</th></tr></thead>
+  <tbody>
+    <tr><td><code>account</code></td><td><span class="path">Invoicing</span></td><td>Buku besar, Chart of Accounts, Vendor Bill, Customer Invoice, pembayaran, rekonsiliasi. Fondasi seluruh dampak akuntansi.</td></tr>
+    <tr><td><code>purchase</code> + <code>purchase_stock</code></td><td><span class="path">Purchase</span></td><td>RFQ → Purchase Order → penerimaan. Diperluas dengan <b>Purchase Type Trade/Non-Trade</b> dan penomoran terpisah.</td></tr>
+    <tr><td><code>stock</code> + <code>stock_account</code></td><td><span class="path">Inventory</span></td><td>Warehouse, lokasi, Receipt/Delivery, Lot/Serial, valuasi persediaan. Diperluas dengan blokir <i>over-receipt</i> dan jurnal Goods Receipt kustom.</td></tr>
+    <tr><td><code>point_of_sale</code></td><td><span class="path">Point of Sale</span></td><td>Sesi POS, order, metode pembayaran, jurnal penutup sesi. Menjadi target replay data penjualan toko dari X24DN.</td></tr>
+    <tr><td><code>product</code></td><td><span class="path">Inventory ▸ Products</span></td><td>Master produk &amp; varian. Katalog Levi's berukuran besar: ± 32.000 <i>template</i>, ratusan ribu varian (atribut Size × Inseam).</td></tr>
+    <tr><td><code>mail</code></td><td>—</td><td><i>Chatter</i>, aktivitas, dan jejak perubahan pada dokumen.</td></tr>
+    <tr><td><code>queue_job</code> <span class="small">(OCA)</span></td><td><span class="path">Job Queue</span></td><td>Eksekusi impor besar secara asinkron (mis. X101 ± 160.000 varian). Kanal: <code>root.retail_import</code>.</td></tr>
+  </tbody>
+</table>
+
+<h2>2.3 Daftar Modul Kustom</h2>
+<p>29 modul kustom terpasang. Dikelompokkan menurut fungsinya:</p>
+<table class="tight">
+  <thead><tr><th style="width:24%">Modul</th><th style="width:9%">Versi</th><th>Fungsi</th></tr></thead>
+  <tbody>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">A. Lokalisasi Khusus Levi's</td></tr>
+    <tr><td><code>custom_levis_localization</code></td><td>19.0.1.18.0</td><td><b>Modul inti.</b> 14 fitur: Trade/Non-Trade, GR/IR, Operating Unit, Scrap Batch, COGS Periodik, Inventory Reconciliation, MDR/BIN kartu, Payment Voucher &amp; Receipt, kontrol <i>over-receipt</i>, HS Code, master bank Indonesia.</td></tr>
+    <tr><td><code>custom_levis_asset_accounts</code></td><td>19.0.2.0.0</td><td>Data seed 6 kategori aktiva tetap EBR + akun revaluasi PSAK 16.</td></tr>
+
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">B. Integrasi Data Toko</td></tr>
+    <tr><td><code>custom_retail_import</code></td><td>19.0.0.16.0</td><td>Adapter berkas EBR/SAP (X101, X24DN, X70D, X31, X48, X20, TB, GL). Tiga transport: upload manual, SFTP feed, mailbox IMAP.</td></tr>
+    <tr><td><code>custom_retail_import_pos</code></td><td>19.0.0.4.0</td><td>Jembatan POS (<i>auto-install</i>). Memaksa angka net/pajak/diskon mengikuti berkas sumber persis, menghilangkan selisih pembulatan.</td></tr>
+    <tr><td><code>custom_product_barcode</code></td><td>19.0.0.1.0</td><td>Satu varian boleh memiliki banyak GTIN/barcode. Wajib untuk pencocokan SKU dari berkas X.</td></tr>
+
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">C. Akuntansi &amp; Pelaporan</td></tr>
+    <tr><td><code>custom_accounting_full</code></td><td>19.0.0.3.1</td><td>Chart of Accounts PSAK, konsolidasi, dimensi cabang, blokir referensi Vendor Bill ganda.</td></tr>
+    <tr><td><code>custom_accounting_reports</code></td><td>19.0.0.3.0</td><td>Mesin laporan dinamis: Trial Balance, GL, Balance Sheet, P&amp;L, Cash Flow, Aged Payable/Receivable, Kartu Utang/Piutang, GL Analysis, dan 17 Laporan Pajak.</td></tr>
+    <tr><td><code>custom_accounting_asset</code></td><td>19.0.0.4.0</td><td>Aktiva tetap: registrasi, depresiasi garis lurus, revaluasi, pelepasan, Asset Register.</td></tr>
+    <tr><td><code>custom_accounting_recurring</code></td><td>—</td><td>Jurnal berulang <span class="en">(recurring journal)</span>.</td></tr>
+    <tr><td><code>custom_bank_import</code></td><td>—</td><td>Impor rekening koran bank untuk rekonsiliasi.</td></tr>
+
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">D. Pengadaan</td></tr>
+    <tr><td><code>custom_po_return</code></td><td>19.0.0.1.0</td><td>Retur pembelian (RTV) berbasis kuantitas dengan mesin alokasi FIFO lintas PO/GR, serta Credit Note per faktur asal.</td></tr>
+    <tr><td><code>custom_approval_engine</code></td><td>19.0.0.1.0</td><td>Matriks otorisasi bertingkat, delegasi, <i>out-of-office</i>, eskalasi SLA. Dipakai untuk persetujuan PO.</td></tr>
+
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">E. Perpajakan &amp; Kepatuhan</td></tr>
+    <tr><td><code>custom_tax_id</code></td><td>19.0.0.2.1</td><td>PPh potong-pungut: 107 kode objek pajak EBR, deteksi otomatis saat Bill di-post, aturan tarif (PPh 23 naik 2%→4% tanpa NPWP, PPh 26 untuk vendor asing).</td></tr>
+    <tr><td><code>custom_coretax</code></td><td>19.0.0.3.0</td><td>Coretax DJP: register NSFP, e-Faktur XML, penyimpanan Sertel.</td></tr>
+    <tr><td><code>custom_coretax_bupot</code></td><td>19.0.0.1.0</td><td>Bukti Potong Unifikasi (PPh 22/23/4(2)/15/26) + export XML sesuai skema Coretax.</td></tr>
+    <tr><td><code>custom_pdp_core</code>, <code>custom_pdp_audit</code>, <code>custom_pdp_consent</code></td><td>—</td><td>Kepatuhan UU 27/2022 (PDP). <code>custom_pdp_audit</code> menulis <i>audit log</i> yang di-<i>hash chain</i> (SHA256, append-only) untuk setiap aksi akuntansi.</td></tr>
+    <tr><td><code>l10n_erajaya</code></td><td>19.0.1.0.0</td><td>Template Chart of Accounts EBR: CoA 10-digit Indonesia + set pajak PPN/PPh lengkap.</td></tr>
+
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">F. Gudang (WMS)</td></tr>
+    <tr><td><code>custom_wms_putaway</code></td><td>19.0.0.1.0</td><td>Mesin <i>putaway</i> bertingkat untuk DC.</td></tr>
+    <tr><td><code>custom_wms_cycle_count</code></td><td>19.0.0.1.0</td><td>Stok opname berkala berbasis rencana + alur persetujuan selisih.</td></tr>
+    <tr><td><code>custom_barcode</code></td><td>—</td><td>Pemindaian barcode untuk operasi gudang.</td></tr>
+
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">G. Pendukung Platform</td></tr>
+    <tr><td><code>custom_core</code></td><td>19.0.0.1.0</td><td>Fondasi: <i>mixin</i> bersama dan kategori hak akses platform.</td></tr>
+    <tr><td><code>custom_pos_id</code></td><td>19.0.0.1.0</td><td>Lokalisasi POS Indonesia: QRIS, pembulatan rupiah, e-receipt.</td></tr>
+    <tr><td><code>custom_home_console</code>, <code>custom_documents</code>, <code>custom_sign</code>, <code>custom_helpdesk</code>, <code>custom_spreadsheet</code>, <code>custom_studio_lite</code>, <code>custom_whatsapp</code>, <code>custom_ai_bridge</code>, <code>custom_adapter_framework</code></td><td>—</td><td>Modul platform tambahan (konsol beranda, manajemen dokumen, tanda tangan digital, helpdesk, spreadsheet, kustomisasi ringan, notifikasi WhatsApp, jembatan AI, kerangka adapter).</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ 3 ============ -->
+<h1 class="chap"><span class="num">3.</span> Peran Pengguna &amp; Hak Akses</h1>
+<div class="sub">User roles &amp; access rights</div>
+
+<h2>3.1 Peta Peran Organisasi</h2>
+<figure class="dia">
+  <img src="svg/D02_peta_role.svg" alt="Peta peran pengguna">
+  <figcaption><b>Gambar 2.</b> Peta peran pengguna Levi's. Nama grup akses Odoo dicetak miring. Tidak ada grup akses baru yang dibuat oleh <code>custom_levis_localization</code> — modul ini menumpang pada grup standar Odoo.</figcaption>
+</figure>
+
+<h2>3.2 Matriks Peran → Grup Akses → Menu</h2>
+<table class="tight">
+  <thead><tr><th style="width:16%">Peran</th><th style="width:22%">Grup Akses Odoo</th><th style="width:30%">Menu yang Dapat Diakses</th><th>Wewenang Utama</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="chip store">TOKO</span><b>Store Staff / Kasir</b></td>
+      <td>Point of Sale / User</td>
+      <td><span class="path">Point of Sale</span></td>
+      <td>Membuka &amp; menutup sesi POS, mencatat penjualan. <i>Catatan:</i> pada model operasi Levi's, penjualan direkam di sistem EBR dan masuk ke Odoo lewat impor — bukan diketik ulang.</td>
+    </tr>
+    <tr>
+      <td><span class="chip store">TOKO</span><b>Store Supervisor</b></td>
+      <td>Point of Sale / Manager</td>
+      <td><span class="path">Point of Sale ▸ Orders / Sessions / Reporting</span></td>
+      <td>Menutup sesi, meninjau order, melihat laporan penjualan toko.</td>
+    </tr>
+    <tr>
+      <td><span class="chip wh">GUDANG</span><b>Warehouse Staff</b></td>
+      <td>Inventory / User</td>
+      <td><span class="path">Inventory ▸ Overview / Transfers / Products</span></td>
+      <td>Menerima barang (Receipt), memvalidasi transfer, membuat Scrap Batch (tidak boleh menghapus).</td>
+    </tr>
+    <tr>
+      <td><span class="chip wh">GUDANG</span><b>Warehouse Manager</b></td>
+      <td>Inventory / Manager</td>
+      <td><span class="path">Inventory</span> (penuh) + <span class="path">Inventory ▸ Operations ▸ Scrap Batches</span></td>
+      <td>Validasi Scrap Batch, menyetujui selisih Cycle Count, konfigurasi warehouse &amp; lokasi. Akses baca ke Inventory Reconciliation &amp; Periodic COGS.</td>
+    </tr>
+    <tr>
+      <td><span class="chip buy">BELI</span><b>Purchasing Officer</b></td>
+      <td>Purchase / User</td>
+      <td><span class="path">Purchase ▸ Orders</span>, <span class="path">Purchase ▸ Orders ▸ PO Returns</span></td>
+      <td>Membuat RFQ &amp; PO (memilih Trade/Non-Trade), membuat PO Return. Akses baca ke peta akun Trade/Non-Trade.</td>
+    </tr>
+    <tr>
+      <td><span class="chip buy">BELI</span><b>Purchasing Manager</b></td>
+      <td>Purchase / Manager + Approver</td>
+      <td><span class="path">Purchase</span> (penuh) + <span class="path">Approvals</span></td>
+      <td>Menyetujui PO sesuai matriks otorisasi, mengelola vendor &amp; harga.</td>
+    </tr>
+    <tr>
+      <td><span class="chip fin">FINANCE</span><b>AP Officer</b></td>
+      <td>Invoicing / Billing</td>
+      <td><span class="path">Invoicing ▸ Vendors</span></td>
+      <td>Membuat &amp; posting Vendor Bill, Register Payment (termasuk Admin Fee &amp; Card BIN), mencetak Payment Voucher. Akses penuh ke baris biaya administrasi.</td>
+    </tr>
+    <tr>
+      <td><span class="chip fin">FINANCE</span><b>Accountant / GL</b></td>
+      <td>Invoicing / Billing</td>
+      <td><span class="path">Invoicing ▸ Accounting</span>, <span class="path">Invoicing ▸ Reporting</span></td>
+      <td>Jurnal manual, rekonsiliasi, menjalankan laporan.</td>
+    </tr>
+    <tr>
+      <td><span class="chip fin">FINANCE</span><b>Finance Manager</b></td>
+      <td>Invoicing / Administrator</td>
+      <td><span class="path">Invoicing</span> (penuh), termasuk <span class="path">Invoicing ▸ Accounting ▸ Inventory Reconciliation</span> dan <span class="path">▸ Periodic COGS</span></td>
+      <td><b>Akses eksklusif</b> untuk membuat/mengubah Inventory Reconciliation, Periodic COGS, Card BIN/MDR, dan peta akun Trade/Non-Trade. Menetapkan <i>Lock Date</i>.</td>
+    </tr>
+    <tr>
+      <td><span class="chip tax">PAJAK</span><b>Tax Officer</b></td>
+      <td>Invoicing / Billing + Coretax</td>
+      <td><span class="path">Invoicing ▸ Pajak Indonesia</span>, <span class="path">Invoicing ▸ Reporting ▸ Reports ▸ Laporan Pajak</span>, <span class="path">Invoicing ▸ Bupot Unifikasi</span></td>
+      <td>Mengelola Withholding Lines &amp; Bukti Potong, NSFP, e-Faktur, Faktur Pengganti, Pre-Export Validation, dan seluruh laporan pajak.</td>
+    </tr>
+    <tr>
+      <td><span class="chip fin">FINANCE</span><b>Asset Officer</b></td>
+      <td>Asset User / Asset Manager</td>
+      <td><span class="path">Invoicing ▸ Assets</span></td>
+      <td>Registrasi aset, konfirmasi, posting depresiasi, revaluasi, pelepasan, cetak Asset Register. <i>Asset Manager</i> diperlukan untuk mengubah konfigurasi Groups &amp; Locations.</td>
+    </tr>
+    <tr>
+      <td><span class="chip it">IT</span><b>Ops / Data Admin</b></td>
+      <td>Retail Import / Manager</td>
+      <td><span class="path">Retail Import</span> (termasuk <span class="path">▸ Configuration</span>)</td>
+      <td>Menjalankan impor, meninjau log, mengelola Import Profiles, Feeds, dan Mailboxes. <b>Grup <i>Retail Import / User</i></b> hanya bisa membaca konfigurasi dan menjalankan wizard impor.</td>
+    </tr>
+    <tr>
+      <td><span class="chip it">IT</span><b>System Administrator</b></td>
+      <td>Settings / Technical Features</td>
+      <td><span class="path">Settings ▸ Technical</span></td>
+      <td>System Parameters (feature flags), Scheduled Actions, manajemen pengguna &amp; grup akses.</td>
+    </tr>
+  </tbody>
+</table>
+<div class="box warn">
+  <span class="t">Perhatian pemisahan tugas <span class="en">(segregation of duties)</span></span>
+  <p>Parameter sistem seperti <code>retail_import.x24_post_enabled</code> dan
+  <code>custom_levis_localization.suppress_gr_journal</code> <b>mengubah perilaku posting jurnal</b>.
+  Karena itu, akses ke <span class="path">Settings ▸ Technical ▸ System Parameters</span> harus dibatasi
+  pada System Administrator, dan setiap perubahan wajib melalui persetujuan Finance Manager.</p>
+</div>
+
+<!-- ============ 4 ============ -->
+<h1 class="chap"><span class="num">4.</span> Dimensi Operating Unit (OU)</h1>
+<div class="sub">Bagaimana setiap angka di buku besar tahu ia milik toko yang mana</div>
+
+<p>
+  EBR menjalankan satu perusahaan legal tetapi 21 pusat biaya operasional. Odoo Community tidak
+  memiliki fitur <i>Operating Unit</i> bawaan, sehingga solusi ini mengimplementasikannya sebagai
+  <b>Analytic Plan</b> bernama <code>Operating Unit</code>. Setiap toko dan Head Office adalah satu
+  <i>analytic account</i> di dalam <i>plan</i> tersebut.
+</p>
+<figure class="dia">
+  <img src="svg/D13_operating_unit.svg" alt="Dimensi Operating Unit">
+  <figcaption><b>Gambar 3.</b> Aliran dimensi Operating Unit — dari master (warehouse &amp; company) ke titik-titik stempel, lalu ke buku besar dan pelaporan.</figcaption>
+</figure>
+
+<h3>Bagaimana OU terisi otomatis</h3>
+<table class="tight">
+  <thead><tr><th style="width:30%">Dokumen</th><th style="width:32%">Sumber OU</th><th>Field yang diisi</th></tr></thead>
+  <tbody>
+    <tr><td>Purchase Order Line</td><td><i>Warehouse</i> pada PO → <code>l10n_ou_analytic_id</code></td><td><code>analytic_distribution</code> (digabung, tidak menimpa distribusi lain)</td></tr>
+    <tr><td>Jurnal Goods Receipt</td><td><i>Warehouse</i> pada Receipt</td><td><code>account.move.line.l10n_ou_analytic_id</code></td></tr>
+    <tr><td>Vendor Bill</td><td>Diturunkan dari PO; jika tanpa PO, dari Head Office</td><td><code>account.move.l10n_ou_analytic_id</code></td></tr>
+    <tr><td>Jurnal penutup POS</td><td><i>Warehouse</i> dari <code>pos.config</code> toko</td><td>Baris penjualan, PPN, dan piutang — semuanya distempel</td></tr>
+    <tr><td>Payment</td><td>Diisi manual atau diturunkan dari tagihan yang dibayar</td><td><code>account.payment.register.l10n_ou_analytic_id</code></td></tr>
+  </tbody>
+</table>
+
+<h3>Jurnal khusus per toko</h3>
+<p>Selain dimensi analitik, tiap toko memiliki jurnal fisik tersendiri agar rekonsiliasi kas dapat dilakukan per outlet:</p>
+<ul>
+  <li><b>Jurnal Pembelian</b> — <code>Pembelian - OLS SES - &lt;MALL&gt;</code> (20 jurnal) + <code>Pembelian - EBR - HEAD OFFICE</code>.</li>
+  <li><b>Jurnal Kas</b> — <code>Cash - OLS SES - &lt;MALL&gt;</code>, masing-masing dengan <b>akun kas <code>1102…</code> tersendiri</b>, sehingga saldo kas per toko langsung terbaca di Trial Balance.</li>
+</ul>
+<div class="box ok">
+  <span class="t">Manfaat pelaporan</span>
+  <p>Karena setiap baris jurnal membawa OU, laporan <b>GL Analysis</b> dapat disajikan sebagai
+  <i>pivot</i> per Operating Unit, dan <b>Periodic COGS</b> dihitung per kombinasi
+  (Operating Unit × Kategori Produk) — bukan hanya total perusahaan.</p>
+</div>
+
+<!-- ============ 5 ============ -->
+<h1 class="chap"><span class="num">5.</span> Proses Bisnis &amp; Swimlane per Peran</h1>
+<div class="sub">Business processes — setiap alur digambar sebagai swimlane, disertai dampak jurnalnya</div>
+
+<h2>5.1 Retail Sales-to-Cash (Impor Data Toko)</h2>
+<p>
+  Ini adalah alur dengan volume terbesar. Penjualan <b>tidak</b> diketik di Odoo; penjualan terjadi di
+  sistem kasir EBR, lalu direplay ke Odoo sebagai <code>pos.order</code> berikut jurnalnya. Tujuannya
+  agar buku besar Odoo persis sama dengan angka sumber EBR — <b>selisih Rp 0</b>.
+</p>
+<figure class="dia">
+  <img src="svg/D03_swimlane_sales_to_cash.svg" alt="Swimlane Retail Sales-to-Cash">
+  <figcaption><b>Gambar 4.</b> Swimlane Retail Sales-to-Cash. Empat lajur: sumber EBR, Ops/Data Admin, sistem Odoo, dan Finance.</figcaption>
+</figure>
+
+<h3>Berkas sumber dan perannya</h3>
+<table class="tight">
+  <thead><tr><th style="width:12%">Berkas</th><th style="width:28%">Isi</th><th>Menjadi apa di Odoo</th></tr></thead>
+  <tbody>
+    <tr><td><b>X101</b></td><td>Material Master (SKU, kategori, harga, GTIN)</td><td><code>product.template</code> + <code>product.product</code>, kategori 3 tingkat, atribut Size &amp; Inseam, barcode alternatif.</td></tr>
+    <tr><td><b>X24DN</b></td><td>Detail penjualan retail per baris transaksi</td><td><code>pos.order</code> + <code>pos.order.line</code>. <b>Sumber kebenaran</b> untuk pajak, diskon, dan retur.</td></tr>
+    <tr><td><b>X70D</b></td><td>Detail alat bayar <span class="en">(tender)</span></td><td>Jurnal <b>RIREC</b> — memindahkan saldo dari POS Suspense Clearing ke Bank/Piutang Kartu, lalu auto-<i>reconcile</i>.</td></tr>
+    <tr><td><b>X31</b></td><td>Jurnal diskon</td><td>Jurnal <b>RIADJ</b> — reklasifikasi diskon. <span class="small">(Alternatif dari reklas diskon internal X24DN — lihat peringatan di bawah.)</span></td></tr>
+    <tr><td><b>X48</b></td><td>Retur penjualan</td><td><code>pos.order</code> bertipe refund.</td></tr>
+    <tr><td><b>X20</b></td><td>Saldo stok awal</td><td>Penyesuaian persediaan awal. <b>Sekali jalan</b>, dikunci oleh penanda <code>levis.x20_opening_stock_applied</code>.</td></tr>
+    <tr><td><b>TB &amp; GL</b></td><td>Neraca Saldo &amp; Buku Besar EBR</td><td>Saldo awal dan detail GL periode berjalan.</td></tr>
+  </tbody>
+</table>
+
+<h3>Mekanisme kunci</h3>
+<table class="tight">
+  <thead><tr><th style="width:24%">Mekanisme</th><th>Penjelasan</th></tr></thead>
+  <tbody>
+    <tr><td><b>Idempotensi</b></td><td>Setiap berkas di-<i>hash</i> SHA256. Berkas yang sama tidak akan pernah diposting dua kali, meskipun tidak sengaja diunggah ulang.</td></tr>
+    <tr><td><b>Dry-run / Preview</b></td><td>Wizard impor menampilkan 20 baris pertama hasil pemetaan kolom <i>sebelum</i> data ditulis — untuk memverifikasi bahwa format berkas belum berubah.</td></tr>
+    <tr><td><b>Strict Product Mode</b><br><code>x24_strict_product = 1</code></td><td>Transaksi yang memuat SKU <i>tidak ada</i> di master X101 akan <b>diparkir sebagai error</b>, bukan dibuatkan produk asal-asalan. Ini mencegah pendapatan bocor ke akun "Gross Sales – Others".</td></tr>
+    <tr><td><b>Decouple Payment</b><br><code>x24_decouple_payment = 1</code></td><td>Saat X24DN diimpor, pembayaran belum diketahui rinciannya. Maka seluruh nilai penjualan diparkir di akun <b>POS Suspense Clearing</b>. Saat X70D masuk, saldo itu dipindahkan ke Bank / Piutang Kartu yang sebenarnya dan di-<i>reconcile</i>.</td></tr>
+    <tr><td><b>Sesi harian per toko</b><br><code>x24_close_sessions = 1</code></td><td>Dibuat satu <code>pos.session</code> per (toko × hari dagang), lalu ditutup dan jurnalnya di-<i>backdate</i> ke tanggal dagang — bukan tanggal impor. Ini menjaga laporan per periode tetap benar.</td></tr>
+    <tr><td><b>Angka sumber dipakai apa adanya</b></td><td>Modul jembatan POS memaksa Odoo memakai nilai <i>net</i>, <i>tax</i>, dan <i>discount</i> dari berkas, bukan menghitung ulang. Tanpa ini, pembulatan pajak per-order Odoo vs pemotongan per-baris di X24DN menimbulkan selisih ± Rp 1 per baris (± Rp 7.145 per bulan).</td></tr>
+  </tbody>
+</table>
+
+<div class="box danger">
+  <span class="t">Risiko: diskon terhitung dua kali</span>
+  <p>Parameter <code>retail_import.x24_discount_reclass</code> dan <code>retail_import.x31_post_enabled</code>
+  bersifat <b>saling eksklusif</b>. Keduanya mereklasifikasi diskon yang sama. Jika keduanya aktif,
+  <i>Gross Sales</i> akan digelembungkan dua kali. Konfigurasi saat ini:
+  <code>x24_discount_reclass = 1</code>, <code>x31_post_enabled = 0</code> — sudah benar.</p>
+</div>
+
+<h3>Dampak jurnal — penjualan satu hari di satu toko</h3>
+<p class="small">Ilustrasi: penjualan bruto Rp 111.000 (termasuk PPN 11%), diskon Rp 10.000, dibayar Rp 60.000 tunai dan Rp 51.000 kartu kredit.</p>
+
+<h4>① Saat X24DN diimpor — jurnal penutup sesi POS</h4>
+<table class="jrn">
+  <thead><tr><th style="width:44%">Akun</th><th style="width:18%">Operating Unit</th><th style="width:19%" class="amt">Debit</th><th style="width:19%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td class="dr">POS Suspense Clearing</td><td>OLS SES – &lt;MALL&gt;</td><td class="amt">111.000</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Gross Sales – &lt;Kategori&gt;</td><td>OLS SES – &lt;MALL&gt;</td><td class="amt">—</td><td class="amt">100.000</td></tr>
+    <tr><td class="cr">PPN Keluaran</td><td>OLS SES – &lt;MALL&gt;</td><td class="amt">—</td><td class="amt">11.000</td></tr>
+  </tbody>
+</table>
+
+<h4>② Reklasifikasi diskon — ditempel pada jurnal penutup yang sama</h4>
+<table class="jrn">
+  <thead><tr><th style="width:44%">Akun</th><th style="width:18%">Operating Unit</th><th style="width:19%" class="amt">Debit</th><th style="width:19%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td class="dr">Sales Discount – &lt;Kategori&gt;</td><td>OLS SES – &lt;MALL&gt;</td><td class="amt">10.000</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Gross Sales – &lt;Kategori&gt;</td><td>OLS SES – &lt;MALL&gt;</td><td class="amt">—</td><td class="amt">10.000</td></tr>
+  </tbody>
+</table>
+<p class="small">Karena ditempel pada jurnal penutup <i>toko tersebut</i> di <i>hari dagang tersebut</i>,
+reklasifikasi ini otomatis membawa Operating Unit dan tanggal yang benar tanpa konfigurasi tambahan.</p>
+
+<h4>③ Saat X70D diimpor — jurnal RIREC (settlement)</h4>
+<table class="jrn">
+  <thead><tr><th style="width:44%">Akun</th><th style="width:18%">Operating Unit</th><th style="width:19%" class="amt">Debit</th><th style="width:19%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td class="dr">Cash – OLS SES – &lt;MALL&gt;</td><td>OLS SES – &lt;MALL&gt;</td><td class="amt">60.000</td><td class="amt">—</td></tr>
+    <tr><td class="dr">Piutang Kartu Kredit</td><td>OLS SES – &lt;MALL&gt;</td><td class="amt">51.000</td><td class="amt">—</td></tr>
+    <tr><td class="cr">POS Suspense Clearing</td><td>OLS SES – &lt;MALL&gt;</td><td class="amt">—</td><td class="amt">111.000</td></tr>
+  </tbody>
+</table>
+<div class="box ok">
+  <span class="t">Kontrol saldo</span>
+  <p>Setelah kedua berkas terimpor, saldo <b>POS Suspense Clearing = 0</b>. Saldo yang tersisa di akun ini
+  pada akhir periode berarti ada penjualan yang belum ada data alat bayarnya (X70D belum masuk) —
+  ini adalah indikator kontrol utama bagi Accountant.</p>
+</div>
+
+<!-- 5.2 -->
+<h2 class="pb">5.2 Procure-to-Pay — Trade (Barang Dagangan)</h2>
+<p>
+  Alur pembelian barang dagangan Levi's, dari PO sampai pembayaran vendor. Yang membedakannya dari
+  Odoo standar: <b>pemisahan Trade/Non-Trade</b>, <b>blokir over-receipt</b>, dan <b>akun GR/IR Clearing</b>.
+</p>
+<figure class="dia">
+  <img src="svg/D04_swimlane_p2p_trade.svg" alt="Swimlane Procure-to-Pay Trade">
+  <figcaption><b>Gambar 5.</b> Swimlane Procure-to-Pay Trade — enam lajur peran.</figcaption>
+</figure>
+
+<h3>Aturan bisnis yang ditegakkan sistem</h3>
+<table class="tight">
+  <thead><tr><th style="width:26%">Aturan</th><th>Perilaku Sistem</th></tr></thead>
+  <tbody>
+    <tr><td><b>Purchase Type wajib dipilih</b></td><td>Field <i>Purchase Type</i> (Trade / Non-Trade) muncul di form PO. Pilihan ini menentukan <b>penomoran</b>, <b>akun hutang</b>, dan <b>akun GR/IR</b>.</td></tr>
+    <tr><td><b>Penomoran terpisah</b></td><td>Trade: <code>PO/T/EBR/2026/07/xxx</code> · Non-Trade: <code>PO/NT/EBR/2026/07/xxx</code>. Nomor <i>reset bulanan</i>.</td></tr>
+    <tr><td><b>Blokir over-receipt</b></td><td>Saat <i>Validate</i> Receipt, jika kuantitas diterima <b>melebihi</b> kuantitas dipesan, sistem <b>menolak</b>. Ini mencegah penerimaan liar di luar PO.</td></tr>
+    <tr><td><b>Baris receipt harus berasal dari PO</b></td><td>Sistem menolak baris pada Receipt yang tidak terkait ke baris PO manapun.</td></tr>
+    <tr><td><b>Akun hutang otomatis</b></td><td>Baris hutang pada Bill dipetakan ulang sesuai Purchase Type: Trade → Hutang Dagang <code>2103100001</code>; Non-Trade → Hutang Non-Dagang <code>2103300001</code>.</td></tr>
+  </tbody>
+</table>
+
+<h3>Dua mode jurnal Goods Receipt</h3>
+<p>
+  Parameter <code>custom_levis_localization.suppress_gr_journal</code> memilih kebijakan valuasi
+  persediaan. <b>Konfigurasi saat ini: <code>0</code> (Perpetual).</b>
+</p>
+<table class="tight">
+  <thead><tr><th style="width:14%">Nilai</th><th style="width:20%">Mode</th><th>Perilaku</th></tr></thead>
+  <tbody>
+    <tr><td><code>0</code> <span class="chip ok" style="background:#EFF8F2;border-color:#2E8B57;color:#1D5C39">AKTIF</span></td><td><b>Perpetual</b></td><td>Setiap Goods Receipt langsung membentuk jurnal valuasi: <i>Dr Persediaan / Cr GR/IR Clearing</i>. Persediaan di GL selalu sinkron dengan stok fisik.</td></tr>
+    <tr><td><code>1</code></td><td><b>Periodik</b></td><td>Jurnal GR (dan jurnal retur vendor) <b>ditekan</b> — tidak terbentuk. Nilai persediaan di GL disesuaikan secara berkala lewat <b>Inventory Reconciliation</b>.</td></tr>
+  </tbody>
+</table>
+
+<h3>Dampak jurnal — Trade, pembelian Rp 100.000 + PPN 11%</h3>
+<h4>① Goods Receipt (mode Perpetual)</h4>
+<table class="jrn">
+  <thead><tr><th style="width:44%">Akun</th><th style="width:18%">Operating Unit</th><th style="width:19%" class="amt">Debit</th><th style="width:19%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td class="dr">Persediaan / Stock Valuation</td><td>EBR – HEAD OFFICE</td><td class="amt">100.000</td><td class="amt">—</td></tr>
+    <tr><td class="cr">GR/IR Clearing (Trade)</td><td>EBR – HEAD OFFICE</td><td class="amt">—</td><td class="amt">100.000</td></tr>
+  </tbody>
+</table>
+<h4>② Vendor Bill di-post</h4>
+<table class="jrn">
+  <thead><tr><th style="width:44%">Akun</th><th style="width:18%">Operating Unit</th><th style="width:19%" class="amt">Debit</th><th style="width:19%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td class="dr">GR/IR Clearing (Trade)</td><td>EBR – HEAD OFFICE</td><td class="amt">100.000</td><td class="amt">—</td></tr>
+    <tr><td class="dr">PPN Masukan</td><td>EBR – HEAD OFFICE</td><td class="amt">11.000</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Hutang Dagang <code>2103100001</code></td><td>EBR – HEAD OFFICE</td><td class="amt">—</td><td class="amt">111.000</td></tr>
+  </tbody>
+</table>
+<h4>③ Pembayaran</h4>
+<table class="jrn">
+  <thead><tr><th style="width:44%">Akun</th><th style="width:18%">Operating Unit</th><th style="width:19%" class="amt">Debit</th><th style="width:19%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td class="dr">Hutang Dagang</td><td>EBR – HEAD OFFICE</td><td class="amt">111.000</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Bank</td><td>EBR – HEAD OFFICE</td><td class="amt">—</td><td class="amt">111.000</td></tr>
+  </tbody>
+</table>
+
+<h2>5.3 Konsep GR/IR Clearing</h2>
+<p>
+  GR/IR <span class="en">(Goods Received / Invoice Received)</span> adalah akun antara yang menjembatani
+  <b>selisih waktu</b> antara barang datang dan faktur datang. Tanpa akun ini, barang yang sudah diterima
+  tetapi fakturnya belum masuk tidak terlihat sebagai kewajiban di neraca.
+</p>
+<table>
+  <thead><tr>
+    <th style="width:14%">Peristiwa</th>
+    <th style="width:40%">Jurnal yang terbentuk</th>
+    <th style="width:20%">Saldo GR/IR sesudahnya</th>
+    <th>Arti bagi Finance</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Hari 1</b><br>Barang diterima<br><span class="small">Goods Receipt</span></td>
+      <td><span style="color:#1D5C39">Dr</span> Persediaan &nbsp;&nbsp;100<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#7B241C">Cr</span> <b>GR/IR Clearing</b> &nbsp;&nbsp;100</td>
+      <td><b>100 (Kredit)</b></td>
+      <td>Barang sudah ada di gudang, faktur belum datang. Inilah <i>Goods Received, Not Invoiced</i> — kewajiban yang riil tapi belum bernomor faktur.</td>
+    </tr>
+    <tr>
+      <td><b>Hari 5</b><br>Faktur datang<br><span class="small">Vendor Bill</span></td>
+      <td><span style="color:#1D5C39">Dr</span> <b>GR/IR Clearing</b> &nbsp;&nbsp;100<br>
+          <span style="color:#1D5C39">Dr</span> PPN Masukan &nbsp;&nbsp;&nbsp;11<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#7B241C">Cr</span> Hutang Dagang &nbsp;&nbsp;111</td>
+      <td><b>0</b> — seimbang</td>
+      <td>GR/IR kosong kembali. Hutang kini resmi tercatat atas nama vendor.</td>
+    </tr>
+    <tr>
+      <td><b>Hari 35</b><br>Pembayaran</td>
+      <td><span style="color:#1D5C39">Dr</span> Hutang Dagang &nbsp;&nbsp;111<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#7B241C">Cr</span> Bank &nbsp;&nbsp;111</td>
+      <td><b>0</b></td>
+      <td>Siklus selesai.</td>
+    </tr>
+  </tbody>
+</table>
+<div class="box ok">
+  <span class="t">Mengapa akun ini penting</span>
+  <p>Tanpa GR/IR, faktur vendor langsung membebani COGS/Beban. Akibatnya barang yang <b>sudah diterima
+  tetapi belum ditagih</b> tidak muncul sebagai kewajiban di neraca — laporan keuangan understated.
+  <b>Saldo GR/IR pada akhir periode = nilai barang yang sudah diterima namun fakturnya belum masuk</b>,
+  dan angka itu wajib dapat dijelaskan saat tutup buku.</p>
+</div>
+<div class="box danger">
+  <span class="t">Jebakan teknis yang wajib diketahui</span>
+  <p>Akun GR/IR <b>harus</b> bertipe <code>Current Liability</code> (Liabilitas Lancar), <b>bukan</b>
+  <code>Payable</code> (Hutang Usaha). Tipe <i>Payable</i> memicu aturan <i>due date</i> Odoo dan
+  menyebabkan posting Bill gagal atau salah. Ini adalah kesalahan konfigurasi yang pernah terjadi dan
+  sudah diperbaiki.</p>
+</div>
+<h3>Pemetaan akun GR/IR</h3>
+<table class="tight">
+  <thead><tr><th style="width:22%">Stream</th><th style="width:26%">Akun Hutang</th><th style="width:26%">Akun GR/IR</th><th>Sumber Konfigurasi</th></tr></thead>
+  <tbody>
+    <tr><td><b>Trade</b></td><td><code>2103100001</code> Hutang Dagang</td><td>Per <b>Kategori Produk</b> — field <i>Stock Variation Account</i></td><td><span class="path">Inventory ▸ Configuration ▸ Product Categories</span></td></tr>
+    <tr><td><b>Non-Trade</b></td><td><code>2103300001</code> Hutang Non-Dagang</td><td><code>2103300008</code></td><td><span class="path">Invoicing ▸ Configuration ▸ Trade / Non-Trade Accounts</span></td></tr>
+  </tbody>
+</table>
+
+<!-- 5.4 -->
+<h2 class="pb">5.4 Procure-to-Pay — Non-Trade (Operasional)</h2>
+<p>
+  Pembelian di luar barang dagangan: ATK, jasa, sewa, perbaikan, konsultan. Perbedaan utama dari alur
+  Trade: penomoran <code>PO/NT/…</code>, hutang masuk ke <b>Hutang Non-Dagang</b>, biaya langsung ke akun
+  beban, dan — yang penting — <b>pemotongan PPh dapat terpicu otomatis</b>.
+</p>
+<figure class="dia">
+  <img src="svg/D05_swimlane_p2p_nontrade.svg" alt="Swimlane Procure-to-Pay Non-Trade">
+  <figcaption><b>Gambar 6.</b> Swimlane Procure-to-Pay Non-Trade, termasuk percabangan Barang vs Jasa dan pemicu PPh.</figcaption>
+</figure>
+
+<h3>Dampak jurnal — jasa konsultan Rp 100.000, PPN 11%, PPh 23 sebesar 2%</h3>
+<table class="jrn">
+  <thead><tr><th style="width:52%">Akun</th><th style="width:24%" class="amt">Debit</th><th style="width:24%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td class="dr">Beban Jasa Profesional</td><td class="amt">100.000</td><td class="amt">—</td></tr>
+    <tr><td class="dr">PPN Masukan</td><td class="amt">11.000</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Hutang Non-Dagang <code>2103300001</code></td><td class="amt">—</td><td class="amt">109.000</td></tr>
+    <tr><td class="cr">Hutang PPh 23</td><td class="amt">—</td><td class="amt">2.000</td></tr>
+  </tbody>
+</table>
+<p class="small">Vendor menerima Rp 109.000; PPh Rp 2.000 disetorkan EBR ke negara, dan vendor menerima Bukti Potong.</p>
+
+<!-- 5.5 -->
+<h2>5.5 Retur Pembelian (RTV)</h2>
+<p>
+  Retur barang ke vendor. Tantangannya: satu SKU bisa pernah dibeli lewat <b>beberapa PO berbeda dengan
+  harga berbeda</b>. Modul <code>custom_po_return</code> menyelesaikannya dengan <b>mesin alokasi FIFO</b> —
+  pengguna cukup memasukkan produk dan kuantitas, sistem yang menentukan PO/GR/Bill asal dan harganya.
+</p>
+<figure class="dia">
+  <img src="svg/D06_swimlane_po_return.svg" alt="Swimlane PO Return">
+  <figcaption><b>Gambar 7.</b> Swimlane Retur Pembelian (RTV). Nomor dokumen: <code>RTV/2026/xxx</code>.</figcaption>
+</figure>
+
+<h3>Cara kerja mesin alokasi FIFO</h3>
+<ol class="steps">
+  <li><b>Pengguna mengisi kuantitas saja.</b> Tidak perlu tahu PO mana yang akan dipotong.</li>
+  <li><b>Sistem menelusuri</b> seluruh PO &amp; Goods Receipt vendor tersebut, diurutkan dari <b>PO tertua</b>.</li>
+  <li><b>Kuantitas dipotong per <i>slice</i>.</b> Setiap <i>slice</i> memakai <b>harga satuan PO asalnya</b>, dan mencatat Receipt serta Vendor Bill mana yang menjadi dasarnya.</li>
+  <li><b>Proteksi over-return.</b> Kuantitas yang boleh diretur = kuantitas diterima − retur yang sudah pernah terjadi − alokasi yang masih <i>pending</i>. Melebihi itu, sistem menolak.</li>
+  <li><b>Validate</b> menghasilkan dua dokumen: <b>Return Picking</b> (stok keluar + jurnal valuasi RTV) dan <b>Vendor Credit Note</b> berstatus draft, <b>dikelompokkan per Bill asal</b>.</li>
+</ol>
+
+<h3>Dampak jurnal — retur 10 unit @ Rp 10.000</h3>
+<table class="jrn">
+  <thead><tr><th style="width:52%">Akun</th><th style="width:24%" class="amt">Debit</th><th style="width:24%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:600">Return Picking — barang keluar</td></tr>
+    <tr><td class="dr">GR/IR Clearing (Trade)</td><td class="amt">100.000</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Persediaan / Stock Valuation</td><td class="amt">—</td><td class="amt">100.000</td></tr>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:600">Vendor Credit Note — tagihan berkurang</td></tr>
+    <tr><td class="dr">Hutang Dagang</td><td class="amt">111.000</td><td class="amt">—</td></tr>
+    <tr><td class="cr">GR/IR Clearing (Trade)</td><td class="amt">—</td><td class="amt">100.000</td></tr>
+    <tr><td class="cr">PPN Masukan</td><td class="amt">—</td><td class="amt">11.000</td></tr>
+  </tbody>
+</table>
+
+<!-- 5.6 -->
+<h2 class="pb">5.6 Operasi Gudang: Scrap &amp; Cycle Count</h2>
+<figure class="dia">
+  <img src="svg/D07_swimlane_inventory_ops.svg" alt="Swimlane operasi gudang">
+  <figcaption><b>Gambar 8.</b> Swimlane operasi gudang — Scrap Batch (berurutan) dan Cycle Count (berjalan paralel).</figcaption>
+</figure>
+
+<h3>Scrap Batch — mengapa bukan Scrap standar Odoo</h3>
+<p>
+  Odoo standar hanya bisa men-<i>scrap</i> <b>satu produk per dokumen</b>, dan tiap dokumen menghasilkan
+  satu jurnal valuasi. Bagi Levi's yang menghapus puluhan SKU sekaligus, ini menghasilkan puluhan jurnal
+  yang sulit ditelusuri. <b>Scrap Batch</b> (<code>SCRAP/2026/xxx</code>) memungkinkan <b>banyak produk dalam
+  satu dokumen</b>, dan membentuk <b>satu jurnal valuasi konsolidasi</b>.
+</p>
+<table class="jrn">
+  <thead><tr><th style="width:52%">Akun</th><th style="width:24%" class="amt">Debit</th><th style="width:24%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td class="dr">Kerugian Scrap (P&amp;L)</td><td class="amt">xxx</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Persediaan / Stock Valuation</td><td class="amt">—</td><td class="amt">xxx</td></tr>
+  </tbody>
+</table>
+<div class="box danger">
+  <span class="t">Konfigurasi wajib — belum terisi</span>
+  <p>Akun "Kerugian Scrap" diambil dari parameter <code>custom_levis_localization.scrap_loss_account_code</code>.
+  Saat ini parameter tersebut <b>masih kosong</b>, sehingga <b>validasi Scrap Batch akan gagal</b>.
+  Lihat Bab 9, item #2.</p>
+</div>
+
+<h3>Cycle Count</h3>
+<p>
+  Stok opname berkala berbasis <b>rencana</b> (per zona / kategori / frekuensi). Setiap sesi menghasilkan
+  perbandingan hitungan fisik vs sistem. Selisih tidak langsung menyesuaikan stok — harus melalui
+  <b>Adjustment</b> yang disetujui Warehouse Manager, sehingga tercipta jejak audit.
+</p>
+
+<!-- 5.7 -->
+<h2>5.7 Aktiva Tetap</h2>
+<figure class="dia">
+  <img src="svg/D09_swimlane_fixed_asset.svg" alt="Swimlane aktiva tetap">
+  <figcaption><b>Gambar 9.</b> Swimlane siklus hidup aktiva tetap — dari perolehan, depresiasi bulanan, revaluasi PSAK 16, sampai pelepasan.</figcaption>
+</figure>
+
+<h3>Enam kategori aset EBR</h3>
+<table class="tight">
+  <thead><tr><th style="width:34%">Asset Group</th><th>Keterangan</th></tr></thead>
+  <tbody>
+    <tr><td>Land <span class="en">(Tanah)</span></td><td>Tidak disusutkan.</td></tr>
+    <tr><td>Building &amp; Improvements</td><td>Bangunan dan renovasi outlet.</td></tr>
+    <tr><td>Vehicles <span class="en">(Kendaraan)</span></td><td><b>⚠ Belum memiliki akun Akumulasi Depresiasi</b> — posting depresiasi akan gagal. Lihat Bab 9, item #4.</td></tr>
+    <tr><td>Office &amp; Outlet Equipment</td><td>Peralatan kantor dan toko.</td></tr>
+    <tr><td>Machinery <span class="en">(Mesin)</span></td><td>—</td></tr>
+    <tr><td>Furniture &amp; Fixtures</td><td>Perabot dan display toko.</td></tr>
+  </tbody>
+</table>
+
+<h3>Dampak jurnal</h3>
+<table class="jrn">
+  <thead><tr><th style="width:52%">Akun</th><th style="width:24%" class="amt">Debit</th><th style="width:24%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:600">Depresiasi bulanan (otomatis via cron)</td></tr>
+    <tr><td class="dr">Beban Depresiasi</td><td class="amt">xxx</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Akumulasi Depresiasi</td><td class="amt">—</td><td class="amt">xxx</td></tr>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:600">Revaluasi — surplus (nilai wajar &gt; nilai buku)</td></tr>
+    <tr><td class="dr">Aset (nilai perolehan)</td><td class="amt">xxx</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Surplus Revaluasi — OCI <code>3005200004</code></td><td class="amt">—</td><td class="amt">xxx</td></tr>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:600">Revaluasi — rugi (nilai wajar &lt; nilai buku)</td></tr>
+    <tr><td class="dr">Rugi Revaluasi — P&amp;L <code>7706000000</code></td><td class="amt">xxx</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Aset (nilai perolehan)</td><td class="amt">—</td><td class="amt">xxx</td></tr>
+  </tbody>
+</table>
+<p class="small">Akun lain yang di-seed: Pendapatan Revaluasi (P&amp;L) <code>8300000004</code>, Saldo Laba <code>3006100001</code>.</p>
+
+<!-- 5.8 -->
+<h2 class="pb">5.8 Perpajakan: PPN &amp; PPh</h2>
+<figure class="dia">
+  <img src="svg/D10_swimlane_pajak.svg" alt="Swimlane perpajakan">
+  <figcaption><b>Gambar 10.</b> Swimlane perpajakan. Cabang atas: deteksi otomatis PPh saat Bill di-post. Cabang bawah: pengelolaan PPN / e-Faktur.</figcaption>
+</figure>
+
+<h3>Deteksi PPh otomatis</h3>
+<p>Saat Vendor Bill di-<i>post</i>, sistem memeriksa vendor dan produk terhadap 107 kode objek pajak EBR yang sudah dimuat, lalu menerapkan aturan:</p>
+<table class="tight">
+  <thead><tr><th style="width:26%">Kondisi Vendor</th><th style="width:20%">Jenis PPh</th><th>Tarif yang Diterapkan</th></tr></thead>
+  <tbody>
+    <tr><td>Dalam negeri, <b>ber-NPWP</b></td><td>PPh 23</td><td>Tarif normal (mis. 2%)</td></tr>
+    <tr><td>Dalam negeri, <b>tanpa NPWP</b></td><td>PPh 23</td><td><b>Naik 2× menjadi 4%</b> — otomatis</td></tr>
+    <tr><td>Luar negeri</td><td>PPh 26</td><td>20%, atau tarif <i>tax treaty</i> / DGT bila tersedia</td></tr>
+    <tr><td>Objek final</td><td>PPh 4(2)</td><td>Sesuai kode objek</td></tr>
+  </tbody>
+</table>
+<p>Setiap pemotongan menghasilkan <b>Withholding Line</b> dan <b>draft Bukti Potong</b> yang siap dilengkapi Tax Officer.</p>
+
+<h3>Kode objek pajak yang termuat</h3>
+<table class="tight">
+  <thead><tr><th style="width:30%">Jenis</th><th style="width:20%">Jumlah Kode</th><th>Catatan</th></tr></thead>
+  <tbody>
+    <tr><td>PPh 23</td><td>70</td><td>—</td></tr>
+    <tr><td>PPh 26</td><td>26</td><td>Termasuk baris <i>tax treaty</i>/DGT dengan tarif fleksibel (diisi per transaksi).</td></tr>
+    <tr><td>PPh 4(2)</td><td>10</td><td>Final.</td></tr>
+    <tr><td>PPh 21</td><td>1</td><td>Tarif fleksibel.</td></tr>
+    <tr><td><b>Total</b></td><td><b>107</b></td><td>PPh 22 dan PPh 15 <b>belum dimuat</b> — lihat Bab 10.</td></tr>
+  </tbody>
+</table>
+
+<!-- 5.9 -->
+<h2>5.9 Penutupan Periode</h2>
+<figure class="dia">
+  <img src="svg/D08_swimlane_period_close.svg" alt="Swimlane penutupan periode">
+  <figcaption><b>Gambar 11.</b> Swimlane penutupan periode bulanan — urutan wajib dari validasi data operasional sampai penguncian periode.</figcaption>
+</figure>
+
+<h3>Periodic COGS — mengapa diperlukan</h3>
+<div class="box warn">
+  <span class="t">Konteks penting</span>
+  <p>Data penjualan toko diimpor <b>lebih dulu</b> daripada data pembelian tercatat di Odoo. Akibatnya,
+  banyak barang terjual saat harga pokoknya belum ada di sistem — Odoo menilai barang itu
+  <b>berbiaya nol</b>. Odoo 19 juga <b>tidak lagi memiliki mekanisme <i>FIFO vacuum</i></b> yang dulu
+  memperbaiki nilai ini secara retroaktif. Karena itu COGS dihitung <b>secara periodik</b> lewat
+  dokumen <code>COGS/2026/xxx</code>, per kombinasi (Operating Unit × Kategori Produk).</p>
+</div>
+<table class="jrn">
+  <thead><tr><th style="width:52%">Akun</th><th style="width:24%" class="amt">Debit</th><th style="width:24%" class="amt">Kredit</th></tr></thead>
+  <tbody>
+    <tr><td class="dr">Harga Pokok Penjualan (COGS) — per kategori</td><td class="amt">xxx</td><td class="amt">—</td></tr>
+    <tr><td class="cr">Persediaan / Stock Valuation</td><td class="amt">—</td><td class="amt">xxx</td></tr>
+  </tbody>
+</table>
+<p class="small">Field <code>zero_cost_qty</code> pada dokumen COGS Run menunjukkan kuantitas yang masih berbiaya nol — angka ini harus diinvestigasi sebelum periode ditutup.</p>
+
+<h3>Inventory Reconciliation</h3>
+<p>
+  Membandingkan <b>saldo GL akun persediaan</b> dengan <b>nilai stok riil</b> per akun valuasi, lalu
+  membentuk jurnal penyesuaian ke akun <i>Stock Variation</i>. Wajib dijalankan bila mode
+  <b>Periodik</b> aktif; disarankan tetap dijalankan sebagai kontrol meskipun mode Perpetual aktif.
+</p>
+<div class="box">
+  <span class="t">Scheduled Action tersedia (nonaktif)</span>
+  <p>Cron <i>"Levi's: Periodic Inventory Reconciliation (draft)"</i> berjalan bulanan dan hanya membuat
+  dokumen <b>draft</b> — tidak pernah memposting. Saat ini <b>nonaktif</b>; aktifkan bila ingin dokumen
+  disiapkan otomatis setiap awal bulan.</p>
+</div>
+
+<!-- ============ 6 ============ -->
+<h1 class="chap"><span class="num">6.</span> Siklus Hidup Status Dokumen</h1>
+<div class="sub">Document state machines — status apa saja yang mungkin, dan aksi apa yang memindahkannya</div>
+<p>
+  Warna pada diagram: <b style="color:#1B3F6B">biru</b> = status awal ·
+  <b style="color:#7A5308">kuning</b> = status antara ·
+  <b style="color:#1D5C39">hijau</b> = status akhir yang sehat ·
+  <b style="color:#7B241C">merah</b> = pembatalan.
+</p>
+<figure class="dia">
+  <img src="svg/D11a_state_dokumen.svg" alt="Diagram status: PO, Vendor Bill, PO Return, Scrap Batch">
+  <figcaption><b>Gambar 12.</b> Status dokumen pengadaan &amp; gudang: Purchase Order, Vendor Bill, PO Return, Scrap Batch.</figcaption>
+</figure>
+<figure class="dia">
+  <img src="svg/D11b_state_dokumen.svg" alt="Diagram status: Fixed Asset, Inventory Reconciliation, COGS Run, Import Log">
+  <figcaption><b>Gambar 13.</b> Status dokumen akuntansi &amp; integrasi: Fixed Asset, Inventory Reconciliation, Periodic COGS, Import Log.</figcaption>
+</figure>
+
+<!-- ============ 7 ============ -->
+<h1 class="chap"><span class="num">7.</span> Katalog Fitur per Modul</h1>
+<div class="sub">Feature catalogue — rincian setiap modul kustom</div>
+
+<h2>7.1 custom_levis_localization <span class="small">— v19.0.1.18.0</span></h2>
+<p>Modul inti. Berisi 14 fitur yang seluruhnya khas kebutuhan EBR:</p>
+<table class="tight">
+  <thead><tr><th style="width:5%">#</th><th style="width:26%">Fitur</th><th style="width:30%">Menu / Lokasi</th><th>Ringkasan</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>HS Code pada produk</td><td>Form Produk</td><td>Field HS Code untuk keperluan kepabeanan.</td></tr>
+    <tr><td>2</td><td>Indeks katalog</td><td>—</td><td>Indeks database tambahan agar katalog ratusan ribu varian tetap responsif.</td></tr>
+    <tr><td>3</td><td>Kontrol over-receipt</td><td>Receipt ▸ Validate</td><td>Menolak penerimaan melebihi kuantitas PO.</td></tr>
+    <tr><td>4</td><td>Baris receipt wajib dari PO</td><td>Receipt</td><td>Menolak baris yang tidak terkait PO.</td></tr>
+    <tr><td>5</td><td>Jurnal Goods Receipt</td><td>Otomatis</td><td>Mode perpetual/periodik via parameter <code>suppress_gr_journal</code>.</td></tr>
+    <tr><td>6</td><td><b>Inventory Reconciliation</b></td><td><span class="path">Invoicing ▸ Accounting ▸ Inventory Reconciliation</span></td><td>Menyelaraskan saldo GL persediaan dengan nilai stok. Dok: <code>INVREC/2026/xxx</code>.</td></tr>
+    <tr><td>7</td><td><b>Trade / Non-Trade</b></td><td>Form PO + <span class="path">Invoicing ▸ Configuration ▸ Trade / Non-Trade Accounts</span></td><td>Pemisahan stream pembelian: penomoran, akun hutang, akun GR/IR, akun beban.</td></tr>
+    <tr><td>8</td><td><b>Operating Unit</b></td><td>Warehouse &amp; Company</td><td>Dimensi analitik per toko; jurnal pembelian &amp; kas per toko.</td></tr>
+    <tr><td>9</td><td>Payment Voucher &amp; Receipt</td><td>Payment ▸ Print</td><td>PDF bertanda tangan, dengan nominal <i>terbilang</i> Bahasa Indonesia.</td></tr>
+    <tr><td>10</td><td>Journal Billing PDF</td><td>Journal Entry ▸ Print</td><td>Cetakan jurnal untuk lampiran.</td></tr>
+    <tr><td>11</td><td>Admin Fee &amp; MDR/BIN</td><td>Register Payment + <span class="path">Invoicing ▸ Configuration ▸ Card BIN / MDR</span></td><td>Biaya administrasi multi-COA saat pembayaran; netting MDR kartu berdasarkan rentang BIN.</td></tr>
+    <tr><td>12</td><td><b>Scrap Batch</b></td><td><span class="path">Inventory ▸ Operations ▸ Scrap Batches</span></td><td>Banyak produk, satu jurnal. Dok: <code>SCRAP/2026/xxx</code>.</td></tr>
+    <tr><td>13</td><td><b>Periodic COGS</b></td><td><span class="path">Invoicing ▸ Accounting ▸ Periodic COGS</span></td><td>COGS per (OU × Kategori). Dok: <code>COGS/2026/xxx</code>.</td></tr>
+    <tr><td>14</td><td>Master Bank Indonesia</td><td>Form Bank</td><td>Field <i>Kode BI</i> (unik) + 181 bank ter-seed.</td></tr>
+  </tbody>
+</table>
+
+<h2>7.2 custom_retail_import <span class="small">— v19.0.0.16.0</span></h2>
+<h3>Tiga jalur masuk data</h3>
+<table class="tight">
+  <thead><tr><th style="width:22%">Transport</th><th style="width:30%">Menu</th><th>Cara Kerja</th></tr></thead>
+  <tbody>
+    <tr><td><b>Upload Manual</b></td><td><span class="path">Retail Import ▸ Import Data</span></td><td>Wizard: pilih Profile → unggah berkas → <i>Preview</i> (dry-run) → <i>Import</i>.</td></tr>
+    <tr><td><b>SFTP / Local Drop</b></td><td><span class="path">Retail Import ▸ Configuration ▸ Import Feeds</span></td><td>Cron memindai folder sesuai pola nama berkas, urut prioritas (X24 → X70D → X31).</td></tr>
+    <tr><td><b>Mailbox IMAP</b></td><td><span class="path">Retail Import ▸ Configuration ▸ Mailboxes</span></td><td>Menarik lampiran dari INBOX, mencadangkan, lalu menaruhnya di folder <i>drop</i>.</td></tr>
+  </tbody>
+</table>
+<div class="box danger">
+  <span class="t">Aturan operasional mailbox</span>
+  <p>Record <b>Mailbox harus aktif di SATU basis data saja</b>. Cron berjalan per-DB; dua DB yang memantau
+  INBOX yang sama akan saling menghapus pesan.</p>
+</div>
+
+<h3>Status log impor</h3>
+<table class="tight">
+  <thead><tr><th style="width:16%">Status</th><th>Arti &amp; Tindakan</th></tr></thead>
+  <tbody>
+    <tr><td><b>Queued</b></td><td>Menunggu antrean <code>queue_job</code>.</td></tr>
+    <tr><td><b>Running</b></td><td>Sedang diproses. Berkas besar (X101) dapat memakan ± 30 menit.</td></tr>
+    <tr><td><b>Imported</b></td><td>Sukses penuh. Tidak ada tindakan.</td></tr>
+    <tr><td><b>Partial</b></td><td>Sebagian baris gagal. <b>Wajib ditindaklanjuti</b> — buka log, lihat baris ber-status <i>error</i>.</td></tr>
+    <tr><td><b>Failed</b></td><td>Gagal total. Periksa format berkas dan Column Map pada Profile.</td></tr>
+  </tbody>
+</table>
+
+<h2>7.3 custom_po_return <span class="small">— v19.0.0.1.0</span></h2>
+<p>Sudah diuraikan pada §5.5. Ringkasan teknis:</p>
+<ul>
+  <li><b>Menu:</b> <span class="path">Purchase ▸ Orders ▸ PO Returns</span> · <b>Penomoran:</b> <code>RTV/2026/xxx</code></li>
+  <li><b>Hak akses:</b> Purchase / User (buat &amp; ubah), Purchase / Manager (hapus). Ada <i>record rule</i> multi-company.</li>
+  <li><b>Keluaran:</b> Return Picking (stok) + Vendor Credit Note draft (dikelompokkan per Bill asal).</li>
+  <li><b>Tautan:</b> PO menampilkan tombol pintas jumlah retur; baris PO menyimpan kuantitas <i>returned</i> dan <i>returnable</i>.</li>
+</ul>
+
+<h2>7.4 custom_accounting_asset + custom_levis_asset_accounts</h2>
+<ul>
+  <li><b>Menu:</b> <span class="path">Invoicing ▸ Assets</span> → Fixed Assets · Post Depreciation · Revaluations · Asset Register · Configuration (Groups, Locations)</li>
+  <li><b>Metode depresiasi:</b> garis lurus <span class="en">(straight-line)</span>.</li>
+  <li><b>Scheduled Action:</b> <i>"Custom Asset: Post Monthly Depreciation"</i> — interval harian, <b>aktif</b>, memposting seluruh baris depresiasi yang sudah jatuh tempo.</li>
+  <li><b>Wizard:</b> Disposal (hitung gain/loss vs nilai buku) · Revaluation · Asset Register (cetak PDF).</li>
+  <li><b>Hak akses:</b> Asset User, Asset Manager.</li>
+</ul>
+
+<h2>7.5 custom_accounting_reports <span class="small">— v19.0.0.3.0</span></h2>
+<p>
+  Seluruh laporan berbagi satu mesin (<code>custom.report.engine</code>) dan pola yang sama:
+  <b>wizard parameter → View (layar) / Print PDF / Export Excel</b>.
+</p>
+<table class="tight">
+  <thead><tr><th style="width:34%">Kelompok</th><th>Laporan</th></tr></thead>
+  <tbody>
+    <tr><td><b>Laporan Keuangan Inti</b></td><td>Trial Balance · General Ledger · Balance Sheet · Profit &amp; Loss · Cash Flow · GL Analysis (pivot) · Day Book · Cash Book · Bank Book · Journal Audit</td></tr>
+    <tr><td><b>Hutang &amp; Piutang</b></td><td>Aged Payable · Aged Receivable · Partner Ledger · <b>Kartu Utang</b> · <b>Kartu Piutang</b> · Uang Muka / DP</td></tr>
+    <tr><td><b>Laporan Pajak</b><br><span class="small">17 laporan</span></td><td>Tax Report (PPN/PPh) · Rekap Faktur Pajak · Rekap Bukti Potong PPh · SPT Masa PPN 1111 · Rekap PPh Pemotongan · Monitoring NSFP · Data Quality NPWP/NIK · Laporan DPP Nilai Lain · Daftar Faktur Pengganti · <b>Ekualisasi Omzet (PPN vs GL)</b> · <b>Ekualisasi Biaya vs Objek PPh</b> · Monitoring Submission Coretax · Usage Meter Pajakku · Rekonsiliasi PPh · Monitoring Angsuran PPh 25 · Jejak Audit Pajak</td></tr>
+  </tbody>
+</table>
+<p><b>Menu:</b> <span class="path">Invoicing ▸ Reporting ▸ Reports</span> · Laporan pajak di submenu <span class="path">… ▸ Laporan Pajak</span></p>
+<p><b>Hak akses:</b> <i>Custom Reports / User</i> dan <i>Custom Reports / Administrator</i>.</p>
+
+<h2>7.6 Modul Perpajakan &amp; Kepatuhan</h2>
+<table class="tight">
+  <thead><tr><th style="width:24%">Modul</th><th style="width:30%">Menu</th><th>Fungsi</th></tr></thead>
+  <tbody>
+    <tr><td><code>custom_tax_id</code></td><td><span class="path">Invoicing ▸ Pajak Indonesia</span></td><td>Withholding Rules · PPh Categories · Withholding Lines · Issue Faktur Pengganti · Pre-Export Validation.</td></tr>
+    <tr><td><code>custom_coretax</code></td><td><span class="path">Custom ▸ Coretax</span></td><td>Bukti Potong · Faktur Pajak Belum Lengkap · NSFP · e-Faktur XML.</td></tr>
+    <tr><td><code>custom_coretax_bupot</code></td><td><span class="path">Invoicing ▸ Bupot Unifikasi</span></td><td>Bukti Potong Unifikasi + export XML skema Coretax DJP.</td></tr>
+    <tr><td><code>custom_pdp_audit</code></td><td>—</td><td><i>Audit log</i> append-only ter-<i>hash chain</i> (SHA256) untuk setiap aksi akuntansi. Kepatuhan UU 27/2022.</td></tr>
+  </tbody>
+</table>
+
+<h2>7.7 Modul Pendukung</h2>
+<table class="tight">
+  <thead><tr><th style="width:26%">Modul</th><th>Fungsi Ringkas</th></tr></thead>
+  <tbody>
+    <tr><td><code>custom_approval_engine</code></td><td>Matriks otorisasi bertingkat untuk PO. Mendukung delegasi, <i>out-of-office</i>, dan eskalasi SLA. Menu: <span class="path">Approvals</span>.</td></tr>
+    <tr><td><code>custom_wms_putaway</code></td><td>Aturan <i>putaway</i> bertingkat untuk DC — menentukan lokasi simpan otomatis saat barang masuk.</td></tr>
+    <tr><td><code>custom_wms_cycle_count</code></td><td>Rencana &amp; sesi stok opname berkala, dengan alur persetujuan selisih.</td></tr>
+    <tr><td><code>custom_product_barcode</code></td><td>Banyak GTIN per varian + <i>resolver</i> barcode yang dipakai seluruh pencocokan SKU dari berkas X.</td></tr>
+    <tr><td><code>custom_pos_id</code></td><td>QRIS, pembulatan rupiah, e-receipt WhatsApp/SMS.</td></tr>
+    <tr><td><code>custom_accounting_full</code></td><td>CoA PSAK, konsolidasi, dimensi cabang, <b>blokir referensi Vendor Bill ganda</b> (dinaikkan dari peringatan menjadi error).</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ 8 ============ -->
+<h1 class="chap"><span class="num">8.</span> Konfigurasi Sistem</h1>
+<div class="sub">Nilai aktual pada basis data acuan <code>prd_levis_begbal</code></div>
+
+<h2>8.1 Parameter Sistem (Feature Flags)</h2>
+<p><span class="path">Settings ▸ Technical ▸ System Parameters</span></p>
+<table class="tight">
+  <thead><tr><th style="width:34%">Parameter</th><th style="width:10%">Nilai</th><th>Dampak</th></tr></thead>
+  <tbody>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">Retail Import — posting</td></tr>
+    <tr><td><code>retail_import.x24_post_enabled</code></td><td><b>1</b></td><td>X24DN diposting sebagai POS Order + jurnal. <b>Aktif.</b></td></tr>
+    <tr><td><code>retail_import.x24_close_sessions</code></td><td><b>1</b></td><td>Sesi POS ditutup per (toko × hari dagang), jurnal di-<i>backdate</i>.</td></tr>
+    <tr><td><code>retail_import.x24_decouple_payment</code></td><td><b>1</b></td><td>Penjualan diparkir di POS Suspense Clearing; diselesaikan oleh X70D.</td></tr>
+    <tr><td><code>retail_import.x24_discount_reclass</code></td><td><b>1</b></td><td>Diskon direklas dari data X24DN sendiri.</td></tr>
+    <tr><td><code>retail_import.x31_post_enabled</code></td><td><b>0</b></td><td>Nonaktif — <b>benar</b>, karena saling eksklusif dengan baris di atas.</td></tr>
+    <tr><td><code>retail_import.x48_post_enabled</code></td><td><b>0</b></td><td>Retur penjualan X48 belum diposting. Lihat Bab 10.</td></tr>
+    <tr><td><code>retail_import.x24_strict_product</code></td><td><b>1</b></td><td>SKU tak dikenal diparkir sebagai error, tidak dibuatkan produk baru.</td></tr>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">Retail Import — pemetaan non-merchandise</td></tr>
+    <tr><td><code>retail_import.x24_np_category_id</code></td><td>501</td><td>Kategori produk untuk barang non-dagangan (paperbag, dsb.) → pendapatan masuk <i>Miscellaneous</i>.</td></tr>
+    <tr><td><code>retail_import.x24_np_goods_codes</code></td><td><span class="small">TS1000382, TS1000418, …</span></td><td>Kode <code>TS…</code> yang sebenarnya <b>barang</b>, bukan jasa (mis. Fodable Cup, Levi's Pin, Patches).</td></tr>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">Retail Import — teknis</td></tr>
+    <tr><td><code>retail_import.queue_channel</code></td><td><code>root.retail_import</code></td><td>Kanal <code>queue_job</code> untuk impor asinkron.</td></tr>
+    <tr><td><code>retail_import.line_detail_threshold</code></td><td>20.000</td><td>Ambang batas penyimpanan detail baris.</td></tr>
+    <tr><td><code>retail_import.max_log_lines</code></td><td>500.000</td><td>Batas jumlah baris log.</td></tr>
+    <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">Lokalisasi Levi's</td></tr>
+    <tr><td><code>custom_levis_localization.suppress_gr_journal</code></td><td><b>0</b></td><td><b>Mode Perpetual</b> — jurnal Goods Receipt terbentuk.</td></tr>
+    <tr><td><code>custom_levis_localization.scrap_loss_account_code</code></td><td><b>(kosong)</b></td><td>⚠ <b>Belum diisi</b> — validasi Scrap Batch akan gagal. Lihat Bab 9.</td></tr>
+  </tbody>
+</table>
+
+<h2>8.2 Penomoran Dokumen (Sequences)</h2>
+<table class="tight">
+  <thead><tr><th style="width:36%">Dokumen</th><th style="width:34%">Format</th><th>Reset</th></tr></thead>
+  <tbody>
+    <tr><td>Purchase Order — Trade</td><td><code>PO/T/EBR/2026/07/xxx</code></td><td>Bulanan</td></tr>
+    <tr><td>Purchase Order — Non-Trade</td><td><code>PO/NT/EBR/2026/07/xxx</code></td><td>Bulanan</td></tr>
+    <tr><td>Vendor Bill — Trade</td><td><code>BILL/T/EBR/2026/07/xxx</code></td><td>Bulanan</td></tr>
+    <tr><td>Vendor Bill — Non-Trade</td><td><code>BILL/NT/EBR/2026/07/xxx</code></td><td>Bulanan</td></tr>
+    <tr><td>Payment</td><td><code>8282/2026/07/xxx</code> <span class="small">(4 digit terakhir no. rekening)</span></td><td>Bulanan</td></tr>
+    <tr><td>PO Return (RTV)</td><td><code>RTV/2026/xxx</code></td><td>Tahunan</td></tr>
+    <tr><td>Scrap Batch</td><td><code>SCRAP/2026/xxx</code></td><td>Tahunan</td></tr>
+    <tr><td>Periodic COGS</td><td><code>COGS/2026/xxx</code></td><td>Tahunan</td></tr>
+    <tr><td>Inventory Reconciliation</td><td><code>INVREC/2026/xxx</code></td><td>Tahunan</td></tr>
+    <tr><td>Fixed Asset</td><td><code>FA/2026/xxx</code></td><td>Tahunan</td></tr>
+    <tr><td>Bukti Potong Unifikasi</td><td><code>BUP/2026/07/xxx</code></td><td>Bulanan</td></tr>
+    <tr><td>Recurring Journal</td><td><code>REC/2026/xxx</code></td><td>Tahunan</td></tr>
+  </tbody>
+</table>
+
+<h2>8.3 Daftar Jurnal</h2>
+<table class="tight">
+  <thead><tr><th style="width:14%">Tipe</th><th style="width:12%">Jumlah</th><th>Keterangan</th></tr></thead>
+  <tbody>
+    <tr><td><b>Bank</b></td><td>6</td><td>BCA (masuk), BCA (keluar), BNI, BRI, Mandiri, Bank umum. Pemisahan <i>in/out</i> mengikuti kode EBR.</td></tr>
+    <tr><td><b>Cash</b></td><td>22</td><td>Petty Cash + 21 jurnal kas toko (<code>Cash - OLS SES - &lt;MALL&gt;</code>), masing-masing dengan akun kas <code>1102…</code> sendiri.</td></tr>
+    <tr><td><b>Purchase</b></td><td>23</td><td><code>Pembelian</code> (umum), <code>Pembelian - EBR - HEAD OFFICE</code>, + 21 jurnal pembelian per toko.</td></tr>
+    <tr><td><b>Sale</b></td><td>1</td><td><code>Penjualan</code>.</td></tr>
+    <tr><td><b>General</b></td><td>8</td><td><code>GLJV</code> General Journal · <code>RIADJ</code> Retail Import Adjustments · <code>STJ</code> Inventory Valuation · <code>DEPRE</code> Depreciation · <code>EBRTB</code> EBR TB Load · <code>EXCH</code> Exchange Difference · <code>CABA</code> Cash Basis Taxes · <code>MISC</code> Miscellaneous.</td></tr>
+  </tbody>
+</table>
+
+<h2>8.4 Tugas Terjadwal (Scheduled Actions)</h2>
+<p><span class="path">Settings ▸ Technical ▸ Scheduled Actions</span></p>
+<table class="tight">
+  <thead><tr><th style="width:36%">Nama</th><th style="width:14%">Interval</th><th style="width:12%">Status</th><th>Fungsi</th></tr></thead>
+  <tbody>
+    <tr><td>Custom Asset: Post Monthly Depreciation</td><td>Harian</td><td><b>Aktif</b></td><td>Memposting baris depresiasi yang jatuh tempo.</td></tr>
+    <tr><td>Retail Import: fetch mailboxes</td><td>Per jam</td><td><b>Aktif</b></td><td>Menarik lampiran dari IMAP. <i>Saat ini tidak berefek</i> karena record Mailbox nonaktif.</td></tr>
+    <tr><td>Retail Import: poll feeds</td><td>Per jam</td><td><b>Nonaktif</b></td><td>⚠ Inilah saklar yang mengubah berkas di folder <i>drop</i> menjadi POS Order + jurnal. <b>Harus diaktifkan saat go-live.</b></td></tr>
+    <tr><td>Levi's: Periodic Inventory Reconciliation (draft)</td><td>Bulanan</td><td><b>Nonaktif</b></td><td>Menyiapkan dokumen INVREC berstatus draft. Tidak pernah memposting.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ 9 ============ -->
+<h1 class="chap"><span class="num">9.</span> Konfigurasi Wajib yang Belum Selesai</h1>
+<div class="sub">Open configuration items — seluruhnya master data, tidak memerlukan perubahan kode</div>
+
+<table>
+  <thead><tr><th style="width:5%">#</th><th style="width:24%">Item</th><th style="width:11%">Prioritas</th><th>Tindakan</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><b>GR/IR Clearing untuk stream Trade</b></td>
+      <td><span class="chip" style="background:#FDE8E8;border-color:#C0392B;color:#7B241C">TINGGI</span></td>
+      <td>Akun GR/IR Trade diambil dari field <i>Stock Variation Account</i> pada <b>Kategori Produk</b> — dan saat ini <b>belum diisi</b>. Akibatnya, Vendor Bill Trade masih membebani COGS/Beban langsung, bukan mengosongkan GR/IR.<br>
+      <b>Perbaiki di:</b> <span class="path">Inventory ▸ Configuration ▸ Product Categories</span> — isi <i>Stock Variation Account</i>; <b>atau</b> isi field <i>GR/IR Account</i> pada baris Trade di <span class="path">Invoicing ▸ Configuration ▸ Trade / Non-Trade Accounts</span>.<br>
+      <b>Ingat:</b> akun harus bertipe <i>Current Liability</i>, bukan <i>Payable</i>.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><b>Akun Kerugian Scrap</b></td>
+      <td><span class="chip" style="background:#FDE8E8;border-color:#C0392B;color:#7B241C">TINGGI</span></td>
+      <td>Parameter <code>custom_levis_localization.scrap_loss_account_code</code> masih kosong → <b>validasi Scrap Batch gagal</b>.<br>
+      <b>Perbaiki di:</b> <span class="path">Settings ▸ Technical ▸ System Parameters</span> — isi dengan <b>kode akun</b> (bukan ID) beban kerugian persediaan.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><b>Tabel Card BIN &amp; MDR</b></td>
+      <td><span class="chip" style="background:#FFF4E0;border-color:#C98A16;color:#7A5308">SEDANG</span></td>
+      <td>Model <code>levis.mdr.bin</code> masih <b>kosong</b> (0 baris) → netting MDR kartu tidak dapat berjalan.<br>
+      <b>Isi di:</b> <span class="path">Invoicing ▸ Configuration ▸ Card BIN / MDR</span> — per skema kartu, rentang BIN, bank <i>acquirer</i>, dan persentase/nominal MDR.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><b>Akumulasi Depresiasi — Kendaraan</b></td>
+      <td><span class="chip" style="background:#FFF4E0;border-color:#C98A16;color:#7A5308">SEDANG</span></td>
+      <td>Grup aset <i>Vehicles</i> tidak memiliki akun Akumulasi Depresiasi karena kode <code>1205202000</code> <b>tidak ada di Chart of Accounts</b>. Depresiasi kendaraan akan gagal diposting.<br>
+      <b>Perbaiki:</b> tambahkan akun tersebut ke CoA, lalu petakan di <span class="path">Invoicing ▸ Assets ▸ Configuration ▸ Groups ▸ Vehicles</span>.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>Pemetaan COA biaya audit pada Bill</td>
+      <td><span class="chip" style="background:#ECEFF3;border-color:#5A6472;color:#2A313B">RENDAH</span></td>
+      <td>Set akun beban pada produk/kategori terkait.</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><b>Aktivasi go-live impor otomatis</b></td>
+      <td><span class="chip" style="background:#E8F1FD;border-color:#2E6DB4;color:#1B3F6B">GO-LIVE</span></td>
+      <td>Aktifkan Scheduled Action <i>"Retail Import: poll feeds"</i> di <span class="path">Settings ▸ Technical ▸ Scheduled Actions</span>. Tanpa ini, berkas yang masuk ke folder <i>drop</i> hanya akan mengendap, tidak diposting.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============ 10 ============ -->
+<h1 class="chap"><span class="num">10.</span> Batasan, Risiko &amp; Catatan Teknis</h1>
+<div class="sub">Known limitations — hal-hal yang perlu diketahui sebelum go-live</div>
+
+<h2>10.1 Batasan Fungsional</h2>
+<table>
+  <thead><tr><th style="width:26%">Area</th><th>Batasan</th></tr></thead>
+  <tbody>
+    <tr><td><b>Retur penjualan (X48)</b></td><td>Parameter <code>x48_post_enabled</code> masih <code>0</code>. Selain itu, terdapat cacat yang belum diperbaiki: refund X48 di-<i>tender</i> ke metode CASH toko, dan nilai refund mendarat di akun <i>Cash Difference</i> alih-alih mengurangi kas. <b>Harus diperbaiki sebelum diaktifkan.</b></td></tr>
+    <tr><td><b>Rekonsiliasi X70T</b></td><td>Belum dapat diverifikasi — berkas contoh dari EBR masih kosong.</td></tr>
+    <tr><td><b>Export GL EBR</b></td><td>Export GL 2026 dari EBR bersifat <b>satu sisi</b> (tiap baris hanya satu <i>leg</i>, dan &lt;5% membawa Document No). Akibatnya voucher tidak dapat diseimbangkan otomatis. Diperlukan export dua sisi dari pihak EBR.</td></tr>
+    <tr><td><b>PPh 22 &amp; PPh 15</b></td><td>Belum termuat dalam 107 kode objek pajak. Perlu ditambahkan bila EBR memiliki transaksi kedua jenis ini.</td></tr>
+    <tr><td><b>Penjualan berbiaya nol</b></td><td>Penjualan yang terjadi sebelum pembelian tercatat akan tetap bernilai COGS = 0 sampai <b>Periodic COGS</b> dijalankan. Odoo 19 tidak lagi memiliki <i>FIFO vacuum</i> retroaktif.</td></tr>
+  </tbody>
+</table>
+
+<h2>10.2 Risiko Operasional</h2>
+<table>
+  <thead><tr><th style="width:26%">Risiko</th><th>Mitigasi</th></tr></thead>
+  <tbody>
+    <tr><td><b>Diskon terhitung dua kali</b></td><td>Jangan pernah mengaktifkan <code>x24_discount_reclass</code> dan <code>x31_post_enabled</code> bersamaan. Jadikan ini bagian dari <i>checklist</i> perubahan parameter.</td></tr>
+    <tr><td><b>Mailbox aktif di lebih dari satu DB</b></td><td>Pastikan record <code>retail.import.mailbox</code> hanya aktif di satu basis data produksi.</td></tr>
+    <tr><td><b>Perubahan parameter tanpa kontrol</b></td><td>Batasi akses <span class="path">Settings ▸ Technical ▸ System Parameters</span> ke System Administrator; wajibkan persetujuan Finance Manager.</td></tr>
+    <tr><td><b>Impor ganda</b></td><td>Tertangani otomatis oleh <i>hash</i> SHA256 — berkas identik tidak akan diposting dua kali. Namun berkas dengan isi <i>sama</i> tapi <i>hash berbeda</i> (mis. di-<i>re-save</i>) tetap dapat lolos. Selalu gunakan <i>Preview</i> lebih dulu.</td></tr>
+  </tbody>
+</table>
+
+<h2>10.3 Catatan Teknis</h2>
+<ul>
+  <li><b>Tipe akun GR/IR</b> harus <code>Current Liability</code>, bukan <code>Payable</code> — tipe <i>Payable</i> memicu aturan <i>due date</i> Odoo dan merusak posting Bill.</li>
+  <li><b><code>account.code</code> bersifat <i>company-dependent</i></b> pada Odoo 19. Membaca kode akun tanpa konteks perusahaan yang benar akan menghasilkan kolom Code kosong pada laporan.</li>
+  <li><b>Constraint <code>bin_range_order</code></b> pada tabel MDR/BIN <b>tidak aktif di database</b> — Odoo 19 mengabaikan deklarasi <code>_sql_constraints</code> gaya lama secara diam-diam. Validasi rentang BIN harus dilakukan manual saat pengisian.</li>
+  <li><b>Modul <code>custom_retail_pos_offline</code></b> disebut dalam paket industri retail dan dokumen FSD sebelumnya, <b>namun modul ini tidak ada di dalam basis kode</b>. Perlu dikonfirmasi: dibangun, atau dikeluarkan dari cakupan.</li>
+</ul>
+
+<!-- ============ 11 ============ -->
+<h1 class="chap"><span class="num">11.</span> Lampiran</h1>
+<div class="sub">Appendix</div>
+
+<h2>11.1 Daftar Operating Unit</h2>
+<table class="tight">
+  <thead><tr><th style="width:6%">#</th><th style="width:44%">Operating Unit</th><th style="width:6%">#</th><th>Operating Unit</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><b>EBR - HEAD OFFICE</b></td><td>12</td><td>OLS SES - MALL OF INDONESIA</td></tr>
+    <tr><td>2</td><td>OLS SES - AEON BSD CITY</td><td>13</td><td>OLS SES - METROPOLITAN MALL BEKASI</td></tr>
+    <tr><td>3</td><td>OLS SES - BANDUNG INDAH PLAZA</td><td>14</td><td>OLS SES - PAKUWON MALL SURABAYA</td></tr>
+    <tr><td>4</td><td>OLS SES - CENTRAL PARK</td><td>15</td><td>OLS SES - PARIS VAN JAVA</td></tr>
+    <tr><td>5</td><td>OLS SES - GALAXY MALL 3</td><td>16</td><td>OLS SES - PLAZA SENAYAN</td></tr>
+    <tr><td>6</td><td>OLS SES - GANDARIA CITY</td><td>17</td><td>OLS SES - PONDOK INDAH MALL 1</td></tr>
+    <tr><td>7</td><td>OLS SES - GRAND INDONESIA</td><td>18</td><td>OLS SES - PONDOK INDAH MALL 2</td></tr>
+    <tr><td>8</td><td>OLS SES - GRAND METROPOLITAN BEKASI</td><td>19</td><td>OLS SES - SENAYAN CITY</td></tr>
+    <tr><td>9</td><td>OLS SES - KELAPA GADING MALL</td><td>20</td><td>OLS SES - SUMMARECON MALL BANDUNG</td></tr>
+    <tr><td>10</td><td>OLS SES - LOTTE SHOPPING AVENUE</td><td>21</td><td>OLS SES - TRANS STUDIO CIBUBUR</td></tr>
+    <tr><td>11</td><td>OLS SES - TRANS STUDIO MALL BANDUNG</td><td>22</td><td>OLS SES - TUNJUNGAN PLAZA 3</td></tr>
+  </tbody>
+</table>
+<p class="small">Catatan: terdapat pula jurnal untuk PACIFIC PLACE MALL dan PASKAL BANDUNG yang Operating Unit-nya sudah dinonaktifkan (toko tutup / belum aktif).</p>
+
+<h2>11.2 Akun Kunci</h2>
+<table class="tight">
+  <thead><tr><th style="width:22%">Kode</th><th>Nama / Fungsi</th></tr></thead>
+  <tbody>
+    <tr><td><code>2103100001</code></td><td>Hutang Dagang <span class="en">(Trade Payable)</span></td></tr>
+    <tr><td><code>2103300001</code></td><td>Hutang Non-Dagang <span class="en">(Non-Trade Payable)</span></td></tr>
+    <tr><td><code>2103300008</code></td><td>GR/IR Clearing — Non-Trade</td></tr>
+    <tr><td><i>per kategori produk</i></td><td>GR/IR Clearing — Trade (field <i>Stock Variation Account</i>) — <b>belum diisi</b></td></tr>
+    <tr><td><code>1102…</code></td><td>Kas per toko (satu akun per Operating Unit)</td></tr>
+    <tr><td><code>3005200004</code></td><td>Surplus Revaluasi — OCI</td></tr>
+    <tr><td><code>7706000000</code></td><td>Rugi Revaluasi — P&amp;L</td></tr>
+    <tr><td><code>8300000004</code></td><td>Pendapatan Revaluasi — P&amp;L</td></tr>
+    <tr><td><code>3006100001</code></td><td>Saldo Laba <span class="en">(Retained Earnings)</span></td></tr>
+    <tr><td><code>9990000001</code> / <code>9990000002</code></td><td>Selisih pembulatan rupiah POS — untung / rugi</td></tr>
+  </tbody>
+</table>
+
+<h2>11.3 Indeks Gambar</h2>
+<table class="tight">
+  <thead><tr><th style="width:12%">Gambar</th><th>Judul</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Arsitektur solusi Levi's</td></tr>
+    <tr><td>2</td><td>Peta peran pengguna</td></tr>
+    <tr><td>3</td><td>Aliran dimensi Operating Unit</td></tr>
+    <tr><td>4</td><td>Swimlane Retail Sales-to-Cash</td></tr>
+    <tr><td>5</td><td>Swimlane Procure-to-Pay Trade</td></tr>
+    <tr><td>6</td><td>Swimlane Procure-to-Pay Non-Trade</td></tr>
+    <tr><td>7</td><td>Swimlane Retur Pembelian (RTV)</td></tr>
+    <tr><td>8</td><td>Swimlane operasi gudang</td></tr>
+    <tr><td>9</td><td>Swimlane siklus hidup aktiva tetap</td></tr>
+    <tr><td>10</td><td>Swimlane perpajakan</td></tr>
+    <tr><td>11</td><td>Swimlane penutupan periode</td></tr>
+    <tr><td>12</td><td>Status dokumen pengadaan &amp; gudang</td></tr>
+    <tr><td>13</td><td>Status dokumen akuntansi &amp; integrasi</td></tr>
+  </tbody>
+</table>
+
+<div style="margin-top:14mm;padding-top:4mm;border-top:2px solid #D8DCE3" class="small">
+  <b>Functional Document — Levi's / EBR Odoo 19</b> · Versi 1.0 · 13 Juli 2026 · Status: For Review<br>
+  Dokumen ini disusun berdasarkan kode sumber dan konfigurasi aktual basis data <code>prd_levis_begbal</code>.
+</div>

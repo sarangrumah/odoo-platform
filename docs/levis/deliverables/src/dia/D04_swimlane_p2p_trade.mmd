@@ -1,0 +1,65 @@
+flowchart LR
+  classDef l1 fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef l2 fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef l3 fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef l4 fill:#F0EAF7,stroke:#7D4FA8,color:#4A2A66
+  classDef l5 fill:#FDE8E8,stroke:#C0392B,color:#7B241C
+  classDef dec fill:#FFFFFF,stroke:#555,color:#222
+
+  subgraph P["① PURCHASING OFFICER"]
+    direction TB
+    P1["Buat RFQ / Purchase Order<br/>Purchase ▸ Orders ▸ Purchase Orders ▸ New"]:::l1
+    P2["Pilih <b>Purchase Type = Trade</b><br/>(barang dagangan)"]:::l1
+    P3["Isi vendor, produk, qty, harga<br/>Operating Unit terisi dari Warehouse"]:::l1
+    P4["Confirm Order<br/>Nomor: PO/T/EBR/2026/07/xxx"]:::l1
+  end
+
+  subgraph M["② PURCHASING MANAGER (Approver)"]
+    direction TB
+    M1{"Nilai PO di atas<br/>batas matriks<br/>otorisasi?"}:::dec
+    M2["Approve / Reject<br/>Approvals ▸ To Approve"]:::l2
+  end
+
+  subgraph W["③ WAREHOUSE STAFF"]
+    direction TB
+    W1["Terima barang<br/>Inventory ▸ Receipts"]:::l3
+    W2{"Qty diterima ≤<br/>Qty dipesan?"}:::dec
+    W3["DITOLAK sistem<br/>over-receipt diblokir"]:::l5
+    W4["Scan / input Lot-Serial<br/>lalu Validate"]:::l3
+  end
+
+  subgraph S["④ SISTEM — Jurnal Goods Receipt"]
+    direction TB
+    S1{"Parameter<br/>suppress_gr_journal?"}:::dec
+    S2["<b>Perpetual (=0)</b><br/>Dr Persediaan / Stock Valuation<br/>Cr GR/IR Clearing (Trade)<br/>+ Operating Unit"]:::l3
+    S3["<b>Periodik (=1)</b><br/>Tidak ada jurnal GR.<br/>GL disesuaikan lewat<br/>Inventory Reconciliation"]:::l3
+  end
+
+  subgraph A["⑤ AP OFFICER"]
+    direction TB
+    A1["Buat Vendor Bill dari PO<br/>Invoicing ▸ Vendor Bills"]:::l4
+    A2["Baris produk otomatis diarahkan ke<br/><b>GR/IR Clearing</b> (bukan COGS)"]:::l4
+    A3["Post Bill<br/>Nomor: BILL/T/EBR/2026/07/xxx<br/>Dr GR/IR Clearing<br/>Dr PPN Masukan<br/>Cr Hutang Dagang (Trade)"]:::l4
+    A4["Register Payment<br/>+ Admin Fee / MDR (opsional)<br/>+ metode GIRO / Transfer"]:::l4
+    A5["Cetak <b>Payment Voucher</b> (PDF)<br/>bertanda tangan &amp; terbilang"]:::l4
+  end
+
+  subgraph F["⑥ ACCOUNTANT"]
+    direction TB
+    F1["Cek saldo GR/IR Clearing<br/>= barang diterima belum ditagih"]:::l2
+    F2{"Saldo GR/IR<br/>wajar?"}:::dec
+    F3["Telusuri GR tanpa Bill<br/>atau Bill tanpa GR"]:::l2
+    F4["Tutup periode"]:::l2
+  end
+
+  P1 --> P2 --> P3 --> P4 --> M1
+  M1 -- "Ya / Yes" --> M2 --> W1
+  M1 -- "Tidak / No" --> W1
+  W1 --> W2
+  W2 -- "Tidak / No" --> W3 --> W1
+  W2 -- "Ya / Yes" --> W4 --> S1
+  S1 -- "0" --> S2 --> A1
+  S1 -- "1" --> S3 --> A1
+  A1 --> A2 --> A3 --> A4 --> A5 --> F1 --> F2
+  F2 -- "Tidak / No" --> F3 --> A1
+  F2 -- "Ya / Yes" --> F4

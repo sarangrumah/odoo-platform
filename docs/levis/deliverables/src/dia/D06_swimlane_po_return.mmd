@@ -1,0 +1,48 @@
+flowchart LR
+  classDef l1 fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef l3 fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef l4 fill:#F0EAF7,stroke:#7D4FA8,color:#4A2A66
+  classDef l5 fill:#FDE8E8,stroke:#C0392B,color:#7B241C
+  classDef dec fill:#FFFFFF,stroke:#555,color:#222
+
+  subgraph W["① WAREHOUSE / QC"]
+    direction TB
+    W1["Barang cacat / salah kirim<br/>ditemukan"]:::l3
+    W2["Kumpulkan qty per SKU<br/>yang akan diretur"]:::l3
+  end
+
+  subgraph P["② PURCHASING OFFICER"]
+    direction TB
+    P1["Buat PO Return<br/>Purchase ▸ Orders ▸ PO Returns ▸ New"]:::l1
+    P2["Pilih Vendor + isi baris<br/>(hanya produk &amp; qty)"]:::l1
+    P3["Klik <b>Allocate</b>"]:::l1
+  end
+
+  subgraph S["③ SISTEM — FIFO Allocation Engine"]
+    direction TB
+    S1["Telusuri semua PO &amp; Goods Receipt<br/>vendor tsb, urut PO tertua"]:::l3
+    S2{"Qty retur ≤<br/>qty returnable?"}:::dec
+    S3["DITOLAK — over-return<br/>(sudah termasuk retur native<br/>+ alokasi pending)"]:::l5
+    S4["Potong qty per slice:<br/>tiap slice memakai harga satuan<br/>PO asal + menunjuk GR &amp; Bill asal"]:::l3
+  end
+
+  subgraph V["④ VALIDASI"]
+    direction TB
+    V1["Klik <b>Validate</b>"]:::l1
+    V2["Return Picking dibuat<br/>(stock keluar, valuasi RTV)"]:::l3
+    V3["Vendor Credit Note draft<br/>dikelompokkan per Bill asal<br/>Dr Hutang Dagang<br/>Cr Persediaan / GR/IR"]:::l4
+  end
+
+  subgraph A["⑤ AP OFFICER"]
+    direction TB
+    A1["Review &amp; Post Credit Note"]:::l4
+    A2{"Vendor kirim<br/>uang / potong<br/>tagihan?"}:::dec
+    A3["Reconcile Credit Note<br/>dengan Bill berikutnya"]:::l4
+    A4["Terima refund<br/>Register Payment (inbound)<br/>+ cetak Payment Receipt"]:::l4
+  end
+
+  W1 --> W2 --> P1 --> P2 --> P3 --> S1 --> S2
+  S2 -- "Tidak" --> S3 --> P2
+  S2 -- "Ya" --> S4 --> V1 --> V2 --> V3 --> A1 --> A2
+  A2 -- "Potong tagihan" --> A3
+  A2 -- "Refund" --> A4

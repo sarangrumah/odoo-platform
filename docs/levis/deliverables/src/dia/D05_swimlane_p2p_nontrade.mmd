@@ -1,0 +1,50 @@
+flowchart LR
+  classDef l1 fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef l2 fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef l4 fill:#F0EAF7,stroke:#7D4FA8,color:#4A2A66
+  classDef dec fill:#FFFFFF,stroke:#555,color:#222
+
+  subgraph R["① REQUESTOR / USER DEPARTEMEN"]
+    direction TB
+    R1["Kebutuhan non-dagangan:<br/>ATK, jasa, sewa, maintenance"]:::l1
+  end
+
+  subgraph P["② PURCHASING OFFICER"]
+    direction TB
+    P1["Buat Purchase Order<br/>Purchase ▸ Orders ▸ New"]:::l1
+    P2["Pilih <b>Purchase Type = Non-Trade</b>"]:::l1
+    P3["Confirm<br/>Nomor: PO/NT/EBR/2026/07/xxx"]:::l1
+  end
+
+  subgraph M["③ APPROVER"]
+    direction TB
+    M1{"Perlu approval<br/>per matriks?"}:::dec
+    M2["Approve"]:::l2
+  end
+
+  subgraph A["④ AP OFFICER"]
+    direction TB
+    A1{"Barang atau<br/>Jasa?"}:::dec
+    A2["<b>Barang</b> — terima via Receipt<br/>Dr Persediaan / Cr GR/IR Non-Trade<br/>(akun 2103300008)"]:::l4
+    A3["<b>Jasa</b> — tanpa Receipt,<br/>langsung Vendor Bill"]:::l4
+    A4["Buat &amp; Post Vendor Bill<br/>Nomor: BILL/NT/EBR/2026/07/xxx<br/>Dr Beban (expense account non-trade)<br/>Dr PPN Masukan<br/>Cr <b>Hutang Non-Dagang</b> (2103300001)"]:::l4
+    A5{"Objek<br/>PPh?"}:::dec
+    A6["Sistem auto-potong PPh<br/>(PPh 23 / 4(2) / 26)<br/>Cr Hutang PPh<br/>+ draft Bukti Potong"]:::l4
+    A7["Register Payment<br/>+ cetak Payment Voucher"]:::l4
+  end
+
+  subgraph T["⑤ TAX OFFICER"]
+    direction TB
+    T1["Lengkapi Bukti Potong<br/>Invoicing ▸ Pajak Indonesia"]:::l2
+    T2["Export XML Coretax DJP"]:::l2
+  end
+
+  R1 --> P1 --> P2 --> P3 --> M1
+  M1 -- "Ya" --> M2 --> A1
+  M1 -- "Tidak" --> A1
+  A1 -- "Barang" --> A2 --> A4
+  A1 -- "Jasa" --> A3 --> A4
+  A4 --> A5
+  A5 -- "Ya" --> A6 --> T1 --> T2
+  A5 -- "Tidak" --> A7
+  A6 --> A7
