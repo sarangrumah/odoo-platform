@@ -488,13 +488,11 @@
   <img src="shots/E03_scrap_batch_new.png" alt="Form Scrap Batch baru">
   <figcaption><b>Layar 15.</b> Form <b>Scrap Batch</b> baru. Nomor dokumen: <code>SCRAP/2026/xxx</code>. Satu dokumen menampung banyak produk.</figcaption>
 </figure>
-<div class="box danger">
-  <span class="t">Konfigurasi wajib sebelum fitur ini dapat dipakai</span>
-  <p>Jika <b>[Validate]</b> gagal dengan pesan mengenai <i>account</i>, berarti parameter
-  <code>custom_levis_localization.scrap_loss_account_code</code> <b>belum diisi</b>.</p>
-  <p style="margin-top:2mm"><b>System Administrator</b> harus mengisinya lebih dulu di
-  <span class="path">Settings ▸ Technical ▸ System Parameters</span> dengan <b>kode akun</b>
-  (bukan nama, bukan ID) beban kerugian persediaan. Lihat §10.1.</p>
+<div class="box ok">
+  <span class="t">Sudah siap dipakai</span>
+  <p>Akun kerugian scrap sudah dikonfigurasi: <code>7218000001</code> — <i>Inventory write-off</i>.
+  Saat Anda klik <b>[Validate]</b>, jurnal terbentuk otomatis:
+  <b>Dr 7218000001 Inventory write-off / Cr akun persediaan</b> kategori barang tersebut.</p>
 </div>
 
 <h2>5.3 Memeriksa Stok &amp; Lot/Serial</h2>
@@ -633,12 +631,15 @@
   <i>due date</i> Odoo dan akan <b>merusak posting Vendor Bill</b>. Gunakan tipe
   <b>Current Liability</b> (Liabilitas Lancar).</p>
 </div>
-<div class="box warn">
-  <span class="t">GR/IR untuk stream Trade belum terpasang</span>
-  <p>Untuk <b>Trade</b>, akun GR/IR diambil dari field <i>Stock Variation Account</i> pada
-  <b>Kategori Produk</b> (<span class="path">Inventory ▸ Configuration ▸ Product Categories</span>) —
-  dan saat ini <b>belum diisi</b>. Akibatnya Vendor Bill Trade masih membebani COGS langsung.
-  <b>Ini harus diselesaikan sebelum go-live.</b></p>
+<div class="box ok">
+  <span class="t">GR/IR Trade sudah terpasang — jangan diisi ulang</span>
+  <p>Baris <b>Trade</b> pada tabel ini sengaja dibiarkan <b>kosong</b> pada kolom <i>GR/IR Account</i>.
+  GR/IR untuk barang dagangan ditentukan <b>per kategori produk</b> —
+  <code>2103109121</code> textile, <code>…122</code> footwear, <code>…123</code> accessories,
+  <code>…124</code> miscellaneous — dan semuanya sudah benar.</p>
+  <p style="margin-top:2mm"><b>Jika Anda mengisi kolom GR/IR pada baris Trade, isian itu akan MENIMPA
+  pemetaan per-kategori</b> dan seluruh barang dagangan akan masuk ke satu akun GR/IR yang sama.
+  Biarkan kosong.</p>
 </div>
 
 <h3>Card BIN / MDR</h3>
@@ -681,21 +682,23 @@
   <img src="shots/G02_fixed_asset_new.png" alt="Form Fixed Asset baru">
   <figcaption><b>Layar 24.</b> Form <b>Fixed Asset</b> baru. Nomor: <code>FA/2026/xxx</code>.</figcaption>
 </figure>
-<div class="box danger">
-  <span class="t">Grup "Vehicles" belum bisa dipakai</span>
-  <p>Grup <b>Vehicles</b> <b>belum memiliki akun Akumulasi Depresiasi</b> — akun <code>1205202000</code>
-  tidak ada di Chart of Accounts. Selama belum diperbaiki, <b>depresiasi kendaraan akan gagal diposting</b>.</p>
-  <p style="margin-top:2mm">Perbaikan ada di sisi konfigurasi: tambahkan akun tersebut ke CoA, lalu petakan
-  di <span class="path">Invoicing ▸ Assets ▸ Configuration ▸ Groups ▸ Vehicles</span>.</p>
+<div class="box ok">
+  <span class="t">Keenam grup sudah siap</span>
+  <p>Seluruh grup ber-depresiasi kini punya akun akumulasi depresiasi dan <b>jurnal depresiasi</b>
+  (<code>DEPRE</code>). Contoh untuk <b>Vehicles</b>: aset <code>1205103000</code>,
+  akumulasi <code>1205202000</code>, beban <code>7204102000</code>.</p>
+  <p style="margin-top:2mm"><b>Land</b> sengaja tidak punya akun depresiasi — tanah tidak disusutkan.</p>
 </div>
 
 <h2>7.2 Posting Depresiasi</h2>
 <p><span class="path">Invoicing ▸ Assets ▸ Post Depreciation</span></p>
-<div class="box ok">
-  <span class="t">Umumnya berjalan otomatis</span>
-  <p>Sebuah <i>Scheduled Action</i> ("Custom Asset: Post Monthly Depreciation") berjalan <b>setiap hari</b>
-  dan otomatis memposting baris depresiasi yang sudah jatuh tempo. Anda hanya perlu membuka menu ini bila
-  ingin memposting secara manual atau memeriksa yang tertunda.</p>
+<div class="box warn">
+  <span class="t">Saat ini depresiasi TIDAK berjalan otomatis</span>
+  <p><i>Scheduled Action</i> "Custom Asset: Post Monthly Depreciation" sengaja masih <b>nonaktif</b>.
+  Artinya <b>Anda harus memposting depresiasi secara manual</b> dari menu ini setiap bulan.</p>
+  <p style="margin-top:2mm">Alasannya: sekali cron itu diaktifkan, ia langsung memposting <b>seluruh</b>
+  baris depresiasi yang sudah jatuh tempo — bisa banyak sekaligus dan sulit ditarik kembali.
+  Aktifkan hanya setelah Finance melihat dampaknya lewat posting manual.</p>
 </div>
 <p>Jurnal yang terbentuk: <b>Dr Beban Depresiasi / Cr Akumulasi Depresiasi</b>.</p>
 <figure class="shot">
@@ -932,7 +935,7 @@ Menjalankan ini lebih dulu jauh lebih murah daripada ditolak DJP.</p>
     <tr><td><code>retail_import.x48_post_enabled</code></td><td><b>0</b></td><td>Retur penjualan belum diposting.</td></tr>
     <tr><td><code>retail_import.x24_strict_product</code></td><td><b>1</b></td><td>SKU tak dikenal diparkir sebagai error.</td></tr>
     <tr><td><code>custom_levis_localization.suppress_gr_journal</code></td><td><b>0</b></td><td>Mode <b>Perpetual</b> — jurnal Goods Receipt terbentuk.</td></tr>
-    <tr><td><code>custom_levis_localization.scrap_loss_account_code</code></td><td><b>kosong</b></td><td>⚠ <b>Belum diisi</b> — Scrap Batch tidak dapat divalidasi.</td></tr>
+    <tr><td><code>custom_levis_localization.scrap_loss_account_code</code></td><td><b>7218000001</b></td><td>✅ Terisi — <i>Inventory write-off</i>.</td></tr>
   </tbody>
 </table>
 <div class="box danger">
@@ -951,7 +954,7 @@ Menjalankan ini lebih dulu jauh lebih murah daripada ditolak DJP.</p>
 <table class="tight">
   <thead><tr><th style="width:36%">Nama</th><th style="width:12%">Interval</th><th style="width:12%">Status</th><th>Fungsi</th></tr></thead>
   <tbody>
-    <tr><td>Custom Asset: Post Monthly Depreciation</td><td>Harian</td><td><b>Aktif</b></td><td>Memposting depresiasi yang jatuh tempo.</td></tr>
+    <tr><td>Custom Asset: Post Monthly Depreciation</td><td>Harian</td><td><b>Nonaktif</b></td><td>⚠ Depresiasi harus diposting <b>manual</b>. Aktifkan hanya bila Finance siap — cron langsung memposting seluruh baris jatuh tempo.</td></tr>
     <tr><td>Retail Import: fetch mailboxes</td><td>Per jam</td><td><b>Aktif</b></td><td>Menarik lampiran IMAP (tidak berefek selama record Mailbox nonaktif).</td></tr>
     <tr><td><b>Retail Import: poll feeds</b></td><td>Per jam</td><td><b>Nonaktif</b></td><td>⚠ <b>Saklar go-live.</b> Selama nonaktif, berkas di folder <i>drop</i> hanya menumpuk tanpa diproses.</td></tr>
     <tr><td>Levi's: Periodic Inventory Reconciliation (draft)</td><td>Bulanan</td><td><b>Nonaktif</b></td><td>Menyiapkan dokumen INVREC draft. Tidak pernah memposting.</td></tr>
@@ -1021,8 +1024,8 @@ Menjalankan ini lebih dulu jauh lebih murah daripada ditolak DJP.</p>
     </tr>
     <tr>
       <td><b>[Validate] Scrap Batch gagal</b> — pesan tentang <i>account</i></td>
-      <td>Parameter <code>scrap_loss_account_code</code> masih kosong.</td>
-      <td>System Administrator mengisinya di <span class="path">Settings ▸ Technical ▸ System Parameters</span> dengan <b>kode akun</b> beban kerugian persediaan (§10.1).</td>
+      <td>Parameter <code>scrap_loss_account_code</code> kosong. <b>Sudah diperbaiki</b> (<code>7218000001</code>) — seharusnya tidak muncul lagi.</td>
+      <td>Jika tetap muncul, periksa parameter itu di <span class="path">Settings ▸ Technical ▸ System Parameters</span> (§10.1).</td>
     </tr>
     <tr>
       <td><b>Posting Vendor Bill gagal</b> — pesan tentang <i>due date</i></td>
@@ -1035,9 +1038,9 @@ Menjalankan ini lebih dulu jauh lebih murah daripada ditolak DJP.</p>
       <td>Periksa apakah faktur sudah pernah diinput. Ini blokir yang disengaja untuk mencegah faktur ganda.</td>
     </tr>
     <tr>
-      <td><b>Depresiasi kendaraan gagal</b></td>
-      <td>Grup <i>Vehicles</i> belum punya akun Akumulasi Depresiasi (kode <code>1205202000</code> tidak ada di CoA).</td>
-      <td>Tambahkan akun ke CoA, lalu petakan di <span class="path">Invoicing ▸ Assets ▸ Configuration ▸ Groups</span> (§7.1).</td>
+      <td><b>Confirm aset gagal</b> — <i>"depreciation journal must be set"</i> atau akun akumulasi kosong</td>
+      <td>Grup aset belum punya jurnal depresiasi / akun akumulasi. <b>Sudah diperbaiki</b> untuk keenam grup (jurnal <code>DEPRE</code>).</td>
+      <td>Jika muncul pada grup baru yang Anda buat sendiri, isi <i>Journal</i> dan akun-akunnya di <span class="path">Invoicing ▸ Assets ▸ Configuration ▸ Groups</span> (§7.1).</td>
     </tr>
     <tr>
       <td><b>PO Return ditolak</b> — <i>over-return</i></td>
