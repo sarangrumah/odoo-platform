@@ -83,7 +83,11 @@
         <li>Tugas Terjadwal (Scheduled Actions)</li>
       </ol>
     </li>
-    <li>Konfigurasi Wajib yang Belum Selesai</li>
+    <li>Status Konfigurasi
+      <ol>
+        <li>Saklar yang Sengaja Belum Diaktifkan</li>
+      </ol>
+    </li>
     <li>Batasan, Risiko &amp; Catatan Teknis</li>
     <li>Lampiran</li>
   </ol>
@@ -584,7 +588,7 @@ reklasifikasi ini otomatis membawa Operating Unit dan tanggal yang benar tanpa k
 <table class="tight">
   <thead><tr><th style="width:22%">Stream</th><th style="width:26%">Akun Hutang</th><th style="width:26%">Akun GR/IR</th><th>Sumber Konfigurasi</th></tr></thead>
   <tbody>
-    <tr><td><b>Trade</b></td><td><code>2103100001</code> Hutang Dagang</td><td>Per <b>Kategori Produk</b> — field <i>Stock Variation Account</i></td><td><span class="path">Inventory ▸ Configuration ▸ Product Categories</span></td></tr>
+    <tr><td><b>Trade</b></td><td><code>2103100001</code> Hutang Dagang</td><td>Per kategori: <code>2103109121</code> textile · <code>…122</code> footwear · <code>…123</code> accessories · <code>…124</code> miscellaneous</td><td>Diturunkan dari <b>akun valuasi</b> kategori (<i>Stock Variation Account</i> pada akun, bukan pada kategori)</td></tr>
     <tr><td><b>Non-Trade</b></td><td><code>2103300001</code> Hutang Non-Dagang</td><td><code>2103300008</code></td><td><span class="path">Invoicing ▸ Configuration ▸ Trade / Non-Trade Accounts</span></td></tr>
   </tbody>
 </table>
@@ -669,11 +673,11 @@ reklasifikasi ini otomatis membawa Operating Unit dan tanggal yang benar tanpa k
     <tr><td class="cr">Persediaan / Stock Valuation</td><td class="amt">—</td><td class="amt">xxx</td></tr>
   </tbody>
 </table>
-<div class="box danger">
-  <span class="t">Konfigurasi wajib — belum terisi</span>
-  <p>Akun "Kerugian Scrap" diambil dari parameter <code>custom_levis_localization.scrap_loss_account_code</code>.
-  Saat ini parameter tersebut <b>masih kosong</b>, sehingga <b>validasi Scrap Batch akan gagal</b>.
-  Lihat Bab 9, item #2.</p>
+<div class="box ok">
+  <span class="t">Sudah dikonfigurasi</span>
+  <p>Akun "Kerugian Scrap" diambil dari parameter <code>custom_levis_localization.scrap_loss_account_code</code>,
+  yang kini terisi <code>7218000001</code> — <i>Inventory write-off</i>. Scrap Batch sudah dapat divalidasi
+  dan jurnalnya terbentuk: <b>Dr 7218000001 / Cr akun persediaan kategori terkait</b>.</p>
 </div>
 
 <h3>Cycle Count</h3>
@@ -696,7 +700,7 @@ reklasifikasi ini otomatis membawa Operating Unit dan tanggal yang benar tanpa k
   <tbody>
     <tr><td>Land <span class="en">(Tanah)</span></td><td>Tidak disusutkan.</td></tr>
     <tr><td>Building &amp; Improvements</td><td>Bangunan dan renovasi outlet.</td></tr>
-    <tr><td>Vehicles <span class="en">(Kendaraan)</span></td><td><b>⚠ Belum memiliki akun Akumulasi Depresiasi</b> — posting depresiasi akan gagal. Lihat Bab 9, item #4.</td></tr>
+    <tr><td>Vehicles <span class="en">(Kendaraan)</span></td><td>✅ Akumulasi depresiasi <code>1205202000</code>, beban <code>7204102000</code>.</td></tr>
     <tr><td>Office &amp; Outlet Equipment</td><td>Peralatan kantor dan toko.</td></tr>
     <tr><td>Machinery <span class="en">(Mesin)</span></td><td>—</td></tr>
     <tr><td>Furniture &amp; Fixtures</td><td>Perabot dan display toko.</td></tr>
@@ -946,7 +950,7 @@ reklasifikasi ini otomatis membawa Operating Unit dan tanggal yang benar tanpa k
     <tr><td><code>retail_import.max_log_lines</code></td><td>500.000</td><td>Batas jumlah baris log.</td></tr>
     <tr><td colspan="3" style="background:#EDF2F9;font-weight:700;color:#1B3F6B">Lokalisasi Levi's</td></tr>
     <tr><td><code>custom_levis_localization.suppress_gr_journal</code></td><td><b>0</b></td><td><b>Mode Perpetual</b> — jurnal Goods Receipt terbentuk.</td></tr>
-    <tr><td><code>custom_levis_localization.scrap_loss_account_code</code></td><td><b>(kosong)</b></td><td>⚠ <b>Belum diisi</b> — validasi Scrap Batch akan gagal. Lihat Bab 9.</td></tr>
+    <tr><td><code>custom_levis_localization.scrap_loss_account_code</code></td><td><b>7218000001</b></td><td>✅ Terisi — akun <i>Inventory write-off</i>. Scrap Batch dapat divalidasi.</td></tr>
   </tbody>
 </table>
 
@@ -986,7 +990,7 @@ reklasifikasi ini otomatis membawa Operating Unit dan tanggal yang benar tanpa k
 <table class="tight">
   <thead><tr><th style="width:36%">Nama</th><th style="width:14%">Interval</th><th style="width:12%">Status</th><th>Fungsi</th></tr></thead>
   <tbody>
-    <tr><td>Custom Asset: Post Monthly Depreciation</td><td>Harian</td><td><b>Aktif</b></td><td>Memposting baris depresiasi yang jatuh tempo.</td></tr>
+    <tr><td>Custom Asset: Post Monthly Depreciation</td><td>Harian</td><td><b>Nonaktif</b></td><td>⚠ Depresiasi <b>tidak</b> berjalan otomatis. Sekali diaktifkan, cron ini langsung memposting <b>seluruh</b> baris yang sudah jatuh tempo — sebaiknya Finance posting manual dulu lewat <b>Post Depreciation</b>.</td></tr>
     <tr><td>Retail Import: fetch mailboxes</td><td>Per jam</td><td><b>Aktif</b></td><td>Menarik lampiran dari IMAP. <i>Saat ini tidak berefek</i> karena record Mailbox nonaktif.</td></tr>
     <tr><td>Retail Import: poll feeds</td><td>Per jam</td><td><b>Nonaktif</b></td><td>⚠ Inilah saklar yang mengubah berkas di folder <i>drop</i> menjadi POS Order + jurnal. <b>Harus diaktifkan saat go-live.</b></td></tr>
     <tr><td>Levi's: Periodic Inventory Reconciliation (draft)</td><td>Bulanan</td><td><b>Nonaktif</b></td><td>Menyiapkan dokumen INVREC berstatus draft. Tidak pernah memposting.</td></tr>
@@ -994,57 +998,81 @@ reklasifikasi ini otomatis membawa Operating Unit dan tanggal yang benar tanpa k
 </table>
 
 <!-- ============ 9 ============ -->
-<h1 class="chap"><span class="num">9.</span> Konfigurasi Wajib yang Belum Selesai</h1>
-<div class="sub">Open configuration items — seluruhnya master data, tidak memerlukan perubahan kode</div>
+<h1 class="chap"><span class="num">9.</span> Status Konfigurasi</h1>
+<div class="sub">Diverifikasi ulang terhadap basis data yang berjalan pada 13 Juli 2026 — bukan disalin dari catatan lama</div>
+
+<div class="box">
+  <span class="t">Bagaimana bab ini disusun</span>
+  <p>Setiap item di bawah <b>diperiksa langsung ke basis data</b>, lalu yang bisa diperbaiki
+  <b>diperbaiki dan diuji end-to-end</b> (dokumen dibuat, divalidasi, jurnalnya diperiksa, lalu
+  di-<i>rollback</i>). Dua klaim pada catatan tindak lanjut lama ternyata <b>keliru</b> — dikoreksi di sini.</p>
+</div>
 
 <table>
-  <thead><tr><th style="width:5%">#</th><th style="width:24%">Item</th><th style="width:11%">Prioritas</th><th>Tindakan</th></tr></thead>
+  <thead><tr><th style="width:5%">#</th><th style="width:24%">Item</th><th style="width:14%">Status</th><th>Keterangan</th></tr></thead>
   <tbody>
     <tr>
       <td>1</td>
-      <td><b>GR/IR Clearing untuk stream Trade</b></td>
-      <td><span class="chip" style="background:#FDE8E8;border-color:#C0392B;color:#7B241C">TINGGI</span></td>
-      <td>Akun GR/IR Trade diambil dari field <i>Stock Variation Account</i> pada <b>Kategori Produk</b> — dan saat ini <b>belum diisi</b>. Akibatnya, Vendor Bill Trade masih membebani COGS/Beban langsung, bukan mengosongkan GR/IR.<br>
-      <b>Perbaiki di:</b> <span class="path">Inventory ▸ Configuration ▸ Product Categories</span> — isi <i>Stock Variation Account</i>; <b>atau</b> isi field <i>GR/IR Account</i> pada baris Trade di <span class="path">Invoicing ▸ Configuration ▸ Trade / Non-Trade Accounts</span>.<br>
-      <b>Ingat:</b> akun harus bertipe <i>Current Liability</i>, bukan <i>Payable</i>.</td>
+      <td><b>GR/IR Clearing — Trade</b></td>
+      <td><span class="chip" style="background:#EFF8F2;border-color:#2E8B57;color:#1D5C39">SUDAH BENAR</span></td>
+      <td><b>Catatan lama keliru.</b> Seluruh kategori dagangan sudah teresolusi ke akun GR/IR yang tepat dan bertipe <code>liability_current</code>:
+      <code>2103109121</code> textile · <code>…122</code> footwear · <code>…123</code> accessories · <code>…124</code> miscellaneous.<br>
+      Baris <b>Trade</b> pada tabel Trade/Non-Trade memang kosong — dan <b>memang seharusnya begitu</b>. Mengisinya justru akan <b>menimpa</b> pemetaan per-kategori. <b>Tidak ada tindakan.</b></td>
     </tr>
     <tr>
       <td>2</td>
       <td><b>Akun Kerugian Scrap</b></td>
-      <td><span class="chip" style="background:#FDE8E8;border-color:#C0392B;color:#7B241C">TINGGI</span></td>
-      <td>Parameter <code>custom_levis_localization.scrap_loss_account_code</code> masih kosong → <b>validasi Scrap Batch gagal</b>.<br>
-      <b>Perbaiki di:</b> <span class="path">Settings ▸ Technical ▸ System Parameters</span> — isi dengan <b>kode akun</b> (bukan ID) beban kerugian persediaan.</td>
+      <td><span class="chip" style="background:#EFF8F2;border-color:#2E8B57;color:#1D5C39">SELESAI</span></td>
+      <td>Parameter <code>scrap_loss_account_code</code> diisi <code>7218000001</code> — <i>Inventory write-off</i>.<br>
+      <b>Terverifikasi:</b> Scrap Batch tervalidasi, jurnal terbentuk <i>Dr 7218000001 / Cr akun persediaan kategori</i>.</td>
     </tr>
     <tr>
       <td>3</td>
-      <td><b>Tabel Card BIN &amp; MDR</b></td>
-      <td><span class="chip" style="background:#FFF4E0;border-color:#C98A16;color:#7A5308">SEDANG</span></td>
-      <td>Model <code>levis.mdr.bin</code> masih <b>kosong</b> (0 baris) → netting MDR kartu tidak dapat berjalan.<br>
-      <b>Isi di:</b> <span class="path">Invoicing ▸ Configuration ▸ Card BIN / MDR</span> — per skema kartu, rentang BIN, bank <i>acquirer</i>, dan persentase/nominal MDR.</td>
+      <td><b>Tabel Card BIN / MDR</b></td>
+      <td><span class="chip" style="background:#FFF4E0;border-color:#C98A16;color:#7A5308">MENUNGGU DATA</span></td>
+      <td>Masih 0 baris. Tidak dapat diisi tanpa data asli dari Finance: skema kartu, rentang BIN, bank <i>acquirer</i> (Kode BI), tarif MDR, akun beban MDR, masa berlaku.<br>
+      <i>Loader</i> sudah disiapkan dan akan memvalidasi rentang BIN yang tumpang tindih sebelum menulis.</td>
     </tr>
     <tr>
       <td>4</td>
-      <td><b>Akumulasi Depresiasi — Kendaraan</b></td>
-      <td><span class="chip" style="background:#FFF4E0;border-color:#C98A16;color:#7A5308">SEDANG</span></td>
-      <td>Grup aset <i>Vehicles</i> tidak memiliki akun Akumulasi Depresiasi karena kode <code>1205202000</code> <b>tidak ada di Chart of Accounts</b>. Depresiasi kendaraan akan gagal diposting.<br>
-      <b>Perbaiki:</b> tambahkan akun tersebut ke CoA, lalu petakan di <span class="path">Invoicing ▸ Assets ▸ Configuration ▸ Groups ▸ Vehicles</span>.</td>
+      <td><b>Akumulasi Depresiasi — Vehicles</b></td>
+      <td><span class="chip" style="background:#EFF8F2;border-color:#2E8B57;color:#1D5C39">SELESAI</span></td>
+      <td><b>Sebabnya bukan yang dicatat.</b> Akun <code>1205202000</code> <b>ada</b> di Chart of Accounts — hanya <b>pemetaannya</b> pada grup aset yang kosong. Sudah dipetakan.</td>
+    </tr>
+    <tr>
+      <td>4b</td>
+      <td><b>Jurnal Depresiasi — semua grup aset</b><br><span class="small">gap baru</span></td>
+      <td><span class="chip" style="background:#EFF8F2;border-color:#2E8B57;color:#1D5C39">SELESAI</span></td>
+      <td><b>Tidak ada di daftar lama.</b> Ditemukan saat memverifikasi item 4: <b>tidak satu pun dari 6 grup aset</b> memiliki jurnal depresiasi, sehingga <i>Confirm</i> aset <b>gagal untuk semua kategori</b> — bukan hanya Vehicles.<br>
+      Seluruh grup ber-depresiasi kini memakai jurnal <code>DEPRE</code>. <i>Land</i> dilewati (tanah tidak disusutkan).<br>
+      <b>Terverifikasi:</b> aset Vehicles ter-<i>confirm</i>, depresiasi terposting <i>Dr 7204102000 / Cr 1205202000</i>.</td>
     </tr>
     <tr>
       <td>5</td>
-      <td>Pemetaan COA biaya audit pada Bill</td>
-      <td><span class="chip" style="background:#ECEFF3;border-color:#5A6472;color:#2A313B">RENDAH</span></td>
-      <td>Set akun beban pada produk/kategori terkait.</td>
+      <td>Pemetaan COA biaya audit</td>
+      <td><span class="chip" style="background:#ECEFF3;border-color:#5A6472;color:#2A313B">PERLU ARAHAN</span></td>
+      <td>Terlalu kabur untuk ditindak. Finance perlu menyebutkan: biaya audit dibebankan ke akun mana, dan lewat produk/kategori apa ia masuk ke Vendor Bill.</td>
     </tr>
     <tr>
       <td>6</td>
-      <td><b>Aktivasi go-live impor otomatis</b></td>
-      <td><span class="chip" style="background:#E8F1FD;border-color:#2E6DB4;color:#1B3F6B">GO-LIVE</span></td>
-      <td>Aktifkan Scheduled Action <i>"Retail Import: poll feeds"</i> di <span class="path">Settings ▸ Technical ▸ Scheduled Actions</span>. Tanpa ini, berkas yang masuk ke folder <i>drop</i> hanya akan mengendap, tidak diposting.</td>
+      <td><b>Saklar go-live impor</b></td>
+      <td><span class="chip" style="background:#FDE8E8;border-color:#C0392B;color:#7B241C">SENGAJA DITUNDA</span></td>
+      <td>Lihat tabel di bawah — <b>tidak disentuh atas keputusan sadar</b>, bukan karena terlupa.</td>
     </tr>
   </tbody>
 </table>
 
-<!-- ============ 10 ============ -->
+<h2>9.1 Saklar yang Sengaja Belum Diaktifkan</h2>
+<table class="tight">
+  <thead><tr><th style="width:32%">Saklar</th><th style="width:12%">Status</th><th>Alasan menunda</th></tr></thead>
+  <tbody>
+    <tr><td>Cron <i>Retail Import: poll SFTP feeds</i></td><td>Nonaktif</td><td>Mengaktifkannya mulai <b>memposting jurnal ke buku besar</b>. Ini keputusan go-live, bukan keputusan teknis.</td></tr>
+    <tr><td><code>retail_import.x48_post_enabled</code></td><td><code>0</code></td><td><b>Ada bug yang belum diperbaiki:</b> refund X48 di-<i>tender</i> ke metode CASH toko dan nilainya mendarat di akun <i>Cash Difference</i> alih-alih mengurangi kas. Mengaktifkannya sekarang akan mengotori GL.</td></tr>
+    <tr><td><code>retail_import.x31_post_enabled</code></td><td><code>0</code></td><td><b>Benar demikian.</b> Saling eksklusif dengan <code>x24_discount_reclass = 1</code> yang aktif. Mengaktifkan keduanya menggelembungkan <i>Gross Sales</i> dua kali.</td></tr>
+    <tr><td>Cron <i>Custom Asset: Post Monthly Depreciation</i></td><td>Nonaktif</td><td>Sekali aktif, ia langsung memposting <b>seluruh</b> baris depresiasi yang sudah jatuh tempo — bisa banyak sekaligus dan sulit ditarik. Finance sebaiknya posting manual dulu lewat <b>Post Depreciation</b>.<br><b>Konsekuensi saat ini: depresiasi tidak berjalan otomatis</b> dan harus diposting manual tiap bulan.</td></tr>
+  </tbody>
+</table>
+
 <h1 class="chap"><span class="num">10.</span> Batasan, Risiko &amp; Catatan Teknis</h1>
 <div class="sub">Known limitations — hal-hal yang perlu diketahui sebelum go-live</div>
 
@@ -1109,7 +1137,13 @@ reklasifikasi ini otomatis membawa Operating Unit dan tanggal yang benar tanpa k
     <tr><td><code>2103100001</code></td><td>Hutang Dagang <span class="en">(Trade Payable)</span></td></tr>
     <tr><td><code>2103300001</code></td><td>Hutang Non-Dagang <span class="en">(Non-Trade Payable)</span></td></tr>
     <tr><td><code>2103300008</code></td><td>GR/IR Clearing — Non-Trade</td></tr>
-    <tr><td><i>per kategori produk</i></td><td>GR/IR Clearing — Trade (field <i>Stock Variation Account</i>) — <b>belum diisi</b></td></tr>
+    <tr><td><code>2103109121</code></td><td>GR/IR Clearing — Trade · <b>textile</b></td></tr>
+    <tr><td><code>2103109122</code></td><td>GR/IR Clearing — Trade · <b>footwear</b></td></tr>
+    <tr><td><code>2103109123</code></td><td>GR/IR Clearing — Trade · <b>accessories</b></td></tr>
+    <tr><td><code>2103109124</code></td><td>GR/IR Clearing — Trade · <b>miscellaneous</b></td></tr>
+    <tr><td><code>7218000001</code></td><td>Inventory write-off — akun kerugian <b>Scrap Batch</b></td></tr>
+    <tr><td><code>1205202000</code></td><td>Akumulasi Depresiasi — <b>Vehicles</b></td></tr>
+    <tr><td><code>7204102000</code></td><td>Beban Depresiasi — <b>Vehicles</b></td></tr>
     <tr><td><code>1102…</code></td><td>Kas per toko (satu akun per Operating Unit)</td></tr>
     <tr><td><code>3005200004</code></td><td>Surplus Revaluasi — OCI</td></tr>
     <tr><td><code>7706000000</code></td><td>Rugi Revaluasi — P&amp;L</td></tr>

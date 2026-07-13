@@ -1,0 +1,16 @@
+name,card_scheme,bin_from,bin_to,acquirer_bank_code,mdr_percent,mdr_fixed,mdr_account_code,date_start,date_end
+# TEMPLATE -- ganti baris contoh di bawah dengan data MDR/BIN yang sebenarnya dari Finance.
+# Kolom:
+#   name              : label bebas, mis. "BCA Visa Credit"
+#   card_scheme       : visa / mastercard / jcb / amex / debit / qris / other
+#   bin_from,bin_to   : rentang digit awal nomor kartu (string, panjang sama, mis. 400000-499999)
+#   acquirer_bank_code: Kode BI bank acquirer (field l10n_id_bi_code pada res.bank)
+#   mdr_percent       : tarif MDR dalam persen, mis. 1.8  (kosongkan/0 bila hanya fixed)
+#   mdr_fixed         : biaya tetap per transaksi dalam rupiah (kosongkan/0 bila hanya persen)
+#   mdr_account_code  : kode akun COA untuk beban MDR (harus bertipe expense)
+#   date_start        : YYYY-MM-DD, awal masa berlaku
+#   date_end          : YYYY-MM-DD, akhir masa berlaku (boleh kosong = tak berbatas)
+#
+# PENTING: rentang BIN tidak boleh saling tumpang tindih untuk (card_scheme, periode)
+# yang sama. Odoo 19 mengabaikan constraint gaya lama, jadi script yang memvalidasi.
+BCA Visa Credit (CONTOH - HAPUS),visa,400000,499999,014,1.80,0,7205000001,2026-01-01,
