@@ -1,0 +1,33 @@
+flowchart TB
+  classDef d fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef ok fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef bad fill:#FDE8E8,stroke:#C0392B,color:#7B241C
+  classDef mid fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+
+    subgraph PO["Purchase Order — purchase.order"]
+    direction LR
+    PO1["Draft / RFQ"]:::d --> PO2["To Approve"]:::mid --> PO3["Purchase Order"]:::ok --> PO4["Done / Locked"]:::ok
+    PO1 --> PO5["Cancelled"]:::bad
+    PO3 --> PO5
+  end
+  subgraph BI["Vendor Bill — account.move"]
+    direction LR
+    BI1["Draft"]:::d --> BI2["Posted"]:::ok --> BI3["Paid / In Payment"]:::ok
+    BI1 --> BI4["Cancelled"]:::bad
+    BI2 -.->|"Reset to Draft"| BI1
+  end
+  subgraph RT["PO Return — custom.po.return"]
+    direction LR
+    RT1["Draft"]:::d -->|"Allocate"| RT2["Allocated"]:::mid -->|"Validate"| RT3["Validated<br/>Picking + Credit Note"]:::ok
+    RT1 --> RT4["Cancelled"]:::bad
+    RT2 --> RT4
+  end
+  subgraph SB["Scrap Batch — custom.scrap.batch"]
+    direction LR
+    SB1["Draft"]:::d -->|"Validate"| SB2["Done<br/>Jurnal valuasi terbentuk"]:::ok
+    SB1 --> SB3["Cancelled"]:::bad
+  end
+
+  PO4 ~~~ BI1
+  BI3 ~~~ RT1
+  RT3 ~~~ SB1

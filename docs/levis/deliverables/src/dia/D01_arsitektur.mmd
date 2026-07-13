@@ -1,0 +1,83 @@
+%% Layout note: subgraph `direction` is ignored by mermaid whenever edges cross
+%% subgraph boundaries. So we do NOT rely on it — instead every node in a layer
+%% gets its own edge to the next layer, which puts the layer on one rank (a wide
+%% horizontal row) and keeps the whole figure landscape-shaped.
+flowchart TB
+  classDef src fill:#FDE8E8,stroke:#C0392B,color:#7B241C
+  classDef ada fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef core fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef loc fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef out fill:#F0EAF7,stroke:#7D4FA8,color:#4A2A66
+
+  subgraph S["① SUMBER DATA EBR / SAP — berkas 'X'"]
+    X1["X101<br/>Material Master"]:::src
+    X2["X24DN<br/>Retail Sales"]:::src
+    X3["X70D<br/>Tender"]:::src
+    X4["X48<br/>Sales Return"]:::src
+    X5["X31<br/>Discount"]:::src
+    X6["X20<br/>Opening Stock"]:::src
+    X7["EBR<br/>TB &amp; GL"]:::src
+  end
+
+  subgraph T["② TRANSPORT"]
+    M1["Upload Manual<br/>Import Wizard"]:::ada
+    M2["SFTP / Local Drop<br/>Import Feed"]:::ada
+    M3["Mailbox IMAP"]:::ada
+  end
+
+  subgraph E["③ IMPORT ENGINE"]
+    ENG["custom_retail_import<br/>Profile + Column Map · Dedup SHA256 · queue_job async"]:::ada
+    BR["custom_retail_import_pos — POS Bridge (auto-install)<br/>angka net/pajak/diskon sumber dipakai apa adanya"]:::ada
+  end
+
+  subgraph O["④ ODOO 19 CORE"]
+    P["product.product<br/>Produk &amp; Varian"]:::core
+    PO["pos.order<br/>pos.session"]:::core
+    SM["stock.move<br/>Pergerakan Stok"]:::core
+    AM["account.move<br/>Jurnal / GL"]:::core
+  end
+
+  subgraph L["⑤ LAPISAN LOKALISASI LEVIS"]
+    L1["custom_levis_localization<br/>Trade/Non-Trade · GR/IR · Operating Unit<br/>Scrap Batch · COGS Run · Inventory Reconciliation<br/>MDR/BIN · Payment Voucher"]:::loc
+    L2["custom_po_return<br/>Retur Pembelian (RTV)<br/>FIFO Allocation"]:::loc
+    L3["custom_accounting_asset<br/>Aktiva Tetap<br/>&amp; Revaluasi"]:::loc
+    L4["custom_tax_id<br/>custom_coretax<br/>PPN / PPh / e-Faktur"]:::loc
+  end
+
+  subgraph R["⑥ KELUARAN"]
+    R1["custom_accounting_reports<br/>TB · GL · BS · P&amp;L · Kartu Utang/Piutang<br/>17 Laporan Pajak"]:::out
+    R2["Dokumen PDF<br/>Payment Voucher · Receipt<br/>Journal Billing · Asset Register"]:::out
+    R3["custom_pdp_audit<br/>Audit Log ter-hash<br/>(UU 27/2022)"]:::out
+  end
+
+  X1 --> M1
+  X2 --> M2
+  X3 --> M2
+  X4 --> M1
+  X5 --> M2
+  X6 --> M1
+  X7 --> M3
+
+  M1 --> ENG
+  M2 --> ENG
+  M3 --> ENG
+  ENG --> BR
+
+  ENG --> P
+  BR --> PO
+  ENG --> SM
+  BR --> AM
+
+  P --> L1
+  PO --> L1
+  SM --> L2
+  AM --> L3
+  AM --> L4
+  AM --> L1
+
+  L1 --> R1
+  L2 --> R1
+  L3 --> R2
+  L4 --> R3
+  L1 --> R2
+  L1 --> R3

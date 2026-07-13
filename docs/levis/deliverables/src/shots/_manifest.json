@@ -1,0 +1,452 @@
+[
+  {
+    "name": "A01_home_apps",
+    "url": "http://localhost:18069/odoo",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "B01_retail_import_logs",
+    "url": "http://localhost:18069/odoo/action-795",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "B02_retail_import_log_form",
+    "url": "http://localhost:18069/odoo/action-795",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "B03_retail_import_wizard",
+    "url": "http://localhost:18069/odoo/action-797",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "B04_retail_import_profiles",
+    "url": "http://localhost:18069/odoo/action-794",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "B05_retail_import_profile_form",
+    "url": "http://localhost:18069/odoo/action-794",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "B06_retail_import_feeds",
+    "url": "http://localhost:18069/odoo/action-796",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "B07_retail_import_mailboxes",
+    "url": "http://localhost:18069/odoo/action-850",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "C01_pos_dashboard",
+    "url": "http://localhost:18069/odoo/action-610",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "C02_pos_orders",
+    "url": "http://localhost:18069/odoo/action-593",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "C03_pos_order_form",
+    "url": "http://localhost:18069/odoo/action-593",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "C04_pos_sessions",
+    "url": "http://localhost:18069/odoo/action-613",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "C05_pos_session_form",
+    "url": "http://localhost:18069/odoo/action-613",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "C06_pos_payments",
+    "url": "http://localhost:18069/odoo/action-609",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "C07_pos_reporting_orders",
+    "url": "http://localhost:18069/odoo/action-616",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "D01_purchase_orders",
+    "url": "http://localhost:18069/odoo/action-470",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "D02_purchase_order_new",
+    "url": "http://localhost:18069/odoo/action-470",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "D03_rfq",
+    "url": "http://localhost:18069/odoo/action-469",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "D04_po_returns",
+    "url": "http://localhost:18069/odoo/action-842",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "D05_po_return_new",
+    "url": "http://localhost:18069/odoo/action-842",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "D06_vendors",
+    "url": "http://localhost:18069/odoo/action-299",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "E01_inventory_overview",
+    "url": "http://localhost:18069/odoo/action-432",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "E02_scrap_batches",
+    "url": "http://localhost:18069/odoo/action-844",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "E03_scrap_batch_new",
+    "url": "http://localhost:18069/odoo/action-844",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "E04_scrap",
+    "url": "http://localhost:18069/odoo/action-395",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "E05_products",
+    "url": "http://localhost:18069/odoo/action-438",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "E06_product_form",
+    "url": "http://localhost:18069/odoo/action-438",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "E07_lots",
+    "url": "http://localhost:18069/odoo/action-393",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "E08_stock_report",
+    "url": "http://localhost:18069/odoo/action-437",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "E09_moves_history",
+    "url": "http://localhost:18069/odoo/action-404",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F01_invoicing_dashboard",
+    "url": "http://localhost:18069/odoo/accounting",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F02_vendor_bills",
+    "url": "http://localhost:18069/odoo/action-account.action_move_in_invoice_type",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F03_journal_entries",
+    "url": "http://localhost:18069/odoo/action-account.action_move_journal_line",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F04_journal_entry_form",
+    "url": "http://localhost:18069/odoo/action-account.action_move_journal_line",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F05_chart_of_accounts",
+    "url": "http://localhost:18069/odoo/action-account.action_account_form",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F06_inventory_reconciliation",
+    "url": "http://localhost:18069/odoo/action-822",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F07_inventory_reconciliation_new",
+    "url": "http://localhost:18069/odoo/action-822",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F08_periodic_cogs",
+    "url": "http://localhost:18069/odoo/action-847",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F09_periodic_cogs_new",
+    "url": "http://localhost:18069/odoo/action-847",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F10_card_bin_mdr",
+    "url": "http://localhost:18069/odoo/action-845",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F11_card_bin_mdr_new",
+    "url": "http://localhost:18069/odoo/action-845",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F12_trade_nontrade_accounts",
+    "url": "http://localhost:18069/odoo/action-843",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "F13_payments",
+    "url": "http://localhost:18069/odoo/action-account.action_account_payments_payable",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "G01_fixed_assets",
+    "url": "http://localhost:18069/odoo/action-525",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "G02_fixed_asset_new",
+    "url": "http://localhost:18069/odoo/action-525",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "G03_asset_groups",
+    "url": "http://localhost:18069/odoo/action-523",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "G04_asset_group_form",
+    "url": "http://localhost:18069/odoo/action-523",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "G05_asset_locations",
+    "url": "http://localhost:18069/odoo/action-524",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "G06_post_depreciation",
+    "url": "http://localhost:18069/odoo/action-841",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "G07_revaluations",
+    "url": "http://localhost:18069/odoo/action-840",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "G08_asset_register_wizard",
+    "url": "http://localhost:18069/odoo/action-526",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H01_trial_balance",
+    "url": "http://localhost:18069/odoo/action-505",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H02_general_ledger",
+    "url": "http://localhost:18069/odoo/action-504",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H03_balance_sheet",
+    "url": "http://localhost:18069/odoo/action-506",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H04_profit_loss",
+    "url": "http://localhost:18069/odoo/action-507",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H05_cash_flow",
+    "url": "http://localhost:18069/odoo/action-508",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H06_gl_analysis",
+    "url": "http://localhost:18069/odoo/action-846",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H07_aged_receivable",
+    "url": "http://localhost:18069/odoo/action-509",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H08_aged_payable",
+    "url": "http://localhost:18069/odoo/action-510",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H09_kartu_utang",
+    "url": "http://localhost:18069/odoo/action-512",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H10_kartu_piutang",
+    "url": "http://localhost:18069/odoo/action-513",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H11_rekap_faktur_pajak",
+    "url": "http://localhost:18069/odoo/action-824",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H12_rekap_bupot",
+    "url": "http://localhost:18069/odoo/action-825",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "H13_ekualisasi_omzet",
+    "url": "http://localhost:18069/odoo/action-832",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "I01_withholding_rules",
+    "url": "http://localhost:18069/odoo/action-789",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "I02_pph_categories",
+    "url": "http://localhost:18069/odoo/action-788",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "I03_withholding_lines",
+    "url": "http://localhost:18069/odoo/action-790",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "I04_faktur_pengganti",
+    "url": "http://localhost:18069/odoo/action-791",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "I05_pre_export_validation",
+    "url": "http://localhost:18069/odoo/action-792",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "I06_coretax_bupot",
+    "url": "http://localhost:18069/odoo/action-669",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "J01_approvals",
+    "url": "http://localhost:18069/odoo/approvals",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "K01_system_parameters",
+    "url": "http://localhost:18069/odoo/action-base.action_ir_config_list",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "K02_scheduled_actions",
+    "url": "http://localhost:18069/odoo/action-base.ir_cron_act",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "K03_users",
+    "url": "http://localhost:18069/odoo/action-base.action_res_users",
+    "ok": true,
+    "err": ""
+  },
+  {
+    "name": "K04_companies",
+    "url": "http://localhost:18069/odoo/action-base.action_res_company_form",
+    "ok": true,
+    "err": ""
+  }
+]

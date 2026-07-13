@@ -1,0 +1,50 @@
+flowchart LR
+  classDef lane1 fill:#FDE8E8,stroke:#C0392B,color:#7B241C
+  classDef lane2 fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef lane3 fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef lane4 fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef dec fill:#FFFFFF,stroke:#555,color:#222
+
+  subgraph A["① SUMBER — Sistem Toko EBR / EBR Store System"]
+    direction TB
+    A1["Transaksi kasir terjadi di toko<br/>Sale happens at the POS terminal"]:::lane1
+    A2["Batch harian di-export:<br/>X24DN · X70D · X31 · X48"]:::lane1
+  end
+
+  subgraph B["② OPS / DATA ADMIN — Retail Import"]
+    direction TB
+    B1["File masuk lewat<br/>SFTP Feed / Mailbox / Upload Manual"]:::lane2
+    B2{"Sudah pernah<br/>diimpor?<br/>(SHA256)"}:::dec
+    B3["Preview / Dry-run<br/>20 baris pertama"]:::lane2
+    B4["Jalankan Import<br/>(queue_job async)"]:::lane2
+    B5{"Semua SKU<br/>ada di master?<br/>(strict mode)"}:::dec
+    B6["Transaksi di-PARKIR<br/>status: error"]:::lane2
+    B7["Perbaiki master X101<br/>lalu import ulang"]:::lane2
+  end
+
+  subgraph C["③ SISTEM — Odoo POS &amp; GL"]
+    direction TB
+    C1["Buat pos.session per<br/>(toko × hari dagang)"]:::lane3
+    C2["Buat pos.order + pos.order.line<br/>angka net/tax/discount<br/>diambil apa adanya dari file"]:::lane3
+    C3["Pembayaran diarahkan ke<br/>POS Suspense Clearing<br/>(x24_decouple_payment)"]:::lane3
+    C4["Tutup sesi &amp; posting<br/>jurnal penutup POS<br/>(backdated ke hari dagang)"]:::lane3
+    C5["Reklas diskon ditempel<br/>ke jurnal penutup<br/>Dr Sales Discount / Cr Gross Sales"]:::lane3
+    C6["Stempel Operating Unit<br/>pada semua baris jurnal"]:::lane3
+    C7["Import X70D → jurnal RIREC<br/>Dr Bank/Piutang Kartu<br/>Cr POS Suspense Clearing<br/>+ auto-reconcile"]:::lane3
+  end
+
+  subgraph D["④ AKUNTAN / FINANCE"]
+    direction TB
+    D1["Cek Trial Balance &amp;<br/>GL Analysis per Operating Unit"]:::lane4
+    D2{"Selisih<br/>= 0?"}:::dec
+    D3["Investigasi:<br/>saldo POS Suspense Clearing<br/>yang belum ter-settle"]:::lane4
+    D4["Periode siap ditutup"]:::lane4
+  end
+
+  A1 --> A2 --> B1 --> B2
+  B2 -- "Ya / Yes" --> B2X["Dilewati — idempoten<br/>Skipped (no double post)"]:::lane2
+  B2 -- "Tidak / No" --> B3 --> B4 --> B5
+  B5 -- "Tidak / No" --> B6 --> B7 --> B4
+  B5 -- "Ya / Yes" --> C1 --> C2 --> C3 --> C4 --> C5 --> C6 --> C7 --> D1 --> D2
+  D2 -- "Tidak / No" --> D3 --> B7
+  D2 -- "Ya / Yes" --> D4

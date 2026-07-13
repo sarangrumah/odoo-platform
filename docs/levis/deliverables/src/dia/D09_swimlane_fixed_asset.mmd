@@ -1,0 +1,57 @@
+flowchart LR
+  classDef l1 fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef l4 fill:#F0EAF7,stroke:#7D4FA8,color:#4A2A66
+  classDef l2 fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef l5 fill:#FDE8E8,stroke:#C0392B,color:#7B241C
+  classDef dec fill:#FFFFFF,stroke:#555,color:#222
+
+  subgraph P["① PENGADAAN"]
+    direction TB
+    P1["Beli aset (PO Non-Trade)<br/>Bill di-post ke akun Aset"]:::l1
+  end
+
+  subgraph A["② ASSET OFFICER"]
+    direction TB
+    A1["Buat Fixed Asset<br/>Invoicing ▸ Assets ▸ Fixed Assets ▸ New<br/>Nomor: FA/2026/xxx"]:::l4
+    A2["Pilih <b>Asset Group</b> (6 kategori EBR):<br/>Tanah · Bangunan · Kendaraan<br/>Peralatan Kantor &amp; Outlet<br/>Mesin · Furniture &amp; Fixtures"]:::l4
+    A3["Isi Acquisition Value, Salvage Value,<br/>Useful Life, Tanggal Perolehan,<br/>Location"]:::l4
+    A4["Klik <b>Confirm</b> → state = Running<br/>Jadwal depresiasi garis lurus dibuat"]:::l4
+  end
+
+  subgraph S["③ SISTEM — Depresiasi Bulanan"]
+    direction TB
+    S1["Cron <i>Custom Asset: Post Monthly Depreciation</i><br/>(harian, aktif) — posting baris jatuh tempo"]:::l4
+    S2["Dr Beban Depresiasi<br/>Cr Akumulasi Depresiasi"]:::l4
+    S3{"Grup punya akun<br/>Akumulasi<br/>Depresiasi?"}:::dec
+    S4["<b>GAGAL</b> — mis. grup <i>Kendaraan</i><br/>belum punya akun akumulasi.<br/>Admin harus lengkapi di<br/>Assets ▸ Configuration ▸ Groups"]:::l5
+  end
+
+  subgraph R["④ REVALUASI (IAS 16 / PSAK 16)"]
+    direction TB
+    R1["Buat Revaluation<br/>Invoicing ▸ Assets ▸ Revaluations"]:::l4
+    R2{"Nilai wajar ><br/>nilai buku?"}:::dec
+    R3["<b>Surplus</b> → OCI<br/>Cr Surplus Revaluasi (3005200004)"]:::l4
+    R4["<b>Rugi</b> → P&amp;L<br/>Dr Rugi Revaluasi (7706000000)"]:::l4
+  end
+
+  subgraph D["⑤ PELEPASAN / DISPOSAL"]
+    direction TB
+    D1["Disposal Wizard<br/>isi harga jual"]:::l4
+    D2["Sistem hitung Gain/Loss<br/>vs Net Book Value<br/>→ state = Disposed"]:::l4
+  end
+
+  subgraph M["⑥ FINANCE MANAGER"]
+    direction TB
+    M1["Cetak <b>Asset Register</b> (PDF)<br/>Invoicing ▸ Assets ▸ Asset Register"]:::l2
+  end
+
+  P1 --> A1 --> A2 --> A3 --> A4 --> S1 --> S3
+  S3 -- "Tidak" --> S4
+  S3 -- "Ya" --> S2
+  S2 --> R1
+  R1 --> R2
+  R2 -- "Ya" --> R3
+  R2 -- "Tidak" --> R4
+  S2 --> D1 --> D2 --> M1
+  R3 --> M1
+  R4 --> M1
