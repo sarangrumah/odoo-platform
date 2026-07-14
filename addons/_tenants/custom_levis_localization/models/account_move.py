@@ -268,14 +268,40 @@ class AccountMove(models.Model):
         orders = self.line_ids.mapped("purchase_line_id.order_id")
         return orders.mapped("picking_type_id.warehouse_id")
 
-    def _edo_operating_unit(self, line):
-        """ "Operating Unit" = the warehouse/store from the source document.
+    def _edo_line_ou_analytic(self, line):
+        """Operating-Unit analytic account carried by ``line``, if any.
 
-        Uses the warehouse of the PO behind this specific line; lines without a
-        PO link (tax, payable) fall back to the bill's warehouse, and finally to
-        the company name when the bill has no purchase origin at all.
+        Checks the explicit ``l10n_ou_analytic_id`` pick first, then the
+        OU-plan account stamped inside ``analytic_distribution`` (PO-derived
+        lines get their OU only through the distribution).
+        """
+        ou = line.l10n_ou_analytic_id if "l10n_ou_analytic_id" in line._fields else False
+        if ou:
+            return ou
+        for key in line.analytic_distribution or {}:
+            for acc_id in str(key).split(","):
+                acc = self.env["account.analytic.account"].browse(int(acc_id)).exists()
+                if acc and acc.plan_id.name == "Operating Unit":
+                    return acc
+        return self.env["account.analytic.account"]
+
+    def _edo_operating_unit(self, line):
+        """ "Operating Unit" = the store/OU of the source document.
+
+        Priority: the line's own OU analytic (manual pick or the OU stamped in
+        its analytic distribution), then the OU of any product line on the bill
+        (so tax/payable rows show the store too), then the PO warehouse, and
+        finally the company name when the bill has no OU/purchase origin at all.
         """
         self.ensure_one()
+        ou = self._edo_line_ou_analytic(line)
+        if not ou:
+            for other in self.line_ids.filtered(lambda l: l.display_type == "product"):
+                ou = self._edo_line_ou_analytic(other)
+                if ou:
+                    break
+        if ou:
+            return ou.name
         pol = line.purchase_line_id if "purchase_line_id" in line._fields else False
         wh = pol.order_id.picking_type_id.warehouse_id if pol else False
         if not wh:
