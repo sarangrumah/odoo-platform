@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class PartnerLedgerWizard(models.TransientModel):
     _name = "custom.report.partner.ledger.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Partner Ledger Wizard"
+    _report_code = "partner_ledger"
 
     date_from = fields.Date(
         required=True,

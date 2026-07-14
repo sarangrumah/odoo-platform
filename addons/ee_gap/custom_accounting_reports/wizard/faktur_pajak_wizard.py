@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class FakturPajakWizard(models.TransientModel):
     _name = "custom.report.faktur.pajak.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Rekap Faktur Pajak Wizard"
+    _report_code = "faktur_pajak"
 
     date_from = fields.Date(
         string="Masa Dari",

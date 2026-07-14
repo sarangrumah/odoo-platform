@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class AdvanceWizard(models.TransientModel):
     _name = "custom.report.advance.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Uang Muka / Down Payment Wizard"
+    _report_code = "advance"
 
     date_from = fields.Date(
         required=True,
@@ -23,7 +25,8 @@ class AdvanceWizard(models.TransientModel):
     account_ids = fields.Many2many(
         "account.account",
         string="Advance Accounts",
-        help="Leave empty to auto-detect accounts named like 'Uang Muka' / 'Advance' / 'Prepayment' / 'Down Payment'.",
+        help="Leave empty to auto-detect accounts named like 'Uang Muka' / "
+        "'Advance' / 'Prepayment' / 'Down Payment'.",
     )
     posted_only = fields.Boolean(default=True)
 

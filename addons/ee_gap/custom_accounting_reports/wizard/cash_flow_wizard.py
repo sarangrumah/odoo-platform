@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class CashFlowWizard(models.TransientModel):
     _name = "custom.report.cash.flow.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Cash Flow Statement Wizard"
+    _report_code = "cash_flow"
 
     date_from = fields.Date(
         required=True,

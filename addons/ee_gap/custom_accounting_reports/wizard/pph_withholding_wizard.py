@@ -7,7 +7,9 @@ from odoo.exceptions import UserError
 
 class PphWithholdingWizard(models.TransientModel):
     _name = "custom.report.pph.withholding.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Rekap PPh Pemotongan Wizard"
+    _report_code = "pph_withholding"
 
     date_from = fields.Date(
         string="Masa Dari",

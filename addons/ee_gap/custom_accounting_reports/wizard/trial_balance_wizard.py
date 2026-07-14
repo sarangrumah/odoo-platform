@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class TrialBalanceWizard(models.TransientModel):
     _name = "custom.report.trial.balance.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Trial Balance Wizard"
+    _report_code = "trial_balance"
 
     date_from = fields.Date(
         required=True,

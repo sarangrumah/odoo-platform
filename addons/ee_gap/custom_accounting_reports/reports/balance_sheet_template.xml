@@ -26,6 +26,27 @@
                             </td>
                         </tr>
                         <t t-if="line.get('type') == 'section'">
+                            <t t-foreach="line.get('subgroups', [])" t-as="sub">
+                                <tr>
+                                    <td colspan="3" class="ps-3">
+                                        <strong>
+                                            <span t-esc="sub['code']"/>
+                                            <span t-esc="sub['label']"/>
+                                        </strong>
+                                    </td>
+                                </tr>
+                                <tr t-foreach="sub['accounts']" t-as="acc">
+                                    <td class="ps-5">
+                                        <span t-esc="acc['account_code']"/>
+                                        <span t-esc="acc['account_name']"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-esc="acc['signed_balance']"
+                                              t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                    </td>
+                                    <td class="text-end text-muted">—</td>
+                                </tr>
+                            </t>
                             <tr t-foreach="line['accounts']" t-as="acc">
                                 <td class="ps-4">
                                     <span t-esc="acc['account_code']"/>
@@ -37,19 +58,15 @@
                                 </td>
                                 <td class="text-end text-muted">—</td>
                             </tr>
-                            <tr class="fw-bold">
-                                <td class="text-end">Subtotal</td>
-                                <td class="text-end">
-                                    <span t-esc="line['subtotal']"
-                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                </td>
-                                <td class="text-end">
-                                    <span t-if="line.get('comparison') is not None"
-                                          t-esc="line['comparison']"
-                                          t-options="{'widget': 'monetary', 'display_currency': currency}"/>
-                                </td>
-                            </tr>
                         </t>
+                        <tr t-if="line.get('type') == 'subtotal'" class="fw-bold">
+                            <td class="ps-4" t-esc="line['label']"/>
+                            <td class="text-end">
+                                <span t-esc="line['signed_balance']"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td/>
+                        </tr>
                         <tr t-if="line.get('type') == 'total'"
                             class="table-secondary fw-bold">
                             <td t-esc="line['label']"/>

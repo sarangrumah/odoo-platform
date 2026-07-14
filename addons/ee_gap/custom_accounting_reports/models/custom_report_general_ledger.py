@@ -51,6 +51,7 @@ _FLAT_ORDER = (
     "reference",
     "tax",
     "clearing",
+    "branch",
     "cost_center",
     "profit_center",
     "currency",
@@ -61,6 +62,9 @@ _FLAT_ORDER = (
     "credit",
     "balance",
 )
+# The branch column is core, not optional: Finance reads the ledger per store
+# and asked for it "untuk all CoA". Keeping it out of GL_OPTIONAL_COLUMNS also
+# spares every wizard a new ``show_branch`` column.
 _FLAT_CORE = {
     "date",
     "journal",
@@ -68,6 +72,7 @@ _FLAT_CORE = {
     "account_name",
     "partner",
     "label",
+    "branch",
     "debit",
     "credit",
     "balance",
@@ -88,6 +93,18 @@ class CustomReportGeneralLedger(models.AbstractModel):
     def _is_flat(self):
         return self.env.context.get("gl_layout") == "flat"
 
+    def _branch_column_header(self):
+        """Name the branch column after the tenant's own analytic plan
+        ("Operating Unit" for Levi's), falling back to a neutral label."""
+        return self._branch_plan().name or "Branch"
+
+    def _compute(self, filters=None):
+        # The QWeb template renders a header row of its own, so it needs the
+        # branch label alongside the lines.
+        ctx = super()._compute(filters)
+        ctx["branch_label"] = self._branch_column_header()
+        return ctx
+
     def _flat_column_registry(self):
         """Full spec for every flat column, keyed by column key."""
         return {
@@ -101,15 +118,11 @@ class CustomReportGeneralLedger(models.AbstractModel):
             "reference": {"header": "Reference", "field": "reference", "kind": "text", "width": 18},
             "tax": {"header": "Tax Code", "field": "tax_code", "kind": "text", "width": 12},
             "clearing": {"header": "Clearing Doc", "field": "clearing", "kind": "text", "width": 16},
+            "branch": {"header": self._branch_column_header(), "field": "branch", "kind": "text", "width": 28},
             "cost_center": {"header": "Cost Center", "field": "cost_center", "kind": "text", "width": 18},
             "profit_center": {"header": "Profit Center", "field": "profit_center", "kind": "text", "width": 18},
             "currency": {"header": "Doc Currency", "field": "currency", "kind": "text", "width": 10},
-            "amount_currency": {
-                "header": "Amount (Doc Curr.)",
-                "field": "amount_currency",
-                "kind": "number",
-                "width": 16,
-            },
+            "amount_currency": {"header": "Amount (Doc Curr.)", "field": "amount_currency", "kind": "number", "width": 16},
             "due_date": {"header": "Due Date", "field": "due_date", "kind": "date", "width": 12},
             "user": {"header": "User", "field": "user", "kind": "text", "width": 18},
             "debit": {"header": "Debit", "field": "debit", "kind": "number", "width": 16},
@@ -127,6 +140,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
                 {"header": "Entry", "field": "move_name", "kind": "text", "width": 18},
                 {"header": "Partner", "field": "partner", "kind": "text", "width": 28},
                 {"header": "Label", "field": "label", "kind": "text", "width": 34},
+                {"header": self._branch_column_header(), "field": "branch", "kind": "text", "width": 26},
                 {"header": "Debit", "field": "debit", "kind": "number", "width": 16},
                 {"header": "Credit", "field": "credit", "kind": "number", "width": 16},
                 {"header": "Balance", "field": "balance", "kind": "number", "width": 16},
@@ -150,11 +164,18 @@ class CustomReportGeneralLedger(models.AbstractModel):
             return super()._xlsx_body(sheet, ctx, columns, fmts, start_row)
 
         ncol = len(columns)
+        # The grouped layout always ends with Debit / Credit / Balance; every
+        # column before them is text, so the layout survives inserting one.
+        first_num = ncol - 3
         row = start_row
         for col_idx, col in enumerate(columns):
             sheet.write(row, col_idx, col["header"], fmts["header"])
         sheet.freeze_panes(row + 1, 0)
         row += 1
+
+        def write_totals(source, keys, fmt):
+            for offset, key in enumerate(keys):
+                sheet.write_number(row, first_num + offset, float(source.get(key) or 0.0), fmt)
 
         for line in ctx.get("lines", []):
             ltype = line.get("type")
@@ -164,34 +185,31 @@ class CustomReportGeneralLedger(models.AbstractModel):
                     line.get("account_name") or "",
                 )
                 sheet.merge_range(row, 0, row, ncol - 2, heading, fmts["group_text"])
-                sheet.write_number(row, ncol - 1, float(line.get("opening") or 0.0), fmts["group_num"])
+                sheet.write_number(
+                    row, ncol - 1, float(line.get("opening") or 0.0), fmts["group_num"]
+                )
                 row += 1
                 for ml in line.get("lines", []):
-                    sheet.write(row, 0, self._format_date_id(ml.get("date")), fmts["text"])
-                    sheet.write(row, 1, ml.get("move_name") or "", fmts["text"])
-                    sheet.write(row, 2, ml.get("partner") or "", fmts["text"])
-                    sheet.write(row, 3, ml.get("label") or "", fmts["text"])
-                    sheet.write_number(row, 4, float(ml.get("debit") or 0.0), fmts["num"])
-                    sheet.write_number(row, 5, float(ml.get("credit") or 0.0), fmts["num"])
-                    sheet.write_number(row, 6, float(ml.get("balance") or 0.0), fmts["num"])
+                    for col_idx, col in enumerate(columns[:first_num]):
+                        value = ml.get(col["field"])
+                        if col["field"] == "date":
+                            value = self._format_date_id(value)
+                        sheet.write(row, col_idx, value or "", fmts["text"])
+                    write_totals(ml, ("debit", "credit", "balance"), fmts["num"])
                     row += 1
                 sheet.merge_range(
-                    row,
-                    0,
-                    row,
-                    3,
+                    row, 0, row, first_num - 1,
                     "Total %s" % (line.get("account_code") or ""),
                     fmts["total_text"],
                 )
-                sheet.write_number(row, 4, float(line.get("total_debit") or 0.0), fmts["total_num"])
-                sheet.write_number(row, 5, float(line.get("total_credit") or 0.0), fmts["total_num"])
-                sheet.write_number(row, 6, float(line.get("closing") or 0.0), fmts["total_num"])
+                write_totals(line, ("total_debit", "total_credit", "closing"), fmts["total_num"])
                 row += 1
             elif ltype == "grand_total":
-                sheet.merge_range(row, 0, row, 3, line.get("label") or "Grand Total", fmts["total_text"])
-                sheet.write_number(row, 4, float(line.get("total_debit") or 0.0), fmts["total_num"])
-                sheet.write_number(row, 5, float(line.get("total_credit") or 0.0), fmts["total_num"])
-                sheet.write_number(row, 6, float(line.get("closing") or 0.0), fmts["total_num"])
+                sheet.merge_range(
+                    row, 0, row, first_num - 1,
+                    line.get("label") or "Grand Total", fmts["total_text"],
+                )
+                write_totals(line, ("total_debit", "total_credit", "closing"), fmts["total_num"])
                 row += 1
         return row
 
@@ -231,6 +249,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
         accounts = {a.id: a for a in AccountAccount.browse(account_ids)}
         moves = {m.id: m for m in AccountMove.browse(move_ids)}
         partners = {p.id: p for p in ResPartner.browse(partner_ids)}
+        analytics, plan_kind = self._analytic_context(rows)
 
         by_account = {}
         for row in rows:
@@ -254,6 +273,9 @@ class CustomReportGeneralLedger(models.AbstractModel):
             )
             move = moves.get(row["move_id"])
             partner = partners.get(row["partner_id"])
+            _cost, _profit, branch = self._split_analytic(
+                row.get("analytic_distribution"), analytics, plan_kind
+            )
             bucket["lines"].append(
                 {
                     "date": row["date"],
@@ -261,6 +283,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
                     "move_name": (move.name if move else "") or "/",
                     "partner": partner.display_name if partner else "",
                     "label": row["name"] or "",
+                    "branch": branch,
                     "debit": row["debit"] or 0.0,
                     "credit": row["credit"] or 0.0,
                 }
@@ -331,7 +354,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
             SELECT aml.id, aml.date, aml.name AS label, aml.ref AS aml_ref,
                    aml.debit, aml.credit, aml.balance, aml.amount_currency,
                    aml.date_maturity, aml.account_id, aml.partner_id,
-                   aml.currency_id, aml.full_reconcile_id, aml.tax_line_id,
+                   aml.currency_id, aml.matching_number, aml.tax_line_id,
                    aml.create_uid, aml.analytic_distribution,
                    aml.move_id, aml.journal_id
               FROM account_move_line aml
@@ -358,27 +381,40 @@ class CustomReportGeneralLedger(models.AbstractModel):
         query += " ORDER BY aml.account_id, aml.date, aml.id"
         return query, tuple(params)
 
-    def _split_analytic(self, distribution, analytic_map, plan_is_profit):
-        """Split an ``analytic_distribution`` JSON dict into
-        ``(cost_center_str, profit_center_str)`` by analytic-plan name."""
-        if not distribution:
-            return "", ""
-        ids = set()
-        for key in distribution.keys():
-            for part in str(key).split(","):
-                part = part.strip()
-                if part.isdigit():
-                    ids.add(int(part))
-        cost, profit = [], []
-        for aid in ids:
-            acc = analytic_map.get(aid)
-            if not acc:
-                continue
-            if plan_is_profit.get(acc.plan_id.id):
-                profit.append(acc.name)
+    def _analytic_context(self, rows):
+        """Resolve every analytic account referenced by ``rows`` in one read,
+        and classify its plan as branch / profit centre / cost centre."""
+        analytic_ids = set()
+        for row in rows:
+            analytic_ids |= self._analytic_ids_from_distribution(
+                row.get("analytic_distribution")
+            )
+        analytics = {
+            a.id: a
+            for a in self.env["account.analytic.account"].browse(sorted(analytic_ids))
+        }
+        branch_plan_id = self._branch_plan().id
+        plan_kind = {}
+        for account in analytics.values():
+            plan = account.plan_id
+            if plan.id == branch_plan_id:
+                plan_kind[plan.id] = "branch"
+            elif "profit" in (plan.name or "").lower():
+                plan_kind[plan.id] = "profit"
             else:
-                cost.append(acc.name)
-        return ", ".join(filter(None, cost)), ", ".join(filter(None, profit))
+                plan_kind[plan.id] = "cost"
+        return analytics, plan_kind
+
+    def _split_analytic(self, distribution, analytic_map, plan_kind):
+        """Split an ``analytic_distribution`` JSON dict into
+        ``(cost_center, profit_center, branch)`` strings by analytic plan."""
+        parts = {"cost": [], "profit": [], "branch": []}
+        for aid in self._analytic_ids_from_distribution(distribution):
+            account = analytic_map.get(aid)
+            if not account:
+                continue
+            parts[plan_kind.get(account.plan_id.id, "cost")].append(account.name)
+        return tuple(", ".join(filter(None, parts[k])) for k in ("cost", "profit", "branch"))
 
     def _build_flat_lines(self, filters):
         # The flat query reads ``parent_state`` (a stored related of
@@ -401,17 +437,8 @@ class CustomReportGeneralLedger(models.AbstractModel):
         currencies = {c.id: c for c in self.env["res.currency"].browse(_ids("currency_id"))}
         users = {u.id: u for u in self.env["res.users"].browse(_ids("create_uid"))}
         taxes = {t.id: t for t in self.env["account.tax"].browse(_ids("tax_line_id"))}
-        recs = {f.id: f for f in self.env["account.full.reconcile"].browse(_ids("full_reconcile_id"))}
 
-        analytic_ids = set()
-        for r in rows:
-            for key in (r.get("analytic_distribution") or {}).keys():
-                for part in str(key).split(","):
-                    part = part.strip()
-                    if part.isdigit():
-                        analytic_ids.add(int(part))
-        analytics = {a.id: a for a in self.env["account.analytic.account"].browse(sorted(analytic_ids))}
-        plan_is_profit = {a.plan_id.id: "profit" in (a.plan_id.name or "").lower() for a in analytics.values()}
+        analytics, plan_kind = self._analytic_context(rows)
 
         lines = []
         total_d = total_c = total_b = 0.0
@@ -423,8 +450,9 @@ class CustomReportGeneralLedger(models.AbstractModel):
             currency = currencies.get(r["currency_id"])
             user = users.get(r["create_uid"])
             tax = taxes.get(r["tax_line_id"])
-            rec = recs.get(r["full_reconcile_id"])
-            cost, profit = self._split_analytic(r.get("analytic_distribution"), analytics, plan_is_profit)
+            cost, profit, branch = self._split_analytic(
+                r.get("analytic_distribution"), analytics, plan_kind
+            )
             lines.append(
                 {
                     "date": r["date"],
@@ -436,7 +464,8 @@ class CustomReportGeneralLedger(models.AbstractModel):
                     "doc_no": (move.name if move else "") or "",
                     "reference": r["aml_ref"] or (move.ref if move else "") or "",
                     "tax_code": tax.name if tax else "",
-                    "clearing": rec.name if rec else "",
+                    "clearing": r["matching_number"] or "",
+                    "branch": branch,
                     "cost_center": cost,
                     "profit_center": profit,
                     "currency": currency.name if currency else "",

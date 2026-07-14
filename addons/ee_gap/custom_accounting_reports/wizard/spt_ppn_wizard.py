@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class SptPpnWizard(models.TransientModel):
     _name = "custom.report.spt.ppn.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "SPT Masa PPN 1111 (Induk) Wizard"
+    _report_code = "spt_ppn"
 
     date_from = fields.Date(
         string="Masa Dari",

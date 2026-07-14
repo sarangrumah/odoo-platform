@@ -16,10 +16,21 @@
                         <field name="company_ids" widget="many2many_tags"/>
                     </group>
                 </group>
+                <div class="text-muted">
+                    "by Branch" reports the same lines with one amount column per
+                    Operating Unit. Journal items carrying no Operating Unit are
+                    reported under the head-office column.
+                </div>
                 <footer>
-                    <button string="Print PDF" name="action_print"
+                    <button string="View" name="action_view"
                             type="object" class="btn-primary"/>
+                    <button string="View by Branch" name="action_view_by_branch"
+                            type="object" class="btn-secondary"/>
+                    <button string="Print PDF" name="action_print"
+                            type="object" class="btn-secondary"/>
                     <button string="Export Excel" name="action_export_xlsx"
+                            type="object" class="btn-secondary"/>
+                    <button string="Export by Branch" name="action_export_xlsx_by_branch"
                             type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary"
                             special="cancel"/>
