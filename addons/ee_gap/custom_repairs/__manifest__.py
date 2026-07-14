@@ -1,15 +1,21 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Repairs",
-    "summary": "Repair extensions: warranty tracking, WhatsApp status updates, turnaround SLA",
+    "summary": "Internal asset repairs bridged to maintenance.equipment / maintenance.request",
     "description": """
-Custom Repairs extends the CE `repair` module for Indonesian SMB tenants with:
+Custom Repairs extends the CE `repair` module for INTERNAL asset maintenance
+(repairs on the company's own equipment, not external-customer jobs):
 
-- Warranty tracking (in/out/extended) and warranty-until date.
-- Promised vs actual completion-date tracking.
-- Turnaround SLA computation (on_track / at_risk / breached / done).
-- Customer status updates via custom_whatsapp (stub queue creation).
-- Customer complaint capture in Bahasa Indonesia.
+- Link each repair to an internal asset (maintenance.equipment).
+- Bridge: auto-create a corrective maintenance.request on the linked
+  equipment when the repair is confirmed, feeding the asset's
+  maintenance history (MTBF/MTTR in custom_maintenance).
+- Internal fault description and requester (department/user) capture.
+- Promised vs actual completion-date tracking + turnaround SLA
+  (on_track / at_risk / breached / done).
+- Re-open / rework flow for repairs that come back internally.
+- Labor + material cost analysis, quality check on completion, and
+  optional MRP work-order stub for spare-part consumption.
 
 Convention notes:
 - Uses <list>, no <tree>; flat search filters (no <group string="Group By">).
@@ -18,17 +24,17 @@ Convention notes:
 """,
     "author": "Custom Platform",
     "category": "Manufacturing/Repair",
-    "version": "19.0.0.1.0",
+    "version": "19.0.1.0.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
         "custom_pdp_audit",
         "custom_quality_full",
         "repair",
-        "custom_whatsapp",
+        "maintenance",
         "mail",
     ],
-    "capability_tags": ["helpdesk", "whatsapp", "quality", "manufacturing"],
+    "capability_tags": ["maintenance", "quality", "manufacturing"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

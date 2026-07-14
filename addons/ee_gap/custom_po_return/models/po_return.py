@@ -269,8 +269,9 @@ class CustomPoReturn(models.Model):
             rec.state = "done"
             rec.message_post(
                 body=_(
-                    "Return validated: %(picking_count)s return picking(s), "
-                    "%(cn_count)s credit note(s), total %(amount)s.",
+                    "Return validated: %(picking_count)s return picking(s) "
+                    "created as draft (validate them in Inventory to move the "
+                    "stock), %(cn_count)s credit note(s), total %(amount)s.",
                     picking_count=rec.return_picking_count,
                     cn_count=rec.credit_note_count,
                     amount=rec.amount_total,
@@ -305,17 +306,16 @@ class CustomPoReturn(models.Model):
                 name=self.name,
                 picking=picking.name,
             )
+            # The return picking is left in its natural draft/ready state (core
+            # already confirmed + reserved it) so the warehouse reviews and
+            # validates it manually. We only wire the allocation <-> return move
+            # link here; the inventory move (and its valuation journal) posts
+            # when the user validates the picking, not at PO Return validation.
             for move in new_picking.move_ids:
                 alloc = alloc_by_move.get(move.origin_returned_move_id.id)
                 if alloc:
                     alloc.return_move_id = move
                     alloc.return_picking_id = new_picking
-                move.quantity = move.product_uom_qty
-                move.picked = True
-            new_picking.with_context(
-                skip_backorder=True,
-                picking_ids_not_to_backorder=new_picking.ids,
-            ).button_validate()
 
     def _create_credit_notes(self):
         self.ensure_one()

@@ -65,6 +65,12 @@
 		redir /portal/ 308
 	}
 
+	# --- Web file share (File Browser) at /files/* ---
+	# Same public 443 ingress; browse/upload the SFTP share via HTTPS.
+	handle /files* {
+		reverse_proxy odoo19-platform-filebrowser:80
+	}
+
 	# Forward all remaining traffic to internal nginx, which still enforces
 	# rate-limit, blocks /web/database/manager, terminates HTTPS again for
 	# its full Odoo server-block (the port-80 block is a pure HTTP→HTTPS

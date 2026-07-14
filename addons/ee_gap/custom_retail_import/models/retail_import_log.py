@@ -8,7 +8,6 @@ queue_job, so we track ``job_uuid`` and per-stage record counters.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 
 from odoo import _, fields, models
@@ -130,6 +129,7 @@ class RetailImportLog(models.Model):
                     "type": "ir.actions.act_window",
                     "res_model": "retail.import.log",
                     "view_mode": "list,form",
+                    "views": [(False, "list"), (False, "form")],
                     "target": "current",
                     "name": _("Imports"),
                 },

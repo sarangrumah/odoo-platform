@@ -46,10 +46,15 @@ _logger = logging.getLogger(__name__)
 class RetailImportFeed(models.Model):
     _name = "retail.import.feed"
     _description = "Retail Import SFTP Feed"
-    _order = "name"
+    _order = "sequence, name"
     _inherit = ["mail.thread"]
 
     name = fields.Char(required=True, index=True)
+    sequence = fields.Integer(
+        default=50,
+        help="Poll order. Matters once posting is enabled: X24 creates the POS suspense "
+        "entries that X70D reconciles against, so X24 must run first.",
+    )
     active = fields.Boolean(default=True)
     profile_id = fields.Many2one("retail.import.profile", required=True, ondelete="restrict")
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company, required=True)
@@ -79,19 +84,14 @@ class RetailImportFeed(models.Model):
     # Local-directory (FTPS drop) mode -----------------------------------------
     local_dir = fields.Char(help="Directory inside the container to poll, e.g. /mnt/data_levis/data.")
     archive_dir = fields.Char(
-        help="Where processed files are moved (with a YYYYMMDD_HHMMSS_ prefix), "
-        "e.g. /mnt/data_levis/archive."
+        help="Where processed files are moved (with a YYYYMMDD_HHMMSS_ prefix), e.g. /mnt/data_levis/archive."
     )
 
     file_glob = fields.Char(default="*", required=True, help="e.g. 'X20_*.csv' or 'X24DN_*.xlsx'.")
-    run_async = fields.Boolean(
-        string="Process asynchronously", default=True, help="Hand each file to queue_job."
-    )
+    run_async = fields.Boolean(string="Process asynchronously", default=True, help="Hand each file to queue_job.")
 
     last_run = fields.Datetime(readonly=True)
-    last_status = fields.Selection(
-        [("ok", "OK"), ("error", "Error"), ("idle", "Idle")], default="idle", readonly=True
-    )
+    last_status = fields.Selection([("ok", "OK"), ("error", "Error"), ("idle", "Idle")], default="idle", readonly=True)
     last_message = fields.Text(readonly=True)
     files_imported = fields.Integer(default=0, readonly=True)
 
@@ -102,15 +102,11 @@ class RetailImportFeed(models.Model):
             if feed.source_type == "sftp":
                 missing = [f for f in ("host", "username") if not feed[f]]
                 if missing:
-                    raise ValidationError(
-                        _("Feed %s: SFTP source requires %s.") % (feed.name, ", ".join(missing))
-                    )
+                    raise ValidationError(_("Feed %s: SFTP source requires %s.") % (feed.name, ", ".join(missing)))
             elif feed.source_type == "local":
                 missing = [f for f in ("local_dir", "archive_dir") if not feed[f]]
                 if missing:
-                    raise ValidationError(
-                        _("Feed %s: local source requires %s.") % (feed.name, ", ".join(missing))
-                    )
+                    raise ValidationError(_("Feed %s: local source requires %s.") % (feed.name, ", ".join(missing)))
 
     # ------------------------------------------------------------------
     def _secret(self):
@@ -146,8 +142,7 @@ class RetailImportFeed(models.Model):
         if self.source_type == "local":
             if not self.local_dir or not os.path.isdir(self.local_dir):
                 raise UserError(
-                    _("Feed %s: local_dir %s does not exist or is not a directory.")
-                    % (self.name, self.local_dir or "")
+                    _("Feed %s: local_dir %s does not exist or is not a directory.") % (self.name, self.local_dir or "")
                 )
             names = os.listdir(self.local_dir)
             where = self.local_dir
@@ -324,7 +319,7 @@ class RetailImportFeed(models.Model):
             )
 
     def _cron_poll_feeds(self):
-        """ir.cron entry point: poll every active feed."""
-        for feed in self.search([("active", "=", True)]):
+        """ir.cron entry point: poll every active feed, in ``sequence`` order."""
+        for feed in self.search([("active", "=", True)], order="sequence, name"):
             feed._run_feed()
         return True

@@ -67,7 +67,7 @@
         <field name="data_start_row">2</field>
         <field name="date_format">%Y-%m-%d</field>
         <field name="company_id" ref="base.main_company"/>
-        <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "item_code": 14, "waist": 15, "inseam": 16, "item_description": 17, "ean": 22, "retail_price": 23, "gross_price": 24, "net_qty": 25, "net_discount": 26, "net_amount": 27, "tax_rate": 28, "tax_amount": 29, "total_amount": 30}</field>
+        <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "staff_id": 10, "staff_name": 11, "item_type": 12, "line_id": 13, "item_code": 14, "waist": 15, "inseam": 16, "item_description": 17, "brand": 18, "category": 19, "class": 20, "subclass": 21, "ean": 22, "retail_price": 23, "gross_price": 24, "net_qty": 25, "net_discount": 26, "net_amount": 27, "tax_rate": 28, "tax_amount": 29, "total_amount": 30, "discount_type_1": 31, "discount_code_1": 32, "discount_description_1": 33, "discount_amount_1": 34, "discount_percentage_1": 35, "discount_type_2": 36, "discount_code_2": 37, "discount_description_2": 38, "discount_amount_2": 39, "discount_percentage_2": 40, "discount_type_3": 41, "discount_code_3": 42, "discount_description_3": 43, "discount_amount_3": 44, "discount_percentage_3": 45, "discount_type_4": 46, "discount_code_4": 47, "discount_description_4": 48, "discount_amount_4": 49, "discount_percentage_4": 50, "line_comment": 51, "transaction_note": 52, "member_id": 56, "member_type": 57, "customer_phone": 58, "omni_order_id": 59}</field>
     </record>
 
     <!-- X70D — Tender Detail (payments). Header row 1, data row 2. Staged (Phase-5 gated). -->
@@ -152,7 +152,7 @@
         <field name="file_format">xlsx</field>
         <field name="data_start_row">2</field>
         <field name="company_id" ref="base.main_company"/>
-        <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "product_code": 15, "waist": 16, "inseam": 17, "ean": 24, "net_qty": 27, "total_amount": 31}</field>
+        <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "product_code": 15, "waist": 16, "inseam": 17, "category": 21, "ean": 24, "net_qty": 27, "net_discount": 28, "net_amount": 29, "tax_amount": 30, "total_amount": 31}</field>
     </record>
 
     <!-- X53 — RTV Report (standard). Header row 1, data row 2. -->

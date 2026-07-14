@@ -29,14 +29,20 @@ Pieces
 * ``retail.import.log`` — audit trail, keeps the source file in ir.attachment.
 * ``retail.import.feed`` — SFTP poller (paramiko) that pulls new files into the
   same executor on an ``ir.cron`` schedule.
+* ``retail.import.mailbox`` — IMAP bridge for tenants whose source files arrive as
+  nightly email attachments. Backs every attachment up to the SFTP share, drops the
+  ingestible ones into a feed's directory, then deletes the message once the backup
+  verifies. Deletion keys off the backup, never the import, so a parser bug can never
+  destroy source data.
 """,
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Retail",
-    "version": "19.0.0.1.1",
+    "version": "19.0.0.16.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
+        "custom_product_barcode",
         "queue_job",
         "product",
         "stock",
@@ -50,9 +56,11 @@ Pieces
         "data/cron.xml",
         "data/retail_import_profiles.xml",
         "data/feeds.xml",
+        "data/mailboxes.xml",
         "views/retail_import_profile_views.xml",
         "views/retail_import_log_views.xml",
         "views/retail_import_feed_views.xml",
+        "views/retail_import_mailbox_views.xml",
         "wizard/retail_import_wizard_views.xml",
         "views/menu_views.xml",
     ],

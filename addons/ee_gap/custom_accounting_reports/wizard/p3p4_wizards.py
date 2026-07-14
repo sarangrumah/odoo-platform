@@ -14,6 +14,7 @@ from odoo.exceptions import UserError
 
 class TaxReportWizardMixin(models.AbstractModel):
     _name = "custom.report.tax.wizard.mixin"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Common tax report wizard (masa + company)"
 
     date_from = fields.Date(

@@ -16,7 +16,7 @@ core rental.asset / rental.order skeleton with:
 """,
     "author": "Custom Platform",
     "category": "Sales/Rental",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.3.1",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -43,6 +43,7 @@ core rental.asset / rental.order skeleton with:
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",
         "report/rental_contract_report.xml",
+        "reports/bast_report_loan.xml",
     ],
     "installable": True,
     "application": True,

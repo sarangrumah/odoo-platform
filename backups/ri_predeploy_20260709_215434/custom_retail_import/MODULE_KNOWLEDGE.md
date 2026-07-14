@@ -1,0 +1,74 @@
+---
+status: draft
+generated_at: 2026-06-11T00:00:00Z
+generator: claude-code
+module: custom_retail_import
+manifest_version: 19.0.0.9.0
+---
+
+# custom_retail_import
+
+## Purpose
+Productized adapter that converts customer-provided Excel/CSV files into Odoo records, plus an optional direct-from-SFTP recurring feed. Built for the Levi's (PT Sinar Eka Selaras / `levis` tenant) onboarding and reusable for any retail tenant. Generalizes the `custom_bank_import` template/wizard/log trio into per-file-type **import profiles**, and ports the proven `scripts/tenants/era_busana_retailindo` X101 pipeline into the X101 executor.
+
+Answers the three customer questions: (1) Excel→Odoo adapter = the wizard + profiles; (2) read directly from FTP = `retail.import.feed` (paramiko/SFTP + cron); (3) X* master/transaction files = per-`file_type` executors.
+
+## Business Flow
+- **Manual import**: Operator opens **Retail Import ▸ Import Data** (`retail.import.wizard`), picks a `retail.import.profile`, uploads a file. `action_preview()` parses the first 20 rows and shows them with NO commit (dry-run). `action_import()` computes `sha256`, blocks duplicates (unless `force`), persists the file to `ir.attachment`, creates a `retail.import.log` (state `queued`), then runs `retail.import.executor.run(log)` — **async via queue_job** (`channel="root.retail_import"`) for large files (`ASYNC_TYPES = {x101,x20,x24,x70d,x32p}`), synchronous otherwise. Falls back to sync if queue_job is unavailable.
+- **SFTP feed**: `retail.import.feed` binds an SFTP location + glob to a profile. `ir.cron cron_poll_retail_feeds` (hourly, **off by default**) → `_cron_poll_feeds()` → per active feed, **in `sequence` order**, `_poll_one()` lists files matching `file_glob`, dedups by `retail.import.log` file-hash, stores to `ir.attachment`, and enqueues the same executor.
+- **Mailbox feed (19.0.0.9.0)**: `retail.import.mailbox` pulls the nightly X-center reports out of IMAP. `ir.cron cron_fetch_retail_mailboxes` (hourly) → `_cron_fetch_mailboxes()` → per active mailbox `_fetch()` then `_purge()`. `_fetch` writes every attachment to `backup_dir` (`YYYY/MM/`) and copies the `ingest_glob` subset into `drop_dir`, where the ordinary `local` feeds pick it up. The import pipeline is untouched — this is a transport bridge, not a second importer.
+- **`cron_poll_retail_feeds` stays DISABLED** through the 19.0.0.9.0 migration. It is the switch that turns a staged file into `pos.order` + journal entries (where `retail_import.x24_post_enabled` is set). Enabling it is an operator decision that must follow the X70D-vs-`pos.payment` Rp 0 reconciliation — never a side effect of a schema upgrade.
+- **Executor dispatch**: `run(log)` reads the stored attachment, calls `_load_<file_type>`. Idempotency via `ir.model.data` external IDs under `profile.namespace` (e.g. `levis`).
+
+## Coverage by file_type (executor)
+- `x101` — **FULL**. Products: builds 3-level `product.category` (CATEGORY>CLASS>SUBCLASS), `product.attribute` Size+Inseam (`create_variant=always`), `product.template` with `attribute_line_ids` (Odoo auto-generates variants), then matches auto-variants by `(template, frozenset(size,inseam value_ids))` and writes `default_code`=PROD SKU + `barcode`=PROD GTIN. Dedup by SKU keeping latest PRICE EFFECTIVE FROM. Batched commits (200 tmpl).
+- `coa` — **FULL**. `account.account` from clean `code,name,account_type`; validates `account_type` against the model selection; Odoo-19 `company_ids` M2M aware (`with_company` + `(4, company.id)`).
+- `company` — **FULL**. Writes `res.company` name + partner `vat`/`street`/`phone`/`email`; tolerant of the SES "Label : Value" single-cell layout.
+- `x20` — **FULL**. Opening on-hand → `stock.quant` inventory adjustment per store location; resolves variant by barcode(EAN)/default_code(ITEM ID), location by `wh_<storecode>` external ID. ONE-SHOT (guarded: refuses if an `imported` log already exists for the profile).
+- `x24` / `x70d` — **DECISION-GATED (Phase 5)**. Parser + transaction grouping ready (`_group_x24`); `run` raises `UserError` until POS representation, history depth, payment-method map and tax mapping are confirmed against a live DB. Target: `pos.order`/`pos.order.line` + `pos.payment`, posted **without moving stock** (X20 already set on-hand).
+- `x70t` / `x31` / `x32p` / `store_master` — **STAGED**: parsed, counted, attachment kept, no model writes. X32P is reference/audit only (not replayed). Warehouse creation is done by the Track A `scripts/tenants/levis/04_load_stores.py` (Store Master stores are header-wise, not row-wise).
+
+## Key Models
+- `retail.import.profile` — Declarative parser config per file type. `read_records(file_b64, limit)` → `{records:[{logical_field: value, _row}], total_rows, blank_rows}`.
+- `retail.import.log` — Audit row; `file_hash` (SHA256 dedup), `attachment_id` (kept source), `job_uuid`, `records_created/matched/skipped`, `state` ∈ queued/running/imported/partial/failed. Inherits `mail.thread`.
+- `retail.import.executor` — **AbstractModel**; the per-file-type loaders. Delayable via queue_job.
+- `retail.import.feed` — SFTP/local source + cron poller. `sequence` fixes poll order.
+- `retail.import.mailbox` — IMAP source (stdlib `imaplib`) + retention policy. `retail.import.mail.message` is its per-attachment ledger (uid, uidvalidity, sha256, backup_path, staged_path, state).
+- `retail.import.wizard` (TransientModel) — Upload + preview + import.
+
+## Important Fields
+- `retail.import.profile.code` (Char, unique-per-company), `file_type` (Selection, see list), `namespace` (Char — per-tenant external-ID module, e.g. `levis`).
+- `retail.import.profile.file_format` (xlsx/csv), `sheet_name`, `data_start_row` (Integer, 1-based — **the key generalization** over bank import: X70T/X31/X32P have a title row before the header; X101=3, Store Master=3, X24/X70D=2, X20=2, CoA=3).
+- `retail.import.profile.column_map_json` (Text) — JSON `{logical_field: 1-based_col_index}`. Seeded per Levi's file in `data/retail_import_profiles.xml`.
+- `retail.import.profile.fix_encoding` (Boolean) — restore U+FFFD → '®' (X101 quirk).
+- `retail.import.log.file_hash` (Char, indexed) — dedup key.
+- `retail.import.feed.password_param` (Char) — `ir.config_parameter` key holding the SFTP secret.
+- `retail.import.feed.sequence` (Integer) — poll order. X24=10, X70D=20, X31=30. Matters once posting is enabled: X24 books the POS entries that X70D's tender reconciliation settles against.
+- `retail.import.mailbox.password_env` (Char) — environment variable read first (`LEVIS_MAIL_PASSWORD`, injected via docker-compose). `password_param` is a clear-text DB fallback.
+- `retail.import.mailbox.ingest_glob` (Char) — comma-separated globs; backed-up attachments matching one are also copied to `drop_dir`. Everything else is backup-only.
+- `retail.import.mailbox.purge_enabled` / `dry_run` / `retention_days` — three switches, thrown in that order.
+
+## Gotchas / Decisions
+- **openpyxl must be in the Odoo image** for in-container `.xlsx` reading — added to `odoo/requirements.txt` (xlsxwriter in the image is write-only). `paramiko` added for SFTP. **Rebuild the image** before installing this module.
+- **Large files run async** to dodge the reverse-proxy `ERR_EMPTY_RESPONSE` timeout on long synchronous web requests. The X101 import is ~30 min for ~160k variants. queue_job runner must be active (odoo-mgmt loads `queue_job` via `SERVER_WIDE_MODULES`).
+- **Idempotency**: master data (products, categories, accounts) via `ir.model.data` external IDs (`noupdate=True`); transactions via file-hash + per-row external IDs; X20 opening stock is a guarded ONE-SHOT (re-applying would double on-hand).
+- **SFTP credentials are stored raw** in `ir.config_parameter` — the platform has no at-rest decryptor yet (the adapter-framework `enc:` convention is aspirational). Restrict parameter read access; prefer key-based auth.
+- **Data reality (Levi's, 2026-06-11)**: the delivered X20/X24/X70D are **single-store samples** (store 14694 only). X101 + CoA are full. The 24-store list comes from the Store Master (names only — no store codes for 23 of 24). The store-code→warehouse crosswalk and full multi-store transactions are blocked on the customer providing complete store-coded extracts (or the live SFTP feed). See `scripts/tenants/levis/README.md`.
+- **POS history is the chosen model** for X24 (not sale.order) — register/cashier/tender/member map ~1:1 to POS. Gated on Phase-5 decisions.
+- **X101 data-quality (v19.0.0.2.0)**: (1) `_clean_str` scrubs spreadsheet error sentinels (`#N/A`, `#REF!`, `#VALUE!`, …) to `""` so they no longer leak into category names/SKUs/barcodes (a real category literally named `#N/A` was observed — openpyxl `data_only=True` returns cached VLOOKUP errors as strings). (2) X101 merchandise is created **storable** (`is_storable=True`, type `consu`); the **"Original cut" tailoring service** → `type="service"`, detected by `ir.config_parameter` `retail_import.service_product_codes` (exact code) or `retail_import.service_category_keywords` (substring). **Both default EMPTY** — a substring default like `TAILOR` false-matched 102 real merchandise rows in rnd_levis ("TAILORED BUSTIER", "TAILORED CLASSIC" shirts), so everything is storable merchandise until the actual service marker is configured. (3) Rows with a **blank category** or **zero/unparseable price** are flagged `state=error` on `retail.import.line` (bumps `error_count` → log state `partial`) but still imported (no silent data loss). Remediate already-imported DBs with `scripts/tenants/levis/71_fix_retail_import_dataquality.py` (dry-run default; `RETAIL_FIX_APPLY=1` to write).
+- **X101 multi-GTIN + variant backfill (v19.0.0.3.0)**: depends on `custom_product_barcode`. (Fix A) every GTIN of a SKU is registered as a `product.barcode` alternate on the variant (`_x101_register_gtins`) — a Levi's SKU has several GTINs and the variant's single `barcode` field holds only one; X20/X24/X48 barcode lookups switched to `product.product._resolve_barcode` so any scanned code resolves. (Fix B) re-running X101 now backfills newly-appearing Size/Inseam values onto an already-registered template (`_x101_backfill_template_attrs`) so missing variants regenerate, instead of skipping the template outright.
+- **Mailbox retention keys off the BACKUP, never the IMPORT (19.0.0.9.0)**. `_purge` re-reads each backup off disk and re-checks its SHA256 before it flags `\Deleted`; a failed import still has raw bytes in `backup_dir` + `drop_dir` and gets retried by the feed. Coupling deletion to import success would let a parser bug destroy source data that exists nowhere else. Deletion is `UID STORE +FLAGS (\Deleted)` then `UID EXPUNGE <uid>` (the server advertises `UIDPLUS`); nothing is copied to Trash, which would double the storage the purge is trying to reclaim.
+- **The X-center mails carry a CONSTANT filename** every day (`X24DN_Retail_Sales_Detail_Report.xlsx`). `_suffixed_name` appends `__<sentUTC>` (a *suffix*, so `X24*.xlsx` still matches) — otherwise day N+1 silently overwrites a day-N file that failed to import and is still sitting in `drop_dir`. The stamp is provenance only; business dates come from inside the file.
+- **`mail.erajaya.com` reports no quota** (`GETQUOTAROOT` returns empty) even though it advertises `QUOTA`, so retention must be self-managed: `retention_days` plus a `max_messages`/`max_bytes_mb` emergency drain that logs a warning rather than truncating silently. Volume is ~10.4 MB/day across six attachments (X24DN/X70D/X31 ingested; X20/X32P/X70T backup-only). X101 and X48 are never mailed.
+- **`imaplib` returns the bare UIDVALIDITY value** (`response("UIDVALIDITY") -> ('UIDVALIDITY', [b'1'])`), not the `[UIDVALIDITY 1]` bracket. `_uidvalidity` accepts both; parsing only the bracket silently yields `""`, which disables the UID bookkeeping purge depends on.
+- **`retail.import.mailbox` must be `active` in exactly ONE database.** The cron runs per-DB; two DBs polling the same INBOX would race to delete each other's messages. `_lock()`'s `pg_try_advisory_lock` only guards workers *within* one database. It is session-scoped on purpose: `_fetch` commits per message, which would release a `FOR UPDATE` row lock. That commit is routed through `_checkpoint()`, which no-ops under tests (Odoo 19's test cursor raises on `commit()`).
+- **Do not name a One2many `message_ids` on a `mail.thread` model** — it shadows the chatter's own field. The mailbox ledger is `fetched_ids`.
+- **X20 must stay out of the mailbox ingest set.** `_load_x20` is a guarded one-shot opening-balance loader, and the emailed X20 is `.xlsx` with a 14-column layout that the existing CSV profile (columns 16–29) cannot read. Same for X32P/X70T (staged-only).
+- **`res.groups` in Odoo 19**: `category_id` → `privilege_id`, `users` → `user_ids`. `security.xml` carried the old names; `noupdate="1"` skips existing records on `-u`, so upgrades passed while every *fresh install* died with `Invalid field 'category_id' in 'res.groups'`. Fixed in 19.0.0.9.0.
+- **Storable ⇒ POS must still not move stock**: making merchandise storable means POS session-close would otherwise create pickings (Odoo gates this on `pos.session.update_stock_at_closing`, derived from company config). The X24/X48 executors force `update_stock_at_closing=False` on import-created sessions (post-create, since `pos.session.create` overrides it) so the financial-only replay never double-counts the X20 on-hand snapshot. The `:1002` guard (`UNEXPECTED n stock move(s) on close`) is the tripwire.
+
+## Related
+- `scripts/tenants/levis/` — Track A ops scripts (fast go-live without the image rebuild): `01_extract_x101.py`+`02_import_to_odoo.py` (products), `03_extract_stores.py`+`04_load_stores.py` (warehouses), `05_load_x20.py` (opening stock).
+- `scripts/tenants/era_busana_retailindo/` — the original precedent this module generalizes.
+- `addons/ee_gap/custom_bank_import/` — the template/wizard/log pattern this extends.
+- `addons/core/custom_adapter_framework/` — adapter config/credential pattern (SFTP alternative).

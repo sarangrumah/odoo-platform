@@ -17,8 +17,10 @@
                     </group>
                 </group>
                 <footer>
-                    <button string="Print PDF" name="action_print"
+                    <button string="View" name="action_view"
                             type="object" class="btn-primary"/>
+                    <button string="Print PDF" name="action_print"
+                            type="object" class="btn-secondary"/>
                     <button string="Export Excel" name="action_export_xlsx"
                             type="object" class="btn-secondary"/>
                     <button string="Lihat Transaksi" name="action_view_source"

@@ -62,14 +62,14 @@ class RetailImportWizard(models.TransientModel):
             "res_model": self._name,
             "res_id": self.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "new",
         }
 
     def _build_preview_table(self, sample, rows, columns):
         """Render the sampled rows as an HTML table (logical fields as columns)."""
         summary = _(
-            "Profile: %(code)s (%(ftype)s) — parsed %(count)s sample row(s), "
-            "%(blank)s blank skipped",
+            "Profile: %(code)s (%(ftype)s) — parsed %(count)s sample row(s), %(blank)s blank skipped",
             code=self.profile_id.code,
             ftype=self.profile_id.file_type,
             count=len(sample["records"]),
@@ -77,17 +77,13 @@ class RetailImportWizard(models.TransientModel):
         )
         cell_style = "white-space:nowrap;padding:2px 8px;"
         head = Markup('<th style="{}">{}</th>').format(cell_style, _("Row"))
-        head += Markup("").join(
-            Markup('<th style="{}">{}</th>').format(cell_style, col) for col in columns
-        )
+        head += Markup("").join(Markup('<th style="{}">{}</th>').format(cell_style, col) for col in columns)
         body = Markup("")
         for rec in rows:
             cells = Markup('<td style="{}">{}</td>').format(cell_style, rec.get("_row"))
             for col in columns:
                 val = rec.get(col)
-                cells += Markup('<td style="{}">{}</td>').format(
-                    cell_style, "" if val is None else val
-                )
+                cells += Markup('<td style="{}">{}</td>').format(cell_style, "" if val is None else val)
             body += Markup("<tr>{}</tr>").format(cells)
         return Markup(
             '<p class="text-muted">{summary}</p>'
@@ -106,8 +102,8 @@ class RetailImportWizard(models.TransientModel):
             dup = Log.find_duplicate(file_hash)
             if dup:
                 raise UserError(
-                    _("This exact file was already imported/queued (log #%s). "
-                      "Tick 'Force re-import' to override.") % dup.id
+                    _("This exact file was already imported/queued (log #%s). Tick 'Force re-import' to override.")
+                    % dup.id
                 )
         log = Log.create(
             {
@@ -137,5 +133,6 @@ class RetailImportWizard(models.TransientModel):
             "res_model": "retail.import.log",
             "res_id": log.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "current",
         }

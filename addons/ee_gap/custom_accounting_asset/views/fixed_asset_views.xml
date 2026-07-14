@@ -118,16 +118,21 @@
                     <notebook>
                         <page string="Depreciation Schedule">
                             <field name="depreciation_line_ids">
-                                <list decoration-success="posted">
+                                <list decoration-success="posted" decoration-muted="reversed">
                                     <field name="sequence"/>
                                     <field name="date"/>
                                     <field name="amount"/>
                                     <field name="posted"/>
+                                    <field name="reversed"/>
                                     <field name="move_id"/>
                                     <field name="currency_id" column_invisible="True"/>
                                     <button name="action_post_now"
                                             type="object" string="Post"
-                                            invisible="posted"/>
+                                            invisible="posted or reversed"/>
+                                    <button name="action_reverse"
+                                            type="object" string="Reverse"
+                                            invisible="not posted"
+                                            confirm="Reverse this posted depreciation? A reversing journal entry will be booked and the asset NBV will be restored."/>
                                 </list>
                             </field>
                         </page>

@@ -7,7 +7,9 @@ from odoo.exceptions import UserError
 
 class BupotWizard(models.TransientModel):
     _name = "custom.report.bupot.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Rekap Bukti Potong PPh Wizard"
+    _report_code = "bupot"
 
     date_from = fields.Date(
         string="Masa Dari",

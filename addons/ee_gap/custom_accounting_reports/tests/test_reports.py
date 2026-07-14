@@ -410,18 +410,27 @@ class TestCustomReports(TransactionCase):
             "signed_balance"
         ]
 
-        # The accounting equation (Assets = Liab + Equity) holds only
-        # when the period P&L is closed into equity. Until close, the
-        # gap equals net profit / (loss). Verify directly.
+        # The Balance Sheet reports the un-closed period result as a
+        # "Current Year Earnings" equity line, so the accounting equation
+        # holds even before the period is closed.
         pl = self.env["custom.report.profit.loss"]
         pl_lines = pl._build_lines(self._filters())
         net_profit = next(l for l in pl_lines if l.get("type") == "grand_total")["signed_balance"]
 
+        earnings = next(l for l in lines if l.get("label") == "Current Year Earnings")[
+            "signed_balance"
+        ]
         self.assertAlmostEqual(
-            total_assets - total_liab - total_eq,
+            earnings,
             net_profit,
             places=2,
-            msg=("Assets - (Liab + Equity) must equal Net Profit before period close."),
+            msg="Current Year Earnings must equal the period's Net Profit.",
+        )
+        self.assertAlmostEqual(
+            total_assets - total_liab - total_eq,
+            0.0,
+            places=2,
+            msg="Assets must equal Liabilities + Equity once earnings are included.",
         )
 
     # ------------------------------------------------------------------
@@ -527,8 +536,9 @@ class TestCustomReports(TransactionCase):
         gl_core = self.env["custom.report.general.ledger"].with_context(
             gl_layout="flat", gl_columns=[]
         )
-        self.assertEqual(len(gl_core._xlsx_columns()), 9)
-        # All optional columns selected -> 9 core + 10 optional = 19.
+        # 10 core columns -- the branch column is always shown.
+        self.assertEqual(len(gl_core._xlsx_columns()), 10)
+        # All optional columns selected -> 10 core + 10 optional = 20.
         gl_full = self.env["custom.report.general.ledger"].with_context(
             gl_layout="flat",
             gl_columns=[
@@ -536,10 +546,10 @@ class TestCustomReports(TransactionCase):
                 "profit_center", "currency", "amount_currency", "due_date", "user",
             ],
         )
-        self.assertEqual(len(gl_full._xlsx_columns()), 19)
-        # Grouped layout keeps the legacy 7-column spec.
+        self.assertEqual(len(gl_full._xlsx_columns()), 20)
+        # Grouped layout: Date/Entry/Partner/Label/Branch + Debit/Credit/Balance.
         gl_grouped = self.env["custom.report.general.ledger"]
-        self.assertEqual(len(gl_grouped._xlsx_columns()), 7)
+        self.assertEqual(len(gl_grouped._xlsx_columns()), 8)
 
     # ------------------------------------------------------------------
     # 7) Aged receivable detail: one row per open document, grouped by
@@ -1266,3 +1276,187 @@ class TestCustomReports(TransactionCase):
         wiz = self.env["custom.report.ekualisasi.omzet.wizard"].create({})
         with self.assertRaises(UserError):
             wiz.action_view_source()
+
+    # ------------------------------------------------------------------
+    # 20) Account-group hierarchy: reports nest by code prefix, not by
+    #     account_type. An Indonesian chart types its cost-of-sales
+    #     accounts plain ``expense``, so only the prefix separates COGS
+    #     from an operating expense.
+    # ------------------------------------------------------------------
+    def _seed_groups(self):
+        Group = self.env["account.group"]
+
+        def group(prefix, name, parent=None):
+            return Group.create(
+                {
+                    "code_prefix_start": prefix,
+                    "code_prefix_end": prefix,
+                    "name": name,
+                    "company_id": self.company.id,
+                    "parent_id": parent.id if parent else False,
+                }
+            )
+
+        g5 = group("5", "Net Sales")
+        group("51", "Gross Sales", g5)
+        g6 = group("6", "Cost Of Goods Sold")
+        group("61", "Hpp Gross", g6)
+        g7 = group("7", "Operating Expenses")
+        group("72", "General And Administrative Expenses", g7)
+        group("78", "Finance Income", g7)
+
+    def _seed_grouped_pl(self):
+        """A chart + four postings exercising every bucket the grouping fixes."""
+        self._seed_groups()
+        sales = self._mk_account("5100000001", "Gross Sales-Textile", "income")
+        # Typed ``expense``, not ``expense_direct_cost`` -- the whole point.
+        cogs = self._mk_account("6100000001", "COGS-Textile", "expense")
+        opex = self._mk_account("7200000001", "Office Rental", "expense")
+        # Typed ``income_other``: belongs under Finance Income, not Revenue.
+        interest = self._mk_account("7800000001", "Interest Income", "income_other")
+
+        today = date.today()
+        self._post_move([(self.acc_cash, 1000.0, 0.0), (sales, 0.0, 1000.0)], dt=today, ref="G1")
+        self._post_move([(cogs, 400.0, 0.0), (self.acc_cash, 0.0, 400.0)], dt=today, ref="G2")
+        self._post_move([(opex, 100.0, 0.0), (self.acc_cash, 0.0, 100.0)], dt=today, ref="G3")
+        self._post_move([(self.acc_cash, 30.0, 0.0), (interest, 0.0, 30.0)], dt=today, ref="G4")
+        return sales
+
+    def test_profit_loss_buckets_by_code_prefix(self):
+        self._seed_grouped_pl()
+        lines = self.env["custom.report.profit.loss"]._build_lines(self._filters())
+
+        def total(label):
+            return next(l for l in lines if l.get("label") == label)["signed_balance"]
+
+        self.assertAlmostEqual(total("Total Revenue"), 1000.0, places=2)
+        self.assertAlmostEqual(total("Total COGS"), 400.0, places=2)
+        self.assertAlmostEqual(total("Gross Profit"), 600.0, places=2)
+        self.assertAlmostEqual(total("Total Operating Expenses"), 100.0, places=2)
+        self.assertAlmostEqual(total("Operating Profit"), 500.0, places=2)
+        # Finance Income sits below Operating Profit, not inside Revenue.
+        self.assertAlmostEqual(total("Net Profit / (Loss) Before Tax"), 530.0, places=2)
+        self.assertAlmostEqual(total("Net Profit / (Loss)"), 530.0, places=2)
+
+    def test_profit_loss_nests_group_2_headers(self):
+        self._seed_grouped_pl()
+        lines = self.env["custom.report.profit.loss"]._build_lines(self._filters())
+        revenue = next(l for l in lines if l.get("label") == "Revenue")
+
+        self.assertEqual([s["label"] for s in revenue["subgroups"]], ["Gross Sales"])
+        # Prefix "51" is rendered the way Finance writes it.
+        self.assertEqual(revenue["subgroups"][0]["code"], "5100000000")
+        self.assertEqual(
+            [a["account_code"] for a in revenue["subgroups"][0]["accounts"]],
+            ["5100000001"],
+        )
+        # ``accounts`` holds only what has no GROUP 2.
+        self.assertFalse(revenue["accounts"])
+
+    def test_balance_sheet_current_year_earnings_balances(self):
+        self._seed_grouped_pl()
+        lines = self.env["custom.report.balance.sheet"]._build_lines(self._filters())
+
+        def total(label):
+            return next(l for l in lines if l.get("label") == label)["signed_balance"]
+
+        self.assertAlmostEqual(total("Current Year Earnings"), 530.0, places=2)
+        self.assertAlmostEqual(total("Imbalance (should be zero)"), 0.0, places=2)
+
+    def test_reports_fall_back_to_account_type_without_groups(self):
+        """No ``account.group`` for this company -> flat, type-bucketed sections."""
+        today = date.today()
+        self._post_move(
+            [(self.acc_recv, 700.0, 0.0), (self.acc_revenue, 0.0, 700.0)],
+            dt=today, partner=self.partner_a, ref="NoGrp",
+        )
+        lines = self.env["custom.report.profit.loss"]._build_lines(self._filters())
+        revenue = next(l for l in lines if l.get("label") == "Revenue")
+        self.assertFalse(revenue.get("subgroups"))
+        self.assertEqual([a["account_code"] for a in revenue["accounts"]], ["41000"])
+
+    # ------------------------------------------------------------------
+    # 21) Profit & Loss by Branch: one column per Operating Unit; untagged
+    #     journal items fall back to the head-office column.
+    # ------------------------------------------------------------------
+    def test_profit_loss_branch_columns_and_residual(self):
+        sales = self._seed_grouped_pl()
+        # Name the branch plan through the documented hook so the test does not
+        # collide with whatever plan the host database already calls its own.
+        plan = self.env["account.analytic.plan"].create({"name": "Branch Test Plan"})
+        self.env["ir.config_parameter"].sudo().set_param(
+            "custom_accounting_reports.branch_plan_name", plan.name
+        )
+        store = self.env["account.analytic.account"].create(
+            {"name": "Store One", "plan_id": plan.id, "company_id": self.company.id}
+        )
+        move = self._post_move(
+            [(self.acc_cash, 200.0, 0.0), (sales, 0.0, 200.0)],
+            dt=date.today(), ref="G-branch",
+        )
+        move.line_ids.filtered(lambda l: l.account_id == sales).analytic_distribution = {
+            str(store.id): 100.0
+        }
+
+        report = self.env["custom.report.profit.loss.branch"]
+        self.assertEqual(
+            [c["field"] for c in report._xlsx_columns()],
+            ["account_code", "account_name", "hq", "ou_%s" % store.id],
+        )
+
+        lines = report._build_lines(self._filters())
+        revenue = next(l for l in lines if l.get("label") == "Total Revenue")
+        self.assertAlmostEqual(revenue["ou_%s" % store.id], 200.0, places=2)
+        # The untagged 1_000 sale is reported under the head office.
+        self.assertAlmostEqual(revenue["hq"], 1000.0, places=2)
+
+    def test_profit_loss_wizard_opens_branch_variant(self):
+        """The by-branch report rides on the P&L wizard — it owns no table."""
+        wizard = self.env["custom.report.profit.loss.wizard"].create({})
+        action = wizard.action_view_by_branch()
+        self.assertEqual(action["tag"], "custom_report_table")
+        self.assertEqual(action["params"]["report_code"], "profit_loss_branch")
+        # Same filters as the plain P&L view.
+        self.assertEqual(action["params"]["options"], wizard._report_options())
+        self.assertFalse(
+            self.env["custom.report.profit.loss.branch"]._auto,
+            "The by-branch report must stay an AbstractModel (no table).",
+        )
+
+    # ------------------------------------------------------------------
+    # 22) Aged reports: per-document detail is the default, and the
+    #     headers name the document and its control account.
+    # ------------------------------------------------------------------
+    def test_aged_detail_headers(self):
+        payable = self.env["custom.report.aged.payable"].with_context(aging_detail=True)
+        headers = [c["header"] for c in payable._xlsx_columns()]
+        self.assertEqual(headers[1:3], ["Bill Number", "Bill Reference"])
+        self.assertEqual(headers[6], "Payable Account")
+
+        receivable = self.env["custom.report.aged.receivable"].with_context(aging_detail=True)
+        headers = [c["header"] for c in receivable._xlsx_columns()]
+        self.assertEqual(headers[1], "Invoice Number")
+        self.assertEqual(headers[6], "Receivable Account")
+
+    def test_aged_wizards_default_to_detail(self):
+        for model in (
+            "custom.report.aged.payable.wizard",
+            "custom.report.aged.receivable.wizard",
+        ):
+            wizard = self.env[model].create({})
+            self.assertEqual(wizard.detail_mode, "detail")
+            self.assertTrue(wizard._report_context_extra()["aging_detail"])
+
+    def test_aged_screen_table_renders(self):
+        """The on-screen flattener must cope with the aging dict payload."""
+        options = {
+            "date_from": "1970-01-01",
+            "date_to": date.today().isoformat(),
+            "company_ids": [self.company.id],
+            "posted_only": True,
+        }
+        table = self.env["custom.report.aged.payable"].get_report_table(
+            options, {"aging_detail": True}
+        )
+        self.assertTrue(table["columns"])
+        self.assertEqual(table["lines"][-1]["type"], "grand_total")

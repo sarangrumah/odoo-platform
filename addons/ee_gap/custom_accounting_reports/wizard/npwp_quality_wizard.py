@@ -7,7 +7,9 @@ from odoo.exceptions import UserError
 
 class NpwpQualityWizard(models.TransientModel):
     _name = "custom.report.npwp.quality.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Data Quality NPWP/NIK Wizard"
+    _report_code = "npwp_quality"
 
     date_from = fields.Date(
         string="Masa Dari",

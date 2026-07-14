@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class AgedReceivableWizard(models.TransientModel):
     _name = "custom.report.aged.receivable.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Aged Receivable Wizard"
+    _report_code = "aged_receivable"
 
     date_to = fields.Date(
         string="As Of",
@@ -23,12 +25,15 @@ class AgedReceivableWizard(models.TransientModel):
             ("summary", "Summary (per partner)"),
             ("detail", "Detail (per document)"),
         ],
-        string="Excel Detail",
-        default="summary",
+        string="Detail Level",
+        default="detail",
         required=True,
-        help="Detail = one row per open document (the PDF always prints the "
-        "per-partner summary).",
+        help="Detail = one row per open document, with its invoice number and "
+        "receivable account (the PDF always prints the per-partner summary).",
     )
+
+    def _report_context_extra(self):
+        return {"aging_detail": self.detail_mode == "detail"}
 
     def _build_filters(self):
         self.ensure_one()

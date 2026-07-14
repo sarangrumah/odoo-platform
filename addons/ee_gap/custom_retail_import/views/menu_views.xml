@@ -26,4 +26,8 @@
     <menuitem id="menu_retail_import_feeds" name="Import Feeds"
               parent="menu_retail_import_config"
               action="action_retail_import_feed" sequence="20"/>
+
+    <menuitem id="menu_retail_import_mailboxes" name="Mailboxes"
+              parent="menu_retail_import_config"
+              action="action_retail_import_mailbox" sequence="30"/>
 </odoo>

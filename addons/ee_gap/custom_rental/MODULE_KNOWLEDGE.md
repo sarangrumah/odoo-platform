@@ -1,91 +1,83 @@
 ---
 status: draft
-generated_at: 2026-05-20T18:39:01Z
+generated_at: 2026-07-02T08:10:48Z
 generator: bootstrap-v1
 module: custom_rental
-manifest_version: 19.0.0.2.0
+manifest_version: 19.0.0.3.0
 ---
 
 # custom_rental
 
 ## Purpose
-Provides the end-to-end lifecycle for **asset-based equipment rental**: an inventory of rentable physical assets (`rental.asset`), per-product multi-tier pricing (`custom.rental.pricing`), a workflow-driven rental order (`rental.order`) with overlap protection, late-fee cron accrual, BAST (handover) integration, customer e-signature capture, stock picking generation, and a customer portal for self-service viewing/signing.
-
-It is the canonical rental module in the platform — anything related to renting a single, serialisable, returnable physical asset to a customer for a date window should live here or extend here.
+This module manages the lifecycle of asset rentals: rentable products with per-period pricing tiers, a calendar-friendly schedule, BAST handover documents, late-fee accrual, an internal asset-loan flow, and customer portal access with signature capture. Fees (rental fee, late penalty, cumulative late-fee total, total due) are only **computed and displayed** — the module creates **no** `account.move` / invoice. The `account` dependency is declared in the manifest but no accounting/invoicing logic exists here.
 
 ## Business Flow
-- A manager registers a rentable asset on `rental.asset` (state `available`), optionally linked to a `product.product` for stock integration, with `daily_rate` and `deposit_amount`.
-- A product manager configures `custom.rental.pricing` tiers (hour/day/week/month @ price) on `product.template` (gated by `is_rentable`).
-- A user creates a `rental.order` in `draft`; sequence `rental.order` assigns the `name`. If `daily_rate` is empty it is auto-copied from the asset on create.
-- `action_confirm()` enforces draft→`confirmed`, writes a `pdp.audited.mixin` audit entry, and (if `custom_rental.config_stock_integration` is enabled and the asset has a `product_id`) creates an outbound `stock.picking` via `_create_stock_picking('outgoing')`.
-- `_check_overlap()` constraint blocks any other `confirmed`/`picked_up` order on the same `asset_id` for an intersecting `[pickup_dt, return_dt_expected)` window.
-- `action_pickup()` moves `confirmed`→`picked_up`, flips `rental.asset.state` to `on_rent`.
-- A daily cron iterates `picked_up` orders past `return_dt_expected` and appends a `custom.rental.late.fee.line` row per day, bumping `late_fee_total` (one row per `(order_id, accrued_on)`).
-- `action_return()` moves `picked_up`→`returned`, stamps `return_dt_actual = now()`, flips asset back to `available`, recomputes `days_actual` / `rental_fee` / `late_penalty` (50% surcharge on overrun days, distinct from cron `late_fee_total`), and creates an inbound `stock.picking`.
-- `action_cancel()` is allowed from any state except `returned`; releases asset if it was `on_rent`.
-- The portal lets the customer view `/my/rentals`, download the rental contract PDF (`custom_rental.action_report_rental_contract`), and POST a base64 signature to `/my/rentals/<id>/sign` which writes `customer_signature`, `customer_signed_by`, `customer_signed_at`.
-- BAST documents are attached via `bast_pickup_id` / `bast_return_id` (provided by `custom_bast`). They are created with directional parties — pickup: `party_from_id = company`, `party_to_id = customer`; return: reversed — and `reference = "rental.order,<id>"`; the document `name` is auto-assigned by the `custom.bast.document` ir.sequence (not set manually here).
-- `custom.rental.schedule` exposes a read-only SQL view for calendar/Gantt UIs, computing a derived `late` pseudo-state when `picked_up` runs past `return_dt_expected`.
+1. **Order creation:**
+   - A `rental.order` is created selecting either an `asset_id` (single-serial mode, requires `qty=1`) or a `product_id` (bulk-by-qty mode) — exactly one, enforced by `_check_rental_mode`.
+   - Details include `pickup_dt`, `return_dt_expected`, `qty`, optional `loan_qty` (spare/loan units, not billed), `daily_rate`, and `late_fee_rate`.
+
+2. **Order confirmation (`action_confirm`):**
+   - State moves `draft` → `confirmed`.
+   - An outgoing `stock.picking` is created via `_create_stock_picking("outgoing")` when stock integration is enabled (config param `custom_rental.config_stock_integration`, default True). In internal-loan mode this is an internal Stock → On-Loan transfer instead.
+
+3. **Pickup (`action_pickup`):**
+   - State `confirmed` → `picked_up`; the linked `rental.asset` is set to `on_rent`.
+   - A pickup BAST may be generated (`action_generate_bast_pickup`).
+
+4. **Return (`action_return`):**
+   - State `picked_up` → `returned`; `return_dt_actual` stamped; asset set back to `available`.
+   - An incoming picking is created; a return BAST may be generated.
+   - `action_validate_loan_return` verifies loan quantity came back in full and (for serial products) that the exact dispatched serials returned.
+
+5. **Late-fee accrual:**
+   - `_cron_accrue_late_fees()` exists to accrue one `custom.rental.late.fee.line` per day per overdue `picked_up` order and grow `late_fee_total`.
+   - **IMPORTANT:** No `ir.cron` record is shipped. `data/cron_data.xml` is an empty placeholder ("original data file missing... generated by demo-bootstrap to allow module install"). As shipped, nothing runs this method daily — only the test suite invokes it.
+
+6. **Customer portal:**
+   - Customers view rentals via the portal and can capture a signature (`action_capture_signature`).
 
 ## Key Models
-- `rental.asset` — Physical rentable unit; tracks `state` (available/on_rent/maintenance/retired), `daily_rate`, `deposit_amount`, optional link to `product.product` for stock moves.
-- `rental.order` — The transactional record; one asset, one customer, one date window. Inherits `mail.thread`, `mail.activity.mixin`, `pdp.audited.mixin` (classification `financial`).
-- `custom.rental.pricing` — Per-`product.template` pricing tier (duration × unit × price). Multiple tiers per product; `_get_rental_price` picks the cheapest combination.
-- `custom.rental.late.fee.line` — Daily accrual audit row written by the late-fee cron; uniqueness `(order_id, accrued_on)`.
-- `custom.rental.schedule` — `_auto=False` SQL view over `rental_order` for calendar/Gantt; aliases `order_id` as `line_id` reserved for future multi-line support.
-- `product.template` (inherited) — Adds `is_rentable` flag and `rental_pricing_ids`.
-- `res.config.settings` (inherited) — Holds `rental_stock_integration` and `rental_default_late_fee_rate` ir.config_parameters.
+- `rental.order` — Top-level rental agreement. `_inherit`s `mail.thread`, `mail.activity.mixin`, `pdp.audited.mixin`. Holds partner, asset/product, quantities, dates, computed fees, BAST links, picking links, signature, and internal-loan config.
+- `rental.asset` (`_name="rental.asset"`, inherits `mail.thread`, `mail.activity.mixin`) — Serial-tracked rentable unit. State machine `available` / `on_rent` / `maintenance` / `retired`. Fields: `name`, `code` (unique), `product_id`, `serial_number`, `daily_rate`, `deposit_amount`. Central to serial-mode rentals; `create()` on the order copies `daily_rate`/`deposit_amount` from the asset.
+- `custom.rental.pricing` — Per-period pricing tier attached to `product.template` (`product_template_id`). Fields: `duration` (Integer), `unit` (Selection hour/day/week/month), `price` (Monetary), `currency_id`, `active`, computed `name`. Multiple tiers co-exist; quoting picks the cheapest combination.
+- `custom.rental.schedule` — Read-only SQL view (`_auto=False`), one row per rental.order, for calendar/kanban/list. Fields: `name`, `order_id`, `line_id`, `product_id`, `asset_id`, `partner_id`, `date_start` (=`pickup_dt`), `date_stop` (=`return_dt_expected`), `state`.
+- `custom.rental.late.fee.line` — Audit row, one per day per overdue order (unique `(order_id, accrued_on)`). Fields: `accrued_on`, `days_overdue`, `rate`, `base_amount`, `fee_amount`, `currency_id`, `note`.
 
 ## Important Fields
-- `rental.order.state` (Selection: draft/confirmed/picked_up/returned/cancelled) — drives the entire workflow; transitions guarded by `action_*` raising `UserError`.
-- `rental.order.asset_id` (M2o `rental.asset`, domain excludes retired) — the rented unit; overlap constraint pivots on this.
-- `rental.order.pickup_dt` / `return_dt_expected` / `return_dt_actual` (Datetime) — booking window; `return_dt_actual` is stamped automatically by `action_return`.
-- `rental.order.days_planned` / `days_actual` (Float, computed, stored) — clamped to minimum 1.0 day; the divisor is 86400 seconds.
-- `rental.order.rental_fee` / `late_penalty` / `total_due` (Monetary, computed) — `late_penalty` uses a hardcoded **50% surcharge** on overrun days; `total_due` sums all three including cron-accrued `late_fee_total`.
-- `rental.order.late_fee_rate` (Float, default from `custom_rental.default_late_fee_rate`) — per-day percentage used by the accrual cron.
-- `rental.order.late_fee_total` (Monetary, readonly) — cumulative cron-driven late fee, distinct from compute-time `late_penalty`.
-- `rental.order.bast_pickup_id` / `bast_return_id` (M2o `custom.bast.document`) — handover documents, filtered by `kind`.
-- `rental.order.customer_signature` (Binary) + `customer_signed_by` (Char) + `customer_signed_at` (Datetime) — portal-captured e-signature.
-- `rental.order.pickup_picking_id` / `return_picking_id` (M2o `stock.picking`, readonly) — auto-generated stock moves.
-- `rental.asset.state` (Selection: available/on_rent/maintenance/retired) — kept in sync with order workflow via `sudo()` writes.
-- `custom.rental.pricing.unit` (Selection: hour/day/week/month) — combined with `duration` via `UNIT_TO_HOURS` (month = 30 days).
+- `rental.order.state` (Selection: `draft` / `confirmed` / `picked_up` / `returned` / `cancelled`): lifecycle state.
+- `rental.order.daily_rate` (Monetary), `late_fee_rate` (Float, % per day, default from config param `custom_rental.default_late_fee_rate` = 10.0).
+- `rental.order.is_internal_loan` (Boolean) + `on_loan_location_id` (Many2one stock.location, internal): internal-loan mode moves the unit Stock ↔ On-Loan with no COGS/valuation impact. Enabling `is_internal_loan` requires `on_loan_location_id` (constraint `_check_rental_mode`).
+- `rental.order.loan_qty` (Integer): spare/loan units shipped alongside; excluded from billing; must return in full.
+- `custom.rental.pricing.duration` (Integer): a count expressed in the sibling `unit` field, NOT hours. `_hours()` converts it via `UNIT_TO_HOURS[unit]` (hour=1, day=24, week=168, month=720).
+- `custom.rental.schedule.state`: computed in SQL — a `picked_up` order past its expected return is reported as `late`, a state that exists only on the schedule view and not on `rental.order.state`.
 
 ## Public Methods
-- `rental.order.action_confirm()` — draft→confirmed, audit log, creates outbound `stock.picking`.
-- `rental.order.action_pickup()` — confirmed→picked_up, flips asset to `on_rent`.
-- `rental.order.action_return()` — picked_up→returned, stamps `return_dt_actual`, frees asset, creates inbound picking.
-- `rental.order.action_cancel()` — any non-returned state→cancelled, releases asset if it was on rent.
-- `rental.order._create_stock_picking(direction)` — internal helper, returns False silently if integration disabled, no `product_id`, or no matching picking type/locations.
-- `rental.order._stock_integration_enabled()` — reads `custom_rental.config_stock_integration` ir.config_parameter.
-- `rental.order._pdp_audit_classification()` — returns `"financial"` for PDP audit routing.
-- `custom.rental.pricing._get_rental_price(product, start_dt, end_dt, currency=None)` (`@api.model`) — quoting helper; accepts `product.product` or `product.template`; greedily fills with largest tier, falls back to smallest tier for leftover hours.
-- `custom.rental.pricing._hours()` — converts (duration, unit) → hours via `UNIT_TO_HOURS`.
-- Portal: `/my/rentals`, `/my/rentals/<id>`, `/my/rentals/<id>?report_type=pdf`, `/my/rentals/<id>/sign` (JSON).
+- `rental.order.action_confirm()`: draft → confirmed; writes PDP audit; creates the outgoing picking.
+- `rental.order.action_pickup()` / `action_return()` / `action_cancel()`: state transitions with asset-state side effects.
+- `rental.order.action_validate_loan_return()`: enforces loan-qty return and calls `_check_returned_serials()` (serial-for-serial match on serial-tracked products).
+- `rental.order.action_generate_bast_pickup()` / `action_generate_bast_return()`: create `custom.bast.document` handover records.
+- `rental.order._cron_accrue_late_fees()`: `@api.model` accrual routine (see gotcha — not wired to any cron).
+- `custom.rental.pricing._get_rental_price(self, product, start_dt, end_dt, currency=None)`: `@api.model`. First positional arg is the **product** (product.product or product.template); returns the total price using the cheapest tier combination for the `start_dt`→`end_dt` span.
 
 ## Integration Points
-- **Depends on:** `custom_core`, `custom_pdp_audit`, `custom_bast`, `mail`, `portal`, `product`, `stock`, `account`.
-- **Inherits from:** `product.template` (adds `is_rentable`, `rental_pricing_ids`), `res.config.settings` (adds rental config params), `mail.thread` + `mail.activity.mixin` + `pdp.audited.mixin` (on `rental.order` and `rental.asset`), `portal.CustomerPortal`.
-- **Extended by:** typically vertical-specific rental modules (e.g. drone rental, prorata billing variants) — none declared in this manifest but the `line_id` alias in `custom.rental.schedule` is an explicit hook for future multi-line rental.
-- **External calls:** none.
-- **Cross-vertical:** generic asset-rental capability; not vertical-locked.
-- **Account module:** declared as dependency but no `account.move` / invoice generation is implemented here — `total_due` is computed but never posted to accounting.
+- **Depends on:** custom_core, custom_pdp_audit, custom_bast, mail, portal, product, stock, account.
+- **Inherits / extends:**
+  - `product.template` — adds `is_rentable`, `rental_pricing_ids`.
+  - `custom.bast.line` — adds `is_loan`.
+  - `stock.move` — adds `is_loan` (flags loan/cadangan moves).
+  - `res.config.settings` — adds `rental_stock_integration` and `rental_default_late_fee_rate` config params.
+  - `rental.order` itself mixes in `mail.thread`, `mail.activity.mixin`, `pdp.audited.mixin`.
+- **Extended by:** None.
+- **External calls:** None.
 
 ## Gotchas
-- **No invoicing.** `account` is in depends but the module never creates an `account.move`. `total_due` is a display value only. Any BRD requiring rental invoicing needs a new module or extension.
-- **Hardcoded 50% late surcharge** in `_compute_fees` (`late_penalty = daily_rate * late_days * 0.5`). Not configurable.
-- **Two parallel late-fee mechanisms** that both feed `total_due`: the compute-time `late_penalty` (only relevant after `return_dt_actual` is set) and the cron-time `late_fee_total` (accrues while still `picked_up`). They are additive and can double-charge if both apply post-return — review before relying on either.
-- **`UNIT_TO_HOURS` treats a month as 30 days** flat; no calendar-aware month math.
-- **`days_planned` / `days_actual` clamp to `max(1.0, ...)`** — a same-day return still bills a full day.
-- **Overlap check uses `sudo().search`** and ignores `cancelled`/`returned` orders; multi-company isolation relies on `company_id` being set on records, not on the search domain.
-- **Stock picking creation is best-effort and silent**: if no picking type or no `product_id` on the asset, `_create_stock_picking` returns False with no warning. `pickup_picking_id` / `return_picking_id` may stay empty.
-- **`rental.order.name` fallback is `"RNT-???"`** if the `rental.order` sequence is missing — this will appear in production data if the sequence XML data file is not loaded.
-- **Portal signature endpoint stores raw base64** (strips the `data:image/...;base64,` prefix); validated only with `base64.b64decode(..., validate=True)`, no size/format limit.
-- **`custom.rental.schedule` `late` state is view-computed**, not stored on `rental.order` — filters on `rental.order.state` will never see `'late'`.
-- **`bast_pickup_id` / `bast_return_id` are M2o but the workflow does not auto-create the BAST** — must be set manually or by an extension.
+- **No late-fee cron is wired.** `_cron_accrue_late_fees()` exists but `data/cron_data.xml` defines no `ir.cron`; accrual never runs automatically in a shipped install — only tests call it.
+- Internal asset-loan mode requires `on_loan_location_id`; the constraint raises otherwise.
+- Serial-mode return runs a serial-for-serial check (`_check_returned_serials`) — missing or substituted serials block validation.
+- `custom.rental.schedule.state` has a `late` value not present on `rental.order.state`; do not treat the two selections as identical.
+- Fees are computed only; there is no invoice/journal creation despite the `account` dependency.
 
 ## Out of Scope
-- **Rental invoicing / billing posting** — no `account.move` is created; `total_due` is informational.
-- **Deposit handling beyond storage** — `deposit_amount` is captured but never reserved, invoiced, or refunded.
-- **Multi-line / multi-asset orders** — one order = one asset. The `line_id` alias in the schedule view hints at future support but is not implemented.
-- **Calendar-accurate periods** — month/week conversions are fixed (30/7 days).
-- **Maintenance scheduling**
+- Multi-line rentals: each order is a single line (the schedule view keeps a `line_id` alias reserved for future multi-line support).
+- Customizable pricing tiers by customer segment or time of day: pricing tiers are fixed per product template.
+- Accounting/invoicing: no `account.move` is created; only computed fee display.

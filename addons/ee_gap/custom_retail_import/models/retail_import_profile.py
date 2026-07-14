@@ -33,6 +33,26 @@ _logger = logging.getLogger(__name__)
 # era_busana X101 extractor.
 _ENCODING_REPL = {"�": "®"}
 
+# Spreadsheet error sentinels. openpyxl is opened with data_only=True, so a
+# cached =VLOOKUP/=MATCH error cell yields the literal string (e.g. "#N/A")
+# instead of a value. Left unscrubbed these leak into category names, product
+# names, SKUs and barcodes (a real product.category literally named "#N/A" was
+# observed). Treat them as empty so downstream blank-handling / validation kicks
+# in. Matched case-insensitively against the whole stripped cell.
+_ERROR_SENTINELS = frozenset(
+    {
+        "#N/A",
+        "N/A",
+        "#REF!",
+        "#VALUE!",
+        "#DIV/0!",
+        "#NAME?",
+        "#NUM!",
+        "#NULL!",
+        "NULL",
+    }
+)
+
 FILE_TYPES = [
     ("x101", "X101 — Material Master (products)"),
     ("x20", "X20 — Current On-hand Inventory"),
@@ -64,24 +84,17 @@ class RetailImportProfile(models.Model):
     sequence = fields.Integer(default=10)
     code = fields.Char(required=True, index=True, help="Stable identifier, e.g. 'levis_x101'.")
     file_type = fields.Selection(FILE_TYPES, required=True, index=True)
-    company_id = fields.Many2one(
-        "res.company", string="Company", default=lambda s: s.env.company, required=True
-    )
+    company_id = fields.Many2one("res.company", string="Company", default=lambda s: s.env.company, required=True)
     active = fields.Boolean(default=True)
     namespace = fields.Char(
         default="retail_import",
         required=True,
-        help="ir.model.data module namespace for external IDs (idempotency). "
-        "Use a per-tenant value, e.g. 'levis'.",
+        help="ir.model.data module namespace for external IDs (idempotency). Use a per-tenant value, e.g. 'levis'.",
     )
 
     # --- source format ---
-    file_format = fields.Selection(
-        [("xlsx", "Excel (.xlsx)"), ("csv", "CSV")], default="xlsx", required=True
-    )
-    sheet_name = fields.Char(
-        help="For xlsx: sheet to read. Empty = active/first sheet."
-    )
+    file_format = fields.Selection([("xlsx", "Excel (.xlsx)"), ("csv", "CSV")], default="xlsx", required=True)
+    sheet_name = fields.Char(help="For xlsx: sheet to read. Empty = active/first sheet.")
     data_start_row = fields.Integer(
         default=2,
         required=True,
@@ -99,7 +112,7 @@ class RetailImportProfile(models.Model):
     column_map_json = fields.Text(
         required=True,
         default="{}",
-        help='JSON object mapping logical field name -> 1-based column index, e.g. '
+        help="JSON object mapping logical field name -> 1-based column index, e.g. "
         '{"product_code": 2, "description": 3, "sku": 10}. Indices are 1-based to '
         "match spreadsheet column letters (A=1).",
     )
@@ -111,9 +124,7 @@ class RetailImportProfile(models.Model):
     )
     decimal_separator = fields.Char(default=".", size=1)
     thousand_separator = fields.Char(default=",", size=1)
-    fix_encoding = fields.Boolean(
-        default=True, help="Restore U+FFFD -> '®' on all string cells (X101 quirk)."
-    )
+    fix_encoding = fields.Boolean(default=True, help="Restore U+FFFD -> '®' on all string cells (X101 quirk).")
 
     sample_file = fields.Binary(string="Sample File", attachment=True)
     sample_filename = fields.Char()
@@ -136,10 +147,7 @@ class RetailImportProfile(models.Model):
             try:
                 out[k] = int(v)
             except (TypeError, ValueError):
-                raise UserError(
-                    _("Profile %s column_map: index for %r must be an integer, got %r")
-                    % (self.code, k, v)
-                )
+                raise UserError(_("Profile %s column_map: index for %r must be an integer, got %r") % (self.code, k, v))
         return out
 
     # ------------------------------------------------------------------
@@ -152,7 +160,10 @@ class RetailImportProfile(models.Model):
         if self.fix_encoding:
             for k, v in _ENCODING_REPL.items():
                 s = s.replace(k, v)
-        return s.strip()
+        s = s.strip()
+        if s.upper() in _ERROR_SENTINELS:
+            return ""
+        return s
 
     def _parse_amount(self, raw: Any) -> Decimal:
         if raw is None or raw == "":

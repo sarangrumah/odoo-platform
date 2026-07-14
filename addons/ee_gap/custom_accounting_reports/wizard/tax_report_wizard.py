@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class TaxReportWizard(models.TransientModel):
     _name = "custom.report.tax.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Tax Report Wizard"
+    _report_code = "tax"
 
     date_from = fields.Date(
         required=True,

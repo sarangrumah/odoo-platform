@@ -9,6 +9,40 @@
 CREATE SCHEMA IF NOT EXISTS pdp;
 COMMENT ON SCHEMA pdp IS 'Personal Data Protection (UU 27/2022) — audit, consent, retention';
 
+-- ----- Idempotent migration: converge pre-existing tables to current schema -----
+-- Older DBs bootstrapped audit_log with action VARCHAR(16) + a closed-enum CHECK.
+-- CREATE TABLE IF NOT EXISTS below never migrates an existing table, so widen the
+-- column and swap the stale enum CHECK for the current regex CHECK in place. This
+-- block is a no-op on a fresh DB (table absent) and on an already-current DB.
+DO $pdp_mig$
+BEGIN
+  IF to_regclass('pdp.audit_log') IS NOT NULL THEN
+    -- Views reference action and would block the type change; drop and let the
+    -- rest of this script (pdp.audit_log_v) and Odoo (public.pdp_audit_log,
+    -- an _auto=False model view rebuilt on registry load) recreate them.
+    DROP VIEW IF EXISTS public.pdp_audit_log;
+    DROP VIEW IF EXISTS pdp.audit_log_v;
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'pdp' AND table_name = 'audit_log'
+        AND column_name = 'action' AND character_maximum_length < 64
+    ) THEN
+      ALTER TABLE pdp.audit_log ALTER COLUMN action TYPE varchar(64);
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = 'pdp.audit_log'::regclass
+        AND conname = 'audit_log_action_check'
+        AND pg_get_constraintdef(oid) NOT LIKE '%~%'
+    ) THEN
+      ALTER TABLE pdp.audit_log DROP CONSTRAINT audit_log_action_check;
+      ALTER TABLE pdp.audit_log
+        ADD CONSTRAINT audit_log_action_check CHECK (action ~ '^[a-z][a-z0-9_]{1,63}$');
+    END IF;
+  END IF;
+END
+$pdp_mig$;
+
 -- ----- Audit log table (append-only, hash-chained) -----
 CREATE TABLE IF NOT EXISTS pdp.audit_log (
   id              BIGSERIAL    PRIMARY KEY,

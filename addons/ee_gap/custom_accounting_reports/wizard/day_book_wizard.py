@@ -11,7 +11,12 @@ from odoo import fields, models
 
 class DayBookWizard(models.TransientModel):
     _name = "custom.report.day.book.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Day / Cash / Bank Book / Journal Audit Wizard"
+
+    def _report_code_for_view(self):
+        # One wizard serves four reports, selected by ``book_type``.
+        return self.book_type
 
     book_type = fields.Selection(
         selection=[

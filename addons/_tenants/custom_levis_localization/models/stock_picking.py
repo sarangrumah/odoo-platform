@@ -1,11 +1,26 @@
 # -*- coding: utf-8 -*-
-from odoo import _, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_compare
 
 
 class StockPicking(models.Model):
     _inherit = "stock.picking"
+
+    # Trade / Non-Trade stream of the source PO (feature #9); read by the GR
+    # valuation poster to route the GR/IR clearing account.
+    l10n_purchase_type = fields.Selection(
+        [("trade", "Trade"), ("non_trade", "Non-Trade")],
+        string="Purchase Type",
+        compute="_compute_l10n_purchase_type",
+        store=True,
+    )
+
+    @api.depends("purchase_id.l10n_purchase_type", "move_ids.purchase_line_id")
+    def _compute_l10n_purchase_type(self):
+        for picking in self:
+            orders = picking._levis_purchase_orders()
+            picking.l10n_purchase_type = orders[:1].l10n_purchase_type or False
 
     def _levis_purchase_orders(self):
         """Purchase order(s) this receipt is linked to.

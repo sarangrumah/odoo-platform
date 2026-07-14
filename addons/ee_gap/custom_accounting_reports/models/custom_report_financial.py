@@ -158,6 +158,16 @@ class CustomReportFinancialRenderer(models.AbstractModel):
     _report_code = "financial"
     _report_title = "Financial Report"
 
+    def _xlsx_columns(self):
+        # Lines produced by ``custom.report.financial._flatten`` key on
+        # ``code`` / ``label`` / ``signed_balance`` and carry ``level``, so
+        # the engine's default (level-aware) flattener renders them as-is.
+        return [
+            {"header": "Code", "field": "code", "kind": "text", "width": 16},
+            {"header": "Account", "field": "label", "kind": "text", "width": 46},
+            {"header": "Balance", "field": "signed_balance", "kind": "number", "width": 20},
+        ]
+
     def _build_lines(self, filters):
         report_id = filters.get("financial_report_id")
         if not report_id:

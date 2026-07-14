@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models
+from odoo import _, fields, models
+from odoo.exceptions import UserError
 
 
 class CustomFixedAssetDepreciationLine(models.Model):
@@ -32,6 +33,13 @@ class CustomFixedAssetDepreciationLine(models.Model):
         copy=False,
         help="Set once the journal entry has been booked to the GL.",
     )
+    reversed = fields.Boolean(
+        default=False,
+        copy=False,
+        help="Set when the posted depreciation has been reversed. A reversed "
+        "line is excluded from the accumulated depreciation / NBV and is not "
+        "re-posted by the schedule.",
+    )
     move_id = fields.Many2one(
         comodel_name="account.move",
         string="Journal Entry",
@@ -47,3 +55,28 @@ class CustomFixedAssetDepreciationLine(models.Model):
             if line.posted:
                 continue
             line.asset_id._post_due_depreciation(as_of=line.date)
+
+    def action_reverse(self):
+        """Reverse a posted depreciation line.
+
+        Books a reversing journal entry (Dr Accum. / Cr Expense) for the linked
+        move, marks the line reversed and un-posted so the accumulated
+        depreciation drops out and the asset NBV recomputes (feedback Accounting
+        #4/#19). The line is NOT re-posted by the schedule afterwards.
+        """
+        for line in self:
+            if not line.posted:
+                raise UserError(
+                    _("Depreciation line #%(seq)s is not posted; nothing to reverse.",
+                      seq=line.sequence)
+                )
+            move = line.move_id
+            if move and move.state == "posted":
+                # Full reversal reconciled against the original entry.
+                move._reverse_moves(
+                    [{"date": fields.Date.context_today(line), "ref": _(
+                        "Reversal of Depreciation %(code)s #%(seq)s",
+                        code=line.asset_id.code, seq=line.sequence)}],
+                    cancel=True,
+                )
+            line.write({"posted": False, "reversed": True})

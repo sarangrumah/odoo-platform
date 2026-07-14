@@ -6,7 +6,7 @@
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Custom Platform/Compliance/PDP",
-    "version": "19.0.0.2.0",
+    "version": "19.0.0.1.1",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_core"],
     "capability_tags": ["pdp", "audit-trail", "compliance"],
