@@ -72,7 +72,7 @@ print("  has full accounting (account_user): %s" % new_user.has_group("account.g
 
 if CREATE_COMMIT:
     env.cr.commit()
-    print("\nCOMMITTED. Temporary password set to: %s" % TEMP_PASSWORD)
+    print("\nCOMMITTED. Temporary password set (see the TEMP_PASSWORD knob above).")
 else:
     # roll back the in-memory create so preview leaves nothing behind
     env.cr.rollback()
