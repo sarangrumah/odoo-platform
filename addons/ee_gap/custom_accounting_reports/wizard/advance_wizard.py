@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class AdvanceWizard(models.TransientModel):
     _name = "custom.report.advance.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Uang Muka / Down Payment Wizard"
+    _report_code = "advance"
 
     date_from = fields.Date(
         required=True,

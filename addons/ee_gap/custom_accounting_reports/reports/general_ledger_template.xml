@@ -16,6 +16,7 @@
                                 <th>Ref</th>
                                 <th>Partner</th>
                                 <th>Label</th>
+                                <th t-esc="branch_label"/>
                                 <th class="text-end">Debit</th>
                                 <th class="text-end">Credit</th>
                                 <th class="text-end">Balance</th>
@@ -23,7 +24,7 @@
                         </thead>
                         <tbody>
                             <tr class="fw-bold">
-                                <td colspan="6">Opening Balance</td>
+                                <td colspan="7">Opening Balance</td>
                                 <td class="text-end">
                                     <span t-esc="line['opening']"
                                           t-options="{'widget': 'monetary', 'display_currency': currency}"/>
@@ -34,6 +35,7 @@
                                 <td t-esc="ml['ref']"/>
                                 <td t-esc="ml['partner']"/>
                                 <td t-esc="ml['label']"/>
+                                <td t-esc="ml['branch']"/>
                                 <td class="text-end">
                                     <span t-esc="ml['debit']"
                                           t-options="{'widget': 'monetary', 'display_currency': currency}"/>
@@ -48,7 +50,7 @@
                                 </td>
                             </tr>
                             <tr class="table-secondary fw-bold">
-                                <td colspan="4" class="text-end">Total</td>
+                                <td colspan="5" class="text-end">Total</td>
                                 <td class="text-end">
                                     <span t-esc="line['total_debit']"
                                           t-options="{'widget': 'monetary', 'display_currency': currency}"/>

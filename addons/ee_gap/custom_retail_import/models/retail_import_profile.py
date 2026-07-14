@@ -33,6 +33,26 @@ _logger = logging.getLogger(__name__)
 # era_busana X101 extractor.
 _ENCODING_REPL = {"�": "®"}
 
+# Spreadsheet error sentinels. openpyxl is opened with data_only=True, so a
+# cached =VLOOKUP/=MATCH error cell yields the literal string (e.g. "#N/A")
+# instead of a value. Left unscrubbed these leak into category names, product
+# names, SKUs and barcodes (a real product.category literally named "#N/A" was
+# observed). Treat them as empty so downstream blank-handling / validation kicks
+# in. Matched case-insensitively against the whole stripped cell.
+_ERROR_SENTINELS = frozenset(
+    {
+        "#N/A",
+        "N/A",
+        "#REF!",
+        "#VALUE!",
+        "#DIV/0!",
+        "#NAME?",
+        "#NUM!",
+        "#NULL!",
+        "NULL",
+    }
+)
+
 FILE_TYPES = [
     ("x101", "X101 — Material Master (products)"),
     ("x20", "X20 — Current On-hand Inventory"),
@@ -41,6 +61,14 @@ FILE_TYPES = [
     ("x70t", "X70T — Tender Settlement"),
     ("x31", "X31 — Discount Journal (promotions)"),
     ("x32p", "X32P — Stock Movement with Price (reference)"),
+    ("x70", "X70 — Tender Breakdown"),
+    ("x26", "X26 — Shipping"),
+    ("x29", "X29 — Inventory Adjustment"),
+    ("x48", "X48 — Customer Return"),
+    ("x53", "X53 — Return to Vendor (RTV)"),
+    ("x53_ebr", "X53-EBR — Return to Vendor (alternate format)"),
+    ("x21", "X21 — Payment Summary"),
+    ("x25n", "X25N — Receiving"),
     ("coa", "Chart of Accounts"),
     ("store_master", "Store Master / Warehouses"),
     ("company", "Company / Legal Entity"),
@@ -132,7 +160,10 @@ class RetailImportProfile(models.Model):
         if self.fix_encoding:
             for k, v in _ENCODING_REPL.items():
                 s = s.replace(k, v)
-        return s.strip()
+        s = s.strip()
+        if s.upper() in _ERROR_SENTINELS:
+            return ""
+        return s
 
     def _parse_amount(self, raw: Any) -> Decimal:
         if raw is None or raw == "":

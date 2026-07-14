@@ -72,6 +72,7 @@ Every withholding line creation + Faktur Pengganti relink writes to
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
+        "data/config_parameters.xml",
         "data/withholding_category_data.xml",
         "data/withholding_rule_seed.xml",
         "data/dpp_nilai_lain_category_data.xml",

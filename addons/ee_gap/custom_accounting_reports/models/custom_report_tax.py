@@ -66,6 +66,25 @@ class CustomReportTax(models.AbstractModel):
                 sheet.write_number(row, 4, float(line.get("base_amount") or 0.0), fmts["total_num"])
                 sheet.write_number(row, 5, float(line.get("tax_amount") or 0.0), fmts["total_num"])
                 row += 1
+            elif ltype == "reconciliation_header":
+                row += 1  # spacer
+                sheet.merge_range(row, 0, row, 5, line.get("label") or "", fmts["section"])
+                row += 1
+                sheet.merge_range(row, 0, row, 2, "Akun PPN", fmts["header"])
+                sheet.write(row, 3, "Mutasi via Faktur Pajak", fmts["header"])
+                sheet.write(row, 4, "Mutasi Buku Besar", fmts["header"])
+                sheet.write(row, 5, "Selisih", fmts["header"])
+                row += 1
+            elif ltype == "reconciliation":
+                sheet.merge_range(row, 0, row, 2, line.get("account") or "", fmts["text"])
+                sheet.write_number(row, 3, float(line.get("tax_movement") or 0.0), fmts["num"])
+                sheet.write_number(row, 4, float(line.get("gl_movement") or 0.0), fmts["num"])
+                sheet.write_number(row, 5, float(line.get("selisih") or 0.0), fmts["num"])
+                row += 1
+            elif ltype == "reconciliation_total":
+                sheet.merge_range(row, 0, row, 4, line.get("label") or "", fmts["total_text"])
+                sheet.write_number(row, 5, float(line.get("selisih") or 0.0), fmts["total_num"])
+                row += 1
         return row
 
     def _classify(self, tax):
@@ -204,4 +223,59 @@ class CustomReportTax(models.AbstractModel):
                 "tax_amount": total_tax,
             }
         )
+
+        # PPN vs GL reconciliation (TAX-PPN-04). Appended AFTER grand_total so
+        # the category/grand-total invariant (sum of category subtotals ==
+        # grand tax_amount) is untouched.
+        ppn_tax_ids = [t["tax_id"] for cat in ("output", "input") for t in groups.get(cat, {}).get("taxes", [])]
+        lines += self._ppn_reconciliation(filters, ppn_tax_ids)
         return lines
+
+    def _ppn_reconciliation(self, filters, ppn_tax_ids):
+        """Compare each PPN GL account's total period movement against the
+        movement that flowed through the tax mechanism (``tax_line_id``).
+
+        A non-zero *selisih* flags manual/other journal entries hitting the
+        PPN account — the exact thing the tax team must reconcile before
+        filing. In a clean masa every selisih is 0.
+        """
+        if not ppn_tax_ids:
+            return []
+        AML = self.env["account.move.line"]
+        domain = self._base_move_line_domain(filters)
+        acc_rows = AML._read_group(
+            domain=domain + [("tax_line_id", "in", ppn_tax_ids)],
+            groupby=["account_id"],
+            aggregates=["balance:sum"],
+        )
+        tax_by_account = {acc.id: (bal or 0.0) for acc, bal in acc_rows if acc}
+        if not tax_by_account:
+            return []
+        gl = self._sum_by_account(filters, account_domain=[("id", "in", list(tax_by_account))])
+
+        recon = [{"type": "reconciliation_header", "label": "Rekonsiliasi PPN vs Buku Besar"}]
+        total_selisih = 0.0
+        for account_id, tax_mov in sorted(tax_by_account.items()):
+            gl_row = gl.get(account_id, {})
+            gl_mov = gl_row.get("balance", 0.0)
+            selisih = gl_mov - tax_mov
+            total_selisih += selisih
+            code = gl_row.get("account_code") or ""
+            name = gl_row.get("account_name") or ""
+            recon.append(
+                {
+                    "type": "reconciliation",
+                    "account": ("%s %s" % (code, name)).strip(),
+                    "tax_movement": tax_mov,
+                    "gl_movement": gl_mov,
+                    "selisih": selisih,
+                }
+            )
+        recon.append(
+            {
+                "type": "reconciliation_total",
+                "label": "Total Selisih (idealnya 0)",
+                "selisih": total_selisih,
+            }
+        )
+        return recon

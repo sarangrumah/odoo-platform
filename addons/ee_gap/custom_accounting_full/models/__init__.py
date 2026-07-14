@@ -19,3 +19,6 @@ from . import match_policy
 from . import match_result
 from . import match_line_result
 from . import account_move_match
+
+# v0.3.0 — vendor bill reference uniqueness (hard block on duplicate)
+from . import account_move_bill_ref

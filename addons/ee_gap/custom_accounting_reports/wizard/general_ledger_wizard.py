@@ -8,7 +8,9 @@ from ..models.custom_report_general_ledger import GL_OPTIONAL_COLUMNS
 
 class GeneralLedgerWizard(models.TransientModel):
     _name = "custom.report.general.ledger.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "General Ledger Wizard"
+    _report_code = "general_ledger"
 
     date_from = fields.Date(
         required=True,
@@ -58,6 +60,13 @@ class GeneralLedgerWizard(models.TransientModel):
         """Return the list of enabled optional flat-column keys."""
         self.ensure_one()
         return [key for key in GL_OPTIONAL_COLUMNS if getattr(self, "show_%s" % key)]
+
+    def _report_context_extra(self):
+        """On-screen GL always uses the flat layout (a per-account nested
+        table does not map to a single column set); honour the user's
+        optional-column selection."""
+        self.ensure_one()
+        return {"gl_layout": "flat", "gl_columns": self._selected_columns()}
 
     def _build_filters(self):
         self.ensure_one()

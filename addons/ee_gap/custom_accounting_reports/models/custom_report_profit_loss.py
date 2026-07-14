@@ -1,15 +1,48 @@
 # -*- coding: utf-8 -*-
-"""Profit & Loss: Revenue / COGS / Op Ex / Other / Tax with YTD."""
+"""Profit & Loss down to Total Comprehensive Income.
+
+Sections follow the chart-of-accounts hierarchy (``account.group``), not
+``account_type``. Indonesian charts put every cost-of-sales account under
+prefix ``6`` while typing them plain ``expense``, so an ``account_type``
+split reports a zero COGS and files finance income under Revenue. Grouping
+by account-code prefix is what Finance reconciles against. Databases with no
+``account.group`` fall back to ``account_type``.
+
+Every amount is shown with its natural sign: revenue-nature accounts are
+flipped positive, cost-nature accounts stay positive. The running-profit
+lines therefore add income buckets and subtract cost buckets explicitly
+rather than summing signed balances.
+"""
 
 from datetime import date as date_cls
 
 from odoo import models
 
 
-REVENUE_TYPES = ("income", "income_other")
-COGS_TYPES = ("expense_direct_cost",)
-EXPENSE_TYPES = ("expense",)
-OTHER_TYPES = ("expense_depreciation",)
+INCOME_TYPES = ("income", "income_other")
+
+# GROUP 1 prefix → coarse bucket.
+G1_REVENUE = "5"
+G1_COGS = "6"
+G1_OPEX = "7"
+G1_TAX = "8"
+
+# GROUP 2 prefixes that break out of their GROUP 1 default bucket.
+G2_OTHER_INCOME = ("76", "78")  # other operating income, finance income
+G2_OTHER_EXPENSE = ("77", "79")  # other operating expenses, finance costs
+G2_OCI = ("83",)  # other comprehensive income
+
+# Buckets, in report order. ``income`` flags how the bucket enters the
+# running-profit arithmetic.
+BUCKETS = (
+    ("revenue", "Revenue", True),
+    ("cogs", "Cost of Goods Sold", False),
+    ("opex", "Operating Expenses", False),
+    ("other_income", "Other Income", True),
+    ("other_expense", "Other Expenses", False),
+    ("tax", "Income Tax", False),
+    ("oci", "Other Comprehensive Income", True),
+)
 
 
 class CustomReportProfitLoss(models.AbstractModel):
@@ -38,22 +71,64 @@ class CustomReportProfitLoss(models.AbstractModel):
             section_heading=True,
         )
 
-    def _section(self, label, type_codes, balances, flip_sign):
-        accounts = []
-        subtotal = 0.0
-        for row in balances.values():
-            if row["account_type"] not in type_codes:
-                continue
-            signed = -row["balance"] if flip_sign else row["balance"]
-            accounts.append(dict(row, signed_balance=signed))
-            subtotal += signed
-        accounts.sort(key=lambda r: r["account_code"] or "")
+    def _flatten_for_screen(self, lines, columns):
+        return self._flatten_sectioned(lines, columns, section_heading=True)
+
+    # ------------------------------------------------------------------
+    # Bucketing
+    # ------------------------------------------------------------------
+    def _pl_buckets(self):
+        """``(key, label, is_income)`` in report order — shared with the
+        by-branch variant."""
+        return BUCKETS
+
+    def _signed(self, row):
+        """Revenue-nature accounts carry a credit balance; show them positive."""
+        balance = row["balance"]
+        return -balance if row["account_type"] in INCOME_TYPES else balance
+
+    def _bucket_key(self, row, group):
+        if not group:
+            return self._bucket_key_by_type(row)
+        g1, g2 = group["g1_code"], group["g2_code"]
+        if g1 == G1_REVENUE:
+            return "revenue"
+        if g1 == G1_COGS:
+            return "cogs"
+        if g1 == G1_OPEX:
+            if g2 in G2_OTHER_INCOME:
+                return "other_income"
+            if g2 in G2_OTHER_EXPENSE:
+                return "other_expense"
+            if not g2:
+                # GROUP 1 "7" with no GROUP 2 (e.g. share of net income from
+                # associates) — an income account there is not an expense.
+                return "other_income" if row["account_type"] in INCOME_TYPES else "opex"
+            return "opex"
+        if g1 == G1_TAX:
+            return "oci" if g2 in G2_OCI else "tax"
+        return None
+
+    def _bucket_key_by_type(self, row):
+        """Best-effort bucket for charts that carry no ``account.group``."""
         return {
-            "type": "section",
-            "label": label,
-            "accounts": accounts,
-            "subtotal": subtotal,
-        }
+            "income": "revenue",
+            "income_other": "other_income",
+            "expense_direct_cost": "cogs",
+            "expense": "opex",
+            "expense_depreciation": "other_expense",
+            "expense_other": "other_expense",
+        }.get(row["account_type"])
+
+    def _bucket_rows(self, balances):
+        """``{bucket_key: [row with signed_balance, ...]}`` for every P&L account."""
+        groups = self._account_groups(list(balances))
+        buckets = {key: [] for key, _label, _income in BUCKETS}
+        for row in balances.values():
+            key = self._bucket_key(row, groups.get(row["account_id"]))
+            if key:
+                buckets[key].append(dict(row, signed_balance=self._signed(row)))
+        return buckets
 
     def _ytd_period(self, filters):
         """Year-to-Date period: from 1-Jan of date_to's year until
@@ -63,96 +138,54 @@ class CustomReportProfitLoss(models.AbstractModel):
         ytd_filters = dict(filters, date_from=ytd_start)
         return self._get_account_balances(ytd_filters)
 
+    # ------------------------------------------------------------------
+    # Lines
+    # ------------------------------------------------------------------
     def _build_lines(self, filters):
-        balances = self._get_account_balances(filters)
-        ytd_balances = self._ytd_period(filters)
+        period = self._bucket_rows(self._get_account_balances(filters))
+        ytd = self._bucket_rows(self._ytd_period(filters))
 
-        lines = []
-        revenue = self._section(
-            "Revenue",
-            REVENUE_TYPES,
-            balances,
-            flip_sign=True,
-        )
-        cogs = self._section(
-            "Cost of Goods Sold",
-            COGS_TYPES,
-            balances,
-            flip_sign=False,
-        )
-        op_ex = self._section(
-            "Operating Expenses",
-            EXPENSE_TYPES,
-            balances,
-            flip_sign=False,
-        )
-        other = self._section(
-            "Other Expenses",
-            OTHER_TYPES,
-            balances,
-            flip_sign=False,
-        )
+        def totals(source):
+            return {key: sum(row["signed_balance"] for row in source[key]) for key, _label, _income in BUCKETS}
 
-        gross_profit = revenue["subtotal"] - cogs["subtotal"]
-        operating_profit = gross_profit - op_ex["subtotal"]
-        net_profit = operating_profit - other["subtotal"]
+        p, y = totals(period), totals(ytd)
 
-        # YTD signed totals
-        def ytd_sum(type_codes, flip):
-            tot = 0.0
-            for row in ytd_balances.values():
-                if row["account_type"] in type_codes:
-                    tot += -row["balance"] if flip else row["balance"]
-            return tot
+        def milestones(t):
+            gross = t["revenue"] - t["cogs"]
+            operating = gross - t["opex"]
+            before_tax = operating + t["other_income"] - t["other_expense"]
+            after_tax = before_tax - t["tax"]
+            return gross, operating, before_tax, after_tax, after_tax + t["oci"]
 
-        ytd_revenue = ytd_sum(REVENUE_TYPES, True)
-        ytd_cogs = ytd_sum(COGS_TYPES, False)
-        ytd_opex = ytd_sum(EXPENSE_TYPES, False)
-        ytd_other = ytd_sum(OTHER_TYPES, False)
-        ytd_net = ytd_revenue - ytd_cogs - ytd_opex - ytd_other
+        p_gross, p_op, p_before, p_after, p_comp = milestones(p)
+        y_gross, y_op, y_before, y_after, y_comp = milestones(y)
 
-        lines.append(revenue)
-        lines.append(
-            {
-                "type": "total",
-                "label": "Total Revenue",
-                "signed_balance": revenue["subtotal"],
-                "ytd": ytd_revenue,
-            }
-        )
-        lines.append(cogs)
-        lines.append(
-            {
-                "type": "total",
-                "label": "Total COGS",
-                "signed_balance": cogs["subtotal"],
-                "ytd": ytd_cogs,
-            }
-        )
-        lines.append(
-            {
-                "type": "total",
-                "label": "Gross Profit",
-                "signed_balance": gross_profit,
-                "ytd": ytd_revenue - ytd_cogs,
-            }
-        )
-        lines.append(op_ex)
-        lines.append(
-            {
-                "type": "total",
-                "label": "Operating Profit",
-                "signed_balance": operating_profit,
-                "ytd": ytd_revenue - ytd_cogs - ytd_opex,
-            }
-        )
-        lines.append(other)
-        lines.append(
-            {
-                "type": "grand_total",
-                "label": "Net Profit / (Loss)",
-                "signed_balance": net_profit,
-                "ytd": ytd_net,
-            }
-        )
-        return lines
+        labels = {key: label for key, label, _income in BUCKETS}
+
+        def section(key):
+            """Emit a section only when it holds accounts — an empty
+            "Other Comprehensive Income" heading helps nobody."""
+            return self._grouped_section(labels[key], period[key]) if period[key] else None
+
+        def total(label, value, ytd_value, ltype="total"):
+            return {"type": ltype, "label": label, "signed_balance": value, "ytd": ytd_value}
+
+        lines = [
+            section("revenue"),
+            total("Total Revenue", p["revenue"], y["revenue"]),
+            section("cogs"),
+            total("Total COGS", p["cogs"], y["cogs"]),
+            total("Gross Profit", p_gross, y_gross),
+            section("opex"),
+            total("Total Operating Expenses", p["opex"], y["opex"]),
+            total("Operating Profit", p_op, y_op),
+            section("other_income"),
+            section("other_expense"),
+            total("Net Profit / (Loss) Before Tax", p_before, y_before),
+            section("tax"),
+            total("Net Profit / (Loss)", p_after, y_after, ltype="grand_total"),
+        ]
+        if period["oci"]:
+            lines.append(section("oci"))
+            lines.append(total("Total Comprehensive Income", p_comp, y_comp, ltype="grand_total"))
+        return [line for line in lines if line]

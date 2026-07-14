@@ -22,6 +22,16 @@ DROP DATABASE IF EXISTS \"${DST}\";
 CREATE DATABASE \"${DST}\" TEMPLATE \"${SRC}\" OWNER \"\$POSTGRES_USER\";
 SQL"
 
+# 2. Clear the cloned queue_job rows. The TEMPLATE copy carries the source DB's
+#    queue_job rows verbatim, so the clone shares their UUIDs. The queue_job
+#    jobrunner keys pending jobs by UUID across ALL databases in one process; a
+#    duplicate UUID trips `assert job.db_name == db_name` in channels.py and the
+#    runner crash-loops, so background jobs never drain for ANY tenant. Wiping the
+#    clone's queue (CASCADE also clears queue_job_lock + wizard rel tables) is the
+#    permanent fix. Guarded so it is a no-op when queue_job is not installed.
+echo ">>> clear cloned queue_job (prevents duplicate-UUID jobrunner crash-loop)"
+docker exec "$PG" sh -c "PGPASSWORD=\"\$POSTGRES_PASSWORD\" psql -U \"\$POSTGRES_USER\" -d \"${DST}\" -v ON_ERROR_STOP=1 -tAc \"DO \\\$\\\$ BEGIN IF to_regclass('public.queue_job') IS NOT NULL THEN TRUNCATE TABLE queue_job CASCADE; END IF; END \\\$\\\$;\""
+
 # 3. Copy the filestore.
 echo ">>> copy filestore"
 docker exec "$ODOO" sh -c "rm -rf /var/lib/odoo/filestore/${DST}; if [ -d /var/lib/odoo/filestore/${SRC} ]; then cp -a /var/lib/odoo/filestore/${SRC} /var/lib/odoo/filestore/${DST}; fi"

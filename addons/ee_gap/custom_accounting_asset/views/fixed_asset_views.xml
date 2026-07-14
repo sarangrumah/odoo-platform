@@ -31,6 +31,9 @@
                     <button name="action_confirm" type="object" string="Confirm"
                             class="oe_highlight"
                             invisible="state != 'draft'"/>
+                    <button name="action_open_revaluation_wizard" type="object"
+                            string="Revalue"
+                            invisible="state != 'running'"/>
                     <button name="action_open_dispose_wizard" type="object"
                             string="Dispose"
                             invisible="state != 'running'"/>
@@ -43,6 +46,14 @@
                            statusbar_visible="draft,running,disposed"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_revaluations" type="object"
+                                class="oe_stat_button" icon="fa-line-chart"
+                                invisible="revaluation_count == 0">
+                            <field name="revaluation_count" widget="statinfo"
+                                   string="Revaluations"/>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <label for="code"/>
                         <h1><field name="code" readonly="state != 'draft'"/></h1>
@@ -52,6 +63,10 @@
                     <group>
                         <group string="Acquisition">
                             <field name="acquisition_date"
+                                   readonly="state != 'draft'"/>
+                            <field name="posting_date"
+                                   readonly="state != 'draft'"/>
+                            <field name="depreciation_date_mode"
                                    readonly="state != 'draft'"/>
                             <field name="acquisition_value"
                                    readonly="state != 'draft'"/>
@@ -86,6 +101,12 @@
                     </group>
                     <group string="Totals">
                         <field name="accumulated_depreciation"/>
+                        <field name="revaluation_value"
+                               invisible="revaluation_value == 0"/>
+                        <field name="revaluation_surplus_balance"
+                               invisible="revaluation_surplus_balance == 0"/>
+                        <field name="revaluation_loss_recognized"
+                               invisible="revaluation_loss_recognized == 0"/>
                         <field name="net_book_value"/>
                     </group>
                     <group string="Disposal" invisible="state != 'disposed'">
@@ -97,16 +118,21 @@
                     <notebook>
                         <page string="Depreciation Schedule">
                             <field name="depreciation_line_ids">
-                                <list decoration-success="posted">
+                                <list decoration-success="posted" decoration-muted="reversed">
                                     <field name="sequence"/>
                                     <field name="date"/>
                                     <field name="amount"/>
                                     <field name="posted"/>
+                                    <field name="reversed"/>
                                     <field name="move_id"/>
                                     <field name="currency_id" column_invisible="True"/>
                                     <button name="action_post_now"
                                             type="object" string="Post"
-                                            invisible="posted"/>
+                                            invisible="posted or reversed"/>
+                                    <button name="action_reverse"
+                                            type="object" string="Reverse"
+                                            invisible="not posted"
+                                            confirm="Reverse this posted depreciation? A reversing journal entry will be booked and the asset NBV will be restored."/>
                                 </list>
                             </field>
                         </page>

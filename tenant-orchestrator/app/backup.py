@@ -248,6 +248,12 @@ def restore_backup(
         dbops.create_database(target, owner_role=s.pg_tenant_owner_role)
         _pg_restore(target, local)
 
+        # The restored dump carries the source tenant's queue_job rows (same
+        # UUIDs). If target != slug (e.g. a <slug>_staging clone) those UUIDs
+        # collide with the still-live source and crash-loop the shared
+        # jobrunner. Clear them; harmless when restoring in place too.
+        dbops.clear_queue_jobs(target)
+
         registry.log_action(
             slug,
             "restore",

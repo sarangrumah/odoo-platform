@@ -24,8 +24,9 @@ All report models are `AbstractModel`s that inherit `custom.report.engine` (the 
 - `report.custom_accounting_reports.report_dispatch` — **AbstractModel.** QWeb report dispatcher; maps a `report_code` to the target report model and returns its computed context.
 - `custom.report.general.ledger` — General Ledger.
 - `custom.report.trial.balance` — Trial Balance (default dispatch target).
-- `custom.report.profit.loss` — Profit & Loss.
-- `custom.report.balance.sheet` — Balance Sheet (Asset / Liability / Equity by account type).
+- `custom.report.profit.loss` — Profit & Loss, bucketed by `account.group` (GROUP 1 code prefix), falling back to `account_type`.
+- `custom.report.profit.loss.branch` — Profit & Loss with one amount column per branch; inherits `custom.report.profit.loss`. Reached from the P&L wizard's *View / Export by Branch* buttons (it owns no wizard, so no tenant needs a schema upgrade).
+- `custom.report.balance.sheet` — Balance Sheet (Asset / Liability / Equity by account type, nested by `account.group`), including a computed **Current Year Earnings** equity line.
 - `custom.report.cash.flow` — Cash Flow Statement (indirect method).
 - `custom.report.partner.ledger` — Partner Ledger.
 - `custom.report.partner.card.base` — Partner card base, subclassed by `custom.report.payable.card` and `custom.report.receivable.card`.
@@ -54,7 +55,7 @@ Report models are AbstractModels and generally have no stored fields; user input
 
 - **custom.report.aged.receivable.wizard / aged.payable.wizard**
   - `partner_ids`: `Many2many` to `res.partner`.
-  - `detail_mode`: `Selection` switching summary vs. detail layout. (Note: `aging_detail` is only a **context key** derived from `detail_mode == "detail"`, not a field.)
+  - `detail_mode`: `Selection` switching summary vs. detail layout, **defaulting to `detail`**. (Note: `aging_detail` is only a **context key** derived from `detail_mode == "detail"`, not a field.)
 
 - **Cash Flow bucketing** — `custom.report.cash.flow` has no `account_type` field. Buckets are defined by module-level tuples `OPERATING_TYPES`, `INVESTING_TYPES`, `FINANCING_TYPES`, `CASH_TYPES` matched against each row's Odoo `account_type`.
 
@@ -67,6 +68,9 @@ Report models are AbstractModels and generally have no stored fields; user input
   - `_default_filters()` / filter normalisation.
   - `_get_account_balances(filters)`, `_get_move_lines_query(...)`, `_sum_by_account(...)`: raw-SQL aggregation helpers.
   - `_compute(options)`: builds the render context.
+  - `_account_groups(account_ids)`: two-level `account.group` ancestry per account; `{}` when the database defines no groups (the signal to fall back to `account_type`).
+  - `_grouped_section(label, rows)`: nests signed rows under their GROUP 2 headers; degrades to a flat `accounts` list without groups.
+  - `_branch_plan()`: the `account.analytic.plan` carrying the branch dimension, named by the `custom_accounting_reports.branch_plan_name` config parameter (default `Operating Unit`).
   - `_log_report_run(...)`: writes a run record to `pdp.audit_log`.
 
 - **Report models**
@@ -81,6 +85,10 @@ Report models are AbstractModels and generally have no stored fields; user input
 
 ## Gotchas
 - All computation runs through the single `custom.report.engine` base; overriding `_build_lines` is the extension point, not adding fields.
+- **Never bucket a P&L by `account_type` alone.** Indonesian charts type every cost-of-sales account plain `expense` (not `expense_direct_cost`), so a type-based split reports COGS as zero, files `income_other` under Revenue, and drops `expense_other` entirely. Section membership comes from the account-code prefix via `account.group`.
+- `account.account.group_id` is **computed, not stored** in Odoo 19 (resolved from the code prefix). It cannot appear in a SQL join or an ORM domain — read it off a browsed recordset, as `_account_groups` does.
+- `account.group` rows are company-scoped; `account.analytic.plan` is not, but its accounts are. Both are filtered against the active companies.
+- This module ships to every tenant. Adding a field or a `TransientModel` forces an `-u` on **all** databases that have it installed, or their General Ledger wizard breaks and their autovacuum cron logs errors. Prefer context keys and buttons on existing wizards.
 - The `custom.report.advance` model auto-detects advance/down-payment accounts by name, which may not cover all chart-of-account edge cases.
 - `custom.report.aged.payable` inherits `custom.report.aged.receivable`, reusing its layout logic.
 - Every run performs a defensive raw-SQL insert into `pdp.audit_log`; failures are logged as warnings and do not block the report.

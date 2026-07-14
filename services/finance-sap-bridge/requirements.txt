@@ -1,0 +1,6 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+httpx>=0.27
+pydantic>=2.6
+# Optional — the Kafka layer degrades to mock mode when this is absent.
+confluent-kafka>=2.3

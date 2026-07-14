@@ -61,6 +61,9 @@ class CustomReportCashFlow(models.AbstractModel):
             section_heading=True,
         )
 
+    def _flatten_for_screen(self, lines, columns):
+        return self._flatten_sectioned(lines, columns, section_heading=True)
+
     def _bucket(self, label, code, type_codes, balances, sign=-1):
         """Compute one activity bucket.
 

@@ -11,8 +11,8 @@ Mirrors ``custom.bank.import.csv.wizard`` (Binary upload + SHA256 dedup) and add
 from __future__ import annotations
 
 import base64
-import json
 import logging
+from markupsafe import Markup
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
@@ -35,7 +35,7 @@ class RetailImportWizard(models.TransientModel):
         string="Force re-import",
         help="Bypass the file-hash duplicate guard (use with care).",
     )
-    preview_text = fields.Text(readonly=True)
+    preview_html = fields.Html(readonly=True, sanitize=False)
 
     # ------------------------------------------------------------------
     def _decoded(self):
@@ -48,23 +48,50 @@ class RetailImportWizard(models.TransientModel):
         self.ensure_one()
         self._decoded()
         sample = self.profile_id.read_records(self.file, limit=20)
-        lines = [
-            f"Profile: {self.profile_id.code} ({self.profile_id.file_type})",
-            f"Parsed sample rows: {len(sample['records'])} (blank skipped: {sample['blank_rows']})",
-            "",
-            "First rows (logical fields):",
-        ]
-        for rec in sample["records"][:8]:
-            shown = {k: v for k, v in rec.items() if k != "_row"}
-            lines.append(f"  row {rec.get('_row')}: {json.dumps(shown, default=str, ensure_ascii=False)}")
-        self.preview_text = "\n".join(lines)
+        rows = sample["records"][:8]
+        # Logical fields vary per profile, so derive the columns from the
+        # union of keys across the sampled rows (preserving first-seen order).
+        columns = []
+        for rec in rows:
+            for key in rec:
+                if key != "_row" and key not in columns:
+                    columns.append(key)
+        self.preview_html = self._build_preview_table(sample, rows, columns)
         return {
             "type": "ir.actions.act_window",
             "res_model": self._name,
             "res_id": self.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "new",
         }
+
+    def _build_preview_table(self, sample, rows, columns):
+        """Render the sampled rows as an HTML table (logical fields as columns)."""
+        summary = _(
+            "Profile: %(code)s (%(ftype)s) — parsed %(count)s sample row(s), %(blank)s blank skipped",
+            code=self.profile_id.code,
+            ftype=self.profile_id.file_type,
+            count=len(sample["records"]),
+            blank=sample["blank_rows"],
+        )
+        cell_style = "white-space:nowrap;padding:2px 8px;"
+        head = Markup('<th style="{}">{}</th>').format(cell_style, _("Row"))
+        head += Markup("").join(Markup('<th style="{}">{}</th>').format(cell_style, col) for col in columns)
+        body = Markup("")
+        for rec in rows:
+            cells = Markup('<td style="{}">{}</td>').format(cell_style, rec.get("_row"))
+            for col in columns:
+                val = rec.get(col)
+                cells += Markup('<td style="{}">{}</td>').format(cell_style, "" if val is None else val)
+            body += Markup("<tr>{}</tr>").format(cells)
+        return Markup(
+            '<p class="text-muted">{summary}</p>'
+            '<div style="overflow-x:auto;">'
+            '<table class="table table-sm table-bordered" style="width:auto;">'
+            "<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+            "</div>"
+        ).format(summary=summary, head=head, body=body)
 
     def action_import(self):
         self.ensure_one()
@@ -89,12 +116,9 @@ class RetailImportWizard(models.TransientModel):
         log.store_source(self.file, self.filename)
         Executor = self.env["retail.import.executor"]
         if self.profile_id.file_type in ASYNC_TYPES:
-            channel = (
-                self.env["ir.config_parameter"].sudo().get_param("retail_import.queue_channel", "root.retail_import")
-            )
             try:
                 job = Executor.with_delay(
-                    channel=channel,
+                    channel="root.retail_import",
                     description=f"Retail import {self.profile_id.code} ({self.filename})",
                 ).run(log)
                 log.job_uuid = getattr(job, "uuid", False)
@@ -109,5 +133,6 @@ class RetailImportWizard(models.TransientModel):
             "res_model": "retail.import.log",
             "res_id": log.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "current",
         }

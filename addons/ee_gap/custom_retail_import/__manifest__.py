@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Retail Import",
-    "summary": "Excel/CSV + SFTP/FTP/FTPS ingestion adapter for retail master & transaction data",
+    "summary": "Excel/CSV + SFTP ingestion adapter for retail master & transaction data",
     "description": """
 Custom Retail Import
 ====================
@@ -26,17 +26,19 @@ Pieces
 * ``retail.import.executor`` — per-file-type loaders with ``ir.model.data``
   external IDs for idempotency. X101/CoA/company/X20 are full; X24/X70 are
   Phase-5 decision-gated; X70T/X31/X32P/store-master are staged.
-* ``retail.import.log`` — audit trail (who/when + live progress), keeps the source
-  file in ir.attachment, with per-row ``retail.import.log.line`` results
-  (created/updated/archived/skipped/duplicate/error) browsable as a table, plus
-  re-process and error-report-CSV actions.
-* ``retail.import.feed`` — SFTP/FTP/FTPS poller that pulls new files into the same
-  executor on an ``ir.cron`` schedule.
+* ``retail.import.log`` — audit trail, keeps the source file in ir.attachment.
+* ``retail.import.feed`` — SFTP poller (paramiko) that pulls new files into the
+  same executor on an ``ir.cron`` schedule.
+* ``retail.import.mailbox`` — IMAP bridge for tenants whose source files arrive as
+  nightly email attachments. Backs every attachment up to the SFTP share, drops the
+  ingestible ones into a feed's directory, then deletes the message once the backup
+  verifies. Deletion keys off the backup, never the import, so a parser bug can never
+  destroy source data.
 """,
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Retail",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.16.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -47,17 +49,18 @@ Pieces
         "account",
     ],
     "external_dependencies": {"python": ["openpyxl"]},
-    "capability_tags": ["data-import", "retail", "excel", "sftp", "ftp", "audit-trail"],
+    "capability_tags": ["data-import", "retail", "excel", "sftp", "audit-trail"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/cron.xml",
         "data/retail_import_profiles.xml",
+        "data/feeds.xml",
+        "data/mailboxes.xml",
         "views/retail_import_profile_views.xml",
-        "views/retail_import_log_line_views.xml",
         "views/retail_import_log_views.xml",
         "views/retail_import_feed_views.xml",
-        "views/res_config_settings_views.xml",
+        "views/retail_import_mailbox_views.xml",
         "wizard/retail_import_wizard_views.xml",
         "views/menu_views.xml",
     ],

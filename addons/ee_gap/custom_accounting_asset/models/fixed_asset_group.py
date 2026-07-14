@@ -38,6 +38,31 @@ class CustomFixedAssetGroup(models.Model):
         string="Default Depreciation Journal",
         domain="[('type', '=', 'general'), ('company_id', '=', company_id)]",
     )
+    default_revaluation_surplus_account_id = fields.Many2one(
+        comodel_name="account.account",
+        string="Default Revaluation Surplus Account",
+        domain="[('company_ids', 'in', company_id)]",
+        help="Equity / OCI account credited for an upward revaluation.",
+    )
+    default_revaluation_loss_account_id = fields.Many2one(
+        comodel_name="account.account",
+        string="Default Revaluation Loss Account",
+        domain="[('company_ids', 'in', company_id)]",
+        help="P&L expense account debited for a downward revaluation not covered by an existing surplus.",
+    )
+    default_revaluation_income_account_id = fields.Many2one(
+        comodel_name="account.account",
+        string="Default Revaluation Income Account",
+        domain="[('company_ids', 'in', company_id)]",
+        help="P&L income account credited when an upward revaluation reverses a "
+        "prior downward revaluation that was expensed.",
+    )
+    default_retained_earnings_account_id = fields.Many2one(
+        comodel_name="account.account",
+        string="Default Retained Earnings Account",
+        domain="[('company_ids', 'in', company_id)]",
+        help="Equity account the revaluation surplus is transferred to on disposal.",
+    )
 
     _sql_constraints = [
         (

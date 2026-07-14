@@ -3,3 +3,17 @@ access_levis_inv_recon_acct,levis.inventory.reconciliation account,model_levis_i
 access_levis_inv_recon_line_acct,levis.inventory.reconciliation.line account,model_levis_inventory_reconciliation_line,account.group_account_manager,1,1,1,1
 access_levis_inv_recon_stock,levis.inventory.reconciliation stock,model_levis_inventory_reconciliation,stock.group_stock_manager,1,0,0,0
 access_levis_inv_recon_line_stock,levis.inventory.reconciliation.line stock,model_levis_inventory_reconciliation_line,stock.group_stock_manager,1,0,0,0
+access_levis_payment_register_fee,levis.payment.register.fee,model_levis_payment_register_fee,account.group_account_invoice,1,1,1,1
+access_levis_purchase_account_map_mgr,levis.purchase.account.map manager,model_levis_purchase_account_map,account.group_account_manager,1,1,1,1
+access_levis_purchase_account_map_user,levis.purchase.account.map user,model_levis_purchase_account_map,account.group_account_invoice,1,0,0,0
+access_levis_purchase_account_map_purchase,levis.purchase.account.map purchase,model_levis_purchase_account_map,purchase.group_purchase_user,1,0,0,0
+access_custom_scrap_batch_user,custom.scrap.batch user,model_custom_scrap_batch,stock.group_stock_user,1,1,1,0
+access_custom_scrap_batch_manager,custom.scrap.batch manager,model_custom_scrap_batch,stock.group_stock_manager,1,1,1,1
+access_custom_scrap_batch_line_user,custom.scrap.batch.line user,model_custom_scrap_batch_line,stock.group_stock_user,1,1,1,1
+access_custom_scrap_batch_line_manager,custom.scrap.batch.line manager,model_custom_scrap_batch_line,stock.group_stock_manager,1,1,1,1
+access_levis_mdr_bin_manager,levis.mdr.bin manager,model_levis_mdr_bin,account.group_account_manager,1,1,1,1
+access_levis_mdr_bin_user,levis.mdr.bin user,model_levis_mdr_bin,account.group_account_invoice,1,0,0,0
+access_levis_cogs_run_acct,levis.cogs.run account,model_levis_cogs_run,account.group_account_manager,1,1,1,1
+access_levis_cogs_run_line_acct,levis.cogs.run.line account,model_levis_cogs_run_line,account.group_account_manager,1,1,1,1
+access_levis_cogs_run_stock,levis.cogs.run stock,model_levis_cogs_run,stock.group_stock_manager,1,0,0,0
+access_levis_cogs_run_line_stock,levis.cogs.run.line stock,model_levis_cogs_run_line,stock.group_stock_manager,1,0,0,0
