@@ -4,11 +4,17 @@ fail_fast: false
 
 # Vendored upstream code (OCA modules, third-party static libs) is owned by
 # its source repos — we don't reformat it here. Applies to every hook below.
+#
+# Client deliverables under docs/**/deliverables/ are generated artifacts
+# (Chromium-rendered PDFs, Playwright screenshots, Mermaid SVGs). Reformatting
+# them would be undone by the next build, and the PDFs exceed the large-file
+# limit by design — they are the thing being delivered.
 exclude: |
   (?x)^(
     addons/_vendor/.*|
     .*/static/lib/.*|
-    .*\.min\.(js|css)
+    .*\.min\.(js|css)|
+    docs/.*/deliverables/.*\.(pdf|docx|png|svg)
   )$
 
 repos:

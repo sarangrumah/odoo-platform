@@ -1,11 +1,16 @@
 # Levis client deliverables
 
-| File | Pages | Audience |
-|---|---|---|
-| `Levis_Functional_Document.pdf` | 42 | Sign-off fungsional: arsitektur, peran, swimlane per proses, dampak jurnal, katalog fitur, konfigurasi. |
-| `Levis_Manual_Guide.pdf` | 48 | Pengguna akhir: panduan langkah-demi-langkah per peran, dengan tangkapan layar. |
+| Dokumen | Hal. | Format | Untuk siapa |
+|---|---|---|---|
+| Functional Document | 42 | `.pdf` · `.docx` | Sign-off fungsional: arsitektur, peran, swimlane per proses, dampak jurnal, katalog fitur, konfigurasi. |
+| Manual Guide | 48 | `.pdf` · `.docx` | Pengguna akhir: panduan langkah-demi-langkah per peran, dengan tangkapan layar. |
 
 Bahasa: Indonesia, dengan istilah antarmuka Odoo dipertahankan dalam Bahasa Inggris.
+
+**PDF adalah versi kanonik** — tata letaknya persis seperti yang dirancang. DOCX disediakan agar
+dokumen bisa disunting; Word mengabaikan CSS kita, sehingga kotak peringatan menjadi *blockquote*
+berlabel (PENTING / PERHATIAN / CATATAN), jalur menu menjadi teks `code`, dan sampul berwarna
+menjadi halaman judul biasa. Isi dan urutannya sama.
 
 Screenshot diambil dari `prd_levis_begbal` pada 13 Juli 2026. DB itu tidak memiliki Purchase Order
 maupun Receipt, sehingga layar Purchase/Receipt/Asset tampil sebagai form kosong.
@@ -36,6 +41,21 @@ pngquant --quality=65-92 --speed 1 --force --ext .png shots/*.png
 # 3. PDF
 node build-pdf.mjs fd.html     ../Levis_Functional_Document.pdf "Functional Document — Levi's / EBR Odoo 19"
 node build-pdf.mjs manual.html ../Levis_Manual_Guide.pdf         "Manual Guide — Levi's / EBR Odoo 19"
+
+# 4. DOCX -- perlu diagram sebagai PNG (Word tidak andal merender SVG)
+sudo apt-get install -y pandoc
+for f in dia/*.mmd; do
+  npx mmdc -i "$f" -o "png/$(basename "$f" .mmd).png" \
+    -c mmdc.json -p puppeteer.json -b white --width 2400
+done
+python3 to-docx.py fd.html     fd-docx.html
+python3 to-docx.py manual.html manual-docx.html
+pandoc fd-docx.html     -f html -t docx -o ../Levis_Functional_Document.docx \
+  --toc --toc-depth=2 --resource-path=. \
+  --metadata title="Dokumen Fungsional — Implementasi Odoo 19 (Levi's / EBR)"
+pandoc manual-docx.html -f html -t docx -o ../Levis_Manual_Guide.docx \
+  --toc --toc-depth=2 --resource-path=. \
+  --metadata title="Panduan Penggunaan Odoo 19 (Levi's / EBR)"
 ```
 
 ### Catatan yang menghemat waktu
