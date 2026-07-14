@@ -208,8 +208,7 @@ if KEEP_JOURNALS:
         raise SystemExit(1)
 
     if not KEEP_MOVE:
-        log("note: journal(s) %s exist but hold no moves -- nothing to preserve, continuing."
-            % ",".join(KEEP_JOURNALS))
+        log("note: journal(s) %s exist but hold no moves -- nothing to preserve, continuing." % ",".join(KEEP_JOURNALS))
 
 # FK columns of every closure table that point at account_move / account_move_line.
 cr.execute(

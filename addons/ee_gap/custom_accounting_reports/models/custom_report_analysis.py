@@ -29,8 +29,7 @@ class CustomReportJournalItemAnalysis(models.Model):
     date = fields.Date(string="Date", readonly=True)
     account_id = fields.Many2one("account.account", string="Account", readonly=True)
     account_type = fields.Selection(
-        selection=lambda self: self.env["account.account"]
-        ._fields["account_type"].selection,
+        selection=lambda self: self.env["account.account"]._fields["account_type"].selection,
         string="Account Type",
         readonly=True,
     )

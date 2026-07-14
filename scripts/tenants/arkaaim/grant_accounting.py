@@ -25,12 +25,12 @@ By default it only PREVIEWS (no commit). Set GRANT_COMMIT = True to persist.
 
 # ----- knobs -------------------------------------------------------------
 LOGINS = [
-    "arman.effisan@erajaya.com",   # Arman
-    "kurnia.adhi@erajaya.com",     # Kurnia
-    "ricad.lingga@erajaya.com",    # Ricad (display name "Ricard")
+    "arman.effisan@erajaya.com",  # Arman
+    "kurnia.adhi@erajaya.com",  # Kurnia
+    "ricad.lingga@erajaya.com",  # Ricad (display name "Ricard")
 ]
-GROUP_XMLID = "account.group_account_user"   # Accountant — full accounting features
-GRANT_COMMIT = True     # True to persist; False = preview only
+GROUP_XMLID = "account.group_account_user"  # Accountant — full accounting features
+GRANT_COMMIT = True  # True to persist; False = preview only
 # -------------------------------------------------------------------------
 
 env = self.env  # noqa: F821  (provided by odoo shell)

@@ -68,12 +68,15 @@ for group in stale:
     prefix = group.code_prefix_start
     # ``group_id`` is computed, not stored -- count by prefix instead of search().
     accounts = sum(1 for acc in all_accounts if (acc.code or "").startswith(prefix))
-    log("delete  %-3s %r (%d accounts fall back to GROUP 1)" % (
-        prefix, group.name, accounts,
-    ))
-    env["ir.model.data"].search(
-        [("model", "=", "account.group"), ("res_id", "=", group.id)]
-    ).unlink()
+    log(
+        "delete  %-3s %r (%d accounts fall back to GROUP 1)"
+        % (
+            prefix,
+            group.name,
+            accounts,
+        )
+    )
+    env["ir.model.data"].search([("model", "=", "account.group"), ("res_id", "=", group.id)]).unlink()
     group.unlink()
     deleted += 1
 

@@ -47,9 +47,15 @@ def data_rows(path, sku_col, header_rows=1):
 
 def check(label, expected, actual):
     ok = abs(expected - actual) <= TOL
-    log("%-46s expected %18s  actual %18s  %s"
-        % (label, "{:,.2f}".format(expected), "{:,.2f}".format(actual),
-           "OK" if ok else "MISMATCH (%s)" % "{:,.2f}".format(actual - expected)))
+    log(
+        "%-46s expected %18s  actual %18s  %s"
+        % (
+            label,
+            "{:,.2f}".format(expected),
+            "{:,.2f}".format(actual),
+            "OK" if ok else "MISMATCH (%s)" % "{:,.2f}".format(actual - expected),
+        )
+    )
     if not ok:
         failures.append(label)
 
@@ -64,11 +70,11 @@ x48 = list(data_rows(X48_FILE, sku_col=15))
 src_x48_tax = sum(float(cell(r, 30) or 0) for r in x48)
 src_x48_net = sum(float(cell(r, 29) or 0) for r in x48)
 
-log("X24DN rows %d | net %s tax %s discount %s"
-    % (len(x24), "{:,.0f}".format(src_x24_net), "{:,.0f}".format(src_x24_tax),
-       "{:,.0f}".format(src_x24_disc)))
-log("X48   rows %d | net %s tax %s\n"
-    % (len(x48), "{:,.0f}".format(src_x48_net), "{:,.0f}".format(src_x48_tax)))
+log(
+    "X24DN rows %d | net %s tax %s discount %s"
+    % (len(x24), "{:,.0f}".format(src_x24_net), "{:,.0f}".format(src_x24_tax), "{:,.0f}".format(src_x24_disc))
+)
+log("X48   rows %d | net %s tax %s\n" % (len(x48), "{:,.0f}".format(src_x48_net), "{:,.0f}".format(src_x48_tax)))
 
 
 # ---- 2. GL totals ----------------------------------------------------------------
@@ -78,8 +84,7 @@ company = env.company
 
 def balance(domain):
     """Signed sum of `balance` over posted lines. Revenue is credit => negative."""
-    lines = AML.search([("parent_state", "=", "posted"),
-                        ("company_id", "=", company.id)] + domain)
+    lines = AML.search([("parent_state", "=", "posted"), ("company_id", "=", company.id)] + domain)
     return sum(lines.mapped("balance"))
 
 
@@ -115,8 +120,7 @@ check("Sum Gross Sales-<category>", src_x24_net + src_x24_disc, gross)
 # ---- 3. per-category breakdown ---------------------------------------------------
 log("\nPer-account detail:")
 for pattern in ("gross sales", "sales discount", "sales return"):
-    lines = AML.search([("parent_state", "=", "posted"),
-                        ("company_id", "=", company.id)] + by_name(pattern))
+    lines = AML.search([("parent_state", "=", "posted"), ("company_id", "=", company.id)] + by_name(pattern))
     seen = {}
     for ln in lines:
         seen.setdefault(ln.account_id, 0.0)

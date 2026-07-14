@@ -89,41 +89,79 @@ try:
         amt = r(recv_by_date.get(day, 0.0))
         if amt:
             # zero the POS receivable, move balance to trade receivables
-            lines.append((0, 0, {
-                "account_id": acc_recv_from.id, "name": "Reklas piutang POS -> Trade Receivables",
-                "debit": -amt if amt < 0 else 0.0, "credit": amt if amt > 0 else 0.0,
-            }))
-            lines.append((0, 0, {
-                "account_id": acc_recv_to.id, "name": "Reklas piutang POS -> Trade Receivables",
-                "debit": amt if amt > 0 else 0.0, "credit": -amt if amt < 0 else 0.0,
-            }))
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": acc_recv_from.id,
+                        "name": "Reklas piutang POS -> Trade Receivables",
+                        "debit": -amt if amt < 0 else 0.0,
+                        "credit": amt if amt > 0 else 0.0,
+                    },
+                )
+            )
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": acc_recv_to.id,
+                        "name": "Reklas piutang POS -> Trade Receivables",
+                        "debit": amt if amt > 0 else 0.0,
+                        "credit": -amt if amt < 0 else 0.0,
+                    },
+                )
+            )
             total_recv += amt
         for af, at, net, analytic in ret_by_date.get(day, []):
             # move the return (debit balance) into gross sales, same OU
-            lines.append((0, 0, {
-                "account_id": af.id, "name": "Reklas retur penjualan -> %s" % at.code,
-                "debit": -net if net < 0 else 0.0, "credit": net if net > 0 else 0.0,
-                "analytic_distribution": analytic,
-            }))
-            lines.append((0, 0, {
-                "account_id": at.id, "name": "Reklas retur penjualan (net ke gross sales)",
-                "debit": net if net > 0 else 0.0, "credit": -net if net < 0 else 0.0,
-                "analytic_distribution": analytic,
-            }))
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": af.id,
+                        "name": "Reklas retur penjualan -> %s" % at.code,
+                        "debit": -net if net < 0 else 0.0,
+                        "credit": net if net > 0 else 0.0,
+                        "analytic_distribution": analytic,
+                    },
+                )
+            )
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": at.id,
+                        "name": "Reklas retur penjualan (net ke gross sales)",
+                        "debit": net if net > 0 else 0.0,
+                        "credit": -net if net < 0 else 0.0,
+                        "analytic_distribution": analytic,
+                    },
+                )
+            )
             total_ret += net
         if not lines:
             continue
-        move = Move.create({
-            "journal_id": journal.id,
-            "date": day,
-            "ref": "%s-%s" % (REF_PREFIX, day),
-            "company_id": company.id,
-            "move_type": "entry",
-            "narration": "Penyesuaian struktur penyajian per pembukuan EBR (piutang POS & retur), per tanggal %s" % day,
-            "line_ids": lines,
-        })
+        move = Move.create(
+            {
+                "journal_id": journal.id,
+                "date": day,
+                "ref": "%s-%s" % (REF_PREFIX, day),
+                "company_id": company.id,
+                "move_type": "entry",
+                "narration": "Penyesuaian struktur penyajian per pembukuan EBR (piutang POS & retur), per tanggal %s"
+                % day,
+                "line_ids": lines,
+            }
+        )
         move.action_post()
-        log("posted %s %s (recv %s, ret-lines %d)" % (move.name, day, r(recv_by_date.get(day, 0.0)), len(ret_by_date.get(day, []))))
+        log(
+            "posted %s %s (recv %s, ret-lines %d)"
+            % (move.name, day, r(recv_by_date.get(day, 0.0)), len(ret_by_date.get(day, [])))
+        )
     log("moved receivable total %s, returns total %s" % (r(total_recv), r(total_ret)))
 
     # ---- verify final balances -------------------------------------------
@@ -133,7 +171,8 @@ try:
             """select coalesce(sum(l.debit-l.credit),0) from account_move_line l
                join account_move m on m.id=l.move_id
                where m.state='posted' and l.account_id=%s and l.company_id=%s""",
-            (acc.id, company.id))
+            (acc.id, company.id),
+        )
         return r(env.cr.fetchone()[0])
 
     for code in [RECV_FROM] + list(RETURN_MAP):

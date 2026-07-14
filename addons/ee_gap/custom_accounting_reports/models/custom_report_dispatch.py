@@ -100,6 +100,4 @@ class CustomReportDispatch(models.AbstractModel):
         """Build the QWeb-PDF download for ``report_code`` — mirrors the
         wizard's ``action_print``."""
         data = {"report_code": report_code, "options": options or {}}
-        return self.env.ref(
-            "custom_accounting_reports.action_report_custom_financial"
-        ).report_action([], data=data)
+        return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action([], data=data)

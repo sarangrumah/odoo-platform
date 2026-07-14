@@ -125,10 +125,7 @@ class CustomReportProfitLossBranch(models.AbstractModel):
         params.append(tuple(analytic_ids))
 
         self.env.cr.execute(sql, tuple(params))
-        return {
-            (row["account_id"], row["analytic_id"]): row["balance"] or 0.0
-            for row in self.env.cr.dictfetchall()
-        }
+        return {(row["account_id"], row["analytic_id"]): row["balance"] or 0.0 for row in self.env.cr.dictfetchall()}
 
     def _account_row(self, row, columns, per_branch):
         """One account line carrying an amount per branch column."""
@@ -151,9 +148,7 @@ class CustomReportProfitLossBranch(models.AbstractModel):
         columns = self._branch_columns()
         keys = [key for key, _label, _analytic_id in columns]
         balances = self._get_account_balances(filters)
-        per_branch = self._sum_by_account_and_branch(
-            filters, [aid for _k, _l, aid in columns if aid]
-        )
+        per_branch = self._sum_by_account_and_branch(filters, [aid for _k, _l, aid in columns if aid])
         groups = self._account_groups(list(balances))
 
         buckets = {key: [] for key, _label, _income in self._pl_buckets()}
@@ -169,17 +164,11 @@ class CustomReportProfitLossBranch(models.AbstractModel):
 
         def combine(*terms):
             """``terms`` are ``(sign, bucket)`` pairs summed per branch column."""
-            return {
-                key: sum(sign * sums[bucket][key] for sign, bucket in terms)
-                for key in keys
-            }
+            return {key: sum(sign * sums[bucket][key] for sign, bucket in terms) for key in keys}
 
         gross = combine((1, "revenue"), (-1, "cogs"))
         operating = {key: gross[key] - sums["opex"][key] for key in keys}
-        before_tax = {
-            key: operating[key] + sums["other_income"][key] - sums["other_expense"][key]
-            for key in keys
-        }
+        before_tax = {key: operating[key] + sums["other_income"][key] - sums["other_expense"][key] for key in keys}
         after_tax = {key: before_tax[key] - sums["tax"][key] for key in keys}
 
         labels = {key: label for key, label, _income in self._pl_buckets()}

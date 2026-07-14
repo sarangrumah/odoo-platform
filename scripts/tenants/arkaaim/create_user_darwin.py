@@ -22,8 +22,8 @@ By default it only PREVIEWS (no commit). Set CREATE_COMMIT = True to persist.
 LOGIN = "darwin.sitio@erajaya.com"
 NAME = "Darwin Sitio"
 TEMP_PASSWORD = "Od00!"
-PEER_LOGIN = "arman.effisan@erajaya.com"   # profile to mirror (group set + companies)
-CREATE_COMMIT = True     # True to persist; False = preview only
+PEER_LOGIN = "arman.effisan@erajaya.com"  # profile to mirror (group set + companies)
+CREATE_COMMIT = True  # True to persist; False = preview only
 # -------------------------------------------------------------------------
 
 env = self.env  # noqa: F821  (provided by odoo shell)
@@ -47,18 +47,19 @@ print("-" * 64)
 
 existing = Users.with_context(active_test=False).search([("login", "=", LOGIN)], limit=1)
 if existing:
-    print("!! User %s already exists (id=%s, active=%s) — NOT creating."
-          % (LOGIN, existing.id, existing.active))
+    print("!! User %s already exists (id=%s, active=%s) — NOT creating." % (LOGIN, existing.id, existing.active))
     new_user = existing
 else:
-    new_user = Users.create({
-        "name": NAME,
-        "login": LOGIN,
-        "password": TEMP_PASSWORD,
-        "company_id": main_company,
-        "company_ids": [(6, 0, company_ids)],
-        "group_ids": [(6, 0, group_ids)],
-    })
+    new_user = Users.create(
+        {
+            "name": NAME,
+            "login": LOGIN,
+            "password": TEMP_PASSWORD,
+            "company_id": main_company,
+            "company_ids": [(6, 0, company_ids)],
+            "group_ids": [(6, 0, group_ids)],
+        }
+    )
     print("Created user %s -> id=%s" % (LOGIN, new_user.id))
 
 print("-" * 64)
@@ -67,8 +68,7 @@ print("  login        : %s" % new_user.login)
 print("  name         : %s" % new_user.name)
 print("  main company : %s" % new_user.company_id.display_name)
 print("  companies    : %s" % ", ".join(new_user.company_ids.mapped("display_name")))
-print("  has full accounting (account_user): %s"
-      % new_user.has_group("account.group_account_user"))
+print("  has full accounting (account_user): %s" % new_user.has_group("account.group_account_user"))
 
 if CREATE_COMMIT:
     env.cr.commit()
