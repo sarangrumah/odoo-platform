@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Mapping res.partner (Odoo mitra) <-> MSG019T.ID (Oracle memberId)."""
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
@@ -19,13 +20,16 @@ class OracleMemberMap(models.Model):
         tracking=True,
     )
     oracle_member_id = fields.Integer(
-        string="Oracle Member ID", required=True, tracking=True,
+        string="Oracle Member ID",
+        required=True,
+        tracking=True,
         help="Value of MSG019T.ID for this mitra.",
     )
     oracle_member_no = fields.Char(string="Oracle Member No", readonly=True)
     oracle_member_group = fields.Char(string="Oracle Member Group", readonly=True)
     last_known_balance = fields.Monetary(
-        currency_field="currency_id", readonly=True,
+        currency_field="currency_id",
+        readonly=True,
         help="Last DEPOSIT_BALANCE seen during balance mirror sync.",
     )
     last_balance_sync = fields.Datetime(readonly=True)
@@ -37,13 +41,13 @@ class OracleMemberMap(models.Model):
     )
 
     _partner_uniq = models.Constraint(
-        'unique(partner_id)',
-        'Each mitra can only be mapped to one Oracle member.',
+        "unique(partner_id)",
+        "Each mitra can only be mapped to one Oracle member.",
     )
 
     _oracle_member_id_uniq = models.Constraint(
-        'unique(oracle_member_id)',
-        'Each Oracle member ID can only be mapped to one mitra.',
+        "unique(oracle_member_id)",
+        "Each Oracle member ID can only be mapped to one mitra.",
     )
 
     @api.constrains("oracle_member_id")
@@ -64,12 +68,14 @@ class OracleMemberMap(models.Model):
         if not rows:
             raise UserError(_("Member ID %s tidak ditemukan di Oracle MSG019T.") % self.oracle_member_id)
         _id, member_no, member_group, balance = rows
-        self.write({
-            "oracle_member_no": member_no,
-            "oracle_member_group": member_group,
-            "last_known_balance": balance or 0.0,
-            "last_balance_sync": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "oracle_member_no": member_no,
+                "oracle_member_group": member_group,
+                "last_known_balance": balance or 0.0,
+                "last_balance_sync": fields.Datetime.now(),
+            }
+        )
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",

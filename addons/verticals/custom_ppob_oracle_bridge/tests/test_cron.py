@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for the 3 Oracle Bridge cron jobs."""
+
 from odoo.tests import tagged
 
 from ..models.constants import PARAM_INBOUND_CURSOR
@@ -8,7 +9,6 @@ from .common import OracleBridgeCommon
 
 @tagged("post_install", "-at_install", "custom_ppob_oracle_bridge")
 class TestCronStatusSync(OracleBridgeCommon):
-
     def test_in_progress_to_success_when_oracle_done(self):
         with self._patch_connection():
             txn = self._make_transaction("TXN-CRON-OK")
@@ -42,7 +42,6 @@ class TestCronStatusSync(OracleBridgeCommon):
 
 @tagged("post_install", "-at_install", "custom_ppob_oracle_bridge")
 class TestCronInboundIngest(OracleBridgeCommon):
-
     def setUp(self):
         super().setUp()
         self.env["ir.config_parameter"].sudo().set_param(PARAM_INBOUND_CURSOR, "0")
@@ -61,8 +60,7 @@ class TestCronInboundIngest(OracleBridgeCommon):
         self.mock.add_msg016t(99999, "TSEL10", "LEGACY-NOMAP", status="P")
         with self._patch_connection():
             self.env["custom.ppob.transaction"]._cron_oracle_inbound_ingest()
-        skipped = self.env["custom.ppob.oracle.ingest.skipped"].search([
-            ("trx_number_client", "=", "LEGACY-NOMAP")])
+        skipped = self.env["custom.ppob.oracle.ingest.skipped"].search([("trx_number_client", "=", "LEGACY-NOMAP")])
         self.assertEqual(len(skipped), 1)
         self.assertEqual(skipped.skip_reason, "member_not_mapped")
 
@@ -87,17 +85,19 @@ class TestCronInboundIngest(OracleBridgeCommon):
 
 @tagged("post_install", "-at_install", "custom_ppob_oracle_bridge")
 class TestCronBalanceMirror(OracleBridgeCommon):
-
     def _create_oracle_wallet(self, balance=0.0):
-        return self.env["custom.ppob.wallet"].create({
-            "partner_id": self.partner.id,
-            "class_id": self.product_class.id,
-            "mirror_source": "oracle",
-            "balance": balance,
-            "account_id": self.env["account.account"].search(
-                [("account_type", "in", ["liability_current", "liability_payable"])], limit=1).id,
-            "journal_id": self._journal(self.__class__).id,
-        })
+        return self.env["custom.ppob.wallet"].create(
+            {
+                "partner_id": self.partner.id,
+                "class_id": self.product_class.id,
+                "mirror_source": "oracle",
+                "balance": balance,
+                "account_id": self.env["account.account"]
+                .search([("account_type", "in", ["liability_current", "liability_payable"])], limit=1)
+                .id,
+                "journal_id": self._journal(self.__class__).id,
+            }
+        )
 
     def test_mirror_records_delta_on_change(self):
         wallet = self._create_oracle_wallet(balance=500000.0)
@@ -106,8 +106,9 @@ class TestCronBalanceMirror(OracleBridgeCommon):
             self.env["custom.ppob.transaction"]._cron_oracle_balance_mirror()
         wallet.invalidate_recordset()
         self.assertEqual(wallet.balance, 750000.0)
-        moves = self.env["custom.ppob.wallet.move"].search([
-            ("wallet_id", "=", wallet.id), ("type", "=", "oracle_sync")])
+        moves = self.env["custom.ppob.wallet.move"].search(
+            [("wallet_id", "=", wallet.id), ("type", "=", "oracle_sync")]
+        )
         self.assertEqual(len(moves), 1)
         self.assertEqual(moves.amount_signed, 250000.0)
 
@@ -116,7 +117,8 @@ class TestCronBalanceMirror(OracleBridgeCommon):
         self.mock.msg019t[12345]["deposit_balance"] = 1000000.0
         with self._patch_connection():
             self.env["custom.ppob.transaction"]._cron_oracle_balance_mirror()
-        moves = self.env["custom.ppob.wallet.move"].search([
-            ("wallet_id", "=", wallet.id), ("type", "=", "oracle_sync")])
+        moves = self.env["custom.ppob.wallet.move"].search(
+            [("wallet_id", "=", wallet.id), ("type", "=", "oracle_sync")]
+        )
         self.assertEqual(len(moves), 0)
         self.assertTrue(self.member_map.last_balance_sync)

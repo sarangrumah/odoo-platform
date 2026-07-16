@@ -29,8 +29,7 @@ class PpobProviderTopupWizard(models.TransientModel):
         default=lambda self: "PRV-TOPUP-" + uuid.uuid4().hex[:12].upper(),
         required=True,
         copy=False,
-        help="Stable key. Re-running the wizard with the same value is a no-op "
-             "(returns existing DP/Pelunasan pair).",
+        help="Stable key. Re-running the wizard with the same value is a no-op (returns existing DP/Pelunasan pair).",
     )
     gross_amount = fields.Monetary(
         string="Gross Amount (incl. PPN, face value)",
@@ -42,8 +41,8 @@ class PpobProviderTopupWizard(models.TransientModel):
         currency_field="currency_id",
         default=0.0,
         help="Vendor discount on this topup. The deposit value stays at the "
-             "gross face; discount is journaled per provider config (income or "
-             "reduce_inventory).",
+        "gross face; discount is journaled per provider config (income or "
+        "reduce_inventory).",
     )
     paid_amount = fields.Monetary(
         string="Paid Amount",
@@ -68,15 +67,19 @@ class PpobProviderTopupWizard(models.TransientModel):
         string="Source Bank Account",
         domain="[('account_type', 'in', ['asset_cash', 'asset_current'])]",
         help="For reference only; the bill is created in draft and the user "
-             "pays it via Register Payment after the wizard finishes.",
+        "pays it via Register Payment after the wizard finishes.",
     )
     reason = fields.Char(required=True, default="Provider deposit topup")
     currency_id = fields.Many2one(related="provider_id.currency_id", readonly=True)
 
-    @api.depends("gross_amount", "discount_amount", "provider_id",
-                 "provider_id.coretax_method",
-                 "provider_id.dpp_factor",
-                 "provider_id.ppn_rate")
+    @api.depends(
+        "gross_amount",
+        "discount_amount",
+        "provider_id",
+        "provider_id.coretax_method",
+        "provider_id.dpp_factor",
+        "provider_id.ppn_rate",
+    )
     def _compute_split(self):
         for w in self:
             gross = w.gross_amount or 0.0
@@ -96,11 +99,14 @@ class PpobProviderTopupWizard(models.TransientModel):
             self.bucket_id = False
             return
         if self.provider_id.bucket_mode == "bulky":
-            bucket = self.env["custom.ppob.provider.bucket"].search([
-                ("provider_id", "=", self.provider_id.id),
-                ("mode", "=", "bulky"),
-                ("state", "=", "active"),
-            ], limit=1)
+            bucket = self.env["custom.ppob.provider.bucket"].search(
+                [
+                    ("provider_id", "=", self.provider_id.id),
+                    ("mode", "=", "bulky"),
+                    ("state", "=", "active"),
+                ],
+                limit=1,
+            )
             self.bucket_id = bucket.id if bucket else False
         else:
             self.bucket_id = False
@@ -126,23 +132,28 @@ class PpobProviderTopupWizard(models.TransientModel):
             return self._return_pair_action(existing.dp_invoice_id, existing.pelunasan_invoice_id)
 
         if not provider.dp_purchase_tax_id:
-            raise UserError(_(
-                "Provider %s has no Purchase PPN Tax configured "
-                "(dp_purchase_tax_id). Set one before running this wizard."
-            ) % provider.code)
+            raise UserError(
+                _(
+                    "Provider %s has no Purchase PPN Tax configured "
+                    "(dp_purchase_tax_id). Set one before running this wizard."
+                )
+                % provider.code
+            )
         if not provider.partner_id:
             raise UserError(_("Provider %s has no vendor partner configured.") % provider.code)
 
         log = existing or Log.create(self._prepare_log_vals())
-        log.write({
-            "gross_amount": self.gross_amount,
-            "discount_amount": self.discount_amount,
-            "dpp_amount": self.dpp_amount,
-            "ppn_amount": self.tax_amount,
-            "coretax_method": provider.coretax_method,
-            "timing": provider.topup_dp_timing,
-            "reason": self.reason,
-        })
+        log.write(
+            {
+                "gross_amount": self.gross_amount,
+                "discount_amount": self.discount_amount,
+                "dpp_amount": self.dpp_amount,
+                "ppn_amount": self.tax_amount,
+                "coretax_method": provider.coretax_method,
+                "timing": provider.topup_dp_timing,
+                "reason": self.reason,
+            }
+        )
 
         AccountMove = self.env["account.move"]
         dp_invoice = AccountMove.create(self._prepare_dp_vals(log))
@@ -150,10 +161,12 @@ class PpobProviderTopupWizard(models.TransientModel):
 
         # Two-way link
         dp_invoice.x_custom_ppob_pelunasan_bill_id = pelunasan_invoice.id
-        log.write({
-            "dp_invoice_id": dp_invoice.id,
-            "pelunasan_invoice_id": pelunasan_invoice.id,
-        })
+        log.write(
+            {
+                "dp_invoice_id": dp_invoice.id,
+                "pelunasan_invoice_id": pelunasan_invoice.id,
+            }
+        )
 
         # Post DP first; bucket credit fires via _post hook for dp_post timing.
         dp_invoice.action_post()
@@ -163,9 +176,7 @@ class PpobProviderTopupWizard(models.TransientModel):
         # Stock integration: incoming picking when bucket has an inventory
         # product. qty equals DPP (deposit face value, IDR) so 1 unit = Rp 1.
         if bucket.inventory_product_id:
-            picking_invoice = (
-                dp_invoice if provider.topup_dp_timing == "dp_post" else pelunasan_invoice
-            )
+            picking_invoice = dp_invoice if provider.topup_dp_timing == "dp_post" else pelunasan_invoice
             picking_qty = log.dpp_amount or self.dpp_amount
             bucket._stock_picking_incoming(
                 qty=picking_qty,
@@ -184,21 +195,23 @@ class PpobProviderTopupWizard(models.TransientModel):
 
     def _validate_provider_config(self, provider):
         if provider.topup_dp_timing == "pelunasan_post" and not provider.vendor_advance_account_id:
-            raise UserError(_(
-                "Provider %s: Vendor Advance Account is required for "
-                "topup_dp_timing=pelunasan_post."
-            ) % provider.code)
-        if (self.discount_amount or 0.0) > 0 \
-                and provider.discount_handling == "income" \
-                and not provider.discount_income_account_id:
-            raise UserError(_(
-                "Provider %s: Discount Income Account is required when "
-                "discount_handling=income and a discount is applied."
-            ) % provider.code)
+            raise UserError(
+                _("Provider %s: Vendor Advance Account is required for topup_dp_timing=pelunasan_post.") % provider.code
+            )
+        if (
+            (self.discount_amount or 0.0) > 0
+            and provider.discount_handling == "income"
+            and not provider.discount_income_account_id
+        ):
+            raise UserError(
+                _(
+                    "Provider %s: Discount Income Account is required when "
+                    "discount_handling=income and a discount is applied."
+                )
+                % provider.code
+            )
         if not _bucket_inventory_account(provider, self.bucket_id):
-            raise UserError(_(
-                "Bucket %s has no asset account; cannot post DP bill."
-            ) % self.bucket_id.display_name)
+            raise UserError(_("Bucket %s has no asset account; cannot post DP bill.") % self.bucket_id.display_name)
 
     def _prepare_log_vals(self):
         return {
@@ -231,35 +244,53 @@ class PpobProviderTopupWizard(models.TransientModel):
         line_account = self._dp_line_account(provider, bucket)
         dp_product = self.env.ref("custom_ppob_provider.product_provider_dp_100")
 
-        lines = [(0, 0, {
-            "product_id": dp_product.id,
-            "name": _("Provider DP 100%% — %s") % (self.reason or self.request_uid),
-            "quantity": 1.0,
-            "price_unit": self.gross_amount,
-            "account_id": line_account.id,
-            "tax_ids": [(6, 0, ppn_tax.ids)] if ppn_tax else [(6, 0, [])],
-        })]
+        lines = [
+            (
+                0,
+                0,
+                {
+                    "product_id": dp_product.id,
+                    "name": _("Provider DP 100%% — %s") % (self.reason or self.request_uid),
+                    "quantity": 1.0,
+                    "price_unit": self.gross_amount,
+                    "account_id": line_account.id,
+                    "tax_ids": [(6, 0, ppn_tax.ids)] if ppn_tax else [(6, 0, [])],
+                },
+            )
+        ]
 
         if (self.discount_amount or 0.0) > 0:
             if provider.discount_handling == "income":
                 disc_account = provider.discount_income_account_id
-                lines.append((0, 0, {
-                    "product_id": dp_product.id,
-                    "name": _("Vendor discount — %s") % self.request_uid,
-                    "quantity": 1.0,
-                    "price_unit": -self.discount_amount,
-                    "account_id": disc_account.id,
-                    "tax_ids": [(6, 0, [])],
-                }))
+                lines.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": dp_product.id,
+                            "name": _("Vendor discount — %s") % self.request_uid,
+                            "quantity": 1.0,
+                            "price_unit": -self.discount_amount,
+                            "account_id": disc_account.id,
+                            "tax_ids": [(6, 0, [])],
+                        },
+                    )
+                )
             else:  # reduce_inventory
-                lines.append((0, 0, {
-                    "product_id": dp_product.id,
-                    "name": _("Vendor discount (reduces inventory) — %s") % self.request_uid,
-                    "quantity": 1.0,
-                    "price_unit": -self.discount_amount,
-                    "account_id": line_account.id,
-                    "tax_ids": [(6, 0, [])],
-                }))
+                lines.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": dp_product.id,
+                            "name": _("Vendor discount (reduces inventory) — %s") % self.request_uid,
+                            "quantity": 1.0,
+                            "price_unit": -self.discount_amount,
+                            "account_id": line_account.id,
+                            "tax_ids": [(6, 0, [])],
+                        },
+                    )
+                )
 
         return {
             "move_type": "in_invoice",
@@ -284,42 +315,58 @@ class PpobProviderTopupWizard(models.TransientModel):
             # Net-zero pair on the bucket account: reversal without changing
             # balances. PPN already booked on DP.
             lines = [
-                (0, 0, {
-                    "product_id": product_pelunasan.id,
-                    "name": _("Pelunasan offset (DP-post mode) — %s") % self.request_uid,
-                    "quantity": 1.0,
-                    "price_unit": self.gross_amount,
-                    "account_id": bucket.account_id.id,
-                    "tax_ids": no_tax,
-                }),
-                (0, 0, {
-                    "product_id": product_pelunasan.id,
-                    "name": _("Pelunasan reversal — %s") % self.request_uid,
-                    "quantity": 1.0,
-                    "price_unit": -self.gross_amount,
-                    "account_id": bucket.account_id.id,
-                    "tax_ids": no_tax,
-                }),
+                (
+                    0,
+                    0,
+                    {
+                        "product_id": product_pelunasan.id,
+                        "name": _("Pelunasan offset (DP-post mode) — %s") % self.request_uid,
+                        "quantity": 1.0,
+                        "price_unit": self.gross_amount,
+                        "account_id": bucket.account_id.id,
+                        "tax_ids": no_tax,
+                    },
+                ),
+                (
+                    0,
+                    0,
+                    {
+                        "product_id": product_pelunasan.id,
+                        "name": _("Pelunasan reversal — %s") % self.request_uid,
+                        "quantity": 1.0,
+                        "price_unit": -self.gross_amount,
+                        "account_id": bucket.account_id.id,
+                        "tax_ids": no_tax,
+                    },
+                ),
             ]
         else:  # pelunasan_post
             # Move Vendor Advance -> Bucket Inventory at Pelunasan post.
             lines = [
-                (0, 0, {
-                    "product_id": product_pelunasan.id,
-                    "name": _("Pelunasan: recognise bucket inventory — %s") % self.request_uid,
-                    "quantity": 1.0,
-                    "price_unit": self.dpp_amount,
-                    "account_id": bucket.account_id.id,
-                    "tax_ids": no_tax,
-                }),
-                (0, 0, {
-                    "product_id": product_pelunasan.id,
-                    "name": _("Pelunasan: clear vendor advance — %s") % self.request_uid,
-                    "quantity": 1.0,
-                    "price_unit": -self.dpp_amount,
-                    "account_id": provider.vendor_advance_account_id.id,
-                    "tax_ids": no_tax,
-                }),
+                (
+                    0,
+                    0,
+                    {
+                        "product_id": product_pelunasan.id,
+                        "name": _("Pelunasan: recognise bucket inventory — %s") % self.request_uid,
+                        "quantity": 1.0,
+                        "price_unit": self.dpp_amount,
+                        "account_id": bucket.account_id.id,
+                        "tax_ids": no_tax,
+                    },
+                ),
+                (
+                    0,
+                    0,
+                    {
+                        "product_id": product_pelunasan.id,
+                        "name": _("Pelunasan: clear vendor advance — %s") % self.request_uid,
+                        "quantity": 1.0,
+                        "price_unit": -self.dpp_amount,
+                        "account_id": provider.vendor_advance_account_id.id,
+                        "tax_ids": no_tax,
+                    },
+                ),
             ]
 
         return {

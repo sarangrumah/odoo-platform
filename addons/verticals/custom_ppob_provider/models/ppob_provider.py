@@ -41,19 +41,18 @@ class PpobProvider(models.Model):
     )
     failover_priority = fields.Integer(
         default=100,
-        help="Lower number = preferred. Used when routing a transaction across "
-             "providers that map to the same SKU.",
+        help="Lower number = preferred. Used when routing a transaction across providers that map to the same SKU.",
     )
     stale_threshold_minutes = fields.Integer(
         string="Stale Threshold (minutes)",
         default=10,
         required=True,
         help="Reaper considers a transaction stale if it has been in "
-             "state=in_progress for longer than this. Tune per provider: "
-             "prepaid pulsa adapters usually respond in seconds (5-10 min is "
-             "safe), while postpaid PLN / PDAM may legitimately take 15-30 "
-             "minutes. The cron uses MAX(this, 1) to avoid reaping mid-call. "
-             "Set higher on flaky providers; never set to 0.",
+        "state=in_progress for longer than this. Tune per provider: "
+        "prepaid pulsa adapters usually respond in seconds (5-10 min is "
+        "safe), while postpaid PLN / PDAM may legitimately take 15-30 "
+        "minutes. The cron uses MAX(this, 1) to avoid reaping mid-call. "
+        "Set higher on flaky providers; never set to 0.",
     )
     bucket_mode = fields.Selection(
         selection=[
@@ -63,15 +62,15 @@ class PpobProvider(models.Model):
         default="bulky",
         required=True,
         help="Determines how prepaid deposit is partitioned. fixed_denom "
-             "creates one bucket per SKU; bulky uses a single bucket for all "
-             "products of the provider.",
+        "creates one bucket per SKU; bulky uses a single bucket for all "
+        "products of the provider.",
     )
     tax_rate_topup = fields.Float(
         string="Topup Tax Rate",
         default=0.11,
         help="VAT rate applied to the gross topup amount. The Input VAT is "
-             "posted to the Input VAT account; only the ex-tax DPP grows the "
-             "bucket balance.",
+        "posted to the Input VAT account; only the ex-tax DPP grows the "
+        "bucket balance.",
     )
     bucket_inventory_account_id = fields.Many2one(
         comodel_name="account.account",
@@ -105,14 +104,14 @@ class PpobProvider(models.Model):
     )
     credential_ref = fields.Char(
         help="Fallback ir.config_parameter key holding the API secret, used "
-             "only when no Adapter Config is linked. Never paste the secret here.",
+        "only when no Adapter Config is linked. Never paste the secret here.",
     )
     adapter_config_id = fields.Many2one(
         comodel_name="custom.adapter.config",
         string="Adapter Config",
         help="Preferred source of base URL / credential / timeout for HTTP "
-             "adapters (per-tenant, from custom_adapter_framework). Adapter "
-             "calls are also logged to custom.adapter.call.log when set.",
+        "adapters (per-tenant, from custom_adapter_framework). Adapter "
+        "calls are also logged to custom.adapter.call.log when set.",
     )
     adapter_class = fields.Selection(
         selection="_adapter_selection",
@@ -155,9 +154,9 @@ class PpobProvider(models.Model):
         default="dp_post",
         required=True,
         help="When does the bucket subledger receive the credit during a DP "
-             "100% topup? dp_post lets the DP bill carry the bucket movement; "
-             "pelunasan_post defers it to Pelunasan with a Vendor Advance asset "
-             "in between.",
+        "100% topup? dp_post lets the DP bill carry the bucket movement; "
+        "pelunasan_post defers it to Pelunasan with a Vendor Advance asset "
+        "in between.",
     )
     vendor_advance_account_id = fields.Many2one(
         comodel_name="account.account",
@@ -165,14 +164,14 @@ class PpobProvider(models.Model):
         domain="[('account_type', '=', 'asset_current')]",
         default=lambda self: _default_account(self.env, "vendor_advance"),
         help="Required when topup_dp_timing=pelunasan_post. Holds the pre-paid "
-             "amount until the Pelunasan bill recognises it as bucket inventory.",
+        "amount until the Pelunasan bill recognises it as bucket inventory.",
     )
     dp_purchase_tax_id = fields.Many2one(
         comodel_name="account.tax",
         string="Purchase PPN Tax (inclusive)",
         domain="[('type_tax_use', '=', 'purchase'), ('amount_type', '=', 'percent')]",
         help="Tax applied to DP 100% bill lines. Should be a tax-inclusive PPN "
-             "with repartition routing the tax amount to PPN Masukan.",
+        "with repartition routing the tax amount to PPN Masukan.",
     )
     coretax_method = fields.Selection(
         selection=[
@@ -182,16 +181,16 @@ class PpobProvider(models.Model):
         default="dpp_nilai_lain",
         required=True,
         help="Coretax DPP/PPN split formula. Default mirrors PMK 131/2024 DPP "
-             "nilai lain. Switch to gross_minus_ppn for jurisdictions where the "
-             "deposit value equals the gross less PPN.",
+        "nilai lain. Switch to gross_minus_ppn for jurisdictions where the "
+        "deposit value equals the gross less PPN.",
     )
     dpp_factor = fields.Float(
         string="DPP Factor",
         default=11.0 / 12.0,
         digits=(16, 12),
         help="Multiplier used in the Coretax formula. PMK 131/2024 uses 11/12 "
-             "(~0.916666666667). Stored at 12 decimals to preserve precision on "
-             "large gross amounts.",
+        "(~0.916666666667). Stored at 12 decimals to preserve precision on "
+        "large gross amounts.",
     )
     ppn_rate = fields.Float(
         string="PPN Rate",
@@ -206,9 +205,9 @@ class PpobProvider(models.Model):
         default="income",
         required=True,
         help="How vendor discounts on a topup are journaled. income posts the "
-             "saving to a Purchase Discount Received income account and keeps "
-             "inventory at face value; reduce_inventory lowers the bucket credit "
-             "by the discount amount.",
+        "saving to a Purchase Discount Received income account and keeps "
+        "inventory at face value; reduce_inventory lowers the bucket credit "
+        "by the discount amount.",
     )
     discount_income_account_id = fields.Many2one(
         comodel_name="account.account",
@@ -219,20 +218,25 @@ class PpobProvider(models.Model):
     )
 
     _code_uniq = models.Constraint(
-        'unique(code)',
-        'Provider code must be unique.',
+        "unique(code)",
+        "Provider code must be unique.",
     )
 
-    @api.constrains("topup_dp_timing", "vendor_advance_account_id",
-                    "discount_handling", "discount_income_account_id",
-                    "coretax_method", "dpp_factor", "ppn_rate")
+    @api.constrains(
+        "topup_dp_timing",
+        "vendor_advance_account_id",
+        "discount_handling",
+        "discount_income_account_id",
+        "coretax_method",
+        "dpp_factor",
+        "ppn_rate",
+    )
     def _check_dp_topup_config(self):
         for p in self:
             if p.topup_dp_timing == "pelunasan_post" and not p.vendor_advance_account_id:
-                raise ValidationError(_(
-                    "Provider %s: Vendor Advance Account is required when "
-                    "topup_dp_timing=pelunasan_post."
-                ) % p.code)
+                raise ValidationError(
+                    _("Provider %s: Vendor Advance Account is required when topup_dp_timing=pelunasan_post.") % p.code
+                )
             if p.dpp_factor <= 0 or p.dpp_factor > 1.0:
                 raise ValidationError(_("Provider %s: dpp_factor must be in (0, 1].") % p.code)
             if p.ppn_rate < 0 or p.ppn_rate > 1.0:
@@ -265,9 +269,7 @@ class PpobProvider(models.Model):
     @api.depends("bucket_ids.balance", "bucket_ids.state")
     def _compute_bucket_total_balance(self):
         for p in self:
-            p.bucket_total_balance = sum(
-                b.balance for b in p.bucket_ids if b.state == "active"
-            )
+            p.bucket_total_balance = sum(b.balance for b in p.bucket_ids if b.state == "active")
 
     @api.constrains("bucket_mode")
     def _check_mode_switch_safe(self):
@@ -275,10 +277,12 @@ class PpobProvider(models.Model):
             non_zero = p.bucket_ids.filtered(lambda b: b.state == "active" and b.balance != 0)
             mismatch = p.bucket_ids.filtered(lambda b: b.state == "active" and b.mode != p.bucket_mode)
             if non_zero and mismatch:
-                raise ValidationError(_(
-                    "Cannot switch bucket_mode while active buckets with "
-                    "non-zero balance exist. Drain or archive them first."
-                ))
+                raise ValidationError(
+                    _(
+                        "Cannot switch bucket_mode while active buckets with "
+                        "non-zero balance exist. Drain or archive them first."
+                    )
+                )
 
     def _get_adapter(self):
         self.ensure_one()
@@ -301,9 +305,10 @@ class PpobProvider(models.Model):
             domain.append(("product_id", "=", product.id))
         bucket = Bucket.search(domain, limit=1)
         if not bucket:
-            raise UserError(_(
-                "No active %(mode)s bucket for provider %(prov)s / product %(prod)s."
-            ) % {"mode": self.bucket_mode, "prov": self.code, "prod": product.code})
+            raise UserError(
+                _("No active %(mode)s bucket for provider %(prov)s / product %(prod)s.")
+                % {"mode": self.bucket_mode, "prov": self.code, "prod": product.code}
+            )
         return bucket
 
     def action_ensure_buckets(self):
@@ -313,42 +318,51 @@ class PpobProvider(models.Model):
             if p.settlement_mode != "prepaid_deposit":
                 continue
             if not p.bucket_inventory_account_id:
-                raise UserError(_(
-                    "Set Bucket Inventory Account on provider %s before "
-                    "creating buckets."
-                ) % p.display_name)
+                raise UserError(
+                    _("Set Bucket Inventory Account on provider %s before creating buckets.") % p.display_name
+                )
             if p.bucket_mode == "bulky":
-                existing = Bucket.search([
-                    ("provider_id", "=", p.id),
-                    ("mode", "=", "bulky"),
-                ], limit=1)
+                existing = Bucket.search(
+                    [
+                        ("provider_id", "=", p.id),
+                        ("mode", "=", "bulky"),
+                    ],
+                    limit=1,
+                )
                 if existing:
                     continue
-                Bucket.create({
-                    "provider_id": p.id,
-                    "mode": "bulky",
-                    "account_id": p.bucket_inventory_account_id.id,
-                    "journal_id": p.journal_id.id,
-                })
+                Bucket.create(
+                    {
+                        "provider_id": p.id,
+                        "mode": "bulky",
+                        "account_id": p.bucket_inventory_account_id.id,
+                        "journal_id": p.journal_id.id,
+                    }
+                )
             else:  # fixed_denom
                 products = p.sku_map_ids.filtered(
                     lambda s: s.active and s.product_id and s.product_id.denom > 0
                 ).mapped("product_id")
                 for product in products:
-                    existing = Bucket.search([
-                        ("provider_id", "=", p.id),
-                        ("mode", "=", "fixed_denom"),
-                        ("product_id", "=", product.id),
-                    ], limit=1)
+                    existing = Bucket.search(
+                        [
+                            ("provider_id", "=", p.id),
+                            ("mode", "=", "fixed_denom"),
+                            ("product_id", "=", product.id),
+                        ],
+                        limit=1,
+                    )
                     if existing:
                         continue
-                    Bucket.create({
-                        "provider_id": p.id,
-                        "mode": "fixed_denom",
-                        "product_id": product.id,
-                        "account_id": p.bucket_inventory_account_id.id,
-                        "journal_id": p.journal_id.id,
-                    })
+                    Bucket.create(
+                        {
+                            "provider_id": p.id,
+                            "mode": "fixed_denom",
+                            "product_id": product.id,
+                            "account_id": p.bucket_inventory_account_id.id,
+                            "journal_id": p.journal_id.id,
+                        }
+                    )
         return True
 
     def action_test_connection(self):

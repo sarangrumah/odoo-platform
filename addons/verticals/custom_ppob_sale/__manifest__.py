@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - Sale / Transaction",
     "summary": "PPOB transaction state machine, atomic wallet + bucket "
-               "drawdown, provider dispatch, stale reaper, PMK-63 margin VAT.",
+    "drawdown, provider dispatch, stale reaper, PMK-63 margin VAT.",
     "description": """
 Custom PPOB Suite - Sale / Transaction
 ======================================

@@ -5,6 +5,7 @@ All SP calls and direct queries go through this model so credentials, pool
 sizing, and SP defaults are centralised. Pool is cached per (id, dsn, username)
 at the process level and rebuilt on credential/DSN change.
 """
+
 import logging
 import threading
 
@@ -33,8 +34,7 @@ class OracleConnection(models.Model):
         string="DSN",
         required=True,
         tracking=True,
-        help="Oracle Easy Connect string: host:port/service_name. "
-             "Example: oracle-prod.internal:1521/EVSHOPDB",
+        help="Oracle Easy Connect string: host:port/service_name. Example: oracle-prod.internal:1521/EVSHOPDB",
     )
     username = fields.Char(required=True, tracking=True)
     password = fields.Char(
@@ -64,8 +64,8 @@ class OracleConnection(models.Model):
     server_version = fields.Char(readonly=True)
 
     _name_uniq = models.Constraint(
-        'unique(name)',
-        'Connection name must be unique.',
+        "unique(name)",
+        "Connection name must be unique.",
     )
 
     # ---------- Pool management ----------
@@ -76,10 +76,9 @@ class OracleConnection(models.Model):
     def _get_active(self):
         rec = self.search([("active", "=", True)], limit=1)
         if not rec:
-            raise UserError(_(
-                "Tidak ada koneksi Oracle aktif. Konfigurasi via "
-                "Configuration > Oracle Bridge > Connection."
-            ))
+            raise UserError(
+                _("Tidak ada koneksi Oracle aktif. Konfigurasi via Configuration > Oracle Bridge > Connection.")
+            )
         return rec
 
     def _get_pool(self):
@@ -123,20 +122,24 @@ class OracleConnection(models.Model):
                     cur.execute("SELECT banner FROM v$version WHERE rownum = 1")
                     row = cur.fetchone()
                     version = row[0] if row else "unknown"
-            self.write({
-                "last_test_at": fields.Datetime.now(),
-                "last_test_ok": True,
-                "last_test_msg": "OK",
-                "server_version": version,
-            })
+            self.write(
+                {
+                    "last_test_at": fields.Datetime.now(),
+                    "last_test_ok": True,
+                    "last_test_msg": "OK",
+                    "server_version": version,
+                }
+            )
             return self._notify(_("Connection OK: %s") % version, "success")
         except Exception as exc:
             _logger.exception("Oracle test connection failed")
-            self.write({
-                "last_test_at": fields.Datetime.now(),
-                "last_test_ok": False,
-                "last_test_msg": str(exc)[:1000],
-            })
+            self.write(
+                {
+                    "last_test_at": fields.Datetime.now(),
+                    "last_test_ok": False,
+                    "last_test_msg": str(exc)[:1000],
+                }
+            )
             return self._notify(_("Connection failed: %s") % exc, "danger")
 
     def _notify(self, message, ntype):
@@ -165,8 +168,7 @@ class OracleConnection(models.Model):
                 cur.callproc(full_name, keyword_parameters=bind)
                 result = {name: bind[name].getvalue() for name in out_specs}
                 conn.commit()
-        _logger.info("SP %s called with keys=%s, OUT=%s",
-                     full_name, list(params.keys()), list(out_specs.keys()))
+        _logger.info("SP %s called with keys=%s, OUT=%s", full_name, list(params.keys()), list(out_specs.keys()))
         return result
 
     def query(self, sql, params=None, fetch="all"):

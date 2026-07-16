@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - Daily Rollup",
     "summary": "Aggregate successful PPOB transactions into a daily sale.order "
-               "+ summary faktur per mitra for e-Faktur / Coretax.",
+    "+ summary faktur per mitra for e-Faktur / Coretax.",
     "description": """
 Custom PPOB Suite - Daily Rollup
 ================================

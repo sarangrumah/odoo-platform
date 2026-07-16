@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom PPOB - Wallet",
-    "summary": "Mitra prepaid wallets with atomic, row-locked debit/credit "
-               "primitives and a paired GL ledger.",
+    "summary": "Mitra prepaid wallets with atomic, row-locked debit/credit primitives and a paired GL ledger.",
     "description": """
 Custom PPOB Suite - Wallet
 ==========================

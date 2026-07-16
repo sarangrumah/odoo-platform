@@ -6,6 +6,7 @@ two HTTP controllers call after auth), so the two-feed join + GL projection +
 idempotency + skipped queue + mirror guard are all exercised without HTTP.
 Reuses the TELKO product class seeded by ``custom_ppob_core`` post_init.
 """
+
 import hashlib
 import hmac
 import json
@@ -20,38 +21,45 @@ from odoo.tools import mute_logger
 
 @tagged("post_install", "-at_install", "custom_ppob_eraspace_bridge")
 class TestEraspaceBridge(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.company = cls.env.company
         cls.Join = cls.env["custom.ppob.eraspace.txn"]
-        cls.klass = cls.env["custom.ppob.product.class"].search(
-            [("code", "=", "TELKO")], limit=1)
+        cls.klass = cls.env["custom.ppob.product.class"].search([("code", "=", "TELKO")], limit=1)
         assert cls.klass, "TELKO class should be seeded by custom_ppob_core post_init"
 
-        cls.mitra = cls.env["res.partner"].create({
-            "name": "Mitra ERASPACE",
-            "x_custom_ppob_is_mitra": True,
-            "x_custom_ppob_mitra_code": "ERA-MTR-1",
-        })
-        cls.vendor = cls.env["res.partner"].create({
-            "name": "Biller ERASPACE", "x_custom_ppob_is_provider": True,
-        })
-        cls.product = cls.env["custom.ppob.product"].create({
-            "code": "ERA_TSEL5",
-            "name": "TSEL 5k (eraspace)",
-            "class_id": cls.klass.id,
-            "denom": 5000.0,
-            "cost_price_default": 4900.0,
-        })
-        cls.provider = cls.env["custom.ppob.provider"].create({
-            "code": "ERABILL",
-            "name": "ERASPACE Biller",
-            "partner_id": cls.vendor.id,
-            "settlement_mode": "postpaid",
-            "adapter_class": "ppob_mock",
-        })
+        cls.mitra = cls.env["res.partner"].create(
+            {
+                "name": "Mitra ERASPACE",
+                "x_custom_ppob_is_mitra": True,
+                "x_custom_ppob_mitra_code": "ERA-MTR-1",
+            }
+        )
+        cls.vendor = cls.env["res.partner"].create(
+            {
+                "name": "Biller ERASPACE",
+                "x_custom_ppob_is_provider": True,
+            }
+        )
+        cls.product = cls.env["custom.ppob.product"].create(
+            {
+                "code": "ERA_TSEL5",
+                "name": "TSEL 5k (eraspace)",
+                "class_id": cls.klass.id,
+                "denom": 5000.0,
+                "cost_price_default": 4900.0,
+            }
+        )
+        cls.provider = cls.env["custom.ppob.provider"].create(
+            {
+                "code": "ERABILL",
+                "name": "ERASPACE Biller",
+                "partner_id": cls.vendor.id,
+                "settlement_mode": "postpaid",
+                "adapter_class": "ppob_mock",
+            }
+        )
 
     # ------------------------------------------------------------------
     # Helpers
@@ -87,10 +95,13 @@ class TestEraspaceBridge(TransactionCase):
         return self.Join._ingest_event("h2h", payload)
 
     def _wallet(self):
-        return self.env["custom.ppob.wallet"].search([
-            ("partner_id", "=", self.mitra.id),
-            ("class_id", "=", self.klass.id),
-        ], limit=1)
+        return self.env["custom.ppob.wallet"].search(
+            [
+                ("partner_id", "=", self.mitra.id),
+                ("class_id", "=", self.klass.id),
+            ],
+            limit=1,
+        )
 
     # ------------------------------------------------------------------
     # POS feed
@@ -106,8 +117,7 @@ class TestEraspaceBridge(TransactionCase):
         self.assertTrue(wallet.eraspace_mirror)
         # Mirror drawdown from 0 with no ceiling -> -5000.
         self.assertAlmostEqual(wallet.balance, -5000.0, places=2)
-        wm = self.env["custom.ppob.wallet.move"].search(
-            [("wallet_id", "=", wallet.id), ("type", "=", "eraspace_sale")])
+        wm = self.env["custom.ppob.wallet.move"].search([("wallet_id", "=", wallet.id), ("type", "=", "eraspace_sale")])
         self.assertEqual(len(wm), 1)
         self.assertTrue(wm.move_id, "wallet move must carry a posted GL entry")
         self.assertEqual(wm.move_id.state, "posted")
@@ -125,7 +135,8 @@ class TestEraspaceBridge(TransactionCase):
         wallet = self._wallet()
         self.assertAlmostEqual(wallet.balance, 100000.0, places=2)
         wm = self.env["custom.ppob.wallet.move"].search(
-            [("wallet_id", "=", wallet.id), ("type", "=", "eraspace_topup")])
+            [("wallet_id", "=", wallet.id), ("type", "=", "eraspace_topup")]
+        )
         self.assertEqual(len(wm), 1)
 
     def test_pos_failed_sale_posts_nothing(self):
@@ -168,15 +179,15 @@ class TestEraspaceBridge(TransactionCase):
         self._pos("POS-IDEM")
         wallet = self._wallet()
         bal_after_first = wallet.balance
-        moves_first = self.env["custom.ppob.wallet.move"].search_count(
-            [("wallet_id", "=", wallet.id)])
+        moves_first = self.env["custom.ppob.wallet.move"].search_count([("wallet_id", "=", wallet.id)])
         # Replay the identical POS event.
         join2 = self._pos("POS-IDEM")
         self.assertTrue(join2)
         self.assertAlmostEqual(self._wallet().balance, bal_after_first, places=2)
         self.assertEqual(
             self.env["custom.ppob.wallet.move"].search_count([("wallet_id", "=", wallet.id)]),
-            moves_first, "duplicate POS event must not double-post",
+            moves_first,
+            "duplicate POS event must not double-post",
         )
 
     # ------------------------------------------------------------------
@@ -185,25 +196,30 @@ class TestEraspaceBridge(TransactionCase):
 
     def test_unmapped_mitra_is_skipped(self):
         payload = {
-            "pos_trx_ref": "POS-NOMITRA", "event_type": "sale", "status": "success",
-            "mitra_ref": "DOES-NOT-EXIST", "product_code": self.product.code,
+            "pos_trx_ref": "POS-NOMITRA",
+            "event_type": "sale",
+            "status": "success",
+            "mitra_ref": "DOES-NOT-EXIST",
+            "product_code": self.product.code,
             "sell_price": 5000.0,
         }
         result = self.Join._ingest_event("pos", payload)
         self.assertFalse(result)
-        skip = self.env["custom.ppob.eraspace.ingest.skipped"].search(
-            [("external_ref", "=", "POS-NOMITRA:pos")])
+        skip = self.env["custom.ppob.eraspace.ingest.skipped"].search([("external_ref", "=", "POS-NOMITRA:pos")])
         self.assertEqual(len(skip), 1)
         self.assertEqual(skip.skip_reason, "mitra_not_mapped")
 
     def test_skipped_replay_after_mapping(self):
         payload = {
-            "pos_trx_ref": "POS-REPLAY", "event_type": "sale", "status": "success",
-            "mitra_ref": "ERA-NEW", "product_code": self.product.code, "sell_price": 5000.0,
+            "pos_trx_ref": "POS-REPLAY",
+            "event_type": "sale",
+            "status": "success",
+            "mitra_ref": "ERA-NEW",
+            "product_code": self.product.code,
+            "sell_price": 5000.0,
         }
         self.assertFalse(self.Join._ingest_event("pos", payload))
-        skip = self.env["custom.ppob.eraspace.ingest.skipped"].search(
-            [("external_ref", "=", "POS-REPLAY:pos")])
+        skip = self.env["custom.ppob.eraspace.ingest.skipped"].search([("external_ref", "=", "POS-REPLAY:pos")])
         self.assertTrue(skip)
         # Complete the mapping, then replay.
         self.mitra.copy({"name": "Mitra New", "x_custom_ppob_mitra_code": "ERA-NEW"})
@@ -218,20 +234,18 @@ class TestEraspaceBridge(TransactionCase):
 
     @mute_logger("odoo.sql_db")
     def test_native_mutation_blocked_on_mirror_wallet(self):
-        wallet = self.env["custom.ppob.wallet"].create({
-            "partner_id": self.mitra.id,
-            "class_id": self.klass.id,
-            "eraspace_mirror": True,
-        })
-        bank = self.env["custom.ppob.account.mapping"]._get_account(
-            "cash_bca_escrow", self.company)
+        wallet = self.env["custom.ppob.wallet"].create(
+            {
+                "partner_id": self.mitra.id,
+                "class_id": self.klass.id,
+                "eraspace_mirror": True,
+            }
+        )
+        bank = self.env["custom.ppob.account.mapping"]._get_account("cash_bca_escrow", self.company)
         with self.assertRaises(UserError):
-            wallet._atomic_debit(
-                amount=100.0, reason="native", counterpart_account=bank, move_type="sale")
+            wallet._atomic_debit(amount=100.0, reason="native", counterpart_account=bank, move_type="sale")
         # Mirror helper is allowed.
-        wm = wallet._mirror_debit(
-            amount=100.0, reason="mirror", counterpart_account=bank,
-            move_type="eraspace_sale")
+        wm = wallet._mirror_debit(amount=100.0, reason="mirror", counterpart_account=bank, move_type="eraspace_sale")
         self.assertTrue(wm)
         self.assertAlmostEqual(wallet.balance, -100.0, places=2)
 
@@ -262,52 +276,78 @@ class TestEraspaceIngestHttp(HttpCase):
         super().setUpClass()
         cls.secret = "eraspace-secret"
         cls.env["ir.config_parameter"].sudo().set_param("eraspace.pos.secret", cls.secret)
-        cls.env["custom.ppob.eraspace.connection"].create({
-            "feed": "pos", "credential_ref": "eraspace.pos.secret", "status": "active",
-        })
+        cls.env["custom.ppob.eraspace.connection"].create(
+            {
+                "feed": "pos",
+                "credential_ref": "eraspace.pos.secret",
+                "status": "active",
+            }
+        )
         cls.klass = cls.env["custom.ppob.product.class"].search([("code", "=", "TELKO")], limit=1)
-        cls.mitra = cls.env["res.partner"].create({
-            "name": "Mitra HTTP", "x_custom_ppob_is_mitra": True,
-            "x_custom_ppob_mitra_code": "ERA-HTTP-1",
-        })
-        cls.product = cls.env["custom.ppob.product"].create({
-            "code": "ERA_HTTP5", "name": "TSEL 5k http", "class_id": cls.klass.id,
-            "denom": 5000.0, "cost_price_default": 4900.0,
-        })
+        cls.mitra = cls.env["res.partner"].create(
+            {
+                "name": "Mitra HTTP",
+                "x_custom_ppob_is_mitra": True,
+                "x_custom_ppob_mitra_code": "ERA-HTTP-1",
+            }
+        )
+        cls.product = cls.env["custom.ppob.product"].create(
+            {
+                "code": "ERA_HTTP5",
+                "name": "TSEL 5k http",
+                "class_id": cls.klass.id,
+                "denom": 5000.0,
+                "cost_price_default": 4900.0,
+            }
+        )
 
     def _signed_post(self, path, payload):
         body = json.dumps(payload).encode()
         ts = str(int(time.time()))
         sig = hmac.new(self.secret.encode(), ts.encode() + body, hashlib.sha256).hexdigest()
-        return self.url_open(path, data=body, headers={
-            "Content-Type": "application/json",
-            "X-Signature": sig,
-            "X-Timestamp": ts,
-            "X-Odoo-Database": self.env.cr.dbname,
-        }, timeout=30)
+        return self.url_open(
+            path,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Signature": sig,
+                "X-Timestamp": ts,
+                "X-Odoo-Database": self.env.cr.dbname,
+            },
+            timeout=30,
+        )
 
     def test_pos_feed_http_posts_gl(self):
         payload = {
-            "pos_trx_ref": "HTTP-POS-1", "event_type": "sale", "status": "success",
-            "mitra_ref": "ERA-HTTP-1", "product_code": self.product.code,
-            "sell_price": 5000.0, "customer_no": "0812xxxx1111",
+            "pos_trx_ref": "HTTP-POS-1",
+            "event_type": "sale",
+            "status": "success",
+            "mitra_ref": "ERA-HTTP-1",
+            "product_code": self.product.code,
+            "sell_price": 5000.0,
+            "customer_no": "0812xxxx1111",
         }
         resp = self._signed_post("/api/ppob/eraspace/pos", payload)
         self.assertEqual(resp.status_code, 200, resp.text[:300])
         body = resp.json()
         self.assertTrue(body["ok"])
         self.assertTrue(body["posted"], body)
-        join = self.env["custom.ppob.eraspace.txn"].search(
-            [("pos_trx_ref", "=", "HTTP-POS-1")], limit=1)
+        join = self.env["custom.ppob.eraspace.txn"].search([("pos_trx_ref", "=", "HTTP-POS-1")], limit=1)
         self.assertTrue(join.pos_posted)
         self.assertTrue(join.pos_wallet_move_id.move_id, "GL entry must be posted")
 
     def test_bad_signature_rejected(self):
         body = json.dumps({"pos_trx_ref": "HTTP-BAD"}).encode()
-        resp = self.url_open("/api/ppob/eraspace/pos", data=body, headers={
-            "Content-Type": "application/json",
-            "X-Signature": "deadbeef", "X-Timestamp": str(int(time.time())),
-            "X-Odoo-Database": self.env.cr.dbname,
-        }, timeout=30)
+        resp = self.url_open(
+            "/api/ppob/eraspace/pos",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Signature": "deadbeef",
+                "X-Timestamp": str(int(time.time())),
+                "X-Odoo-Database": self.env.cr.dbname,
+            },
+            timeout=30,
+        )
         self.assertEqual(resp.status_code, 401)
         self.assertEqual(resp.json()["error_code"], "BAD_SIGNATURE")

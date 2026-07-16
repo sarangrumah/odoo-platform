@@ -24,8 +24,9 @@ class _StatusFailAdapter(PPOBProviderAdapter):
         return AdapterResult(ok=True, provider_ref="TF-PAY", amount=transaction.cost_price)
 
     def status(self, provider_ref):
-        return AdapterResult(ok=False, error_code="CONFIRMED_FAIL",
-                             error_message="provider says failed", raw={"state": "failed"})
+        return AdapterResult(
+            ok=False, error_code="CONFIRMED_FAIL", error_message="provider says failed", raw={"state": "failed"}
+        )
 
     def topup(self, amount):
         return AdapterResult(ok=True, amount=amount)
@@ -33,7 +34,6 @@ class _StatusFailAdapter(PPOBProviderAdapter):
 
 @tagged("post_install", "-at_install", "custom_ppob_sale")
 class TestPpobSale(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -43,66 +43,87 @@ class TestPpobSale(TransactionCase):
         assert cls.klass, "TELKO class should be seeded by custom_ppob_core post_init"
         cls.bank = Mapping._get_account("cash_bca_escrow", cls.company)
 
-        cls.mitra = cls.env["res.partner"].create({
-            "name": "Mitra Test",
-            "x_custom_ppob_is_mitra": True,
-            "x_custom_ppob_mitra_code": "MTRTEST1",
-        })
-        cls.vendor = cls.env["res.partner"].create({
-            "name": "Vendor Test",
-            "x_custom_ppob_is_provider": True,
-        })
-        cls.product = cls.env["custom.ppob.product"].create({
-            "code": "TSELSALE5",
-            "name": "TSEL Pulsa 5k (sale test)",
-            "class_id": cls.klass.id,
-            "denom": 5000.0,
-            "cost_price_default": 4900.0,
-        })
+        cls.mitra = cls.env["res.partner"].create(
+            {
+                "name": "Mitra Test",
+                "x_custom_ppob_is_mitra": True,
+                "x_custom_ppob_mitra_code": "MTRTEST1",
+            }
+        )
+        cls.vendor = cls.env["res.partner"].create(
+            {
+                "name": "Vendor Test",
+                "x_custom_ppob_is_provider": True,
+            }
+        )
+        cls.product = cls.env["custom.ppob.product"].create(
+            {
+                "code": "TSELSALE5",
+                "name": "TSEL Pulsa 5k (sale test)",
+                "class_id": cls.klass.id,
+                "denom": 5000.0,
+                "cost_price_default": 4900.0,
+            }
+        )
         # Mitra wallet, topped up.
-        cls.wallet = cls.env["custom.ppob.wallet"].create({
-            "partner_id": cls.mitra.id,
-            "class_id": cls.klass.id,
-        })
+        cls.wallet = cls.env["custom.ppob.wallet"].create(
+            {
+                "partner_id": cls.mitra.id,
+                "class_id": cls.klass.id,
+            }
+        )
         cls.wallet._atomic_credit(
-            amount=1_000_000.0, reason="seed", counterpart_account=cls.bank, move_type="topup",
+            amount=1_000_000.0,
+            reason="seed",
+            counterpart_account=cls.bank,
+            move_type="topup",
         )
 
     def _make_provider(self, code, adapter="ppob_mock", priority=100, mock_outcome="success"):
-        provider = self.env["custom.ppob.provider"].create({
-            "code": code,
-            "name": f"Provider {code}",
-            "partner_id": self.vendor.id,
-            "settlement_mode": "prepaid_deposit",
-            "bucket_mode": "bulky",
-            "adapter_class": adapter,
-            "mock_outcome": mock_outcome,
-            "failover_priority": priority,
-        })
+        provider = self.env["custom.ppob.provider"].create(
+            {
+                "code": code,
+                "name": f"Provider {code}",
+                "partner_id": self.vendor.id,
+                "settlement_mode": "prepaid_deposit",
+                "bucket_mode": "bulky",
+                "adapter_class": adapter,
+                "mock_outcome": mock_outcome,
+                "failover_priority": priority,
+            }
+        )
         provider.action_ensure_buckets()
         provider.bucket_ids._atomic_credit(
-            dpp_amount=500_000.0, tax_amount=0.0, gross_amount=500_000.0,
-            reason="seed bucket", counterpart_account=self.bank, move_type="topup",
+            dpp_amount=500_000.0,
+            tax_amount=0.0,
+            gross_amount=500_000.0,
+            reason="seed bucket",
+            counterpart_account=self.bank,
+            move_type="topup",
         )
-        self.env["custom.ppob.provider.sku.map"].create({
-            "provider_id": provider.id,
-            "product_id": self.product.id,
-            "provider_sku": f"SKU-{code}",
-            "buy_price": 4900.0,
-            "priority": priority,
-        })
+        self.env["custom.ppob.provider.sku.map"].create(
+            {
+                "provider_id": provider.id,
+                "product_id": self.product.id,
+                "provider_sku": f"SKU-{code}",
+                "buy_price": 4900.0,
+                "priority": priority,
+            }
+        )
         return provider
 
     def _make_txn(self, provider=None, sell=5000.0, key=None):
-        return self.env["custom.ppob.transaction"].create({
-            "mitra_id": self.mitra.id,
-            "product_id": self.product.id,
-            "msisdn": "081200000000",
-            "provider_id": provider.id if provider else False,
-            "sell_price": sell,
-            "cost_price": 4900.0,
-            "idempotency_key": key or f"K-{sell}-{id(self)}",
-        })
+        return self.env["custom.ppob.transaction"].create(
+            {
+                "mitra_id": self.mitra.id,
+                "product_id": self.product.id,
+                "msisdn": "081200000000",
+                "provider_id": provider.id if provider else False,
+                "sell_price": sell,
+                "cost_price": 4900.0,
+                "idempotency_key": key or f"K-{sell}-{id(self)}",
+            }
+        )
 
     # ------------------------------------------------------------------
     # Happy path
@@ -123,8 +144,7 @@ class TestPpobSale(TransactionCase):
         self.assertTrue(txn.wallet_move_id.move_id)
         self.assertTrue(txn.bucket_move_id.move_id)
         for move in (txn.wallet_move_id.move_id, txn.bucket_move_id.move_id):
-            self.assertAlmostEqual(sum(move.line_ids.mapped("debit")),
-                                   sum(move.line_ids.mapped("credit")), places=2)
+            self.assertAlmostEqual(sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2)
         # Subledger back-references wired.
         self.assertEqual(txn.wallet_move_id.ppob_transaction_id, txn)
         self.assertEqual(txn.bucket_move_id.ppob_transaction_id, txn)
@@ -190,29 +210,44 @@ class TestPpobSale(TransactionCase):
     # ------------------------------------------------------------------
 
     def _class(self, code, vat_mode):
-        return self.env["custom.ppob.product.class"].create({
-            "code": code, "name": code, "vat_mode": vat_mode,
-        })
+        return self.env["custom.ppob.product.class"].create(
+            {
+                "code": code,
+                "name": code,
+                "vat_mode": vat_mode,
+            }
+        )
 
     def _txn_for_mode(self, vat_mode, sell, cost):
         klass = self._class(f"VC_{vat_mode}", vat_mode)
-        product = self.env["custom.ppob.product"].create({
-            "code": f"P_{vat_mode}", "name": vat_mode, "class_id": klass.id, "denom": sell,
-        })
-        return self.env["custom.ppob.transaction"].create({
-            "mitra_id": self.mitra.id, "product_id": product.id, "msisdn": "08120000",
-            "sell_price": sell, "cost_price": cost, "idempotency_key": f"VAT-{vat_mode}",
-        })
+        product = self.env["custom.ppob.product"].create(
+            {
+                "code": f"P_{vat_mode}",
+                "name": vat_mode,
+                "class_id": klass.id,
+                "denom": sell,
+            }
+        )
+        return self.env["custom.ppob.transaction"].create(
+            {
+                "mitra_id": self.mitra.id,
+                "product_id": product.id,
+                "msisdn": "08120000",
+                "sell_price": sell,
+                "cost_price": cost,
+                "idempotency_key": f"VAT-{vat_mode}",
+            }
+        )
 
     def test_vat_margin(self):
         t = self._txn_for_mode("margin", 5000.0, 4900.0)
-        self.assertAlmostEqual(t.dpp_amount, 100.0, places=2)      # sell - cost
-        self.assertAlmostEqual(t.ppn_amount, 11.0, places=2)       # 100 * 0.11
+        self.assertAlmostEqual(t.dpp_amount, 100.0, places=2)  # sell - cost
+        self.assertAlmostEqual(t.ppn_amount, 11.0, places=2)  # 100 * 0.11
 
     def test_vat_other_valuation(self):
         t = self._txn_for_mode("other_valuation", 11000.0, 10000.0)
-        self.assertAlmostEqual(t.dpp_amount, 10000.0, places=2)    # 10/11 * sell
-        self.assertAlmostEqual(t.ppn_amount, 1100.0, places=2)     # 10000 * 0.11
+        self.assertAlmostEqual(t.dpp_amount, 10000.0, places=2)  # 10/11 * sell
+        self.assertAlmostEqual(t.ppn_amount, 1100.0, places=2)  # 10000 * 0.11
 
     def test_vat_gross(self):
         t = self._txn_for_mode("gross", 5000.0, 4900.0)
@@ -265,8 +300,7 @@ class TestPpobSale(TransactionCase):
         txn = self._make_txn(provider, key="K-REAP-FAIL")
         txn.action_dispatch()  # pay ok -> in_progress -> success (pay ok=True) ...
         # pay() ok=True marks success; force in_progress to test the reaper path.
-        txn.write({"state": "in_progress",
-                   "wallet_refund_move_id": False, "bucket_refund_move_id": False})
+        txn.write({"state": "in_progress", "wallet_refund_move_id": False, "bucket_refund_move_id": False})
         self.env.flush_all()  # persist state before the reaper's search
         self.env.cr.execute(
             "UPDATE custom_ppob_transaction SET dispatched_at = now() - interval '1 hour' WHERE id = %s",

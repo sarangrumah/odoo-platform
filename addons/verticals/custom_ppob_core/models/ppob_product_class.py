@@ -16,8 +16,7 @@ class PpobProductClass(models.Model):
         comodel_name="account.account",
         string="Default Wallet Liability Account",
         domain="[('account_type', '=', 'liability_current')]",
-        help="Account that mitra wallets of this class post to. Used when "
-             "auto-creating wallets.",
+        help="Account that mitra wallets of this class post to. Used when auto-creating wallets.",
     )
     default_revenue_account_id = fields.Many2one(
         comodel_name="account.account",
@@ -40,10 +39,10 @@ class PpobProductClass(models.Model):
         default="margin",
         required=True,
         help="How PPN (VAT) is computed for transactions of this class. "
-             "See PMK-63/2022 for pulsa/voucher distributor valuation.",
+        "See PMK-63/2022 for pulsa/voucher distributor valuation.",
     )
 
     _code_uniq = models.Constraint(
-        'unique(code)',
-        'Product class code must be unique.',
+        "unique(code)",
+        "Product class code must be unique.",
     )

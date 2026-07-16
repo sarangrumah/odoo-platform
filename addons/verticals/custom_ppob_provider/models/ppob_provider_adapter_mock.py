@@ -5,6 +5,7 @@ Behaviour is controlled by fields on ``custom.ppob.provider``:
 
 * ``mock_outcome`` - success / fail / timeout, default success.
 """
+
 import secrets
 
 from .ppob_provider_adapter_base import (
@@ -16,7 +17,6 @@ from .ppob_provider_adapter_base import (
 
 @register_adapter("ppob_mock")
 class MockProviderAdapter(PPOBProviderAdapter):
-
     def _gen_ref(self):
         return "MOCK-" + secrets.token_hex(6).upper()
 

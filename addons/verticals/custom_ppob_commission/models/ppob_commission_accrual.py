@@ -9,7 +9,8 @@ class PpobCommissionAccrual(models.Model):
     _order = "date desc, id desc"
 
     name = fields.Char(
-        required=True, copy=False,
+        required=True,
+        copy=False,
         default=lambda self: self.env["ir.sequence"].next_by_code("custom.ppob.commission.accrual") or "/",
     )
     transaction_id = fields.Many2one("custom.ppob.transaction", required=True, ondelete="cascade", index=True)
@@ -31,10 +32,14 @@ class PpobCommissionAccrual(models.Model):
     accrual_move_id = fields.Many2one("account.move", string="Accrual JE", readonly=True)
     settlement_move_id = fields.Many2one("account.move", string="Settlement JE", readonly=True)
     company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, required=True,
+        "res.company",
+        default=lambda self: self.env.company,
+        required=True,
     )
     currency_id = fields.Many2one(
-        "res.currency", default=lambda self: self.env.company.currency_id, required=True,
+        "res.currency",
+        default=lambda self: self.env.company.currency_id,
+        required=True,
     )
 
     def _acc(self, role):
@@ -55,27 +60,44 @@ class PpobCommissionAccrual(models.Model):
             debit = self._acc("mitra_rebate_expense")
             credit = self._acc("commission_payable_mitra")
         if not (debit and credit):
-            raise UserError(_("Commission accrual accounts not mapped - check the "
-                              "PPOB account mapping (commission_* roles)."))
+            raise UserError(
+                _("Commission accrual accounts not mapped - check the PPOB account mapping (commission_* roles).")
+            )
         journal = self.env.ref("custom_ppob_wallet.journal_ppob_sale", raise_if_not_found=False)
         if not journal:
             raise UserError(_("PPOB Sale journal not found."))
         ref = f"Commission {self.name} ({self.transaction_id.name})"
-        move = self.env["account.move"].create({
-            "journal_id": journal.id,
-            "move_type": "entry",
-            "ref": ref,
-            "partner_id": self.partner_id.id,
-            "line_ids": [
-                (0, 0, {
-                    "account_id": debit.id, "partner_id": self.partner_id.id,
-                    "name": ref, "debit": self.amount, "credit": 0.0,
-                }),
-                (0, 0, {
-                    "account_id": credit.id, "partner_id": self.partner_id.id,
-                    "name": ref, "debit": 0.0, "credit": self.amount,
-                }),
-            ],
-        })
+        move = self.env["account.move"].create(
+            {
+                "journal_id": journal.id,
+                "move_type": "entry",
+                "ref": ref,
+                "partner_id": self.partner_id.id,
+                "line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": debit.id,
+                            "partner_id": self.partner_id.id,
+                            "name": ref,
+                            "debit": self.amount,
+                            "credit": 0.0,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": credit.id,
+                            "partner_id": self.partner_id.id,
+                            "name": ref,
+                            "debit": 0.0,
+                            "credit": self.amount,
+                        },
+                    ),
+                ],
+            }
+        )
         move.action_post()
         self.accrual_move_id = move.id

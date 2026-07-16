@@ -29,12 +29,14 @@ class PpobRollup(models.AbstractModel):
         Txn = self.env["custom.ppob.transaction"]
         day_start = datetime.combine(rollup_date, time(0, 0, 0))
         day_end = datetime.combine(rollup_date + timedelta(days=1), time(0, 0, 0))
-        pending = Txn.search([
-            ("state", "=", "success"),
-            ("x_custom_ppob_rollup_so_id", "=", False),
-            ("completed_at", ">=", day_start),
-            ("completed_at", "<", day_end),
-        ])
+        pending = Txn.search(
+            [
+                ("state", "=", "success"),
+                ("x_custom_ppob_rollup_so_id", "=", False),
+                ("completed_at", ">=", day_start),
+                ("completed_at", "<", day_end),
+            ]
+        )
         if not pending:
             _logger.info("PPOB rollup %s: nothing to do", rollup_date)
             return 0
@@ -66,20 +68,28 @@ class PpobRollup(models.AbstractModel):
         order_line = []
         for (_pid, _price), agg in lines_by_key.items():
             odoo_product = self._ensure_odoo_product(agg["product"])
-            order_line.append((0, 0, {
-                "product_id": odoo_product.id,
-                "name": f'{agg["product"].display_name} (PPOB rollup {rollup_date})',
-                "product_uom_qty": agg["qty"],
-                "price_unit": agg["price"],
-            }))
-        so = SaleOrder.create({
-            "partner_id": mitra.id,
-            "x_custom_ppob_is_rollup": True,
-            "x_custom_ppob_rollup_date": rollup_date,
-            "date_order": datetime.combine(rollup_date, time(23, 59, 0)),
-            "order_line": order_line,
-            "client_order_ref": f"PPOB Rollup {mitra.x_custom_ppob_mitra_code or mitra.display_name} {rollup_date}",
-        })
+            order_line.append(
+                (
+                    0,
+                    0,
+                    {
+                        "product_id": odoo_product.id,
+                        "name": f"{agg['product'].display_name} (PPOB rollup {rollup_date})",
+                        "product_uom_qty": agg["qty"],
+                        "price_unit": agg["price"],
+                    },
+                )
+            )
+        so = SaleOrder.create(
+            {
+                "partner_id": mitra.id,
+                "x_custom_ppob_is_rollup": True,
+                "x_custom_ppob_rollup_date": rollup_date,
+                "date_order": datetime.combine(rollup_date, time(23, 59, 0)),
+                "order_line": order_line,
+                "client_order_ref": f"PPOB Rollup {mitra.x_custom_ppob_mitra_code or mitra.display_name} {rollup_date}",
+            }
+        )
         so.action_confirm()
         return so
 
@@ -91,14 +101,16 @@ class PpobRollup(models.AbstractModel):
         existing = Product.search([("default_code", "=", ppob_product.code)], limit=1)
         if existing:
             return existing
-        return Product.create({
-            "name": ppob_product.name,
-            "default_code": ppob_product.code,
-            "type": "service",
-            "invoice_policy": "order",
-            "list_price": ppob_product.denom or 0.0,
-            "standard_price": ppob_product.cost_price_default or 0.0,
-        })
+        return Product.create(
+            {
+                "name": ppob_product.name,
+                "default_code": ppob_product.code,
+                "type": "service",
+                "invoice_policy": "order",
+                "list_price": ppob_product.denom or 0.0,
+                "standard_price": ppob_product.cost_price_default or 0.0,
+            }
+        )
 
     def _invoice_rollup(self, so):
         """Create + post the summary invoice on the report-excluded summary
@@ -112,9 +124,11 @@ class PpobRollup(models.AbstractModel):
         moves = so._create_invoices()
         if not moves:
             return False
-        moves.write({
-            "x_custom_ppob_is_summary": True,
-            "journal_id": journal.id,
-        })
+        moves.write(
+            {
+                "x_custom_ppob_is_summary": True,
+                "journal_id": journal.id,
+            }
+        )
         moves.action_post()
         return moves

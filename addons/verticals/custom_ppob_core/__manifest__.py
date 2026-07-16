@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - Core",
     "summary": "Foundation for the PPOB vertical: mitra/provider partners, "
-               "product catalogue, pricing tiers, chart-of-account scaffolding.",
+    "product catalogue, pricing tiers, chart-of-account scaffolding.",
     "description": """
 Custom PPOB Suite - Core
 ========================

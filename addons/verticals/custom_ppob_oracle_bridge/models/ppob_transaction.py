@@ -5,6 +5,7 @@ Adds oracle_msg016t_id + inbound_source, overrides _dispatch_one to short-circui
 oracle_bridge providers (skipping native wallet/bucket debit -- Oracle owns
 saldo/inventory), and hosts the three bridge crons.
 """
+
 import json
 import logging
 
@@ -29,7 +30,9 @@ class PpobTransaction(models.Model):
     _inherit = "custom.ppob.transaction"
 
     oracle_msg016t_id = fields.Integer(
-        string="Oracle MSG016T ID", index=True, copy=False,
+        string="Oracle MSG016T ID",
+        index=True,
+        copy=False,
         help="Typed cache of MSG016T.ID (also kept as string in provider_ref).",
     )
     inbound_source = fields.Selection(
@@ -41,7 +44,7 @@ class PpobTransaction(models.Model):
         required=True,
         index=True,
         help="Origin: odoo (created via Odoo UI/API) or oracle_legacy (ingested "
-             "from MSG016T -- mitra used the EVShop Client desktop app).",
+        "from MSG016T -- mitra used the EVShop Client desktop app).",
     )
 
     # ------------------------------------------------------------------
@@ -62,12 +65,14 @@ class PpobTransaction(models.Model):
         saldo & inventory). GL posting is deferred to the terminal-state cron."""
         self.ensure_one()
         self._check_caps()
-        self.write({
-            "provider_id": provider.id,
-            "provider_sku": sku_line.provider_sku,
-            "cost_price": self.cost_price or sku_line.buy_price,
-            "dispatched_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "provider_id": provider.id,
+                "provider_sku": sku_line.provider_sku,
+                "cost_price": self.cost_price or sku_line.buy_price,
+                "dispatched_at": fields.Datetime.now(),
+            }
+        )
         adapter = provider._get_adapter()
         try:
             result = adapter.pay(self)
@@ -81,20 +86,24 @@ class PpobTransaction(models.Model):
                 msg016t_id = int(result.provider_ref) if result.provider_ref else 0
             except (TypeError, ValueError):
                 msg016t_id = 0
-            self.write({
-                "state": "in_progress",
-                "provider_ref": result.provider_ref,
-                "oracle_msg016t_id": msg016t_id,
-            })
+            self.write(
+                {
+                    "state": "in_progress",
+                    "provider_ref": result.provider_ref,
+                    "oracle_msg016t_id": msg016t_id,
+                }
+            )
             return True
 
         # Failure on dispatch -- no Odoo-side debit happened, so no refund.
-        self.write({
-            "state": "failed",
-            "error_code": result.error_code or "ORACLE_FAIL",
-            "error_message": result.error_message or "Oracle SP returned error",
-            "completed_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "state": "failed",
+                "error_code": result.error_code or "ORACLE_FAIL",
+                "error_message": result.error_message or "Oracle SP returned error",
+                "completed_at": fields.Datetime.now(),
+            }
+        )
         return False
 
     # ------------------------------------------------------------------
@@ -107,20 +116,23 @@ class PpobTransaction(models.Model):
         if not connection:
             _logger.info("Oracle Bridge: no active connection, skipping status sync")
             return
-        txns = self.search([
-            ("state", "=", "in_progress"),
-            ("provider_id.bridge_mode", "=", "oracle_bridge"),
-            ("oracle_msg016t_id", "!=", 0),
-            ("oracle_msg016t_id", "!=", False),
-        ], limit=batch_size, order="oracle_msg016t_id")
+        txns = self.search(
+            [
+                ("state", "=", "in_progress"),
+                ("provider_id.bridge_mode", "=", "oracle_bridge"),
+                ("oracle_msg016t_id", "!=", 0),
+                ("oracle_msg016t_id", "!=", False),
+            ],
+            limit=batch_size,
+            order="oracle_msg016t_id",
+        )
         if not txns:
             return
 
         ids = [t.oracle_msg016t_id for t in txns]
         bind_names = {f"id{i}": v for i, v in enumerate(ids)}
         in_clause = ",".join(":id%d" % i for i in range(len(ids)))
-        sql = ("SELECT id, status_ussd_2_provider, message_result_exec_ussd "
-               "FROM msg016t WHERE id IN (%s)" % in_clause)
+        sql = "SELECT id, status_ussd_2_provider, message_result_exec_ussd FROM msg016t WHERE id IN (%s)" % in_clause
         try:
             rows = connection.query(sql, bind_names, fetch="all")
         except Exception:
@@ -131,8 +143,9 @@ class PpobTransaction(models.Model):
         for txn in txns:
             data = status_by_id.get(txn.oracle_msg016t_id)
             if data is None:
-                _logger.warning("Oracle status sync: MSG016T id=%s for txn %s not found",
-                                txn.oracle_msg016t_id, txn.name)
+                _logger.warning(
+                    "Oracle status sync: MSG016T id=%s for txn %s not found", txn.oracle_msg016t_id, txn.name
+                )
                 continue
             status, msg = data
             if status not in ORACLE_STATUS_TERMINAL:
@@ -142,8 +155,9 @@ class PpobTransaction(models.Model):
                     if ORACLE_STATUS_MAP.get(status) == "success":
                         txn._mark_success(provider_ref=str(txn.oracle_msg016t_id), serial_token=None)
                     else:
-                        txn._mark_failed(error_code="oracle_provider_failed",
-                                         error_message=msg or "Failed by Oracle pipeline")
+                        txn._mark_failed(
+                            error_code="oracle_provider_failed", error_message=msg or "Failed by Oracle pipeline"
+                        )
             except Exception:
                 _logger.exception("Failed to transition txn %s on status %s", txn.name, status)
 
@@ -185,40 +199,83 @@ class PpobTransaction(models.Model):
         ingested = skipped = 0
 
         for row in rows:
-            (msg016t_id, trx_no_client, member_id, kode_voucher, msisdn, nominal_req,
-             sales_price, fee_amount, is_ppob, status, req_date, exec_msg, conv_id) = row
+            (
+                msg016t_id,
+                trx_no_client,
+                member_id,
+                kode_voucher,
+                msisdn,
+                nominal_req,
+                sales_price,
+                fee_amount,
+                is_ppob,
+                status,
+                req_date,
+                exec_msg,
+                conv_id,
+            ) = row
             if msg016t_id and msg016t_id > new_cursor:
                 new_cursor = msg016t_id
             try:
                 with self.env.cr.savepoint():
                     self._ingest_one_msg016t_row(
-                        Map, SkuMap, Skipped, msg016t_id, trx_no_client, member_id,
-                        kode_voucher, msisdn, sales_price, status, exec_msg,
+                        Map,
+                        SkuMap,
+                        Skipped,
+                        msg016t_id,
+                        trx_no_client,
+                        member_id,
+                        kode_voucher,
+                        msisdn,
+                        sales_price,
+                        status,
+                        exec_msg,
                     )
                 ingested += 1
             except _IngestSkipped as skip:
-                Skipped.create({
-                    "msg016t_id": msg016t_id,
-                    "oracle_member_id": member_id,
-                    "kode_voucher": kode_voucher,
-                    "trx_number_client": trx_no_client,
-                    "skip_reason": skip.reason,
-                    "raw_payload": json.dumps({
-                        "msg016t_id": msg016t_id, "trx_number_client": trx_no_client,
-                        "member_id": member_id, "kode_voucher": kode_voucher,
-                        "msisdn": msisdn, "sales_price": float(sales_price or 0), "status": status,
-                    }),
-                })
+                Skipped.create(
+                    {
+                        "msg016t_id": msg016t_id,
+                        "oracle_member_id": member_id,
+                        "kode_voucher": kode_voucher,
+                        "trx_number_client": trx_no_client,
+                        "skip_reason": skip.reason,
+                        "raw_payload": json.dumps(
+                            {
+                                "msg016t_id": msg016t_id,
+                                "trx_number_client": trx_no_client,
+                                "member_id": member_id,
+                                "kode_voucher": kode_voucher,
+                                "msisdn": msisdn,
+                                "sales_price": float(sales_price or 0),
+                                "status": status,
+                            }
+                        ),
+                    }
+                )
                 skipped += 1
             except Exception:
                 _logger.exception("Oracle ingest failed for MSG016T id=%s", msg016t_id)
 
         Param.set_param(PARAM_INBOUND_CURSOR, str(new_cursor))
-        _logger.info("Oracle inbound ingest: cursor %s -> %s, ingested=%s, skipped=%s",
-                     last_seen, new_cursor, ingested, skipped)
+        _logger.info(
+            "Oracle inbound ingest: cursor %s -> %s, ingested=%s, skipped=%s", last_seen, new_cursor, ingested, skipped
+        )
 
-    def _ingest_one_msg016t_row(self, Map, SkuMap, Skipped, msg016t_id, trx_no_client,
-                                member_id, kode_voucher, msisdn, sales_price, status, exec_msg):
+    def _ingest_one_msg016t_row(
+        self,
+        Map,
+        SkuMap,
+        Skipped,
+        msg016t_id,
+        trx_no_client,
+        member_id,
+        kode_voucher,
+        msisdn,
+        sales_price,
+        status,
+        exec_msg,
+    ):
         """Process one MSG016T row; raise _IngestSkipped if it cannot be mapped."""
         member_map = Map.search([("oracle_member_id", "=", member_id)], limit=1)
         if not member_map:
@@ -230,10 +287,13 @@ class PpobTransaction(models.Model):
             raise _IngestSkipped("voucher_not_mapped")
 
         idem_key = trx_no_client or f"MSG016T-{msg016t_id}"
-        existing = self.search([
-            ("mitra_id", "=", member_map.partner_id.id),
-            ("idempotency_key", "=", idem_key),
-        ], limit=1)
+        existing = self.search(
+            [
+                ("mitra_id", "=", member_map.partner_id.id),
+                ("idempotency_key", "=", idem_key),
+            ],
+            limit=1,
+        )
         if existing:
             if not existing.oracle_msg016t_id:
                 existing.write({"oracle_msg016t_id": msg016t_id, "provider_ref": str(msg016t_id)})
@@ -294,27 +354,32 @@ class PpobTransaction(models.Model):
             if oracle_balance is None:
                 continue
             oracle_balance = float(oracle_balance or 0)
-            wallets = Wallet.search([
-                ("partner_id", "=", m.partner_id.id),
-                ("mirror_source", "=", "oracle"),
-            ])
+            wallets = Wallet.search(
+                [
+                    ("partner_id", "=", m.partner_id.id),
+                    ("mirror_source", "=", "oracle"),
+                ]
+            )
             for w in wallets:
                 delta = oracle_balance - w.balance
                 if abs(delta) > 0.0001:
-                    WalletMove.create({
-                        "wallet_id": w.id,
-                        "type": "oracle_sync",
-                        "amount_signed": delta,
-                        "balance_after": oracle_balance,
-                        "ref": f"Oracle MSG019T sync {now}",
-                        "state": "posted",
-                    })
+                    WalletMove.create(
+                        {
+                            "wallet_id": w.id,
+                            "type": "oracle_sync",
+                            "amount_signed": delta,
+                            "balance_after": oracle_balance,
+                            "ref": f"Oracle MSG019T sync {now}",
+                            "state": "posted",
+                        }
+                    )
                     w.write({"balance": oracle_balance})
             m.write({"last_known_balance": oracle_balance, "last_balance_sync": now})
 
 
 class _IngestSkipped(Exception):
     """Internal signal used during inbound ingest to record skips."""
+
     def __init__(self, reason):
         super().__init__(reason)
         self.reason = reason

@@ -19,6 +19,7 @@ never retried and cannot double-sell.
 ``status`` is REQUIRED on every adapter. The transaction reaper refuses to
 auto-refund any transaction whose provider does not expose a status endpoint.
 """
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -39,10 +40,12 @@ _ADAPTER_REGISTRY = {}
 
 def register_adapter(name):
     """Decorator used by adapter subclasses to register by name."""
+
     def _wrap(cls):
         _ADAPTER_REGISTRY[name] = cls
         cls._adapter_name = name
         return cls
+
     return _wrap
 
 

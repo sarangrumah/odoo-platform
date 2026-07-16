@@ -10,7 +10,7 @@ class SaleOrder(models.Model):
         default=False,
         index=True,
         help="Marks sale.orders that are PPOB daily aggregates. The linked "
-             "invoice uses a summary journal excluded from the TB.",
+        "invoice uses a summary journal excluded from the TB.",
     )
     x_custom_ppob_rollup_date = fields.Date(string="Rollup Date", index=True)
     x_custom_ppob_transaction_ids = fields.One2many(

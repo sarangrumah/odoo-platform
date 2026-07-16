@@ -36,21 +36,31 @@ def _seed_sale_taxes(env, company):
     Tax = env["account.tax"].sudo().with_company(company)
     group = _tax_group(env, company)
     ppn_keluaran = env["custom.ppob.account.mapping"]._get_account("ppn_keluaran", company)
-    country = (company.account_fiscal_country_id or company.country_id
-               or env.ref("base.id", raise_if_not_found=False))
+    country = company.account_fiscal_country_id or company.country_id or env.ref("base.id", raise_if_not_found=False)
     Command = fields.Command
 
     # name -> (price_include_override, route_to_ppn_keluaran, description)
     specs = [
-        ("PPN Margin 11% (DPP nilai selisih)", "tax_excluded", False,
-         "PPN atas margin (sell-cost). PMK-63/2022."),
-        ("PPN DPP Nilai Lain 11% (10/11 x sell)", "tax_excluded", False,
-         "PPN atas DPP nilai lain 10/11 x selling price. PMK-63/2022 kode transaksi 04."),
+        ("PPN Margin 11% (DPP nilai selisih)", "tax_excluded", False, "PPN atas margin (sell-cost). PMK-63/2022."),
+        (
+            "PPN DPP Nilai Lain 11% (10/11 x sell)",
+            "tax_excluded",
+            False,
+            "PPN atas DPP nilai lain 10/11 x selling price. PMK-63/2022 kode transaksi 04.",
+        ),
         ("PPN Gross 11%", "tax_excluded", False, ""),
-        ("PPN Gross 11% (Tax-Inclusive)", "tax_included", True,
-         "PPN 11% over gross sell. Price-inclusive variant for DP 100% / Pelunasan flow."),
-        ("PPN DPP Nilai Lain 11% (Tax-Inclusive)", "tax_included", True,
-         "PPN atas DPP nilai lain 10/11 x sell. Price-inclusive variant."),
+        (
+            "PPN Gross 11% (Tax-Inclusive)",
+            "tax_included",
+            True,
+            "PPN 11% over gross sell. Price-inclusive variant for DP 100% / Pelunasan flow.",
+        ),
+        (
+            "PPN DPP Nilai Lain 11% (Tax-Inclusive)",
+            "tax_included",
+            True,
+            "PPN atas DPP nilai lain 10/11 x sell. Price-inclusive variant.",
+        ),
     ]
     for name, price_include, route, description in specs:
         existing = Tax.search(
@@ -73,11 +83,25 @@ def _seed_sale_taxes(env, company):
         if route and ppn_keluaran:
             vals["invoice_repartition_line_ids"] = [
                 Command.create({"document_type": "invoice", "repartition_type": "base", "factor_percent": 100.0}),
-                Command.create({"document_type": "invoice", "repartition_type": "tax", "factor_percent": 100.0, "account_id": ppn_keluaran.id}),
+                Command.create(
+                    {
+                        "document_type": "invoice",
+                        "repartition_type": "tax",
+                        "factor_percent": 100.0,
+                        "account_id": ppn_keluaran.id,
+                    }
+                ),
             ]
             vals["refund_repartition_line_ids"] = [
                 Command.create({"document_type": "refund", "repartition_type": "base", "factor_percent": 100.0}),
-                Command.create({"document_type": "refund", "repartition_type": "tax", "factor_percent": 100.0, "account_id": ppn_keluaran.id}),
+                Command.create(
+                    {
+                        "document_type": "refund",
+                        "repartition_type": "tax",
+                        "factor_percent": 100.0,
+                        "account_id": ppn_keluaran.id,
+                    }
+                ),
             ]
         Tax.create(vals)
 

@@ -10,6 +10,6 @@ class AccountMove(models.Model):
         default=False,
         index=True,
         help="Marks this invoice as the per-mitra-day PPOB rollup faktur. GL "
-             "revenue is already booked on the per-transaction moves; this "
-             "document lives on a report-excluded journal for audit + e-Faktur.",
+        "revenue is already booked on the per-transaction moves; this "
+        "document lives on a report-excluded journal for audit + e-Faktur.",
     )

@@ -20,6 +20,6 @@ class PpobProviderSkuMap(models.Model):
     )
 
     _prov_sku_uniq = models.Constraint(
-        'unique(provider_id, provider_sku)',
-        'Provider SKU must be unique within a provider.',
+        "unique(provider_id, provider_sku)",
+        "Provider SKU must be unique within a provider.",
     )

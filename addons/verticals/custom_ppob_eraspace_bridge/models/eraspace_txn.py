@@ -14,6 +14,7 @@ GL model (doc S7):
 
 Margin = sell - cost is computed by Odoo on the join, never taken from a feed.
 """
+
 import json
 import logging
 from datetime import timedelta
@@ -48,7 +49,10 @@ class EraspaceTxn(models.Model):
 
     name = fields.Char(default="/", copy=False, index=True)
     pos_trx_ref = fields.Char(
-        string="POS Trx Ref (correlation)", required=True, index=True, copy=False,
+        string="POS Trx Ref (correlation)",
+        required=True,
+        index=True,
+        copy=False,
     )
     match_state = fields.Selection(
         selection=[
@@ -57,13 +61,17 @@ class EraspaceTxn(models.Model):
             ("matched", "Matched"),
             ("mismatch", "Mismatch (exception)"),
         ],
-        compute="_compute_match_state", store=True, index=True,
+        compute="_compute_match_state",
+        store=True,
+        index=True,
     )
     mitra_id = fields.Many2one("res.partner", string="Mitra", index=True)
     product_id = fields.Many2one("custom.ppob.product", string="Product", index=True)
     provider_id = fields.Many2one("custom.ppob.provider", string="Biller")
     transaction_id = fields.Many2one(
-        "custom.ppob.transaction", string="Mirror Transaction", copy=False,
+        "custom.ppob.transaction",
+        string="Mirror Transaction",
+        copy=False,
     )
 
     # --- POS feed ---
@@ -105,23 +113,27 @@ class EraspaceTxn(models.Model):
     h2h_move_id = fields.Many2one("account.move", string="COGS/Deposit Entry", copy=False)
 
     margin = fields.Monetary(
-        currency_field="currency_id", compute="_compute_margin", store=True,
+        currency_field="currency_id",
+        compute="_compute_margin",
+        store=True,
     )
     recon_flagged = fields.Boolean(default=False, index=True)
     recon_note = fields.Char()
     raw_pos = fields.Text()
     raw_h2h = fields.Text()
     currency_id = fields.Many2one(
-        "res.currency", default=lambda self: self.env.company.currency_id, required=True,
+        "res.currency",
+        default=lambda self: self.env.company.currency_id,
+        required=True,
     )
     company_id = fields.Many2one(
-        "res.company", default=lambda self: self.env.company, required=True,
+        "res.company",
+        default=lambda self: self.env.company,
+        required=True,
     )
 
-    _pos_ref_uniq = models.Constraint(
-        "unique(pos_ref)", "POS feed external ref must be unique.")
-    _h2h_ref_uniq = models.Constraint(
-        "unique(h2h_ref)", "H2H feed external ref must be unique.")
+    _pos_ref_uniq = models.Constraint("unique(pos_ref)", "POS feed external ref must be unique.")
+    _h2h_ref_uniq = models.Constraint("unique(h2h_ref)", "H2H feed external ref must be unique.")
 
     # ------------------------------------------------------------------
     # Computes
@@ -172,9 +184,7 @@ class EraspaceTxn(models.Model):
     def _record_skip(self, feed, payload, skip, replay=False):
         Skipped = self.env["custom.ppob.eraspace.ingest.skipped"]
         pos_trx_ref = payload.get("pos_trx_ref") or ""
-        external_ref = payload.get("_external_ref") or (
-            pos_trx_ref + (":pos" if feed == FEED_POS else ":h2h")
-        )
+        external_ref = payload.get("_external_ref") or (pos_trx_ref + (":pos" if feed == FEED_POS else ":h2h"))
         if replay:
             # Replaying an existing skip row -- don't create a duplicate.
             existing = Skipped.search([("external_ref", "=", external_ref)], limit=1)
@@ -182,16 +192,18 @@ class EraspaceTxn(models.Model):
                 return
         if Skipped.search([("external_ref", "=", external_ref)], limit=1):
             return
-        Skipped.create({
-            "feed": feed,
-            "external_ref": external_ref,
-            "pos_trx_ref": pos_trx_ref,
-            "mitra_ref": payload.get("mitra_ref"),
-            "product_code": payload.get("product_code"),
-            "skip_reason": skip.reason,
-            "error_detail": (skip.detail or "")[:512],
-            "raw_payload": json.dumps(payload),
-        })
+        Skipped.create(
+            {
+                "feed": feed,
+                "external_ref": external_ref,
+                "pos_trx_ref": pos_trx_ref,
+                "mitra_ref": payload.get("mitra_ref"),
+                "product_code": payload.get("product_code"),
+                "skip_reason": skip.reason,
+                "error_detail": (skip.detail or "")[:512],
+                "raw_payload": json.dumps(payload),
+            }
+        )
 
     # ------------------------------------------------------------------
     # POS feed
@@ -219,8 +231,7 @@ class EraspaceTxn(models.Model):
             product = self._resolve_product(payload.get("product_code"))
         elif payload.get("product_code"):
             # Optional on top-up: used only to derive the wallet class.
-            product = self.env["custom.ppob.product"].search(
-                [("code", "=", payload["product_code"])], limit=1) or None
+            product = self.env["custom.ppob.product"].search([("code", "=", payload["product_code"])], limit=1) or None
 
         join = join or self._get_or_create_join(pos_trx_ref)
         vals = {
@@ -271,8 +282,7 @@ class EraspaceTxn(models.Model):
     def _project_pos_topup(self, mitra, klass):
         self.ensure_one()
         wallet = self._get_or_create_mirror_wallet(mitra, klass)
-        counterpart = self._resolve_account(
-            ["va_clearing", "cash_bca_escrow"], "top-up bank/clearing")
+        counterpart = self._resolve_account(["va_clearing", "cash_bca_escrow"], "top-up bank/clearing")
         wallet._mirror_credit(
             amount=self.sell_price,
             reason=_("ERASPACE top-up %s") % self.pos_trx_ref,
@@ -343,28 +353,37 @@ class EraspaceTxn(models.Model):
         """Dr COGS / Cr Biller Deposit (direct account.move)."""
         self.ensure_one()
         cogs_account = product._get_cogs_account()
-        deposit_account = self._resolve_account(
-            ["provider_deposit_default"], "biller deposit")
+        deposit_account = self._resolve_account(["provider_deposit_default"], "biller deposit")
         journal = self._mirror_journal()
-        move = self.env["account.move"].create({
-            "journal_id": journal.id,
-            "move_type": "entry",
-            "ref": _("ERASPACE H2H %s") % self.pos_trx_ref,
-            "line_ids": [
-                (0, 0, {
-                    "account_id": cogs_account.id,
-                    "name": _("COGS %s") % self.pos_trx_ref,
-                    "debit": self.cost_price,
-                    "credit": 0.0,
-                }),
-                (0, 0, {
-                    "account_id": deposit_account.id,
-                    "name": _("Biller deposit %s") % self.pos_trx_ref,
-                    "debit": 0.0,
-                    "credit": self.cost_price,
-                }),
-            ],
-        })
+        move = self.env["account.move"].create(
+            {
+                "journal_id": journal.id,
+                "move_type": "entry",
+                "ref": _("ERASPACE H2H %s") % self.pos_trx_ref,
+                "line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": cogs_account.id,
+                            "name": _("COGS %s") % self.pos_trx_ref,
+                            "debit": self.cost_price,
+                            "credit": 0.0,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": deposit_account.id,
+                            "name": _("Biller deposit %s") % self.pos_trx_ref,
+                            "debit": 0.0,
+                            "credit": self.cost_price,
+                        },
+                    ),
+                ],
+            }
+        )
         move.action_post()
         self.h2h_move_id = move.id
 
@@ -382,10 +401,13 @@ class EraspaceTxn(models.Model):
     def _resolve_mitra(self, mitra_ref):
         if not mitra_ref:
             raise _IngestSkip("mitra_not_mapped", "empty mitra_ref")
-        mitra = self.env["res.partner"].search([
-            ("x_custom_ppob_mitra_code", "=", mitra_ref),
-            ("x_custom_ppob_is_mitra", "=", True),
-        ], limit=1)
+        mitra = self.env["res.partner"].search(
+            [
+                ("x_custom_ppob_mitra_code", "=", mitra_ref),
+                ("x_custom_ppob_is_mitra", "=", True),
+            ],
+            limit=1,
+        )
         if not mitra:
             raise _IngestSkip("mitra_not_mapped", "mitra_ref=%s" % mitra_ref)
         return mitra
@@ -394,9 +416,12 @@ class EraspaceTxn(models.Model):
     def _resolve_product(self, product_code):
         if not product_code:
             raise _IngestSkip("product_not_mapped", "empty product_code")
-        product = self.env["custom.ppob.product"].search([
-            ("code", "=", product_code),
-        ], limit=1)
+        product = self.env["custom.ppob.product"].search(
+            [
+                ("code", "=", product_code),
+            ],
+            limit=1,
+        )
         if not product:
             raise _IngestSkip("product_not_mapped", "product_code=%s" % product_code)
         return product
@@ -405,9 +430,12 @@ class EraspaceTxn(models.Model):
     def _resolve_provider(self, biller_code):
         if not biller_code:
             return self.env["custom.ppob.provider"]
-        return self.env["custom.ppob.provider"].search([
-            ("code", "=", biller_code),
-        ], limit=1)
+        return self.env["custom.ppob.provider"].search(
+            [
+                ("code", "=", biller_code),
+            ],
+            limit=1,
+        )
 
     def _resolve_account(self, roles, label):
         Mapping = self.env["custom.ppob.account.mapping"]
@@ -421,10 +449,13 @@ class EraspaceTxn(models.Model):
         )
 
     def _mirror_journal(self):
-        journal = self.env["account.journal"].search([
-            ("type", "=", "general"),
-            ("company_id", "=", self.company_id.id),
-        ], limit=1)
+        journal = self.env["account.journal"].search(
+            [
+                ("type", "=", "general"),
+                ("company_id", "=", self.company_id.id),
+            ],
+            limit=1,
+        )
         if not journal:
             raise _IngestSkip("post_error", "no general journal for company")
         return journal
@@ -432,31 +463,38 @@ class EraspaceTxn(models.Model):
     def _topup_class(self, mitra):
         """Fallback product class for a top-up event without a product_code:
         the mitra's first existing wallet class."""
-        wallet = self.env["custom.ppob.wallet"].search([
-            ("partner_id", "=", mitra.id),
-        ], limit=1)
+        wallet = self.env["custom.ppob.wallet"].search(
+            [
+                ("partner_id", "=", mitra.id),
+            ],
+            limit=1,
+        )
         if not wallet:
             raise _IngestSkip("post_error", "no wallet class for top-up mitra")
         return wallet.class_id
 
     def _get_or_create_mirror_wallet(self, mitra, klass):
         Wallet = self.env["custom.ppob.wallet"]
-        wallet = Wallet.search([
-            ("partner_id", "=", mitra.id),
-            ("class_id", "=", klass.id),
-            ("company_id", "=", self.company_id.id),
-        ], limit=1)
+        wallet = Wallet.search(
+            [
+                ("partner_id", "=", mitra.id),
+                ("class_id", "=", klass.id),
+                ("company_id", "=", self.company_id.id),
+            ],
+            limit=1,
+        )
         if wallet:
             return wallet
         if not klass.default_wallet_account_id:
-            raise _IngestSkip(
-                "post_error", "class %s has no default wallet account" % klass.code)
-        return Wallet.create({
-            "partner_id": mitra.id,
-            "class_id": klass.id,
-            "company_id": self.company_id.id,
-            "eraspace_mirror": True,
-        })
+            raise _IngestSkip("post_error", "class %s has no default wallet account" % klass.code)
+        return Wallet.create(
+            {
+                "partner_id": mitra.id,
+                "class_id": klass.id,
+                "company_id": self.company_id.id,
+                "eraspace_mirror": True,
+            }
+        )
 
     def _ensure_mirror_transaction(self, mitra, product, state):
         """Get-or-create the mirror custom.ppob.transaction for this join."""
@@ -464,25 +502,30 @@ class EraspaceTxn(models.Model):
         if self.transaction_id:
             return self.transaction_id
         Txn = self.env["custom.ppob.transaction"]
-        existing = Txn.search([
-            ("mitra_id", "=", mitra.id),
-            ("idempotency_key", "=", self.pos_trx_ref),
-        ], limit=1)
+        existing = Txn.search(
+            [
+                ("mitra_id", "=", mitra.id),
+                ("idempotency_key", "=", self.pos_trx_ref),
+            ],
+            limit=1,
+        )
         if existing:
             self.transaction_id = existing.id
             return existing
-        txn = Txn.create({
-            "mitra_id": mitra.id,
-            "product_id": product.id,
-            "msisdn": self.customer_no or "-",
-            "idempotency_key": self.pos_trx_ref,
-            "sell_price": self.sell_price,
-            "cost_price": self.cost_price or product.cost_price_default or 0.0,
-            "state": state,
-            "eraspace_txn_id": self.id,
-            "provider_id": self.provider_id.id if self.provider_id else False,
-            "completed_at": fields.Datetime.now(),
-        })
+        txn = Txn.create(
+            {
+                "mitra_id": mitra.id,
+                "product_id": product.id,
+                "msisdn": self.customer_no or "-",
+                "idempotency_key": self.pos_trx_ref,
+                "sell_price": self.sell_price,
+                "cost_price": self.cost_price or product.cost_price_default or 0.0,
+                "state": state,
+                "eraspace_txn_id": self.id,
+                "provider_id": self.provider_id.id if self.provider_id else False,
+                "completed_at": fields.Datetime.now(),
+            }
+        )
         self.transaction_id = txn.id
         return txn
 
@@ -502,31 +545,39 @@ class EraspaceTxn(models.Model):
         except (TypeError, ValueError):
             sla_min = DEFAULT_POS_ONLY_SLA_MIN
         cutoff = fields.Datetime.now() - timedelta(minutes=sla_min)
-        stale = self.search([
-            ("match_state", "=", "pos_only"),
-            ("pos_status", "=", STATUS_SUCCESS),
-            ("recon_flagged", "=", False),
-            ("pos_txn_time", "<", cutoff),
-        ])
+        stale = self.search(
+            [
+                ("match_state", "=", "pos_only"),
+                ("pos_status", "=", STATUS_SUCCESS),
+                ("recon_flagged", "=", False),
+                ("pos_txn_time", "<", cutoff),
+            ]
+        )
         for rec in stale:
-            rec.write({
-                "recon_flagged": True,
-                "recon_note": _("pos_only beyond SLA (%s min) -- H2H feed missing.") % sla_min,
-            })
+            rec.write(
+                {
+                    "recon_flagged": True,
+                    "recon_note": _("pos_only beyond SLA (%s min) -- H2H feed missing.") % sla_min,
+                }
+            )
         if stale:
             _logger.warning("ERASPACE recon: %s pos_only rows flagged past SLA", len(stale))
 
         # Mismatch rows are exceptions -- flag once for ops.
-        mismatches = self.search([
-            ("match_state", "=", "mismatch"),
-            ("recon_flagged", "=", False),
-        ])
+        mismatches = self.search(
+            [
+                ("match_state", "=", "mismatch"),
+                ("recon_flagged", "=", False),
+            ]
+        )
         for rec in mismatches:
-            rec.write({
-                "recon_flagged": True,
-                "recon_note": _("Status mismatch POS=%s H2H=%s -- needs review.")
-                % (rec.pos_status, rec.h2h_status),
-            })
+            rec.write(
+                {
+                    "recon_flagged": True,
+                    "recon_note": _("Status mismatch POS=%s H2H=%s -- needs review.")
+                    % (rec.pos_status, rec.h2h_status),
+                }
+            )
 
         self._reconcile_settlements()
 

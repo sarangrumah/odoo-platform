@@ -4,6 +4,7 @@
 Does NOT touch the main ingest cursor. Idempotent -- already-ingested rows
 (matched by mitra + trx_number_client) are skipped.
 """
+
 import json
 import logging
 
@@ -19,11 +20,13 @@ class OracleBackfillWizard(models.TransientModel):
     _description = "Oracle Bridge: Backfill Wizard"
 
     from_msg016t_id = fields.Integer(
-        string="From MSG016T ID", required=True,
+        string="From MSG016T ID",
+        required=True,
         help="Lower bound (inclusive). Set to MAX(MSG016T.ID) - N to replay the last N rows.",
     )
     to_msg016t_id = fields.Integer(
-        string="To MSG016T ID", help="Upper bound (inclusive). Leave 0 for no upper limit.",
+        string="To MSG016T ID",
+        help="Upper bound (inclusive). Leave 0 for no upper limit.",
     )
     dry_run = fields.Boolean(
         default=True,
@@ -68,8 +71,7 @@ class OracleBackfillWizard(models.TransientModel):
         will_ingest = will_skip = already_exists = 0
 
         for row in rows:
-            (msg016t_id, trx_no, member_id, kode_voucher, msisdn,
-             sales_price, status, exec_msg) = row
+            (msg016t_id, trx_no, member_id, kode_voucher, msisdn, sales_price, status, exec_msg) = row
             idem_key = trx_no or f"MSG016T-{msg016t_id}"
             member_map = Map.search([("oracle_member_id", "=", member_id)], limit=1)
             sku_map = SkuMap.search([("oracle_kode_voucher", "=", kode_voucher)], limit=1)
@@ -77,25 +79,37 @@ class OracleBackfillWizard(models.TransientModel):
             if not member_map or not sku_map or not member_map.active:
                 will_skip += 1
                 if not self.dry_run:
-                    reason = ("member_not_mapped" if not member_map else
-                              ("voucher_not_mapped" if not sku_map else "member_inactive"))
-                    Skipped.create({
-                        "msg016t_id": msg016t_id,
-                        "oracle_member_id": member_id,
-                        "kode_voucher": kode_voucher,
-                        "trx_number_client": trx_no,
-                        "skip_reason": reason,
-                        "raw_payload": json.dumps({
-                            "msg016t_id": msg016t_id, "member_id": member_id,
-                            "kode_voucher": kode_voucher, "status": status,
-                        }),
-                    })
+                    reason = (
+                        "member_not_mapped"
+                        if not member_map
+                        else ("voucher_not_mapped" if not sku_map else "member_inactive")
+                    )
+                    Skipped.create(
+                        {
+                            "msg016t_id": msg016t_id,
+                            "oracle_member_id": member_id,
+                            "kode_voucher": kode_voucher,
+                            "trx_number_client": trx_no,
+                            "skip_reason": reason,
+                            "raw_payload": json.dumps(
+                                {
+                                    "msg016t_id": msg016t_id,
+                                    "member_id": member_id,
+                                    "kode_voucher": kode_voucher,
+                                    "status": status,
+                                }
+                            ),
+                        }
+                    )
                 continue
 
-            existing = Txn.search([
-                ("mitra_id", "=", member_map.partner_id.id),
-                ("idempotency_key", "=", idem_key),
-            ], limit=1)
+            existing = Txn.search(
+                [
+                    ("mitra_id", "=", member_map.partner_id.id),
+                    ("idempotency_key", "=", idem_key),
+                ],
+                limit=1,
+            )
             if existing:
                 already_exists += 1
                 continue
@@ -103,29 +117,31 @@ class OracleBackfillWizard(models.TransientModel):
             will_ingest += 1
             if not self.dry_run:
                 odoo_state = ORACLE_STATUS_MAP.get(status, "in_progress")
-                Txn.create({
-                    "mitra_id": member_map.partner_id.id,
-                    "product_id": sku_map.product_id.id,
-                    "provider_id": sku_map.provider_id.id,
-                    "provider_sku": sku_map.provider_sku,
-                    "idempotency_key": idem_key,
-                    "provider_ref": str(msg016t_id),
-                    "oracle_msg016t_id": msg016t_id,
-                    "inbound_source": "oracle_legacy",
-                    "msisdn": msisdn or "",
-                    "sell_price": float(sales_price or 0),
-                    "cost_price": float(sku_map.buy_price or sales_price or 0),
-                    "state": odoo_state,
-                })
+                Txn.create(
+                    {
+                        "mitra_id": member_map.partner_id.id,
+                        "product_id": sku_map.product_id.id,
+                        "provider_id": sku_map.provider_id.id,
+                        "provider_sku": sku_map.provider_sku,
+                        "idempotency_key": idem_key,
+                        "provider_ref": str(msg016t_id),
+                        "oracle_msg016t_id": msg016t_id,
+                        "inbound_source": "oracle_legacy",
+                        "msisdn": msisdn or "",
+                        "sell_price": float(sales_price or 0),
+                        "cost_price": float(sku_map.buy_price or sales_price or 0),
+                        "state": odoo_state,
+                    }
+                )
 
         verb = "Would ingest" if self.dry_run else "Ingested"
         self.result_summary = (
-            f'Range [{self.from_msg016t_id}..{self.to_msg016t_id or "MAX"}]\n'
+            f"Range [{self.from_msg016t_id}..{self.to_msg016t_id or 'MAX'}]\n"
             f"Total rows: {total}\n"
             f"{verb}: {will_ingest}\n"
             f"Skipped (un-mapped): {will_skip}\n"
             f"Already exists (idempotent): {already_exists}\n"
-            f'{"(DRY RUN — uncheck dry_run to apply)" if self.dry_run else ""}'
+            f"{'(DRY RUN — uncheck dry_run to apply)' if self.dry_run else ''}"
         )
         return self._reload_form()
 

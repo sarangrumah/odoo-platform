@@ -10,19 +10,19 @@ class ResPartner(models.Model):
         string="Is PPOB Mitra",
         default=False,
         help="Check this if the partner is a PPOB B2B mitra (reseller) that "
-             "holds wallets and can submit PPOB transactions.",
+        "holds wallets and can submit PPOB transactions.",
     )
     x_custom_ppob_is_provider = fields.Boolean(
         string="Is PPOB Provider",
         default=False,
         help="Check this if the partner is a PPOB provider (telco, PLN, BPJS, "
-             "aggregator) from whom PPOB pre-purchases deposits.",
+        "aggregator) from whom PPOB pre-purchases deposits.",
     )
     x_custom_ppob_mitra_code = fields.Char(
         string="Mitra Code",
         copy=False,
         help="Unique short code for the mitra (e.g., MTR001). Used on virtual "
-             "account derivation and transaction prefix.",
+        "account derivation and transaction prefix.",
     )
     x_custom_ppob_mitra_tier_id = fields.Many2one(
         comodel_name="custom.ppob.price.tier",
@@ -44,7 +44,7 @@ class ResPartner(models.Model):
         compute="_compute_x_custom_ppob_has_npwp",
         store=True,
         help="Derived from the partner's tax id (vat / NPWP). Drives the PPh "
-             "withholding rate on commission payouts (2% with NPWP, 4% without).",
+        "withholding rate on commission payouts (2% with NPWP, 4% without).",
     )
 
     @api.depends("vat")
@@ -53,14 +53,12 @@ class ResPartner(models.Model):
             partner.x_custom_ppob_has_npwp = bool(partner.vat)
 
     _x_custom_ppob_mitra_code_uniq = models.Constraint(
-        'unique(x_custom_ppob_mitra_code)',
-        'Mitra code must be unique across partners.',
+        "unique(x_custom_ppob_mitra_code)",
+        "Mitra code must be unique across partners.",
     )
 
     @api.constrains("x_custom_ppob_is_mitra", "x_custom_ppob_mitra_code")
     def _check_ppob_mitra_code(self):
         for partner in self:
             if partner.x_custom_ppob_is_mitra and not partner.x_custom_ppob_mitra_code:
-                raise ValidationError(
-                    'Mitra code is required when "Is PPOB Mitra" is set.'
-                )
+                raise ValidationError('Mitra code is required when "Is PPOB Mitra" is set.')

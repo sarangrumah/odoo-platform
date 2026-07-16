@@ -25,19 +25,17 @@ class PpobProduct(models.Model):
         string="Denomination",
         currency_field="currency_id",
         help="Nominal value for fixed-denomination products (pulsa, token). "
-             "0 means variable / open amount (PLN postpaid, BPJS).",
+        "0 means variable / open amount (PLN postpaid, BPJS).",
     )
     cost_price_default = fields.Monetary(
         string="Default Cost Price",
         currency_field="currency_id",
-        help="Default buy price. Per-provider override on "
-             "custom.ppob.provider.sku.map takes precedence.",
+        help="Default buy price. Per-provider override on custom.ppob.provider.sku.map takes precedence.",
     )
     inquiry_required = fields.Boolean(
         string="Requires Inquiry",
         default=False,
-        help="Check for products that need a 2-step flow (inquiry, then pay): "
-             "PLN postpaid, BPJS, PDAM, etc.",
+        help="Check for products that need a 2-step flow (inquiry, then pay): PLN postpaid, BPJS, PDAM, etc.",
     )
     currency_id = fields.Many2one(
         comodel_name="res.currency",
@@ -58,8 +56,8 @@ class PpobProduct(models.Model):
     )
 
     _code_uniq = models.Constraint(
-        'unique(code)',
-        'PPOB product code must be unique.',
+        "unique(code)",
+        "PPOB product code must be unique.",
     )
 
     def _get_revenue_account(self):

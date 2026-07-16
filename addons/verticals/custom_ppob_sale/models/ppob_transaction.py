@@ -78,7 +78,7 @@ class PpobTransaction(models.Model):
         compute="_compute_tax",
         store=True,
         help="Taxable base (Dasar Pengenaan Pajak). Computed per class vat_mode; "
-             "recognised in GL at the daily rollup faktur, not per transaction.",
+        "recognised in GL at the daily rollup faktur, not per transaction.",
     )
     ppn_amount = fields.Monetary(
         string="PPN",
@@ -131,8 +131,8 @@ class PpobTransaction(models.Model):
     )
 
     _mitra_idempotency_uniq = models.Constraint(
-        'unique(mitra_id, idempotency_key)',
-        'Idempotency key must be unique per mitra.',
+        "unique(mitra_id, idempotency_key)",
+        "Idempotency key must be unique per mitra.",
     )
 
     # ------------------------------------------------------------------
@@ -166,10 +166,13 @@ class PpobTransaction(models.Model):
         Wallet = self.env["custom.ppob.wallet"]
         for t in self:
             if t.mitra_id and t.class_id:
-                t.wallet_id = Wallet.search([
-                    ("partner_id", "=", t.mitra_id.id),
-                    ("class_id", "=", t.class_id.id),
-                ], limit=1)
+                t.wallet_id = Wallet.search(
+                    [
+                        ("partner_id", "=", t.mitra_id.id),
+                        ("class_id", "=", t.class_id.id),
+                    ],
+                    limit=1,
+                )
             else:
                 t.wallet_id = False
 
@@ -181,9 +184,10 @@ class PpobTransaction(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("idempotency_key"):
-                vals["idempotency_key"] = self.env["ir.sequence"].next_by_code(
-                    "custom.ppob.transaction"
-                ) or self.env.cr.mogrify("%s", (fields.Datetime.now(),)).decode()
+                vals["idempotency_key"] = (
+                    self.env["ir.sequence"].next_by_code("custom.ppob.transaction")
+                    or self.env.cr.mogrify("%s", (fields.Datetime.now(),)).decode()
+                )
             if not vals.get("cost_price"):
                 product = self.env["custom.ppob.product"].browse(vals.get("product_id"))
                 vals["cost_price"] = product.cost_price_default if product else 0.0
@@ -197,20 +201,27 @@ class PpobTransaction(models.Model):
         """Pick the best provider for the product based on priority."""
         self.ensure_one()
         if self.provider_id:
-            sku = self.env["custom.ppob.provider.sku.map"].search([
-                ("provider_id", "=", self.provider_id.id),
-                ("product_id", "=", self.product_id.id),
-                ("active", "=", True),
-            ], limit=1)
+            sku = self.env["custom.ppob.provider.sku.map"].search(
+                [
+                    ("provider_id", "=", self.provider_id.id),
+                    ("product_id", "=", self.product_id.id),
+                    ("active", "=", True),
+                ],
+                limit=1,
+            )
             if sku:
                 return self.provider_id, sku
-            raise UserError(_("No SKU map for provider %s and product %s.") % (
-                self.provider_id.code, self.product_id.code))
-        candidates = self.env["custom.ppob.provider.sku.map"].search([
-            ("product_id", "=", self.product_id.id),
-            ("active", "=", True),
-            ("provider_id.status", "=", "active"),
-        ], order="priority asc, id asc")
+            raise UserError(
+                _("No SKU map for provider %s and product %s.") % (self.provider_id.code, self.product_id.code)
+            )
+        candidates = self.env["custom.ppob.provider.sku.map"].search(
+            [
+                ("product_id", "=", self.product_id.id),
+                ("active", "=", True),
+                ("provider_id.status", "=", "active"),
+            ],
+            order="priority asc, id asc",
+        )
         if not candidates:
             raise UserError(_("No active provider route for product %s.") % self.product_id.code)
         chosen = candidates[0]
@@ -228,19 +239,27 @@ class PpobTransaction(models.Model):
         month_start = today.replace(day=1)
         Txn = self.env["custom.ppob.transaction"]
         if daily_cap:
-            daily = sum(Txn.search([
-                ("mitra_id", "=", mitra.id),
-                ("state", "in", ["success", "in_progress"]),
-                ("dispatched_at", ">=", fields.Datetime.to_datetime(today)),
-            ]).mapped("sell_price"))
+            daily = sum(
+                Txn.search(
+                    [
+                        ("mitra_id", "=", mitra.id),
+                        ("state", "in", ["success", "in_progress"]),
+                        ("dispatched_at", ">=", fields.Datetime.to_datetime(today)),
+                    ]
+                ).mapped("sell_price")
+            )
             if daily + self.sell_price > daily_cap:
                 raise UserError(_("Mitra daily transaction cap exceeded."))
         if monthly_cap:
-            monthly = sum(Txn.search([
-                ("mitra_id", "=", mitra.id),
-                ("state", "in", ["success", "in_progress"]),
-                ("dispatched_at", ">=", fields.Datetime.to_datetime(month_start)),
-            ]).mapped("sell_price"))
+            monthly = sum(
+                Txn.search(
+                    [
+                        ("mitra_id", "=", mitra.id),
+                        ("state", "in", ["success", "in_progress"]),
+                        ("dispatched_at", ">=", fields.Datetime.to_datetime(month_start)),
+                    ]
+                ).mapped("sell_price")
+            )
             if monthly + self.sell_price > monthly_cap:
                 raise UserError(_("Mitra monthly transaction cap exceeded."))
 
@@ -266,15 +285,22 @@ class PpobTransaction(models.Model):
         acc = self.env["custom.ppob.account.mapping"]._get_account("ppn_keluaran", self.company_id)
         if acc:
             return acc
-        acc = self.env["account.account"].with_company(self.company_id).search(
-            [("code", "=", "2.1.8.01"), ("company_ids", "in", self.company_id.id)], limit=1,
+        acc = (
+            self.env["account.account"]
+            .with_company(self.company_id)
+            .search(
+                [("code", "=", "2.1.8.01"), ("company_ids", "in", self.company_id.id)],
+                limit=1,
+            )
         )
         if acc:
             return acc
-        raise UserError(_(
-            "No Output VAT (PPN Keluaran) account found. Expected the "
-            "ppn_keluaran role mapping or account code 2.1.8.01."
-        ))
+        raise UserError(
+            _(
+                "No Output VAT (PPN Keluaran) account found. Expected the "
+                "ppn_keluaran role mapping or account code 2.1.8.01."
+            )
+        )
 
     # ------------------------------------------------------------------
     # State transitions
@@ -299,20 +325,26 @@ class PpobTransaction(models.Model):
         # the existing cost only when the resolved sku_line carries no price.
         resolved_cost = sku_line.buy_price or self.cost_price
         if not resolved_cost:
-            raise UserError(_(
-                "Transaction %s: cannot resolve cost_price. SKU map for "
-                "provider %s / product %s has buy_price=0 and the transaction "
-                "was created without a default cost."
-            ) % (self.name, provider.code, self.product_id.code))
-        self.write({
-            "provider_id": provider.id,
-            "provider_sku": sku_line.provider_sku,
-            "cost_price": resolved_cost,
-        })
+            raise UserError(
+                _(
+                    "Transaction %s: cannot resolve cost_price. SKU map for "
+                    "provider %s / product %s has buy_price=0 and the transaction "
+                    "was created without a default cost."
+                )
+                % (self.name, provider.code, self.product_id.code)
+            )
+        self.write(
+            {
+                "provider_id": provider.id,
+                "provider_sku": sku_line.provider_sku,
+                "cost_price": resolved_cost,
+            }
+        )
 
         if not self.wallet_id:
-            raise UserError(_("Mitra %s has no wallet for class %s.") % (
-                self.mitra_id.display_name, self.class_id.code))
+            raise UserError(
+                _("Mitra %s has no wallet for class %s.") % (self.mitra_id.display_name, self.class_id.code)
+            )
 
         # 1. Debit mitra wallet (raises on insufficient).
         wallet_move = self.wallet_id._atomic_debit(
@@ -350,10 +382,12 @@ class PpobTransaction(models.Model):
         # posts its own paired entry). There is no separate compound sale move
         # (the ERA source's _post_sale_move was dead code -- see D7). PPN is
         # recognised at the daily rollup faktur, not per transaction.
-        self.write({
-            "state": "in_progress",
-            "dispatched_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "state": "in_progress",
+                "dispatched_at": fields.Datetime.now(),
+            }
+        )
 
         # 4. Fire the adapter (best-effort; on failure we refund).
         adapter = provider._get_adapter()
@@ -379,23 +413,27 @@ class PpobTransaction(models.Model):
 
     def _mark_success(self, provider_ref=None, serial_token=None):
         self.ensure_one()
-        self.write({
-            "state": "success",
-            "provider_ref": provider_ref,
-            "serial_token": serial_token,
-            "completed_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "state": "success",
+                "provider_ref": provider_ref,
+                "serial_token": serial_token,
+                "completed_at": fields.Datetime.now(),
+            }
+        )
         return True
 
     def _mark_failed(self, error_code=None, error_message=None):
         """Failure path: reverse wallet debit + provider deposit debit,
         create reversing journal entries, set state=failed."""
         self.ensure_one()
-        self.write({
-            "error_code": error_code,
-            "error_message": error_message,
-            "completed_at": fields.Datetime.now(),
-        })
+        self.write(
+            {
+                "error_code": error_code,
+                "error_message": error_message,
+                "completed_at": fields.Datetime.now(),
+            }
+        )
         self._refund_subledgers()
         self.state = "failed"
         return False
@@ -451,24 +489,26 @@ class PpobTransaction(models.Model):
     def action_retry(self):
         """Create a clone with attempt_no + 1, preserving the idempotency family."""
         self.ensure_one()
-        clone = self.copy({
-            "idempotency_key": f"{self.idempotency_key}/R{self.attempt_no + 1}",
-            "attempt_no": self.attempt_no + 1,
-            "state": "pending",
-            "provider_ref": False,
-            "serial_token": False,
-            "raw_response": False,
-            "error_code": False,
-            "error_message": False,
-            "move_id": False,
-            "wallet_move_id": False,
-            "wallet_refund_move_id": False,
-            "bucket_id": False,
-            "bucket_move_id": False,
-            "bucket_refund_move_id": False,
-            "dispatched_at": False,
-            "completed_at": False,
-        })
+        clone = self.copy(
+            {
+                "idempotency_key": f"{self.idempotency_key}/R{self.attempt_no + 1}",
+                "attempt_no": self.attempt_no + 1,
+                "state": "pending",
+                "provider_ref": False,
+                "serial_token": False,
+                "raw_response": False,
+                "error_code": False,
+                "error_message": False,
+                "move_id": False,
+                "wallet_move_id": False,
+                "wallet_refund_move_id": False,
+                "bucket_id": False,
+                "bucket_move_id": False,
+                "bucket_refund_move_id": False,
+                "dispatched_at": False,
+                "completed_at": False,
+            }
+        )
         return {
             "type": "ir.actions.act_window",
             "res_model": "custom.ppob.transaction",
@@ -494,10 +534,12 @@ class PpobTransaction(models.Model):
         # Coarse pre-filter (older than 1 minute); per-provider threshold is
         # then checked in the loop below to avoid loading the whole table.
         coarse_cutoff = now - timedelta(minutes=1)
-        candidates = self.search([
-            ("state", "=", "in_progress"),
-            ("dispatched_at", "<", coarse_cutoff),
-        ])
+        candidates = self.search(
+            [
+                ("state", "=", "in_progress"),
+                ("dispatched_at", "<", coarse_cutoff),
+            ]
+        )
         stale = self.env["custom.ppob.transaction"]
         for txn in candidates:
             if stale_minutes is not None:
@@ -518,8 +560,9 @@ class PpobTransaction(models.Model):
                 result = adapter.status(txn.provider_ref or txn.name)
             except NotImplementedError:
                 _logger.warning(
-                    "Provider %s has no status() - not auto-refunding %s. "
-                    "Manual ops required.", txn.provider_id.code, txn.name,
+                    "Provider %s has no status() - not auto-refunding %s. Manual ops required.",
+                    txn.provider_id.code,
+                    txn.name,
                 )
                 continue
             except Exception as exc:
@@ -533,9 +576,11 @@ class PpobTransaction(models.Model):
                     serial_token=result.serial_token,
                 )
             elif not result.ok or remote_state in ("failed", "rejected"):
-                txn.write({
-                    "error_code": result.error_code or "STALE_CONFIRMED_FAIL",
-                    "error_message": result.error_message or "Status check confirmed failure.",
-                })
+                txn.write(
+                    {
+                        "error_code": result.error_code or "STALE_CONFIRMED_FAIL",
+                        "error_message": result.error_message or "Status check confirmed failure.",
+                    }
+                )
                 txn._refund_subledgers()
                 txn.state = "timeout"

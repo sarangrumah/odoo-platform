@@ -7,6 +7,7 @@ instead of reconciling against an AR/AP move line. Integrated into the platform
 reconcile flow by overriding ``_custom_apply_reconcile_rules`` on the statement
 line so VA rules run before the standard AR/AP matching.
 """
+
 import re
 
 from odoo import _, api, fields, models
@@ -28,13 +29,12 @@ class ReconcileRule(models.Model):
     )
     va_bank_code = fields.Selection(
         selection=BANK_CODES,
-        help="Only used when rule_type=va_match. Restricts the VA lookup to "
-             "this bank.",
+        help="Only used when rule_type=va_match. Restricts the VA lookup to this bank.",
     )
     va_extract_regex = fields.Char(
         string="VA Extract Regex",
         help="Python regex with a named capture group ``va`` that extracts the "
-             "VA number from the statement payment_ref.",
+        "VA number from the statement payment_ref.",
     )
 
     @api.constrains("rule_type", "va_extract_regex")
@@ -73,20 +73,21 @@ class ReconcileRule(models.Model):
             return False
 
         Topup = self.env["custom.ppob.va.topup"]
-        details = statement_line.transaction_details if isinstance(
-            statement_line.transaction_details, dict) else {}
+        details = statement_line.transaction_details if isinstance(statement_line.transaction_details, dict) else {}
         bank_ref = details.get("ref") or statement_line.ref or statement_line.payment_ref
         existing = Topup.search([("bank_ref", "=", bank_ref)], limit=1)
         if existing:
             return existing
-        topup = Topup.create({
-            "va_account_id": va.id,
-            "amount": abs(statement_line.amount or 0.0),
-            "bank_ref": bank_ref or f"{statement_line.id}",
-            "source": "csv_import",
-            "state": "settled",
-            "statement_line_id": statement_line.id,
-        })
+        topup = Topup.create(
+            {
+                "va_account_id": va.id,
+                "amount": abs(statement_line.amount or 0.0),
+                "bank_ref": bank_ref or f"{statement_line.id}",
+                "source": "csv_import",
+                "state": "settled",
+                "statement_line_id": statement_line.id,
+            }
+        )
         topup.action_credit_wallet()
         return topup
 
@@ -98,9 +99,7 @@ class AccountBankStatementLine(models.Model):
         """Run VA-topup rules first; fall back to the standard AR/AP matching."""
         self.ensure_one()
         if not self.is_reconciled:
-            va_rules = self._custom_applicable_rules().filtered(
-                lambda r: r.rule_type == "va_match"
-            )
+            va_rules = self._custom_applicable_rules().filtered(lambda r: r.rule_type == "va_match")
             for rule in va_rules:
                 topup = rule._apply_va_match(self)
                 if topup:

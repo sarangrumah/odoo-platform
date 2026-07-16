@@ -6,6 +6,7 @@ Lives here (not in custom_ppob_provider) because this module owns
 ``_stock_picking_outgoing`` fills this column when it exists, keeping the
 provider module independently installable.
 """
+
 from odoo import fields, models
 
 

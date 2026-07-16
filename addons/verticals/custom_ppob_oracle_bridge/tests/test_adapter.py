@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for OracleBridgeAdapter."""
+
 from odoo.tests import tagged
 
 from .common import OracleBridgeCommon
@@ -7,7 +8,6 @@ from .common import OracleBridgeCommon
 
 @tagged("post_install", "-at_install", "custom_ppob_oracle_bridge")
 class TestOracleBridgeAdapter(OracleBridgeCommon):
-
     def test_pay_success_creates_msg016t(self):
         with self._patch_connection():
             adapter = self.provider._get_adapter()
@@ -97,6 +97,7 @@ class TestOracleBridgeAdapter(OracleBridgeCommon):
     def test_idempotency_unique_key_per_mitra(self):
         from psycopg2 import IntegrityError
         from odoo.tools.misc import mute_logger
+
         with self._patch_connection():
             txn1 = self._make_transaction("TXN-DUP")
             txn1.action_dispatch()

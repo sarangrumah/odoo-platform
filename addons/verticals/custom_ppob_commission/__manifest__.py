@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - Commission",
     "summary": "Two-way PPOB commissions: provider->us income and us->mitra "
-               "rebate with PPh 23 withholding via the platform engine.",
+    "rebate with PPh 23 withholding via the platform engine.",
     "description": """
 Custom PPOB Suite - Commission
 ==============================

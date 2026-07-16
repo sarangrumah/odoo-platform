@@ -26,19 +26,20 @@ def _tax_group(env, company):
         limit=1,
     )
     if not group:
-        group = Group.create({
-            "name": TAX_GROUP_NAME,
-            "sequence": 10,
-            "company_id": company.id,
-        })
+        group = Group.create(
+            {
+                "name": TAX_GROUP_NAME,
+                "sequence": 10,
+                "company_id": company.id,
+            }
+        )
     return group
 
 
 def _ensure_purchase_ppn_tax(env, company):
     Tax = env["account.tax"].sudo().with_company(company)
     existing = Tax.search(
-        [("name", "=", TAX_NAME), ("company_id", "=", company.id),
-         ("type_tax_use", "=", "purchase")],
+        [("name", "=", TAX_NAME), ("company_id", "=", company.id), ("type_tax_use", "=", "purchase")],
         limit=1,
     )
     if existing:
@@ -46,35 +47,50 @@ def _ensure_purchase_ppn_tax(env, company):
     ppn_masukan = env["custom.ppob.account.mapping"]._get_account("ppn_masukan", company)
     if not ppn_masukan:
         _logger.warning(
-            "custom_ppob_provider: PPN Masukan account not mapped for %s; "
-            "skipping purchase PPN tax seed.", company.name,
+            "custom_ppob_provider: PPN Masukan account not mapped for %s; skipping purchase PPN tax seed.",
+            company.name,
         )
         return env["account.tax"]
     group = _tax_group(env, company)
-    country = (company.account_fiscal_country_id or company.country_id
-               or env.ref("base.id", raise_if_not_found=False))
+    country = company.account_fiscal_country_id or company.country_id or env.ref("base.id", raise_if_not_found=False)
     Command = fields.Command
-    return Tax.create({
-        "name": TAX_NAME,
-        "amount_type": "percent",
-        "amount": 11.0,
-        "type_tax_use": "purchase",
-        "price_include_override": "tax_included",
-        "tax_group_id": group.id,
-        "company_id": company.id,
-        "country_id": country.id if country else False,
-        "description": "Coretax PMK 131/2024 (effective 11% inclusive). "
-                       "For gross 5,000,000: DPP = gross / 1.11 = 4,504,504.50; "
-                       "PPN = gross - DPP = 495,495.50.",
-        "invoice_repartition_line_ids": [
-            Command.create({"document_type": "invoice", "repartition_type": "base", "factor_percent": 100.0}),
-            Command.create({"document_type": "invoice", "repartition_type": "tax", "factor_percent": 100.0, "account_id": ppn_masukan.id}),
-        ],
-        "refund_repartition_line_ids": [
-            Command.create({"document_type": "refund", "repartition_type": "base", "factor_percent": 100.0}),
-            Command.create({"document_type": "refund", "repartition_type": "tax", "factor_percent": 100.0, "account_id": ppn_masukan.id}),
-        ],
-    })
+    return Tax.create(
+        {
+            "name": TAX_NAME,
+            "amount_type": "percent",
+            "amount": 11.0,
+            "type_tax_use": "purchase",
+            "price_include_override": "tax_included",
+            "tax_group_id": group.id,
+            "company_id": company.id,
+            "country_id": country.id if country else False,
+            "description": "Coretax PMK 131/2024 (effective 11% inclusive). "
+            "For gross 5,000,000: DPP = gross / 1.11 = 4,504,504.50; "
+            "PPN = gross - DPP = 495,495.50.",
+            "invoice_repartition_line_ids": [
+                Command.create({"document_type": "invoice", "repartition_type": "base", "factor_percent": 100.0}),
+                Command.create(
+                    {
+                        "document_type": "invoice",
+                        "repartition_type": "tax",
+                        "factor_percent": 100.0,
+                        "account_id": ppn_masukan.id,
+                    }
+                ),
+            ],
+            "refund_repartition_line_ids": [
+                Command.create({"document_type": "refund", "repartition_type": "base", "factor_percent": 100.0}),
+                Command.create(
+                    {
+                        "document_type": "refund",
+                        "repartition_type": "tax",
+                        "factor_percent": 100.0,
+                        "account_id": ppn_masukan.id,
+                    }
+                ),
+            ],
+        }
+    )
 
 
 def post_init_hook(env):

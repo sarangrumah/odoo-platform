@@ -35,7 +35,7 @@ class PpobProviderTopupLog(models.Model):
         index=True,
         default=lambda self: "PRV-TOPUP-" + uuid.uuid4().hex[:12].upper(),
         help="Unique key for this topup request. Re-running the wizard with the "
-             "same value is a no-op (returns existing pair).",
+        "same value is a no-op (returns existing pair).",
     )
     gross_amount = fields.Monetary(currency_field="currency_id", required=True)
     discount_amount = fields.Monetary(currency_field="currency_id", default=0.0)
@@ -90,8 +90,8 @@ class PpobProviderTopupLog(models.Model):
     )
 
     _request_uid_uniq = models.Constraint(
-        'unique(request_uid)',
-        'Topup request_uid must be unique.',
+        "unique(request_uid)",
+        "Topup request_uid must be unique.",
     )
 
     @api.depends("gross_amount", "discount_amount")

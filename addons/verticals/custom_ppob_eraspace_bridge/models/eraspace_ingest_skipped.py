@@ -3,6 +3,7 @@
 (unmapped mitra/product, non-terminal status, missing correlation). Nothing is
 dropped silently; ops complete the mapping then replay.
 """
+
 import json
 
 from odoo import _, fields, models
@@ -15,10 +16,13 @@ class EraspaceIngestSkipped(models.Model):
 
     feed = fields.Selection(
         selection=[("pos", "POS"), ("h2h", "H2H")],
-        required=True, index=True,
+        required=True,
+        index=True,
     )
     external_ref = fields.Char(
-        string="Feed External Ref", required=True, index=True,
+        string="Feed External Ref",
+        required=True,
+        index=True,
         help="pos_trx_ref + ':pos'|':h2h' -- the per-feed idempotency key.",
     )
     pos_trx_ref = fields.Char(index=True)
@@ -33,7 +37,8 @@ class EraspaceIngestSkipped(models.Model):
             ("post_error", "Error while projecting to GL"),
             ("other", "Other"),
         ],
-        required=True, index=True,
+        required=True,
+        index=True,
     )
     error_detail = fields.Char()
     raw_payload = fields.Text(help="JSON dump of the event, for replay.")
@@ -41,12 +46,11 @@ class EraspaceIngestSkipped(models.Model):
     replayed_at = fields.Datetime(readonly=True)
     eraspace_txn_id = fields.Many2one(
         comodel_name="custom.ppob.eraspace.txn",
-        string="Resulting Join Row", readonly=True,
+        string="Resulting Join Row",
+        readonly=True,
     )
 
-    _external_ref_uniq = models.Constraint(
-        "unique(external_ref)",
-        "A single feed event can only have one skip record.")
+    _external_ref_uniq = models.Constraint("unique(external_ref)", "A single feed event can only have one skip record.")
 
     def action_replay(self):
         """Re-feed the stored payload through the ingest projector. Idempotent:
@@ -62,11 +66,13 @@ class EraspaceIngestSkipped(models.Model):
                 continue
             join = Txn._ingest_event(rec.feed, payload, replay=True)
             if join:
-                rec.write({
-                    "replayed": True,
-                    "replayed_at": fields.Datetime.now(),
-                    "eraspace_txn_id": join.id,
-                })
+                rec.write(
+                    {
+                        "replayed": True,
+                        "replayed_at": fields.Datetime.now(),
+                        "eraspace_txn_id": join.id,
+                    }
+                )
                 replayed += 1
         return {
             "type": "ir.actions.client",

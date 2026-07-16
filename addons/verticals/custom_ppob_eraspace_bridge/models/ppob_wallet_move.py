@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Add ERASPACE mirror move types to custom.ppob.wallet.move."""
+
 from odoo import fields, models
 
 

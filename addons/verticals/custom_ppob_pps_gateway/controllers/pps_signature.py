@@ -11,6 +11,7 @@ Do NOT import this module anywhere outside ``custom_ppob_pps_gateway``. The
 signature alone is not the whole defense -- the controller also enforces an IP
 allowlist, a replay/nonce guard and timestamp/notrx freshness.
 """
+
 import hashlib
 import hmac
 
@@ -27,23 +28,26 @@ def _md5(value):
 # spec dictates (always md5(password) as an inner term).
 SIG_FORMULAS = {
     # MD5(mdn + produk + notrx + md5(password))
-    "sell": lambda p, pw: _md5(
-        (p.get("mdn") or "") + (p.get("produk") or "") + (p.get("notrx") or "") + _md5(pw)),
+    "sell": lambda p, pw: _md5((p.get("mdn") or "") + (p.get("produk") or "") + (p.get("notrx") or "") + _md5(pw)),
     # MD5(notrx + md5(password))
     "statustrx": lambda p, pw: _md5((p.get("notrx") or "") + _md5(pw)),
     "statustrxdeposit": lambda p, pw: _md5((p.get("notrx") or "") + _md5(pw)),
     # MD5(notrx + user + product + md5(password) + customer_no)
     "checknocustomer": lambda p, pw: _md5(
-        (p.get("notrx") or "") + (p.get("user") or "") + (p.get("product") or "")
-        + _md5(pw) + (p.get("customer_no") or "")),
+        (p.get("notrx") or "")
+        + (p.get("user") or "")
+        + (p.get("product") or "")
+        + _md5(pw)
+        + (p.get("customer_no") or "")
+    ),
     # MD5(customerNumber + user + md5(password))
-    "inquiry_pln": lambda p, pw: _md5(
-        (p.get("customerNumber") or "") + (p.get("user") or "") + _md5(pw)),
+    "inquiry_pln": lambda p, pw: _md5((p.get("customerNumber") or "") + (p.get("user") or "") + _md5(pw)),
     # MD5(timestamp + md5(password))
     "game_list": lambda p, pw: _md5((p.get("timestamp") or "") + _md5(pw)),
     # MD5(md5(password) + username + produk + noTrx)
     "direct_topup": lambda p, pw: _md5(
-        _md5(pw) + (p.get("user") or "") + (p.get("product") or "") + (p.get("notrx") or "")),
+        _md5(pw) + (p.get("user") or "") + (p.get("product") or "") + (p.get("notrx") or "")
+    ),
 }
 
 

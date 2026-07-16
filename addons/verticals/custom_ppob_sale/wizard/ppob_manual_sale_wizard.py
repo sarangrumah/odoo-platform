@@ -10,7 +10,9 @@ class PpobManualSaleWizard(models.TransientModel):
     _description = "Manual PPOB Sale (ops-only; bypasses mitra API)"
 
     mitra_id = fields.Many2one(
-        "res.partner", required=True, domain=[("x_custom_ppob_is_mitra", "=", True)],
+        "res.partner",
+        required=True,
+        domain=[("x_custom_ppob_is_mitra", "=", True)],
     )
     product_id = fields.Many2one("custom.ppob.product", required=True)
     msisdn = fields.Char(required=True)
@@ -18,7 +20,8 @@ class PpobManualSaleWizard(models.TransientModel):
     sell_price = fields.Monetary(required=True, currency_field="currency_id")
     cost_price = fields.Monetary(currency_field="currency_id")
     currency_id = fields.Many2one(
-        "res.currency", default=lambda self: self.env.company.currency_id,
+        "res.currency",
+        default=lambda self: self.env.company.currency_id,
     )
 
     @api.onchange("mitra_id", "product_id")
@@ -35,15 +38,17 @@ class PpobManualSaleWizard(models.TransientModel):
 
     def action_create_and_dispatch(self):
         self.ensure_one()
-        txn = self.env["custom.ppob.transaction"].create({
-            "mitra_id": self.mitra_id.id,
-            "product_id": self.product_id.id,
-            "msisdn": self.msisdn,
-            "provider_id": self.provider_id.id if self.provider_id else False,
-            "sell_price": self.sell_price,
-            "cost_price": self.cost_price or self.product_id.cost_price_default,
-            "idempotency_key": "MANUAL/" + secrets.token_hex(6).upper(),
-        })
+        txn = self.env["custom.ppob.transaction"].create(
+            {
+                "mitra_id": self.mitra_id.id,
+                "product_id": self.product_id.id,
+                "msisdn": self.msisdn,
+                "provider_id": self.provider_id.id if self.provider_id else False,
+                "sell_price": self.sell_price,
+                "cost_price": self.cost_price or self.product_id.cost_price_default,
+                "idempotency_key": "MANUAL/" + secrets.token_hex(6).upper(),
+            }
+        )
         txn.action_dispatch()
         return {
             "type": "ir.actions.act_window",

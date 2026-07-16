@@ -9,9 +9,9 @@ class AccountJournal(models.Model):
         string="Exclude from Financial Reports",
         default=False,
         help="When set, move lines on this journal are omitted from every "
-             "custom.report.engine report (Trial Balance, P&L, Balance Sheet, "
-             "General Ledger, etc.). Use for document-only / memo journals "
-             "whose GL effect must not reach the financial statements -- e.g. "
-             "the PPOB daily summary (e-Faktur) journal whose revenue is "
-             "already booked per transaction.",
+        "custom.report.engine report (Trial Balance, P&L, Balance Sheet, "
+        "General Ledger, etc.). Use for document-only / memo journals "
+        "whose GL effect must not reach the financial statements -- e.g. "
+        "the PPOB daily summary (e-Faktur) journal whose revenue is "
+        "already booked per transaction.",
     )

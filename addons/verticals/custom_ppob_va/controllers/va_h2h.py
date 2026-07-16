@@ -14,6 +14,7 @@ duplicate callback credits the wallet once and returns the original ack.
 
 Behind a reverse proxy the client IP is the first X-Forwarded-For hop.
 """
+
 import hashlib
 import hmac
 import json
@@ -49,18 +50,24 @@ def _verify_va_signature(connection, bank_code, body, signature, timestamp):
     if abs(time.time() - ts) > skew:
         _logger.warning("VA verify: skew exceeded (ts=%s now=%s skew=%s)", ts, int(time.time()), skew)
         return False
-    secret = request.env["ir.config_parameter"].sudo().get_param(
-        connection.credential_ref or "", "",
+    secret = (
+        request.env["ir.config_parameter"]
+        .sudo()
+        .get_param(
+            connection.credential_ref or "",
+            "",
+        )
     )
     if not secret:
         _logger.warning("VA verify: empty secret for credential_ref=%r", connection.credential_ref)
         return False
     expected = hmac.new(
-        secret.encode("utf-8"), timestamp.encode("utf-8") + body, hashlib.sha256,
+        secret.encode("utf-8"),
+        timestamp.encode("utf-8") + body,
+        hashlib.sha256,
     ).hexdigest()
     if not hmac.compare_digest(expected, signature or ""):
-        _logger.warning("VA verify: hmac mismatch (bodylen=%s, sig_present=%s)",
-                        len(body), bool(signature))
+        _logger.warning("VA verify: hmac mismatch (bodylen=%s, sig_present=%s)", len(body), bool(signature))
         return False
     # Cross-worker best-effort replay throttle; the DB UNIQUE(bank_ref) is the
     # authoritative idempotency line for the actual money movement.
@@ -71,10 +78,14 @@ def _verify_va_signature(connection, bank_code, body, signature, timestamp):
 
 
 class VaH2HController(http.Controller):
-
     def _authenticate(self, bank_code):
-        connection = request.env["custom.ppob.va.bank.connection"].sudo().search(
-            [("bank_code", "=", bank_code), ("status", "=", "active")], limit=1,
+        connection = (
+            request.env["custom.ppob.va.bank.connection"]
+            .sudo()
+            .search(
+                [("bank_code", "=", bank_code), ("status", "=", "active")],
+                limit=1,
+            )
         )
         if not connection:
             return None, {"ok": False, "error_code": "NOT_CONFIGURED"}
@@ -96,7 +107,11 @@ class VaH2HController(http.Controller):
 
     @http.route(
         "/api/ppob/va/<string:bank_code>/inquiry",
-        type="http", auth="public", methods=["POST"], csrf=False, readonly=False,
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+        readonly=False,
     )
     def inquiry(self, bank_code, **_):
         bank_code = (bank_code or "").upper()
@@ -107,19 +122,26 @@ class VaH2HController(http.Controller):
         va = request.env["custom.ppob.va.account"].sudo()._find_by_va_number(bank_code, va_number)
         if not va:
             return request.make_json_response(
-                {"ok": False, "error_code": "VA_NOT_FOUND"}, status=404,
+                {"ok": False, "error_code": "VA_NOT_FOUND"},
+                status=404,
             )
-        return request.make_json_response({
-            "ok": True,
-            "va_number": va.va_number,
-            "customer_name": va.mitra_id.display_name,
-            "mitra_code": va.mitra_id.x_custom_ppob_mitra_code,
-            "wallet_class": va.wallet_id.class_id.code,
-        })
+        return request.make_json_response(
+            {
+                "ok": True,
+                "va_number": va.va_number,
+                "customer_name": va.mitra_id.display_name,
+                "mitra_code": va.mitra_id.x_custom_ppob_mitra_code,
+                "wallet_class": va.wallet_id.class_id.code,
+            }
+        )
 
     @http.route(
         "/api/ppob/va/<string:bank_code>/payment",
-        type="http", auth="public", methods=["POST"], csrf=False, readonly=False,
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+        readonly=False,
     )
     def payment(self, bank_code, **_):
         bank_code = (bank_code or "").upper()
@@ -131,31 +153,43 @@ class VaH2HController(http.Controller):
         bank_ref = payload.get("bank_ref") or payload.get("trxId")
         if not (va_number and amount > 0 and bank_ref):
             return request.make_json_response(
-                {"ok": False, "error_code": "BAD_PAYLOAD"}, status=400,
+                {"ok": False, "error_code": "BAD_PAYLOAD"},
+                status=400,
             )
         Topup = request.env["custom.ppob.va.topup"].sudo()
         existing = Topup.search([("bank_ref", "=", bank_ref)], limit=1)
         if existing:
             # Idempotent: duplicate callback -> credit already done, return the ack.
-            return request.make_json_response({
-                "ok": True, "duplicate": True, "topup_ref": existing.name,
-            })
+            return request.make_json_response(
+                {
+                    "ok": True,
+                    "duplicate": True,
+                    "topup_ref": existing.name,
+                }
+            )
         va = request.env["custom.ppob.va.account"].sudo()._find_by_va_number(bank_code, va_number)
         if not va:
             return request.make_json_response(
-                {"ok": False, "error_code": "VA_NOT_FOUND"}, status=404,
+                {"ok": False, "error_code": "VA_NOT_FOUND"},
+                status=404,
             )
         # auth='none' requests have no env.company, so company-dependent
         # defaults (currency) would resolve empty -> set them from the wallet.
-        topup = Topup.with_company(va.wallet_id.company_id).create({
-            "va_account_id": va.id,
-            "amount": amount,
-            "bank_ref": bank_ref,
-            "source": "h2h_callback",
-            "state": "settled",
-            "currency_id": va.wallet_id.currency_id.id,
-        })
+        topup = Topup.with_company(va.wallet_id.company_id).create(
+            {
+                "va_account_id": va.id,
+                "amount": amount,
+                "bank_ref": bank_ref,
+                "source": "h2h_callback",
+                "state": "settled",
+                "currency_id": va.wallet_id.currency_id.id,
+            }
+        )
         topup.action_credit_wallet()
-        return request.make_json_response({
-            "ok": True, "topup_ref": topup.name, "new_balance": va.wallet_id.balance,
-        })
+        return request.make_json_response(
+            {
+                "ok": True,
+                "topup_ref": topup.name,
+                "new_balance": va.wallet_id.balance,
+            }
+        )

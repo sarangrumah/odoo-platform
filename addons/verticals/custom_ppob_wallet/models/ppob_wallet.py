@@ -33,14 +33,13 @@ class PpobWallet(models.Model):
         readonly=True,
         copy=False,
         default=0.0,
-        help="Current wallet balance. Updated atomically by _atomic_debit and "
-             "_atomic_credit; do NOT assign directly.",
+        help="Current wallet balance. Updated atomically by _atomic_debit and _atomic_credit; do NOT assign directly.",
     )
     credit_limit = fields.Monetary(
         currency_field="currency_id",
         default=0.0,
         help="Amount the mitra is allowed to overdraw (credit line). "
-             "balance + credit_limit is the hard ceiling for debits.",
+        "balance + credit_limit is the hard ceiling for debits.",
     )
     state = fields.Selection(
         selection=[
@@ -55,8 +54,7 @@ class PpobWallet(models.Model):
         string="Liability Account",
         required=True,
         domain="[('account_type', 'in', ['liability_current', 'liability_payable'])]",
-        help="GL liability account that the wallet posts against. Usually "
-             "derived from the product class default.",
+        help="GL liability account that the wallet posts against. Usually derived from the product class default.",
     )
     journal_id = fields.Many2one(
         comodel_name="account.journal",
@@ -82,8 +80,8 @@ class PpobWallet(models.Model):
     display_name = fields.Char(compute="_compute_display_name", store=True)
 
     _partner_class_uniq = models.Constraint(
-        'unique(partner_id, class_id, company_id)',
-        'Each mitra can have only one wallet per product class per company.',
+        "unique(partner_id, class_id, company_id)",
+        "Each mitra can have only one wallet per product class per company.",
     )
 
     @api.depends("partner_id.display_name", "class_id.code")
@@ -160,28 +158,38 @@ class PpobWallet(models.Model):
         else:
             raise UserError(_("Unknown wallet journal move type: %s") % move_type)
 
-        move = self.env["account.move"].create({
-            "journal_id": self.journal_id.id,
-            "move_type": "entry",
-            "ref": reason,
-            "partner_id": partner.id,
-            "line_ids": [
-                (0, 0, {
-                    "account_id": debit_account.id,
-                    "partner_id": partner.id,
-                    "name": reason,
-                    "debit": amount,
-                    "credit": 0.0,
-                }),
-                (0, 0, {
-                    "account_id": credit_account.id,
-                    "partner_id": partner.id,
-                    "name": reason,
-                    "debit": 0.0,
-                    "credit": amount,
-                }),
-            ],
-        })
+        move = self.env["account.move"].create(
+            {
+                "journal_id": self.journal_id.id,
+                "move_type": "entry",
+                "ref": reason,
+                "partner_id": partner.id,
+                "line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": debit_account.id,
+                            "partner_id": partner.id,
+                            "name": reason,
+                            "debit": amount,
+                            "credit": 0.0,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": credit_account.id,
+                            "partner_id": partner.id,
+                            "name": reason,
+                            "debit": 0.0,
+                            "credit": amount,
+                        },
+                    ),
+                ],
+            }
+        )
         move.action_post()
         return move
 
@@ -203,15 +211,18 @@ class PpobWallet(models.Model):
         fresh_balance = self._lock()
         ceiling = fresh_balance + (self.credit_limit or 0.0)
         if amount > ceiling:
-            raise UserError(_(
-                "Insufficient wallet balance for %(mitra)s [%(klass)s]. "
-                "Requested: %(req).2f. Available (balance+limit): %(avail).2f."
-            ) % {
-                "mitra": self.partner_id.display_name,
-                "klass": self.class_id.code,
-                "req": amount,
-                "avail": ceiling,
-            })
+            raise UserError(
+                _(
+                    "Insufficient wallet balance for %(mitra)s [%(klass)s]. "
+                    "Requested: %(req).2f. Available (balance+limit): %(avail).2f."
+                )
+                % {
+                    "mitra": self.partner_id.display_name,
+                    "klass": self.class_id.code,
+                    "req": amount,
+                    "avail": ceiling,
+                }
+            )
 
         move = self._post_wallet_journal(
             amount=amount,
@@ -220,15 +231,18 @@ class PpobWallet(models.Model):
             counterpart_account=counterpart_account,
         )
         new_balance = fresh_balance - amount
-        move_vals = self._build_move_vals({
-            "wallet_id": self.id,
-            "type": extras.get("move_type") or "sale",
-            "amount_signed": -amount,
-            "balance_after": new_balance,
-            "ref": reason,
-            "move_id": move.id,
-            "state": "posted",
-        }, extras)
+        move_vals = self._build_move_vals(
+            {
+                "wallet_id": self.id,
+                "type": extras.get("move_type") or "sale",
+                "amount_signed": -amount,
+                "balance_after": new_balance,
+                "ref": reason,
+                "move_id": move.id,
+                "state": "posted",
+            },
+            extras,
+        )
         wallet_move = self.env["custom.ppob.wallet.move"].create(move_vals)
         self.env.cr.execute(
             "UPDATE custom_ppob_wallet SET balance = %s WHERE id = %s",
@@ -253,15 +267,18 @@ class PpobWallet(models.Model):
             counterpart_account=counterpart_account,
         )
         new_balance = fresh_balance + amount
-        move_vals = self._build_move_vals({
-            "wallet_id": self.id,
-            "type": extras.get("move_type") or "topup",
-            "amount_signed": amount,
-            "balance_after": new_balance,
-            "ref": reason,
-            "move_id": move.id,
-            "state": "posted",
-        }, extras)
+        move_vals = self._build_move_vals(
+            {
+                "wallet_id": self.id,
+                "type": extras.get("move_type") or "topup",
+                "amount_signed": amount,
+                "balance_after": new_balance,
+                "ref": reason,
+                "move_id": move.id,
+                "state": "posted",
+            },
+            extras,
+        )
         wallet_move = self.env["custom.ppob.wallet.move"].create(move_vals)
         self.env.cr.execute(
             "UPDATE custom_ppob_wallet SET balance = %s WHERE id = %s",
@@ -270,8 +287,7 @@ class PpobWallet(models.Model):
         self.invalidate_recordset(["balance"])
         return wallet_move
 
-    def _atomic_credit_with_tax(self, gross_amount, output_tax, reason,
-                                counterpart_account, **extras):
+    def _atomic_credit_with_tax(self, gross_amount, output_tax, reason, counterpart_account, **extras):
         """Tax-inclusive sister of ``_atomic_credit``.
 
         Splits ``gross_amount`` using ``output_tax`` (a tax-inclusive sale tax
@@ -303,56 +319,73 @@ class PpobWallet(models.Model):
             lambda l: l.repartition_type == "tax" and l.account_id
         )
         if not tax_lines:
-            raise UserError(_(
-                "Output tax %s has no repartition line with an account_id; "
-                "cannot route the PPN portion."
-            ) % output_tax.name)
+            raise UserError(
+                _("Output tax %s has no repartition line with an account_id; cannot route the PPN portion.")
+                % output_tax.name
+            )
         ppn_account = tax_lines[0].account_id
 
         fresh_balance = self._lock()
         partner = self.partner_id
-        move = self.env["account.move"].create({
-            "journal_id": self.journal_id.id,
-            "move_type": "entry",
-            "ref": reason,
-            "partner_id": partner.id,
-            "line_ids": [
-                (0, 0, {
-                    "account_id": counterpart_account.id,
-                    "partner_id": partner.id,
-                    "name": reason,
-                    "debit": gross_amount,
-                    "credit": 0.0,
-                }),
-                (0, 0, {
-                    "account_id": self.account_id.id,
-                    "partner_id": partner.id,
-                    "name": reason,
-                    "debit": 0.0,
-                    "credit": dpp,
-                }),
-                (0, 0, {
-                    "account_id": ppn_account.id,
-                    "partner_id": partner.id,
-                    "name": _("%s (PPN Keluaran)") % reason,
-                    "debit": 0.0,
-                    "credit": ppn,
-                }),
-            ],
-        })
+        move = self.env["account.move"].create(
+            {
+                "journal_id": self.journal_id.id,
+                "move_type": "entry",
+                "ref": reason,
+                "partner_id": partner.id,
+                "line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": counterpart_account.id,
+                            "partner_id": partner.id,
+                            "name": reason,
+                            "debit": gross_amount,
+                            "credit": 0.0,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": self.account_id.id,
+                            "partner_id": partner.id,
+                            "name": reason,
+                            "debit": 0.0,
+                            "credit": dpp,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": ppn_account.id,
+                            "partner_id": partner.id,
+                            "name": _("%s (PPN Keluaran)") % reason,
+                            "debit": 0.0,
+                            "credit": ppn,
+                        },
+                    ),
+                ],
+            }
+        )
         move.action_post()
 
         new_balance = fresh_balance + dpp
         WalletMove = self.env["custom.ppob.wallet.move"]
-        move_vals = self._build_move_vals({
-            "wallet_id": self.id,
-            "type": extras.get("move_type") or "topup",
-            "amount_signed": dpp,
-            "balance_after": new_balance,
-            "ref": reason,
-            "move_id": move.id,
-            "state": "posted",
-        }, extras)
+        move_vals = self._build_move_vals(
+            {
+                "wallet_id": self.id,
+                "type": extras.get("move_type") or "topup",
+                "amount_signed": dpp,
+                "balance_after": new_balance,
+                "ref": reason,
+                "move_id": move.id,
+                "state": "posted",
+            },
+            extras,
+        )
         if "tax_amount" in WalletMove._fields:
             move_vals["tax_amount"] = ppn
         if "gross_amount" in WalletMove._fields:

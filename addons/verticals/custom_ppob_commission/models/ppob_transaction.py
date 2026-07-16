@@ -36,10 +36,12 @@ class PpobTransaction(models.Model):
                 partner = self.mitra_id
             if not partner:
                 continue
-            accrual = Accrual.create({
-                "transaction_id": self.id,
-                "rule_id": rule.id,
-                "partner_id": partner.id,
-                "amount": amount,
-            })
+            accrual = Accrual.create(
+                {
+                    "transaction_id": self.id,
+                    "rule_id": rule.id,
+                    "partner_id": partner.id,
+                    "amount": amount,
+                }
+            )
             accrual._post_accrual()

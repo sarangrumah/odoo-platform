@@ -26,8 +26,7 @@ class PpobWalletAdjustWizard(models.TransientModel):
         comodel_name="account.account",
         string="Counterpart Account",
         required=True,
-        help="For topup: bank/cash account debited. For adjustment: "
-             "income/expense account on the opposite leg.",
+        help="For topup: bank/cash account debited. For adjustment: income/expense account on the opposite leg.",
     )
     currency_id = fields.Many2one(
         related="wallet_id.currency_id",

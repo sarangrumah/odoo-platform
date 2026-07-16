@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - Provider",
     "summary": "Provider master data, atomic bucket inventory, SKU mapping, "
-               "adapter abstraction, DP 100% deposit topup.",
+    "adapter abstraction, DP 100% deposit topup.",
     "description": """
 Custom PPOB Suite - Provider
 ============================

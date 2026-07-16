@@ -26,7 +26,7 @@ class PpobAccountMapping(models.Model):
         required=True,
         index=True,
         help="Stable role key referenced by PPOB business logic "
-             "(e.g. wallet_liab_telko, ppn_masukan, provider_deposit_default).",
+        "(e.g. wallet_liab_telko, ppn_masukan, provider_deposit_default).",
     )
     account_id = fields.Many2one(
         comodel_name="account.account",
@@ -36,8 +36,8 @@ class PpobAccountMapping(models.Model):
     )
 
     _company_role_uniq = models.Constraint(
-        'unique(company_id, role)',
-        'Each account role can be mapped only once per company.',
+        "unique(company_id, role)",
+        "Each account role can be mapped only once per company.",
     )
 
     @api.model
@@ -47,6 +47,5 @@ class PpobAccountMapping(models.Model):
         Returns an empty recordset if unmapped (callers decide whether that
         is an error in their context)."""
         company = company or self.env.company
-        rec = self.search(
-            [("company_id", "=", company.id), ("role", "=", role)], limit=1)
+        rec = self.search([("company_id", "=", company.id), ("role", "=", role)], limit=1)
         return rec.account_id

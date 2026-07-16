@@ -12,6 +12,7 @@ idempotency is the DB ``unique(mitra_id, idempotency_key)`` -- a duplicate Sell
 with the same ``notrx`` returns the ORIGINAL result, never a second sell. We do
 NOT nonce-guard, because StatusTrx is polled repeatedly with the same notrx.
 """
+
 import json
 import logging
 
@@ -50,7 +51,6 @@ class _InquiryCarrier:
 
 
 class PpsGatewayController(http.Controller):
-
     # ------------------------------------------------------------------
     # Auth + parsing
     # ------------------------------------------------------------------
@@ -59,8 +59,11 @@ class PpsGatewayController(http.Controller):
         user = params.get("user")
         if not user:
             return None, "BAD_FORMAT"
-        cred = request.env["custom.ppob.pps.mitra.credential"].sudo().search(
-            [("pps_user", "=", user), ("status", "=", "active")], limit=1)
+        cred = (
+            request.env["custom.ppob.pps.mitra.credential"]
+            .sudo()
+            .search([("pps_user", "=", user), ("status", "=", "active")], limit=1)
+        )
         if not cred:
             return None, "UNKNOWN_USER"
         if not _check_ip_whitelist(cred.ip_whitelist, _client_ip()):
@@ -91,21 +94,25 @@ class PpsGatewayController(http.Controller):
     # ------------------------------------------------------------------
 
     def _sell_ok(self, txn):
-        return self._resp({
-            "Status": state_to_status(txn.state),
-            "ServerIDTrx": txn.pps_serveridtrx,
-            "ClientNoTrx": txn.idempotency_key,
-            "Message": sale_message(txn),
-        })
+        return self._resp(
+            {
+                "Status": state_to_status(txn.state),
+                "ServerIDTrx": txn.pps_serveridtrx,
+                "ClientNoTrx": txn.idempotency_key,
+                "Message": sale_message(txn),
+            }
+        )
 
     def _sell_err(self, code, notrx, serverid=None):
         status, message = resolve_error(code)
-        return self._resp({
-            "Status": status,
-            "ServerIDTrx": serverid,
-            "ClientNoTrx": notrx,
-            "Message": message,
-        })
+        return self._resp(
+            {
+                "Status": status,
+                "ServerIDTrx": serverid,
+                "ClientNoTrx": notrx,
+                "Message": message,
+            }
+        )
 
     @staticmethod
     def _map_usererror(msg):
@@ -127,18 +134,21 @@ class PpsGatewayController(http.Controller):
     def _company(self):
         # auth="public", readonly=False requests have no logged-in user, so env.company can be
         # empty and the transaction's currency/company defaults won't fire.
-        return request.env.company or request.env["res.company"].sudo().search(
-            [], order="id", limit=1)
+        return request.env.company or request.env["res.company"].sudo().search([], order="id", limit=1)
 
     def _product_by_code(self, code):
-        return request.env["custom.ppob.product"].sudo().search(
-            [("code", "=", code)], limit=1)
+        return request.env["custom.ppob.product"].sudo().search([("code", "=", code)], limit=1)
 
     def _provider_for(self, product):
-        sku = request.env["custom.ppob.provider.sku.map"].sudo().search(
-            [("product_id", "=", product.id), ("active", "=", True),
-             ("provider_id.status", "=", "active")],
-            order="priority asc, id asc", limit=1)
+        sku = (
+            request.env["custom.ppob.provider.sku.map"]
+            .sudo()
+            .search(
+                [("product_id", "=", product.id), ("active", "=", True), ("provider_id.status", "=", "active")],
+                order="priority asc, id asc",
+                limit=1,
+            )
+        )
         return sku.provider_id if sku else request.env["custom.ppob.provider"].sudo()
 
     def _sell_price(self, mitra, product):
@@ -166,8 +176,7 @@ class PpsGatewayController(http.Controller):
             return self._sell_err("BAD_FORMAT", notrx)
 
         Txn = request.env["custom.ppob.transaction"].sudo()
-        existing = Txn.search(
-            [("mitra_id", "=", cred.mitra_id.id), ("idempotency_key", "=", notrx)], limit=1)
+        existing = Txn.search([("mitra_id", "=", cred.mitra_id.id), ("idempotency_key", "=", notrx)], limit=1)
         if existing:
             return self._sell_ok(existing)  # idempotent: original result
 
@@ -180,18 +189,20 @@ class PpsGatewayController(http.Controller):
         company = self._company()
         try:
             with request.env.cr.savepoint():
-                txn = Txn.with_company(company).create({
-                    "mitra_id": cred.mitra_id.id,
-                    "product_id": product.id,
-                    "msisdn": params["mdn"],
-                    "idempotency_key": notrx,
-                    "sell_price": sell_price,
-                    "company_id": company.id,
-                    "currency_id": company.currency_id.id,
-                    "pps_serveridtrx": serverid,
-                    "pps_produk": params["produk"],
-                    "pps_callback_url": cred.callback_url or False,
-                })
+                txn = Txn.with_company(company).create(
+                    {
+                        "mitra_id": cred.mitra_id.id,
+                        "product_id": product.id,
+                        "msisdn": params["mdn"],
+                        "idempotency_key": notrx,
+                        "sell_price": sell_price,
+                        "company_id": company.id,
+                        "currency_id": company.currency_id.id,
+                        "pps_serveridtrx": serverid,
+                        "pps_produk": params["produk"],
+                        "pps_callback_url": cred.callback_url or False,
+                    }
+                )
                 txn.action_dispatch()
         except UserError as exc:
             return self._sell_err(self._map_usererror(str(exc)), notrx, serverid)
@@ -207,26 +218,30 @@ class PpsGatewayController(http.Controller):
         cred, err = self._authn(endpoint, params)
         if err:
             return self._sell_err(err, notrx)
-        txn = request.env["custom.ppob.transaction"].sudo().search(
-            [("mitra_id", "=", cred.mitra_id.id), ("idempotency_key", "=", notrx)], limit=1)
+        txn = (
+            request.env["custom.ppob.transaction"]
+            .sudo()
+            .search([("mitra_id", "=", cred.mitra_id.id), ("idempotency_key", "=", notrx)], limit=1)
+        )
         if not txn:
             return self._sell_err("NOT_FOUND", notrx)
         message = sale_message(txn)
         if with_dep:
             message = with_deposit(message, txn.wallet_id.balance)
-        return self._resp({
-            "Status": state_to_status(txn.state),
-            "ServerIDTrx": txn.pps_serveridtrx,
-            "ClientNoTrx": notrx,
-            "Message": message,
-        })
+        return self._resp(
+            {
+                "Status": state_to_status(txn.state),
+                "ServerIDTrx": txn.pps_serveridtrx,
+                "ClientNoTrx": notrx,
+                "Message": message,
+            }
+        )
 
     @http.route("/pps/statustrx", type="http", auth="public", readonly=False, methods=["POST"], csrf=False)
     def statustrx(self, **_):
         return self._status("statustrx", with_dep=False)
 
-    @http.route("/pps/statustrxwithdeposit", type="http", auth="public", readonly=False,
-                methods=["POST"], csrf=False)
+    @http.route("/pps/statustrxwithdeposit", type="http", auth="public", readonly=False, methods=["POST"], csrf=False)
     def statustrxwithdeposit(self, **_):
         return self._status("statustrxdeposit", with_dep=True)
 
@@ -234,38 +249,45 @@ class PpsGatewayController(http.Controller):
     # 4. CHECK CUSTOMER (e-wallet name inquiry)
     # ------------------------------------------------------------------
 
-    @http.route("/pps/checknocustomer", type="http", auth="public", readonly=False,
-                methods=["POST"], csrf=False)
+    @http.route("/pps/checknocustomer", type="http", auth="public", readonly=False, methods=["POST"], csrf=False)
     def checknocustomer(self, **_):
         params = self._form()
         customer_no = params.get("customer_no")
         cred, err = self._authn("checknocustomer", params)
         if err:
             status, message = resolve_error(err)
-            return self._resp({"status": status, "message": message,
-                               "data": {"no_tujuan": customer_no or "", "nama": ""}})
+            return self._resp(
+                {"status": status, "message": message, "data": {"no_tujuan": customer_no or "", "nama": ""}}
+            )
         product = self._product_by_code(params.get("product"))
         if not product:
-            return self._resp({"status": "1", "message": "Produk tidak ditemukan",
-                               "data": {"no_tujuan": customer_no or "", "nama": ""}})
+            return self._resp(
+                {
+                    "status": "1",
+                    "message": "Produk tidak ditemukan",
+                    "data": {"no_tujuan": customer_no or "", "nama": ""},
+                }
+            )
         result = self._run_inquiry(product, customer_no)
         if result is None or not result.ok:
-            return self._resp({"status": "1", "message": "Cek Pelanggan Gagal",
-                               "data": {"no_tujuan": customer_no or "", "nama": ""}})
+            return self._resp(
+                {"status": "1", "message": "Cek Pelanggan Gagal", "data": {"no_tujuan": customer_no or "", "nama": ""}}
+            )
         raw = result.raw or {}
         name = raw.get("nama") or raw.get("customerName") or ""
-        return self._resp({
-            "status": "0",
-            "message": "NOMOR: %s@NAMA:%s" % (customer_no or "", name),
-            "data": {"no_tujuan": customer_no or "", "nama": name},
-        })
+        return self._resp(
+            {
+                "status": "0",
+                "message": "NOMOR: %s@NAMA:%s" % (customer_no or "", name),
+                "data": {"no_tujuan": customer_no or "", "nama": name},
+            }
+        )
 
     # ------------------------------------------------------------------
     # 5. INQUIRY PLN
     # ------------------------------------------------------------------
 
-    @http.route("/pps/inquiry-pln", type="http", auth="public", readonly=False,
-                methods=["POST"], csrf=False)
+    @http.route("/pps/inquiry-pln", type="http", auth="public", readonly=False, methods=["POST"], csrf=False)
     def inquiry_pln(self, **_):
         params = self._json_body()
         if params is None:
@@ -275,24 +297,36 @@ class PpsGatewayController(http.Controller):
         if err:
             status, message = resolve_error(err)
             return self._resp({"status": status, "message": message, "data": {}})
-        code = request.env["ir.config_parameter"].sudo().get_param(
-            "custom_ppob_pps_gateway.pln_product_code", "")
-        product = self._product_by_code(code) if code else \
-            request.env["custom.ppob.product"].sudo().search(
-                [("inquiry_required", "=", True)], limit=1)
+        code = request.env["ir.config_parameter"].sudo().get_param("custom_ppob_pps_gateway.pln_product_code", "")
+        product = (
+            self._product_by_code(code)
+            if code
+            else request.env["custom.ppob.product"].sudo().search([("inquiry_required", "=", True)], limit=1)
+        )
         if not product:
             return self._resp({"status": "1", "message": "PLN product not configured", "data": {}})
         result = self._run_inquiry(product, customer_no)
         if result is None or not result.ok:
-            return self._resp({"status": "1", "message": "PLN Inquiry failed", "data": {
-                "meterNumber": "", "customerName": "", "subscriberID": "", "electricityTariff": ""}})
+            return self._resp(
+                {
+                    "status": "1",
+                    "message": "PLN Inquiry failed",
+                    "data": {"meterNumber": "", "customerName": "", "subscriberID": "", "electricityTariff": ""},
+                }
+            )
         raw = result.raw or {}
-        return self._resp({"status": "0", "message": "Successfully", "data": {
-            "meterNumber": raw.get("meterNumber", ""),
-            "customerName": raw.get("customerName", ""),
-            "subscriberID": raw.get("subscriberID", customer_no or ""),
-            "electricityTariff": raw.get("electricityTariff", ""),
-        }})
+        return self._resp(
+            {
+                "status": "0",
+                "message": "Successfully",
+                "data": {
+                    "meterNumber": raw.get("meterNumber", ""),
+                    "customerName": raw.get("customerName", ""),
+                    "subscriberID": raw.get("subscriberID", customer_no or ""),
+                    "electricityTariff": raw.get("electricityTariff", ""),
+                },
+            }
+        )
 
     def _run_inquiry(self, product, customer_no):
         provider = self._provider_for(product)
@@ -303,9 +337,7 @@ class PpsGatewayController(http.Controller):
         except Exception:
             _logger.exception("inquiry: cannot instantiate adapter")
             return None
-        carrier = _InquiryCarrier(
-            product, provider, customer_no, request.env.company,
-            request.env.company.currency_id)
+        carrier = _InquiryCarrier(product, provider, customer_no, request.env.company, request.env.company.currency_id)
         try:
             return adapter.inquiry(carrier)
         except Exception as exc:
@@ -330,11 +362,13 @@ class PpsGatewayController(http.Controller):
         data = []
         for product in products:
             fields_ = GameField.search([("product_id", "=", product.id)])
-            data.append({
-                "product": product.code,
-                "product_desc": product.name,
-                "fields": [{"name": f.key, "type": f.field_type} for f in fields_],
-            })
+            data.append(
+                {
+                    "product": product.code,
+                    "product_desc": product.name,
+                    "fields": [{"name": f.key, "type": f.field_type} for f in fields_],
+                }
+            )
         return self._resp({"status": "0", "message": "OK", "data": data})
 
     # ------------------------------------------------------------------
@@ -354,8 +388,7 @@ class PpsGatewayController(http.Controller):
             return self._sell_err("BAD_FORMAT", notrx)
 
         Txn = request.env["custom.ppob.transaction"].sudo()
-        existing = Txn.search(
-            [("mitra_id", "=", cred.mitra_id.id), ("idempotency_key", "=", notrx)], limit=1)
+        existing = Txn.search([("mitra_id", "=", cred.mitra_id.id), ("idempotency_key", "=", notrx)], limit=1)
         if existing:
             return self._sell_ok(existing)
 
@@ -373,25 +406,30 @@ class PpsGatewayController(http.Controller):
         company = self._company()
         try:
             with request.env.cr.savepoint():
-                txn = Txn.with_company(company).create({
-                    "mitra_id": cred.mitra_id.id,
-                    "product_id": product.id,
-                    "msisdn": str(field.get("userid") or "-"),
-                    "idempotency_key": notrx,
-                    "sell_price": sell_price,
-                    "company_id": company.id,
-                    "currency_id": company.currency_id.id,
-                    "pps_serveridtrx": serverid,
-                    "pps_produk": params["product"],
-                    "pps_callback_url": cred.callback_url or False,
-                    "dynamic_field": field,
-                })
+                txn = Txn.with_company(company).create(
+                    {
+                        "mitra_id": cred.mitra_id.id,
+                        "product_id": product.id,
+                        "msisdn": str(field.get("userid") or "-"),
+                        "idempotency_key": notrx,
+                        "sell_price": sell_price,
+                        "company_id": company.id,
+                        "currency_id": company.currency_id.id,
+                        "pps_serveridtrx": serverid,
+                        "pps_produk": params["product"],
+                        "pps_callback_url": cred.callback_url or False,
+                        "dynamic_field": field,
+                    }
+                )
                 txn.action_dispatch()
         except UserError as exc:
             return self._sell_err(self._map_usererror(str(exc)), notrx, serverid)
         return self._sell_ok(txn)
 
     def _missing_game_fields(self, product, field):
-        required = request.env["custom.ppob.pps.game.field"].sudo().search(
-            [("product_id", "=", product.id), ("required", "=", True)])
+        required = (
+            request.env["custom.ppob.pps.game.field"]
+            .sudo()
+            .search([("product_id", "=", product.id), ("required", "=", True)])
+        )
         return [f.key for f in required if not field.get(f.key)]

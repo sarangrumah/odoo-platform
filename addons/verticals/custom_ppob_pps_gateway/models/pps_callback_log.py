@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Audit log of outbound PPS callbacks (Odoo -> POS). One row per attempt."""
+
 from odoo import fields, models
 
 
@@ -9,8 +10,11 @@ class PpsCallbackLog(models.Model):
     _order = "create_date desc, id desc"
 
     transaction_id = fields.Many2one(
-        comodel_name="custom.ppob.transaction", string="Transaction",
-        required=True, ondelete="cascade", index=True,
+        comodel_name="custom.ppob.transaction",
+        string="Transaction",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     url = fields.Char()
     querystring = fields.Text()

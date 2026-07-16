@@ -6,6 +6,7 @@ is push-only, so there is no upstream to re-poll. "Backfill" therefore means
 re-processing the skipped queue after mappings are completed -- e.g. once a new
 mitra/SKU is mapped, replay every event that skipped for that reason.
 """
+
 from odoo import _, fields, models
 
 
@@ -17,7 +18,8 @@ class EraspaceBackfillWizard(models.TransientModel):
     date_to = fields.Datetime()
     feed = fields.Selection(
         selection=[("all", "All"), ("pos", "POS"), ("h2h", "H2H")],
-        default="all", required=True,
+        default="all",
+        required=True,
     )
     skip_reason = fields.Selection(
         selection=[
@@ -28,7 +30,8 @@ class EraspaceBackfillWizard(models.TransientModel):
             ("bad_payload", "Bad payload"),
             ("post_error", "Post error"),
         ],
-        default="all", required=True,
+        default="all",
+        required=True,
     )
 
     def _domain(self):

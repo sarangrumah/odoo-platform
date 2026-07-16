@@ -7,6 +7,7 @@ money-movement DB transaction holding wallet/bucket row locks): those methods
 only FLAG the callback; a dedicated cron fires the HTTP GET so a slow POS
 endpoint can never hold locks or roll back a successful sell.
 """
+
 import logging
 
 from odoo import api, fields, models
@@ -29,16 +30,19 @@ class PpobTransaction(models.Model):
     _inherit = "custom.ppob.transaction"
 
     pps_serveridtrx = fields.Char(
-        string="PPS ServerIDTrx", index=True, copy=False,
-        help="Numeric server transaction id returned to POS. Set for gateway "
-             "(PPS-originated) transactions only.",
+        string="PPS ServerIDTrx",
+        index=True,
+        copy=False,
+        help="Numeric server transaction id returned to POS. Set for gateway (PPS-originated) transactions only.",
     )
     pps_produk = fields.Char(
-        string="PPS Produk", copy=False,
+        string="PPS Produk",
+        copy=False,
         help="The 'produk' code POS sent (echoed on the callback).",
     )
     dynamic_field = fields.Json(
-        string="Game Dynamic Fields", copy=False,
+        string="Game Dynamic Fields",
+        copy=False,
         help="direct-topup 'field' object (userid/zoneid/server).",
     )
     pps_callback_url = fields.Char(copy=False)
@@ -49,7 +53,10 @@ class PpobTransaction(models.Model):
             ("sent", "Sent"),
             ("failed", "Failed (gave up)"),
         ],
-        default="none", required=True, index=True, copy=False,
+        default="none",
+        required=True,
+        index=True,
+        copy=False,
     )
     pps_callback_attempts = fields.Integer(default=0, copy=False)
     pps_last_callback_at = fields.Datetime(copy=False)
@@ -81,10 +88,13 @@ class PpobTransaction(models.Model):
     def _cron_pps_dispatch_callbacks(self, batch_size=200):
         """Fire the PPS GET callback for terminal, pending-callback gateway
         transactions. Meets the <=60s SLA at a 1-minute cron cadence."""
-        txns = self.search([
-            ("pps_callback_state", "=", "pending"),
-            ("state", "in", ("success", "failed", "timeout", "refunded")),
-        ], limit=batch_size)
+        txns = self.search(
+            [
+                ("pps_callback_state", "=", "pending"),
+                ("state", "in", ("success", "failed", "timeout", "refunded")),
+            ],
+            limit=batch_size,
+        )
         for txn in txns:
             txn._pps_fire_callback()
 
@@ -113,23 +123,24 @@ class PpobTransaction(models.Model):
         error = False
         ok = False
         try:
-            resp = requests.get(self.pps_callback_url, params=params,
-                                timeout=_CALLBACK_TIMEOUT_S)
+            resp = requests.get(self.pps_callback_url, params=params, timeout=_CALLBACK_TIMEOUT_S)
             http_status = resp.status_code
             ok = 200 <= resp.status_code < 300
         except Exception as exc:  # network / timeout
             error = str(exc)[:512]
             _logger.warning("PPS callback failed for %s: %s", self.name, error)
 
-        Log.create({
-            "transaction_id": self.id,
-            "url": self.pps_callback_url,
-            "querystring": "&".join(f"{k}={v}" for k, v in params.items()),
-            "http_status": http_status,
-            "attempt_no": attempt,
-            "ok": ok,
-            "error": error,
-        })
+        Log.create(
+            {
+                "transaction_id": self.id,
+                "url": self.pps_callback_url,
+                "querystring": "&".join(f"{k}={v}" for k, v in params.items()),
+                "http_status": http_status,
+                "attempt_no": attempt,
+                "ok": ok,
+                "error": error,
+            }
+        )
         vals = {
             "pps_callback_attempts": attempt,
             "pps_last_callback_at": fields.Datetime.now(),
@@ -139,8 +150,8 @@ class PpobTransaction(models.Model):
         elif attempt >= _CALLBACK_MAX_ATTEMPTS:
             vals["pps_callback_state"] = "failed"
             _logger.warning(
-                "PPS callback for %s gave up after %s attempts (POS must poll "
-                "StatusTrx).", self.name, attempt)
+                "PPS callback for %s gave up after %s attempts (POS must poll StatusTrx).", self.name, attempt
+            )
         self.write(vals)
         return ok
 

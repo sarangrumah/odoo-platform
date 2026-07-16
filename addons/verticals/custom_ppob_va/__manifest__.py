@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - Virtual Account",
     "summary": "Mitra virtual accounts + wallet top-up (bank H2H callbacks + "
-               "CSV reconcile), idempotent by bank reference.",
+    "CSV reconcile), idempotent by bank reference.",
     "description": """
 Custom PPOB Suite - Virtual Account
 ===================================

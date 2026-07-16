@@ -20,9 +20,9 @@ class PpobCommissionSettlementWizard(models.TransientModel):
     pph_rate = fields.Float(
         default=2.0,
         help="Fallback PPh 23 rate (%) for us_to_mitra payouts when no "
-             "custom.witholding.rate (pph_type 23) matches. 2% for partners "
-             "with NPWP, 4% without. When a rate rule exists, the platform "
-             "withholding engine decides instead.",
+        "custom.witholding.rate (pph_type 23) matches. 2% for partners "
+        "with NPWP, 4% without. When a rate rule exists, the platform "
+        "withholding engine decides instead.",
     )
 
     def action_run(self):
@@ -69,26 +69,33 @@ class PpobCommissionSettlementWizard(models.TransientModel):
     def _create_vendor_bill(self, partner, accruals, total):
         """Provider->us: create a vendor refund so the provider pays us."""
         journal = self.env["account.journal"].search(
-            [("type", "=", "purchase"), ("company_id", "=", self.env.company.id)], limit=1,
+            [("type", "=", "purchase"), ("company_id", "=", self.env.company.id)],
+            limit=1,
         )
         if not journal:
             raise UserError(_("No purchase journal found."))
         income_acc = self._acc("commission_income")
-        return self.env["account.move"].create({
-            "move_type": "in_refund",
-            "journal_id": journal.id,
-            "partner_id": partner.id,
-            "invoice_date": self.date_to,
-            "ref": f"Commission {self.date_from} - {self.date_to}",
-            "invoice_line_ids": [
-                (0, 0, {
-                    "name": f"PPOB Commission {self.date_from}..{self.date_to}",
-                    "quantity": 1.0,
-                    "price_unit": total,
-                    "account_id": income_acc.id if income_acc else False,
-                }),
-            ],
-        })
+        return self.env["account.move"].create(
+            {
+                "move_type": "in_refund",
+                "journal_id": journal.id,
+                "partner_id": partner.id,
+                "invoice_date": self.date_to,
+                "ref": f"Commission {self.date_from} - {self.date_to}",
+                "invoice_line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "name": f"PPOB Commission {self.date_from}..{self.date_to}",
+                            "quantity": 1.0,
+                            "price_unit": total,
+                            "account_id": income_acc.id if income_acc else False,
+                        },
+                    ),
+                ],
+            }
+        )
 
     def _create_mitra_payout(self, partner, accruals, total):
         """Us->mitra: create a payout JE that settles CommPayable-Mitra,
@@ -114,25 +121,48 @@ class PpobCommissionSettlementWizard(models.TransientModel):
         net = total - pph_amount
 
         ref = f"Commission payout {partner.display_name} {self.date_from}..{self.date_to}"
-        move = self.env["account.move"].create({
-            "journal_id": journal.id,
-            "move_type": "entry",
-            "ref": ref,
-            "partner_id": partner.id,
-            "line_ids": [
-                (0, 0, {
-                    "account_id": comm_payable.id, "partner_id": partner.id,
-                    "name": ref, "debit": total, "credit": 0.0,
-                }),
-                (0, 0, {
-                    "account_id": pph_payable.id, "partner_id": partner.id,
-                    "name": f"{ref} PPh23 {rate}%", "debit": 0.0, "credit": pph_amount,
-                }),
-                (0, 0, {
-                    "account_id": comm_payable.id, "partner_id": partner.id,
-                    "name": f"{ref} Net", "debit": 0.0, "credit": net,
-                }),
-            ],
-        })
+        move = self.env["account.move"].create(
+            {
+                "journal_id": journal.id,
+                "move_type": "entry",
+                "ref": ref,
+                "partner_id": partner.id,
+                "line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": comm_payable.id,
+                            "partner_id": partner.id,
+                            "name": ref,
+                            "debit": total,
+                            "credit": 0.0,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": pph_payable.id,
+                            "partner_id": partner.id,
+                            "name": f"{ref} PPh23 {rate}%",
+                            "debit": 0.0,
+                            "credit": pph_amount,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": comm_payable.id,
+                            "partner_id": partner.id,
+                            "name": f"{ref} Net",
+                            "debit": 0.0,
+                            "credit": net,
+                        },
+                    ),
+                ],
+            }
+        )
         move.action_post()
         return move

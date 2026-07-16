@@ -22,8 +22,7 @@ class PpobCommissionRule(models.Model):
     product_id = fields.Many2one("custom.ppob.product", help="Blank matches any product in the class.")
     partner_id = fields.Many2one(
         "res.partner",
-        help="Provider (scope=provider_to_us) or mitra (scope=us_to_mitra). "
-             "Blank matches any partner.",
+        help="Provider (scope=provider_to_us) or mitra (scope=us_to_mitra). Blank matches any partner.",
     )
     calc_type = fields.Selection(
         selection=[

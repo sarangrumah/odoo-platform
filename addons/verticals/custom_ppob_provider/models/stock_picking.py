@@ -43,13 +43,14 @@ class PpobProviderBucket(models.Model):
         if self.inventory_warehouse_id:
             return self.inventory_warehouse_id
         wh = self.env["stock.warehouse"].search(
-            [("company_id", "=", self.company_id.id)], limit=1,
+            [("company_id", "=", self.company_id.id)],
+            limit=1,
         )
         if not wh:
-            raise UserError(_(
-                "No stock.warehouse found for company %s. Create one before "
-                "topping up an inventory-tracked bucket."
-            ) % self.company_id.name)
+            raise UserError(
+                _("No stock.warehouse found for company %s. Create one before topping up an inventory-tracked bucket.")
+                % self.company_id.name
+            )
         return wh
 
     def _stock_picking_incoming(self, qty, *, origin=None, invoice=None, partner=None):
@@ -59,37 +60,41 @@ class PpobProviderBucket(models.Model):
         if not self.inventory_product_id:
             return self.env["stock.picking"]
         if qty <= 0:
-            raise UserError(_(
-                "Cannot create incoming picking: qty must be positive (got %s)."
-            ) % qty)
+            raise UserError(_("Cannot create incoming picking: qty must be positive (got %s).") % qty)
 
         warehouse = self._get_warehouse()
         picking_type = warehouse.in_type_id
         if not picking_type:
-            raise UserError(_(
-                "Warehouse %s has no incoming picking type configured."
-            ) % warehouse.display_name)
+            raise UserError(_("Warehouse %s has no incoming picking type configured.") % warehouse.display_name)
 
         src = picking_type.default_location_src_id.id or self.env.ref("stock.stock_location_suppliers").id
         dest = picking_type.default_location_dest_id.id
-        picking = self.env["stock.picking"].create({
-            "picking_type_id": picking_type.id,
-            "partner_id": (partner or self.provider_id.partner_id).id,
-            "origin": origin or self.display_name,
-            "location_id": src,
-            "location_dest_id": dest,
-            "company_id": self.company_id.id,
-            "x_custom_ppob_bucket_id": self.id,
-            "x_custom_ppob_dp_invoice_id": invoice.id if invoice else False,
-            "move_ids": [(0, 0, {
-                "name": self.inventory_product_id.display_name,
-                "product_id": self.inventory_product_id.id,
-                "product_uom": self.inventory_product_id.uom_id.id,
-                "product_uom_qty": qty,
+        picking = self.env["stock.picking"].create(
+            {
+                "picking_type_id": picking_type.id,
+                "partner_id": (partner or self.provider_id.partner_id).id,
+                "origin": origin or self.display_name,
                 "location_id": src,
                 "location_dest_id": dest,
-            })],
-        })
+                "company_id": self.company_id.id,
+                "x_custom_ppob_bucket_id": self.id,
+                "x_custom_ppob_dp_invoice_id": invoice.id if invoice else False,
+                "move_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "name": self.inventory_product_id.display_name,
+                            "product_id": self.inventory_product_id.id,
+                            "product_uom": self.inventory_product_id.uom_id.id,
+                            "product_uom_qty": qty,
+                            "location_id": src,
+                            "location_dest_id": dest,
+                        },
+                    )
+                ],
+            }
+        )
         picking.action_confirm()
         picking.action_assign()
         for move in picking.move_ids:
@@ -105,16 +110,12 @@ class PpobProviderBucket(models.Model):
         if not self.inventory_product_id:
             return self.env["stock.picking"]
         if qty <= 0:
-            raise UserError(_(
-                "Cannot create outgoing picking: qty must be positive (got %s)."
-            ) % qty)
+            raise UserError(_("Cannot create outgoing picking: qty must be positive (got %s).") % qty)
 
         warehouse = self._get_warehouse()
         picking_type = warehouse.out_type_id
         if not picking_type:
-            raise UserError(_(
-                "Warehouse %s has no outgoing picking type configured."
-            ) % warehouse.display_name)
+            raise UserError(_("Warehouse %s has no outgoing picking type configured.") % warehouse.display_name)
 
         src = picking_type.default_location_src_id.id
         dest = picking_type.default_location_dest_id.id or self.env.ref("stock.stock_location_customers").id
@@ -126,14 +127,20 @@ class PpobProviderBucket(models.Model):
             "location_dest_id": dest,
             "company_id": self.company_id.id,
             "x_custom_ppob_bucket_id": self.id,
-            "move_ids": [(0, 0, {
-                "name": self.inventory_product_id.display_name,
-                "product_id": self.inventory_product_id.id,
-                "product_uom": self.inventory_product_id.uom_id.id,
-                "product_uom_qty": qty,
-                "location_id": src,
-                "location_dest_id": dest,
-            })],
+            "move_ids": [
+                (
+                    0,
+                    0,
+                    {
+                        "name": self.inventory_product_id.display_name,
+                        "product_id": self.inventory_product_id.id,
+                        "product_uom": self.inventory_product_id.uom_id.id,
+                        "product_uom_qty": qty,
+                        "location_id": src,
+                        "location_dest_id": dest,
+                    },
+                )
+            ],
         }
         # Link to the originating transaction only when custom_ppob_sale has
         # declared the column (keeps provider independently installable).

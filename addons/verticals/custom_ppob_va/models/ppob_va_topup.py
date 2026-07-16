@@ -18,8 +18,7 @@ class PpobVaTopup(models.Model):
     mitra_id = fields.Many2one(related="va_account_id.mitra_id", store=True)
     wallet_id = fields.Many2one(related="va_account_id.wallet_id", store=True)
     amount = fields.Monetary(required=True, currency_field="currency_id")
-    bank_ref = fields.Char(required=True, copy=False, index=True,
-                           help="Bank-side reference. Used as idempotency key.")
+    bank_ref = fields.Char(required=True, copy=False, index=True, help="Bank-side reference. Used as idempotency key.")
     source = fields.Selection(
         selection=[
             ("csv_import", "CSV Import"),
@@ -43,12 +42,14 @@ class PpobVaTopup(models.Model):
     wallet_move_id = fields.Many2one("custom.ppob.wallet.move", ondelete="set null", copy=False)
     note = fields.Char()
     currency_id = fields.Many2one(
-        "res.currency", default=lambda self: self.env.company.currency_id, required=True,
+        "res.currency",
+        default=lambda self: self.env.company.currency_id,
+        required=True,
     )
 
     _bank_ref_uniq = models.Constraint(
-        'unique(bank_ref)',
-        'Bank reference must be unique (idempotency key).',
+        "unique(bank_ref)",
+        "Bank reference must be unique (idempotency key).",
     )
 
     def action_credit_wallet(self):
@@ -60,7 +61,9 @@ class PpobVaTopup(models.Model):
                 raise UserError(_("Topup %s in state %s cannot be credited.") % (topup.name, topup.state))
             counterpart = topup.va_account_id.transit_account_id
             if not counterpart:
-                raise UserError(_("VA account %s has no transit account configured.") % topup.va_account_id.display_name)
+                raise UserError(
+                    _("VA account %s has no transit account configured.") % topup.va_account_id.display_name
+                )
             output_tax = topup.va_account_id.output_tax_id
             reason = f"VA Topup {topup.name} ({topup.bank_ref})"
             if output_tax:
@@ -80,10 +83,12 @@ class PpobVaTopup(models.Model):
                     move_type="topup",
                     va_topup_id=topup.id,
                 )
-            topup.write({
-                "wallet_move_id": wallet_move.id,
-                "state": "credited",
-            })
+            topup.write(
+                {
+                    "wallet_move_id": wallet_move.id,
+                    "state": "credited",
+                }
+            )
         return True
 
     def action_reject(self):

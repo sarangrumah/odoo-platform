@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - ERASPACE Bridge (Mirror)",
     "summary": "Mirror ERASPACE POS + H2H feeds into Odoo Finance/Accounting "
-               "(2-feed HMAC ingest, join by pos_trx_ref, GL-on-terminal).",
+    "(2-feed HMAC ingest, join by pos_trx_ref, GL-on-terminal).",
     "description": """
 Custom PPOB Suite - ERASPACE Bridge (Revamp I: mirror-only)
 ===========================================================

@@ -11,6 +11,7 @@ idempotency is the DB ``UNIQUE(pos_ref)`` / ``UNIQUE(h2h_ref)`` on the join.
 
 Behind a reverse proxy the client IP is the first X-Forwarded-For hop.
 """
+
 import hashlib
 import hmac
 import json
@@ -43,13 +44,20 @@ def _verify_signature(connection, feed, body, signature, timestamp):
     skew = connection.max_clock_skew_s or 300
     if abs(time.time() - ts) > skew:
         return False
-    secret = request.env["ir.config_parameter"].sudo().get_param(
-        connection.credential_ref or "", "",
+    secret = (
+        request.env["ir.config_parameter"]
+        .sudo()
+        .get_param(
+            connection.credential_ref or "",
+            "",
+        )
     )
     if not secret:
         return False
     expected = hmac.new(
-        secret.encode("utf-8"), timestamp.encode("utf-8") + body, hashlib.sha256,
+        secret.encode("utf-8"),
+        timestamp.encode("utf-8") + body,
+        hashlib.sha256,
     ).hexdigest()
     if not hmac.compare_digest(expected, signature or ""):
         return False
@@ -59,10 +67,14 @@ def _verify_signature(connection, feed, body, signature, timestamp):
 
 
 class EraspaceIngestController(http.Controller):
-
     def _authenticate(self, feed):
-        connection = request.env["custom.ppob.eraspace.connection"].sudo().search(
-            [("feed", "=", feed), ("status", "=", "active")], limit=1,
+        connection = (
+            request.env["custom.ppob.eraspace.connection"]
+            .sudo()
+            .search(
+                [("feed", "=", feed), ("status", "=", "active")],
+                limit=1,
+            )
         )
         if not connection:
             return None, {"ok": False, "error_code": "NOT_CONFIGURED"}, 401
@@ -87,34 +99,32 @@ class EraspaceIngestController(http.Controller):
         if err:
             return request.make_json_response(err, status=status)
         if not payload.get("pos_trx_ref"):
-            return request.make_json_response(
-                {"ok": False, "error_code": "MISSING_POS_TRX_REF"}, status=400)
+            return request.make_json_response({"ok": False, "error_code": "MISSING_POS_TRX_REF"}, status=400)
         # auth="public" requests have no company context, so company-dependent
         # defaults (currency, wallet/journal company) would not resolve; bind an
         # explicit company before touching the ORM.
-        company = request.env.company or request.env["res.company"].sudo().search(
-            [], order="id", limit=1)
+        company = request.env.company or request.env["res.company"].sudo().search([], order="id", limit=1)
         Join = request.env["custom.ppob.eraspace.txn"].sudo().with_company(company)
         join = Join._ingest_event(feed, payload)
         if not join:
             # Routed to the skipped queue (unmapped / non-terminal / post error).
             return request.make_json_response(
-                {"ok": True, "accepted": True, "posted": False,
-                 "note": "queued for review"}, status=202)
-        return request.make_json_response({
-            "ok": True,
-            "accepted": True,
-            "posted": bool(join.pos_posted if feed == "pos" else join.h2h_posted),
-            "join_ref": join.name,
-            "match_state": join.match_state,
-        })
+                {"ok": True, "accepted": True, "posted": False, "note": "queued for review"}, status=202
+            )
+        return request.make_json_response(
+            {
+                "ok": True,
+                "accepted": True,
+                "posted": bool(join.pos_posted if feed == "pos" else join.h2h_posted),
+                "join_ref": join.name,
+                "match_state": join.match_state,
+            }
+        )
 
-    @http.route("/api/ppob/eraspace/pos", type="http", auth="public", readonly=False,
-                methods=["POST"], csrf=False)
+    @http.route("/api/ppob/eraspace/pos", type="http", auth="public", readonly=False, methods=["POST"], csrf=False)
     def pos_feed(self, **_):
         return self._handle("pos")
 
-    @http.route("/api/ppob/eraspace/h2h", type="http", auth="public", readonly=False,
-                methods=["POST"], csrf=False)
+    @http.route("/api/ppob/eraspace/h2h", type="http", auth="public", readonly=False, methods=["POST"], csrf=False)
     def h2h_feed(self, **_):
         return self._handle("h2h")

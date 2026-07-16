@@ -27,7 +27,12 @@ PPOB_ACCOUNTS = {
     "ppn_masukan": ("1.1.7.01", "PPN Masukan (Input VAT)", "asset_current", True),
     "commission_receivable": ("1.2.4.01", "Commission Receivable - Provider", "asset_receivable", True),
     "provider_deposit_default": ("1.3.01.00", "Provider Deposit (default holding)", "asset_current", True),
-    "customer_advance_payments": ("2.1.4.01", "Customer Advance Payments (Uang Muka Pelanggan)", "liability_current", True),
+    "customer_advance_payments": (
+        "2.1.4.01",
+        "Customer Advance Payments (Uang Muka Pelanggan)",
+        "liability_current",
+        True,
+    ),
     "wallet_liab_telko": ("2.1.5.01", "Mitra Wallet Liability - Telko", "liability_current", True),
     "wallet_liab_non_telko": ("2.1.5.02", "Mitra Wallet Liability - Non-Telko", "liability_current", True),
     "commission_payable_mitra": ("2.1.6.01", "Commission Payable - Mitra", "liability_payable", True),
@@ -46,7 +51,14 @@ PPOB_ACCOUNTS = {
 # code -> (name, sequence, wallet_role, revenue_role, cogs_role, vat_mode)
 PPOB_CLASSES = {
     "TELKO": ("Telko (Pulsa, Data, Token)", 10, "wallet_liab_telko", "sales_ppob_telko", "cogs_ppob_telko", "margin"),
-    "NON_TELKO": ("Non-Telko (Tagihan, BPJS, PLN, PDAM)", 20, "wallet_liab_non_telko", "sales_ppob_non_telko", "cogs_ppob_non_telko", "margin"),
+    "NON_TELKO": (
+        "Non-Telko (Tagihan, BPJS, PLN, PDAM)",
+        20,
+        "wallet_liab_non_telko",
+        "sales_ppob_non_telko",
+        "cogs_ppob_non_telko",
+        "margin",
+    ),
 }
 
 
@@ -65,17 +77,17 @@ def _ensure_accounts(env, company):
     for role, (code, name, atype, reconcile) in PPOB_ACCOUNTS.items():
         acc = _resolve_account(env, code, company)
         if not acc:
-            acc = Account.create({
-                "code": code,
-                "name": name,
-                "account_type": atype,
-                "reconcile": reconcile,
-                "company_ids": [Command.link(company.id)],
-            })
-            _logger.info("custom_ppob_core: created account %s (%s) for %s",
-                         code, atype, company.name)
-        mapping = Mapping.search(
-            [("company_id", "=", company.id), ("role", "=", role)], limit=1)
+            acc = Account.create(
+                {
+                    "code": code,
+                    "name": name,
+                    "account_type": atype,
+                    "reconcile": reconcile,
+                    "company_ids": [Command.link(company.id)],
+                }
+            )
+            _logger.info("custom_ppob_core: created account %s (%s) for %s", code, atype, company.name)
+        mapping = Mapping.search([("company_id", "=", company.id), ("role", "=", role)], limit=1)
         if mapping:
             mapping.account_id = acc.id
         else:
@@ -90,11 +102,13 @@ def _ensure_tax_group(env, company):
         limit=1,
     )
     if not existing:
-        Group.create({
-            "name": "PPN (Indonesian VAT)",
-            "sequence": 10,
-            "company_id": company.id,
-        })
+        Group.create(
+            {
+                "name": "PPN (Indonesian VAT)",
+                "sequence": 10,
+                "company_id": company.id,
+            }
+        )
 
 
 def _ensure_classes(env, company):
@@ -117,15 +131,17 @@ def _ensure_classes(env, company):
             if vals:
                 rec.write(vals)
         else:
-            Class.create({
-                "code": code,
-                "name": name,
-                "sequence": seq,
-                "default_wallet_account_id": wallet.id if wallet else False,
-                "default_revenue_account_id": revenue.id if revenue else False,
-                "default_cogs_account_id": cogs.id if cogs else False,
-                "vat_mode": vat,
-            })
+            Class.create(
+                {
+                    "code": code,
+                    "name": name,
+                    "sequence": seq,
+                    "default_wallet_account_id": wallet.id if wallet else False,
+                    "default_revenue_account_id": revenue.id if revenue else False,
+                    "default_cogs_account_id": cogs.id if cogs else False,
+                    "vat_mode": vat,
+                }
+            )
 
 
 def post_init_hook(env):

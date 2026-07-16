@@ -15,6 +15,7 @@ management and reusing the platform adapter registry's audit log
 External teams typically replace this with a provider-specific subclass
 (e.g. Digiflazz) registered under its own ``ppob_*`` name.
 """
+
 import hashlib
 import hmac
 import json
@@ -34,7 +35,6 @@ _logger = logging.getLogger(__name__)
 
 @register_adapter("ppob_http_json")
 class HttpJsonProviderAdapter(PPOBProviderAdapter):
-
     DEFAULT_TIMEOUT = 15
 
     # ------------------------------------------------------------------
@@ -68,15 +68,17 @@ class HttpJsonProviderAdapter(PPOBProviderAdapter):
         if not cfg:
             return
         try:
-            self.provider.env["custom.adapter.call.log"].sudo().create({
-                "config_id": cfg.id,
-                "endpoint": path,
-                "request_hash": hashlib.sha256(body or b"").hexdigest() if body else "",
-                "response_status": status_code,
-                "latency_ms": latency_ms,
-                "error": (error or "")[:512] if error else False,
-                "ok": ok,
-            })
+            self.provider.env["custom.adapter.call.log"].sudo().create(
+                {
+                    "config_id": cfg.id,
+                    "endpoint": path,
+                    "request_hash": hashlib.sha256(body or b"").hexdigest() if body else "",
+                    "response_status": status_code,
+                    "latency_ms": latency_ms,
+                    "error": (error or "")[:512] if error else False,
+                    "ok": ok,
+                }
+            )
         except Exception as e:  # pragma: no cover - never block the business call
             _logger.error("ppob http adapter call log write failed: %s", e)
 
@@ -97,8 +99,7 @@ class HttpJsonProviderAdapter(PPOBProviderAdapter):
             latency_ms = int((time.time() - t0) * 1000)
             data = resp.json() if resp.content else {}
             ok = 200 <= resp.status_code < 300
-            self._log_call(path, body, resp.status_code, latency_ms,
-                           None if ok else f"HTTP{resp.status_code}", ok)
+            self._log_call(path, body, resp.status_code, latency_ms, None if ok else f"HTTP{resp.status_code}", ok)
             return resp.status_code, data if isinstance(data, dict) else {"_raw": data}
         except requests.RequestException as exc:
             latency_ms = int((time.time() - t0) * 1000)
@@ -124,22 +125,28 @@ class HttpJsonProviderAdapter(PPOBProviderAdapter):
     # ------------------------------------------------------------------
 
     def inquiry(self, transaction):
-        status, data = self._post("inquiry", {
-            "sku": transaction.provider_sku,
-            "msisdn": transaction.msisdn,
-            "ref": transaction.name,
-        })
+        status, data = self._post(
+            "inquiry",
+            {
+                "sku": transaction.provider_sku,
+                "msisdn": transaction.msisdn,
+                "ref": transaction.name,
+            },
+        )
         return self._result_from(status, data)
 
     def pay(self, transaction):
-        status, data = self._post("pay", {
-            "sku": transaction.provider_sku,
-            "msisdn": transaction.msisdn,
-            "ref": transaction.name,
-            "amount": transaction.cost_price,
-            "inquiry_ref": transaction.inquiry_reference,
-            "idempotency_key": transaction.idempotency_key,
-        })
+        status, data = self._post(
+            "pay",
+            {
+                "sku": transaction.provider_sku,
+                "msisdn": transaction.msisdn,
+                "ref": transaction.name,
+                "amount": transaction.cost_price,
+                "inquiry_ref": transaction.inquiry_reference,
+                "idempotency_key": transaction.idempotency_key,
+            },
+        )
         return self._result_from(status, data)
 
     def status(self, provider_ref):

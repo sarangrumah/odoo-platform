@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - PPS Gateway (H2H inbound)",
     "summary": "Expose the PPS/EVShop H2H API from Odoo so ERASPACE POS can "
-               "transact against Odoo as the switcher (Revamp II).",
+    "transact against Odoo as the switcher (Revamp II).",
     "description": """
 Custom PPOB Suite - PPS Gateway (Revamp II: Odoo as switcher)
 ============================================================

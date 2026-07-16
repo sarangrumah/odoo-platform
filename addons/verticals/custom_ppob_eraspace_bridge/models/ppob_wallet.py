@@ -13,6 +13,7 @@ POS; Odoo only mirrors it. Two consequences:
    (doc S6.2), so posting must never be blocked by a not-yet-mirrored top-up.
    They still serialise on the same ``SELECT ... FOR UPDATE`` row lock.
 """
+
 from odoo import _, fields, models
 from odoo.exceptions import UserError
 
@@ -26,8 +27,8 @@ class PpobWallet(models.Model):
         string="ERASPACE Mirror",
         default=False,
         help="When set, this wallet mirrors an ERASPACE POS balance. Native "
-             "debit/credit is blocked; only the ERASPACE feed writes it via "
-             "_mirror_debit/_mirror_credit (no credit-limit ceiling).",
+        "debit/credit is blocked; only the ERASPACE feed writes it via "
+        "_mirror_debit/_mirror_credit (no credit-limit ceiling).",
     )
 
     # ------------------------------------------------------------------
@@ -37,11 +38,14 @@ class PpobWallet(models.Model):
     def _check_eraspace_mirror_guard(self, move_type):
         for rec in self:
             if rec.eraspace_mirror and move_type not in MIRROR_MOVE_TYPES:
-                raise UserError(_(
-                    "Wallet '%(w)s' is an ERASPACE mirror; native mutation is "
-                    "not allowed. Balance is authoritative at ERASPACE POS and "
-                    "is projected via the mirror feed. (move_type=%(t)s)"
-                ) % {"w": rec.display_name, "t": move_type or "unknown"})
+                raise UserError(
+                    _(
+                        "Wallet '%(w)s' is an ERASPACE mirror; native mutation is "
+                        "not allowed. Balance is authoritative at ERASPACE POS and "
+                        "is projected via the mirror feed. (move_type=%(t)s)"
+                    )
+                    % {"w": rec.display_name, "t": move_type or "unknown"}
+                )
 
     def _atomic_debit(self, amount, reason, counterpart_account, **extras):
         self._check_eraspace_mirror_guard(extras.get("move_type"))
@@ -64,19 +68,24 @@ class PpobWallet(models.Model):
             raise UserError(_("Mirror debit amount must be positive."))
         fresh_balance = self._lock()
         move = self._post_wallet_journal(
-            amount=amount, move_type="debit_wallet",
-            reason=reason, counterpart_account=counterpart_account,
+            amount=amount,
+            move_type="debit_wallet",
+            reason=reason,
+            counterpart_account=counterpart_account,
         )
         new_balance = fresh_balance - amount
-        move_vals = self._build_move_vals({
-            "wallet_id": self.id,
-            "type": move_type,
-            "amount_signed": -amount,
-            "balance_after": new_balance,
-            "ref": reason,
-            "move_id": move.id,
-            "state": "posted",
-        }, extras)
+        move_vals = self._build_move_vals(
+            {
+                "wallet_id": self.id,
+                "type": move_type,
+                "amount_signed": -amount,
+                "balance_after": new_balance,
+                "ref": reason,
+                "move_id": move.id,
+                "state": "posted",
+            },
+            extras,
+        )
         wallet_move = self.env["custom.ppob.wallet.move"].create(move_vals)
         self.env.cr.execute(
             "UPDATE custom_ppob_wallet SET balance = %s WHERE id = %s",
@@ -93,19 +102,24 @@ class PpobWallet(models.Model):
             raise UserError(_("Mirror credit amount must be positive."))
         fresh_balance = self._lock()
         move = self._post_wallet_journal(
-            amount=amount, move_type="credit_wallet",
-            reason=reason, counterpart_account=counterpart_account,
+            amount=amount,
+            move_type="credit_wallet",
+            reason=reason,
+            counterpart_account=counterpart_account,
         )
         new_balance = fresh_balance + amount
-        move_vals = self._build_move_vals({
-            "wallet_id": self.id,
-            "type": move_type,
-            "amount_signed": amount,
-            "balance_after": new_balance,
-            "ref": reason,
-            "move_id": move.id,
-            "state": "posted",
-        }, extras)
+        move_vals = self._build_move_vals(
+            {
+                "wallet_id": self.id,
+                "type": move_type,
+                "amount_signed": amount,
+                "balance_after": new_balance,
+                "ref": reason,
+                "move_id": move.id,
+                "state": "posted",
+            },
+            extras,
+        )
         wallet_move = self.env["custom.ppob.wallet.move"].create(move_vals)
         self.env.cr.execute(
             "UPDATE custom_ppob_wallet SET balance = %s WHERE id = %s",
@@ -123,14 +137,16 @@ class PpobWallet(models.Model):
         delta = (target_balance or 0.0) - fresh
         if abs(delta) <= 0.0001:
             return False
-        self.env["custom.ppob.wallet.move"].create({
-            "wallet_id": self.id,
-            "type": "eraspace_sync",
-            "amount_signed": delta,
-            "balance_after": target_balance,
-            "ref": reason,
-            "state": "posted",
-        })
+        self.env["custom.ppob.wallet.move"].create(
+            {
+                "wallet_id": self.id,
+                "type": "eraspace_sync",
+                "amount_signed": delta,
+                "balance_after": target_balance,
+                "ref": reason,
+                "state": "posted",
+            }
+        )
         self.env.cr.execute(
             "UPDATE custom_ppob_wallet SET balance = %s WHERE id = %s",
             (target_balance, self.id),

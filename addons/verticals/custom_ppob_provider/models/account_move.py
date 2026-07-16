@@ -29,7 +29,7 @@ class AccountMove(models.Model):
         copy=False,
         index=True,
         help="Marks this move as part of a provider deposit DP/Pelunasan pair "
-             "created by custom.ppob.provider.topup.wizard.",
+        "created by custom.ppob.provider.topup.wizard.",
     )
     x_custom_ppob_dp_bill_id = fields.Many2one(
         comodel_name="account.move",
@@ -47,8 +47,7 @@ class AccountMove(models.Model):
         comodel_name="custom.ppob.provider.bucket",
         string="Provider Bucket",
         copy=False,
-        help="Subledger row credited when this DP / Pelunasan bill posts, "
-             "depending on provider.topup_dp_timing.",
+        help="Subledger row credited when this DP / Pelunasan bill posts, depending on provider.topup_dp_timing.",
     )
     x_custom_ppob_topup_log_id = fields.Many2one(
         comodel_name="custom.ppob.provider.topup.log",
@@ -78,9 +77,8 @@ class AccountMove(models.Model):
         provider = bucket.provider_id
         timing = provider.topup_dp_timing
         role = self.x_custom_ppob_dp_role
-        should_credit = (
-            (timing == "dp_post" and role == "dp_100")
-            or (timing == "pelunasan_post" and role == "pelunasan")
+        should_credit = (timing == "dp_post" and role == "dp_100") or (
+            timing == "pelunasan_post" and role == "pelunasan"
         )
         if not should_credit:
             return
@@ -89,18 +87,16 @@ class AccountMove(models.Model):
         # debit-credit balance on the bucket account across this move's lines.
         # This guarantees subledger == GL even when Odoo's tax engine rounds the
         # DPP/PPN split differently from the wizard's pre-computed amounts.
-        dpp = sum(
-            line.balance for line in self.line_ids
-            if line.account_id == bucket.account_id
-        )
+        dpp = sum(line.balance for line in self.line_ids if line.account_id == bucket.account_id)
         log = self.x_custom_ppob_topup_log_id
         ppn = log.ppn_amount if log else 0.0
         gross = log.gross_amount if log else abs(self.amount_total)
 
         if dpp <= 0:
             _logger.warning(
-                "ppob provider DP hook: move %s has non-positive bucket delta "
-                "%.2f, skipping bucket credit.", self.name, dpp,
+                "ppob provider DP hook: move %s has non-positive bucket delta %.2f, skipping bucket credit.",
+                self.name,
+                dpp,
             )
             return
 

@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - Oracle Bridge",
     "summary": "Bridge the PPOB suite to the legacy Oracle EVShop pipeline "
-               "(MSG016T) via stored procedure SellWithDenom_HA + status polling.",
+    "(MSG016T) via stored procedure SellWithDenom_HA + status polling.",
     "description": """
 Custom PPOB Suite - Oracle Bridge
 =================================

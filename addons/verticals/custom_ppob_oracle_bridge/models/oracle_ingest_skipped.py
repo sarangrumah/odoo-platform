@@ -3,6 +3,7 @@
 un-mapped). The cursor advances past skipped rows; this table allows replay
 once mappings are added.
 """
+
 from odoo import _, fields, models
 
 
@@ -35,8 +36,8 @@ class OracleIngestSkipped(models.Model):
     )
 
     _msg016t_id_uniq = models.Constraint(
-        'unique(msg016t_id)',
-        'A single MSG016T row can only have one skip record.',
+        "unique(msg016t_id)",
+        "A single MSG016T row can only have one skip record.",
     )
 
     def action_replay(self):
@@ -68,25 +69,30 @@ class OracleIngestSkipped(models.Model):
                 continue
 
             from .constants import ORACLE_STATUS_MAP
+
             odoo_state = ORACLE_STATUS_MAP.get(status, "in_progress")
-            txn = Txn.create({
-                "mitra_id": member_map.partner_id.id,
-                "product_id": sku_map.product_id.id,
-                "provider_id": sku_map.provider_id.id,
-                "idempotency_key": trx_no or f"MSG016T-{msg016t_id}",
-                "provider_ref": str(msg016t_id),
-                "oracle_msg016t_id": msg016t_id,
-                "inbound_source": "oracle_legacy",
-                "msisdn": msisdn or "",
-                "sell_price": sales_price or 0.0,
-                "cost_price": sales_price or 0.0,
-                "state": odoo_state,
-            })
-            rec.write({
-                "replayed": True,
-                "replayed_at": fields.Datetime.now(),
-                "transaction_id": txn.id,
-            })
+            txn = Txn.create(
+                {
+                    "mitra_id": member_map.partner_id.id,
+                    "product_id": sku_map.product_id.id,
+                    "provider_id": sku_map.provider_id.id,
+                    "idempotency_key": trx_no or f"MSG016T-{msg016t_id}",
+                    "provider_ref": str(msg016t_id),
+                    "oracle_msg016t_id": msg016t_id,
+                    "inbound_source": "oracle_legacy",
+                    "msisdn": msisdn or "",
+                    "sell_price": sales_price or 0.0,
+                    "cost_price": sales_price or 0.0,
+                    "state": odoo_state,
+                }
+            )
+            rec.write(
+                {
+                    "replayed": True,
+                    "replayed_at": fields.Datetime.now(),
+                    "transaction_id": txn.id,
+                }
+            )
             replayed_count += 1
 
         return {

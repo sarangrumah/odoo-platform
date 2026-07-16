@@ -29,22 +29,21 @@ class PpobPriceTier(models.Model):
         """
         tier = partner.x_custom_ppob_mitra_tier_id or self
         if not tier:
-            raise UserError(
-                "Partner %s has no price tier and no default is configured."
-                % partner.display_name
-            )
-        line = self.env["custom.ppob.price.tier.line"].search([
-            ("tier_id", "=", tier.id),
-            ("product_id", "=", product.id),
-        ], limit=1)
+            raise UserError("Partner %s has no price tier and no default is configured." % partner.display_name)
+        line = self.env["custom.ppob.price.tier.line"].search(
+            [
+                ("tier_id", "=", tier.id),
+                ("product_id", "=", product.id),
+            ],
+            limit=1,
+        )
         if line:
             return line.sell_price
         if product.denom:
             return product.denom
         raise UserError(
             "No selling price for product %s in tier %s, and the product has "
-            "no denomination to fall back on."
-            % (product.display_name, tier.display_name)
+            "no denomination to fall back on." % (product.display_name, tier.display_name)
         )
 
 
@@ -74,8 +73,8 @@ class PpobPriceTierLine(models.Model):
     )
 
     _tier_product_uniq = models.Constraint(
-        'unique(tier_id, product_id)',
-        'Each product can appear only once per tier.',
+        "unique(tier_id, product_id)",
+        "Each product can appear only once per tier.",
     )
 
     @api.constrains("sell_price")
