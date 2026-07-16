@@ -8,8 +8,8 @@ Scope  : GentleWoman storefront (Next.js) x Odoo 19 (backend) — features, the
          and a mandays-derived timeline. No pricing. Erajaya VAS framing (no BCT/Bima).
 
 Run    : python tools/build_gentlewoman_deck.py
-Out    : docs/gentlewoman/GentleWoman-Business-Presentation-v1.0.pptx
-         docs/gentlewoman/GentleWoman-Business-Presentation-v1.0.pdf
+Out    : docs/projects/gentlewoman/GentleWoman-Business-Presentation-v1.0.pptx
+         docs/projects/gentlewoman/GentleWoman-Business-Presentation-v1.0.pdf
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 # Levi's (PT Sinar Eka Selaras) — data onboarding runbook
 
-Tenant DB: `levis`. Source files: `docs/levis/`. This folder is **Track A** (ops
+Tenant DB: `levis`. Source files: `docs/projects/levis/`. This folder is **Track A** (ops
 scripts for fast go-live). The durable, reusable adapter is the **Track B** module
 `addons/ee_gap/custom_retail_import` (Excel/CSV upload wizard + SFTP feed).
 
@@ -55,7 +55,7 @@ Creates 24 warehouses keyed by name; adds `wh_<CODE>` aliases where codes are kn
 
 ### 4. Opening stock (X20) — store 14694 only, until full data arrives
 ```
-docker cp "docs/levis/X20_Current_Onhand_Inventory_Report- For current inventory.csv" odoo19-platform-odoo-mgmt:/tmp/levis/X20.csv
+docker cp "docs/projects/levis/X20_Current_Onhand_Inventory_Report- For current inventory.csv" odoo19-platform-odoo-mgmt:/tmp/levis/X20.csv
 docker exec -i odoo19-platform-odoo-mgmt odoo shell -d levis --no-http < scripts/tenants/levis/05_load_x20.py
 ```
 ONE-SHOT (guarded by `ir.config_parameter` marker `levis.x20_opening_stock_applied`).

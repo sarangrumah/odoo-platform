@@ -39,9 +39,12 @@ exploration but should not run in production.
 
 ## Where they appear in Odoo
 
-- **Apps list**: filter by category. The platform uses
-  `Vertical/<Subcategory>` (e.g. `Vertical/Logistics`). Operators can install
+- **Apps list**: filter by category. Verticals use
+  `Industry/<Subcategory>` (e.g. `Industry/PPOB`). Operators can install
   with the standard Apps UI once the module is in the addons path.
+  Note that `category` only controls Apps-list placement — it does **not**
+  encode the module tier. The tier is the `addons/` group the module lives in;
+  see "Module tiers" in `docs/architecture.md`.
 - **Top navbar**: every vertical attaches a top-level menu under the shared
   `custom_core.menu_custom_root`. So all verticals appear together under the **Custom**
   menu, not scattered across stock Odoo menus.

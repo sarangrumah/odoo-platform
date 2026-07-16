@@ -4,7 +4,7 @@ Pipeline: pandoc (markdown -> standalone HTML with inlined Erajaya VAS CSS via -
           -> headless Chrome (HTML -> PDF, no header/footer).
 
 Run : python tools/build_gentlewoman_docs.py
-Out : docs/gentlewoman/GentleWoman-{TSD,Blueprint,FSD}-v1.0.pdf
+Out : docs/projects/gentlewoman/GentleWoman-{TSD,Blueprint,FSD}-v1.0.pdf
 """
 
 from __future__ import annotations

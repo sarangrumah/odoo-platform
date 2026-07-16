@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Generator skenario end-to-end Arka (jasa drone show) x Aim (rental drone).
-Output: docs/skenario-arka-aim/Skenario-Arka-Aim-Drone-Show-Rental.xlsx
+Output: docs/projects/arka-aim/Skenario-Arka-Aim-Drone-Show-Rental.xlsx
 
 Skenario: Customer (Event Organizer) menyewa jasa drone show ke ARKA.
 ARKA menyewa unit drone + kru teknis ke AIM. Termasuk survey lokasi, BAST,
@@ -626,7 +626,10 @@ for name in ["02-Master Data", "04-PraSales & Survey", "05-Sales & Rental",
     wb[name].freeze_panes = "A5"
 
 import os
-outdir = "e:/Projects/Odoo/platform/docs/skenario-arka-aim"
+outdir = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "docs", "projects", "arka-aim",
+)
 os.makedirs(outdir, exist_ok=True)
 outpath = os.path.join(outdir, "Skenario-Arka-Aim-Drone-Show-Rental.xlsx")
 try:

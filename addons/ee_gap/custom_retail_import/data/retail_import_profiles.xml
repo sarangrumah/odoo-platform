@@ -3,7 +3,7 @@
     <!--
       Seed import profiles for Levi's (PT Sinar Eka Selaras). namespace="levis"
       isolates the external IDs per tenant. Column indices are 1-based (A=1) and
-      match the headers observed in docs/levis/. Adjust per-tenant by editing
+      match the headers observed in docs/projects/levis/. Adjust per-tenant by editing
       these records (data, not code).
     -->
 

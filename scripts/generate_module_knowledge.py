@@ -44,6 +44,7 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 ADDONS_ROOTS = [
     ROOT / "addons" / "core",
+    ROOT / "addons" / "control_plane",
     ROOT / "addons" / "compliance",
     ROOT / "addons" / "ee_gap",
     ROOT / "addons" / "operations",

@@ -30,7 +30,7 @@ def store_master_stores():
     """Return ordered list of store names from the Store Master header (cols 34..57)."""
     hits = glob.glob(os.path.join(LEVIS_DIR, "*STORE MASTER DATA*.xlsx"))
     if not hits:
-        raise SystemExit("Store Master xlsx not found in docs/levis/")
+        raise SystemExit("Store Master xlsx not found in docs/projects/levis/")
     wb = openpyxl.load_workbook(hits[0], read_only=True, data_only=True)
     ws = wb["Stock by Store by PC13-update"] if "Stock by Store by PC13-update" in wb.sheetnames else wb.active
     names = []

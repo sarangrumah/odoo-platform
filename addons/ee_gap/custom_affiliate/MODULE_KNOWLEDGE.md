@@ -1,7 +1,7 @@
 # custom_affiliate
 
 Affiliate program for the platform (Odoo CE has none). Spec: §6 of
-`docs/spec-headless-fashion-commerce-ai.md`. First consumer: the Gentle Woman
+`docs/projects/gentlewoman/spec-headless-fashion-commerce-ai.md`. First consumer: the Gentle Woman
 headless storefront, but the module is channel-agnostic (attribution fires on
 any `sale.order.action_confirm`).
 

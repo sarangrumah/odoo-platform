@@ -15,7 +15,7 @@ import os
 import sys
 from collections import defaultdict
 
-ROOT = os.path.join("e:/Projects/Odoo/platform", "addons")
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "addons")
 SKIP_DIRS = {"_vendor", "__pycache__"}
 
 # model_name -> set of modules that define it (via _name=)

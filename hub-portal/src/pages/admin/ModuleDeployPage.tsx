@@ -7,7 +7,7 @@ import { colors, spacing } from '../../tokens';
 import { createDeployment, deployPack, listDeployments, listIndustryPacks, listModuleCatalog, listTenants } from '../../api';
 
 const PAGE_SIZE = 20;
-const CATEGORIES = ['core', 'compliance', 'ee_gap', 'operations', 'vertical', 'odoo'];
+const CATEGORIES = ['core', 'control_plane', 'compliance', 'ee_gap', 'operations', 'vertical', 'odoo'];
 const MATURITIES = ['scaffold', 'partial', 'production'];
 
 export default function ModuleDeployPage() {

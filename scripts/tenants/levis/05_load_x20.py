@@ -1,6 +1,6 @@
 """Apply Levi's X20 opening on-hand stock as inventory adjustments (run in CONTAINER).
 
-    docker cp "docs/levis/X20_Current_Onhand_Inventory_Report- For current inventory.csv" \
+    docker cp "docs/projects/levis/X20_Current_Onhand_Inventory_Report- For current inventory.csv" \
         odoo19-platform-odoo-mgmt:/tmp/levis/X20.csv
     docker exec -i odoo19-platform-odoo-mgmt odoo shell -d levis --no-http < scripts/tenants/levis/05_load_x20.py
 

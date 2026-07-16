@@ -95,6 +95,7 @@
                     <field name="module_name"/>
                     <field name="capability_tag_ids"/>
                     <filter name="filter_core" string="Core" domain="[('category','=','core')]"/>
+                    <filter name="filter_control_plane" string="Control Plane" domain="[('category','=','control_plane')]"/>
                     <filter name="filter_compliance" string="Compliance" domain="[('category','=','compliance')]"/>
                     <filter name="filter_ee_gap" string="EE-Gap" domain="[('category','=','ee_gap')]"/>
                     <filter name="filter_operations" string="Operations" domain="[('category','=','operations')]"/>

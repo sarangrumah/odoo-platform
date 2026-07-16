@@ -24,6 +24,7 @@ _logger = logging.getLogger(__name__)
 
 CATEGORY_BY_PATH_SEGMENT = {
     "core": "core",
+    "control_plane": "control_plane",
     "compliance": "compliance",
     "ee_gap": "ee_gap",
     "operations": "operations",
@@ -86,6 +87,7 @@ class CustomModuleCapabilityEntry(models.Model):
     category = fields.Selection(
         [
             ("core", "Core"),
+            ("control_plane", "Control Plane"),
             ("compliance", "Compliance"),
             ("ee_gap", "EE-Gap"),
             ("operations", "Operations"),
@@ -301,12 +303,19 @@ class CustomModuleCapabilityEntry(models.Model):
             return None
 
     @staticmethod
-    def _infer_category(path: str) -> str:
+    def _infer_category(path: str) -> str | bool:
         parts = Path(path).parts
         for seg in parts:
             if seg in CATEGORY_BY_PATH_SEGMENT:
                 return CATEGORY_BY_PATH_SEGMENT[seg]
-        return "operations"
+        # An unmapped addons group must stay visibly uncategorised: guessing here
+        # silently mislabels every module in a newly added group.
+        _logger.warning(
+            "BRD scan: no addons group in %s maps to a category — add it to "
+            "CATEGORY_BY_PATH_SEGMENT (and the `category` Selection)",
+            path,
+        )
+        return False
 
     # Module-level regex constants for model scraping.
     _RE_NAME = re.compile(r"^\s*_name\s*=\s*['\"]([\w.]+)['\"]", re.MULTILINE)
