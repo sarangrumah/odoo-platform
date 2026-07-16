@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from . import account_journal
 from . import custom_report_engine
 from . import custom_report_financial
 from . import custom_report_general_ledger
