@@ -9,7 +9,7 @@ endpoint can never hold locks or roll back a successful sell.
 """
 import logging
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 from ..pps_errors import state_to_status
 from ..pps_message import sale_message

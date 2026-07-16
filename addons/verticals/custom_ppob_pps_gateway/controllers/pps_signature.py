@@ -16,7 +16,10 @@ import hmac
 
 
 def _md5(value):
-    return hashlib.md5((value or "").encode("utf-8")).hexdigest()
+    # usedforsecurity=False: MD5 is the vendor contract's wire format, not a
+    # security control here. Freshness/replay/IP checks are enforced separately
+    # by the controller (see module docstring).
+    return hashlib.md5((value or "").encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 # Per-endpoint signature formula: f(params, md5_password) -> expected hex digest.

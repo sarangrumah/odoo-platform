@@ -63,7 +63,7 @@ class OracleMemberMap(models.Model):
         )
         if not rows:
             raise UserError(_("Member ID %s tidak ditemukan di Oracle MSG019T.") % self.oracle_member_id)
-        _, member_no, member_group, balance = rows
+        _id, member_no, member_group, balance = rows
         self.write({
             "oracle_member_no": member_no,
             "oracle_member_group": member_group,
