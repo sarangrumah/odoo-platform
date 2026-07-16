@@ -32,10 +32,10 @@ class TestVatCheckId(TransactionCase):
 
     def test_check_vat_id_rejects_bad_input(self):
         Partner = self.Partner
-        self.assertFalse(Partner.check_vat_id("123"))            # too short
+        self.assertFalse(Partner.check_vat_id("123"))  # too short
         self.assertFalse(Partner.check_vat_id("01234567890123456789"))  # too long
         self.assertFalse(Partner.check_vat_id("abc456789012345"))  # non-numeric
-        self.assertFalse(Partner.check_vat_id(""))               # empty
+        self.assertFalse(Partner.check_vat_id(""))  # empty
 
     def test_partner_save_with_rejected_npwp(self):
         # The original report: this exact value raised ValidationError via
@@ -51,8 +51,6 @@ class TestVatCheckId(TransactionCase):
         self.assertEqual(p.vat, "015556667008000")
 
     def test_partner_write_with_rejected_npwp(self):
-        p = self.Partner.create(
-            {"name": "Test Partner", "country_id": self.id_country.id}
-        )
+        p = self.Partner.create({"name": "Test Partner", "country_id": self.id_country.id})
         p.write({"vat": "015556667008000"})
         self.assertEqual(p.vat, "015556667008000")

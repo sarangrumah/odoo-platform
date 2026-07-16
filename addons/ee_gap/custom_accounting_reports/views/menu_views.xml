@@ -6,6 +6,12 @@
               sequence="80"
               groups="group_report_user"/>
 
+    <menuitem id="menu_custom_reports_gl_analysis"
+              name="GL Analysis"
+              parent="menu_custom_reports_root"
+              action="action_gl_analysis"
+              sequence="5"/>
+
     <menuitem id="menu_custom_reports_trial_balance"
               name="Trial Balance"
               parent="menu_custom_reports_root"

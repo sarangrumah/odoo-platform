@@ -29,7 +29,7 @@ import base64
 import json
 import os
 import sys
-import xmlrpc.client
+import xmlrpc.client  # nosec B411 - client calls to our own controlled Odoo XML-RPC endpoint, not untrusted-XML parsing
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,8 +41,12 @@ ARTIFACTS = [
     ("GentleWoman-TSD-v1.0.pdf", "GentleWoman - TSD v1.0", "application/pdf", True),
     ("GentleWoman-Blueprint-v1.0.pdf", "GentleWoman - Blueprint v1.0", "application/pdf", True),
     ("GentleWoman-FSD-v1.0.pdf", "GentleWoman - FSD v1.0", "application/pdf", True),
-    ("GentleWoman-Business-Presentation-v1.0.pptx", "GentleWoman - Business Presentation v1.0 (PPTX)",
-     "application/vnd.openxmlformats-officedocument.presentationml.presentation", True),
+    (
+        "GentleWoman-Business-Presentation-v1.0.pptx",
+        "GentleWoman - Business Presentation v1.0 (PPTX)",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        True,
+    ),
 ]
 
 URL = os.environ.get("ODOO_URL", "http://localhost:18069")
@@ -109,8 +113,7 @@ def main() -> int:
     for fname, name, mime, public in ARTIFACTS:
         path = DOCS / fname
         vals = {"name": name, "datas": b64(path), "mimetype": mime, "type": "binary", "public": public}
-        found = models.execute_kw(DB, uid, PASSWORD, "ir.attachment", "search",
-                                  [[["name", "=", name]]], {"limit": 1})
+        found = models.execute_kw(DB, uid, PASSWORD, "ir.attachment", "search", [[["name", "=", name]]], {"limit": 1})
         if found:
             att_id = found[0]
             models.execute_kw(DB, uid, PASSWORD, "ir.attachment", "write", [[att_id], vals])

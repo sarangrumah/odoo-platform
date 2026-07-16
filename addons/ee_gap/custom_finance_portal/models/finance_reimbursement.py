@@ -67,9 +67,7 @@ class FinanceReimbursementLine(models.Model):
     _description = "Reimbursement Detail Line"
     _order = "reimbursement_id, sequence, id"
 
-    reimbursement_id = fields.Many2one(
-        "finance.reimbursement", required=True, ondelete="cascade"
-    )
+    reimbursement_id = fields.Many2one("finance.reimbursement", required=True, ondelete="cascade")
     sequence = fields.Integer(default=10)
     name = fields.Char(string="Description", required=True)
     item_id = fields.Many2one("finance.item.submission", string="Item")

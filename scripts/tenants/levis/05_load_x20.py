@@ -31,6 +31,7 @@ def log(m):
 if env["ir.config_parameter"].sudo().get_param(MARKER):
     log("ABORT: X20 opening stock already applied (marker set). Clear the parameter to override.")
 else:
+
     def safe_xid(prefix, value):
         return prefix + "".join(c if c.isalnum() else "_" for c in str(value)).upper()
 
@@ -85,8 +86,10 @@ else:
             errors.append(f"row {i}: no product ean={ean} item={item}")
             continue
         try:
-            q = env["stock.quant"].with_context(inventory_mode=True).create(
-                {"product_id": prod.id, "location_id": loc.id, "inventory_quantity": qty}
+            q = (
+                env["stock.quant"]
+                .with_context(inventory_mode=True)
+                .create({"product_id": prod.id, "location_id": loc.id, "inventory_quantity": qty})
             )
             q.action_apply_inventory()
             applied += 1

@@ -6,6 +6,7 @@ House style mirrors docs/projects/levis/build_tsd_charter_workflow_docx.py.
 
 Usage:  python docs/projects/finance-portal/build_charter_docx.py
 """
+
 import os
 
 from docx import Document
@@ -41,8 +42,7 @@ class Builder:
             section.left_margin = Cm(2.5)
             section.right_margin = Cm(2.5)
 
-    def p(self, text, bold=False, italic=False, align=WD_ALIGN_PARAGRAPH.JUSTIFY,
-          size=None, color=None, space_after=6):
+    def p(self, text, bold=False, italic=False, align=WD_ALIGN_PARAGRAPH.JUSTIFY, size=None, color=None, space_after=6):
         par = self.doc.add_paragraph()
         par.alignment = align
         par.paragraph_format.space_after = Pt(space_after)
@@ -63,7 +63,8 @@ class Builder:
             par = self.doc.add_paragraph(style="List Bullet")
             par.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             if isinstance(it, tuple):
-                r = par.add_run(it[0]); r.bold = True
+                r = par.add_run(it[0])
+                r.bold = True
                 par.add_run(it[1])
             else:
                 par.add_run(it)
@@ -111,8 +112,7 @@ class Builder:
     def cover(self, kind, title, subtitle, attrs):
         for _ in range(5):
             self.doc.add_paragraph()
-        self.p(kind, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, size=22,
-               color=ACCENT, space_after=2)
+        self.p(kind, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, size=22, color=ACCENT, space_after=2)
         self.doc.add_paragraph()
         self.p(title, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, size=16)
         self.p(subtitle, align=WD_ALIGN_PARAGRAPH.CENTER, size=11)
@@ -170,16 +170,18 @@ def build():
 
     # ---------------- 2. Tujuan ----------------
     b.h("2. Tujuan Proyek (Objectives)", 1)
-    b.bullets([
-        "Menyediakan portal terpadu: Cash Advance (+Realization), Reimbursement & Expenses, "
-        "Vendor Invoice (PO/Non-PO Non-Trade), dan settlement Perjalanan Dinas.",
-        "Menjalankan approval dua tahap Tax Review -> Finance Review dengan matrix konfigurable.",
-        "Validasi budget per divisi dan aturan PR wajib untuk pengajuan > Rp 1.000.000.",
-        "Integrasi dengan SAP (push GL/journal/MIRO, terima payment plan & status) dan HRIS "
-        "(read travel) melalui kontrak yang disepakati.",
-        "Menyediakan SSO (Keycloak) untuk login karyawan & vendor.",
-        "Odoo tidak melakukan posting GL — pembukuan tetap di SAP.",
-    ])
+    b.bullets(
+        [
+            "Menyediakan portal terpadu: Cash Advance (+Realization), Reimbursement & Expenses, "
+            "Vendor Invoice (PO/Non-PO Non-Trade), dan settlement Perjalanan Dinas.",
+            "Menjalankan approval dua tahap Tax Review -> Finance Review dengan matrix konfigurable.",
+            "Validasi budget per divisi dan aturan PR wajib untuk pengajuan > Rp 1.000.000.",
+            "Integrasi dengan SAP (push GL/journal/MIRO, terima payment plan & status) dan HRIS "
+            "(read travel) melalui kontrak yang disepakati.",
+            "Menyediakan SSO (Keycloak) untuk login karyawan & vendor.",
+            "Odoo tidak melakukan posting GL — pembukuan tetap di SAP.",
+        ]
+    )
 
     # ---------------- 3. Success Criteria ----------------
     b.h("3. Kriteria Sukses (Success Criteria / KPI)", 1)
@@ -199,24 +201,37 @@ def build():
     # ---------------- 4. Scope ----------------
     b.h("4. Ruang Lingkup (Scope)", 1)
     b.h("4.1 In-Scope (Odoo)", 2)
-    b.bullets([
-        "Modul: custom_finance_portal, custom_finance_budget, custom_finance_portal_sap "
-        "(adapter sisi Odoo), custom_finance_portal_sso.",
-        "Dokumen + workflow approval Tax->Finance, budget control, aturan PR > Rp 1jt.",
-        "Adapter Odoo ke kontrak REST integrasi, upsert master idempoten, webhook status (HMAC), "
-        "push job async, sync log + menu.",
-        "Vendor Portal (login SSO, submit invoice, tracking), SSO Keycloak (config sisi Odoo).",
-        "Reporting (login/transaction/sync log), dashboard, konfigurasi, security/PDP audit, hardening.",
-    ])
+    b.bullets(
+        [
+            "Modul: custom_finance_portal, custom_finance_budget, custom_finance_portal_sap "
+            "(adapter sisi Odoo), custom_finance_portal_sso.",
+            "Dokumen + workflow approval Tax->Finance, budget control, aturan PR > Rp 1jt.",
+            "Adapter Odoo ke kontrak REST integrasi, upsert master idempoten, webhook status (HMAC), "
+            "push job async, sync log + menu.",
+            "Vendor Portal (login SSO, submit invoice, tracking), SSO Keycloak (config sisi Odoo).",
+            "Reporting (login/transaction/sync log), dashboard, konfigurasi, security/PDP audit, hardening.",
+        ]
+    )
     b.h("4.2 Out-of-Scope (DIKELUARKAN)", 2)
     b.table(
         ["Area", "Penjelasan", "Pemilik"],
         [
-            ["SAP development", "ABAP/CPI/OData, posting GL/journal/MIRO, expose PR/PO/GR non-trade + "
-             "nilai/status, payment list, attachment SAP Basis, approval status PO", "Tim SAP klien"],
-            ["HC / HRIS development", "Konektor HRIS->Kafka, perubahan modul travel, ekstraksi "
-             "employee master", "Tim HC/HRIS klien"],
-            ["Kafka & konektor", "Cluster Kafka, topik, konektor SAP<->Kafka & Kafka<->Portal", "Tim integrasi/Kafka klien"],
+            [
+                "SAP development",
+                "ABAP/CPI/OData, posting GL/journal/MIRO, expose PR/PO/GR non-trade + "
+                "nilai/status, payment list, attachment SAP Basis, approval status PO",
+                "Tim SAP klien",
+            ],
+            [
+                "HC / HRIS development",
+                "Konektor HRIS->Kafka, perubahan modul travel, ekstraksi employee master",
+                "Tim HC/HRIS klien",
+            ],
+            [
+                "Kafka & konektor",
+                "Cluster Kafka, topik, konektor SAP<->Kafka & Kafka<->Portal",
+                "Tim integrasi/Kafka klien",
+            ],
             ["Infrastruktur non-Odoo", "Provisioning Keycloak server, jaringan, sertifikat", "Tim infra klien"],
         ],
         widths=[3.5, 9, 3.5],
@@ -225,12 +240,14 @@ def build():
 
     # ---------------- 5. Deliverables ----------------
     b.h("5. Deliverables Utama", 1)
-    b.bullets([
-        "4 modul Odoo terinstal & teruji.",
-        "Konfigurasi SSO Keycloak (sisi Odoo) + role mapping.",
-        "Dokumentasi: FSD, TSD, kontrak integrasi (JSON + topik), runbook deploy, user guide.",
-        "Laporan UAT & sign-off, rencana cutover, laporan hypercare.",
-    ])
+    b.bullets(
+        [
+            "4 modul Odoo terinstal & teruji.",
+            "Konfigurasi SSO Keycloak (sisi Odoo) + role mapping.",
+            "Dokumentasi: FSD, TSD, kontrak integrasi (JSON + topik), runbook deploy, user guide.",
+            "Laporan UAT & sign-off, rencana cutover, laporan hypercare.",
+        ]
+    )
 
     # ---------------- 6. Milestone ----------------
     b.h("6. Milestone & Timeline (±24 minggu / ±6 bulan)", 1)
@@ -323,45 +340,63 @@ def build():
     )
     b.p("R = Responsible, A = Accountable, C = Consulted, I = Informed.", italic=True, size=9)
     b.h("8.3 Cadence & Change Control", 2)
-    b.bullets([
-        "Sprint 2-mingguan; demo akhir sprint; stand-up harian tim delivery.",
-        "Steering Committee bulanan; status report mingguan oleh PMO.",
-        "Change control: setiap perubahan scope/kontrak via formulir CR, disetujui PMO + Sponsor.",
-        "Eskalasi: blocker > 2 hari kerja dieskalasi ke Steering.",
-    ])
+    b.bullets(
+        [
+            "Sprint 2-mingguan; demo akhir sprint; stand-up harian tim delivery.",
+            "Steering Committee bulanan; status report mingguan oleh PMO.",
+            "Change control: setiap perubahan scope/kontrak via formulir CR, disetujui PMO + Sponsor.",
+            "Eskalasi: blocker > 2 hari kerja dieskalasi ke Steering.",
+        ]
+    )
 
     # ---------------- 9-11 ----------------
     b.h("9. Asumsi", 1)
-    b.bullets([
-        "1 manday = 1 orang-hari (±20 hari/bulan); mandays ≠ durasi kalender.",
-        "Reuse komponen Odoo (approval engine, adapter framework, queue_job, PDP audit, reporting).",
-        "Kontrak integrasi (JSON + topik) final di fase Requirement; tim SAP/Kafka/HC menyediakannya.",
-        "Konektor SAP/Kafka/HRIS siap sebelum SIT (±W13).",
-        "Lingkungan dev/staging/prod Odoo + Keycloak disediakan klien tepat waktu.",
-        "Master data SAP berkualitas memadai.",
-    ])
+    b.bullets(
+        [
+            "1 manday = 1 orang-hari (±20 hari/bulan); mandays ≠ durasi kalender.",
+            "Reuse komponen Odoo (approval engine, adapter framework, queue_job, PDP audit, reporting).",
+            "Kontrak integrasi (JSON + topik) final di fase Requirement; tim SAP/Kafka/HC menyediakannya.",
+            "Konektor SAP/Kafka/HRIS siap sebelum SIT (±W13).",
+            "Lingkungan dev/staging/prod Odoo + Keycloak disediakan klien tepat waktu.",
+            "Master data SAP berkualitas memadai.",
+        ]
+    )
     b.h("10. Batasan (Constraints)", 1)
-    b.bullets([
-        "Odoo tidak memposting GL — pembukuan tetap di SAP.",
-        "Integrasi hanya via kontrak REST/Kafka yang disepakati (tidak akses langsung DB SAP).",
-        "Kepatuhan UU PDP (audit trail, masking data sensitif: NIK, rekening).",
-        "Timeline bergantung pada kesiapan dependency eksternal.",
-    ])
+    b.bullets(
+        [
+            "Odoo tidak memposting GL — pembukuan tetap di SAP.",
+            "Integrasi hanya via kontrak REST/Kafka yang disepakati (tidak akses langsung DB SAP).",
+            "Kepatuhan UU PDP (audit trail, masking data sensitif: NIK, rekening).",
+            "Timeline bergantung pada kesiapan dependency eksternal.",
+        ]
+    )
     b.h("11. Dependensi", 1)
-    b.bullets([
-        "Konektor & endpoint SAP/Kafka/HRIS (eksternal).",
-        "Keycloak realm/client + role mapper (infra klien).",
-        "Akses & approval data master dari SAP/HRIS.",
-    ])
+    b.bullets(
+        [
+            "Konektor & endpoint SAP/Kafka/HRIS (eksternal).",
+            "Keycloak realm/client + role mapper (infra klien).",
+            "Akses & approval data master dari SAP/HRIS.",
+        ]
+    )
 
     # ---------------- 12. Risk ----------------
     b.h("12. Risiko Tingkat Tinggi (RAID)", 1)
     b.table(
         ["#", "Risiko", "Dampak", "Mitigasi"],
         [
-            ["1", "Konektor SAP/Kafka/HRIS belum siap saat SIT", "Geser SIT->Go-Live", "Contract-first + stub/mock; SIT gated milestone"],
+            [
+                "1",
+                "Konektor SAP/Kafka/HRIS belum siap saat SIT",
+                "Geser SIT->Go-Live",
+                "Contract-first + stub/mock; SIT gated milestone",
+            ],
             ["2", "Kualitas master data SAP", "Rework mapping", "Cleansing dini di Build"],
-            ["3", "Attachment SAP Basis & approval status PO belum ada", "Potensi CR", "Tandai sebagai opsi/CR di awal"],
+            [
+                "3",
+                "Attachment SAP Basis & approval status PO belum ada",
+                "Potensi CR",
+                "Tandai sebagai opsi/CR di awal",
+            ],
             ["4", "Ketersediaan user UAT", "UAT molor", "Jadwalkan slot UAT sejak Design"],
             ["5", "Perubahan kontrak integrasi", "Effort bertambah", "Change control via PMO"],
         ],
@@ -370,12 +405,14 @@ def build():
 
     # ---------------- 13. Acceptance ----------------
     b.h("13. Kriteria Penerimaan (Acceptance)", 1)
-    b.bullets([
-        "Seluruh deliverable in-scope diterima & sign-off.",
-        "KPI Bab 3 tercapai; 0 defect Sev-1/Sev-2 terbuka saat Go-Live.",
-        "UAT sign-off oleh Product Owner & user Finance/Tax.",
-        "Handover dokumentasi & runbook ke tim support.",
-    ])
+    b.bullets(
+        [
+            "Seluruh deliverable in-scope diterima & sign-off.",
+            "KPI Bab 3 tercapai; 0 defect Sev-1/Sev-2 terbuka saat Go-Live.",
+            "UAT sign-off oleh Product Owner & user Finance/Tax.",
+            "Handover dokumentasi & runbook ke tim support.",
+        ]
+    )
 
     # ---------------- 14. Sign-off ----------------
     b.h("14. Persetujuan (Sign-off)", 1)

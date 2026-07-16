@@ -64,7 +64,7 @@
                     <td style="width: 13%; padding: 2px 4px; vertical-align: top;">Voucher Number</td>
                     <td style="width: 37%; padding: 2px 4px; vertical-align: top;">: <t t-out="o.name or 'Draft'"/></td>
                     <td style="width: 13%; padding: 2px 4px; vertical-align: top;">Bank Name</td>
-                    <td style="width: 37%; padding: 2px 4px; vertical-align: top;">: <t t-out="o.journal_id.name or ''"/></td>
+                    <td style="width: 37%; padding: 2px 4px; vertical-align: top;">: <t t-out="o.journal_id.bank_account_id.bank_id.name or o.journal_id.name or ''"/></td>
                 </tr>
                 <tr>
                     <td style="padding: 2px 4px; vertical-align: top;">Payment Date</td>
@@ -169,22 +169,45 @@
                 </tr>
                 <tr style="height: 55px;"><td/><td/><td/><td/></tr>
                 <tr>
-                    <td style="padding: 4px; border-top: 1px solid #000;" t-out="o.create_uid.name or ''"/>
-                    <td style="padding: 4px; border-top: 1px solid #000;">&#160;</td>
-                    <td style="padding: 4px; border-top: 1px solid #000;">&#160;</td>
-                    <td style="padding: 4px; border-top: 1px solid #000;">&#160;</td>
+                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;" t-out="o.create_uid.name or ''"/>
+                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">(________________)</td>
+                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">(________________)</td>
+                    <td style="padding: 4px 4px 0; border-top: 1px solid #000;">(________________)</td>
+                </tr>
+                <!-- Levi's has no approval engine: leave the approver names blank
+                     with fillable signature lines instead of designations. -->
+                <tr style="font-size: 9px; color: #555;">
+                    <td style="padding: 0 4px 4px;"/>
+                    <td style="padding: 0 4px 4px;"/>
+                    <td style="padding: 0 4px 4px;"/>
+                    <td style="padding: 0 4px 4px;"/>
                 </tr>
             </table>
         </div>
     </template>
 
-    <!-- Payment Voucher: vendor / outbound payments. -->
+    <!-- Payment Voucher: vendor / outbound payments.
+         Self-contained wrapper: no web.html_container → no external asset (report.url)
+         callback that stalls wkhtmltopdf. <main> required by _prepare_html. -->
     <template id="report_payment_voucher">
-        <t t-call="web.html_container">
-            <t t-foreach="docs" t-as="o">
-                <t t-set="doc_title">PAYMENT VOUCHER</t>
-                <t t-call="custom_levis_localization.report_payment_document"/>
-            </t>
-        </t>
+        <html>
+            <head>
+                <meta charset="utf-8"/>
+                <style>
+                    @page { margin: 15mm; }
+                    * { box-sizing: border-box; }
+                    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; margin: 0; padding: 0; }
+                </style>
+            </head>
+            <body>
+                <main>
+                    <t t-foreach="docs" t-as="o">
+                        <div t-if="not o_first" style="page-break-before: always;"></div>
+                        <t t-set="doc_title">PAYMENT VOUCHER</t>
+                        <t t-call="custom_levis_localization.report_payment_document"/>
+                    </t>
+                </main>
+            </body>
+        </html>
     </template>
 </odoo>

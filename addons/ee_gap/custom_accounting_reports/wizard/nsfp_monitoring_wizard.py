@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class NsfpMonitoringWizard(models.TransientModel):
     _name = "custom.report.nsfp.monitoring.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Monitoring NSFP Wizard"
+    _report_code = "nsfp_monitoring"
 
     date_from = fields.Date(
         string="Masa Dari",

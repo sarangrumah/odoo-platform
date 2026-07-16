@@ -32,7 +32,7 @@ const COOKIE_KEY = createHash("sha256")
 /** AES-256-GCM seal → base64url(iv|tag|ciphertext). */
 export function sealToken(plain: string): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", COOKIE_KEY, iv);
+  const cipher = createCipheriv("aes-256-gcm", COOKIE_KEY, iv, { authTagLength: 16 });
   const ct = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), ct]).toString("base64url");
 }
@@ -45,7 +45,7 @@ export function openToken(sealed: string | undefined): string | null {
     const iv = buf.subarray(0, 12);
     const tag = buf.subarray(12, 28);
     const ct = buf.subarray(28);
-    const decipher = createDecipheriv("aes-256-gcm", COOKIE_KEY, iv);
+    const decipher = createDecipheriv("aes-256-gcm", COOKIE_KEY, iv, { authTagLength: 16 });
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
   } catch {

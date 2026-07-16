@@ -32,9 +32,7 @@ class CustomReportSptPpn(models.AbstractModel):
 
     def _ppn_totals(self, filters, type_tax_use, sign):
         """Return ``(dpp, ppn)`` for one VAT side over the period."""
-        ppn_ids = self.env["custom.report.faktur.pajak"]._ppn_tax_ids(
-            type_tax_use, filters["company_ids"]
-        )
+        ppn_ids = self.env["custom.report.faktur.pajak"]._ppn_tax_ids(type_tax_use, filters["company_ids"])
         if not ppn_ids:
             return 0.0, 0.0
         AML = self.env["account.move.line"]

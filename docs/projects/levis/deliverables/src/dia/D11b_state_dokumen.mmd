@@ -1,0 +1,29 @@
+flowchart TB
+  classDef d fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef ok fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef bad fill:#FDE8E8,stroke:#C0392B,color:#7B241C
+  classDef mid fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+
+    subgraph FA["Fixed Asset — custom.fixed.asset"]
+    direction LR
+    FA1["Draft"]:::d -->|"Confirm"| FA2["Running<br/>depresiasi berjalan"]:::ok -->|"Disposal Wizard"| FA3["Disposed"]:::mid
+    FA1 --> FA4["Cancelled"]:::bad
+  end
+  subgraph IR["Inventory Reconciliation — levis.inventory.reconciliation"]
+    direction LR
+    IR1["Draft"]:::d -->|"Compute"| IR2["Computed<br/>selisih tampil"]:::mid -->|"Generate Entry"| IR3["Generated<br/>jurnal penyesuaian"]:::ok
+  end
+  subgraph CG["Periodic COGS — levis.cogs.run"]
+    direction LR
+    CG1["Draft"]:::d -->|"Compute"| CG2["Computed"]:::mid -->|"Post"| CG3["Posted"]:::ok
+  end
+  subgraph IL["Import Log — retail.import.log"]
+    direction LR
+    IL1["Queued"]:::d --> IL2["Running"]:::mid --> IL3["Imported"]:::ok
+    IL2 --> IL4["Partial<br/>sebagian baris error"]:::mid
+    IL2 --> IL5["Failed"]:::bad
+  end
+
+  FA3 ~~~ IR1
+  IR3 ~~~ CG1
+  CG3 ~~~ IL1

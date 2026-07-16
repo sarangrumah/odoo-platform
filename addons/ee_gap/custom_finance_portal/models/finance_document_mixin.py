@@ -63,9 +63,7 @@ class FinanceDocumentMixin(models.AbstractModel):
     requester_id = fields.Many2one(
         "hr.employee",
         string="Requester",
-        default=lambda self: self.env["hr.employee"].search(
-            [("user_id", "=", self.env.uid)], limit=1
-        ),
+        default=lambda self: self.env["hr.employee"].search([("user_id", "=", self.env.uid)], limit=1),
         tracking=True,
     )
     division_id = fields.Many2one(
@@ -222,8 +220,7 @@ class FinanceDocumentMixin(models.AbstractModel):
         if threshold and (self.amount or 0.0) > threshold and not self.pr_number:
             raise UserError(
                 _(
-                    "Amount %(amt)s exceeds %(thr)s — a Purchase Request (PR) "
-                    "number is required before submitting.",
+                    "Amount %(amt)s exceeds %(thr)s — a Purchase Request (PR) number is required before submitting.",
                     amt=self.amount,
                     thr=threshold,
                 )

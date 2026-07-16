@@ -80,6 +80,27 @@ def install_extensions(db_name: str, extensions: list[str]) -> None:
             cur.execute(sql.SQL("CREATE EXTENSION IF NOT EXISTS {}").format(_quote_ident(ext)))
 
 
+def clear_queue_jobs(db_name: str) -> None:
+    """Wipe queue_job rows in a cloned/restored DB.
+
+    A DB produced by copying another (CREATE DATABASE ... TEMPLATE, or a
+    pg_restore of one tenant's dump into a different DB name) inherits the
+    source's queue_job rows verbatim — including their UUIDs. The queue_job
+    jobrunner keys pending jobs by UUID across ALL databases in one process; a
+    duplicate UUID trips ``assert job.db_name == db_name`` in channels.py and
+    the runner crash-loops, so background jobs never drain for ANY tenant.
+    Clearing the copy's queue is the permanent fix. CASCADE also empties the
+    internal queue_job_lock + wizard rel tables. No-op if queue_job is absent.
+    """
+    with superuser_connection(db=db_name) as conn, conn.cursor() as cur:
+        cur.execute(
+            "DO $$ BEGIN "
+            "IF to_regclass('public.queue_job') IS NOT NULL THEN "
+            "TRUNCATE TABLE queue_job CASCADE; "
+            "END IF; END $$;"
+        )
+
+
 def apply_pdp_schema(db_name: str, schema_sql_path: str) -> None:
     """Apply ``02-pdp-schema.sql`` into a freshly created tenant DB.
 

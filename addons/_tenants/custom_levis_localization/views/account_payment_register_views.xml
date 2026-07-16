@@ -7,15 +7,29 @@
         <field name="inherit_id" ref="account.view_account_payment_register_form"/>
         <field name="arch" type="xml">
             <xpath expr="//footer" position="before">
+                <group string="Card MDR"
+                       invisible="not can_edit_wizard or payment_type != 'inbound' or (can_group_payments and not group_payment)">
+                    <field name="x_card_bin" placeholder="e.g. 400000"/>
+                    <field name="x_mdr_bin_id" invisible="not x_mdr_bin_id"/>
+                </group>
+                <group string="Additional Info">
+                    <field name="l10n_ou_analytic_id" options="{'no_create': True}"/>
+                    <field name="l10n_override_outstanding_account_id"
+                           options="{'no_create': True}"/>
+                    <field name="l10n_note"/>
+                    <field name="l10n_remark"/>
+                </group>
                 <group string="Admin Fees"
                        invisible="not can_edit_wizard or (can_group_payments and not group_payment)">
                     <field name="admin_fee_line_ids" nolabel="1" colspan="2">
                         <list editable="bottom">
                             <field name="currency_id" column_invisible="1"/>
-                            <field name="name"/>
+                            <field name="is_mdr" column_invisible="1"/>
+                            <field name="name" readonly="is_mdr"/>
                             <field name="account_id"
+                                   readonly="is_mdr"
                                    options="{'no_create': True, 'no_open': True}"/>
-                            <field name="amount"/>
+                            <field name="amount" readonly="is_mdr"/>
                         </list>
                     </field>
                     <field name="admin_fee_total"

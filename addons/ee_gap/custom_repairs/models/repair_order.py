@@ -22,16 +22,14 @@ class RepairOrder(models.Model):
         string="Asset / Equipment",
         tracking=True,
         index="btree_not_null",
-        help="Internal asset being repaired. Bridges this repair to the "
-        "maintenance module.",
+        help="Internal asset being repaired. Bridges this repair to the maintenance module.",
     )
     x_maintenance_request_id = fields.Many2one(
         "maintenance.request",
         string="Maintenance Request",
         readonly=True,
         copy=False,
-        help="Corrective maintenance request auto-created for the linked "
-        "asset when this repair is confirmed.",
+        help="Corrective maintenance request auto-created for the linked asset when this repair is confirmed.",
     )
 
     # ---------- Internal requester ----------
@@ -342,9 +340,7 @@ class RepairOrder(models.Model):
                 }
             )
         except Exception as exc:  # pragma: no cover (defensive)
-            _logger.info(
-                "custom_repairs: maintenance.request create skipped (%s)", exc
-            )
+            _logger.info("custom_repairs: maintenance.request create skipped (%s)", exc)
             return
         self.x_maintenance_request_id = request.id
         _logger.info(

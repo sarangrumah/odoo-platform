@@ -16,6 +16,9 @@ rules:
           metavariable: $CR
           patterns:
             - pattern-regex: '^(cr|self\.env\.cr|self\.cr)$'
+      # Exclude the Odoo _auto=False report-view idiom: the only interpolation is
+      # {self._table}, the framework-controlled model table name (never user input).
+      - pattern-not-regex: 'CREATE OR REPLACE VIEW \{self\._table\}'
 
   - id: odoo-sql-injection-percent-format
     languages: [python]
@@ -24,6 +27,13 @@ rules:
       cr.execute() called with `%` string formatting — SQL injection risk.
     pattern: |
       $CR.execute("..." % ...)
+    # Dev/ops-only code paths: migrations and one-off tenant scripts run by admins
+    # with direct DB access, never on user input. Real request-path SQL still lives
+    # in addons/**/models and is fully covered.
+    paths:
+      exclude:
+        - "**/migrations/**"
+        - "scripts/**"
 
   - id: odoo-sudo-without-comment
     languages: [python]
@@ -73,13 +83,9 @@ rules:
       - pattern: hashlib.md5(...)
       - pattern: hashlib.sha1(...)
 
-  - id: odoo-missing-access-csv
-    languages: [generic]
-    severity: WARNING
-    message: >
-      A new model is defined but there is no matching `ir.model.access.csv` entry.
-      Manual review required — Semgrep cannot confirm membership reliably.
-    paths:
-      include:
-        - "addons/**/models/**/*.py"
-    pattern-regex: '^\s*_name\s*=\s*[''"][a-z][a-z0-9_.]+[''"]'
+  # Removed: odoo-missing-access-csv.
+  # It matched every `_name = "..."` model definition (~310 hits) and, by its own
+  # admission, "cannot confirm membership reliably" — Semgrep can't cross-reference
+  # ir.model.access.csv across files, so it produced only noise as a blocking rule.
+  # A real "model missing ACL" check needs a dedicated Python linter that parses the
+  # CSVs; tracked separately. See GitHub issue #50.

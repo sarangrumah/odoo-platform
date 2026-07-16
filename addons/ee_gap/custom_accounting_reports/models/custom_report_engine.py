@@ -198,7 +198,8 @@ class CustomReportEngine(models.AbstractModel):
                    aml.amount_residual,
                    aml.date_maturity,
                    aml.company_id,
-                   aml.parent_state
+                   aml.parent_state,
+                   aml.analytic_distribution
             FROM account_move_line aml
             WHERE aml.date >= %s
               AND aml.date <= %s
@@ -326,12 +327,7 @@ class CustomReportEngine(models.AbstractModel):
         # JSONB). Resolve them through the ORM so per-company codes and the
         # active language are honoured -- mirroring how the rest of this
         # module reads ``account_id.code``.
-        accounts = {
-            acc.id: acc
-            for acc in self.env["account.account"].browse(
-                [row["account_id"] for row in rows]
-            )
-        }
+        accounts = {acc.id: acc for acc in self.env["account.account"].browse([row["account_id"] for row in rows])}
         result = {}
         for row in rows:
             acc = accounts.get(row["account_id"])
@@ -345,6 +341,115 @@ class CustomReportEngine(models.AbstractModel):
                 "balance": row["balance"] or 0.0,
             }
         return result
+
+    # ------------------------------------------------------------------
+    # Account-group hierarchy (GROUP 1 / GROUP 2)
+    # ------------------------------------------------------------------
+    def _account_groups(self, account_ids):
+        """Map each account onto its two-level ``account.group`` ancestry.
+
+        Returns ``{account_id: {g1_code, g1_name, g2_code, g2_name}}``, or an
+        empty dict when the database holds no ``account.group`` at all — that
+        is the signal for callers to fall back to ``account_type`` sections.
+
+        ``account.account.group_id`` is a non-stored computed field in Odoo 19
+        (resolved from the code prefix), so it must be read through the ORM on
+        a whole recordset rather than joined in SQL. ``g1`` is the top-most
+        ancestor; ``g2`` is the account's own group when it is not already the
+        top-most one.
+        """
+        if not account_ids or not self.env["account.group"].search_count([]):
+            return {}
+        result = {}
+        for account in self.env["account.account"].browse(account_ids):
+            group = account.group_id
+            if not group:
+                continue
+            root = group
+            while root.parent_id:
+                root = root.parent_id
+            leaf = group if group != root else self.env["account.group"]
+            result[account.id] = {
+                "g1_code": root.code_prefix_start or "",
+                "g1_name": root.name or "",
+                "g2_code": leaf.code_prefix_start or "",
+                "g2_name": leaf.name or "",
+            }
+        return result
+
+    def _group_display_code(self, prefix, width=10):
+        """Render a group prefix the way Finance writes it: ``51`` → ``5100000000``."""
+        prefix = prefix or ""
+        return prefix.ljust(width, "0") if prefix else ""
+
+    def _grouped_section(self, label, rows):
+        """Nest signed ``rows`` under their GROUP 2 headers.
+
+        ``rows`` are balance dicts already carrying ``signed_balance``. When
+        the database has no ``account.group`` the section degrades to the flat
+        ``accounts`` list every renderer already understands.
+        """
+        rows = sorted(rows, key=lambda r: r["account_code"] or "")
+        subtotal = sum(r["signed_balance"] for r in rows)
+        groups = self._account_groups([r["account_id"] for r in rows])
+        if not groups:
+            return {"type": "section", "label": label, "accounts": rows, "subtotal": subtotal}
+
+        buckets = {}
+        ungrouped = []
+        for row in rows:
+            info = groups.get(row["account_id"])
+            if not info or not info["g2_code"]:
+                ungrouped.append(row)
+                continue
+            bucket = buckets.setdefault(
+                info["g2_code"],
+                {
+                    "code": self._group_display_code(info["g2_code"]),
+                    "label": info["g2_name"],
+                    "accounts": [],
+                    "subtotal": 0.0,
+                },
+            )
+            bucket["accounts"].append(row)
+            bucket["subtotal"] += row["signed_balance"]
+        return {
+            "type": "section",
+            "label": label,
+            "subgroups": [buckets[key] for key in sorted(buckets)],
+            "accounts": ungrouped,
+            "subtotal": subtotal,
+        }
+
+    # ------------------------------------------------------------------
+    # Branch (Operating Unit) analytic plan
+    # ------------------------------------------------------------------
+    def _branch_plan(self):
+        """The ``account.analytic.plan`` that carries the branch dimension.
+
+        Tenant-configurable so this module stays generic: Levi's calls it
+        "Operating Unit", another tenant may not have one at all (empty
+        recordset — callers must cope).
+        """
+        name = (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param("custom_accounting_reports.branch_plan_name", "Operating Unit")
+        )
+        return self.env["account.analytic.plan"].search([("name", "=", name)], limit=1)
+
+    def _analytic_ids_from_distribution(self, distribution):
+        """Every analytic id referenced by an ``analytic_distribution`` JSON.
+
+        Odoo joins ids from several plans into one comma-separated key.
+        """
+        ids = set()
+        for key in (distribution or {}).keys():
+            for part in str(key).split(","):
+                part = part.strip()
+                if part.isdigit():
+                    ids.add(int(part))
+        return ids
 
     def _account_code(self, account):
         """Return an account's code resolved in its OWN company.
@@ -453,6 +558,7 @@ class CustomReportEngine(models.AbstractModel):
             "filters": filters,
             "options": filters,
             "lines": lines,
+            "company": companies[:1],
             "company_names": ", ".join(companies.mapped("name")),
             "currency": currency,
             "date_from": filters["date_from"],
@@ -462,6 +568,138 @@ class CustomReportEngine(models.AbstractModel):
             "date_from_id": self._format_date_id(filters["date_from"]),
             "date_to_id": self._format_date_id(filters["date_to"]),
         }
+
+    # ------------------------------------------------------------------
+    # On-screen interactive table
+    # ------------------------------------------------------------------
+    def get_report_table(self, options=None, context_extra=None):
+        """Compute the report and return a JSON-serialisable payload the
+        OWL client action renders as an interactive on-screen table.
+
+        Reuses the exact same contract as the Excel exporter:
+        :py:meth:`_xlsx_columns` (column spec) + :py:meth:`_build_lines`
+        (row data, via ``_compute``). ``context_extra`` carries per-report
+        context knobs (e.g. GL's ``gl_layout``/``gl_columns``).
+        """
+        report = self.with_context(**(context_extra or {}))
+        ctx = report._compute(options)
+        columns = report._xlsx_columns()
+        currency = ctx.get("currency")
+        return {
+            "title": ctx.get("report_title"),
+            "company_names": ctx.get("company_names"),
+            "period": {
+                "date_from": ctx.get("date_from_id"),
+                "date_to": ctx.get("date_to_id"),
+            },
+            "currency": {
+                "symbol": currency.symbol if currency else "",
+                "position": currency.position if currency else "before",
+                "decimals": currency.decimal_places if currency else 2,
+            },
+            "columns": [
+                {
+                    "header": col.get("header", ""),
+                    "field": col["field"],
+                    "kind": col.get("kind", "text"),
+                    "width": col.get("width", 16),
+                }
+                for col in columns
+            ],
+            "lines": report._flatten_for_screen(ctx.get("lines", []), columns),
+        }
+
+    def _first_text_field(self, columns):
+        """The first non-numeric/non-date column field — where a total
+        row's ``label`` is rendered when it has no account field."""
+        return next(
+            (col["field"] for col in columns if col.get("kind") not in ("number", "date")),
+            None,
+        )
+
+    def _screen_row(self, line, columns, first_text=None):
+        """Coerce one ``_build_lines`` dict into a display row
+        ``{type, level, values}`` keyed by the column fields."""
+        values = {}
+        for col in columns:
+            field = col["field"]
+            kind = col.get("kind")
+            value = line.get(field)
+            if kind == "date":
+                value = self._format_date_id(value)
+            elif kind == "number":
+                # ``None`` = this row has no amount for this column (heading
+                # rows); the client renders it blank instead of ``0.00``.
+                missing = value is None or value is False or value == ""
+                value = None if missing else float(value)
+            else:
+                value = value if value not in (None, False) else ""
+            values[field] = value
+        # Total-type rows often carry only a ``label`` + numbers.
+        if first_text and not values.get(first_text) and line.get("label"):
+            values[first_text] = line["label"]
+        return {
+            "type": line.get("type") or "data",
+            "level": line.get("level", 0),
+            "values": values,
+        }
+
+    def _flatten_for_screen(self, lines, columns):
+        """Default flattener: pass rows through, drop the coverage banner,
+        tag each with ``type``/``level``. Reports with nested ``section``
+        rows (Balance Sheet / P&L / Cash Flow) override this to call
+        :py:meth:`_flatten_sectioned`."""
+        first_text = self._first_text_field(columns)
+        return [self._screen_row(line, columns, first_text) for line in lines if line.get("type") != "coverage"]
+
+    def _text_fields(self, columns):
+        """The first two non-numeric column fields — where a group header
+        writes its code and its name."""
+        fields = [col["field"] for col in columns if col.get("kind") not in ("number", "date")]
+        return (fields + [None, None])[:2]
+
+    def _flatten_sectioned(self, lines, columns, section_heading=False):
+        """Flatten ``header``/``section``/``total`` reports (Balance Sheet,
+        P&L, Cash Flow) into display rows — the on-screen analogue of
+        :py:meth:`_xlsx_sectioned_body`.
+
+        ``section_heading`` mirrors the same flag on the XLSX body: when
+        ``True`` (P&L / Cash Flow) each section emits its own ``label`` as a
+        heading row; when ``False`` (Balance Sheet) sections rely on the
+        explicit ``header`` lines that precede them.
+
+        A section carrying ``subgroups`` renders one extra heading level
+        (GROUP 2), pushing its accounts to ``level`` 2.
+        """
+        first_text, second_text = self._text_fields(columns)
+        out = []
+
+        def emit_accounts(accounts, level):
+            for acc in accounts:
+                row = self._screen_row(acc, columns, first_text)
+                row["level"] = level
+                out.append(row)
+
+        for line in lines:
+            ltype = line.get("type")
+            if ltype == "coverage":
+                continue
+            if ltype == "header":
+                out.append({"type": "header", "level": 0, "values": {first_text: line.get("label") or ""}})
+            elif ltype == "section":
+                if section_heading and line.get("label"):
+                    out.append({"type": "section", "level": 0, "values": {first_text: line["label"]}})
+                subgroups = line.get("subgroups") or []
+                for sub in subgroups:
+                    values = {first_text: sub.get("code") or ""}
+                    if second_text:
+                        values[second_text] = sub.get("label") or ""
+                    out.append({"type": "group", "level": 1, "values": values})
+                    emit_accounts(sub.get("accounts", []), 2)
+                emit_accounts(line.get("accounts", []), 2 if subgroups else 1)
+            else:
+                out.append(self._screen_row(line, columns, first_text))
+        return out
 
     # ------------------------------------------------------------------
     # XLSX export
@@ -480,8 +718,7 @@ class CustomReportEngine(models.AbstractModel):
         """
         raise NotImplementedError(
             _(
-                "Report %(code)s does not support XLSX export "
-                "(override _xlsx_columns()).",
+                "Report %(code)s does not support XLSX export (override _xlsx_columns()).",
                 code=self._report_code or self._name,
             )
         )
@@ -489,9 +726,7 @@ class CustomReportEngine(models.AbstractModel):
     def _xlsx_formats(self, workbook):
         """Reusable cell formats shared by every report's XLSX body."""
         return {
-            "title": workbook.add_format(
-                {"bold": True, "font_size": 14, "align": "center"}
-            ),
+            "title": workbook.add_format({"bold": True, "font_size": 14, "align": "center"}),
             "meta": workbook.add_format({"align": "center", "font_size": 10}),
             "header": workbook.add_format(
                 {
@@ -505,9 +740,7 @@ class CustomReportEngine(models.AbstractModel):
             ),
             "text": workbook.add_format({"border": 1}),
             "num": workbook.add_format({"border": 1, "num_format": "#,##0.00"}),
-            "total_text": workbook.add_format(
-                {"border": 1, "bold": True, "bg_color": "#F2F2F2"}
-            ),
+            "total_text": workbook.add_format({"border": 1, "bold": True, "bg_color": "#F2F2F2"}),
             "total_num": workbook.add_format(
                 {
                     "border": 1,
@@ -517,9 +750,7 @@ class CustomReportEngine(models.AbstractModel):
                 }
             ),
             # Hierarchical reports (GL group headers, BS section headers).
-            "group_text": workbook.add_format(
-                {"border": 1, "bold": True, "bg_color": "#EDEDED"}
-            ),
+            "group_text": workbook.add_format({"border": 1, "bold": True, "bg_color": "#EDEDED"}),
             "group_num": workbook.add_format(
                 {
                     "border": 1,
@@ -528,9 +759,7 @@ class CustomReportEngine(models.AbstractModel):
                     "num_format": "#,##0.00",
                 }
             ),
-            "section": workbook.add_format(
-                {"bold": True, "font_size": 11, "bg_color": "#FCE4D6"}
-            ),
+            "section": workbook.add_format({"bold": True, "font_size": 11, "bg_color": "#FCE4D6"}),
         }
 
     def _xlsx_export(self, filters=None):
@@ -601,7 +830,10 @@ class CustomReportEngine(models.AbstractModel):
                 value = line.get(col["field"])
                 if kind == "number":
                     fmt = fmts["total_num"] if is_total else fmts["num"]
-                    sheet.write_number(row, col_idx, float(value or 0.0), fmt)
+                    if value is None or value is False or value == "":
+                        sheet.write(row, col_idx, "", fmt)
+                    else:
+                        sheet.write_number(row, col_idx, float(value), fmt)
                     continue
                 fmt = fmts["total_text"] if is_total else fmts["text"]
                 if kind == "date":
@@ -613,8 +845,14 @@ class CustomReportEngine(models.AbstractModel):
         return row
 
     def _xlsx_sectioned_body(
-        self, sheet, ctx, fmts, start_row,
-        amount_header="Amount", secondary=None, section_heading=False,
+        self,
+        sheet,
+        ctx,
+        fmts,
+        start_row,
+        amount_header="Amount",
+        secondary=None,
+        section_heading=False,
     ):
         """Render reports whose lines are header/section/total rows
         (Balance Sheet, P&L, Cash Flow).
@@ -640,6 +878,16 @@ class CustomReportEngine(models.AbstractModel):
         sheet.freeze_panes(row + 1, 0)
         row += 1
 
+        def write_accounts(accounts, row):
+            for acc in accounts:
+                sheet.write(row, 0, acc.get("account_code") or "", fmts["text"])
+                sheet.write(row, 1, acc.get("account_name") or "", fmts["text"])
+                sheet.write_number(row, 2, float(acc.get("signed_balance") or 0.0), fmts["num"])
+                if has_secondary:
+                    sheet.write(row, 3, "", fmts["text"])
+                row += 1
+            return row
+
         for line in lines:
             ltype = line.get("type")
             if ltype == "header":
@@ -649,13 +897,15 @@ class CustomReportEngine(models.AbstractModel):
                 if section_heading and line.get("label"):
                     sheet.merge_range(row, 0, row, last_col, line["label"], fmts["group_text"])
                     row += 1
-                for acc in line.get("accounts", []):
-                    sheet.write(row, 0, acc.get("account_code") or "", fmts["text"])
-                    sheet.write(row, 1, acc.get("account_name") or "", fmts["text"])
-                    sheet.write_number(row, 2, float(acc.get("signed_balance") or 0.0), fmts["num"])
+                for sub in line.get("subgroups") or []:
+                    sheet.write(row, 0, sub.get("code") or "", fmts["group_text"])
+                    sheet.write(row, 1, sub.get("label") or "", fmts["group_text"])
+                    sheet.write(row, 2, "", fmts["group_text"])
                     if has_secondary:
-                        sheet.write(row, 3, "", fmts["text"])
+                        sheet.write(row, 3, "", fmts["group_text"])
                     row += 1
+                    row = write_accounts(sub.get("accounts", []), row)
+                row = write_accounts(line.get("accounts", []), row)
             elif ltype in ("total", "subtotal", "grand_total", "check"):
                 sheet.merge_range(row, 0, row, 1, line.get("label") or "", fmts["total_text"])
                 sheet.write_number(row, 2, float(line.get("signed_balance") or 0.0), fmts["total_num"])
@@ -679,10 +929,7 @@ class CustomReportEngine(models.AbstractModel):
                 "name": filename,
                 "type": "binary",
                 "datas": base64.b64encode(content),
-                "mimetype": (
-                    "application/vnd.openxmlformats-officedocument"
-                    ".spreadsheetml.sheet"
-                ),
+                "mimetype": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
             }
         )
         return {

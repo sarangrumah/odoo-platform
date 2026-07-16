@@ -298,6 +298,7 @@ class CustomFixedAsset(models.Model):
     @api.depends(
         "depreciation_line_ids.amount",
         "depreciation_line_ids.posted",
+        "depreciation_line_ids.reversed",
         "acquisition_value",
         "revaluation_value",
     )
@@ -306,9 +307,7 @@ class CustomFixedAsset(models.Model):
             posted = asset.depreciation_line_ids.filtered("posted")
             accum = sum(posted.mapped("amount"))
             asset.accumulated_depreciation = accum
-            asset.net_book_value = (
-                (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0) - accum
-            )
+            asset.net_book_value = (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0) - accum
 
     def _compute_revaluation_count(self):
         for asset in self:
@@ -353,8 +352,9 @@ class CustomFixedAsset(models.Model):
         if months <= 0 or base <= 0:
             return
 
-        # Drop unposted lines so we can rebuild from current parameters.
-        self.depreciation_line_ids.filtered(lambda l: not l.posted).unlink()
+        # Drop unposted lines so we can rebuild from current parameters. Reversed
+        # lines are kept for audit (posted=False but excluded from scheduling).
+        self.depreciation_line_ids.filtered(lambda l: not l.posted and not l.reversed).unlink()
         posted_amount = sum(self.depreciation_line_ids.filtered("posted").mapped("amount"))
         remaining = max(0.0, base - posted_amount)
         if remaining <= 0:
@@ -518,7 +518,9 @@ class CustomFixedAsset(models.Model):
         for asset in self:
             if asset.state != "running":
                 continue
-            due = asset.depreciation_line_ids.filtered(lambda l: not l.posted and l.date <= as_of).sorted("date")
+            due = asset.depreciation_line_ids.filtered(
+                lambda l: not l.posted and not l.reversed and l.date <= as_of
+            ).sorted("date")
             for line in due:
                 move_vals = {
                     "date": line.date,

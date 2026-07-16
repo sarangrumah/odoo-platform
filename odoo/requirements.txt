@@ -3,7 +3,7 @@
 
 httpx[http2]==0.27.2          # AI gateway client
 redis==5.1.1                  # session cache + queue_job (vendored later)
-cryptography==48.0.0          # Fernet for sertel + ir.config_parameter; CVE-2024-12797, CVE-2026-26007
+cryptography==48.0.1          # Fernet for sertel + ir.config_parameter; CVE-2024-12797, CVE-2026-26007, GHSA-537c-gmf6-5ccf (48.0.1)
 pyjwt==2.13.0                 # JWT for AI gateway auth (alt to HMAC); CVE-2026-32597 (`crit` header)
 xmlschema==3.4.1              # Coretax XSD validation
 signxml==4.4.0                # Sertel XAdES signing (DJP requirement); CVE-2025-48994, CVE-2025-48995
@@ -11,7 +11,7 @@ lxml==6.1.1                   # Explicit pin (transitive via signxml); CVE-2026-
 phonenumbers==8.13.50         # E.164 normalization for PII fields
 qrcode==7.4.2                 # 2FA + receipt QR
 pyotp==2.9.0                  # TOTP for 2FA admin
-pypdf==6.12.1                 # PDF utilities for Documents/Sign; 15+ CVEs across 5.x → 6.x (-55197 onward)
+pypdf==6.13.3                 # PDF utilities for Documents/Sign; 15+ CVEs across 5.x → 6.x (-55197 onward); 6.13.3 clears CVE-2026-49460/49461/54530/54531 + GHSA-jm82-fx9c-mx94
 python-dateutil==2.9.0
 prometheus-client==0.21.0     # Optional: Odoo can expose /metrics later
 
@@ -25,7 +25,11 @@ croniter==6.2.2               # cron-expression evaluator for backup schedule
 
 # --- custom_retail_import (Excel/CSV ingestion + SFTP feed) ---
 openpyxl==3.1.5               # read .xlsx master/transaction files in-container (xlsxwriter is write-only)
-paramiko==3.5.1               # SFTP pull for direct customer-FTP ingestion (preferred over unmaintained pysftp)
+paramiko==5.0.0               # SFTP pull for direct customer-FTP ingestion (preferred over unmaintained pysftp)
+                              # 5.0.0 clears CVE-2026-44405 (drops SHA-1/ssh-rsa signing). API surface used here
+                              # (Transport, RSAKey/Ed25519Key.from_private_key[_file], SFTPClient.from_transport,
+                              # SSHClient, AutoAddPolicy) is unchanged. Op note: legacy SFTP servers that only
+                              # offer ssh-rsa (SHA-1) host keys must move to rsa-sha2-256/512 or ed25519.
 
 # --- custom_ppob_oracle_bridge (legacy Oracle EVShop H2H) ---
 oracledb==3.4.0              # thin mode (no Instant Client); callproc SellWithDenom_HA + MSG016T/MSG019T polling

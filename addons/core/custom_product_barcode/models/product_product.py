@@ -24,9 +24,7 @@ class ProductBarcode(models.Model):
     _description = "Alternate Product Barcode"
     _order = "product_id, id"
 
-    product_id = fields.Many2one(
-        "product.product", required=True, ondelete="cascade", index=True
-    )
+    product_id = fields.Many2one("product.product", required=True, ondelete="cascade", index=True)
     barcode = fields.Char(required=True, index=True)
     note = fields.Char(help="Origin/type, e.g. 'GTIN historis' or 'carton'.")
     active = fields.Boolean(default=True)

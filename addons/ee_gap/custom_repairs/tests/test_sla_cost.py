@@ -22,9 +22,7 @@ class TestRepairSlaCost(TransactionCase):
         self.assertEqual(repair.x_sla_status, "on_track")
 
     def test_labor_cost_computes(self):
-        repair = self.Repair.create(
-            {"x_labor_hours": 2.0, "x_labor_rate": 50000.0}
-        )
+        repair = self.Repair.create({"x_labor_hours": 2.0, "x_labor_rate": 50000.0})
         self.assertEqual(repair.x_labor_cost, 100000.0)
         self.assertEqual(
             repair.x_total_repair_cost,

@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Fixed Asset Revaluation Accounts",
-    "version": "19.0.1.0.0",
-    "summary": "Wire IAS 16 revaluation account defaults onto fixed-asset groups "
-    "by resolving Erajaya chart codes per company.",
+    "version": "19.0.2.0.0",
+    "summary": "Seed the 6 EBR fixed-asset categories and wire IAS 16 revaluation "
+    "account defaults onto fixed-asset groups by resolving Erajaya chart codes per "
+    "company.",
     "description": """
 Levi's Fixed Asset Revaluation Accounts
 =======================================
-Fills the IAS 16 revaluation account defaults on every ``custom.fixed.asset.group``
+Seeds the 6 EBR fixed-asset categories (Land, Building & improvements, Vehicles,
+Office & outlet equipment, Machinery, Furniture & fixtures) as
+``custom.fixed.asset.group`` records — each wired to its Erajaya cost /
+accumulated-depreciation / depreciation-expense account by code per company — and
+fills the IAS 16 revaluation account defaults on every ``custom.fixed.asset.group``
 (``default_revaluation_surplus_account_id`` / ``_loss_`` / ``_income_`` /
 ``default_retained_earnings_account_id``) for companies running the Erajaya chart.
 
@@ -43,6 +48,9 @@ TENANT-SCOPED: install only on the Levi's / Erajaya tenant databases.
         "custom_accounting_asset",
     ],
     "data": [
+        # Order matters: seed the 6 groups first, then wire revaluation defaults
+        # onto them.
+        "data/asset_group_defaults.xml",
         "data/revaluation_account_defaults.xml",
     ],
     "installable": True,

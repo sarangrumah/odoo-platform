@@ -92,7 +92,10 @@ def main():
             if code:
                 n_known += 1
             w.writerow([nm, code, sap, is_dc, "yes" if code else "no"])
-    print(f"Wrote {out}: {len(stores)} stores ({n_known} with known codes, {len(stores) - n_known} pending codes).", flush=True)
+    print(
+        f"Wrote {out}: {len(stores)} stores ({n_known} with known codes, {len(stores) - n_known} pending codes).",
+        flush=True,
+    )
     print("ACTION: ask the customer for SAP/store codes for the stores marked code_known=no.", flush=True)
 
 

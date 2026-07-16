@@ -97,9 +97,7 @@ class CustomReportPartnerCardBase(models.AbstractModel):
                 _write_totals(line, fmts["total_num"], fmts["total_text"])
                 row += 1
             elif ltype == "grand_total":
-                sheet.merge_range(
-                    row, 0, row, debit_i - 1, line.get("label") or "Grand Total", fmts["total_text"]
-                )
+                sheet.merge_range(row, 0, row, debit_i - 1, line.get("label") or "Grand Total", fmts["total_text"])
                 _write_totals(line, fmts["total_num"], fmts["total_text"])
                 row += 1
         return row
@@ -117,14 +115,11 @@ class CustomReportPartnerCardBase(models.AbstractModel):
             date_to=filters["date_from"] - timedelta(days=1),
         )
         opening_rows = AML._read_group(
-            domain=self._base_move_line_domain(opening_filters)
-            + [("account_id.account_type", "in", types)],
+            domain=self._base_move_line_domain(opening_filters) + [("account_id.account_type", "in", types)],
             groupby=["partner_id"],
             aggregates=["debit:sum", "credit:sum"],
         )
-        opening_by_partner = {
-            (p.id if p else 0): (d or 0.0) - (c or 0.0) for p, d, c in opening_rows
-        }
+        opening_by_partner = {(p.id if p else 0): (d or 0.0) - (c or 0.0) for p, d, c in opening_rows}
 
         period_domain = self._base_move_line_domain(filters) + [
             ("account_id.account_type", "in", types),

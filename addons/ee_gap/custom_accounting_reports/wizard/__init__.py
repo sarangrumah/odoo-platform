@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from . import report_wizard_mixin
 from . import general_ledger_wizard
 from . import trial_balance_wizard
 from . import balance_sheet_wizard

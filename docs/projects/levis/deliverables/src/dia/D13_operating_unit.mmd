@@ -1,0 +1,45 @@
+flowchart TB
+  classDef src fill:#E8F1FD,stroke:#2E6DB4,color:#1B3F6B
+  classDef ou fill:#FFF4E0,stroke:#C98A16,color:#7A5308
+  classDef gl fill:#EAF7EE,stroke:#2E8B57,color:#1D5C39
+  classDef rep fill:#F0EAF7,stroke:#7D4FA8,color:#4A2A66
+
+  PLAN["<b>Analytic Plan 'Operating Unit'</b> — 21 OU aktif: EBR HEAD OFFICE + 20 toko OLS SES"]:::ou
+
+  WH["stock.warehouse<br/><b>l10n_ou_analytic_id</b><br/><b>l10n_purchase_journal_id</b><br/><i>1 toko = 1 warehouse</i>"]:::src
+  CO["res.company<br/><b>l10n_ho_analytic_id</b><br/><i>= EBR HEAD OFFICE</i>"]:::src
+
+  S1["purchase.order.line<br/>analytic distribution"]:::src
+  S2["stock.move<br/>jurnal Goods Receipt"]:::src
+  S4["pos.session — jurnal penutup POS<br/>penjualan · PPN · piutang"]:::src
+  S3["account.move.line<br/>Vendor Bill"]:::src
+  S5["account.payment.register<br/>pembayaran"]:::src
+
+  J1["<b>Jurnal per toko</b><br/>Pembelian - OLS SES - &lt;MALL&gt;<br/>Cash - OLS SES - &lt;MALL&gt;<br/><i>akun kas 1102… sendiri</i>"]:::gl
+
+  GL["<b>account.move.line</b> — field <b>l10n_ou_analytic_id</b> terisi"]:::gl
+
+  R1["GL Analysis<br/>pivot per Operating Unit"]:::rep
+  R2["Trial Balance / P&amp;L<br/>difilter per Operating Unit"]:::rep
+  R3["Periodic COGS<br/>per (OU × Kategori Produk)"]:::rep
+
+  PLAN --> WH
+  PLAN --> CO
+
+  WH --> S1
+  WH --> S2
+  WH --> S4
+  WH --> J1
+  CO --> S3
+  CO --> S5
+
+  S1 --> GL
+  S2 --> GL
+  S3 --> GL
+  S4 --> GL
+  S5 --> GL
+  J1 --> GL
+
+  GL --> R1
+  GL --> R2
+  GL --> R3

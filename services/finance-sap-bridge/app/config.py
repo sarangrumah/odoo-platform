@@ -1,4 +1,5 @@
 """Environment configuration for the finance-sap-bridge."""
+
 from __future__ import annotations
 
 import os

@@ -6,12 +6,16 @@ from odoo import fields, models
 
 class _PartnerCardWizardMixin(models.AbstractModel):
     _name = "custom.report.partner.card.wizard.mixin"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Partner Card Wizard (Mixin)"
 
     # Concrete wizards set these.
     _card_report_model = None
     _card_report_code = None
     _card_filename_prefix = "Partner_Card"
+
+    def _report_code_for_view(self):
+        return self._card_report_code
 
     date_from = fields.Date(
         required=True,

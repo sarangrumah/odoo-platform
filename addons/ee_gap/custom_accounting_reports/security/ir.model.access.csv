@@ -30,3 +30,4 @@ access_pph_reconciliation_wizard_user,pph reconciliation wizard user,model_custo
 access_pph25_wizard_user,pph25 wizard user,model_custom_report_pph25_wizard,group_report_user,1,1,1,1
 access_tax_audit_wizard_user,tax audit wizard user,model_custom_report_tax_audit_wizard,group_report_user,1,1,1,1
 access_db_wizard_user,day book wizard user,model_custom_report_day_book_wizard,group_report_user,1,1,1,1
+access_gl_analysis_user,gl analysis user,model_custom_report_journal_item_analysis,group_report_user,1,0,0,0

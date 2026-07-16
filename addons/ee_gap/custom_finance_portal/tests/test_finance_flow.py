@@ -8,22 +8,15 @@ class TestFinancePortal(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.employee = cls.env["hr.employee"].create(
-            {"name": "Budi Requester", "user_id": cls.env.uid}
-        )
-        cls.item = cls.env["finance.item.submission"].create(
-            {"name": "Meal Allowance", "code": "MEAL"}
-        )
+        cls.employee = cls.env["hr.employee"].create({"name": "Budi Requester", "user_id": cls.env.uid})
+        cls.item = cls.env["finance.item.submission"].create({"name": "Meal Allowance", "code": "MEAL"})
 
     def _make_ca(self, amount, pr=None):
         return self.env["finance.cash.advance"].create(
             {
                 "requester_id": self.employee.id,
                 "pr_number": pr,
-                "line_ids": [
-                    (0, 0, {"name": "Item", "item_id": self.item.id,
-                            "quantity": 1.0, "unit_amount": amount})
-                ],
+                "line_ids": [(0, 0, {"name": "Item", "item_id": self.item.id, "quantity": 1.0, "unit_amount": amount})],
             }
         )
 
@@ -53,9 +46,7 @@ class TestFinancePortal(TransactionCase):
         self.assertEqual(ca.sap_sync_state, "pushed")
         self.assertTrue(ca.sap_pushed_at)
         # Bridge mirrors SAP status back.
-        ca._finance_apply_sap_status(
-            {"sap_document_no": "SAP-CA-1", "sap_payment_status": "paid"}
-        )
+        ca._finance_apply_sap_status({"sap_document_no": "SAP-CA-1", "sap_payment_status": "paid"})
         self.assertEqual(ca.sap_document_no, "SAP-CA-1")
         self.assertEqual(ca.state, "paid")
 
@@ -71,10 +62,26 @@ class TestFinancePortal(TransactionCase):
                 "condition_domain": "[]",
                 "trigger": "manual",
                 "tier_ids": [
-                    (0, 0, {"sequence": 10, "name": "Tax Review",
-                            "approver_type": "group", "approver_group_id": tax_group.id}),
-                    (0, 0, {"sequence": 20, "name": "Finance Review",
-                            "approver_type": "group", "approver_group_id": fin_group.id}),
+                    (
+                        0,
+                        0,
+                        {
+                            "sequence": 10,
+                            "name": "Tax Review",
+                            "approver_type": "group",
+                            "approver_group_id": tax_group.id,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "sequence": 20,
+                            "name": "Finance Review",
+                            "approver_type": "group",
+                            "approver_group_id": fin_group.id,
+                        },
+                    ),
                 ],
             }
         )
@@ -88,12 +95,8 @@ class TestFinancePortal(TransactionCase):
     def test_vendor_invoice_po_requires_po(self):
         vendor = self.env["res.partner"].create({"name": "Vendor A", "supplier_rank": 1})
         with self.assertRaises(UserError):
-            self.env["finance.vendor.invoice"].create(
-                {"invoice_subtype": "po_non_trade", "vendor_id": vendor.id}
-            )
-        inv = self.env["finance.vendor.invoice"].create(
-            {"invoice_subtype": "non_po_non_trade", "vendor_id": vendor.id}
-        )
+            self.env["finance.vendor.invoice"].create({"invoice_subtype": "po_non_trade", "vendor_id": vendor.id})
+        inv = self.env["finance.vendor.invoice"].create({"invoice_subtype": "non_po_non_trade", "vendor_id": vendor.id})
         self.assertTrue(inv.id)
 
     # ---- Realization difference computation ----

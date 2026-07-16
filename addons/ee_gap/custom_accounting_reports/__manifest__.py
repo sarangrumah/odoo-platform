@@ -26,7 +26,7 @@ render to QWeb PDF or HTML. PSAK-aligned default tree shipped under
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.3.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -82,8 +82,16 @@ render to QWeb PDF or HTML. PSAK-aligned default tree shipped under
         "reports/journal_audit_template.xml",
         "reports/financial_report_template.xml",
         "reports/report_common.xml",
+        "views/analysis_views.xml",
         "views/menu_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "custom_accounting_reports/static/src/report_table/report_table.js",
+            "custom_accounting_reports/static/src/report_table/report_table.xml",
+            "custom_accounting_reports/static/src/report_table/report_table.scss",
+        ],
+    },
     "installable": True,
     "application": True,
     "auto_install": False,

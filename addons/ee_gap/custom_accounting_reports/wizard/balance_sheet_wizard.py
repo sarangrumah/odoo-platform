@@ -6,7 +6,9 @@ from odoo import fields, models
 
 class BalanceSheetWizard(models.TransientModel):
     _name = "custom.report.balance.sheet.wizard"
+    _inherit = "custom.report.wizard.mixin"
     _description = "Balance Sheet Wizard"
+    _report_code = "balance_sheet"
 
     date_to = fields.Date(
         required=True,
@@ -48,9 +50,7 @@ class BalanceSheetWizard(models.TransientModel):
         options = {
             **self._build_filters(),
             "date_to": self.date_to.isoformat(),
-            "comparison_date_to": (
-                self.comparison_date_to.isoformat() if self.comparison_date_to else None
-            ),
+            "comparison_date_to": (self.comparison_date_to.isoformat() if self.comparison_date_to else None),
         }
         filename = "Balance_Sheet_%s.xlsx" % self.date_to
         return self.env["custom.report.balance.sheet"]._xlsx_action(options, filename)

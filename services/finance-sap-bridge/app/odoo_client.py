@@ -1,4 +1,5 @@
 """Outbound HTTP to Odoo's HMAC-secured Finance Portal webhook."""
+
 from __future__ import annotations
 
 import json

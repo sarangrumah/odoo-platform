@@ -53,6 +53,57 @@ docker exec -i odoo19-platform-odoo-mgmt odoo shell -d levis --no-http < scripts
 Creates 24 warehouses keyed by name; adds `wh_<CODE>` aliases where codes are known.
 **Re-run `04` after the customer supplies the missing 23 store codes** (idempotent — just adds aliases).
 
+### 3b. Operating-Unit normalisation — `41_normalize_ou.py` + `42_backfill_ou_analytic.py` + `43_align_pos_naming.py`
+```
+RUN_DRY=0 docker exec -i -e RUN_DRY=0 odoo19-platform-odoo-mgmt odoo shell -d <db> --no-http \
+    < scripts/tenants/levis/41_normalize_ou.py
+RUN_DRY=0 docker exec -i -e RUN_DRY=0 odoo19-platform-odoo-mgmt odoo shell -d <db> --no-http \
+    < scripts/tenants/levis/42_backfill_ou_analytic.py
+RUN_DRY=0 docker exec -i -e RUN_DRY=0 odoo19-platform-odoo-mgmt odoo shell -d <db> --no-http \
+    < scripts/tenants/levis/43_align_pos_naming.py
+```
+All three are idempotent and **dry-run by default** (`RUN_DRY=1`); run `40_setup_trade_ou.py` first,
+and `43` after `41` (it reads the `pos.config` names `41` writes).
+
+`41` leaves the "Operating Unit" analytic plan holding exactly 21 active accounts —
+`EBR - HEAD OFFICE` plus the 20 live stores, all named `OLS SES - <MALL>`. Stores are
+keyed by `stock.warehouse.code` (the store number the retail import joins on); codes are
+never touched. The name is rewritten on the warehouse, its OU analytic, its purchase
+journal (`Pembelian - <store>`) and its `pos.config`; core cascades it to the routes,
+rules and stock sequences. `GRAND INDONESIA`, `PACIFIC PLACE MALL` and `PASKAL BANDUNG`
+(no POS orders) are configured like live stores, then archived, as is the stray `PI021`
+warehouse and the duplicate `My Company` OU.
+
+`43` finishes the job on the POS side, which `41` does not reach: the per-store cash
+journal (`Cash - <store>`), its default account when that account mirrored the journal
+name, every journal's `…: Check Number Sequence`, and the already-issued documents —
+`pos.session.name`, `pos.order.name` and the `ref`/`memo` fields the accounting entries
+copied a session name into. It never matches on `LIKE '%OLS %'` (real product names such
+as `GRAPHIC CREWNECK TEE TOOLS PEWTER` contain that substring); renames are driven by an
+explicit old → new map built from `pos.config`. Chatter (`mail_message`,
+`mail_tracking_value`) is left alone on purpose — it records what a record was called at
+the time.
+
+`44_fix_cash_journal_accounts.py` repairs the cash **accounts** those journals post into.
+The EBR chart has no per-store cash account, so `point_of_sale` auto-created one per store
+by walking the `1102` code block — and the walk collided with six genuine EBR accounts
+(`Cash on hand IDR/USD/MYR/SGD`, `Cash on hand - RA`, `Cash clearing acc`), which six store
+journals then adopted as their default. `Petty Cash` had the same defect. `44` gives each a
+dedicated account at the next free `1102` code, reclasses the few already-posted lines off
+the EBR accounts (unreconciled only, debit/credit untouched, moves stay balanced), and
+archives the two unused `Cash (POS) (copy)` accounts. Run it after `43`, since the target
+account name is the journal name.
+
+The new codes differ per database (`1102000027–32` where a `Petty Cash` account already
+occupied `…24`, `1102000024–29` elsewhere) — they are new accounts with no TB counterpart,
+so nothing maps to them by code.
+
+`42` stamps the OU analytic on POS revenue that was posted before
+`custom_levis_localization` started doing it at source (`pos.session._get_sale_vals`).
+Only `display_type='product'` lines of each `pos.session.move_id` are touched — tax,
+receivable and bank lines are balance sheet. Sanity check: the analytic-ledger total must
+equal the net POS income.
+
 ### 4. Opening stock (X20) — store 14694 only, until full data arrives
 ```
 docker cp "docs/projects/levis/X20_Current_Onhand_Inventory_Report- For current inventory.csv" odoo19-platform-odoo-mgmt:/tmp/levis/X20.csv
@@ -75,6 +126,47 @@ docker exec -i odoo19-platform-odoo-mgmt odoo shell -d demo_levis --no-http < sc
 expense/valuation/variation/journal account to the right EBR branch (unknown roots →
 `misc`). Both re-runnable; `33` no-ops once every category is complete.
 
+### 6. EBR finance load (TB + GL) from the monthly "For Upload to Odoo" workbook
+Source: `YYYY-MM - EBR - TB and GL For Upload to Odoo.xlsx` (sheets: `CoA EBR`,
+`Trial Balance EBR 2026`, `GL EBR 2026`, plus subledgers). **Verified end-to-end on
+`rnd_levis` — all 101 TB accounts reconcile to the sheet's June ending balances (0 diff).**
+
+**a. Export the workbook to CSVs (HOST, needs openpyxl):**
+```
+python scripts/tenants/levis/59_export_ebr.py "<path>/2026-06 - EBR - TB and GL For Upload to Odoo.xlsx"
+# -> ebr_coa.csv, tb_ebr.csv, gl_ebr.csv  (next to the script)
+```
+`59` adds a small SUPPLEMENT for accounts the TB references but the CoA sheet omits
+(e.g. `1117400001` Tax Deposit).
+
+**b. Chart of accounts** — stage `ebr_coa.csv` as `/tmp/ebr_coa.csv` and run the
+existing reconciler (adds missing, preserves operational, aligns names):
+```
+docker cp scripts/tenants/levis/ebr_coa.csv odoo19-platform-odoo:/tmp/ebr_coa.csv
+docker exec -i odoo19-platform-odoo odoo shell -d rnd_levis --no-http < scripts/tenants/levis/30_fix_coa.py
+```
+
+**c. Trial balance (summary)** — opening move (2026-01-01) + one summary movement move
+per month, into a dedicated `EBRTB` journal. Idempotent; **auto-lifts and restores the
+company `fiscalyear_lock_date`** (which otherwise silently bumps backdated entries to today):
+```
+docker cp scripts/tenants/levis/tb_ebr.csv odoo19-platform-odoo:/tmp/levis/tb_ebr.csv
+docker exec -i -e TB_DRY=1 odoo19-platform-odoo odoo shell -d rnd_levis --no-http < scripts/tenants/levis/60_load_tb.py  # dry-run
+docker exec -i          odoo19-platform-odoo odoo shell -d rnd_levis --no-http < scripts/tenants/levis/60_load_tb.py  # commit
+```
+Flags: `TB_OPENING_ONLY=1` (opening move only, then go live natively), `TB_DRY=1` (roll back).
+
+**d. General ledger (detail)** — `61_load_gl.py` groups the GL by Document No into one
+balanced `account.move` per voucher (store→analytic, business partner, journal by
+Transaction Type). **BLOCKED:** the current `GL EBR 2026` sheet is *single-sided* (each
+row is one leg only, no contra account, <5% have a Document No) so no voucher balances —
+a `GL_DRY=1` run skips all 1461 rows. Needs a corrected **2-sided** export from the EBR/SAP
+team. Fallback `GL_ALLOW_FALLBACK=1` synthesizes contra legs from `CONTRA_MAP` per
+Transaction Type — **confirm the map with finance first.** Flags: `GL_DRY=1`, `GL_LIMIT=<n>`.
+
+Reconcile after (c): `sum(debit-credit)` per account (date ≤ month-end) must equal the
+sheet's Ending Balance column. Repeat the whole sequence on `prd_levis`, then `prd_detail_levis`.
+
 ## Track B (module) — Excel/CSV wizard + SFTP feed
 After adding `openpyxl`+`paramiko` to `odoo/requirements.txt` and rebuilding the
 image, install `custom_retail_import` on `levis`. Then:
@@ -94,4 +186,43 @@ env['account.account'].search_count([])                          # == CoA rows
 env['stock.warehouse'].search_count([])                          # 24
 sum(env['stock.quant'].search([]).mapped('quantity'))            # == X20 (store 14694) total
 ```
+
+## Reset transactions for a re-import trial — `20_reset_txn.py`
+Wipes **all transaction data** on a levis DB while **keeping master data** (CoA, taxes,
+journals, products, categories, `pos.config`, payment methods + their receivable split,
+partners, users, `posconfig_<store>` xids). Use it to re-run an import from a blank
+ledger without re-importing the slow ~30-min X101 product master.
+
+Wipes: `account.move`/lines/reconciles/payments/statements, POS orders/sessions/payments,
+stock moves/pickings/quants, purchase/sale orders, retail-import staging (log+line), the
+fixed-asset register, bank matching — **plus** the lazy X24 products (`x24prod_`) and the
+`posorder_`/`posreturn_`/`x31entry_` idempotency xids.
+
+**Always back up first** (destructive, wipes opening balances too):
+```
+docker exec odoo19-platform-postgres sh -lc 'PGPASSWORD=$POSTGRES_PASSWORD \
+  pg_dump -h localhost -U odoo -Fc -d <db>' > /opt/odoo-platform/backups/<db>_bak_$(date +%Y%m%d).dump
+```
+Preview (dry-run, default) then execute:
+```
+docker exec -i odoo19-platform-odoo bash -lc 'RESET_DRY=1 odoo shell -d <db> --no-http' < scripts/tenants/levis/20_reset_txn.py   # closure only
+docker exec -i odoo19-platform-odoo bash -lc 'RESET_DRY=0 odoo shell -d <db> --no-http' < scripts/tenants/levis/20_reset_txn.py   # execute
+```
+Safe by construction: it computes the transitive FK-closure of the core txn tables
+**excluding** a hard GUARD of master tables, deletes with
+`session_replication_role='replica'` (FK triggers off → no cascade into master), NULLs
+guarded back-refs (`res_company.account_opening_move_id` etc.), and prints a master
+before/after snapshot that MUST read `MASTER INTACT`. **Never** use `TRUNCATE … CASCADE`
+here — it bridges via `res_company`'s opening-move FK and wipes the whole DB.
+
+The reset does **not** touch the `retail_import.*_post_enabled` flags — set them to `0`
+separately if a trial turned them on. To also drop a one-off store mapping, delete the
+`posconfig_<code>` xid.
+
+## Phase-5+ posting status (Track B)
+X24 sales, X70D tenders, **X48 returns** (refund pos.orders) and **X31 discounts**
+(contra-revenue reclass) now **post** behind per-file flags
+`retail_import.{x24,x48,x31}_post_enabled` (+ `x24_close_sessions`), default off. GL is
+period-correct (SQL re-stamp), per-tender receivable split, balanced. See memory
+`x24-phase5-pos-posting` and `levis-txn-reset`.
 """

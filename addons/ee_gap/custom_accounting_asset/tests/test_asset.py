@@ -261,18 +261,14 @@ class TestCustomFixedAsset(TransactionCase):
         self.assertEqual(a_next.depreciation_line_ids.sorted("sequence")[0].date, date(2025, 2, 1))
 
         # specific: line 1 lands exactly on the posting date.
-        a_spec = self._make_asset(
-            depreciation_date_mode="specific", posting_date=date(2025, 1, 10)
-        )
+        a_spec = self._make_asset(depreciation_date_mode="specific", posting_date=date(2025, 1, 10))
         a_spec.action_confirm()
         spec_lines = a_spec.depreciation_line_ids.sorted("sequence")
         self.assertEqual(spec_lines[0].date, date(2025, 1, 10))
         self.assertEqual(spec_lines[1].date, date(2025, 2, 10))
 
         # end_following_month: last day of the month following the anchor.
-        a_eom = self._make_asset(
-            depreciation_date_mode="end_following_month", posting_date=date(2025, 1, 15)
-        )
+        a_eom = self._make_asset(depreciation_date_mode="end_following_month", posting_date=date(2025, 1, 15))
         a_eom.action_confirm()
         eom_lines = a_eom.depreciation_line_ids.sorted("sequence")
         self.assertEqual(eom_lines[0].date, date(2025, 2, 28))
@@ -285,9 +281,7 @@ class TestCustomFixedAsset(TransactionCase):
         a2.action_confirm()
 
         # Wizard posts every running asset's lines due on/before the cutoff.
-        wiz = self.env["custom.fixed.asset.post.wizard"].create(
-            {"cutoff_date": date(2025, 3, 5)}
-        )
+        wiz = self.env["custom.fixed.asset.post.wizard"].create({"cutoff_date": date(2025, 3, 5)})
         wiz.action_post()
         self.assertEqual(len(a1.depreciation_line_ids.filtered("posted")), 2)
         self.assertEqual(len(a2.depreciation_line_ids.filtered("posted")), 2)
@@ -341,9 +335,7 @@ class TestCustomFixedAsset(TransactionCase):
         reval = asset.revaluation_ids
         move = reval.move_id
         self.assertTrue(move)
-        self.assertAlmostEqual(
-            sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2
-        )
+        self.assertAlmostEqual(sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2)
         asset_line = move.line_ids.filtered(lambda l: l.account_id == self.asset_account)
         surplus_line = move.line_ids.filtered(lambda l: l.account_id == self.surplus_account)
         self.assertAlmostEqual(asset_line.debit, 4500.0, places=2)
@@ -419,9 +411,7 @@ class TestCustomFixedAsset(TransactionCase):
         self.assertAlmostEqual(surplus_line.debit, 4500.0, places=2)
         self.assertAlmostEqual(re_line.credit, 4500.0, places=2)
         self.assertAlmostEqual(asset.revaluation_surplus_balance, 0.0, places=2)
-        self.assertAlmostEqual(
-            sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2
-        )
+        self.assertAlmostEqual(sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2)
 
     def test_12_downward_offsets_existing_surplus(self):
         asset = self._make_asset()
@@ -506,6 +496,54 @@ class TestCustomFixedAsset(TransactionCase):
         self.assertAlmostEqual(income_line.credit, 3000.0, places=2)
         self.assertAlmostEqual(surplus_line.credit, 1000.0, places=2)
         self.assertAlmostEqual(asset_line.debit, 4000.0, places=2)
+
+    def test_14_reverse_depreciation_line(self):
+        # Reverse a posted depreciation line: status flips to reversed/unposted,
+        # NBV recomputes, and the line is not re-posted by the schedule.
+        asset = self._make_asset()
+        asset.action_confirm()
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))  # 3 posted, NBV 9000
+        self.assertAlmostEqual(asset.net_book_value, 9000.0, places=2)
+        line = asset.depreciation_line_ids.filtered("posted").sorted("sequence")[-1]
+
+        line.action_reverse()
+        self.assertFalse(line.posted)
+        self.assertTrue(line.reversed)
+        # accumulated drops one month (2000) and NBV restored to 10000
+        self.assertAlmostEqual(asset.accumulated_depreciation, 2000.0, places=2)
+        self.assertAlmostEqual(asset.net_book_value, 10000.0, places=2)
+        # a later schedule run must NOT re-post the reversed line
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))
+        self.assertFalse(line.posted)
+        self.assertTrue(line.reversed)
+        # reversing an unposted line is rejected
+        with self.assertRaises(UserError):
+            line.action_reverse()
+
+    def test_15_external_move_delete_and_draft_self_heal(self):
+        # Deleting / drafting the depreciation entry directly in Accounting must
+        # un-post the line so NBV recomputes and the period can be re-posted
+        # (feedback Accounting #4/#20).
+        asset = self._make_asset()
+        asset.action_confirm()
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))  # 3 posted
+        line = asset.depreciation_line_ids.filtered("posted").sorted("sequence")[-1]
+        move = line.move_id
+
+        move.button_draft()
+        self.assertFalse(line.posted)  # draft self-heals
+        self.assertAlmostEqual(asset.accumulated_depreciation, 2000.0, places=2)
+
+        move.unlink()
+        self.assertFalse(line.posted)
+        self.assertFalse(line.move_id)
+        self.assertFalse(line.reversed)  # deletion -> repostable, not reversed
+
+        # schedule reposts the freed line and NBV returns to 9000
+        asset._post_due_depreciation(as_of=date(2025, 4, 5))
+        self.assertTrue(line.posted)
+        self.assertTrue(line.move_id)
+        self.assertAlmostEqual(asset.accumulated_depreciation, 3000.0, places=2)
 
     def _mock_today(self, today):
         """Lightweight context manager that monkey-patches

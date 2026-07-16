@@ -6,6 +6,7 @@ from . import custom_report_general_ledger
 from . import custom_report_trial_balance
 from . import custom_report_balance_sheet
 from . import custom_report_profit_loss
+from . import custom_report_profit_loss_branch
 from . import custom_report_cash_flow
 from . import custom_report_aged_receivable
 from . import custom_report_aged_payable
@@ -30,4 +31,5 @@ from . import custom_report_pph_reconciliation
 from . import custom_report_pph25
 from . import custom_report_tax_audit
 from . import custom_report_books
+from . import custom_report_analysis
 from . import custom_report_dispatch

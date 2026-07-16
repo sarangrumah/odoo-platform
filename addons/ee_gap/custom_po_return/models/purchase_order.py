@@ -18,9 +18,7 @@ class PurchaseOrder(models.Model):
     def _compute_x_custom_po_returns(self):
         Allocation = self.env["custom.po.return.allocation"].sudo()
         for order in self:
-            returns = Allocation.search(
-                [("purchase_line_id", "in", order.order_line.ids)]
-            ).return_id
+            returns = Allocation.search([("purchase_line_id", "in", order.order_line.ids)]).return_id
             order.x_custom_po_return_ids = returns
             order.x_custom_po_return_count = len(returns)
 
@@ -48,8 +46,7 @@ class PurchaseOrderLine(models.Model):
         compute="_compute_x_custom_return_qtys",
         string="Returnable Qty",
         digits="Product Unit",
-        help="Received quantity minus done returns and pending PO Return "
-        "allocations.",
+        help="Received quantity minus done returns and pending PO Return allocations.",
     )
 
     def _compute_x_custom_return_qtys(self):
@@ -62,18 +59,18 @@ class PurchaseOrderLine(models.Model):
                     and move._is_purchase_return()
                     and (not move.origin_returned_move_id or move.to_refund)
                 ):
-                    returned += move.product_uom._compute_quantity(
-                        move.quantity, line.product_uom_id
-                    )
+                    returned += move.product_uom._compute_quantity(move.quantity, line.product_uom_id)
             pending = Allocation.search(
                 [
                     ("purchase_line_id", "=", line.id),
                     ("return_id.state", "in", ("draft", "allocated")),
                 ]
             )
-            pending_qty = line.product_id.uom_id._compute_quantity(
-                sum(pending.mapped("qty")), line.product_uom_id
-            ) if pending else 0.0
+            pending_qty = (
+                line.product_id.uom_id._compute_quantity(sum(pending.mapped("qty")), line.product_uom_id)
+                if pending
+                else 0.0
+            )
             line.x_custom_returned_qty = returned
             # qty_received is already net of done returns (to_refund moves)
             line.x_custom_returnable_qty = line.qty_received - pending_qty

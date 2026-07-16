@@ -5,6 +5,7 @@ served as request/reply (master/PR lookup).
 Background (SAP/HRIS → Portal): Kafka consumer translates and calls the Odoo
 HMAC webhook via odoo_client.
 """
+
 from __future__ import annotations
 
 import logging

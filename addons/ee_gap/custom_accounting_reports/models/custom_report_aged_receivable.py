@@ -3,11 +3,12 @@
 
 Two layouts, switched by the context key ``aging_detail``:
 
-* ``summary`` (default, used by the PDF) — one row per partner with the
-  open balance spread across overdue buckets.
-* ``detail`` — one row per open document (invoice/move line), grouped by
-  partner with a partner subtotal, matching the legacy-ERP "AP/AR aging
-  detail" export. Honoured by the Excel export only.
+* ``summary`` — one row per partner with the open balance spread across
+  overdue buckets. Always used by the PDF.
+* ``detail`` (default) — one row per open document, grouped by partner with
+  a partner subtotal, carrying the document number, the counterparty's own
+  reference and the receivable/payable account. Honoured by the on-screen
+  table and the Excel export.
 """
 
 from odoo import models
@@ -50,20 +51,52 @@ class CustomReportAgedReceivable(models.AbstractModel):
         cols.append({"header": "Total", "field": "total", "kind": "number", "width": 16})
         return cols
 
+    # Headers Finance asked for; ``custom.report.aged.payable`` overrides them
+    # with the vendor-bill wording.
+    _doc_no_header = "Invoice Number"
+    _reference_header = "Invoice Reference"
+    _account_header = "Receivable Account"
+
     def _detail_columns(self):
         cols = [
             {"header": "Partner", "field": "partner_name", "kind": "text", "width": 30},
-            {"header": "Document No", "field": "doc_no", "kind": "text", "width": 18},
-            {"header": "Reference", "field": "reference", "kind": "text", "width": 18},
+            {"header": self._doc_no_header, "field": "doc_no", "kind": "text", "width": 18},
+            {"header": self._reference_header, "field": "reference", "kind": "text", "width": 18},
             {"header": "Doc Date", "field": "doc_date", "kind": "date", "width": 12},
             {"header": "Due Date", "field": "due_date", "kind": "date", "width": 12},
             {"header": "Overdue Days", "field": "overdue_days", "kind": "text", "width": 11},
-            {"header": "Account", "field": "account_code", "kind": "text", "width": 12},
+            {"header": self._account_header, "field": "account_code", "kind": "text", "width": 18},
         ]
         for code, label, _lower, _upper in BUCKETS:
             cols.append({"header": label, "field": code, "kind": "number", "width": 13})
         cols.append({"header": "Total", "field": "total", "kind": "number", "width": 16})
         return cols
+
+    # ------------------------------------------------------------------
+    # On-screen table
+    # ------------------------------------------------------------------
+    def _flatten_for_screen(self, lines, columns):
+        """``_build_lines`` returns an aging *dict*, not the list of row dicts
+        the engine's default flattener expects."""
+        data = lines or {}
+        grand = dict(data.get("grand_total", {}), partner_name="Grand Total")
+        out = []
+        if self._is_detail():
+            for group in data.get("partners", []):
+                for row in group.get("rows", []):
+                    out.append(self._screen_row(row, columns))
+                subtotal = dict(
+                    group.get("subtotal", {}),
+                    partner_name="Subtotal %s" % (group.get("partner_name") or ""),
+                    type="subtotal",
+                )
+                out.append(self._screen_row(subtotal, columns))
+        else:
+            for row in data.get("rows", []):
+                out.append(self._screen_row(row, columns))
+        grand["type"] = "grand_total"
+        out.append(self._screen_row(grand, columns))
+        return out
 
     # ------------------------------------------------------------------
     # XLSX body
@@ -127,8 +160,12 @@ class CustomReportAgedReceivable(models.AbstractModel):
                 row += 1
             # Partner subtotal
             sheet.merge_range(
-                row, 0, row, bucket_start - 1,
-                "Subtotal %s" % (grp.get("partner_name") or ""), fmts["total_text"],
+                row,
+                0,
+                row,
+                bucket_start - 1,
+                "Subtotal %s" % (grp.get("partner_name") or ""),
+                fmts["total_text"],
             )
             _write_amounts(grp, grp.get("subtotal", {}), fmts["total_num"])
             row += 1
