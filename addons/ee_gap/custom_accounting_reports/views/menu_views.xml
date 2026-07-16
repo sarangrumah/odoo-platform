@@ -48,6 +48,12 @@
               action="action_aged_receivable_wizard"
               sequence="60"/>
 
+    <menuitem id="menu_custom_reports_credit_limit"
+              name="Credit Limit"
+              parent="menu_custom_reports_root"
+              action="action_credit_limit_wizard"
+              sequence="65"/>
+
     <menuitem id="menu_custom_reports_aged_payable"
               name="Aged Payable"
               parent="menu_custom_reports_root"
@@ -77,6 +83,12 @@
               parent="menu_custom_reports_root"
               action="action_advance_wizard"
               sequence="86"/>
+
+    <menuitem id="menu_custom_reports_purchase"
+              name="Purchase Report"
+              parent="menu_custom_reports_root"
+              action="action_purchase_wizard"
+              sequence="87"/>
 
     <menuitem id="menu_custom_reports_sales"
               name="Sales Report"

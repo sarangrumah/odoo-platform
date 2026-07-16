@@ -11,6 +11,8 @@ from . import partner_ledger_wizard
 from . import partner_card_wizard
 from . import advance_wizard
 from . import sales_wizard
+from . import purchase_wizard
+from . import credit_limit_wizard
 from . import tax_report_wizard
 from . import faktur_pajak_wizard
 from . import bupot_wizard
