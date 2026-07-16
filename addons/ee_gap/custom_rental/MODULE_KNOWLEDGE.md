@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T08:10:48Z
 generator: bootstrap-v1
 module: custom_rental
-manifest_version: 19.0.0.3.0
+manifest_version: 19.0.0.4.0
 ---
 
 # custom_rental
@@ -15,18 +15,21 @@ This module manages the lifecycle of asset rentals: rentable products with per-p
 1. **Order creation:**
    - A `rental.order` is created selecting either an `asset_id` (single-serial mode, requires `qty=1`) or a `product_id` (bulk-by-qty mode) — exactly one, enforced by `_check_rental_mode`.
    - Details include `pickup_dt`, `return_dt_expected`, `qty`, optional `loan_qty` (spare/loan units, not billed), `daily_rate`, and `late_fee_rate`.
+   - `name` comes from the `rental.order` sequence (`RNT/<year>/0001`, `data/ir_sequence_data.xml`), falling back to the literal `RNT-???` if that sequence is ever missing.
 
 2. **Order confirmation (`action_confirm`):**
    - State moves `draft` → `confirmed`.
    - An outgoing `stock.picking` is created via `_create_stock_picking("outgoing")` when stock integration is enabled (config param `custom_rental.config_stock_integration`, default True). In internal-loan mode this is an internal Stock → On-Loan transfer instead.
+   - The picking is immediately confirmed and reserved (`_process_picking`), so it lands in the warehouse queue as Ready rather than sitting in draft. **No stock moves yet** — confirming an order only queues the transfer.
 
 3. **Pickup (`action_pickup`):**
    - State `confirmed` → `picked_up`; the linked `rental.asset` is set to `on_rent`.
+   - The pickup picking is **validated** (`_process_picking(..., validate=True)`) — this is where stock actually decrements.
    - A pickup BAST may be generated (`action_generate_bast_pickup`).
 
 4. **Return (`action_return`):**
    - State `picked_up` → `returned`; `return_dt_actual` stamped; asset set back to `available`.
-   - An incoming picking is created; a return BAST may be generated.
+   - An incoming picking is created and **validated**, so stock increments again; a return BAST may be generated.
    - `action_validate_loan_return` verifies loan quantity came back in full and (for serial products) that the exact dispatched serials returned.
 
 5. **Late-fee accrual:**
@@ -52,8 +55,9 @@ This module manages the lifecycle of asset rentals: rentable products with per-p
 - `custom.rental.schedule.state`: computed in SQL — a `picked_up` order past its expected return is reported as `late`, a state that exists only on the schedule view and not on `rental.order.state`.
 
 ## Public Methods
-- `rental.order.action_confirm()`: draft → confirmed; writes PDP audit; creates the outgoing picking.
-- `rental.order.action_pickup()` / `action_return()` / `action_cancel()`: state transitions with asset-state side effects.
+- `rental.order.action_confirm()`: draft → confirmed; writes PDP audit; creates the outgoing picking and confirms/reserves it.
+- `rental.order.action_pickup()` / `action_return()` / `action_cancel()`: state transitions with asset-state side effects; pickup and return also validate their picking so stock moves.
+- `rental.order._process_picking(picking, validate=False)`: confirm + `action_assign()` a picking, and optionally validate it. Reservation is what builds the move lines and assigns lots for serial-tracked units, which `_check_returned_serials` and `action_validate_loan_return` depend on. When nothing can be reserved (a unit never stocked in Odoo) it falls back to the demanded quantity rather than blocking the rental.
 - `rental.order.action_validate_loan_return()`: enforces loan-qty return and calls `_check_returned_serials()` (serial-for-serial match on serial-tracked products).
 - `rental.order.action_generate_bast_pickup()` / `action_generate_bast_return()`: create `custom.bast.document` handover records.
 - `rental.order._cron_accrue_late_fees()`: `@api.model` accrual routine (see gotcha — not wired to any cron).
@@ -71,7 +75,9 @@ This module manages the lifecycle of asset rentals: rentable products with per-p
 - **External calls:** None.
 
 ## Gotchas
-- **No late-fee cron is wired.** `_cron_accrue_late_fees()` exists but `data/cron_data.xml` defines no `ir.cron`; accrual never runs automatically in a shipped install — only tests call it.
+- **No late-fee cron is wired.** `_cron_accrue_late_fees()` exists but `data/cron_data.xml` defines no `ir.cron`; accrual never runs automatically in a shipped install — only tests call it. `data/ir_sequence_data.xml` was an identical empty placeholder until 19.0.0.4.0, which is why every order was once named `RNT-???`; be suspicious of the other demo-bootstrap placeholders in `data/`.
+- **Pickup and return move real stock** (since 19.0.0.4.0). Before that, pickings were created but never confirmed or validated, so they sat in draft forever and inventory never reflected a rental — which also meant `action_validate_loan_return()` could never pass, since it reads `move.quantity`.
+- `stock.move` has no `name` field on Odoo 19 (the description lives on `description_picking`); passing `name` raises `Invalid field 'name' on model 'stock.move'` at picking creation.
 - Internal asset-loan mode requires `on_loan_location_id`; the constraint raises otherwise.
 - Serial-mode return runs a serial-for-serial check (`_check_returned_serials`) — missing or substituted serials block validation.
 - `custom.rental.schedule.state` has a `late` value not present on `rental.order.state`; do not treat the two selections as identical.
