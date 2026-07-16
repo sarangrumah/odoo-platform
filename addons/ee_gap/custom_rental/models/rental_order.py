@@ -233,6 +233,9 @@ class RentalOrder(models.Model):
                 raise UserError(_("Only confirmed orders can be picked up."))
             rec.write({"state": "picked_up"})
             rec.asset_id.sudo().write({"state": "on_rent"})
+            # The units have physically left: validate the pickup transfer so
+            # stock actually decrements.
+            rec._process_picking(rec.pickup_picking_id, validate=True)
             rec._pdp_audit_write("rental_pickup", rec.id, None)
 
     def action_return(self):
@@ -242,7 +245,9 @@ class RentalOrder(models.Model):
             rec.write({"state": "returned", "return_dt_actual": fields.Datetime.now()})
             rec.asset_id.sudo().write({"state": "available"})
             rec._pdp_audit_write("rental_return", rec.id, {"total_due": float(rec.total_due or 0)})
-            rec._create_stock_picking("incoming")
+            # The units are physically back: validate the return transfer so
+            # stock increments again.
+            rec._process_picking(rec._create_stock_picking("incoming"), validate=True)
 
     def action_cancel(self):
         for rec in self:
@@ -338,14 +343,16 @@ class RentalOrder(models.Model):
             return False
 
         def _move(qty, is_loan):
-            name = product.display_name
+            description = product.display_name
             if is_loan:
-                name = "[LOAN] " + name
+                description = "[LOAN] " + description
             return (
                 0,
                 0,
                 {
-                    "name": name,
+                    # Odoo 19 removed stock.move.name; the move description
+                    # now lives on description_picking.
+                    "description_picking": description,
                     "product_id": product.id,
                     "product_uom_qty": float(qty),
                     "product_uom": product.uom_id.id,
@@ -370,10 +377,48 @@ class RentalOrder(models.Model):
             "move_ids": moves,
         }
         picking = Picking.sudo().create(vals)
+        # Take it out of draft immediately: a draft transfer is invisible to the
+        # warehouse queue and reserves nothing. action_assign also builds the
+        # move lines (assigning lots for serial-tracked units), which
+        # _check_returned_serials and action_validate_loan_return rely on.
+        self._process_picking(picking)
         if direction == "outgoing":
             self.pickup_picking_id = picking.id
         else:
             self.return_picking_id = picking.id
+        return picking
+
+    def _process_picking(self, picking, validate=False):
+        """Confirm + reserve a picking, and optionally validate it so the stock
+        actually moves.
+
+        Rentals only shift stock when the goods physically change hands, so the
+        caller decides: confirming an order merely queues the pickup transfer,
+        while pickup/return validate it.
+        """
+        if not picking:
+            return picking
+        picking = picking.sudo()
+        if picking.state in ("done", "cancel"):
+            return picking
+        if picking.state == "draft":
+            picking.action_confirm()
+        picking.action_assign()
+        if not validate:
+            return picking
+
+        for move in picking.move_ids:
+            # Nothing reservable (e.g. the unit was never stocked in Odoo):
+            # fall back to the demanded quantity rather than blocking the rental.
+            if not move.quantity:
+                move.quantity = move.product_uom_qty
+            move.picked = True
+        result = picking.button_validate()
+        # Quantities are set in full above, so no backorder should be proposed;
+        # process one defensively if Odoo still asks.
+        if isinstance(result, dict) and result.get("res_model") == "stock.backorder.confirmation":
+            wizard = self.env[result["res_model"]].with_context(**result.get("context", {})).create({})
+            wizard.process()
         return picking
 
     def action_validate_loan_return(self):
