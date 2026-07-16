@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-06-09T00:00:00Z
 generator: hand-authored
 module: custom_arka_show_date
-manifest_version: 19.0.1.0.0
+manifest_version: 19.0.1.2.0
 ---
 
 # custom_arka_show_date
@@ -13,6 +13,9 @@ Adds a **Show Date** to the sale → invoice flow for opt-in companies (PT ARKA)
 and anchors customer-invoice payment-term due dates to the show date instead of
 the invoice date. Gated by a `res.company` boolean flag so it is safe on a
 multi-company tenant DB (e.g. AIM + ARKA): only the flagged company is affected.
+
+Since 19.0.1.2.0 the show date is also the pivot of a **Profit & Loss per Show**
+report, which is why this module now depends on `custom_accounting_reports`.
 
 ## Business Flow
 1. An operator ticks `res.company.x_custom_show_date_enabled` on the PT ARKA
@@ -29,6 +32,10 @@ multi-company tenant DB (e.g. AIM + ARKA): only the flagged company is affected.
    it for `date_ref`, so every `date_maturity` and the early-payment
    `discount_date` are anchored to the show date. Non-flagged companies are
    untouched (pure pass-through).
+7. **Cost attribution (reporting only):** the show date is *auto-set* on customer
+   invoices, but on vendor bills / refunds an operator sets it by hand — the
+   field is surfaced on those forms too. Anything left untagged shows up in the
+   per-show P&L's "Unassigned" column rather than being silently dropped.
 
 ## Key Models
 - `res.company` (inherited) — `x_custom_show_date_enabled` (Boolean gate flag).
@@ -38,6 +45,15 @@ multi-company tenant DB (e.g. AIM + ARKA): only the flagged company is affected.
 - `account.move` (inherited) — `x_custom_show_date` (Date). Overrides
   `_compute_needed_terms`.
 - `account.payment.term` (inherited) — overrides `_compute_terms`.
+- `custom.report.profit.loss.show` — AbstractModel, `_inherit`s
+  `custom.report.profit.loss.branch` (from `custom_accounting_reports`).
+  Profit & Loss with one amount column per show date. It reuses the branch pivot
+  wholesale by slotting the show date into the position the branch code uses for
+  an `analytic_id`, so only `_branch_columns()` and `_sum_by_account_and_branch()`
+  are overridden — `_build_lines` / `_account_row` / the XLSX and screen
+  renderers are inherited untouched.
+- `custom.report.profit.loss.wizard` (inherited) — adds `action_view_by_show` /
+  `action_export_xlsx_by_show`, mirroring the built-in "by Branch" buttons.
 
 ## Important Fields
 - `res.company.x_custom_show_date_enabled` (Boolean, default False) — gate.
@@ -59,9 +75,21 @@ multi-company tenant DB (e.g. AIM + ARKA): only the flagged company is affected.
   the `arka_show_date_ref` context key.
 
 ## Gating & Scope
-ARKA-only via the `res.company` flag (NOT name, NOT install). Customer invoices
-only (`out_invoice`); vendor bills unaffected. Safe on multi-company / multi-
-tenant DBs.
+ARKA-only via the `res.company` flag (NOT name, NOT install). Safe on
+multi-company / multi-tenant DBs.
+
+Two scopes that are easy to conflate:
+- **Due-date anchoring** — `out_invoice` only. Vendor bills are never re-dated.
+- **The show-date field itself** — visible on customer invoices *and* vendor
+  bills / refunds (since 19.0.1.2.0), because per-show cost attribution needs
+  someone to tag the bills. Auto-set only on customer invoices; on bills it is
+  manual.
+
+The per-show P&L lives here rather than in `custom_accounting_reports` on
+purpose: it queries the `x_custom_show_date` column, which exists only where this
+module is installed, so shipping it in the shared engine would break every other
+tenant. Same reason the "by Show" wizard buttons are injected by view
+inheritance from here.
 
 ## Tests
 `tests/test_show_date.py` (`AccountTestInvoicingCommon`): propagation SO→invoice,

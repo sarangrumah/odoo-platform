@@ -13,6 +13,8 @@ access_apcard_wizard_user,kartu utang wizard user,model_custom_report_payable_ca
 access_arcard_wizard_user,kartu piutang wizard user,model_custom_report_receivable_card_wizard,group_report_user,1,1,1,1
 access_advance_wizard_user,advance wizard user,model_custom_report_advance_wizard,group_report_user,1,1,1,1
 access_sales_wizard_user,sales wizard user,model_custom_report_sales_wizard,group_report_user,1,1,1,1
+access_purchase_wizard_user,purchase wizard user,model_custom_report_purchase_wizard,group_report_user,1,1,1,1
+access_credit_limit_wizard_user,credit limit wizard user,model_custom_report_credit_limit_wizard,group_report_user,1,1,1,1
 access_tax_wizard_user,tax wizard user,model_custom_report_tax_wizard,group_report_user,1,1,1,1
 access_faktur_pajak_wizard_user,faktur pajak wizard user,model_custom_report_faktur_pajak_wizard,group_report_user,1,1,1,1
 access_bupot_wizard_user,bupot wizard user,model_custom_report_bupot_wizard,group_report_user,1,1,1,1

@@ -42,6 +42,9 @@
                         <t t-elif="report_code == 'aged_payable'">
                             <t t-call="custom_accounting_reports.report_aged_payable"/>
                         </t>
+                        <t t-elif="report_code == 'credit_limit'">
+                            <t t-call="custom_accounting_reports.report_credit_limit"/>
+                        </t>
                         <t t-elif="report_code == 'partner_ledger'">
                             <t t-call="custom_accounting_reports.report_partner_ledger"/>
                         </t>
@@ -53,6 +56,9 @@
                         </t>
                         <t t-elif="report_code == 'sales'">
                             <t t-call="custom_accounting_reports.report_sales"/>
+                        </t>
+                        <t t-elif="report_code == 'purchase'">
+                            <t t-call="custom_accounting_reports.report_purchase"/>
                         </t>
                         <t t-elif="report_code == 'tax'">
                             <t t-call="custom_accounting_reports.report_tax"/>

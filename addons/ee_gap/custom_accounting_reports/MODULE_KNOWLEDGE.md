@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T07:43:22Z
 generator: bootstrap-v1
 module: custom_accounting_reports
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.4.0
 ---
 
 # custom_accounting_reports
@@ -33,6 +33,8 @@ All report models are `AbstractModel`s that inherit `custom.report.engine` (the 
 - `custom.report.aged.receivable` — Aged Receivable; `custom.report.aged.payable` inherits it.
 - `custom.report.advance` — Uang Muka / Down-Payment ledger (auto-detects advance accounts).
 - `custom.report.sales` — Sales report.
+- `custom.report.purchase` — Purchase register over vendor bills (`in_invoice` / `in_refund`); the mirror of `custom.report.sales`, grouped by vendor / product / month.
+- `custom.report.credit.limit` — Credit-limit register: `res.partner.custom_credit_limit` (from `custom_accounting_full`) against outstanding AR, with an over-limit flag. Outstanding is recomputed from posted unpaid/partial customer invoices rather than read off the partner's non-stored compute, so it stays company-scoped.
 - `custom.report.tax` — Tax report (PPN / PPh subtotals; cross-references Coretax).
 - `custom.report.book.mixin` — Day/Cash/Bank book mixin, subclassed by `custom.report.day.book`, `custom.report.cash.book`, `custom.report.bank.book` (three distinct models).
 - `custom.report.journal.audit` — Journal Audit.
