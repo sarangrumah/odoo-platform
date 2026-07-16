@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-"""#15 General Report Aset — monthly stock-opname of the drone fleet.
+"""#15 General Report Aset — monthly stock-opname of the fleet.
 
-One row per fixed-asset unit (``custom.fixed.asset`` — the AIM drone register),
-enriched best-effort with:
+One row per fixed-asset unit (``custom.fixed.asset``), enriched best-effort with:
 
 * **Operational state** — matched from ``rental.asset.state`` by serial number
   (available / on_rent / maintenance / retired).
@@ -12,6 +11,13 @@ enriched best-effort with:
 Both enrichments are keyed on the serial string because there is no hard FK from
 the accounting asset register to the rental/BAST records; units with no match
 show a blank operational state / condition. This is a snapshot (no period).
+
+``custom.fixed.asset.serial_number`` is contributed by the ARKA tenant module
+``custom_arka_aim_asset_register``, not by the generic asset app. This report
+does not depend on that tenant module — depending on it would drag ARKA's
+3,329-unit data seed into any database that merely wanted the report — so the
+serial is read only when the field is present, and the enrichment degrades to
+blank when it is not.
 """
 
 from odoo import models
@@ -63,6 +69,10 @@ class CustomReportAssetOpname(models.AbstractModel):
                 out[serial] = line.condition
         return out
 
+    def _has_serial(self):
+        """The serial lives on a tenant module; it may simply not be there."""
+        return "serial_number" in self.env["custom.fixed.asset"]._fields
+
     def _build_lines(self, filters):
         company_ids = filters["company_ids"]
         domain = [("company_id", "in", company_ids)]
@@ -73,8 +83,9 @@ class CustomReportAssetOpname(models.AbstractModel):
         if filters.get("state"):
             domain.append(("state", "=", filters["state"]))
 
-        op_by_serial = self._serial_to_op_state(company_ids)
-        cond_by_serial = self._serial_to_condition(company_ids)
+        has_serial = self._has_serial()
+        op_by_serial = self._serial_to_op_state(company_ids) if has_serial else {}
+        cond_by_serial = self._serial_to_condition(company_ids) if has_serial else {}
 
         state_labels = dict(self.env["custom.fixed.asset"]._fields["state"]._description_selection(self.env))
 
@@ -82,7 +93,7 @@ class CustomReportAssetOpname(models.AbstractModel):
         lines = []
         n_good = n_damaged = n_on_rent = 0
         for idx, asset in enumerate(assets, start=1):
-            serial = asset.serial_number or ""
+            serial = (asset.serial_number or "") if has_serial else ""
             op_state = op_by_serial.get(serial, "")
             condition = cond_by_serial.get(serial, "")
             if condition == "good":

@@ -25,9 +25,14 @@ fleet is actually operated in Odoo.
     "author": "Platform",
     "website": "https://example.com/custom-platform",
     "category": "Operations/Reports",
+    # Generic modules only. Depending on a tenant module (e.g.
+    # custom_arka_aim_asset_register) would invert the layering and drag that
+    # tenant's data seed into any database that just wanted the reports.
+    # `serial_number` is contributed by the ARKA register and is read
+    # defensively, so these reports install and run without it.
     "depends": [
         "custom_accounting_reports",
-        "custom_arka_aim_asset_register",
+        "custom_accounting_asset",
         "custom_rental",
         "custom_maintenance",
         "custom_repairs",

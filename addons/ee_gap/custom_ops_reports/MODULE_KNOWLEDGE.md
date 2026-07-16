@@ -52,8 +52,11 @@ Each has a matching `custom.report.*.wizard` TransientModel inheriting
 This module defines no stored fields. The fields it *reads* and that constrain
 the reports:
 
-- `custom.fixed.asset.serial_number` — added by `custom_arka_aim_asset_register`,
-  not a base field; it is the only join key back to rental/BAST records.
+- `custom.fixed.asset.serial_number` — added by the **tenant** module
+  `custom_arka_aim_asset_register`, not by the generic asset app; it is the only
+  join key back to rental/BAST records. This module does **not** depend on that
+  tenant module, so the field may be absent — `_has_serial()` guards every read
+  and the enrichment degrades to blank.
 - `stock.move.is_loan` — added by `custom_rental`; drives the Rental vs Tool/Loan
   column.
 - `maintenance.request.x_spare_part_ids` — many2many with **no per-part
@@ -70,11 +73,17 @@ contract. Per wizard: `action_view()` (from the mixin) and
 
 ## Integration Points
 - **Depends on:** custom_accounting_reports (the engine + wizard mixin),
-  custom_arka_aim_asset_register, custom_rental, custom_maintenance,
-  custom_repairs, custom_bast, stock.
-  The dependency list is deliberately wide so the module can only install where
-  the fleet is actually operated in Odoo — a report over apps nobody uses would
-  just render empty.
+  custom_accounting_asset, custom_rental, custom_maintenance, custom_repairs,
+  custom_bast, stock. The list is deliberately wide so the module can only
+  install where the fleet is actually operated in Odoo — a report over apps
+  nobody uses would just render empty.
+- **Deliberately does NOT depend on `custom_arka_aim_asset_register`.** That is a
+  `_tenants/` module, and a generic `ee_gap` module depending on a tenant one
+  inverts the layering. Concretely it also drags that module's
+  `post_init_hook`, which seeds 3,329 ARKA drone assets — installing these
+  reports on a training DB once meant seeding thousands of assets with no
+  matching begbal GL accounts. The only thing wanted from it was
+  `serial_number`, which is now read defensively.
 - **Registers into:** `REPORT_MODEL_MAP` in
   `custom_accounting_reports/models/custom_report_dispatch.py`, via
   `setdefault` calls in `models/__init__.py`. That map is what lets the OWL table
