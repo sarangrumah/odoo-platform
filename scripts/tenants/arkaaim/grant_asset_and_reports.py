@@ -39,6 +39,11 @@ By default it only PREVIEWS. Set GRANT_COMMIT = True to persist.
 LOGINS = []
 SOURCE_GROUP = "account.group_account_user"
 
+# Never grant to these, even if they match SOURCE_GROUP. "User" (id=57 on
+# prd_arkaaim) has no email and has never logged in, yet carries Administrator —
+# it looks like an accidental import artefact, so widening it further is wrong.
+EXCLUDE_LOGINS = ["User"]
+
 GROUP_XMLIDS = [
     "custom_accounting_asset.group_asset_user",  # Assets menu + Asset Register report
     "custom_accounting_reports.group_report_user",  # Reports menu (all custom reports)
@@ -75,6 +80,11 @@ else:
         [("active", "=", True), ("share", "=", False)]
     ).filtered(lambda u: u.has_group(SOURCE_GROUP))
     print("\nTargeting every active internal user with %s (%d found)." % (SOURCE_GROUP, len(users)))
+
+excluded = users.filtered(lambda u: u.login in EXCLUDE_LOGINS)
+if excluded:
+    users -= excluded
+    print("Excluded by EXCLUDE_LOGINS: %s" % ", ".join(sorted(excluded.mapped("login"))))
 
 print("-" * 78)
 print("PLAN")
