@@ -48,10 +48,21 @@ class CustomReportMaintenanceHealth(models.AbstractModel):
         by_equip = {}
         no_equip = {"requests": 0, "sla_breach": 0, "labor": 0.0, "parts": 0.0, "total": 0.0}
         for req in requests:
-            bucket = by_equip.setdefault(req.equipment_id.id, {
-                "equipment": req.equipment_id,
-                "requests": 0, "sla_breach": 0, "labor": 0.0, "parts": 0.0, "total": 0.0,
-            }) if req.equipment_id else no_equip
+            bucket = (
+                by_equip.setdefault(
+                    req.equipment_id.id,
+                    {
+                        "equipment": req.equipment_id,
+                        "requests": 0,
+                        "sla_breach": 0,
+                        "labor": 0.0,
+                        "parts": 0.0,
+                        "total": 0.0,
+                    },
+                )
+                if req.equipment_id
+                else no_equip
+            )
             bucket["requests"] += 1
             if req.x_sla_status == "breach":
                 bucket["sla_breach"] += 1
@@ -73,7 +84,8 @@ class CustomReportMaintenanceHealth(models.AbstractModel):
                     "mttr": equipment.x_mttr_hours if equipment else 0.0,
                     "failures": equipment.x_total_failures if equipment else 0,
                     "last_failure": equipment.x_last_failure_at.strftime("%d-%b-%Y")
-                    if equipment and equipment.x_last_failure_at else "",
+                    if equipment and equipment.x_last_failure_at
+                    else "",
                     "sla_breach": b["sla_breach"],
                     "labor": b["labor"],
                     "parts": b["parts"],

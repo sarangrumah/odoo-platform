@@ -76,9 +76,7 @@ class CustomReportAssetOpname(models.AbstractModel):
         op_by_serial = self._serial_to_op_state(company_ids)
         cond_by_serial = self._serial_to_condition(company_ids)
 
-        state_labels = dict(
-            self.env["custom.fixed.asset"]._fields["state"]._description_selection(self.env)
-        )
+        state_labels = dict(self.env["custom.fixed.asset"]._fields["state"]._description_selection(self.env))
 
         assets = self.env["custom.fixed.asset"].search(domain, order="code")
         lines = []

@@ -76,9 +76,11 @@ if LOGINS:
             continue
         users |= user
 else:
-    users = env["res.users"].search(
-        [("active", "=", True), ("share", "=", False)]
-    ).filtered(lambda u: u.has_group(SOURCE_GROUP))
+    users = (
+        env["res.users"]
+        .search([("active", "=", True), ("share", "=", False)])
+        .filtered(lambda u: u.has_group(SOURCE_GROUP))
+    )
     print("\nTargeting every active internal user with %s (%d found)." % (SOURCE_GROUP, len(users)))
 
 excluded = users.filtered(lambda u: u.login in EXCLUDE_LOGINS)

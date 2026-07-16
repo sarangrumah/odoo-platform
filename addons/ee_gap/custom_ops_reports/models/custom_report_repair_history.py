@@ -65,9 +65,11 @@ class CustomReportRepairHistory(models.AbstractModel):
                     "complaint": order.x_id_complaint or "",
                     "state": state_labels.get(order.state, order.state or ""),
                     "promised": order.x_promised_completion_date.strftime("%d-%b-%Y")
-                    if order.x_promised_completion_date else "",
+                    if order.x_promised_completion_date
+                    else "",
                     "actual": order.x_actual_completion_date.strftime("%d-%b-%Y")
-                    if order.x_actual_completion_date else "",
+                    if order.x_actual_completion_date
+                    else "",
                     "sla": sla_labels.get(order.x_sla_status, order.x_sla_status or ""),
                     "rework": "YES" if order.x_returned else "",
                     "labor": order.x_labor_cost or 0.0,
