@@ -26,3 +26,6 @@ croniter==6.2.2               # cron-expression evaluator for backup schedule
 # --- custom_retail_import (Excel/CSV ingestion + SFTP feed) ---
 openpyxl==3.1.5               # read .xlsx master/transaction files in-container (xlsxwriter is write-only)
 paramiko==3.5.1               # SFTP pull for direct customer-FTP ingestion (preferred over unmaintained pysftp)
+
+# --- custom_ppob_oracle_bridge (legacy Oracle EVShop H2H) ---
+oracledb==3.4.0               # thin mode (no Instant Client); callproc SellWithDenom_HA + MSG016T/MSG019T polling

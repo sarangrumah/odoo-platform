@@ -50,7 +50,11 @@ class CustomReportFakturPengganti(models.AbstractModel):
         Move = self.env["account.move"]
         has_fields = any(
             f in Move._fields
-            for f in ("x_custom_coretax_kode_status", "x_custom_coretax_status_code", "x_custom_coretax_replacement_of_id")
+            for f in (
+                "x_custom_coretax_kode_status",
+                "x_custom_coretax_status_code",
+                "x_custom_coretax_replacement_of_id",
+            )
         )
         if not has_fields:
             return [

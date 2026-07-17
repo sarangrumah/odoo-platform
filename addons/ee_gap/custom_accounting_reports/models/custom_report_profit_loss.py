@@ -28,9 +28,9 @@ G1_OPEX = "7"
 G1_TAX = "8"
 
 # GROUP 2 prefixes that break out of their GROUP 1 default bucket.
-G2_OTHER_INCOME = ("76", "78")   # other operating income, finance income
+G2_OTHER_INCOME = ("76", "78")  # other operating income, finance income
 G2_OTHER_EXPENSE = ("77", "79")  # other operating expenses, finance costs
-G2_OCI = ("83",)                 # other comprehensive income
+G2_OCI = ("83",)  # other comprehensive income
 
 # Buckets, in report order. ``income`` flags how the bucket enters the
 # running-profit arithmetic.
@@ -62,8 +62,13 @@ class CustomReportProfitLoss(models.AbstractModel):
 
     def _xlsx_body(self, sheet, ctx, columns, fmts, start_row):
         return self._xlsx_sectioned_body(
-            sheet, ctx, fmts, start_row,
-            amount_header="Period", secondary=("YTD", "ytd"), section_heading=True,
+            sheet,
+            ctx,
+            fmts,
+            start_row,
+            amount_header="Period",
+            secondary=("YTD", "ytd"),
+            section_heading=True,
         )
 
     def _flatten_for_screen(self, lines, columns):
@@ -141,10 +146,7 @@ class CustomReportProfitLoss(models.AbstractModel):
         ytd = self._bucket_rows(self._ytd_period(filters))
 
         def totals(source):
-            return {
-                key: sum(row["signed_balance"] for row in source[key])
-                for key, _label, _income in BUCKETS
-            }
+            return {key: sum(row["signed_balance"] for row in source[key]) for key, _label, _income in BUCKETS}
 
         p, y = totals(period), totals(ytd)
 
@@ -185,7 +187,5 @@ class CustomReportProfitLoss(models.AbstractModel):
         ]
         if period["oci"]:
             lines.append(section("oci"))
-            lines.append(
-                total("Total Comprehensive Income", p_comp, y_comp, ltype="grand_total")
-            )
+            lines.append(total("Total Comprehensive Income", p_comp, y_comp, ltype="grand_total"))
         return [line for line in lines if line]

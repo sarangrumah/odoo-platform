@@ -25,8 +25,7 @@ class AdvanceWizard(models.TransientModel):
     account_ids = fields.Many2many(
         "account.account",
         string="Advance Accounts",
-        help="Leave empty to auto-detect accounts named like 'Uang Muka' / "
-        "'Advance' / 'Prepayment' / 'Down Payment'.",
+        help="Leave empty to auto-detect accounts named like 'Uang Muka' / 'Advance' / 'Prepayment' / 'Down Payment'.",
     )
     posted_only = fields.Boolean(default=True)
 

@@ -33,8 +33,7 @@ class CustomReportWizardMixin(models.AbstractModel):
         self.ensure_one()
         opts = self._build_filters()
         return {
-            key: (value.isoformat() if isinstance(value, (date, datetime)) else value)
-            for key, value in opts.items()
+            key: (value.isoformat() if isinstance(value, (date, datetime)) else value) for key, value in opts.items()
         }
 
     def _report_context_extra(self):

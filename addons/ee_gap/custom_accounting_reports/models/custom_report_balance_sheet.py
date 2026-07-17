@@ -64,8 +64,13 @@ class CustomReportBalanceSheet(models.AbstractModel):
         has_comp = any(line.get("comparison") is not None for line in ctx.get("lines", []))
         secondary = ("Prior Period", "comparison") if has_comp else None
         return self._xlsx_sectioned_body(
-            sheet, ctx, fmts, start_row,
-            amount_header="Balance", secondary=secondary, section_heading=False,
+            sheet,
+            ctx,
+            fmts,
+            start_row,
+            amount_header="Balance",
+            secondary=secondary,
+            section_heading=False,
         )
 
     def _flatten_for_screen(self, lines, columns):
@@ -94,11 +99,7 @@ class CustomReportBalanceSheet(models.AbstractModel):
 
     def _current_year_earnings(self, balances):
         """Net result of every income/expense account, as an equity credit."""
-        return -sum(
-            row["balance"]
-            for row in balances.values()
-            if row["account_type"] in EARNINGS_TYPES
-        )
+        return -sum(row["balance"] for row in balances.values() if row["account_type"] in EARNINGS_TYPES)
 
     def _section(self, label, type_codes, balances, flip_sign):
         """Kept for backwards compatibility with overriding modules."""

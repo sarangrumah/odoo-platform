@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <field name="invoice_date_due" position="after">
                 <field name="x_custom_show_date"
-                       invisible="move_type != 'out_invoice'"/>
+                       invisible="move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund')"/>
             </field>
         </field>
     </record>

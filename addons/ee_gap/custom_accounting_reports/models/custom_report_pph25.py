@@ -80,7 +80,5 @@ class CustomReportPph25(models.AbstractModel):
             g_debit += ml.debit or 0.0
             g_credit += ml.credit or 0.0
 
-        rows.append(
-            {"type": "grand_total", "doc_no": "TOTAL", "debit": g_debit, "credit": g_credit, "saldo": running}
-        )
+        rows.append({"type": "grand_total", "doc_no": "TOTAL", "debit": g_debit, "credit": g_credit, "saldo": running})
         return rows

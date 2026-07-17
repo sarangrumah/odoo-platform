@@ -32,11 +32,15 @@ class CustomReportAdvance(models.AbstractModel):
         if filters.get("account_ids"):
             return list(filters["account_ids"])
         Account = self.env["account.account"]
-        domain = ["|", "|", "|",
-                  ("name", "ilike", "uang muka"),
-                  ("name", "ilike", "advance"),
-                  ("name", "ilike", "prepay"),
-                  ("name", "ilike", "down payment")]
+        domain = [
+            "|",
+            "|",
+            "|",
+            ("name", "ilike", "uang muka"),
+            ("name", "ilike", "advance"),
+            ("name", "ilike", "prepay"),
+            ("name", "ilike", "down payment"),
+        ]
         if filters.get("company_ids"):
             domain = [("company_ids", "in", filters["company_ids"])] + domain
         return Account.search(domain).ids
@@ -110,15 +114,17 @@ class CustomReportAdvance(models.AbstractModel):
                             sheet.write(row, col_idx, val or "", fmts["text"])
                     row += 1
                 sheet.merge_range(
-                    row, 0, row, debit_i - 1,
-                    "Total %s" % (line.get("account_code") or ""), fmts["total_text"],
+                    row,
+                    0,
+                    row,
+                    debit_i - 1,
+                    "Total %s" % (line.get("account_code") or ""),
+                    fmts["total_text"],
                 )
                 _write_totals(line, fmts["total_num"], fmts["total_text"])
                 row += 1
             elif ltype == "grand_total":
-                sheet.merge_range(
-                    row, 0, row, debit_i - 1, line.get("label") or "Grand Total", fmts["total_text"]
-                )
+                sheet.merge_range(row, 0, row, debit_i - 1, line.get("label") or "Grand Total", fmts["total_text"])
                 _write_totals(line, fmts["total_num"], fmts["total_text"])
                 row += 1
         return row
@@ -142,9 +148,16 @@ class CustomReportAdvance(models.AbstractModel):
     def _build_lines(self, filters):
         account_ids = self._advance_account_ids(filters)
         if not account_ids:
-            return [{"type": "grand_total", "label": "No advance accounts found",
-                     "total_debit": 0.0, "total_credit": 0.0,
-                     "total_residual": 0.0, "closing": 0.0}]
+            return [
+                {
+                    "type": "grand_total",
+                    "label": "No advance accounts found",
+                    "total_debit": 0.0,
+                    "total_credit": 0.0,
+                    "total_residual": 0.0,
+                    "closing": 0.0,
+                }
+            ]
 
         scoped = dict(filters, account_ids=account_ids)
 
@@ -154,10 +167,7 @@ class CustomReportAdvance(models.AbstractModel):
             date_from=date_cls(1970, 1, 1),
             date_to=filters["date_from"] - timedelta(days=1),
         )
-        opening_by_account = {
-            aid: row["balance"]
-            for aid, row in self._get_account_balances(opening_filters).items()
-        }
+        opening_by_account = {aid: row["balance"] for aid, row in self._get_account_balances(opening_filters).items()}
 
         AML = self.env["account.move.line"]
         period_domain = self._base_move_line_domain(scoped)

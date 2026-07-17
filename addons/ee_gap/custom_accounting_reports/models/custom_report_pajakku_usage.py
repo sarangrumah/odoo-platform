@@ -34,7 +34,14 @@ class CustomReportPajakkuUsage(models.AbstractModel):
         if "custom.coretax.pajakku.usage" not in self.env:
             return [
                 {"type": "note", "company": "Modul Pajakku (custom_coretax_pajakku) belum terpasang — tidak ada data."},
-                {"type": "grand_total", "company": "TOTAL", "api_calls": 0, "faktur_submits": 0, "bupot_submits": 0, "errors": 0},
+                {
+                    "type": "grand_total",
+                    "company": "TOTAL",
+                    "api_calls": 0,
+                    "faktur_submits": 0,
+                    "bupot_submits": 0,
+                    "errors": 0,
+                },
             ]
 
         Usage = self.env["custom.coretax.pajakku.usage"].sudo()

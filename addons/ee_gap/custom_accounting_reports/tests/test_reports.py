@@ -108,9 +108,7 @@ class TestCustomReports(TransactionCase):
         cls.partner_b = cls.Partner.create({"name": "Customer B"})
 
         # Odoo 19 makes account.tax.tax_group_id mandatory (not-null).
-        cls.tax_group = cls.env["account.tax.group"].create(
-            {"name": "Test Taxes", "company_id": cls.company.id}
-        )
+        cls.tax_group = cls.env["account.tax.group"].create({"name": "Test Taxes", "company_id": cls.company.id})
 
     # ------------------------------------------------------------------
     # Helpers
@@ -417,9 +415,7 @@ class TestCustomReports(TransactionCase):
         pl_lines = pl._build_lines(self._filters())
         net_profit = next(l for l in pl_lines if l.get("type") == "grand_total")["signed_balance"]
 
-        earnings = next(l for l in lines if l.get("label") == "Current Year Earnings")[
-            "signed_balance"
-        ]
+        earnings = next(l for l in lines if l.get("label") == "Current Year Earnings")["signed_balance"]
         self.assertAlmostEqual(
             earnings,
             net_profit,
@@ -533,17 +529,23 @@ class TestCustomReports(TransactionCase):
         self.assertEqual(lines[-1].get("type"), "grand_total")
 
         # No optional columns selected -> 9 core columns only.
-        gl_core = self.env["custom.report.general.ledger"].with_context(
-            gl_layout="flat", gl_columns=[]
-        )
+        gl_core = self.env["custom.report.general.ledger"].with_context(gl_layout="flat", gl_columns=[])
         # 10 core columns -- the branch column is always shown.
         self.assertEqual(len(gl_core._xlsx_columns()), 10)
         # All optional columns selected -> 10 core + 10 optional = 20.
         gl_full = self.env["custom.report.general.ledger"].with_context(
             gl_layout="flat",
             gl_columns=[
-                "doc_no", "reference", "tax", "clearing", "cost_center",
-                "profit_center", "currency", "amount_currency", "due_date", "user",
+                "doc_no",
+                "reference",
+                "tax",
+                "clearing",
+                "cost_center",
+                "profit_center",
+                "currency",
+                "amount_currency",
+                "due_date",
+                "user",
             ],
         )
         self.assertEqual(len(gl_full._xlsx_columns()), 20)
@@ -954,9 +956,7 @@ class TestCustomReports(TransactionCase):
             return
         # Seed a PPh 23 category + rule, then a withholding line on a bill.
         acc_pph = self._mk_account("21290", "Hutang PPh 23", "liability_current")
-        cat = self.env["tax.withholding.category"].create(
-            {"name": "Jasa", "code": "JASA-TEST", "pph_kind": "pph_23"}
-        )
+        cat = self.env["tax.withholding.category"].create({"name": "Jasa", "code": "JASA-TEST", "pph_kind": "pph_23"})
         rule = self.env["tax.withholding.rule"].create(
             {
                 "name": "PPh 23 Jasa Test",
@@ -984,7 +984,9 @@ class TestCustomReports(TransactionCase):
         grand = next(l for l in lines if l.get("type") == "grand_total")
         self.assertAlmostEqual(grand["pph"], 20.0, places=2)
         self.assertTrue(
-            any(l.get("jenis_penghasilan") == "Jasa" for l in lines if l.get("type") not in ("grand_total", "subtotal")),
+            any(
+                l.get("jenis_penghasilan") == "Jasa" for l in lines if l.get("type") not in ("grand_total", "subtotal")
+            ),
             "The jenis penghasilan (category) must appear on detail rows.",
         )
 
@@ -1041,7 +1043,13 @@ class TestCustomReports(TransactionCase):
                 "company_id": self.company.id,
                 "invoice_line_ids": [
                     Command.create(
-                        {"name": "X", "quantity": 1.0, "price_unit": 100.0, "account_id": self.acc_revenue.id, "tax_ids": []}
+                        {
+                            "name": "X",
+                            "quantity": 1.0,
+                            "price_unit": 100.0,
+                            "account_id": self.acc_revenue.id,
+                            "tax_ids": [],
+                        }
                     )
                 ],
             }
@@ -1056,7 +1064,13 @@ class TestCustomReports(TransactionCase):
                 "company_id": self.company.id,
                 "invoice_line_ids": [
                     Command.create(
-                        {"name": "Y", "quantity": 1.0, "price_unit": 100.0, "account_id": self.acc_revenue.id, "tax_ids": []}
+                        {
+                            "name": "Y",
+                            "quantity": 1.0,
+                            "price_unit": 100.0,
+                            "account_id": self.acc_revenue.id,
+                            "tax_ids": [],
+                        }
                     )
                 ],
             }
@@ -1095,7 +1109,11 @@ class TestCustomReports(TransactionCase):
         rep = self.env["custom.report.faktur.pengganti"]
         has_fields = any(
             f in Move._fields
-            for f in ("x_custom_coretax_kode_status", "x_custom_coretax_status_code", "x_custom_coretax_replacement_of_id")
+            for f in (
+                "x_custom_coretax_kode_status",
+                "x_custom_coretax_status_code",
+                "x_custom_coretax_replacement_of_id",
+            )
         )
         if not has_fields:
             self.assertTrue(any(l.get("type") == "note" for l in rep._build_lines(self._filters())))
@@ -1111,8 +1129,10 @@ class TestCustomReports(TransactionCase):
 
         lines = rep._build_lines(self._filters())
         detail = [l for l in lines if l.get("type") != "grand_total"]
-        self.assertTrue(any(r["doc_no"] == inv.name and r["kode"] == "01" for r in detail),
-                        "The pengganti faktur must be listed with kode 01.")
+        self.assertTrue(
+            any(r["doc_no"] == inv.name and r["kode"] == "01" for r in detail),
+            "The pengganti faktur must be listed with kode 01.",
+        )
 
     def test_ekualisasi_omzet(self):
         acc_ppn = self._mk_account("21330", "PPN Keluaran EQ", "liability_current")
@@ -1154,7 +1174,13 @@ class TestCustomReports(TransactionCase):
                 "company_id": self.company.id,
                 "invoice_line_ids": [
                     Command.create(
-                        {"name": "Jasa", "quantity": 1.0, "price_unit": 1000.0, "product_id": product.id, "account_id": self.acc_expense.id}
+                        {
+                            "name": "Jasa",
+                            "quantity": 1.0,
+                            "price_unit": 1000.0,
+                            "product_id": product.id,
+                            "account_id": self.acc_expense.id,
+                        }
                     )
                 ],
             }
@@ -1204,17 +1230,14 @@ class TestCustomReports(TransactionCase):
     def test_pph_reconciliation(self):
         acc_hutang = self._mk_account("21320R", "Hutang PPh 23", "liability_current")
         # Terutang: Cr Hutang PPh 20,000 (as booked by the withholding GL entry).
-        self._post_move(
-            [(self.acc_expense, 20000.0, 0.0), (acc_hutang, 0.0, 20000.0)], ref="terutang"
-        )
+        self._post_move([(self.acc_expense, 20000.0, 0.0), (acc_hutang, 0.0, 20000.0)], ref="terutang")
         # Disetor: Dr Hutang PPh 15,000 (setoran/NTPN).
-        self._post_move(
-            [(acc_hutang, 15000.0, 0.0), (self.acc_cash, 0.0, 15000.0)], ref="setor"
-        )
+        self._post_move([(acc_hutang, 15000.0, 0.0), (self.acc_cash, 0.0, 15000.0)], ref="setor")
         rep = self.env["custom.report.pph.reconciliation"]
         lines = rep._build_lines(self._filters())
         row = next(
-            r for r in lines
+            r
+            for r in lines
             if r.get("type") not in ("grand_total", "note") and "Hutang PPh 23" in (r.get("account") or "")
         )
         self.assertAlmostEqual(row["terutang"], 20000.0, places=2)
@@ -1223,9 +1246,7 @@ class TestCustomReports(TransactionCase):
 
     def test_pph25(self):
         acc25 = self._mk_account("11630R", "PPh 25 Dibayar di Muka", "asset_current")
-        self._post_move(
-            [(acc25, 5000.0, 0.0), (self.acc_cash, 0.0, 5000.0)], ref="angsuran"
-        )
+        self._post_move([(acc25, 5000.0, 0.0), (self.acc_cash, 0.0, 5000.0)], ref="angsuran")
         rep = self.env["custom.report.pph25"]
         lines = rep._build_lines(self._filters())
         detail = [l for l in lines if l.get("type") not in ("grand_total", "note")]
@@ -1368,7 +1389,9 @@ class TestCustomReports(TransactionCase):
         today = date.today()
         self._post_move(
             [(self.acc_recv, 700.0, 0.0), (self.acc_revenue, 0.0, 700.0)],
-            dt=today, partner=self.partner_a, ref="NoGrp",
+            dt=today,
+            partner=self.partner_a,
+            ref="NoGrp",
         )
         lines = self.env["custom.report.profit.loss"]._build_lines(self._filters())
         revenue = next(l for l in lines if l.get("label") == "Revenue")
@@ -1384,19 +1407,16 @@ class TestCustomReports(TransactionCase):
         # Name the branch plan through the documented hook so the test does not
         # collide with whatever plan the host database already calls its own.
         plan = self.env["account.analytic.plan"].create({"name": "Branch Test Plan"})
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_accounting_reports.branch_plan_name", plan.name
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_accounting_reports.branch_plan_name", plan.name)
         store = self.env["account.analytic.account"].create(
             {"name": "Store One", "plan_id": plan.id, "company_id": self.company.id}
         )
         move = self._post_move(
             [(self.acc_cash, 200.0, 0.0), (sales, 0.0, 200.0)],
-            dt=date.today(), ref="G-branch",
+            dt=date.today(),
+            ref="G-branch",
         )
-        move.line_ids.filtered(lambda l: l.account_id == sales).analytic_distribution = {
-            str(store.id): 100.0
-        }
+        move.line_ids.filtered(lambda l: l.account_id == sales).analytic_distribution = {str(store.id): 100.0}
 
         report = self.env["custom.report.profit.loss.branch"]
         self.assertEqual(
@@ -1455,8 +1475,6 @@ class TestCustomReports(TransactionCase):
             "company_ids": [self.company.id],
             "posted_only": True,
         }
-        table = self.env["custom.report.aged.payable"].get_report_table(
-            options, {"aging_detail": True}
-        )
+        table = self.env["custom.report.aged.payable"].get_report_table(options, {"aging_detail": True})
         self.assertTrue(table["columns"])
         self.assertEqual(table["lines"][-1]["type"], "grand_total")

@@ -122,7 +122,12 @@ class CustomReportGeneralLedger(models.AbstractModel):
             "cost_center": {"header": "Cost Center", "field": "cost_center", "kind": "text", "width": 18},
             "profit_center": {"header": "Profit Center", "field": "profit_center", "kind": "text", "width": 18},
             "currency": {"header": "Doc Currency", "field": "currency", "kind": "text", "width": 10},
-            "amount_currency": {"header": "Amount (Doc Curr.)", "field": "amount_currency", "kind": "number", "width": 16},
+            "amount_currency": {
+                "header": "Amount (Doc Curr.)",
+                "field": "amount_currency",
+                "kind": "number",
+                "width": 16,
+            },
             "due_date": {"header": "Due Date", "field": "due_date", "kind": "date", "width": 12},
             "user": {"header": "User", "field": "user", "kind": "text", "width": 18},
             "debit": {"header": "Debit", "field": "debit", "kind": "number", "width": 16},
@@ -185,9 +190,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
                     line.get("account_name") or "",
                 )
                 sheet.merge_range(row, 0, row, ncol - 2, heading, fmts["group_text"])
-                sheet.write_number(
-                    row, ncol - 1, float(line.get("opening") or 0.0), fmts["group_num"]
-                )
+                sheet.write_number(row, ncol - 1, float(line.get("opening") or 0.0), fmts["group_num"])
                 row += 1
                 for ml in line.get("lines", []):
                     for col_idx, col in enumerate(columns[:first_num]):
@@ -198,7 +201,10 @@ class CustomReportGeneralLedger(models.AbstractModel):
                     write_totals(ml, ("debit", "credit", "balance"), fmts["num"])
                     row += 1
                 sheet.merge_range(
-                    row, 0, row, first_num - 1,
+                    row,
+                    0,
+                    row,
+                    first_num - 1,
                     "Total %s" % (line.get("account_code") or ""),
                     fmts["total_text"],
                 )
@@ -206,8 +212,12 @@ class CustomReportGeneralLedger(models.AbstractModel):
                 row += 1
             elif ltype == "grand_total":
                 sheet.merge_range(
-                    row, 0, row, first_num - 1,
-                    line.get("label") or "Grand Total", fmts["total_text"],
+                    row,
+                    0,
+                    row,
+                    first_num - 1,
+                    line.get("label") or "Grand Total",
+                    fmts["total_text"],
                 )
                 write_totals(line, ("total_debit", "total_credit", "closing"), fmts["total_num"])
                 row += 1
@@ -273,9 +283,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
             )
             move = moves.get(row["move_id"])
             partner = partners.get(row["partner_id"])
-            _cost, _profit, branch = self._split_analytic(
-                row.get("analytic_distribution"), analytics, plan_kind
-            )
+            _cost, _profit, branch = self._split_analytic(row.get("analytic_distribution"), analytics, plan_kind)
             bucket["lines"].append(
                 {
                     "date": row["date"],
@@ -386,13 +394,8 @@ class CustomReportGeneralLedger(models.AbstractModel):
         and classify its plan as branch / profit centre / cost centre."""
         analytic_ids = set()
         for row in rows:
-            analytic_ids |= self._analytic_ids_from_distribution(
-                row.get("analytic_distribution")
-            )
-        analytics = {
-            a.id: a
-            for a in self.env["account.analytic.account"].browse(sorted(analytic_ids))
-        }
+            analytic_ids |= self._analytic_ids_from_distribution(row.get("analytic_distribution"))
+        analytics = {a.id: a for a in self.env["account.analytic.account"].browse(sorted(analytic_ids))}
         branch_plan_id = self._branch_plan().id
         plan_kind = {}
         for account in analytics.values():
@@ -450,9 +453,7 @@ class CustomReportGeneralLedger(models.AbstractModel):
             currency = currencies.get(r["currency_id"])
             user = users.get(r["create_uid"])
             tax = taxes.get(r["tax_line_id"])
-            cost, profit, branch = self._split_analytic(
-                r.get("analytic_distribution"), analytics, plan_kind
-            )
+            cost, profit, branch = self._split_analytic(r.get("analytic_distribution"), analytics, plan_kind)
             lines.append(
                 {
                     "date": r["date"],

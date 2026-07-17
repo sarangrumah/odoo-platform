@@ -62,9 +62,7 @@ class CustomReportPphEqualisasi(models.AbstractModel):
         # Which of these lines were actually withheld?
         withheld = {}
         if "account.move.withholding.line" in self.env and lines:
-            wls = self.env["account.move.withholding.line"].sudo().search(
-                [("move_line_id", "in", lines.ids)]
-            )
+            wls = self.env["account.move.withholding.line"].sudo().search([("move_line_id", "in", lines.ids)])
             for wl in wls:
                 withheld[wl.move_line_id.id] = withheld.get(wl.move_line_id.id, 0.0) + (wl.tax_amount or 0.0)
 

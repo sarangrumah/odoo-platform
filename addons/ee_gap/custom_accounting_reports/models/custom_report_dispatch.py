@@ -21,11 +21,13 @@ REPORT_MODEL_MAP = {
     "cash_flow": "custom.report.cash.flow",
     "aged_receivable": "custom.report.aged.receivable",
     "aged_payable": "custom.report.aged.payable",
+    "credit_limit": "custom.report.credit.limit",
     "partner_ledger": "custom.report.partner.ledger",
     "payable_card": "custom.report.payable.card",
     "receivable_card": "custom.report.receivable.card",
     "advance": "custom.report.advance",
     "sales": "custom.report.sales",
+    "purchase": "custom.report.purchase",
     "tax": "custom.report.tax",
     "faktur_pajak": "custom.report.faktur.pajak",
     "bupot": "custom.report.bupot",
@@ -100,6 +102,4 @@ class CustomReportDispatch(models.AbstractModel):
         """Build the QWeb-PDF download for ``report_code`` — mirrors the
         wizard's ``action_print``."""
         data = {"report_code": report_code, "options": options or {}}
-        return self.env.ref(
-            "custom_accounting_reports.action_report_custom_financial"
-        ).report_action([], data=data)
+        return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action([], data=data)
