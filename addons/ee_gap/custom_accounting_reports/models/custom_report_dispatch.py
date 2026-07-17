@@ -9,7 +9,9 @@ builds its context, then hands off to a router QWeb template that
 in turn includes the per-report layout.
 """
 
-from odoo import _, api, models
+from datetime import timedelta
+
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 from .custom_report_general_ledger import GL_OPTIONAL_COLUMNS
@@ -90,13 +92,30 @@ class CustomReportDispatch(models.AbstractModel):
         return self._report_model(report_code).get_report_table(options, context_extra)
 
     @api.model
-    def get_drilldown_action(self, options=None, account_id=None):
+    def _opening_period(self, date_from, company):
+        """The stretch of ``date_from``'s fiscal year that precedes it —
+        i.e. the movements this year that built up an opening balance.
+
+        Note this is NOT the full span the Trial Balance sums for its opening
+        column (which reaches back to the first entry ever), so the drill-down
+        reconciles with the opening figure only when the account carries no
+        balance from earlier years. Finance asked for the this-year view.
+        """
+        fy = company.compute_fiscalyear_dates(date_from)
+        return fy["date_from"], date_from - timedelta(days=1)
+
+    @api.model
+    def get_drilldown_action(self, options=None, account_id=None, scope="period"):
         """Open the General Ledger for one account, keeping the calling
-        report's period/company/journal/posted filters.
+        report's company/journal/posted filters.
 
         Used by the OWL table when a user clicks an account row (e.g. on the
         Trial Balance): same window, GL flat layout, ``account_ids`` pinned to
         the clicked account.
+
+        ``scope`` picks the period: ``"period"`` (default) reuses the calling
+        report's dates; ``"opening"`` — fired by a column flagged
+        ``drilldown: "opening"`` — rewinds to :py:meth:`_opening_period`.
         """
         account = self.env["account.account"].browse(account_id).exists()
         if not account:
@@ -112,6 +131,19 @@ class CustomReportDispatch(models.AbstractModel):
             "code": engine._account_code(account),
             "name": account.name or "",
         }
+        if scope == "opening":
+            company = self.env["res.company"].browse(
+                (gl_options.get("company_ids") or self.env.companies.ids)[:1]
+            )
+            date_from = fields.Date.to_date(gl_options.get("date_from")) or fields.Date.context_today(self)
+            opening_from, opening_to = self._opening_period(date_from, company)
+            if opening_to < opening_from:
+                raise UserError(
+                    _("The period starts on the first day of its fiscal year — there is no opening movement to show.")
+                )
+            gl_options["date_from"] = opening_from.isoformat()
+            gl_options["date_to"] = opening_to.isoformat()
+            title = _("%(title)s — Opening") % {"title": title}
         return {
             "type": "ir.actions.client",
             "tag": "custom_report_table",

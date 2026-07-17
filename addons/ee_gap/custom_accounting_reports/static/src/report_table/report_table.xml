@@ -48,7 +48,10 @@
                             t-att-title="canDrilldown(row) ? 'Lihat General Ledger akun ini' : undefined"
                             t-on-click="() => this.onRowClick(row)">
                             <td t-foreach="state.columns" t-as="col" t-key="col.field"
-                                t-att-style="cellStyle(col, row)">
+                                t-att-style="cellStyle(col, row)"
+                                t-att-class="{ 'o_report_cell_drilldown': canDrilldownCell(col, row) }"
+                                t-att-title="canDrilldownCell(col, row) ? 'Lihat GL awal tahun s/d sebelum periode ini' : undefined"
+                                t-on-click="(ev) => this.onCellClick(col, row, ev)">
                                 <t t-esc="formatCell(col, row)"/>
                             </td>
                         </tr>

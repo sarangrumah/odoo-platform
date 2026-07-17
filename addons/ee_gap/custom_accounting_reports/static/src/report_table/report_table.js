@@ -92,14 +92,40 @@ export class ReportTable extends Component {
         return Boolean(row.account_id) && this.reportCode !== "general_ledger";
     }
 
+    /**
+     * A cell is its own link when the server flags its column with a
+     * drilldown scope (e.g. Trial Balance's opening columns → the GL of the
+     * fiscal year before this report's period) and the cell carries a figure.
+     */
+    canDrilldownCell(column, row) {
+        return (
+            Boolean(column.drilldown) &&
+            this.canDrilldown(row) &&
+            Boolean(row.values && row.values[column.field])
+        );
+    }
+
     async onRowClick(row) {
         if (!this.canDrilldown(row)) {
             return;
         }
+        await this.openDrilldown(row, "period");
+    }
+
+    async onCellClick(column, row, ev) {
+        if (!this.canDrilldownCell(column, row)) {
+            return;
+        }
+        // Otherwise the row handler would fire too and win the race.
+        ev.stopPropagation();
+        await this.openDrilldown(row, column.drilldown);
+    }
+
+    async openDrilldown(row, scope) {
         const action = await this.orm.call(
             "report.custom_accounting_reports.report_dispatch",
             "get_drilldown_action",
-            [this.options, row.account_id]
+            [this.options, row.account_id, scope]
         );
         this.actionService.doAction(action);
     }

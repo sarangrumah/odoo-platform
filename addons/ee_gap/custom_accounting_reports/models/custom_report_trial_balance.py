@@ -18,8 +18,23 @@ class CustomReportTrialBalance(models.AbstractModel):
         return [
             {"header": "Code", "field": "account_code", "kind": "text", "width": 14},
             {"header": "Account", "field": "account_name", "kind": "text", "width": 42},
-            {"header": "Opening Debit", "field": "opening_debit", "kind": "number", "width": 16},
-            {"header": "Opening Credit", "field": "opening_credit", "kind": "number", "width": 16},
+            # ``drilldown`` is screen-only (the Excel writer ignores unknown
+            # keys): clicking an opening cell opens the GL for the stretch of
+            # the fiscal year that precedes this report's period.
+            {
+                "header": "Opening Debit",
+                "field": "opening_debit",
+                "kind": "number",
+                "width": 16,
+                "drilldown": "opening",
+            },
+            {
+                "header": "Opening Credit",
+                "field": "opening_credit",
+                "kind": "number",
+                "width": 16,
+                "drilldown": "opening",
+            },
             {"header": "Movement Debit", "field": "movement_debit", "kind": "number", "width": 16},
             {"header": "Movement Credit", "field": "movement_credit", "kind": "number", "width": 16},
             {"header": "Closing Debit", "field": "closing_debit", "kind": "number", "width": 16},

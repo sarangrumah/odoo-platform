@@ -37,6 +37,12 @@
             }
         }
 
+        td.o_report_cell_drilldown {
+            color: var(--o-action, #714b67);
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
         .o_report_row_check td {
             font-style: italic;
         }

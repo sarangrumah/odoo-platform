@@ -603,6 +603,9 @@ class CustomReportEngine(models.AbstractModel):
                     "field": col["field"],
                     "kind": col.get("kind", "text"),
                     "width": col.get("width", 16),
+                    # Screen-only: non-empty = this cell is its own GL link
+                    # (see ``get_drilldown_action``'s ``scope``).
+                    "drilldown": col.get("drilldown") or "",
                 }
                 for col in columns
             ],
