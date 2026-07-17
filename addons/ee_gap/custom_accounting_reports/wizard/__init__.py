@@ -20,3 +20,5 @@ from . import nsfp_monitoring_wizard
 from . import npwp_quality_wizard
 from . import p3p4_wizards
 from . import day_book_wizard
+from . import purchase_wizard
+from . import credit_limit_wizard

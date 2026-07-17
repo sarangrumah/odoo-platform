@@ -7,7 +7,7 @@ downloadable via:
 The deck PPTX is uploaded too (public) for back-office / native download.
 
 Upload is idempotent (keyed by attachment name). Resulting ids + links are written to
-docs/gentlewoman/_release-1.0-attachments.json and printed.
+docs/projects/gentlewoman/_release-1.0-attachments.json and printed.
 
 Connection (XML-RPC) is configurable via env:
   ODOO_URL      (default http://localhost:18069)   — an endpoint whose dbfilter accepts `gentlewoman`
@@ -72,8 +72,8 @@ def print_shell_snippet() -> None:
         lines.append(f"    ({fname!r}, {name!r}, {mime!r}, {public}),")
     lines += [
         "]",
-        "# adjust to where the docs/gentlewoman folder is mounted inside the container:",
-        "base = pathlib.Path('/mnt/extra-addons/../docs/gentlewoman')  # EDIT THIS PATH",
+        "# adjust to where the docs/projects/gentlewoman folder is mounted inside the container:",
+        "base = pathlib.Path('/mnt/extra-addons/../docs/projects/gentlewoman')  # EDIT THIS PATH",
         "for fname, name, mime, public in specs:",
         "    p = base / fname",
         "    data = base64.b64encode(p.read_bytes()).decode()",

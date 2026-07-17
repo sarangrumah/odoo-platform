@@ -138,8 +138,7 @@ Operator responsibility:
 Operator responsibility:
 
 1. DPO logs in at least weekly.
-2. Breach playbook: `docs/runbooks/incident-pdp-breach.md` (TBD; track in
-   `docs/plan.md`).
+2. Breach playbook: `docs/runbooks/incident-pdp-breach.md` (TBD).
 
 ## Operator checklist
 

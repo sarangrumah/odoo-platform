@@ -216,4 +216,15 @@
               action="action_custom_report_financial"
               sequence="50"
               groups="group_report_admin"/>
+    <menuitem id="menu_custom_reports_credit_limit"
+              name="Credit Limit"
+              parent="menu_custom_reports_root"
+              action="action_credit_limit_wizard"
+              sequence="65"/>
+
+    <menuitem id="menu_custom_reports_purchase"
+              name="Purchase Report"
+              parent="menu_custom_reports_root"
+              action="action_purchase_wizard"
+              sequence="87"/>
 </odoo>

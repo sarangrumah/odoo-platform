@@ -2,9 +2,9 @@
 """
 Generate Odoo-importable COA files per company from the user's master template.
 
-Source : docs/skenario-arka-aim/ARKA-AIM-Master-Data-Template.xlsx  (sheet 06_COA)
-Output : docs/skenario-arka-aim/COA-Import-ARKA.xlsx
-         docs/skenario-arka-aim/COA-Import-AIM.xlsx
+Source : docs/projects/arka-aim/ARKA-AIM-Master-Data-Template.xlsx  (sheet 06_COA)
+Output : docs/projects/arka-aim/COA-Import-ARKA.xlsx
+         docs/projects/arka-aim/COA-Import-AIM.xlsx
 
 COA identik untuk kedua PT KECUALI 4 akun bank (2 ARKA, 2 AIM) -> kolom L template
 menandai kepemilikan per-company. account_type template campur (kode teknis + label
@@ -17,8 +17,8 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-SRC = "docs/skenario-arka-aim/ARKA-AIM-Master-Data-Template.xlsx"
-OUTDIR = "docs/skenario-arka-aim"
+SRC = "docs/projects/arka-aim/ARKA-AIM-Master-Data-Template.xlsx"
+OUTDIR = "docs/projects/arka-aim"
 ARKA = "PT Aero Reksa Kreasi Angkasa"
 AIM = "PT Aero Inovasi Media"
 

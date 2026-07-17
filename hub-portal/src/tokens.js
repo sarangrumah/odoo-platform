@@ -74,6 +74,7 @@ export const verticals = [
   { value: 'fnb',             label: 'Food & Beverage' },
   { value: 'manufacturing',   label: 'Manufacturing' },
   { value: 'services',        label: 'Professional Services' },
+  { value: 'ppob',            label: 'PPOB (Payment Point Online Bank)' },
   { value: 'rental',          label: 'Equipment Rental (general)' },
   { value: 'logistics',       label: 'Logistics & Fleet' },
   { value: 'healthcare',      label: 'Healthcare' },

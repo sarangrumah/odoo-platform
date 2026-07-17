@@ -114,15 +114,21 @@ batch lots + expiration dates.
   record and the low-water TO rule *Replenish PICK from HD*.
 - **Demo:** open `JDC/INT/00001` ▸ *Barcode Scan*: scan source bin, scan
   product EAN, scan destination bin, confirm — the deck's bin-to-bin flow.
-- **Runtime caveat:** the `custom_wms_to_engine` copy deployed under
-  `/opt/odoo-platform/addons` is **stale** vs this `/home` checkout — it still
-  has the pre-`73cf11d` 3-arg `safe_eval` bug *and* a `stock.move.name` write
-  that Odoo 19 removed, so its `engine.materialize()` / domain-rule auto-trigger
-  crash. The seed therefore stages the move as a **native internal transfer**
-  (which is what `custom_barcode` scans anyway) and creates the rule **without
-  location domains**. After `/opt` is redeployed with the committed fix, set the
-  rule's source/target domains to `[('id','child_of', <zone_id>)]` to enable
-  automatic low-water TO generation.
+- **Seed shape:** the seed stages the move as a **native internal transfer**
+  (which is what `custom_barcode` scans anyway) and creates the low-water rule
+  **without location domains**, so the demo works out of the box without relying
+  on the TO engine.
+- **Enabling the auto-TO rule** (optional): set the rule's domains to
+  `[('location_id', 'child_of', <zone_id>)]`. Mind the **inverted semantics** —
+  `source_location_domain` selects the quants *below* the threshold (the bins to
+  replenish, i.e. PICK) while `target_location_domain` selects the *donor* (HD);
+  the proposal then flips them into source=donor / target=low bin. Low-water only
+  sees bins that already carry a quant row, and `low_water_qty` must exceed the
+  seeded PICK qty (40) for any proposal to fire.
+- **Fixed in v19.0.0.2.0:** `materialize()` used to write the removed
+  `stock.move.name` field, and the TO `ir.sequence` was a placeholder stub (every
+  TO came out named `TO/NEW`). Both are resolved; the engine, its domain rules and
+  `cron_evaluate_and_materialize` are verified working on Odoo 19.
 
 ### EAN SCAN STOCK OPNAME (Cycle Count / PID)
 - **Seeded:** plan *JDC PICK Zone Opname* + one **started session** with count

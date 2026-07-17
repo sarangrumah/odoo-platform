@@ -3,7 +3,7 @@
 
 WHY a script (not module data): per the platform convention, tenant catalog data
 is seeded by scripts, never by module `data/` files — otherwise it would be
-re-created on every module upgrade. See docs/gentlewoman/04-TSD.md.
+re-created on every module upgrade. See docs/projects/gentlewoman/04-TSD.md.
 
 WHAT it does (safe to re-run):
   1. Creates namespaced ``product.tag`` records: ``color:*``, ``style:*``,

@@ -1,7 +1,6 @@
 /** @odoo-module **/
 // License: LGPL-3
-import { Component, useState, useRef, onMounted, onWillUnmount, xml } from "@odoo/owl";
-import { registry } from "@web/core/registry";
+import { Component, useState, useRef, onMounted, onWillUnmount } from "@odoo/owl";
 
 import { buildSignedRequest } from "./crypto";
 import * as SyncQueue from "./sync_queue";
@@ -163,6 +162,3 @@ export class HhtShell extends Component {
         return TABS;
     }
 }
-
-// Register as public component so the OWL boot mounts it from /hht/.
-registry.category("public_components").add("custom_hht_bridge.HhtShell", HhtShell);

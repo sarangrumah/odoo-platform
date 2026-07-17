@@ -74,10 +74,8 @@ MODULES_TO_UPDATE=(
   custom_tax_id
 )
 
-# Raw SQL seeds (idempotent — safe to re-apply). Paths INSIDE the
-# odoo container under /mnt/extra-addons (default). Override
-# CONTAINER_REPO_ROOT if your mount path differs.
-CONTAINER_REPO_ROOT="${CONTAINER_REPO_ROOT:-/mnt/extra-addons}"
+# Raw SQL seeds (idempotent — safe to re-apply). Repo-relative; resolved
+# against REPO_ROOT below so the script works from any CWD.
 SQL_SEEDS=(
   "addons/compliance/custom_pdp_audit/data/02-pdp-schema.sql"
 )
@@ -114,12 +112,15 @@ apply_to_db() {
   for sql in "${SQL_SEEDS[@]}"; do
     # Pipe host-side file into the postgres container — works even
     # if the repo isn't mounted into the db service.
-    if [[ -f "$sql" ]]; then
-      ${COMPOSE} exec -T -e PGPASSWORD="$PGPASSWORD" "$DB_SERVICE" \
-        psql -U "$PG_USER" -d "$db" -v ON_ERROR_STOP=1 < "$sql"
-    else
-      echo "WARN: $sql not found on host, skipping"
+    local sql_path="${REPO_ROOT}/${sql}"
+    if [[ ! -f "$sql_path" ]]; then
+      # Skipping leaves the tenant DB without the schema and nothing downstream
+      # notices — a moved/renamed seed must fail loudly, not warn.
+      echo "ERROR: SQL seed not found: $sql_path" >&2
+      exit 1
     fi
+    ${COMPOSE} exec -T -e PGPASSWORD="$PGPASSWORD" "$DB_SERVICE" \
+      psql -U "$PG_USER" -d "$db" -v ON_ERROR_STOP=1 < "$sql_path"
   done
 }
 

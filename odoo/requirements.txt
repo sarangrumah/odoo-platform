@@ -30,3 +30,6 @@ paramiko==5.0.0               # SFTP pull for direct customer-FTP ingestion (pre
                               # (Transport, RSAKey/Ed25519Key.from_private_key[_file], SFTPClient.from_transport,
                               # SSHClient, AutoAddPolicy) is unchanged. Op note: legacy SFTP servers that only
                               # offer ssh-rsa (SHA-1) host keys must move to rsa-sha2-256/512 or ed25519.
+
+# --- custom_ppob_oracle_bridge (legacy Oracle EVShop H2H) ---
+oracledb==3.4.0              # thin mode (no Instant Client); callproc SellWithDenom_HA + MSG016T/MSG019T polling

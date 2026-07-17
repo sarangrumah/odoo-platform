@@ -5,9 +5,22 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 
 from odoo import http
 from odoo.http import request
+
+
+_logger = logging.getLogger(__name__)
+
+# Boot reports are attacker-influenced strings heading for the log, so they are
+# stripped of CR/LF/TAB (log-injection) and hard-capped before being written.
+_LOG_SCRUB = re.compile(r"[\r\n\t]+")
+
+
+def _clean(value, limit):
+    return _LOG_SCRUB.sub(" ", str(value))[:limit]
 
 
 _MANIFEST = {
@@ -34,7 +47,10 @@ _MANIFEST = {
 
 _SW_SOURCE = r"""
 // Hub HHT Service Worker — precache + SWR + offline POST queue.
-const CACHE_NAME = 'hht-shell-v1';
+// Bump CACHE_NAME on every shell change: 'activate' purges every cache whose
+// name differs, so this is what lets a fixed shell reach devices that already
+// cached a broken one.
+const CACHE_NAME = 'hht-shell-v2';
 const PRECACHE = ['/hht/', '/hht/manifest.webmanifest'];
 const DB_NAME = 'hht-offline';
 const STORE = 'pending';
@@ -139,7 +155,23 @@ self.addEventListener('fetch', (event) => {
         );
         return;
     }
+    // Navigations are network-first: cache-first would pin a broken shell on
+    // the device forever, since the HTML lives at a stable URL. Fall back to
+    // cache only when the network is actually unavailable (the offline case).
+    if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+        event.respondWith(
+            fetch(event.request).then((resp) => {
+                if (resp.ok) {
+                    const copy = resp.clone();
+                    caches.open(CACHE_NAME).then((c) => c.put(event.request, copy));
+                }
+                return resp;
+            }).catch(() => caches.match(event.request).then((c) => c || caches.match('/hht/')))
+        );
+        return;
+    }
     if (event.request.method === 'GET') {
+        // Static assets are content-hashed, so cache-first is safe here.
         event.respondWith(
             caches.match(event.request).then((cached) => cached || fetch(event.request))
         );
@@ -167,7 +199,14 @@ class HhtPwaShell(http.Controller):
 
     @http.route("/hht/", type="http", auth="user", methods=["GET"], csrf=False)
     def hht_shell(self, **_kw):
-        return request.render("custom_hht_bridge.hht_shell_layout", {})
+        return request.render(
+            "custom_hht_bridge.hht_shell_layout",
+            {
+                "session_info": request.env["ir.http"].session_info(),
+                "debug": request.session.debug,
+                "json": json,
+            },
+        )
 
     @http.route(
         "/hht/manifest.webmanifest",
@@ -185,6 +224,36 @@ class HhtPwaShell(http.Controller):
                 ("Cache-Control", "public, max-age=3600"),
             ],
         )
+
+    @http.route(
+        "/hht/boot-report",
+        type="http",
+        auth="user",
+        methods=["POST"],
+        csrf=False,
+    )
+    def hht_boot_report(self, **_kw):
+        """Receive a boot failure from a device that has no usable DevTools.
+
+        Handhelds (Zebra/Denso) cannot show a console, so the shell's ES5 boot
+        trap POSTs here instead. Fire-and-forget: never raise, never make the
+        original failure worse.
+        """
+        try:
+            payload = json.loads(request.httprequest.get_data(as_text=True) or "{}")
+        except ValueError:
+            payload = {}
+        errors = payload.get("errors") or []
+        if not isinstance(errors, list):
+            errors = [errors]
+        _logger.warning(
+            "HHT boot failure | user=%s | ua=%s | url=%s | errors=%s",
+            _clean(request.env.user.login, 64),
+            _clean(payload.get("ua", ""), 300),
+            _clean(payload.get("url", ""), 200),
+            " || ".join(_clean(e, 300) for e in errors[:5]) or "(none reported)",
+        )
+        return request.make_response("", headers=[("Content-Type", "text/plain")])
 
     @http.route("/hht/sw.js", type="http", auth="public", methods=["GET"], csrf=False)
     def hht_service_worker(self, **_kw):

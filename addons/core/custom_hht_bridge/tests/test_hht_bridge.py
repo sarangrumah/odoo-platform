@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 import time
 import uuid
 
@@ -242,3 +243,145 @@ class TestHhtBridgeHttp(HttpCase):
         data = json.loads(resp.text)
         self.assertTrue(data.get("ok"))
         self.assertEqual(data["result"]["device"]["device_id"], "HTTP-TEST-001")
+
+
+@tagged("post_install", "-at_install")
+class TestHhtPwaShell(HttpCase):
+    """The PWA shell must ship a working JS runtime, or /hht/ boots blank."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.env["res.users"].create(
+            {
+                "name": "HHT Shell Tester",
+                "login": "hht_shell_tester",
+                "password": "hht_shell_tester_pw",
+                "group_ids": [(6, 0, [cls.env.ref("base.group_user").id])],
+            }
+        )
+
+    def _login(self):
+        self.authenticate("hht_shell_tester", "hht_shell_tester_pw")
+
+    def test_shell_bootstraps_odoo_global(self):
+        self._login()
+        resp = self.url_open("/hht/", timeout=60)
+        self.assertEqual(resp.status_code, 200)
+        # The `odoo` global must be defined before the bundle runs, otherwise
+        # the bundle's first line throws "odoo is not defined".
+        self.assertIn("var odoo =", resp.text)
+        self.assertIn("__session_info__", resp.text)
+        self.assertIn('id="hht-app"', resp.text)
+        # The manifest link must carry credentials or it 404s in multi-db.
+        self.assertIn('crossorigin="use-credentials"', resp.text)
+
+    def test_pwa_assets_bundle_has_module_loader(self):
+        self._login()
+        shell = self.url_open("/hht/", timeout=60)
+        bundles = re.findall(
+            r'src="(/web/assets/[^"]*custom_hht_bridge\.pwa_assets[^"]*\.js)"',
+            shell.text,
+        )
+        self.assertTrue(bundles, "pwa_assets JS bundle not linked in /hht/")
+        js = self.url_open(bundles[0], timeout=60)
+        self.assertEqual(js.status_code, 200)
+        # module_loader.js defines the `odoo` global's `define`/`loader`.
+        self.assertIn("odoo.define", js.text)
+        self.assertIn("HhtShell", js.text)
+
+    def test_manifest_and_icons_exist(self):
+        self._login()
+        resp = self.url_open("/hht/manifest.webmanifest", timeout=30)
+        self.assertEqual(resp.status_code, 200)
+        manifest = json.loads(resp.text)
+        for icon in manifest["icons"]:
+            with self.subTest(icon=icon["src"]):
+                img = self.url_open(icon["src"], timeout=30)
+                self.assertEqual(img.status_code, 200)
+                self.assertEqual(img.headers["Content-Type"], "image/png")
+
+    def test_boot_diagnostics_are_es5_and_precede_bundle(self):
+        """A blank screen on a DevTools-less handheld must explain itself."""
+        self._login()
+        html = self.url_open("/hht/", timeout=60).text
+        self.assertIn("HHT shell failed to start", html)
+        self.assertIn("navigator.userAgent", html)
+        # The trap must be installed before the bundle it is meant to catch.
+        self.assertLess(html.index("window.onerror"), html.index("pwa_assets"))
+        # ES5 only: an old WebView must be able to parse the trap itself.
+        trap = html[
+            html.index("var errors = []") : html.index("t-call-assets")
+            if "t-call-assets" in html
+            else html.index("window.onerror") + 4000
+        ]
+        for modern in ("=>", "const ", "let ", "`"):
+            self.assertNotIn(modern, trap, "boot trap must stay ES5: found %r" % modern)
+
+    def test_service_worker_cannot_pin_a_broken_shell(self):
+        """A cache-first navigation would strand devices on a stale shell."""
+        self._login()
+        sw = self.url_open("/hht/sw.js", timeout=30)
+        self.assertEqual(sw.status_code, 200)
+        # Bumped cache name: 'activate' purges older caches on the device.
+        self.assertIn("hht-shell-v2", sw.text)
+        # Navigations must be network-first.
+        self.assertIn("event.request.mode === 'navigate'", sw.text)
+        # sw.js itself must never be cached, or updates can never land.
+        self.assertEqual(sw.headers.get("Cache-Control"), "no-cache")
+
+    def test_boot_report_endpoint_logs_and_scrubs(self):
+        """Devices with no DevTools report boot failures here."""
+        self._login()
+        resp = self.url_open(
+            "/hht/boot-report",
+            data=json.dumps(
+                {
+                    "errors": ["SyntaxError: Unexpected token '.'\nInjected: FAKE LOG LINE"],
+                    "ua": "Mozilla/5.0 (Linux; Android 8.1.0) Chrome/61.0.3163.98",
+                    "url": "https://example/hht/",
+                }
+            ).encode("utf-8"),
+            timeout=30,
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(resp.status_code, 200)
+
+    def test_boot_report_survives_garbage(self):
+        """Reporting must never raise: it runs when things are already broken."""
+        self._login()
+        # NB: an empty body makes url_open send a GET (-> 405); a real device
+        # always POSTs a body, so use whitespace to exercise the unparseable case.
+        for body in (b" ", b"not json", b'{"errors": "a string not a list"}', b"{}"):
+            with self.subTest(body=body):
+                resp = self.url_open(
+                    "/hht/boot-report",
+                    data=body,
+                    timeout=30,
+                    headers={"Content-Type": "application/json"},
+                )
+                self.assertEqual(resp.status_code, 200)
+
+    def test_boot_report_requires_login(self):
+        resp = self.url_open("/hht/boot-report", data=b"{}", timeout=30, allow_redirects=False)
+        self.assertNotEqual(resp.status_code, 200)
+
+    def test_bundle_ships_set_polyfill_for_older_webviews(self):
+        """core/utils/indexed_db.js calls Set.difference (Chrome 122+).
+
+        A real Chrome 119 handheld died with "this._tables.difference is not a
+        function". web._assets_core omits web/static/src/polyfills, so the
+        caller shipped without its polyfill.
+        """
+        self._login()
+        shell = self.url_open("/hht/", timeout=60)
+        bundles = re.findall(
+            r'src="(/web/assets/[^"]*custom_hht_bridge\.pwa_assets[^"]*\.js)"',
+            shell.text,
+        )
+        self.assertTrue(bundles, "pwa_assets JS bundle not linked in /hht/")
+        js = self.url_open(bundles[0], timeout=60).text
+        # The caller is present...
+        self.assertIn("difference", js)
+        # ...so the guard that installs the polyfill must be too.
+        self.assertIn("Set.prototype.difference", js)

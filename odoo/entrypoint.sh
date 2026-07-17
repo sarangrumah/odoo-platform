@@ -99,7 +99,12 @@ if command -v redis-cli >/dev/null 2>&1; then
 fi
 
 # ----- Verify addons paths readable -----
-for path in /mnt/extra-addons/core /mnt/extra-addons/compliance /mnt/extra-addons/ee_gap /mnt/extra-addons/verticals; do
+# Derived from the rendered config so this never drifts from addons_path.
+addons_path_line="$(grep -E '^addons_path[[:space:]]*=' "$CONFIG_OUT" | head -1 | cut -d= -f2-)"
+IFS=',' read -ra addons_paths <<< "$addons_path_line"
+for path in "${addons_paths[@]}"; do
+  path="${path//[[:space:]]/}"
+  [[ "$path" == /mnt/extra-addons/* ]] || continue
   [[ -d "$path" ]] || log "WARN: $path not present (may be intentional)"
 done
 

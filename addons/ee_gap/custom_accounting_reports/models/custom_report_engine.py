@@ -158,6 +158,9 @@ class CustomReportEngine(models.AbstractModel):
             domain.append(("parent_state", "=", "posted"))
         else:
             domain.append(("parent_state", "in", ("draft", "posted")))
+        # Omit document-only / memo journals (e.g. PPOB summary faktur) whose
+        # GL effect must not reach the financial statements.
+        domain.append(("journal_id.x_custom_report_excluded", "=", False))
         if filters.get("journal_ids"):
             domain.append(("journal_id", "in", list(filters["journal_ids"])))
         if filters.get("account_ids"):
@@ -202,6 +205,7 @@ class CustomReportEngine(models.AbstractModel):
               AND aml.date <= %s
               AND aml.company_id IN %s
               AND aml.account_id IS NOT NULL
+              AND aml.journal_id NOT IN (SELECT id FROM account_journal WHERE x_custom_report_excluded)
         """
         if filters.get("posted_only", True):
             query += " AND aml.parent_state = %s"
@@ -286,6 +290,7 @@ class CustomReportEngine(models.AbstractModel):
                AND aml.date <= %s
                AND aml.company_id IN %s
                AND aml.account_id IS NOT NULL
+               AND aml.journal_id NOT IN (SELECT id FROM account_journal WHERE x_custom_report_excluded)
         """
         if filters.get("posted_only", True):
             sql += " AND aml.parent_state = %s"

@@ -79,5 +79,5 @@ scripts/tenants/levis/out_*.csv
 # The "Mentahan" (raw) XStore export + its zip are ~56MB of source data for the
 # one-off migration extract. Keep them local; do not bloat git history. The
 # reproducible outputs live under scripts/tenants/levis/ (also gitignored above).
-docs/levis/Data XStore (Mentahan)*/
-docs/levis/Data XStore (Mentahan)*.zip
+docs/projects/levis/Data XStore (Mentahan)*/
+docs/projects/levis/Data XStore (Mentahan)*.zip

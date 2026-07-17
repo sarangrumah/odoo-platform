@@ -48,4 +48,4 @@ ignore = [
 # imports (E402) over module structure; that's fine for throwaway tooling.
 "scripts/gentlewoman/seed_shopper_taxonomy.py" = ["F821"]
 "scripts/tenants/**" = ["F821", "E731", "E402"]
-"docs/wms/**" = ["F821", "E731", "E402"]
+"docs/projects/warehouse-jds/**" = ["F821", "E731", "E402"]

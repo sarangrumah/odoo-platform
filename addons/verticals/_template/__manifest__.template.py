@@ -24,7 +24,7 @@ custom_core and other verticals.
 """,
     "author": "Custom Platform Team",
     "website": "https://custom.local",
-    "category": "Vertical/{vertical_cat}",
+    "category": "Industry/{vertical_cat}",
     "version": "19.0.0.1.0",
     "license": "LGPL-3",
     # ---------------------------------------------------------------

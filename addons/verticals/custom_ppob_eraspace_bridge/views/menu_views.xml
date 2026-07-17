@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_eraspace_bridge_root"
+              name="ERASPACE Bridge"
+              parent="custom_ppob_core.menu_ppob_configuration"
+              sequence="85"/>
+
+    <menuitem id="menu_eraspace_txn"
+              name="Transactions (Join)"
+              parent="menu_eraspace_bridge_root"
+              action="action_eraspace_txn"
+              sequence="10"/>
+
+    <menuitem id="menu_eraspace_settlement"
+              name="Settlements / Snapshots"
+              parent="menu_eraspace_bridge_root"
+              action="action_eraspace_settlement"
+              sequence="20"/>
+
+    <menuitem id="menu_eraspace_ingest_skipped"
+              name="Skipped Events"
+              parent="menu_eraspace_bridge_root"
+              action="action_eraspace_ingest_skipped"
+              sequence="30"/>
+
+    <menuitem id="menu_eraspace_connection"
+              name="Feed Connections"
+              parent="menu_eraspace_bridge_root"
+              action="action_eraspace_connection"
+              sequence="40"/>
+
+    <menuitem id="menu_eraspace_backfill_wizard"
+              name="Backfill / Replay"
+              parent="menu_eraspace_bridge_root"
+              action="action_eraspace_backfill_wizard"
+              sequence="50"/>
+
+</odoo>
