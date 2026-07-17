@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA Show Date",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.2.0",
     "summary": "Show-date field on quotation/SO/customer invoice with payment "
     "terms anchored to the show date. PT ARKA only.",
     "description": """
@@ -24,11 +24,12 @@ module is inert.
     "author": "Platform",
     "website": "https://example.com/custom-platform",
     "category": "Tenants/ARKA-AIM",
-    "depends": ["sale_management", "account", "custom_core"],
+    "depends": ["sale_management", "account", "custom_core", "custom_accounting_reports"],
     "data": [
         "views/res_company_views.xml",
         "views/sale_order_views.xml",
         "views/account_move_views.xml",
+        "views/profit_loss_wizard_views.xml",
     ],
     "installable": True,
     "auto_install": False,
