@@ -46,7 +46,11 @@ class _InquiryNameAdapter(PPOBProviderAdapter):
 
 
 def _md5(s):
-    return hashlib.md5((s or "").encode("utf-8")).hexdigest()
+    # Mirrors the vendor contract's signature formula so the tests can forge a
+    # valid request; same rationale as pps_signature._md5.
+    return hashlib.md5(  # nosemgrep
+        (s or "").encode("utf-8"), usedforsecurity=False
+    ).hexdigest()
 
 
 @tagged("post_install", "-at_install", "custom_ppob_pps_gateway")

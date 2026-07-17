@@ -131,6 +131,10 @@ class KeycloakOAuthController(OAuthController):
         )
         if response.status_code != 200:
             # Never log the body — an IdP error can echo the request back.
+            # Only the provider id and HTTP status reach the log, never the
+            # client_secret or the token; the rule matches on the surrounding
+            # token-exchange context, not on a real disclosure.
+            # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
             _logger.warning(
                 "keycloak: token exchange failed (provider %s, HTTP %s)",
                 provider_id,
