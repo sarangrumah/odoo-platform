@@ -21,7 +21,7 @@ Provides:
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Mobile",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -51,11 +51,20 @@ Provides:
             "custom_hht_bridge/static/src/scss/hht_shell.scss",
         ],
         "custom_hht_bridge.pwa_assets": [
+            # SCSS variable/mixin helpers (no JS).
             ("include", "web._assets_helpers"),
             ("include", "web._assets_backend_helpers"),
+            "web/static/src/scss/pre_variables.scss",
+            "web/static/lib/bootstrap/scss/_variables.scss",
+            "web/static/lib/bootstrap/scss/_variables-dark.scss",
+            "web/static/lib/bootstrap/scss/_maps.scss",
+            ("include", "web._assets_bootstrap_backend"),
+            # The JS runtime: module loader (defines the `odoo` global), OWL,
+            # registry, env/session. Without this the bundle's first line
+            # throws "odoo is not defined" and nothing mounts.
+            ("include", "web._assets_core"),
+            ("remove", "web/static/src/core/debug/**/*"),
             "web/static/lib/odoo_ui_icons/*",
-            "web/static/src/scss/primary_variables.scss",
-            "web/static/src/scss/bootstrap_overridden.scss",
             "web/static/src/libs/fontawesome/css/font-awesome.css",
             "custom_hht_bridge/static/src/scss/hht_shell.scss",
             "custom_hht_bridge/static/src/js/hht_shell/crypto.js",
@@ -68,6 +77,7 @@ Provides:
             "custom_hht_bridge/static/src/js/hht_shell/pages/pages.xml",
             "custom_hht_bridge/static/src/js/hht_shell/hht_shell.js",
             "custom_hht_bridge/static/src/js/hht_shell/hht_shell.xml",
+            "custom_hht_bridge/static/src/js/hht_shell/main.js",
         ],
     },
     "installable": True,

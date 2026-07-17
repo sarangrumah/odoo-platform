@@ -167,7 +167,14 @@ class HhtPwaShell(http.Controller):
 
     @http.route("/hht/", type="http", auth="user", methods=["GET"], csrf=False)
     def hht_shell(self, **_kw):
-        return request.render("custom_hht_bridge.hht_shell_layout", {})
+        return request.render(
+            "custom_hht_bridge.hht_shell_layout",
+            {
+                "session_info": request.env["ir.http"].session_info(),
+                "debug": request.session.debug,
+                "json": json,
+            },
+        )
 
     @http.route(
         "/hht/manifest.webmanifest",

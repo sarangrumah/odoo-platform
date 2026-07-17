@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 import time
 import uuid
 
@@ -242,3 +243,60 @@ class TestHhtBridgeHttp(HttpCase):
         data = json.loads(resp.text)
         self.assertTrue(data.get("ok"))
         self.assertEqual(data["result"]["device"]["device_id"], "HTTP-TEST-001")
+
+
+@tagged("post_install", "-at_install")
+class TestHhtPwaShell(HttpCase):
+    """The PWA shell must ship a working JS runtime, or /hht/ boots blank."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.env["res.users"].create(
+            {
+                "name": "HHT Shell Tester",
+                "login": "hht_shell_tester",
+                "password": "hht_shell_tester_pw",
+                "group_ids": [(6, 0, [cls.env.ref("base.group_user").id])],
+            }
+        )
+
+    def _login(self):
+        self.authenticate("hht_shell_tester", "hht_shell_tester_pw")
+
+    def test_shell_bootstraps_odoo_global(self):
+        self._login()
+        resp = self.url_open("/hht/", timeout=60)
+        self.assertEqual(resp.status_code, 200)
+        # The `odoo` global must be defined before the bundle runs, otherwise
+        # the bundle's first line throws "odoo is not defined".
+        self.assertIn("var odoo =", resp.text)
+        self.assertIn("__session_info__", resp.text)
+        self.assertIn('id="hht-app"', resp.text)
+        # The manifest link must carry credentials or it 404s in multi-db.
+        self.assertIn('crossorigin="use-credentials"', resp.text)
+
+    def test_pwa_assets_bundle_has_module_loader(self):
+        self._login()
+        shell = self.url_open("/hht/", timeout=60)
+        bundles = re.findall(
+            r'src="(/web/assets/[^"]*custom_hht_bridge\.pwa_assets[^"]*\.js)"',
+            shell.text,
+        )
+        self.assertTrue(bundles, "pwa_assets JS bundle not linked in /hht/")
+        js = self.url_open(bundles[0], timeout=60)
+        self.assertEqual(js.status_code, 200)
+        # module_loader.js defines the `odoo` global's `define`/`loader`.
+        self.assertIn("odoo.define", js.text)
+        self.assertIn("HhtShell", js.text)
+
+    def test_manifest_and_icons_exist(self):
+        self._login()
+        resp = self.url_open("/hht/manifest.webmanifest", timeout=30)
+        self.assertEqual(resp.status_code, 200)
+        manifest = json.loads(resp.text)
+        for icon in manifest["icons"]:
+            with self.subTest(icon=icon["src"]):
+                img = self.url_open(icon["src"], timeout=30)
+                self.assertEqual(img.status_code, 200)
+                self.assertEqual(img.headers["Content-Type"], "image/png")

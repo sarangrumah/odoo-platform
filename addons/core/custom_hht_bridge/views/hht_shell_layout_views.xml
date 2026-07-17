@@ -9,9 +9,21 @@
                       content="width=device-width, initial-scale=1, viewport-fit=cover"/>
                 <meta name="theme-color" content="#1f2937"/>
                 <title>Hub HHT</title>
-                <link rel="manifest" href="/hht/manifest.webmanifest"/>
+                <!-- crossorigin=use-credentials: the manifest fetch is
+                     uncredentialed by default, so without it the session
+                     cookie is dropped, Odoo cannot resolve the database and
+                     the request 404s. -->
+                <link rel="manifest" href="/hht/manifest.webmanifest"
+                      crossorigin="use-credentials"/>
                 <link rel="icon" sizes="192x192"
                       href="/custom_hht_bridge/static/src/pwa/icon-192.png"/>
+                <script type="text/javascript">
+                    var odoo = <t t-out="json.dumps({
+                        'csrf_token': request.csrf_token(None),
+                        '__session_info__': session_info,
+                        'debug': debug,
+                    })"/>;
+                </script>
                 <t t-call-assets="custom_hht_bridge.pwa_assets" t-css="true" t-js="false"/>
                 <t t-call-assets="custom_hht_bridge.pwa_assets" t-css="false" t-js="true"/>
                 <script type="text/javascript">
@@ -24,8 +36,7 @@
                 </script>
             </head>
             <body>
-                <div id="hht-app"
-                     data-public-component="custom_hht_bridge.HhtShell"/>
+                <div id="hht-app"/>
             </body>
         </html>
     </template>
