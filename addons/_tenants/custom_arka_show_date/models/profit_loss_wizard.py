@@ -48,6 +48,8 @@ class ProfitLossWizardShow(models.TransientModel):
             "date_to": self.date_to.isoformat(),
         }
         filename = "Profit_Loss_by_Show_%s_%s.xlsx" % (self.date_from, self.date_to)
-        return self.env["custom.report.profit.loss.show"].with_context(**self._show_context_extra())._xlsx_action(
-            options, filename
+        return (
+            self.env["custom.report.profit.loss.show"]
+            .with_context(**self._show_context_extra())
+            ._xlsx_action(options, filename)
         )

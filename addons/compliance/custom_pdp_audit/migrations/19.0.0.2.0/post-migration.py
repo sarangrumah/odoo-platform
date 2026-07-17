@@ -20,10 +20,7 @@ _logger = logging.getLogger(__name__)
 
 
 def migrate(cr, version):
-    cr.execute(
-        "SELECT 1 FROM information_schema.tables "
-        "WHERE table_schema = 'pdp' AND table_name = 'audit_log'"
-    )
+    cr.execute("SELECT 1 FROM information_schema.tables WHERE table_schema = 'pdp' AND table_name = 'audit_log'")
     if not cr.fetchone():
         return
 
@@ -42,19 +39,15 @@ def migrate(cr, version):
         cr.execute("DROP VIEW IF EXISTS pdp.%s CASCADE" % name)
 
     cr.execute("ALTER TABLE pdp.audit_log ALTER COLUMN action TYPE VARCHAR(64)")
+    cr.execute("ALTER TABLE pdp.audit_log DROP CONSTRAINT IF EXISTS audit_log_action_check")
     cr.execute(
-        "ALTER TABLE pdp.audit_log DROP CONSTRAINT IF EXISTS audit_log_action_check"
-    )
-    cr.execute(
-        "ALTER TABLE pdp.audit_log ADD CONSTRAINT audit_log_action_check "
-        "CHECK (action ~ '^[a-z][a-z0-9_]{1,63}$')"
+        "ALTER TABLE pdp.audit_log ADD CONSTRAINT audit_log_action_check CHECK (action ~ '^[a-z][a-z0-9_]{1,63}$')"
     )
 
     for name, viewdef in views:
         cr.execute("CREATE OR REPLACE VIEW pdp.%s AS %s" % (name, viewdef))
 
     _logger.info(
-        "custom_pdp_audit: migrated audit_log.action to VARCHAR(64) format check "
-        "(recreated %d view(s))",
+        "custom_pdp_audit: migrated audit_log.action to VARCHAR(64) format check (recreated %d view(s))",
         len(views),
     )

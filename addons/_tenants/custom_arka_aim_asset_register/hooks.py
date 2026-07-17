@@ -93,9 +93,7 @@ def seed_group_and_location(env):
     cost = _acc(env, company, COST_CODE)
     accum = _acc(env, company, ACCUM_CODE)
     expense = _acc(env, company, EXPENSE_CODE)
-    journal = env["account.journal"].search(
-        [("type", "=", "general"), ("company_id", "=", company.id)], limit=1
-    )
+    journal = env["account.journal"].search([("type", "=", "general"), ("company_id", "=", company.id)], limit=1)
     account_vals = {
         "default_asset_account_id": cost.id or False,
         "default_depreciation_account_id": accum.id or False,
@@ -121,9 +119,7 @@ def seed_group_and_location(env):
             }
         )
 
-    location = Location.with_context(active_test=False).search(
-        [("name", "=", LOCATION_NAME)], limit=1
-    )
+    location = Location.with_context(active_test=False).search([("name", "=", LOCATION_NAME)], limit=1)
     if not location:
         location = Location.create({"name": LOCATION_NAME})
 
@@ -151,9 +147,7 @@ def post_init_hook(env):
     cost_acc = _acc(env, company, COST_CODE)
     accum_acc = _acc(env, company, ACCUM_CODE)
     exp_acc = _acc(env, company, EXPENSE_CODE)
-    journal = env["account.journal"].search(
-        [("type", "=", "general"), ("company_id", "=", company.id)], limit=1
-    )
+    journal = env["account.journal"].search([("type", "=", "general"), ("company_id", "=", company.id)], limit=1)
     missing = [
         name
         for name, rec in (("cost", cost_acc), ("accum", accum_acc), ("expense", exp_acc), ("journal", journal))

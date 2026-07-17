@@ -33,8 +33,7 @@ class CustomFixedAsset(models.Model):
     serial_number = fields.Char(
         index=True,
         copy=False,
-        help="Physical serial number from the asset listing (blank for "
-        "spares/consumables that carry no serial).",
+        help="Physical serial number from the asset listing (blank for spares/consumables that carry no serial).",
     )
     source_group = fields.Char(
         string="Source Asset Group",
