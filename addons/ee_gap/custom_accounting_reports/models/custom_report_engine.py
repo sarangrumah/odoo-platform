@@ -572,6 +572,21 @@ class CustomReportEngine(models.AbstractModel):
     # ------------------------------------------------------------------
     # On-screen interactive table
     # ------------------------------------------------------------------
+    def _drilldown_enabled(self):
+        """Whether report rows/cells link into the General Ledger.
+
+        Per-database opt-in (``custom_accounting_reports.drilldown_enabled``,
+        default off): this addon is shared by every tenant DB on the same
+        container, so a code deploy alone would switch the feature on
+        everywhere. Rolled out to prd_levis_begbal only for now.
+        """
+        return (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param("custom_accounting_reports.drilldown_enabled")
+            in ("1", "true", "True")
+        )
+
     def get_report_table(self, options=None, context_extra=None):
         """Compute the report and return a JSON-serialisable payload the
         OWL client action renders as an interactive on-screen table.
@@ -585,6 +600,7 @@ class CustomReportEngine(models.AbstractModel):
         ctx = report._compute(options)
         columns = report._xlsx_columns()
         currency = ctx.get("currency")
+        drilldown = report._drilldown_enabled()
         return {
             "title": ctx.get("report_title"),
             "company_names": ctx.get("company_names"),
@@ -605,7 +621,7 @@ class CustomReportEngine(models.AbstractModel):
                     "width": col.get("width", 16),
                     # Screen-only: non-empty = this cell is its own GL link
                     # (see ``get_drilldown_action``'s ``scope``).
-                    "drilldown": col.get("drilldown") or "",
+                    "drilldown": (col.get("drilldown") or "") if drilldown else "",
                 }
                 for col in columns
             ],
@@ -647,8 +663,9 @@ class CustomReportEngine(models.AbstractModel):
             "values": values,
         }
         # Carried outside ``values`` (it is not a column): the client turns an
-        # account row into a General Ledger drill-down link.
-        if line.get("account_id"):
+        # account row into a General Ledger drill-down link. ``get_param`` is
+        # ormcached, so testing the gate per row is cheap.
+        if line.get("account_id") and self._drilldown_enabled():
             row["account_id"] = line["account_id"]
         return row
 

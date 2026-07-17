@@ -117,6 +117,9 @@ class CustomReportDispatch(models.AbstractModel):
         report's dates; ``"opening"`` — fired by a column flagged
         ``drilldown: "opening"`` — rewinds to :py:meth:`_opening_period`.
         """
+        engine = self.env["custom.report.general.ledger"]
+        if not engine._drilldown_enabled():
+            raise UserError(_("General Ledger drill-down is not enabled on this database."))
         account = self.env["account.account"].browse(account_id).exists()
         if not account:
             raise UserError(_("This row is not linked to an account."))
@@ -126,7 +129,6 @@ class CustomReportDispatch(models.AbstractModel):
             if key in ("date_from", "date_to", "company_ids", "journal_ids", "posted_only")
         }
         gl_options["account_ids"] = account.ids
-        engine = self.env["custom.report.general.ledger"]
         title = _("General Ledger — %(code)s %(name)s") % {
             "code": engine._account_code(account),
             "name": account.name or "",
