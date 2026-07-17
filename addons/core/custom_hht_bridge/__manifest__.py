@@ -64,6 +64,14 @@ Provides:
             # throws "odoo is not defined" and nothing mounts.
             ("include", "web._assets_core"),
             ("remove", "web/static/src/core/debug/**/*"),
+            # Required, not optional: core/utils/indexed_db.js calls
+            # Set.prototype.difference, which only exists from Chrome 122
+            # (02/2024). web._assets_core omits these, while web.assets_backend
+            # pulls them in — so a bundle built on _assets_core alone ships the
+            # caller without the polyfill and dies on any older WebView. Real
+            # symptom: Chrome 119 on an Android 10 handheld threw
+            # "this._tables.difference is not a function" and rendered nothing.
+            "web/static/src/polyfills/**/*.js",
             "web/static/lib/odoo_ui_icons/*",
             "web/static/src/libs/fontawesome/css/font-awesome.css",
             "custom_hht_bridge/static/src/scss/hht_shell.scss",

@@ -365,3 +365,23 @@ class TestHhtPwaShell(HttpCase):
     def test_boot_report_requires_login(self):
         resp = self.url_open("/hht/boot-report", data=b"{}", timeout=30, allow_redirects=False)
         self.assertNotEqual(resp.status_code, 200)
+
+    def test_bundle_ships_set_polyfill_for_older_webviews(self):
+        """core/utils/indexed_db.js calls Set.difference (Chrome 122+).
+
+        A real Chrome 119 handheld died with "this._tables.difference is not a
+        function". web._assets_core omits web/static/src/polyfills, so the
+        caller shipped without its polyfill.
+        """
+        self._login()
+        shell = self.url_open("/hht/", timeout=60)
+        bundles = re.findall(
+            r'src="(/web/assets/[^"]*custom_hht_bridge\.pwa_assets[^"]*\.js)"',
+            shell.text,
+        )
+        self.assertTrue(bundles, "pwa_assets JS bundle not linked in /hht/")
+        js = self.url_open(bundles[0], timeout=60).text
+        # The caller is present...
+        self.assertIn("difference", js)
+        # ...so the guard that installs the polyfill must be too.
+        self.assertIn("Set.prototype.difference", js)
