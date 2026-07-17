@@ -206,7 +206,7 @@ class ToEngine(models.AbstractModel):
         product = self.env["product.product"].browse(proposal_dict["product_id"])
         move = self.env["stock.move"].create(
             {
-                "name": proposal_dict.get("name") or transfer_order.name,
+                "origin": proposal_dict.get("name") or transfer_order.name,
                 "product_id": product.id,
                 "product_uom": product.uom_id.id,
                 "product_uom_qty": proposal_dict.get("planned_qty", 0.0),
