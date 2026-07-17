@@ -19,8 +19,9 @@ Notes / decisions confirmed by Finance:
     flagged in notes ("Tarif fleksibel — isi manual per transaksi (P3B/DGT)").
   * EBR code of sheet row 91 corrected Z6-5T -> Z6-5U (row 90 keeps Z6-5T);
     the sheet's `unique(code)` collision is thus resolved before import.
-  * bupot_object_code 28-423-01 intentionally appears twice (Z5-CV & Z1-1R) —
-    PENDING Finance confirmation; both kept, logged below. Delete one later if needed.
+  * bupot_object_code 28-423-01 belongs to Z1-1R (PP23) alone. Z5-CV (vendor ber-SKB)
+    is kept as a category but carries NO object code — an SKB exemption is reported
+    under the vendor's own PP23 object code, not a separate one.
 """
 
 import csv
@@ -56,11 +57,13 @@ codes = [r["code"] for r in rows]
 dup_codes = sorted({c for c in codes if codes.count(c) > 1})
 if dup_codes:
     raise SystemExit("duplicate category codes in CSV: %s" % dup_codes)
-objs = [r["bupot_object_code"] for r in rows]
+objs = [o for o in (r["bupot_object_code"].strip() for r in rows) if o]
 dup_objs = sorted({o for o in objs if objs.count(o) > 1})
 for o in dup_objs:
     who = [r["code"] for r in rows if r["bupot_object_code"] == o]
-    log("NOTE object-code %s used by %s (pending Finance confirmation)" % (o, who))
+    # The 13 PPh 26 DGT/Non-DGT pairs legitimately share one Coretax object code —
+    # the treaty (DGT) certificate is what distinguishes them, not the code.
+    log("NOTE object-code %s shared by %s (expected: DGT/Non-DGT pair)" % (o, who))
 
 cat_created = cat_updated = rule_created = rule_updated = 0
 
