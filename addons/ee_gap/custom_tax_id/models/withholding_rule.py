@@ -1,10 +1,19 @@
 # -*- coding: utf-8 -*-
 """Withholding rule: (category × condition) → tarif + hutang account.
 
-A rule resolves at vendor-bill-post time. Resolution priority:
-  1. Product-category override (explicit), highest priority.
-  2. Partner-category override.
-  3. Generic rule with empty filters.
+A rule resolves at vendor-bill-post time, in this order:
+  1. The object code the operator picked on the bill line — always wins.
+  2. A rule whose filters (product category / partner tag / foreign-only) match,
+     highest priority first.
+  3. The object code mapped on the product master.
+  4. Nothing — the line is not withheld.
+
+There is deliberately NO generic fallback. A rule carrying no filters at all
+describes no condition, so it cannot be matched against a line; it is only
+reachable by being picked explicitly (1) or via a product mapping (3). Letting
+such a rule match everything meant the whole EBR registry (107 unfiltered rules)
+resolved to whichever one sorted first — every bill line was withheld at the
+15% "Deviden" rate regardless of what was bought.
 """
 
 from __future__ import annotations
@@ -97,17 +106,45 @@ class WithholdingRule(models.Model):
 
     # ------------------------------------------------------------------
 
+    def _has_filters(self):
+        """True when the rule states at least one condition to match a line against."""
+        self.ensure_one()
+        return bool(self.product_category_ids or self.partner_category_ids or self.foreign_only)
+
+    @api.model
+    def _rule_for_category(self, category, company):
+        """The active rule implementing ``category`` for ``company``, if any."""
+        if not category:
+            return self.browse()
+        return self.sudo().search(
+            [
+                ("active", "=", True),
+                ("category_id", "=", category.id),
+                ("company_id", "in", (False, company.id)),
+            ],
+            order="priority desc, sequence asc",
+            limit=1,
+        )
+
     @api.model
     def _resolve_for_line(self, move_line):
-        """Return the best-matching active rule for ``move_line``, or empty recordset.
+        """Return the active rule to withhold ``move_line`` with, or empty recordset.
 
-        ``move_line`` is an ``account.move.line`` on a vendor bill.
+        ``move_line`` is an ``account.move.line`` on a vendor bill. See the module
+        docstring for the resolution order. Returning empty means "do not withhold",
+        which is the correct answer whenever the object code is not knowable.
         """
         if not move_line or move_line.move_id.move_type not in ("in_invoice", "in_refund"):
             return self.browse()
 
         partner = move_line.move_id.partner_id.commercial_partner_id
         company = move_line.move_id.company_id
+
+        # 1. Operator's explicit pick on the line beats every inference.
+        picked = self._rule_for_category(move_line.x_custom_withholding_category_id, company)
+        if picked:
+            return picked
+
         is_foreign = bool(partner.country_id and company.country_id and partner.country_id != company.country_id)
         product_categ = move_line.product_id.categ_id
         partner_tags = partner.category_id
@@ -120,7 +157,10 @@ class WithholdingRule(models.Model):
             order="priority desc, sequence asc",
         )
 
+        # 2. A rule that actually states a condition, and whose condition holds.
         for rule in candidates:
+            if not rule._has_filters():
+                continue
             if rule.foreign_only and not is_foreign:
                 continue
             if rule.product_category_ids:
@@ -130,7 +170,10 @@ class WithholdingRule(models.Model):
                 if not (rule.partner_category_ids & partner_tags):
                     continue
             return rule
-        return self.browse()
+
+        # 3. The product master's mapping — the short-circuit the product field
+        #    has always promised but never had an implementation.
+        return self._rule_for_category(move_line.product_id.x_custom_withholding_category_id, company)
 
     def _effective_tarif(self, vendor):
         """Return the rate that actually applies given vendor's NPWP status."""

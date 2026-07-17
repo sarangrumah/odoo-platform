@@ -57,8 +57,14 @@ class TaxIdCommon(TransactionCase):
             }
         )
 
-        # Use the seeded category for jasa konsultan
-        cls.category_konsultan = cls.env.ref("custom_tax_id.cat_pph23_jasa_konsultan")
+        # The module's category seed file is an empty placeholder (the original
+        # data was lost from the repo), so the xmlids these tests used to ref
+        # do not exist and setUpClass could never run. Build the fixtures here.
+        # Codes are test-only ("T-" prefix): a DB seeded with the real EBR
+        # registry already holds every genuine code, and unique(code) would clash.
+        cls.category_konsultan = cls._make_category("T-KONS", "pph_23", "24-104-03", "Jasa Konsultan (test)")
+        cls.category_sewa = cls._make_category("T-SEWA", "pph_23", "24-100-02", "Sewa non tanah/bangunan (test)")
+        cls.category_pph26_jasa = cls._make_category("T-LN", "pph_26", "27-104-01", "Imbalan jasa LN (test)")
 
         # Rule: PPh 23 jasa konsultan 2% / 4% no-NPWP
         cls.rule_konsultan = cls.Rule.create(
@@ -105,6 +111,17 @@ class TaxIdCommon(TransactionCase):
             }
         )
 
+    @classmethod
+    def _make_category(cls, code, pph_kind, object_code, name):
+        return cls.env["tax.withholding.category"].create(
+            {
+                "code": code,
+                "pph_kind": pph_kind,
+                "bupot_object_code": object_code,
+                "name": name,
+            }
+        )
+
     def _make_vendor_bill(self, vendor, amount, product=None):
         return self.Move.create(
             {
@@ -122,6 +139,12 @@ class TaxIdCommon(TransactionCase):
                             "quantity": 1.0,
                             "price_unit": amount,
                             "account_id": self.expense_account.id,
+                            # No VAT: every withholding assertion is written as
+                            # "tarif x price_unit". These companies default to
+                            # account_price_include = tax_included, so a default
+                            # 11% tax would make the DPP — and thus the correct
+                            # withholding base — 900,900.9 instead of 1,000,000.
+                            "tax_ids": [(5, 0, 0)],
                         },
                     )
                 ],

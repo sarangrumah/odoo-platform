@@ -54,6 +54,7 @@ class TestWithholdingApply(TaxIdCommon):
                             "quantity": 1.0,
                             "price_unit": 500_000,
                             "account_id": self.expense_account.id,
+                            "tax_ids": [(5, 0, 0)],
                         },
                     ),
                     (
@@ -65,6 +66,7 @@ class TestWithholdingApply(TaxIdCommon):
                             "quantity": 1.0,
                             "price_unit": 500_000,
                             "account_id": self.expense_account.id,
+                            "tax_ids": [(5, 0, 0)],
                         },
                     ),
                 ],
