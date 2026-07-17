@@ -44,7 +44,9 @@
                     </thead>
                     <tbody>
                         <tr t-foreach="displayLines" t-as="row" t-key="row_index"
-                            t-att-class="rowClass(row)">
+                            t-att-class="rowClass(row)"
+                            t-att-title="canDrilldown(row) ? 'Lihat General Ledger akun ini' : undefined"
+                            t-on-click="() => this.onRowClick(row)">
                             <td t-foreach="state.columns" t-as="col" t-key="col.field"
                                 t-att-style="cellStyle(col, row)">
                                 <t t-esc="formatCell(col, row)"/>

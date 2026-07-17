@@ -28,6 +28,15 @@
             background-color: var(--o-gray-100, #f8f9fa);
         }
 
+        .o_report_row_drilldown {
+            cursor: pointer;
+
+            td:first-child {
+                color: var(--o-action, #714b67);
+                text-decoration: underline;
+            }
+        }
+
         .o_report_row_check td {
             font-style: italic;
         }

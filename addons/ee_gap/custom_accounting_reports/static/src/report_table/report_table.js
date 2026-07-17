@@ -84,9 +84,32 @@ export class ReportTable extends Component {
         return value;
     }
 
+    /**
+     * An account row drills down into the General Ledger — except when we
+     * already are the General Ledger.
+     */
+    canDrilldown(row) {
+        return Boolean(row.account_id) && this.reportCode !== "general_ledger";
+    }
+
+    async onRowClick(row) {
+        if (!this.canDrilldown(row)) {
+            return;
+        }
+        const action = await this.orm.call(
+            "report.custom_accounting_reports.report_dispatch",
+            "get_drilldown_action",
+            [this.options, row.account_id]
+        );
+        this.actionService.doAction(action);
+    }
+
     rowClass(row) {
         const type = row.type || "data";
         const classes = ["o_report_row", `o_report_row_${type}`];
+        if (this.canDrilldown(row)) {
+            classes.push("o_report_row_drilldown");
+        }
         if (["grand_total", "total", "subtotal", "check", "header", "group"].includes(type)) {
             classes.push("fw-bold");
         }

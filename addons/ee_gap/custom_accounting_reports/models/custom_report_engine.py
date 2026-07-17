@@ -638,11 +638,16 @@ class CustomReportEngine(models.AbstractModel):
         # Total-type rows often carry only a ``label`` + numbers.
         if first_text and not values.get(first_text) and line.get("label"):
             values[first_text] = line["label"]
-        return {
+        row = {
             "type": line.get("type") or "data",
             "level": line.get("level", 0),
             "values": values,
         }
+        # Carried outside ``values`` (it is not a column): the client turns an
+        # account row into a General Ledger drill-down link.
+        if line.get("account_id"):
+            row["account_id"] = line["account_id"]
+        return row
 
     def _flatten_for_screen(self, lines, columns):
         """Default flattener: pass rows through, drop the coverage banner,

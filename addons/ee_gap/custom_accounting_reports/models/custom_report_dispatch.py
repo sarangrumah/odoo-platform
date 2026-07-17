@@ -9,7 +9,10 @@ builds its context, then hands off to a router QWeb template that
 in turn includes the per-report layout.
 """
 
-from odoo import api, models
+from odoo import _, api, models
+from odoo.exceptions import UserError
+
+from .custom_report_general_ledger import GL_OPTIONAL_COLUMNS
 
 
 REPORT_MODEL_MAP = {
@@ -85,6 +88,44 @@ class CustomReportDispatch(models.AbstractModel):
         the report's :py:meth:`~custom.report.engine.get_report_table`
         payload (columns + display rows)."""
         return self._report_model(report_code).get_report_table(options, context_extra)
+
+    @api.model
+    def get_drilldown_action(self, options=None, account_id=None):
+        """Open the General Ledger for one account, keeping the calling
+        report's period/company/journal/posted filters.
+
+        Used by the OWL table when a user clicks an account row (e.g. on the
+        Trial Balance): same window, GL flat layout, ``account_ids`` pinned to
+        the clicked account.
+        """
+        account = self.env["account.account"].browse(account_id).exists()
+        if not account:
+            raise UserError(_("This row is not linked to an account."))
+        gl_options = {
+            key: value
+            for key, value in (options or {}).items()
+            if key in ("date_from", "date_to", "company_ids", "journal_ids", "posted_only")
+        }
+        gl_options["account_ids"] = account.ids
+        engine = self.env["custom.report.general.ledger"]
+        title = _("General Ledger — %(code)s %(name)s") % {
+            "code": engine._account_code(account),
+            "name": account.name or "",
+        }
+        return {
+            "type": "ir.actions.client",
+            "tag": "custom_report_table",
+            "name": title,
+            "params": {
+                "report_code": "general_ledger",
+                "options": gl_options,
+                "context_extra": {
+                    "gl_layout": "flat",
+                    "gl_columns": list(GL_OPTIONAL_COLUMNS),
+                },
+                "title": title,
+            },
+        }
 
     @api.model
     def run_xlsx(self, report_code, options=None, context_extra=None, filename=None):
