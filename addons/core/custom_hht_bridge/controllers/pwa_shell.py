@@ -5,9 +5,22 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 
 from odoo import http
 from odoo.http import request
+
+
+_logger = logging.getLogger(__name__)
+
+# Boot reports are attacker-influenced strings heading for the log, so they are
+# stripped of CR/LF/TAB (log-injection) and hard-capped before being written.
+_LOG_SCRUB = re.compile(r"[\r\n\t]+")
+
+
+def _clean(value, limit):
+    return _LOG_SCRUB.sub(" ", str(value))[:limit]
 
 
 _MANIFEST = {
@@ -211,6 +224,36 @@ class HhtPwaShell(http.Controller):
                 ("Cache-Control", "public, max-age=3600"),
             ],
         )
+
+    @http.route(
+        "/hht/boot-report",
+        type="http",
+        auth="user",
+        methods=["POST"],
+        csrf=False,
+    )
+    def hht_boot_report(self, **_kw):
+        """Receive a boot failure from a device that has no usable DevTools.
+
+        Handhelds (Zebra/Denso) cannot show a console, so the shell's ES5 boot
+        trap POSTs here instead. Fire-and-forget: never raise, never make the
+        original failure worse.
+        """
+        try:
+            payload = json.loads(request.httprequest.get_data(as_text=True) or "{}")
+        except ValueError:
+            payload = {}
+        errors = payload.get("errors") or []
+        if not isinstance(errors, list):
+            errors = [errors]
+        _logger.warning(
+            "HHT boot failure | user=%s | ua=%s | url=%s | errors=%s",
+            _clean(request.env.user.login, 64),
+            _clean(payload.get("ua", ""), 300),
+            _clean(payload.get("url", ""), 200),
+            " || ".join(_clean(e, 300) for e in errors[:5]) or "(none reported)",
+        )
+        return request.make_response("", headers=[("Content-Type", "text/plain")])
 
     @http.route("/hht/sw.js", type="http", auth="public", methods=["GET"], csrf=False)
     def hht_service_worker(self, **_kw):

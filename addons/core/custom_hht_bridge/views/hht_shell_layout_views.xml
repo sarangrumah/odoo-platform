@@ -54,9 +54,30 @@
                             box.appendChild(ua);
                             el.appendChild(box);
                         }
+                        var reportTimer = null;
+                        function report() {
+                            try {
+                                var xhr = new XMLHttpRequest();
+                                xhr.open('POST', '/hht/boot-report', true);
+                                xhr.setRequestHeader('Content-Type', 'application/json');
+                                xhr.send(JSON.stringify({
+                                    errors: errors,
+                                    ua: navigator.userAgent,
+                                    url: window.location.href
+                                }));
+                            } catch (e) {
+                                // Reporting must never mask the failure it reports.
+                            }
+                        }
+                        function scheduleReport() {
+                            // Batch: a parse error often fires several handlers.
+                            if (reportTimer) { return; }
+                            reportTimer = setTimeout(report, 1500);
+                        }
                         window.onerror = function (msg, src, line) {
                             errors.push(String(msg) + '\n  at ' + String(src) + ':' + String(line));
                             render();
+                            scheduleReport();
                             return false;
                         };
                         window.addEventListener('load', function () {
@@ -66,6 +87,7 @@
                                     errors.push('The app did not mount within 12s and reported no error.');
                                 }
                                 render();
+                                scheduleReport();
                             }, 12000);
                         });
                     })();

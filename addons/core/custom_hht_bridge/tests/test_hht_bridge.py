@@ -329,3 +329,39 @@ class TestHhtPwaShell(HttpCase):
         self.assertIn("event.request.mode === 'navigate'", sw.text)
         # sw.js itself must never be cached, or updates can never land.
         self.assertEqual(sw.headers.get("Cache-Control"), "no-cache")
+
+    def test_boot_report_endpoint_logs_and_scrubs(self):
+        """Devices with no DevTools report boot failures here."""
+        self._login()
+        resp = self.url_open(
+            "/hht/boot-report",
+            data=json.dumps(
+                {
+                    "errors": ["SyntaxError: Unexpected token '.'\nInjected: FAKE LOG LINE"],
+                    "ua": "Mozilla/5.0 (Linux; Android 8.1.0) Chrome/61.0.3163.98",
+                    "url": "https://example/hht/",
+                }
+            ).encode("utf-8"),
+            timeout=30,
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(resp.status_code, 200)
+
+    def test_boot_report_survives_garbage(self):
+        """Reporting must never raise: it runs when things are already broken."""
+        self._login()
+        # NB: an empty body makes url_open send a GET (-> 405); a real device
+        # always POSTs a body, so use whitespace to exercise the unparseable case.
+        for body in (b" ", b"not json", b'{"errors": "a string not a list"}', b"{}"):
+            with self.subTest(body=body):
+                resp = self.url_open(
+                    "/hht/boot-report",
+                    data=body,
+                    timeout=30,
+                    headers={"Content-Type": "application/json"},
+                )
+                self.assertEqual(resp.status_code, 200)
+
+    def test_boot_report_requires_login(self):
+        resp = self.url_open("/hht/boot-report", data=b"{}", timeout=30, allow_redirects=False)
+        self.assertNotEqual(resp.status_code, 200)
