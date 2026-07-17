@@ -24,6 +24,52 @@
                         'debug': debug,
                     })"/>;
                 </script>
+                <!-- Boot diagnostics. Deliberately ES5-only (no arrow
+                     functions, const/let, or template literals) so it still
+                     runs on an old Android WebView that cannot even parse the
+                     modern bundle. Registered before the bundle so window.onerror
+                     catches the bundle's own parse/runtime errors, turning a
+                     blank screen into a readable message on a device that has
+                     no DevTools. -->
+                <script type="text/javascript">
+                    (function () {
+                        var errors = [];
+                        function render() {
+                            var el = document.getElementById('hht-app');
+                            if (!el) { return; }
+                            el.innerHTML = '';
+                            var box = document.createElement('div');
+                            box.setAttribute('style', 'padding:14px;font-family:monospace;font-size:12px;color:#e5e7eb;background:#111827;min-height:100vh');
+                            var h = document.createElement('div');
+                            h.setAttribute('style', 'color:#ef4444;font-weight:bold;font-size:14px;margin-bottom:10px');
+                            h.textContent = 'HHT shell failed to start';
+                            box.appendChild(h);
+                            var e = document.createElement('div');
+                            e.setAttribute('style', 'margin-bottom:10px;white-space:pre-wrap;word-break:break-all');
+                            e.textContent = errors.join('\n\n');
+                            box.appendChild(e);
+                            var ua = document.createElement('div');
+                            ua.setAttribute('style', 'color:#9ca3af;white-space:pre-wrap;word-break:break-all');
+                            ua.textContent = 'UA: ' + navigator.userAgent;
+                            box.appendChild(ua);
+                            el.appendChild(box);
+                        }
+                        window.onerror = function (msg, src, line) {
+                            errors.push(String(msg) + '\n  at ' + String(src) + ':' + String(line));
+                            render();
+                            return false;
+                        };
+                        window.addEventListener('load', function () {
+                            setTimeout(function () {
+                                if (document.querySelector('#hht-app .hht-shell')) { return; }
+                                if (errors.length === 0) {
+                                    errors.push('The app did not mount within 12s and reported no error.');
+                                }
+                                render();
+                            }, 12000);
+                        });
+                    })();
+                </script>
                 <t t-call-assets="custom_hht_bridge.pwa_assets" t-css="true" t-js="false"/>
                 <t t-call-assets="custom_hht_bridge.pwa_assets" t-css="false" t-js="true"/>
                 <script type="text/javascript">

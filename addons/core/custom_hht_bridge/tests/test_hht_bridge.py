@@ -300,3 +300,32 @@ class TestHhtPwaShell(HttpCase):
                 img = self.url_open(icon["src"], timeout=30)
                 self.assertEqual(img.status_code, 200)
                 self.assertEqual(img.headers["Content-Type"], "image/png")
+
+    def test_boot_diagnostics_are_es5_and_precede_bundle(self):
+        """A blank screen on a DevTools-less handheld must explain itself."""
+        self._login()
+        html = self.url_open("/hht/", timeout=60).text
+        self.assertIn("HHT shell failed to start", html)
+        self.assertIn("navigator.userAgent", html)
+        # The trap must be installed before the bundle it is meant to catch.
+        self.assertLess(html.index("window.onerror"), html.index("pwa_assets"))
+        # ES5 only: an old WebView must be able to parse the trap itself.
+        trap = html[
+            html.index("var errors = []") : html.index("t-call-assets")
+            if "t-call-assets" in html
+            else html.index("window.onerror") + 4000
+        ]
+        for modern in ("=>", "const ", "let ", "`"):
+            self.assertNotIn(modern, trap, "boot trap must stay ES5: found %r" % modern)
+
+    def test_service_worker_cannot_pin_a_broken_shell(self):
+        """A cache-first navigation would strand devices on a stale shell."""
+        self._login()
+        sw = self.url_open("/hht/sw.js", timeout=30)
+        self.assertEqual(sw.status_code, 200)
+        # Bumped cache name: 'activate' purges older caches on the device.
+        self.assertIn("hht-shell-v2", sw.text)
+        # Navigations must be network-first.
+        self.assertIn("event.request.mode === 'navigate'", sw.text)
+        # sw.js itself must never be cached, or updates can never land.
+        self.assertEqual(sw.headers.get("Cache-Control"), "no-cache")

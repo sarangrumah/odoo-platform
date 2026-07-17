@@ -34,7 +34,10 @@ _MANIFEST = {
 
 _SW_SOURCE = r"""
 // Hub HHT Service Worker — precache + SWR + offline POST queue.
-const CACHE_NAME = 'hht-shell-v1';
+// Bump CACHE_NAME on every shell change: 'activate' purges every cache whose
+// name differs, so this is what lets a fixed shell reach devices that already
+// cached a broken one.
+const CACHE_NAME = 'hht-shell-v2';
 const PRECACHE = ['/hht/', '/hht/manifest.webmanifest'];
 const DB_NAME = 'hht-offline';
 const STORE = 'pending';
@@ -139,7 +142,23 @@ self.addEventListener('fetch', (event) => {
         );
         return;
     }
+    // Navigations are network-first: cache-first would pin a broken shell on
+    // the device forever, since the HTML lives at a stable URL. Fall back to
+    // cache only when the network is actually unavailable (the offline case).
+    if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+        event.respondWith(
+            fetch(event.request).then((resp) => {
+                if (resp.ok) {
+                    const copy = resp.clone();
+                    caches.open(CACHE_NAME).then((c) => c.put(event.request, copy));
+                }
+                return resp;
+            }).catch(() => caches.match(event.request).then((c) => c || caches.match('/hht/')))
+        );
+        return;
+    }
     if (event.request.method === 'GET') {
+        // Static assets are content-hashed, so cache-first is safe here.
         event.respondWith(
             caches.match(event.request).then((cached) => cached || fetch(event.request))
         );
