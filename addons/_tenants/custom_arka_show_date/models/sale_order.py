@@ -19,6 +19,48 @@ class SaleOrder(models.Model):
         help="Technical helper: True when this order's company has Show Date "
         "enabled. Drives the form 'required'/'invisible' attributes.",
     )
+    # The three fields below feed the order-line description block (see
+    # sale_order_line.py). They are captured once per order because a show is
+    # one event: every line of the order belongs to the same event.
+    x_custom_event_name = fields.Char(
+        string="Event",
+        copy=True,
+        tracking=True,
+        help='Event name printed in the line description, e.g. "Danone".',
+    )
+    x_custom_event_location = fields.Char(
+        string="Lokasi Event",
+        copy=True,
+        tracking=True,
+        help='Venue printed in the line description, e.g. "Taman Bhagawan Bali".',
+    )
+    x_custom_dp_note = fields.Char(
+        string="Keterangan DP / Pelunasan",
+        copy=True,
+        tracking=True,
+        help='Free text closing the line description, e.g. "DP 50%" or "PELUNASAN 50%". Left out when empty.',
+    )
+
+    def _custom_event_description(self):
+        """The event line appended to each product line's description.
+
+        Returns "" when the company gate is off or nothing has been captured,
+        so the caller can leave the core description untouched.
+        """
+        self.ensure_one()
+        if not self.company_id.x_custom_show_date_enabled:
+            return ""
+        parts = []
+        if self.x_custom_event_name:
+            parts.append("Event %s" % self.x_custom_event_name)
+        if self.x_custom_event_location:
+            parts.append("Lokasi %s" % self.x_custom_event_location)
+        if self.x_custom_show_date:
+            # dd.mm.yy — the format the client writes in their own samples.
+            parts.append(self.x_custom_show_date.strftime("%d.%m.%y"))
+        if self.x_custom_dp_note:
+            parts.append(self.x_custom_dp_note)
+        return ", ".join(parts)
 
     @api.depends("company_id", "company_id.x_custom_show_date_enabled")
     def _compute_x_custom_show_date_required(self):

@@ -81,7 +81,35 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         receivable = invoice.line_ids.filtered(lambda line: line.account_id.account_type == "asset_receivable")
         self.assertEqual(receivable.date_maturity, date(2026, 10, 1))
 
-    # (4) flag off -> standard behaviour (anchored to invoice_date)
+    # (4) event block appended to the line description and carried to the invoice
+    def test_event_description_block(self):
+        so = self._make_so(self.show)
+        so.write(
+            {
+                "x_custom_event_name": "Danone",
+                "x_custom_event_location": "Taman Bhagawan Bali",
+                "x_custom_dp_note": "DP 50%",
+            }
+        )
+        line = so.order_line[0]
+        self.assertEqual(
+            line.name.splitlines()[-1],
+            "Event Danone, Lokasi Taman Bhagawan Bali, 01.09.26, DP 50%",
+        )
+        self.assertTrue(line.name.startswith(self.product.name))
+
+        so.action_confirm()
+        invoice = so._create_invoices()
+        invoice_line = invoice.invoice_line_ids.filtered(lambda x: x.product_id == self.product)
+        self.assertEqual(invoice_line.name, line.name)
+
+    # (5) empty event data leaves the core description untouched
+    def test_event_description_absent_when_unset(self):
+        so = self._make_so(self.show)
+        so.write({"x_custom_show_date": False})
+        self.assertNotIn("Event", so.order_line[0].name)
+
+    # (6) flag off -> standard behaviour (anchored to invoice_date)
     def test_non_flagged_anchors_to_invoice_date(self):
         self.company.x_custom_show_date_enabled = False
         so = self._make_so(self.show)  # show date set, but flag off

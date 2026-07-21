@@ -134,6 +134,11 @@
                     <t t-else="">
                         <tr>
                             <td style="border: 1px solid #b0b0b0; padding: 3px 5px;">
+                                <!-- Users who overwrite the description with free text lose the
+                                     product name; reprint it when the company asks for it, unless
+                                     the description already opens with it. -->
+                                <div t-if="company.report_show_product_name and line.product_id and not (line.name or '').strip().startswith(line.product_id.name or '')"
+                                     style="font-weight: bold;" t-out="line.product_id.name"/>
                                 <t t-foreach="(line.name or '').split('\n')" t-as="_ln"><t t-out="_ln"/><br t-if="not _ln_last"/></t>
                             </td>
                             <td style="text-align: right; border: 1px solid #b0b0b0; padding: 3px 5px;"><t t-call="custom_report_templates.money"><t t-set="amount" t-value="line.price_unit"/></t></td>

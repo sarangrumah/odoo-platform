@@ -48,7 +48,16 @@
                 <tr>
                     <td style="width: 55%; vertical-align: top; padding-right: 10px;">
                         <t t-call="custom_report_templates.comments_box">
-                            <span t-if="company.report_bank_details" t-out="company.report_bank_details"/>
+                            <!-- Per-invoice recipient bank wins; the company-wide text is the
+                                 fallback for invoices that don't nominate one. -->
+                            <div t-if="o.partner_bank_id">
+                                <div t-out="o.partner_bank_id.bank_id.name or 'Bank'"/>
+                                <div>A/C: <span t-out="o.partner_bank_id.acc_number"/></div>
+                                <div t-if="o.partner_bank_id.acc_holder_name"
+                                     t-out="o.partner_bank_id.acc_holder_name"/>
+                            </div>
+                            <span t-if="not o.partner_bank_id and company.report_bank_details"
+                                  t-out="company.report_bank_details"/>
                             <div t-if="o.narration" style="margin-top: 4px;" t-out="o.narration"/>
                         </t>
                     </td>
