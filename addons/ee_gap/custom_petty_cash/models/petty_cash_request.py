@@ -229,21 +229,48 @@ class PettyCashRequest(models.Model):
             )
         return partner
 
-    def _pc_ou_line_updates(self, extra=None):
-        """Return account.move.line vals stamping the Operating Unit onto a
-        generated line (analytic distribution + the native OU field when the
-        localization provides it)."""
+    def _pc_analytic_distribution(self, base=None):
+        """Merge the Operating Unit and the Employee analytic accounts into
+        ``base`` as two *separate plan tags* on the same 100% slice.
+
+        analytic_distribution keys are comma-joined analytic-account ids (one
+        per plan); OU (plan "Operating Unit") and Employee (plan "Employee")
+        each contribute one id, so a line carries e.g. ``{"<ou>,<emp>": 100}``.
+        Both dimensions stay independently groupable in analytic reporting.
+        Built directly (not via the ``l10n_ou_analytic_id`` line field) so no
+        recompute can clobber the employee tag.
+        """
         self.ensure_one()
-        updates = dict(extra or {})
-        ou = self.l10n_ou_analytic_id
-        if not ou:
-            return updates
-        dist = dict(updates.get("analytic_distribution") or {})
-        dist[str(ou.id)] = 100.0
-        updates["analytic_distribution"] = dist
-        if "l10n_ou_analytic_id" in self.env["account.move.line"]._fields:
-            updates["l10n_ou_analytic_id"] = ou.id
-        return updates
+        ids = []
+        if self.l10n_ou_analytic_id:
+            ids.append(self.l10n_ou_analytic_id.id)
+        if self.employee_id:
+            ids.append(self.employee_id._pc_get_analytic_account().id)
+        if not ids:
+            return dict(base or {})
+        add = ",".join(str(i) for i in ids)
+        dist = dict(base or {})
+        if not dist:
+            return {add: 100.0}
+        # Append our plan ids to every existing key (idempotent per id).
+        merged = {}
+        for key, pct in dist.items():
+            key_ids = key.split(",")
+            for i in add.split(","):
+                if i not in key_ids:
+                    key_ids.append(i)
+            merged[",".join(key_ids)] = pct
+        return merged
+
+    def _pc_line_analytic(self, vals=None):
+        """Return move-line ``vals`` with the combined OU+Employee analytic
+        distribution stamped in."""
+        self.ensure_one()
+        vals = dict(vals or {})
+        dist = self._pc_analytic_distribution(vals.get("analytic_distribution"))
+        if dist:
+            vals["analytic_distribution"] = dist
+        return vals
 
     # ------------------------------------------------------------------
     # CRUD / onchange
@@ -366,7 +393,7 @@ class PettyCashRequest(models.Model):
                     "petty_cash_request_id": self.id,
                     "line_ids": [
                         fields.Command.create(
-                            self._pc_ou_line_updates(
+                            self._pc_line_analytic(
                                 {
                                     "name": label,
                                     "account_id": advance.id,
@@ -500,7 +527,7 @@ class PettyCashRequest(models.Model):
                     "petty_cash_request_id": self.id,
                     "line_ids": [
                         fields.Command.create(
-                            self._pc_ou_line_updates(
+                            self._pc_line_analytic(
                                 {
                                     "name": label,
                                     "account_id": advance.id,

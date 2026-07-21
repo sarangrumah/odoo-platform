@@ -38,7 +38,7 @@ Part of the Custom Platform — multi-tenant Odoo 19 for Indonesian SMB.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",

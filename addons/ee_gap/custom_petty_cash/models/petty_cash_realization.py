@@ -164,7 +164,7 @@ class PettyCashRealization(models.Model):
                 "account.move.line"
             ]._fields:
                 vals["x_custom_withholding_category_id"] = line.x_custom_withholding_category_id.id
-            invoice_lines.append(fields.Command.create(request._pc_ou_line_updates(vals)))
+            invoice_lines.append(fields.Command.create(request._pc_line_analytic(vals)))
 
         move_vals = {
             "move_type": "in_invoice",
@@ -179,8 +179,10 @@ class PettyCashRealization(models.Model):
         move = self.env["account.move"].with_company(self.company_id)
         if "l10n_purchase_type" in move._fields:
             move_vals["l10n_purchase_type"] = "non_trade"
-        if "l10n_ou_analytic_id" in move._fields and request.l10n_ou_analytic_id:
-            move_vals["l10n_ou_analytic_id"] = request.l10n_ou_analytic_id.id
+        # OU + Employee are stamped directly into each line's
+        # analytic_distribution (see request._pc_line_analytic); we deliberately
+        # do NOT set the header l10n_ou_analytic_id, so the localization's
+        # OU-recompute never fires and cannot clobber the employee tag.
         bill = move.create(move_vals)
         bill.action_post()
         self._pay_bill_from_advance(bill)
@@ -252,7 +254,7 @@ class PettyCashRealization(models.Model):
             total += amount
             move_lines.append(
                 fields.Command.create(
-                    request._pc_ou_line_updates(
+                    request._pc_line_analytic(
                         {
                             "name": line.name or self.name,
                             "account_id": line.account_id.id,

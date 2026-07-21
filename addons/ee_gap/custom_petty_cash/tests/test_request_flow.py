@@ -72,6 +72,10 @@ class TestPettyCashFlow(TransactionCase):
         adv_line = req.disburse_move_id.line_ids.filtered(lambda l: l.account_id == self.advance)
         self.assertEqual(adv_line.debit, 1000.0)
         self.assertEqual(req.amount_outstanding, 1000.0)
+        # Advance line carries the employee analytic tag.
+        emp_analytic = self.employee._pc_get_analytic_account()
+        keys = ",".join((adv_line.analytic_distribution or {}).keys())
+        self.assertIn(str(emp_analytic.id), keys.split(","))
 
     def test_expense_realization_and_settle(self):
         req = self._new_request(1000.0)
