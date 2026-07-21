@@ -12,6 +12,26 @@ from odoo.exceptions import ValidationError
 NPWP_15_RE = re.compile(r"^\d{15}$")
 NPWP_16_RE = re.compile(r"^\d{16}$")
 NIK_RE = re.compile(r"^\d{16}$")
+# Coretax expects the counterparty NITKU as 22 digits: the 16-digit NPWP
+# followed by the 6-digit tempat-kegiatan-usaha suffix.
+NITKU_22_RE = re.compile(r"^\d{22}$")
+# The pemotong's own NITKU is carried as the 6-digit suffix alone.
+NITKU_6_RE = re.compile(r"^\d{6}$")
+
+PTKP_SELECTION = [
+    ("TK/0", "TK/0"),
+    ("TK/1", "TK/1"),
+    ("TK/2", "TK/2"),
+    ("TK/3", "TK/3"),
+    ("K/0", "K/0"),
+    ("K/1", "K/1"),
+    ("K/2", "K/2"),
+    ("K/3", "K/3"),
+    ("K/I/0", "K/I/0"),
+    ("K/I/1", "K/I/1"),
+    ("K/I/2", "K/I/2"),
+    ("K/I/3", "K/I/3"),
+]
 
 
 class ResPartner(models.Model):
@@ -48,6 +68,51 @@ class ResPartner(models.Model):
         store=True,
         help="Auto-set when the partner's country differs from the company country.",
     )
+    x_custom_nitku = fields.Char(
+        string="NITKU",
+        help="Nomor Identitas Tempat Kegiatan Usaha (22 digit): NPWP 16 digit + "
+        "6 digit suffix. Falls back to NPWP + '000000' when left empty.",
+    )
+    x_custom_tin = fields.Char(
+        string="TIN (WP Luar Negeri)",
+        help="Tax Identity Number of a foreign counterparty. Used by the Bupot "
+        "Non-Resident export in place of NPWP.",
+    )
+    x_custom_passport = fields.Char(string="Nomor Passport")
+    x_custom_kitas = fields.Char(string="Nomor KITAP/KITAS")
+    x_custom_birth_place = fields.Char(string="Tempat Lahir")
+    x_custom_birth_date = fields.Date(string="Tanggal Lahir")
+    x_custom_ptkp = fields.Selection(
+        PTKP_SELECTION,
+        string="PTKP",
+        help="Penghasilan Tidak Kena Pajak status. Required by the Bupot PPh 21 export.",
+    )
+
+    @api.depends("x_custom_npwp")
+    def _compute_nitku_display(self):
+        for rec in self:
+            rec.x_custom_nitku_display = rec._custom_coretax_nitku()
+
+    x_custom_nitku_display = fields.Char(
+        string="NITKU (efektif)",
+        compute="_compute_nitku_display",
+        help="The value the Coretax exports will actually emit.",
+    )
+
+    def _custom_coretax_nitku(self):
+        """NITKU as Coretax wants it: explicit value, else NPWP + '000000'.
+
+        DJP treats a taxpayer with no separate tempat kegiatan usaha as having
+        the head-office suffix ``000000``, so deriving it is safe and spares
+        operators from typing the NPWP twice.
+        """
+        self.ensure_one()
+        if self.x_custom_nitku:
+            return self.x_custom_nitku
+        npwp = (self.x_custom_npwp or "").replace(".", "").replace("-", "")
+        if NPWP_16_RE.match(npwp):
+            return npwp + "000000"
+        return ""
 
     @api.depends("x_custom_npwp")
     def _compute_npwp_status(self):
@@ -79,6 +144,14 @@ class ResPartner(models.Model):
         for rec in self:
             if rec.x_custom_nik and not NIK_RE.match(rec.x_custom_nik):
                 raise ValidationError(_("NIK harus 16 digit angka."))
+
+    @api.constrains("x_custom_nitku")
+    def _check_nitku(self):
+        for rec in self:
+            if rec.x_custom_nitku and not NITKU_22_RE.match(rec.x_custom_nitku):
+                raise ValidationError(
+                    _("NITKU harus 22 digit angka (NPWP 16 digit + 6 digit tempat kegiatan usaha).")
+                )
 
     def check_vat_id(self, vat):
         """Relaxed Indonesian NPWP validation for the standard ``vat`` field.

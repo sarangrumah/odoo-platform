@@ -19,6 +19,20 @@
                             <field name="x_custom_foreign_counterparty" readonly="1"/>
                         </group>
                     </group>
+                    <group string="Identitas Coretax">
+                        <group>
+                            <field name="x_custom_nitku" placeholder="22 digit (kosongkan = NPWP + 000000)"/>
+                            <field name="x_custom_nitku_display" readonly="1"/>
+                            <field name="x_custom_ptkp"/>
+                        </group>
+                        <group invisible="not x_custom_foreign_counterparty">
+                            <field name="x_custom_tin" placeholder="Tax Identity Number"/>
+                            <field name="x_custom_passport"/>
+                            <field name="x_custom_kitas"/>
+                            <field name="x_custom_birth_place"/>
+                            <field name="x_custom_birth_date"/>
+                        </group>
+                    </group>
                 </page>
             </xpath>
         </field>
