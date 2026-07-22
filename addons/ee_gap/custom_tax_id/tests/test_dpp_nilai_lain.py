@@ -15,6 +15,11 @@ class TestDppNilaiLain(TaxIdCommon):
             "amount_type": "percent",
             "amount": amount,
             "type_tax_use": "purchase",
+            # Every assertion below reads as "PPN on top of the given base", so
+            # pin tax-excluded rather than inheriting the company default: the
+            # Levi's companies run account_price_include = tax_included, which
+            # would silently reinterpret each base as gross (1,000,000 -> 900,900).
+            "price_include_override": "tax_excluded",
             "x_custom_dpp_method": dpp_method,
             "x_custom_dpp_factor": dpp_factor,
         }

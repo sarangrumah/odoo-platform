@@ -38,6 +38,11 @@ class CustomReportJournalItemAnalysis(models.Model):
     company_id = fields.Many2one("res.company", string="Company", readonly=True)
     move_id = fields.Many2one("account.move", string="Journal Entry", readonly=True)
     parent_state = fields.Char(string="Status", readonly=True)
+    # Analytic dimensions extracted from analytic_distribution (one analytic
+    # account per plan). NULL when the line carries no distribution for that
+    # plan, or the plan does not exist on this database.
+    ou_analytic_id = fields.Many2one("account.analytic.account", string="Operating Unit", readonly=True)
+    employee_analytic_id = fields.Many2one("account.analytic.account", string="Employee", readonly=True)
 
     debit = fields.Float(string="Debit", readonly=True, aggregator="sum")
     credit = fields.Float(string="Credit", readonly=True, aggregator="sum")
@@ -45,6 +50,20 @@ class CustomReportJournalItemAnalysis(models.Model):
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
+        # Pull the analytic account for a named plan out of the JSONB
+        # analytic_distribution. Keys are comma-joined analytic-account ids
+        # (one per plan); we split each key, resolve every id to its plan, and
+        # pick the one whose plan name matches. Plan name is a translated
+        # (JSONB) field, keyed by en_US.
+        analytic_subquery = """
+            (SELECT elem.aid::int
+             FROM jsonb_object_keys(aml.analytic_distribution) AS k(key)
+             CROSS JOIN LATERAL unnest(string_to_array(k.key, ',')) AS elem(aid)
+             JOIN account_analytic_account aaa ON aaa.id = elem.aid::int
+             JOIN account_analytic_plan aap ON aap.id = aaa.plan_id
+             WHERE aap.name ->> 'en_US' = %s
+             LIMIT 1)
+        """
         self.env.cr.execute(
             f"""
             CREATE OR REPLACE VIEW {self._table} AS
@@ -58,11 +77,14 @@ class CustomReportJournalItemAnalysis(models.Model):
                 aml.company_id    AS company_id,
                 aml.move_id       AS move_id,
                 aml.parent_state  AS parent_state,
+                {analytic_subquery} AS ou_analytic_id,
+                {analytic_subquery} AS employee_analytic_id,
                 aml.debit         AS debit,
                 aml.credit        AS credit,
                 aml.balance       AS balance
             FROM account_move_line aml
             JOIN account_account acc ON acc.id = aml.account_id
             WHERE aml.account_id IS NOT NULL
-            """
+            """,
+            ["Operating Unit", "Employee"],
         )

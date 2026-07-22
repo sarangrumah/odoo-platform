@@ -64,10 +64,10 @@ The `custom_wms_to_engine` module implements a rule-driven internal transfer orc
 - **External calls**: None.
 
 ## Gotchas
-- The engine does not run evaluations inline. The `stock.quant.write` override stamps `last_run_at` on **all** active `low_water_mark` rules whenever `quantity` changes — it does not filter by the mutated quant's location or product, so any quantity write dirties every low-water rule.
-- Domain expressions for source/target locations are evaluated at runtime via `safe_eval` (with `__builtins__` stripped). A `_check_domains` constraint requires each to evaluate to a list; `_eval_domain` swallows eval errors and returns `[]`.
-- `data/cron.xml` is currently a placeholder stub (no cron record); the `cron_evaluate_and_materialize` method exists but is not bound to a scheduled action in the repo.
-- `_eval_expiry_approaching` no-ops unless `stock.lot` has an `expiration_date` field and a scrap/inventory location exists.
+- The engine does not run evaluations inline. The `stock.quant.write` override stamps `last_run_at` on the low-water rules whose warehouse and company cover the mutated quants (`_to_rules_to_stamp`); a rule with no warehouse/company is treated as global and always in scope. **An earlier revision stamped *every* active low-water rule on *every* quantity write**, which made the marker useless (all rules always looked dirty) and wrote across the whole rule table on each stock move.
+- Domain expressions for source/target locations are evaluated at runtime via `safe_eval`. A `_check_domains` constraint requires each to evaluate to a list; `_eval_domain` swallows eval errors and returns `[]` — so a malformed domain silently yields no proposals. **Odoo 19's `safe_eval` accepts at most 2 positional arguments**; the calls here pass `(raw, context)` and must stay that way (the sibling `custom_wms_putaway` shipped a 3-positional call that raised `TypeError` and silently disabled every domain-driven rule).
+- `_eval_expiry_approaching` no-ops unless `stock.lot` has an `expiration_date` field. **`stock.location.scrap_location` was removed in Odoo 19** — searching it raised `KeyError` and took the whole rule evaluation down; the scrap destination now resolves as the company's first `usage='inventory'` location, matching `stock.scrap._compute_scrap_location_id`.
+- `data/cron.xml` does bind `cron_evaluate_and_materialize` to a real daily `ir.cron` (anchored on the concrete `custom.transfer.order` model, since `custom.to.engine` is abstract). The cron only *creates* proposed TOs — it never advances or executes them.
 
 ## Out of Scope
 - No external integrations. The module focuses on internal transfer order management within the stock/WMS context.

@@ -34,9 +34,11 @@
                     <group string="Targeting">
                         <field name="target_location_id"/>
                         <field name="target_location_domain"/>
+                        <field name="dock_location_id" invisible="kind != 'nearest_empty'"/>
+                        <field name="product_categ_ids" widget="many2many_tags"/>
                         <field name="product_domain"/>
                         <field name="abc_class"/>
-                        <field name="temperature_zone"/>
+                        <field name="temperature_zone" invisible="kind != 'by_temperature'"/>
                     </group>
                     <group string="Custom Python" invisible="kind != 'custom_python'">
                         <field name="custom_python" nolabel="1"/>

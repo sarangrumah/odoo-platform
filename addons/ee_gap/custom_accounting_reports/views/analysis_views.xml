@@ -38,6 +38,8 @@
                 <field name="account_type" optional="show"/>
                 <field name="journal_id" optional="show"/>
                 <field name="partner_id" optional="show"/>
+                <field name="ou_analytic_id" optional="show"/>
+                <field name="employee_analytic_id" optional="show"/>
                 <field name="debit" sum="Debit"/>
                 <field name="credit" sum="Credit"/>
                 <field name="balance" sum="Balance"/>
@@ -56,6 +58,8 @@
                 <field name="partner_id"/>
                 <field name="journal_id"/>
                 <field name="move_id"/>
+                <field name="ou_analytic_id"/>
+                <field name="employee_analytic_id"/>
                 <filter name="posted" string="Posted"
                         domain="[('parent_state', '=', 'posted')]"/>
                 <filter name="draft" string="Unposted"
@@ -71,6 +75,10 @@
                             context="{'group_by': 'journal_id'}"/>
                     <filter name="g_partner" string="Partner"
                             context="{'group_by': 'partner_id'}"/>
+                    <filter name="g_ou" string="Operating Unit"
+                            context="{'group_by': 'ou_analytic_id'}"/>
+                    <filter name="g_employee" string="Employee"
+                            context="{'group_by': 'employee_analytic_id'}"/>
                     <filter name="g_company" string="Company"
                             context="{'group_by': 'company_id'}"
                             groups="base.group_multi_company"/>

@@ -48,7 +48,8 @@ class TestApplyPicking(TransactionCase):
         )
         self.env["stock.move"].create(
             {
-                "name": product.name,
+                # Odoo 19 removed stock.move.name — passing it raises
+                # ValueError: Invalid field 'name' in 'stock.move'.
                 "product_id": product.id,
                 "product_uom_qty": qty,
                 "product_uom": product.uom_id.id,

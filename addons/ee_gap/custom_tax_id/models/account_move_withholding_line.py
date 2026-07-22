@@ -11,8 +11,30 @@ from __future__ import annotations
 import logging
 
 from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
+
+# Kode Fasilitas, transcribed verbatim from the "List KOP & Kode Fasilitas"
+# sheet of the DJP templates. Codes 1-6 come from the Unifikasi template; code
+# 7 (SKD WPLN) exists only in the Non-Resident template, so the union is kept
+# here and each exporter is responsible for emitting a code its own template
+# accepts. '9' (Tanpa Fasilitas) is the default in practice.
+FASILITAS_SELECTION = [
+    ("1", "1 - SKB PPh Pasal 22"),
+    ("2", "2 - SKB PPh Pasal 23"),
+    ("3", "3 - SKB PPh PHTB"),
+    ("4", "4 - DTP"),
+    ("5", "5 - SKB PPh atas bunga deposito, dana pensiun, tabungan"),
+    ("6", "6 - Suket PP23/PP52"),
+    ("7", "7 - SKD WPLN (hanya Bupot Non-Resident)"),
+    ("8", "8 - Fasilitas Lainnya"),
+    ("9", "9 - Tanpa Fasilitas"),
+]
+# Only the SKD WPLN path is reliably rate-bearing: the treaty rate is the whole
+# point of the claim and DJP rejects it blank. Observed client data fills Tarif
+# Fasilitas on code 9 too, so this is deliberately not enforced elsewhere.
+FASILITAS_NEEDS_TARIF = ("7",)
 
 
 class WithholdingLine(models.Model):
@@ -39,6 +61,42 @@ class WithholdingLine(models.Model):
         ondelete="set null",
         readonly=True,
     )
+
+    fasilitas_insentif = fields.Selection(
+        FASILITAS_SELECTION,
+        string="Fasilitas Insentif",
+        default="9",
+        required=True,
+        help="Kode fasilitas emitted to Coretax. Defaults to 9 (Tanpa Fasilitas).",
+    )
+    nomor_sertifikat_insentif = fields.Char(
+        string="Nomor Sertifikat Insentif",
+        help="SKB / DTP / SKD WPLN certificate number backing the facility claim.",
+    )
+    tarif_fasilitas = fields.Float(
+        string="Tarif Fasilitas",
+        digits=(6, 2),
+        help="Treaty or facility rate. Mandatory when Fasilitas Insentif is 7 or 8.",
+    )
+    norma_penghasilan_neto = fields.Float(
+        string="Norma Penghasilan Neto (%)",
+        digits=(6, 2),
+        default=100.0,
+        help="Deemed-profit percentage. Coretax expects 100 when no norma applies.",
+    )
+
+    @api.constrains("fasilitas_insentif", "tarif_fasilitas", "nomor_sertifikat_insentif")
+    def _check_fasilitas(self):
+        for rec in self:
+            if rec.fasilitas_insentif in FASILITAS_NEEDS_TARIF and not rec.tarif_fasilitas:
+                raise ValidationError(
+                    _(
+                        "Fasilitas Insentif %s mewajibkan Tarif Fasilitas diisi.",
+                        rec.fasilitas_insentif,
+                    )
+                )
+            if rec.fasilitas_insentif == "7" and not rec.nomor_sertifikat_insentif:
+                raise ValidationError(_("Fasilitas 7 (SKD WPLN) mewajibkan Nomor Sertifikat Insentif diisi."))
 
     @api.model_create_multi
     def create(self, vals_list):

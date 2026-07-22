@@ -56,13 +56,14 @@ class WmsPutawayStrategy(models.Model):
     rule_count = fields.Integer(compute="_compute_rule_count")
     suggestion_count = fields.Integer(compute="_compute_suggestion_count")
 
-    _sql_constraints = [
-        (
-            "uniq_active_strategy_warehouse",
-            "EXCLUDE (warehouse_id WITH =) WHERE (active)",
-            "Only one active putaway strategy is allowed per warehouse.",
-        ),
-    ]
+    # Odoo 19 SILENTLY IGNORES ``_sql_constraints`` — it logs a warning and
+    # creates nothing. The declaration below is the supported form and does
+    # reach PostgreSQL. (Verify with: select conname from pg_constraint where
+    # conname like '%active_strategy%';)
+    _uniq_active_strategy_warehouse = models.Constraint(
+        "EXCLUDE (warehouse_id WITH =) WHERE (active)",
+        "Only one active putaway strategy is allowed per warehouse.",
+    )
 
     @api.depends("rule_ids")
     def _compute_rule_count(self):
@@ -116,23 +117,29 @@ class WmsPutawayStrategy(models.Model):
         self.ensure_one()
         if not move_line or not move_line.product_id:
             return False
+        engine = self.env["custom.putaway.engine"]
         active_rules = self.rule_ids.filtered(lambda r: r.active).sorted(key=lambda r: (r.tier, r.sequence))
-        best = None
+
+        best_rule = None
         best_score = -1
+        best_reason = ""
+        best_location = None
         for rule in active_rules:
-            score, reason = rule._evaluate(move_line)
+            # Strict tier ordering: once a tier has produced a winner, a rule
+            # from a later (numerically higher) tier can never displace it.
+            if best_rule is not None and rule.tier > best_rule.tier:
+                break
+            score, reason, chosen = rule._evaluate(move_line)
             if score <= 0:
                 continue
-            if best is None or rule.tier < best.tier or (rule.tier == best.tier and score > best_score):
-                best = rule
-                best_score = score
-                best_reason = reason
-                # Strict tier ordering: once we have a hit we still allow
-                # higher scores within the same tier, but stop scanning when
-                # the tier rolls over and we already have a match.
-            elif best is not None and rule.tier > best.tier:
-                break
-        if not best:
+            location = chosen or rule.target_location_id
+            if location:
+                location = engine._feasible_locations(location, move_line)
+            if not location:
+                continue
+            if score > best_score:
+                best_rule, best_score, best_reason, best_location = rule, score, reason, location[:1]
+        if not best_rule or not best_location:
             return False
         Suggestion = self.env["custom.wms.putaway.suggestion"]
         suggestion = Suggestion.create(
@@ -140,12 +147,12 @@ class WmsPutawayStrategy(models.Model):
                 "picking_id": move_line.picking_id.id,
                 "move_line_id": move_line.id,
                 "original_dest_location_id": move_line.location_dest_id.id,
-                "suggested_location_id": best.target_location_id.id,
-                "rule_id": best.id,
+                "suggested_location_id": best_location.id,
+                "rule_id": best_rule.id,
                 "score": best_score,
                 "reason": best_reason,
             }
         )
-        if self.auto_apply_suggestions:
+        if self.auto_apply_suggestions or best_score >= engine._auto_apply_threshold():
             suggestion.action_apply()
         return suggestion

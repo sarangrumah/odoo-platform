@@ -10,6 +10,13 @@
                 <group string="Intercompany" name="intercompany_info">
                     <field name="x_custom_ic_enabled"/>
                 </group>
+                <group string="Lock Dates" name="accounting_lock_dates"
+                       groups="account.group_account_manager">
+                    <field name="fiscalyear_lock_date"/>
+                    <field name="tax_lock_date"/>
+                    <field name="sale_lock_date"/>
+                    <field name="purchase_lock_date"/>
+                </group>
             </xpath>
         </field>
     </record>

@@ -27,6 +27,9 @@ Installed automatically by `00_create_db.sh`.
 | **`custom_wms_putaway`** | `addons/ee_gap` | **ZWME001-style 6-tier putaway** engine (storage type/section search, volume/ABC/nearest-empty) |
 | **`custom_wms_cycle_count`** | `addons/ee_gap` | **Stock Opname** (PID): plan-driven counting, scan count, New Item / New Remark, variance approval |
 | **`custom_wms_to_engine`** | `addons/ee_gap` | **Bin-to-Bin** transfer orders (auto TO + confirm, low-water-mark replenishment) |
+| **`custom_wms_inbound_qc`** | `addons/ee_gap` | **Inbound quarantine**: QC gate on receipts, inbound stock excluded from outbound reservation, unknown-item registration |
+| **`custom_wms_docs`** | `addons/ee_gap` | **Picking List / Packing List / Barcode List / Price Tag** reports + label wizard (Code128 / QR / DataMatrix) |
+| **`custom_wms_integration`** | `addons/ee_gap` | **Host integration** (SAP): `/api/wms/*` inbound REST (ASN, DO, stock, ack) + outbound event outbox |
 | `custom_hht_bridge` | `addons/core` | Physical handheld (Zebra/Honeywell) bridge + PWA shell |
 | `custom_receipt_async` | `addons/ee_gap` | Background validate for large receipts (avoids handheld timeout) |
 
@@ -45,11 +48,19 @@ bash scripts/tenants/wms_demo/00_create_db.sh            # db = demo_wms
 # 1. Seed + configure (run in order)
 ODOO=odoo19-platform-odoo-mgmt
 for f in 10_seed_warehouse 20_seed_products 30_seed_inbound \
-         40_seed_outbound 50_config_wms 99_verify; do
+         40_seed_outbound 50_config_wms 51_config_native_slotting 99_verify; do
   docker exec -i $ODOO odoo shell -d demo_wms --no-http \
       < scripts/tenants/wms_demo/$f.py
 done
 ```
+
+`51_config_native_slotting.py` is what makes the slotting engine actually decide
+anything. It fills in the **native** Odoo 19 records the engine reasons about —
+`stock.package.type` (PxLxT + tare + max weight), `stock.storage.category`
+(+ per-package-type capacity), `stock.putaway.rule` (category routing, per
+company), and FEFO removal strategies — then layers on bin geometry, walk order,
+category reservation, and the inbound quarantine / QC gate. Without it those
+tables are empty and every dimension- or weight-driven rule scores nothing.
 
 `99_verify.py` prints a readiness summary (warehouse, bins, products, PO/SO
 states, putaway strategy, cycle-count session, TO rules, on-hand quants).

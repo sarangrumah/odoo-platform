@@ -1,5 +1,6 @@
 from . import res_company
 from . import sale_order
+from . import sale_order_line
 from . import account_move
 from . import account_payment_term
 from . import custom_report_profit_loss_show

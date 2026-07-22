@@ -10,6 +10,29 @@ from odoo import Command, _, api, fields, models
 _logger = logging.getLogger(__name__)
 
 
+class AccountMoveLine(models.Model):
+    _inherit = "account.move.line"
+
+    x_custom_withholding_category_id = fields.Many2one(
+        "tax.withholding.category",
+        string="Kode Objek PPh",
+        help="Kode objek pajak (bupot) yang dipotong atas baris ini. "
+        "Kosongkan bila baris ini tidak dipotong PPh. "
+        "Terisi otomatis dari master produk bila produknya sudah dipetakan.",
+    )
+
+    @api.onchange("product_id")
+    def _onchange_product_id_withholding_category(self):
+        """Default the object code from the product's mapping, if any.
+
+        Only fills a blank — never overwrites what the operator already picked.
+        """
+        for line in self:
+            if line.x_custom_withholding_category_id:
+                continue
+            line.x_custom_withholding_category_id = line.product_id.x_custom_withholding_category_id
+
+
 class AccountMove(models.Model):
     _inherit = "account.move"
 

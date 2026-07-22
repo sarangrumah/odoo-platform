@@ -12,6 +12,10 @@
                 <field name="base_amount"/>
                 <field name="tarif"/>
                 <field name="tax_amount"/>
+                <field name="fasilitas_insentif"/>
+                <field name="nomor_sertifikat_insentif" optional="hide"/>
+                <field name="tarif_fasilitas" optional="hide"/>
+                <field name="norma_penghasilan_neto" optional="hide"/>
                 <field name="bupot_id"/>
                 <field name="currency_id" invisible="1"/>
             </list>
