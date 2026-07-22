@@ -8,6 +8,8 @@
             <xpath expr="//page[@name='inventory']" position="inside">
                 <group string="Putaway / Velocity">
                     <field name="abc_class"/>
+                    <field name="wms_package_type_id"/>
+                    <field name="wms_units_per_package"/>
                 </group>
             </xpath>
         </field>

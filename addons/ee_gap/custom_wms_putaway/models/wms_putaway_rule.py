@@ -20,6 +20,8 @@ _STRATEGY_KINDS = [
     ("nearest_empty", "Nearest Empty"),
     ("zone_round_robin", "Zone Round-Robin"),
     ("by_volume", "By Volume Fit"),
+    ("by_dimension", "By Dimension Fit (PxLxT)"),
+    ("by_weight", "By Weight Headroom"),
     ("by_temperature", "By Temperature"),
     ("by_abc_velocity", "By ABC Velocity"),
     ("custom_python", "Custom Python (safe_eval)"),
@@ -74,6 +76,29 @@ class WmsPutawayRule(models.Model):
     temperature_zone = fields.Selection(
         [("ambient", "Ambient"), ("chilled", "Chilled"), ("frozen", "Frozen")],
     )
+    product_categ_ids = fields.Many2many(
+        "product.category",
+        "custom_wms_putaway_rule_categ_rel",
+        "rule_id",
+        "categ_id",
+        string="Product Categories",
+        help="Declarative alternative to Product Domain: the rule applies only "
+        "to these categories and their children. Cheaper and safer than a "
+        "safe_eval domain string.",
+    )
+    dock_location_id = fields.Many2one(
+        "stock.location",
+        string="Dock / Origin",
+        check_company=True,
+        help="Reference point for 'nearest empty' distance scoring. Defaults to "
+        "the move line's source location when unset.",
+    )
+    round_robin_cursor = fields.Integer(
+        default=0,
+        copy=False,
+        readonly=True,
+        help="Internal rotation counter for the zone round-robin kind.",
+    )
 
     # Custom python expression (safe_eval) --------------------------------
     custom_python = fields.Text(
@@ -100,7 +125,11 @@ class WmsPutawayRule(models.Model):
         if not raw:
             return []
         try:
-            value = safe_eval(raw, {"__builtins__": {}}, {})
+            # Odoo 19 signature: safe_eval(expr, /, context=None, *, mode, filename).
+            # Passing a third positional (the old `locals_dict`) raises TypeError,
+            # which _score_rule used to swallow — every domain-driven rule scored
+            # 0 and no one noticed. Do not "restore" the old call shape.
+            value = safe_eval(raw)
         except Exception as exc:
             raise ValidationError(_("Invalid domain expression: %s") % exc) from exc
         if not isinstance(value, list):
@@ -110,6 +139,12 @@ class WmsPutawayRule(models.Model):
     # -- engine helpers ---------------------------------------------------
 
     def _candidate_locations(self):
+        """Internal bins this rule may target, before the engine's hard gate.
+
+        Note this deliberately does NOT apply capacity / category feasibility —
+        that lives in ``custom.putaway.engine._feasible_locations`` so every
+        scoring kind gets the same treatment and the rule stays a pure filter.
+        """
         self.ensure_one()
         Location = self.env["stock.location"]
         domain = [("usage", "=", "internal")]
@@ -118,20 +153,42 @@ class WmsPutawayRule(models.Model):
         domain += self._eval_domain(self.target_location_domain)
         return Location.search(domain)
 
+    def _dock_location(self):
+        """Origin used for distance scoring; empty recordset when unset."""
+        self.ensure_one()
+        return self.dock_location_id
+
+    def _next_round_robin_index(self, length: int) -> int:
+        """Advance and return the rotation cursor, wrapped to ``length``.
+
+        Written with ``sudo()`` because operators scanning at the handheld are
+        not expected to hold write access on putaway configuration.
+        """
+        self.ensure_one()
+        if length <= 0:
+            return 0
+        cursor = (self.round_robin_cursor or 0) % length
+        self.sudo().round_robin_cursor = (cursor + 1) % length
+        return cursor
+
     def _matches_product(self, product) -> bool:
         self.ensure_one()
         if self.abc_class and getattr(product, "abc_class", False) != self.abc_class:
             return False
+        if self.product_categ_ids:
+            tree = self.env["product.category"].search([("id", "child_of", self.product_categ_ids.ids)])
+            if product.categ_id.id not in tree.ids:
+                return False
         if self.product_domain:
             dom = self._eval_domain(self.product_domain)
             return bool(self.env["product.product"].search_count([("id", "=", product.id)] + dom))
         return True
 
     def _evaluate(self, move_line):
-        """Return (score:int 0..100, reason:str). 0 means no match."""
+        """Return ``(score:int 0..100, reason:str, location|None)``. 0 = no match."""
         self.ensure_one()
         product = move_line.product_id
         if not self._matches_product(product):
-            return 0, ""
+            return 0, "", None
         engine = self.env["custom.putaway.engine"]
         return engine._score_rule(self, move_line)

@@ -311,8 +311,18 @@ class CustomBarcodeScanSession(models.Model):
                             }
                         )
 
+                # Odoo renamed stock.move.line.qty_done -> quantity (and
+                # reserved_uom_qty -> quantity_product_uom). Resolve the names
+                # ONCE here; hardcoding qty_done below raised
+                # "Invalid field 'qty_done' in 'stock.move.line'" on 19.
+                ml_fields = MoveLine._fields
+                qty_field = "qty_done" if "qty_done" in ml_fields else "quantity"
+                demand_field = (
+                    "reserved_uom_qty" if "reserved_uom_qty" in ml_fields else "quantity_product_uom"
+                )
+
                 # Find a candidate move.line: same product, same picking, no lot
-                # mismatch.  Prefer lines whose qty_done < reserved/qty.
+                # mismatch.  Prefer lines still short of their demand.
                 ml_domain = [
                     ("picking_id", "=", picking.id),
                     ("product_id", "=", line.product_id.id),
@@ -323,7 +333,7 @@ class CustomBarcodeScanSession(models.Model):
                 candidates = MoveLine.search(ml_domain)
                 # Preference: lines still short of expected qty.
                 candidates = candidates.sorted(
-                    key=lambda m: (m.qty_done or 0.0) - (m.quantity or m.reserved_uom_qty or 0.0)
+                    key=lambda m: (m[qty_field] or 0.0) - (m[demand_field] or 0.0)
                 )
                 ml = candidates[:1]
 
@@ -342,16 +352,14 @@ class CustomBarcodeScanSession(models.Model):
                             "location_id": move.location_id.id,
                             "location_dest_id": move.location_dest_id.id,
                             "lot_id": lot_rec.id if lot_rec else False,
-                            "qty_done": 0.0,
+                            qty_field: 0.0,
                             "company_id": picking.company_id.id,
                         }
                     )
                     created_move_lines += 1
 
                 ml = ml[:1]
-                # Update qty_done; field name differs across Odoo versions.
-                qty_field = "qty_done" if "qty_done" in ml._fields else "quantity"
-                current = getattr(ml, qty_field) or 0.0
+                current = ml[qty_field] or 0.0
                 ml[qty_field] = current + (line.quantity or 0.0)
                 if lot_rec and not ml.lot_id:
                     ml.lot_id = lot_rec.id

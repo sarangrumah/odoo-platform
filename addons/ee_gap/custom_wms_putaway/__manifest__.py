@@ -18,7 +18,7 @@ Generic by design — no warehouse-vertical assumptions.
 """,
     "author": "Custom Platform",
     "category": "Inventory/Warehouse",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -32,6 +32,7 @@ Generic by design — no warehouse-vertical assumptions.
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/ir_sequence_data.xml",
+        "data/ir_config_parameter_data.xml",
         "views/putaway_strategy_views.xml",
         "views/putaway_rule_views.xml",
         "views/putaway_proposal_views.xml",

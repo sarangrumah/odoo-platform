@@ -95,9 +95,14 @@ class ToEngine(models.AbstractModel):
             return []
         window = max(0, rule.expiry_days_ahead or 7)
         cutoff = fields.Datetime.now() + timedelta(days=window)
-        scrap = Loc.search([("scrap_location", "=", True)], limit=1)
-        if not scrap:
-            scrap = Loc.search([("usage", "=", "inventory")], limit=1)
+        # Odoo 19 removed stock.location.scrap_location; core now resolves the
+        # scrap destination as the company's first usage='inventory' location
+        # (see stock.scrap._compute_scrap_location_id). Searching the old field
+        # raises KeyError and takes the whole rule evaluation down with it.
+        scrap_domain = [("usage", "=", "inventory")]
+        if rule.company_id:
+            scrap_domain.append(("company_id", "in", (False, rule.company_id.id)))
+        scrap = Loc.search(scrap_domain, order="id", limit=1)
         if not scrap:
             return []
         src_dom = rule._eval_domain(rule.source_location_domain)
