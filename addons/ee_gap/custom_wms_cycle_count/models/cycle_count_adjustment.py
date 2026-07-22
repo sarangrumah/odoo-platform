@@ -38,16 +38,51 @@ class CycleCountAdjustment(models.Model):
                 rec.posted = True
                 continue
             src, dst = (line.location_id, inv_loc) if qty < 0 else (inv_loc, line.location_id)
+            company = warehouse.company_id or self.env.company
+            label = _("Cycle count adjustment %s") % line.session_id.name
+            # Built to match how core books an inventory adjustment
+            # (stock.quant._get_inventory_move_values): is_inventory + a ready
+            # move line + picked, so _action_done actually moves the stock.
+            #
+            # Two Odoo 19 traps here:
+            #   * stock.move.name was removed — passing it raises
+            #     ValueError: Invalid field 'name' in 'stock.move'.
+            #   * reference is compute+store with NO inverse, so writing it is
+            #     silently discarded. The label reaches it through
+            #     inventory_name, which _compute_reference reads for inventory
+            #     moves.
             move = self.env["stock.move"].create(
                 {
-                    "name": _("Cycle count adjustment %s") % line.session_id.name,
+                    "is_inventory": True,
+                    "inventory_name": label,
                     "product_id": line.product_id.id,
                     "product_uom": line.product_id.uom_id.id,
                     "product_uom_qty": abs(qty),
                     "location_id": src.id,
                     "location_dest_id": dst.id,
-                    "company_id": (warehouse.company_id or self.env.company).id,
+                    "company_id": company.id,
+                    "state": "confirmed",
+                    "picked": True,
+                    "move_line_ids": [
+                        (
+                            0,
+                            0,
+                            {
+                                "product_id": line.product_id.id,
+                                "product_uom_id": line.product_id.uom_id.id,
+                                "quantity": abs(qty),
+                                "location_id": src.id,
+                                "location_dest_id": dst.id,
+                                "company_id": company.id,
+                                "lot_id": line.lot_id.id if line.lot_id else False,
+                            },
+                        )
+                    ],
                 }
             )
+            # Without this the move stays in draft: `posted` would read True
+            # while the variance was never reconciled — a silent no-op is worse
+            # than the crash this replaced.
+            move._action_done()
             rec.stock_move_id = move.id
             rec.posted = True

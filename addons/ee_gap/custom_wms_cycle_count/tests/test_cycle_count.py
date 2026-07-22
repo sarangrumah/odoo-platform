@@ -104,3 +104,52 @@ class TestCycleCount(TransactionCase):
         )
         self.assertTrue(line.is_new_item)
         self.assertEqual(line.new_item_product_temp_name, "MysteryBox-2099")
+
+    def test_adjustment_post_actually_moves_stock(self):
+        """Posting a variance must reconcile the ledger, not just flip a flag.
+
+        Two regressions guarded here:
+          * Odoo 19 removed ``stock.move.name`` — creating the move with it
+            raised ValueError and every adjustment failed to post.
+          * The replacement created the move but never completed it, so
+            ``posted`` read True while on-hand was untouched — a silent no-op,
+            which is worse than the crash it replaced.
+        """
+        sup_group = self.env.ref("custom_wms_cycle_count.group_cycle_count_supervisor")
+        self.env.user.group_ids = [(4, sup_group.id)]
+
+        session = self._start_session()
+        line = session.line_ids.filtered(lambda l: l.product_id == self.product)[:1]
+        self.assertTrue(line, "the probe product must be in the session")
+        self.assertEqual(line.expected_qty, 20.0)
+
+        line.action_count(14.0)  # 20 on hand, counted 14 -> variance -6
+        line.action_approve()
+
+        adjustment = self.env["custom.cycle.count.adjustment"].search([("line_id", "=", line.id)], limit=1)
+        self.assertTrue(adjustment, "approving a non-zero variance must create an adjustment")
+        adjustment.action_post()
+
+        self.assertTrue(adjustment.posted)
+        self.assertEqual(adjustment.stock_move_id.state, "done", "the move must be completed, not left draft")
+        self.assertIn(session.name, adjustment.stock_move_id.reference or "")
+
+        on_hand = sum(
+            self.env["stock.quant"]
+            .search([("location_id", "=", self.loc.id), ("product_id", "=", self.product.id)])
+            .mapped("quantity")
+        )
+        self.assertEqual(on_hand, 14.0, "on-hand must match the counted quantity after posting")
+
+    def test_adjustment_post_is_idempotent(self):
+        sup_group = self.env.ref("custom_wms_cycle_count.group_cycle_count_supervisor")
+        self.env.user.group_ids = [(4, sup_group.id)]
+        session = self._start_session()
+        line = session.line_ids.filtered(lambda l: l.product_id == self.product)[:1]
+        line.action_count(18.0)
+        line.action_approve()
+        adjustment = self.env["custom.cycle.count.adjustment"].search([("line_id", "=", line.id)], limit=1)
+        adjustment.action_post()
+        move = adjustment.stock_move_id
+        adjustment.action_post()  # second call must be a no-op
+        self.assertEqual(adjustment.stock_move_id, move, "re-posting must not create a second move")
