@@ -60,6 +60,12 @@ Plan-driven perpetual-inventory / **cycle counting** with a session→line→adj
 - **`variance_value` uses `product.standard_price`** at compute time — historical cost is not captured; reprice on close will retroactively change session value.
 - **`is_new_item` lines block close** unless explicitly set to `skipped`/`approved`.
 - **Adjustment auto-finds inventory location** via `env.ref('stock.location_inventory')` falling back to any `usage='inventory'` — if neither exists, `action_post` raises `UserError`.
+- **`action_post` must build a real inventory move, and three Odoo 19 details make that easy to get wrong** (all fixed 22-Jul-2026):
+  1. **`stock.move.name` was removed.** Passing it raises `ValueError: Invalid field 'name' in 'stock.move'` — *every* cycle-count adjustment failed to post on 19.
+  2. **`reference` is `compute=..., store=True` with no inverse**, so writing it is silently discarded. The label reaches it via **`inventory_name`**, which `_compute_reference` reads when `is_inventory` is set.
+  3. **A created move stays in `draft`.** An earlier fix created the move and stopped there, so `posted` read True while on-hand was untouched — the variance was never reconciled. The move now mirrors `stock.quant._get_inventory_move_values` (`is_inventory`, `state='confirmed'`, `picked=True`, a ready `move_line_ids` entry) and is completed with `_action_done()`.
+
+  `test_adjustment_post_actually_moves_stock` asserts the move reaches `done` **and** that on-hand equals the counted quantity — assert the ledger, not the `posted` flag.
 - **No reservation handling** — counting an item with pending pickings doesn't unreserve them; variance posting can collide with outstanding moves.
 - **Wizard `custom.cycle.count.start.wizard.action_start()` is referenced by the cron** but the sampling algorithm lives in the wizard module file (not shown here); ABC/random/by_zone/by_value/last_counted distinctions are implemented there.
 - **`adhoc` frequency is excluded from the cron** — must be triggered manually via the start wizard.
