@@ -109,9 +109,7 @@ class TestWmsDocs(TransactionCase):
     def test_pick_lines_walk_order(self):
         lines = self.picking._wms_pick_lines()
         self.assertTrue(lines, "action_assign should have produced move lines")
-        keys = [
-            (ml.location_id.complete_name, ml.product_id.default_code) for ml in lines
-        ]
+        keys = [(ml.location_id.complete_name, ml.product_id.default_code) for ml in lines]
         self.assertEqual(keys, sorted(keys), "walk path must be location then product code")
         # BIN-A01 comes before BIN-B02, and inside BIN-A01 DOC-A before DOC-Z.
         codes = [ml.product_id.default_code for ml in lines]
@@ -155,9 +153,7 @@ class TestWmsDocs(TransactionCase):
         self.assertAlmostEqual(totals["gross_weight"], 11.5, places=3)
 
     def test_barcode_rows(self):
-        self.picking.move_line_ids.filtered(
-            lambda ml: ml.product_id == self.p_b
-        ).result_package_id = self.package
+        self.picking.move_line_ids.filtered(lambda ml: ml.product_id == self.p_b).result_package_id = self.package
         rows = self.picking._wms_barcode_rows()
         values = [r["value"] for r in rows]
         self.assertIn("PACK-DOCS-0001", values)
@@ -215,9 +211,7 @@ class TestWmsDocs(TransactionCase):
     # 4. Templates render
     # ------------------------------------------------------------------
     def test_reports_render(self):
-        self.picking.move_line_ids.filtered(
-            lambda ml: ml.product_id == self.p_b
-        ).result_package_id = self.package
+        self.picking.move_line_ids.filtered(lambda ml: ml.product_id == self.p_b).result_package_id = self.package
         Report = self.env["ir.actions.report"]
         for xmlid in (
             "custom_wms_docs.report_wms_picking_list",

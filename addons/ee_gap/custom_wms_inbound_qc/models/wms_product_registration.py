@@ -28,9 +28,7 @@ class WmsProductRegistration(models.Model):
 
     name = fields.Char(required=True, copy=False, readonly=True, default=lambda s: _("New"))
     state = fields.Selection(STATES, default="draft", tracking=True, index=True)
-    company_id = fields.Many2one(
-        "res.company", required=True, default=lambda self: self.env.company, index=True
-    )
+    company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company, index=True)
 
     # -- what was scanned --------------------------------------------------
     barcode = fields.Char(required=True, index=True, tracking=True)

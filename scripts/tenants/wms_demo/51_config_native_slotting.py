@@ -145,9 +145,7 @@ else:
             if existing:
                 existing.quantity = qty
             else:
-                Capacity.create(
-                    {"storage_category_id": rec.id, "package_type_id": ptype.id, "quantity": qty}
-                )
+                Capacity.create({"storage_category_id": rec.id, "package_type_id": ptype.id, "quantity": qty})
         storage_cats[name] = rec
     log("storage categories: %s" % ", ".join(storage_cats))
 
@@ -277,10 +275,7 @@ else:
     for categ in (cat_foot, cat_appa):
         if categ:
             categ.removal_strategy_id = removal("fefo").id
-    log(
-        "removal strategy: %s=fifo, Footwear/Apparel=fefo"
-        % (cat_root.display_name if cat_root else "root")
-    )
+    log("removal strategy: %s=fifo, Footwear/Apparel=fefo" % (cat_root.display_name if cat_root else "root"))
 
     # ==================================================================
     # 8. Default handling unit per product, so the engine can compute PxLxT
@@ -296,9 +291,7 @@ else:
         if not categ:
             continue
         products = env["product.template"].search([("categ_id", "child_of", categ.id)])
-        products.write(
-            {"wms_package_type_id": pkg_types[pkg_name].id, "wms_units_per_package": per_hu}
-        )
+        products.write({"wms_package_type_id": pkg_types[pkg_name].id, "wms_units_per_package": per_hu})
         touched += len(products)
     log("default handling unit set on %d product templates" % touched)
 

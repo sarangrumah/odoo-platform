@@ -317,9 +317,7 @@ class CustomBarcodeScanSession(models.Model):
                 # "Invalid field 'qty_done' in 'stock.move.line'" on 19.
                 ml_fields = MoveLine._fields
                 qty_field = "qty_done" if "qty_done" in ml_fields else "quantity"
-                demand_field = (
-                    "reserved_uom_qty" if "reserved_uom_qty" in ml_fields else "quantity_product_uom"
-                )
+                demand_field = "reserved_uom_qty" if "reserved_uom_qty" in ml_fields else "quantity_product_uom"
 
                 # Find a candidate move.line: same product, same picking, no lot
                 # mismatch.  Prefer lines still short of their demand.
@@ -332,9 +330,7 @@ class CustomBarcodeScanSession(models.Model):
 
                 candidates = MoveLine.search(ml_domain)
                 # Preference: lines still short of expected qty.
-                candidates = candidates.sorted(
-                    key=lambda m: (m[qty_field] or 0.0) - (m[demand_field] or 0.0)
-                )
+                candidates = candidates.sorted(key=lambda m: (m[qty_field] or 0.0) - (m[demand_field] or 0.0))
                 ml = candidates[:1]
 
                 if not ml:

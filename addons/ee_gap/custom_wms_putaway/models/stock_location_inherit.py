@@ -76,8 +76,7 @@ class StockLocation(models.Model):
         "location_id",
         "categ_id",
         string="Reserved for Categories",
-        help="If set, only products in these categories (or their children) "
-        "may be slotted here by the putaway engine.",
+        help="If set, only products in these categories (or their children) may be slotted here by the putaway engine.",
     )
     wms_enforce_categ = fields.Boolean(
         string="Enforce Category Reservation",
@@ -121,8 +120,7 @@ class StockLocation(models.Model):
             ):
                 if (rec[fname] or 0.0) < 0.0:
                     raise ValidationError(
-                        _("Location %(loc)s: %(label)s cannot be negative.")
-                        % {"loc": rec.display_name, "label": label}
+                        _("Location %(loc)s: %(label)s cannot be negative.") % {"loc": rec.display_name, "label": label}
                     )
 
     # ------------------------------------------------------------------

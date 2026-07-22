@@ -43,12 +43,8 @@ class ProductProduct(models.Model):
     _inherit = "product.product"
 
     abc_class = fields.Selection(related="product_tmpl_id.abc_class", store=True, readonly=False)
-    wms_package_type_id = fields.Many2one(
-        related="product_tmpl_id.wms_package_type_id", store=True, readonly=False
-    )
-    wms_units_per_package = fields.Float(
-        related="product_tmpl_id.wms_units_per_package", store=True, readonly=False
-    )
+    wms_package_type_id = fields.Many2one(related="product_tmpl_id.wms_package_type_id", store=True, readonly=False)
+    wms_units_per_package = fields.Float(related="product_tmpl_id.wms_units_per_package", store=True, readonly=False)
 
     # ------------------------------------------------------------------
     # Handling-unit resolution

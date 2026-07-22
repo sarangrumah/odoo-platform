@@ -151,10 +151,14 @@ class StockPicking(models.Model):
         self.ensure_one()
         package_type = package.package_type_id
         dims = (
-            package_type.packaging_length or 0.0,
-            package_type.width or 0.0,
-            package_type.height or 0.0,
-        ) if package_type else (0.0, 0.0, 0.0)
+            (
+                package_type.packaging_length or 0.0,
+                package_type.width or 0.0,
+                package_type.height or 0.0,
+            )
+            if package_type
+            else (0.0, 0.0, 0.0)
+        )
         net_weight = 0.0
         for line in lines:
             weight = getattr(line.product_id, "weight", 0.0) or 0.0

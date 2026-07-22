@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -35,9 +35,7 @@ class TestInboundQc(TransactionCase):
         cls.free_bin = cls.env["stock.location"].create(
             {"name": "FREE-01", "usage": "internal", "location_id": cls.stock_loc.id}
         )
-        cls.product = cls.env["product.product"].create(
-            {"name": "QC Widget", "type": "consu", "is_storable": True}
-        )
+        cls.product = cls.env["product.product"].create({"name": "QC Widget", "type": "consu", "is_storable": True})
 
     # ------------------------------------------------------------------
     # Requirement 6 — quarantined stock is not reservable for outbound
@@ -142,9 +140,7 @@ class TestInboundQc(TransactionCase):
         release = picking.wms_qc_release_picking_id
         self.assertTrue(release, "passing QC must create the release transfer")
         self.assertEqual(release.picking_type_id.code, "internal")
-        self.assertEqual(
-            release.move_ids.location_dest_id, self.stock_loc, "goods must land in pickable stock"
-        )
+        self.assertEqual(release.move_ids.location_dest_id, self.stock_loc, "goods must land in pickable stock")
         self.assertEqual(release.state, "assigned", "release must reserve out of quarantine")
 
     def test_pending_receipt_is_not_a_putaway_event(self):
@@ -211,9 +207,7 @@ class TestInboundQc(TransactionCase):
         picking.action_wms_qc_fail()
         self.assertEqual(picking.wms_qc_state, "failed")
         self.assertFalse(picking.wms_qc_release_picking_id)
-        available = self.env["stock.quant"]._get_available_quantity(
-            self.product, self.warehouse.view_location_id
-        )
+        available = self.env["stock.quant"]._get_available_quantity(self.product, self.warehouse.view_location_id)
         self.assertEqual(available, 0.0)
 
     # ------------------------------------------------------------------

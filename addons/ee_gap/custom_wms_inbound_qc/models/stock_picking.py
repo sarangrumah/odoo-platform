@@ -38,8 +38,7 @@ class StockPickingType(models.Model):
     wms_qc_required = fields.Boolean(
         string="Require Inbound QC",
         default=False,
-        help="Receipts of this type land in the QC area and must be inspected "
-        "before the goods become pickable.",
+        help="Receipts of this type land in the QC area and must be inspected before the goods become pickable.",
     )
     wms_qc_location_id = fields.Many2one(
         "stock.location",
@@ -132,8 +131,7 @@ class StockPicking(models.Model):
                 )
             if pick.state != "done":
                 raise UserError(
-                    _("Validate the receipt %s before passing QC — there is nothing in quarantine yet.")
-                    % pick.name
+                    _("Validate the receipt %s before passing QC — there is nothing in quarantine yet.") % pick.name
                 )
             pick.write(
                 {
@@ -150,9 +148,7 @@ class StockPicking(models.Model):
                     message_type="comment",
                 )
             else:
-                pick.message_post(
-                    body=_("QC passed. No release transfer was needed."), message_type="comment"
-                )
+                pick.message_post(body=_("QC passed. No release transfer was needed."), message_type="comment")
         return True
 
     def action_wms_qc_fail(self):
@@ -220,9 +216,7 @@ class StockPicking(models.Model):
         double the goods, so the route's own picking is adopted instead.
         """
         self.ensure_one()
-        chained = self.move_ids.move_dest_ids.filtered(
-            lambda m: m.state not in ("done", "cancel") and m.picking_id
-        )
+        chained = self.move_ids.move_dest_ids.filtered(lambda m: m.state not in ("done", "cancel") and m.picking_id)
         return chained.picking_id.filtered(lambda p: p.picking_type_id.code == "internal")
 
     def _wms_create_release_transfer(self):
@@ -292,8 +286,10 @@ class StockPicking(models.Model):
             if pick.picking_type_id.code != "outgoing":
                 continue
             failed = pick.move_line_ids.filtered(
-                lambda ml: ml.location_id.wms_block_reservation
-                or ml.location_id.id in set(self.env["stock.location"]._wms_blocked_location_ids())
+                lambda ml: (
+                    ml.location_id.wms_block_reservation
+                    or ml.location_id.id in set(self.env["stock.location"]._wms_blocked_location_ids())
+                )
             )
             if failed:
                 raise UserError(
@@ -321,10 +317,12 @@ class StockMove(models.Model):
         # explicit flag the second leg of a two-step receipt would reserve the
         # goods the moment they land, and the gate would be decorative.
         release = self.filtered(
-            lambda m: m.picking_type_id.code == "internal"
-            and m.picking_id.wms_qc_release_ok
-            and m.location_id.id in blocked
-            and m.location_dest_id.id not in blocked
+            lambda m: (
+                m.picking_type_id.code == "internal"
+                and m.picking_id.wms_qc_release_ok
+                and m.location_id.id in blocked
+                and m.location_dest_id.id not in blocked
+            )
         )
         rest = self - release
         res = None

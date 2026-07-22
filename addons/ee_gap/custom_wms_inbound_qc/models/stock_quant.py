@@ -25,9 +25,7 @@ class StockQuant(models.Model):
     _inherit = "stock.quant"
 
     @api.model
-    def _get_gather_domain(
-        self, product_id, location_id, lot_id=None, package_id=None, owner_id=None, strict=False
-    ):
+    def _get_gather_domain(self, product_id, location_id, lot_id=None, package_id=None, owner_id=None, strict=False):
         domain = super()._get_gather_domain(
             product_id, location_id, lot_id=lot_id, package_id=package_id, owner_id=owner_id, strict=strict
         )

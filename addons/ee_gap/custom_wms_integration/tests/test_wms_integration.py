@@ -227,9 +227,9 @@ class TestWmsIntegration(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_drain_without_adapter_config_is_a_noop(self):
-        self.env["custom.adapter.config"].sudo().search(
-            [("adapter_type", "in", ("wms_host", "wms_sap_host"))]
-        ).write({"status": "disabled"})
+        self.env["custom.adapter.config"].sudo().search([("adapter_type", "in", ("wms_host", "wms_sap_host"))]).write(
+            {"status": "disabled"}
+        )
         event = self.Event.enqueue("goods_receipt", payload={})
         self.assertEqual(self.Event._cron_drain_outbox(), 0)
         self.assertEqual(event.state, "pending", "an unconfigured host leaves events queued, never lost")
