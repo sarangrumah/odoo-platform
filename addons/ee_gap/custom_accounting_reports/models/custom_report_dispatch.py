@@ -134,9 +134,7 @@ class CustomReportDispatch(models.AbstractModel):
             "name": account.name or "",
         }
         if scope == "opening":
-            company = self.env["res.company"].browse(
-                (gl_options.get("company_ids") or self.env.companies.ids)[:1]
-            )
+            company = self.env["res.company"].browse((gl_options.get("company_ids") or self.env.companies.ids)[:1])
             date_from = fields.Date.to_date(gl_options.get("date_from")) or fields.Date.context_today(self)
             opening_from, opening_to = self._opening_period(date_from, company)
             if opening_to < opening_from:

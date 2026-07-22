@@ -91,12 +91,16 @@ class PettyCashRealizationLine(models.Model):
     def _compute_amounts(self):
         for line in self:
             subtotal = (line.price_unit or 0.0) * (line.quantity or 1.0)
-            taxes = line.tax_ids.compute_all(
-                subtotal,
-                currency=line.currency_id,
-                quantity=1.0,
-                partner=line.partner_id,
-            ) if line.tax_ids else None
+            taxes = (
+                line.tax_ids.compute_all(
+                    subtotal,
+                    currency=line.currency_id,
+                    quantity=1.0,
+                    partner=line.partner_id,
+                )
+                if line.tax_ids
+                else None
+            )
             if taxes:
                 line.price_subtotal = taxes["total_excluded"]
                 line.price_total = taxes["total_included"]

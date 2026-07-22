@@ -69,7 +69,7 @@ CE-compatible replacement for the EE-only `stock_barcode` app. Builds on the CE 
 
 ## Gotchas
 - **GS1 parser only supports a subset of AIs** — 01 (GTIN), 10 (lot, FNC1-terminated), 17 (exp YYMMDD), 11 (prod date), 21 (serial), 30 (count), 310n / 320n (weight kg/lb). Unknown AIs cause the parser to stop at that point and return what it has so far.
-- **`apply_to_picking` field name detection (`qty_done` vs `quantity`)** is version-fragile — uses `if 'qty_done' in ml._fields` runtime check.
+- **`apply_to_picking` field name detection (`qty_done` vs `quantity`)** is version-fragile — a runtime `'qty_done' in MoveLine._fields` probe picks the name, and `reserved_uom_qty` vs `quantity_product_uom` is probed the same way. Both names are now resolved **once** at the top of the reconciliation loop. Previously the probe existed in one place while two other spots hardcoded `qty_done`, so on Odoo 19 (where the field is `quantity`) `action_apply_to_picking` raised `ValueError: Invalid field 'qty_done' in 'stock.move.line'` — the entire scan-apply path was dead. Resolve the names once; never inline the literal.
 - **`auto_distribute_lines` is first-fit by `picking_ids` order** — picking order in the M2m matters; no smarter optimisation (e.g. nearest deadline).
 - **`action_apply` (batch/cluster) reparents lines into a transient session, runs apply, then detaches** — if apply raises mid-flight, lines may be orphaned to a half-applied session.
 - **`custom.barcode.format._format_for_model` returns the first match by `(sequence, id)`** — multiple active formats on the same model silently lose precedence to whichever sorts first.

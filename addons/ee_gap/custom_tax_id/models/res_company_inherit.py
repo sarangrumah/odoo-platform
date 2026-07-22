@@ -51,8 +51,7 @@ class ResCompany(models.Model):
         if missing:
             raise ValidationError(
                 _(
-                    "Identitas pemotong belum lengkap pada perusahaan %(company)s.\n"
-                    "Lengkapi dahulu: %(missing)s",
+                    "Identitas pemotong belum lengkap pada perusahaan %(company)s.\nLengkapi dahulu: %(missing)s",
                     company=self.display_name,
                     missing="\n  - ".join([""] + missing),
                 )

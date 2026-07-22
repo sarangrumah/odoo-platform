@@ -15,9 +15,7 @@ class TestPettyCashFlow(TransactionCase):
         Account = cls.env["account.account"]
 
         def _acc(code, name, atype, reconcile=False):
-            return Account.create(
-                {"code": code, "name": name, "account_type": atype, "reconcile": reconcile}
-            )
+            return Account.create({"code": code, "name": name, "account_type": atype, "reconcile": reconcile})
 
         cls.advance = _acc("PC1001", "Uang Muka Petty Cash", "asset_current", reconcile=True)
         cls.bank_acc = _acc("PC1101", "Bank Petty Cash", "asset_cash")
@@ -43,9 +41,7 @@ class TestPettyCashFlow(TransactionCase):
         )
 
         cls.partner_emp = cls.env["res.partner"].create({"name": "Employee Contact"})
-        cls.employee = cls.env["hr.employee"].create(
-            {"name": "Petty Employee", "work_contact_id": cls.partner_emp.id}
-        )
+        cls.employee = cls.env["hr.employee"].create({"name": "Petty Employee", "work_contact_id": cls.partner_emp.id})
         cls.vendor = cls.env["res.partner"].create({"name": "Toko ATK"})
         cls.attachment = cls.env["ir.attachment"].create(
             {"name": "invoice.pdf", "datas": "cGRm", "mimetype": "application/pdf"}

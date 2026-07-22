@@ -96,9 +96,7 @@ class WithholdingLine(models.Model):
                     )
                 )
             if rec.fasilitas_insentif == "7" and not rec.nomor_sertifikat_insentif:
-                raise ValidationError(
-                    _("Fasilitas 7 (SKD WPLN) mewajibkan Nomor Sertifikat Insentif diisi.")
-                )
+                raise ValidationError(_("Fasilitas 7 (SKD WPLN) mewajibkan Nomor Sertifikat Insentif diisi."))
 
     @api.model_create_multi
     def create(self, vals_list):

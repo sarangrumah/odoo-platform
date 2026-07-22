@@ -75,8 +75,7 @@ class ResPartner(models.Model):
     )
     x_custom_tin = fields.Char(
         string="TIN (WP Luar Negeri)",
-        help="Tax Identity Number of a foreign counterparty. Used by the Bupot "
-        "Non-Resident export in place of NPWP.",
+        help="Tax Identity Number of a foreign counterparty. Used by the Bupot Non-Resident export in place of NPWP.",
     )
     x_custom_passport = fields.Char(string="Nomor Passport")
     x_custom_kitas = fields.Char(string="Nomor KITAP/KITAS")
@@ -149,9 +148,7 @@ class ResPartner(models.Model):
     def _check_nitku(self):
         for rec in self:
             if rec.x_custom_nitku and not NITKU_22_RE.match(rec.x_custom_nitku):
-                raise ValidationError(
-                    _("NITKU harus 22 digit angka (NPWP 16 digit + 6 digit tempat kegiatan usaha).")
-                )
+                raise ValidationError(_("NITKU harus 22 digit angka (NPWP 16 digit + 6 digit tempat kegiatan usaha)."))
 
     def check_vat_id(self, vat):
         """Relaxed Indonesian NPWP validation for the standard ``vat`` field.

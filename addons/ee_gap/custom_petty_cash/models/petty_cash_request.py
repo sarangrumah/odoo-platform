@@ -84,8 +84,7 @@ class PettyCashRequest(models.Model):
         string="Amount Requested",
         currency_field="currency_id",
         tracking=True,
-        help="Amount the employee is asking for. When an estimate breakdown "
-        "is entered it must match this total.",
+        help="Amount the employee is asking for. When an estimate breakdown is entered it must match this total.",
     )
     realization_deadline = fields.Date(
         string="Realization Deadline",
@@ -206,9 +205,7 @@ class PettyCashRequest(models.Model):
         self.ensure_one()
         account = self.advance_account_id or self.company_id.petty_cash_advance_account_id
         if not account and not soft:
-            raise UserError(
-                _("Set a Petty Cash Advance account on the request or in Accounting Settings first.")
-            )
+            raise UserError(_("Set a Petty Cash Advance account on the request or in Accounting Settings first."))
         return account
 
     def _pc_bank_journal(self):
@@ -224,8 +221,7 @@ class PettyCashRequest(models.Model):
         partner = emp.work_contact_id or (emp.user_id and emp.user_id.partner_id)
         if not partner:
             raise UserError(
-                _("Employee %s has no linked contact (Work Contact / User) to book the advance against.")
-                % emp.name
+                _("Employee %s has no linked contact (Work Contact / User) to book the advance against.") % emp.name
             )
         return partner
 
@@ -352,9 +348,10 @@ class PettyCashRequest(models.Model):
         journal = self._pc_bank_journal()
         partner = self._pc_employee_partner()
 
-        via_payment = (
-            self.env["ir.config_parameter"].sudo().get_param("custom_petty_cash.disburse_via_payment")
-            in ("1", "true", "True")
+        via_payment = self.env["ir.config_parameter"].sudo().get_param("custom_petty_cash.disburse_via_payment") in (
+            "1",
+            "true",
+            "True",
         )
         if via_payment:
             move = self._disburse_via_payment(amount, advance, journal, partner)
@@ -363,9 +360,7 @@ class PettyCashRequest(models.Model):
 
         self.disburse_move_id = move.id
         if not self.realization_deadline:
-            days = int(
-                self.env["ir.config_parameter"].sudo().get_param("custom_petty_cash.realization_days") or 14
-            )
+            days = int(self.env["ir.config_parameter"].sudo().get_param("custom_petty_cash.realization_days") or 14)
             self.realization_deadline = fields.Date.context_today(self) + timedelta(days=days)
         self.state = "disbursed"
         self.message_post(
@@ -493,8 +488,7 @@ class PettyCashRequest(models.Model):
             raise UserError(_("There is no shortfall to reimburse on this request."))
         move = self._book_bank_advance_transfer(-outstanding, direction="reimburse")
         self.message_post(
-            body=_("Reimbursed %(amt)s to the employee (entry %(move)s).")
-            % {"amt": -outstanding, "move": move.name},
+            body=_("Reimbursed %(amt)s to the employee (entry %(move)s).") % {"amt": -outstanding, "move": move.name},
             subtype_xmlid="mail.mt_note",
         )
         return self._action_open_move(move)
@@ -585,9 +579,7 @@ class PettyCashRequest(models.Model):
             if rec.state == "settled":
                 raise UserError(_("Cannot cancel a settled request."))
             if rec.move_ids.filtered(lambda m: m.state == "posted"):
-                raise UserError(
-                    _("This request already has posted journal entries. Reverse them before cancelling.")
-                )
+                raise UserError(_("This request already has posted journal entries. Reverse them before cancelling."))
             rec.action_cancel_approval()
             rec.state = "cancelled"
         return True
@@ -651,8 +643,10 @@ class PettyCashRequest(models.Model):
             if rec.currency_id.is_zero(rec.amount_outstanding):
                 continue
             user = rec.employee_id.user_id
-            if user and activity_type and not rec.activity_ids.filtered(
-                lambda a: a.activity_type_id == activity_type and a.user_id == user
+            if (
+                user
+                and activity_type
+                and not rec.activity_ids.filtered(lambda a: a.activity_type_id == activity_type and a.user_id == user)
             ):
                 rec.activity_schedule(
                     "mail.mail_activity_data_todo",

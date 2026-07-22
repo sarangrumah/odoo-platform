@@ -10,7 +10,7 @@ raw advance ledger.
 
 from __future__ import annotations
 
-from odoo import fields, models
+from odoo import models
 
 
 class PettyCashReportOutstanding(models.AbstractModel):

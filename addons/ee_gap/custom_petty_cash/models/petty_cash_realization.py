@@ -90,8 +90,7 @@ class PettyCashRealization(models.Model):
             for line in rec.line_ids.filtered(lambda l: l.line_type == "third_party"):
                 if not line.attachment_ids:
                     raise UserError(
-                        _("Third-party line '%s' requires the supplier invoice to be attached.")
-                        % (line.name or "?")
+                        _("Third-party line '%s' requires the supplier invoice to be attached.") % (line.name or "?")
                     )
                 if not line.partner_id:
                     raise UserError(_("Third-party line '%s' requires a vendor.") % (line.name or "?"))
@@ -160,9 +159,10 @@ class PettyCashRealization(models.Model):
                 "price_unit": line.price_subtotal,
                 "tax_ids": [fields.Command.set(line.tax_ids.ids)],
             }
-            if line.x_custom_withholding_category_id and "x_custom_withholding_category_id" in self.env[
-                "account.move.line"
-            ]._fields:
+            if (
+                line.x_custom_withholding_category_id
+                and "x_custom_withholding_category_id" in self.env["account.move.line"]._fields
+            ):
                 vals["x_custom_withholding_category_id"] = line.x_custom_withholding_category_id.id
             invoice_lines.append(fields.Command.create(request._pc_line_analytic(vals)))
 
@@ -195,7 +195,9 @@ class PettyCashRealization(models.Model):
         self.ensure_one()
         journal = self.company_id.petty_cash_payment_journal_id
         if not journal:
-            raise UserError(_("Set a Petty Cash Payment journal in Accounting Settings before posting third-party lines."))
+            raise UserError(
+                _("Set a Petty Cash Payment journal in Accounting Settings before posting third-party lines.")
+            )
         advance = self.request_id._pc_advance_account()
         self._configure_payment_journal(journal, advance)
 
@@ -243,7 +245,9 @@ class PettyCashRealization(models.Model):
             [("type", "=", "general"), ("company_id", "=", self.company_id.id)], limit=1
         )
         if not journal:
-            raise UserError(_("No general journal found for the expense entry. Configure a Petty Cash Expense journal."))
+            raise UserError(
+                _("No general journal found for the expense entry. Configure a Petty Cash Expense journal.")
+            )
 
         move_lines = []
         total = 0.0

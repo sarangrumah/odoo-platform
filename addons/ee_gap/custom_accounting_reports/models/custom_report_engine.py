@@ -580,11 +580,10 @@ class CustomReportEngine(models.AbstractModel):
         container, so a code deploy alone would switch the feature on
         everywhere. Rolled out to prd_levis_begbal only for now.
         """
-        return (
-            self.env["ir.config_parameter"]
-            .sudo()
-            .get_param("custom_accounting_reports.drilldown_enabled")
-            in ("1", "true", "True")
+        return self.env["ir.config_parameter"].sudo().get_param("custom_accounting_reports.drilldown_enabled") in (
+            "1",
+            "true",
+            "True",
         )
 
     def get_report_table(self, options=None, context_extra=None):
