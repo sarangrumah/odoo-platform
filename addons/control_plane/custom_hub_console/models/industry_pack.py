@@ -54,6 +54,10 @@ _SEED_PACK_MODULES = {
         "custom_retail_pos_offline",
         "custom_subscription",
         "custom_appointments",
+        # ESB Core integration: stock opname, demand forecast, auto replenishment.
+        "custom_esb_connector",
+        "custom_fnb_stock_ops",
+        "custom_wms_cycle_count",
         "point_of_sale",
         "stock",
         "crm",
