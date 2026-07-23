@@ -13,6 +13,8 @@ import base64
 import csv
 import io
 import logging
+import re
+from datetime import date as date_cls
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
@@ -127,6 +129,8 @@ class BankImportTemplate(models.Model):
         self.ensure_one()
         file_bytes = base64.b64decode(file_b64)
         rows = self._read_csv(file_bytes)
+        if self._is_bca_corp(rows):
+            return self._parse_bca_corp(rows)
         if self.has_header and rows:
             rows = rows[1:]
         lines: list[dict] = []
@@ -164,4 +168,120 @@ class BankImportTemplate(models.Model):
             "lines": lines,
             "errors": errors,
             "total_rows": len(rows),
+        }
+
+    # ------------------------------------------------------------------
+    # BCA corporate ("KlikBCA Bisnis" / CorpAcctTrxn) CSV
+    # ------------------------------------------------------------------
+    # This export cannot be described by the generic column-index model:
+    #  * a metadata preamble precedes the column header;
+    #  * dates are ``DD/MM`` with NO year (year lives in the "Periode :" line);
+    #  * amount + sign are fused in one "Jumlah" cell, e.g. ``30,000.00 DB`` /
+    #    ``10,930,941.82 CR`` (CR = money in / positive, DB = money out / negative);
+    #  * ``Saldo Awal / Mutasi / Saldo Akhir`` footer rows trail the data.
+    # It is auto-detected (independent of template column config) and handled here.
+
+    _BCA_CORP_HEADER = ["Tanggal Transaksi", "Keterangan", "Cabang", "Jumlah", "Saldo"]
+    _BCA_CORP_FOOTER = ("Saldo Awal", "Mutasi Debet", "Mutasi Kredit", "Saldo Akhir")
+
+    @staticmethod
+    def _bca_corp_amount(raw: Any) -> Decimal:
+        # BCA corporate amounts are always ``1,234,567.89`` (comma thousands, dot
+        # decimal) regardless of the template's configured separators, because this
+        # handler is auto-detected and may run under any selected template.
+        s = str(raw or "").strip().replace(",", "")
+        if not s:
+            return Decimal("0")
+        try:
+            return Decimal(s)
+        except InvalidOperation:
+            return Decimal("0")
+
+    def _is_bca_corp(self, rows) -> bool:
+        if not rows:
+            return False
+        first = (self._safe_cell(rows[0], 1) or "").strip()
+        if first.startswith("Informasi Rekening"):
+            return True
+        for row in rows:
+            if [(str(c).strip()) for c in row[:5]] == self._BCA_CORP_HEADER:
+                return True
+        return False
+
+    def _parse_bca_corp(self, rows) -> dict:
+        lines: list[dict] = []
+        errors: list[tuple[int, str]] = []
+
+        # Resolve the statement's year(s) from the "Periode :" preamble and find the
+        # column-header row; data starts on the row after it.
+        from_month = from_year = to_year = None
+        header_idx = None
+        period_re = re.compile(
+            r"Periode\s*:\s*(\d{2})/(\d{2})/(\d{4})\s*-\s*\d{2}/\d{2}/(\d{4})"
+        )
+        for i, row in enumerate(rows):
+            joined = " ".join(str(c) for c in row)
+            m = period_re.search(joined)
+            if m:
+                from_month = int(m.group(2))
+                from_year = int(m.group(3))
+                to_year = int(m.group(4))
+            if [(str(c).strip()) for c in row[:5]] == self._BCA_CORP_HEADER:
+                header_idx = i
+                break
+
+        start = (header_idx + 1) if header_idx is not None else 0
+        date_re = re.compile(r"^(\d{2})/(\d{2})$")
+
+        for n, row in enumerate(rows[start:], start=start + 1):
+            if not row or all(str(c).strip() == "" for c in row):
+                continue
+            c0 = (self._safe_cell(row, 1) or "").strip()
+            if c0.startswith(self._BCA_CORP_FOOTER):
+                break
+            dm = date_re.match(c0)
+            if not dm:
+                errors.append((n, f"Bad/missing date: {c0!r}"))
+                continue
+            day, month = int(dm.group(1)), int(dm.group(2))
+            # Year rollover: a period spanning Dec->Jan uses the later year for the
+            # months that wrapped past the start month. Inert for a single-month file.
+            if from_year is None:
+                errors.append((n, "Missing 'Periode' line; cannot resolve year"))
+                continue
+            year = to_year if (to_year != from_year and month < from_month) else from_year
+            try:
+                d = date_cls(year, month, day)
+            except ValueError as e:
+                errors.append((n, f"Invalid date {c0!r}: {e}"))
+                continue
+
+            raw_amount = (self._safe_cell(row, 4) or "").strip()
+            am = re.match(r"^(.*?)\s*(CR|DB)$", raw_amount, re.IGNORECASE)
+            if am:
+                num, sign = am.group(1), (1 if am.group(2).upper() == "CR" else -1)
+            else:
+                num, sign = raw_amount, 1
+            amount = self._bca_corp_amount(num) * sign
+            if amount == Decimal("0"):
+                continue
+
+            keterangan = re.sub(r"\s+", " ", str(self._safe_cell(row, 2) or "")).strip()
+            balance_raw = self._safe_cell(row, 5)
+            balance = self._bca_corp_amount(balance_raw) if balance_raw else None
+
+            lines.append(
+                {
+                    "date": d,
+                    "ref": keterangan,
+                    "partner_hint": "",
+                    "amount": amount,
+                    "balance": balance,
+                }
+            )
+
+        return {
+            "lines": lines,
+            "errors": errors,
+            "total_rows": max(0, len(rows) - start),
         }

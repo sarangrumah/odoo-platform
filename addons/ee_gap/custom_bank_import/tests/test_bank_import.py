@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+from decimal import Decimal
 
 from odoo.tests import TransactionCase, tagged
 
@@ -110,6 +111,67 @@ class TestBankImport(TransactionCase):
         self.assertEqual(log.line_count, 1)
         self.assertGreaterEqual(log.error_count, 2)
         self.assertIn("Bad/missing date", log.raw_payload or "")
+
+    # ----- BCA corporate (KlikBCA Bisnis / CorpAcctTrxn) auto-detect -----
+
+    def test_bca_corp_autodetect(self):
+        # Real-world layout: preamble + DD/MM dates (no year) + fused Jumlah+CR/DB
+        # column + Saldo Awal/Mutasi/Saldo Akhir footer. Any template routes to the
+        # BCA-corp handler once the signature is detected.
+        csv = (
+            b'"Informasi Rekening - Mutasi Rekening"," "," "," "," ",\n'
+            b"\n"
+            b'"No. rekening : 2685151268"\n'
+            b'"Nama : ERA BUSANA RETAILINDO PT"\n'
+            b'"Periode : 01/06/2026 - 30/06/2026"\n'
+            b'"Kode Mata Uang : Rp"\n'
+            b'"Tanggal Transaksi","Keterangan","Cabang","Jumlah","Saldo"\n'
+            b'"01/06","BIAYA ADM       ","0000","30,000.00 DB","2,313,178.27"\n'
+            b'"13/06","KR OTOMATIS MID : 885004608391 LEVIS PIM 2   ","0000","10,930,941.82 CR","13,244,120.09"\n'
+            b'"Saldo Awal : 2,343,178.27"\n'
+            b'"Mutasi Debet : 30,000.00","1"\n'
+            b'"Mutasi Kredit : 10,930,941.82","1"\n'
+            b'"Saldo Akhir : 13,244,120.09"\n'
+        )
+        res = self.template.parse_csv(base64.b64encode(csv).decode())
+        self.assertEqual(res["errors"], [])
+        self.assertEqual(len(res["lines"]), 2)
+        by_amount = sorted(res["lines"], key=lambda ln: ln["amount"])
+        debit, credit = by_amount[0], by_amount[1]
+        # DB -> negative (money out), CR -> positive (money in)
+        self.assertEqual(debit["amount"], Decimal("-30000.00"))
+        self.assertEqual(credit["amount"], Decimal("10930941.82"))
+        # DD/MM resolved against the period year, whitespace-collapsed description
+        self.assertEqual(debit["date"].year, 2026)
+        self.assertEqual(debit["date"].month, 6)
+        self.assertEqual(debit["date"].day, 1)
+        self.assertEqual(debit["ref"], "BIAYA ADM")
+        self.assertIn("LEVIS PIM 2", credit["ref"])
+
+    def test_bca_corp_via_wizard_imports(self):
+        csv = (
+            b'"Informasi Rekening - Mutasi Rekening"," "," "," "," ",\n'
+            b'"Periode : 01/06/2026 - 30/06/2026"\n'
+            b'"Tanggal Transaksi","Keterangan","Cabang","Jumlah","Saldo"\n'
+            b'"01/06","BIAYA ADM","0000","30,000.00 DB","2,313,178.27"\n'
+            b'"13/06","SETORAN","0000","1,000,000.00 CR","3,313,178.27"\n'
+            b'"Saldo Akhir : 3,313,178.27"\n'
+        )
+        wiz = self.Wizard.create(
+            {
+                "journal_id": self.journal.id,
+                "template_id": self.template.id,
+                "file": base64.b64encode(csv).decode(),
+                "filename": "bca-corp.csv",
+            }
+        )
+        action = wiz.action_import()
+        log = self.Log.browse(action["res_id"])
+        self.assertEqual(log.state, "imported")
+        self.assertEqual(log.line_count, 2)
+        self.assertEqual(log.error_count, 0)
+        amounts = sorted(log.statement_id.line_ids.mapped("amount"))
+        self.assertEqual(amounts, [-30000.0, 1000000.0])
 
     # ----- H2H mock adapter -----
 
