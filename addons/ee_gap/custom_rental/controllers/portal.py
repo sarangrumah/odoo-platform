@@ -78,7 +78,7 @@ class RentalCustomerPortal(CustomerPortal):
             },
         )
 
-    @http.route(["/my/rentals/<int:order_id>/sign"], type="json", auth="user", website=True)
+    @http.route(["/my/rentals/<int:order_id>/sign"], type="jsonrpc", auth="user", website=True)
     def portal_rental_sign(self, order_id, signature=None, signed_by=None, **kw):
         try:
             order = self._rental_order_get(order_id)
