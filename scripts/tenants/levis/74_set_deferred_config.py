@@ -22,7 +22,8 @@ env = env  # noqa: F821 - provided by odoo shell
 APPLY = os.environ.get("FIX_APPLY") == "1"
 EXPENSE_ACCOUNT_NAME = "Other prepaid expenses"
 REVENUE_ACCOUNT_NAME = "Deferred Income - Current"
-JOURNAL_CODE = "GLJV"
+# Preferred first — not every clone has GLJV (demo_updated_levis only has MISC).
+JOURNAL_CODES = ["GLJV", "MISC"]
 
 tag = "APPLY" if APPLY else "DRY"
 log = lambda m: print(f"[{tag}] {m}")  # noqa: E731
@@ -35,16 +36,20 @@ Acc = env["account.account"].with_company(company)
 
 exp = Acc.search([("name", "=", EXPENSE_ACCOUNT_NAME)], limit=1)
 rev = Acc.search([("name", "=", REVENUE_ACCOUNT_NAME)], limit=1)
-jrn = env["account.journal"].search(
-    [("code", "=", JOURNAL_CODE), ("type", "=", "general"), ("company_id", "=", company.id)],
-    limit=1,
-)
+jrn = env["account.journal"]
+for code in JOURNAL_CODES:
+    jrn = env["account.journal"].search(
+        [("code", "=", code), ("type", "=", "general"), ("company_id", "=", company.id)],
+        limit=1,
+    )
+    if jrn:
+        break
 missing = [
     label
     for label, rec in (
         (EXPENSE_ACCOUNT_NAME, exp),
         (REVENUE_ACCOUNT_NAME, rev),
-        ("journal %s" % JOURNAL_CODE, jrn),
+        ("journal %s" % "/".join(JOURNAL_CODES), jrn),
     )
     if not rec
 ]
