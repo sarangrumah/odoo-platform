@@ -216,9 +216,7 @@ class BankImportTemplate(models.Model):
         # column-header row; data starts on the row after it.
         from_month = from_year = to_year = None
         header_idx = None
-        period_re = re.compile(
-            r"Periode\s*:\s*(\d{2})/(\d{2})/(\d{4})\s*-\s*\d{2}/\d{2}/(\d{4})"
-        )
+        period_re = re.compile(r"Periode\s*:\s*(\d{2})/(\d{2})/(\d{4})\s*-\s*\d{2}/\d{2}/(\d{4})")
         for i, row in enumerate(rows):
             joined = " ".join(str(c) for c in row)
             m = period_re.search(joined)
