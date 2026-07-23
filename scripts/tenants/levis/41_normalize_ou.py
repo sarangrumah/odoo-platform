@@ -1,7 +1,7 @@
 """Normalise the Levi's Operating-Unit dimension on an existing DB.
 
-After this runs the "Operating Unit" analytic plan holds exactly 21 ACTIVE
-accounts: ``EBR - HEAD OFFICE`` plus the 20 live stores. Everything else in the
+After this runs the "Operating Unit" analytic plan holds exactly 23 ACTIVE
+accounts: ``EBR - HEAD OFFICE`` plus the 22 live stores. Everything else in the
 plan is archived, never deleted.
 
     RUN_DRY=0 docker exec -i odoo19-platform-odoo-mgmt odoo shell \
@@ -46,7 +46,7 @@ HO_CODE = "WH"
 HO_NAME = "EBR - HEAD OFFICE"
 HO_NEW_CODE = "EBR"
 
-# warehouse code -> canonical store name (the 20 live stores)
+# warehouse code -> canonical store name (the 22 live stores)
 STORES = {
     "S1469": "OLS SES - TUNJUNGAN PLAZA 3",
     "34885": "OLS SES - BANDUNG INDAH PLAZA",
@@ -68,14 +68,14 @@ STORES = {
     "32818": "OLS SES - PLAZA SENAYAN",
     "33595": "OLS SES - GANDARIA CITY",
     "33637": "OLS SES - SUMMARECON MALL BANDUNG",
+    "27648": "OLS SES - PACIFIC PLACE MALL",
+    "33267": "OLS SES - PASKAL BANDUNG",
 }
 
 # Stores absent from the official list. Configured like the live ones, then
-# archived. All three carry zero POS orders.
+# archived. Carries zero POS orders.
 ARCHIVED_STORES = {
     "14703": "OLS SES - GRAND INDONESIA",
-    "27648": "OLS SES - PACIFIC PLACE MALL",
-    "33267": "OLS SES - PASKAL BANDUNG",
 }
 
 # Warehouses that are not an Operating Unit at all (seeding artefacts).
@@ -212,10 +212,17 @@ for code in STORES:
     wh = _wh(code)
     if not wh:
         continue
+    # Warehouse first: core cascades the un-archive to its picking types,
+    # locations, routes and rules, which pos.config's _check_active needs.
     for rec in (wh, wh.l10n_ou_analytic_id, wh.l10n_purchase_journal_id):
         if rec and not rec.active:
             rec.write({"active": True})
             log.append("  UNARCHIVE %s %s" % (rec._name, rec.id))
+    for config in env["pos.config"].with_context(active_test=False).search(
+        [("warehouse_id", "=", wh.id), ("active", "=", False)]
+    ):
+        config.write({"active": True})
+        log.append("  UNARCHIVE %s %s" % (config._name, config.id))
 
 # --------------------------------------------------------------------------
 # Report
