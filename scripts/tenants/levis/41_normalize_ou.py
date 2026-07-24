@@ -1,7 +1,7 @@
 """Normalise the Levi's Operating-Unit dimension on an existing DB.
 
-After this runs the "Operating Unit" analytic plan holds exactly 23 ACTIVE
-accounts: ``EBR - HEAD OFFICE`` plus the 22 live stores. Everything else in the
+After this runs the "Operating Unit" analytic plan holds exactly 24 ACTIVE
+accounts: ``EBR - HEAD OFFICE`` plus the 23 live stores. Everything else in the
 plan is archived, never deleted.
 
     RUN_DRY=0 docker exec -i odoo19-platform-odoo-mgmt odoo shell \
@@ -46,7 +46,7 @@ HO_CODE = "WH"
 HO_NAME = "EBR - HEAD OFFICE"
 HO_NEW_CODE = "EBR"
 
-# warehouse code -> canonical store name (the 22 live stores)
+# warehouse code -> canonical store name (the 23 live stores)
 STORES = {
     "S1469": "OLS SES - TUNJUNGAN PLAZA 3",
     "34885": "OLS SES - BANDUNG INDAH PLAZA",
@@ -70,13 +70,14 @@ STORES = {
     "33637": "OLS SES - SUMMARECON MALL BANDUNG",
     "27648": "OLS SES - PACIFIC PLACE MALL",
     "33267": "OLS SES - PASKAL BANDUNG",
-}
-
-# Stores absent from the official list. Configured like the live ones, then
-# archived. Carries zero POS orders.
-ARCHIVED_STORES = {
+    # Absent from the official store list but trades daily in the X24DN files,
+    # so it must stay postable (_ri_assert_stores_postable).
     "14703": "OLS SES - GRAND INDONESIA",
 }
+
+# Stores absent from the official list AND absent from the sales files.
+# Configured like the live ones, then archived.
+ARCHIVED_STORES = {}
 
 # Warehouses that are not an Operating Unit at all (seeding artefacts).
 STRAY_CODES = ["PI021"]
