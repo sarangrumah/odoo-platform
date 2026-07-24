@@ -102,6 +102,12 @@
               action="action_faktur_pajak_wizard"
               sequence="20"/>
 
+    <menuitem id="menu_custom_reports_ppn_masukan_import"
+              name="Import PPN Masukan"
+              parent="menu_custom_reports_tax_root"
+              action="action_ppn_masukan_import_wizard"
+              sequence="21"/>
+
     <menuitem id="menu_custom_reports_bupot"
               name="Rekap Bukti Potong PPh"
               parent="menu_custom_reports_tax_root"

@@ -18,6 +18,7 @@ from . import custom_report_purchase
 from . import custom_report_credit_limit
 from . import custom_report_tax
 from . import custom_report_faktur_pajak
+from . import custom_report_ppn_masukan_import
 from . import custom_report_bupot
 from . import custom_report_spt_ppn
 from . import custom_report_pph_withholding
