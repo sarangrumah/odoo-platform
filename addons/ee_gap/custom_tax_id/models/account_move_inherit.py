@@ -91,6 +91,11 @@ class AccountMove(models.Model):
             # (previously False). Skip only true presentational lines.
             if ml.display_type and ml.display_type != "product":
                 continue
+            # A negative-amount purchase tax on the line (e.g. "PPh 23%
+            # (General 2%)") already books the withholding inside the bill
+            # itself; withholding it here too would double the PPh.
+            if any(t.amount < 0 for t in ml.tax_ids):
+                continue
             rule = Rule._resolve_for_line(ml)
             if not rule:
                 continue

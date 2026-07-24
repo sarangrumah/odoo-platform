@@ -127,6 +127,25 @@ class TestWithholdingApply(TaxIdCommon):
         finally:
             self.env["ir.config_parameter"].sudo().set_param("custom_tax_id.withholding_gl_posting", "1")
 
+    def test_line_with_native_pph_tax_is_skipped(self):
+        pph_tax = self.env["account.tax"].create(
+            {
+                "name": "PPh 23% (General 2%) (test)",
+                "amount": -2.0,
+                "amount_type": "percent",
+                "type_tax_use": "purchase",
+                "company_id": self.company.id,
+            }
+        )
+        bill = self._make_vendor_bill(self.vendor_npwp, 1_000_000)
+        bill.invoice_line_ids.tax_ids = [(6, 0, [pph_tax.id])]
+        bill.action_post()
+        self.assertFalse(
+            bill.x_custom_withholding_line_ids,
+            "A line whose native tax already withholds PPh must not be withheld again.",
+        )
+        self.assertFalse(bill.x_custom_withholding_move_id)
+
     def test_sales_invoice_does_not_trigger_withholding(self):
         sale = self.Move.create(
             {
