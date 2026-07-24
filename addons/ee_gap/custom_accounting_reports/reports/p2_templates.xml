@@ -49,10 +49,15 @@
                     <tr>
                         <th>Tanggal</th>
                         <th>No. Dokumen</th>
+                        <th>No. Dok. Jurnal</th>
+                        <th>No. Invoice</th>
+                        <th>Tgl Invoice</th>
                         <th>NPWP/NIK</th>
                         <th>Lawan Transaksi</th>
+                        <th>Kode Objek</th>
                         <th>Jenis PPh</th>
                         <th>Jenis Penghasilan</th>
+                        <th>COA Expense</th>
                         <th class="text-end">DPP</th>
                         <th class="text-end">Tarif</th>
                         <th class="text-end">PPh</th>
@@ -61,10 +66,10 @@
                 <tbody>
                     <t t-foreach="lines" t-as="line">
                         <tr t-if="line.get('type') == 'note'">
-                            <td colspan="9" class="text-muted fst-italic" t-esc="line.get('doc_no')"/>
+                            <td colspan="14" class="text-muted fst-italic" t-esc="line.get('doc_no')"/>
                         </tr>
                         <tr t-elif="line.get('type') == 'subtotal'" class="table-light fw-bold">
-                            <td colspan="6" t-esc="line.get('doc_no')"/>
+                            <td colspan="11" t-esc="line.get('doc_no')"/>
                             <td class="text-end">
                                 <span t-esc="line.get('dpp')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
                             </td>
@@ -74,7 +79,7 @@
                             </td>
                         </tr>
                         <tr t-elif="line.get('type') == 'grand_total'" class="table-dark fw-bold">
-                            <td colspan="6" t-esc="line.get('doc_no') or 'TOTAL'"/>
+                            <td colspan="11" t-esc="line.get('doc_no') or 'TOTAL'"/>
                             <td class="text-end">
                                 <span t-esc="line.get('dpp')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
                             </td>
@@ -86,10 +91,15 @@
                         <tr t-else="">
                             <td t-esc="line.get('date')" t-options="{'widget': 'date'}"/>
                             <td t-esc="line.get('doc_no')"/>
+                            <td t-esc="line.get('journal_no')"/>
+                            <td t-esc="line.get('invoice_no')"/>
+                            <td t-esc="line.get('invoice_date')" t-options="{'widget': 'date'}"/>
                             <td t-esc="line.get('npwp')"/>
                             <td t-esc="line.get('partner')"/>
+                            <td t-esc="line.get('kode_objek')"/>
                             <td t-esc="line.get('jenis_pph')"/>
                             <td t-esc="line.get('jenis_penghasilan')"/>
+                            <td t-esc="line.get('coa_expense')"/>
                             <td class="text-end">
                                 <span t-esc="line.get('dpp')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
                             </td>

@@ -40,10 +40,15 @@ class CustomReportPphWithholding(models.AbstractModel):
         return [
             {"header": "Tanggal", "field": "date", "kind": "date", "width": 12},
             {"header": "No. Dokumen", "field": "doc_no", "kind": "text", "width": 18},
+            {"header": "No. Dokumen Jurnal", "field": "journal_no", "kind": "text", "width": 18},
+            {"header": "No. Invoice", "field": "invoice_no", "kind": "text", "width": 18},
+            {"header": "Tgl Invoice", "field": "invoice_date", "kind": "date", "width": 12},
             {"header": "NPWP/NIK", "field": "npwp", "kind": "text", "width": 20},
             {"header": "Lawan Transaksi", "field": "partner", "kind": "text", "width": 28},
+            {"header": "Kode Objek Pajak", "field": "kode_objek", "kind": "text", "width": 14},
             {"header": "Jenis PPh", "field": "jenis_pph", "kind": "text", "width": 14},
             {"header": "Jenis Penghasilan", "field": "jenis_penghasilan", "kind": "text", "width": 26},
+            {"header": "COA Expense", "field": "coa_expense", "kind": "text", "width": 30},
             {"header": "DPP", "field": "dpp", "kind": "number", "width": 18},
             {"header": "Tarif (%)", "field": "tarif", "kind": "number", "width": 10},
             {"header": "PPh Dipotong", "field": "pph", "kind": "number", "width": 18},
@@ -74,14 +79,28 @@ class CustomReportPphWithholding(models.AbstractModel):
         for wl in records:
             move = wl.move_id
             partner = move.commercial_partner_id or move.partner_id
+            # Separate PPh journal entry ("Pemotongan PPh …"), when custom_tax_id
+            # books it as its own move; blank if the field/module is absent.
+            wmove = self._opt(move, "x_custom_withholding_move_id")
+            journal_no = wmove.name if wmove else ""
+            # Expense account of the withheld source line.
+            exp_acc = wl.move_line_id.account_id if wl.move_line_id else False
+            coa_expense = ""
+            if exp_acc:
+                coa_expense = ("%s %s" % (self._account_code(exp_acc), exp_acc.name or "")).strip()
             buckets.setdefault(wl.pph_kind, []).append(
                 {
                     "date": move.date or move.invoice_date,
                     "doc_no": move.name or "",
+                    "journal_no": journal_no,
+                    "invoice_no": move.ref or "",
+                    "invoice_date": move.invoice_date,
                     "npwp": self._opt(partner, "x_custom_npwp") or self._opt(partner, "x_custom_nik"),
                     "partner": partner.display_name or "",
+                    "kode_objek": wl.category_id.bupot_object_code or (wl.category_id.code or ""),
                     "jenis_pph": _PPH_LABEL.get(wl.pph_kind, wl.pph_kind or ""),
                     "jenis_penghasilan": wl.category_id.name or (wl.category_id.code or ""),
+                    "coa_expense": coa_expense,
                     "dpp": wl.base_amount or 0.0,
                     "tarif": wl.tarif or 0.0,
                     "pph": wl.tax_amount or 0.0,
