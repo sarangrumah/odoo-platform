@@ -1284,6 +1284,7 @@ class RetailImportExecutor(models.AbstractModel):
                 )
             suspense_method = self._x24_ensure_suspense_method()
 
+        self._x24_automap_missing(ns, records)
         tax = self._x24_resolve_tax()
         tenders = {} if decouple else self._x24_tender_index(profile)
         orders = self._x24_group_orders(records)
@@ -1855,6 +1856,31 @@ class RetailImportExecutor(models.AbstractModel):
             _logger.info("x24 store->config: %s xids written", written)
         return report
 
+    def _x24_automap_missing(self, ns, records):
+        """Auto-map stores in this batch that have no ``posconfig_<code>`` xid yet.
+
+        A newly opened (or reactivated) store would otherwise fail every row with
+        "no pos.config" until someone runs ``_x24_map_stores_to_configs`` by hand.
+        Delegates to that mapper, so only a UNIQUE exact/containment name match is
+        written; ambiguous/unmatched stores are left alone and their rows keep
+        failing with the same actionable message as before.
+        """
+        missing, seen = {}, set()
+        for r in records:
+            sc = str(r.get("store_code") or "").strip()
+            if not sc or not sc.isdigit() or sc in seen:
+                continue
+            seen.add(sc)
+            if not self._xid_get(ns, self._safe_xid("posconfig_", sc), "pos.config"):
+                missing[sc] = (
+                    str(r.get("sap_store_code") or "").strip(),
+                    str(r.get("store_name") or "").strip(),
+                )
+        if not missing:
+            return
+        for code, name, _cfg_id, cfg_name, method in self._x24_map_stores_to_configs(stores=missing, commit=True):
+            _logger.info("x24 automap store %s (%s) -> %s [%s]", code, name, cfg_name, method)
+
     def _x24_seed_payment_methods(self):
         """Idempotently create the 4 tender methods missing from the seed (Decision D).
 
@@ -2110,6 +2136,7 @@ class RetailImportExecutor(models.AbstractModel):
             self.env["retail.import.line"].browse([ln.id for ln in row_to_line.values()]).write({"state": "skipped"})
         self.env.cr.commit()
 
+        self._x24_automap_missing(ns, records)
         susp = self._x24_suspense_account(company)
         # (trading day) -> (tender, operating-unit id) -> amount. The store code resolves
         # to its pos.config (and thus its OU) through the same xid X24 posts against.
@@ -2895,6 +2922,7 @@ class RetailImportExecutor(models.AbstractModel):
             )
 
         self._x24_ensure_method_gl_split()
+        self._x24_automap_missing(ns, records)
         tax = self._x24_resolve_tax()
         orders = self._x24_group_orders(records)
 
