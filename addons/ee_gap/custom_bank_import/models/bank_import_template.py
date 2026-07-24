@@ -175,7 +175,8 @@ class BankImportTemplate(models.Model):
     # ------------------------------------------------------------------
     # This export cannot be described by the generic column-index model:
     #  * a metadata preamble precedes the column header;
-    #  * dates are ``DD/MM`` with NO year (year lives in the "Periode :" line);
+    #  * dates are either ``DD/MM`` with NO year (year lives in the "Periode :"
+    #    line) or full ``DD/MM/YYYY`` — both variants exist in the wild;
     #  * amount + sign are fused in one "Jumlah" cell, e.g. ``30,000.00 DB`` /
     #    ``10,930,941.82 CR`` (CR = money in / positive, DB = money out / negative);
     #  * ``Saldo Awal / Mutasi / Saldo Akhir`` footer rows trail the data.
@@ -229,7 +230,7 @@ class BankImportTemplate(models.Model):
                 break
 
         start = (header_idx + 1) if header_idx is not None else 0
-        date_re = re.compile(r"^(\d{2})/(\d{2})$")
+        date_re = re.compile(r"^(\d{2})/(\d{2})(?:/(\d{4}))?$")
 
         for n, row in enumerate(rows[start:], start=start + 1):
             if not row or all(str(c).strip() == "" for c in row):
@@ -242,12 +243,16 @@ class BankImportTemplate(models.Model):
                 errors.append((n, f"Bad/missing date: {c0!r}"))
                 continue
             day, month = int(dm.group(1)), int(dm.group(2))
-            # Year rollover: a period spanning Dec->Jan uses the later year for the
-            # months that wrapped past the start month. Inert for a single-month file.
-            if from_year is None:
-                errors.append((n, "Missing 'Periode' line; cannot resolve year"))
-                continue
-            year = to_year if (to_year != from_year and month < from_month) else from_year
+            if dm.group(3):
+                year = int(dm.group(3))
+            else:
+                # Year rollover: a period spanning Dec->Jan uses the later year for
+                # the months that wrapped past the start month. Inert for a
+                # single-month file.
+                if from_year is None:
+                    errors.append((n, "Missing 'Periode' line; cannot resolve year"))
+                    continue
+                year = to_year if (to_year != from_year and month < from_month) else from_year
             try:
                 d = date_cls(year, month, day)
             except ValueError as e:

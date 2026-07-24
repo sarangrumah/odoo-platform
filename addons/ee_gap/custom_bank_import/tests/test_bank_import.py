@@ -148,6 +148,26 @@ class TestBankImport(TransactionCase):
         self.assertEqual(debit["ref"], "BIAYA ADM")
         self.assertIn("LEVIS PIM 2", credit["ref"])
 
+    def test_bca_corp_full_date_variant(self):
+        # Second real-world variant: "Tanggal Transaksi" carries the full
+        # DD/MM/YYYY date instead of year-less DD/MM.
+        csv = (
+            b'"Informasi Rekening - Mutasi Rekening"," "," "," "," ",\n'
+            b'"Periode : 01/07/2026 - 20/07/2026"\n'
+            b'"Tanggal Transaksi","Keterangan","Cabang","Jumlah","Saldo"\n'
+            b'"01/07/2026","KR OTOMATIS MID : 885004608387 LEVIS SENAYAN CITY  ","0998","4,689,356.40 CR","7,273,422.02"\n'
+            b'"20/07/2026","TRSF E-BANKING DB","0000","960,064,168.95 DB","2,500,000.00"\n'
+            b'"Saldo Akhir : 2,500,000.00"\n'
+        )
+        res = self.template.parse_csv(base64.b64encode(csv).decode())
+        self.assertEqual(res["errors"], [])
+        self.assertEqual(len(res["lines"]), 2)
+        credit, debit = res["lines"]
+        self.assertEqual(credit["amount"], Decimal("4689356.40"))
+        self.assertEqual(credit["date"], debit["date"].replace(day=1))
+        self.assertEqual(debit["date"].isoformat(), "2026-07-20")
+        self.assertEqual(debit["amount"], Decimal("-960064168.95"))
+
     def test_bca_corp_via_wizard_imports(self):
         csv = (
             b'"Informasi Rekening - Mutasi Rekening"," "," "," "," ",\n'
