@@ -117,8 +117,8 @@ class TestWmsReports(TransactionCase):
         wiz = self.env["custom.cycle.count.start.wizard"].create({"plan_id": plan.id})
         res = wiz.action_start()
         session = self.env["custom.cycle.count.session"].browse(res["res_id"])
-        html = self.env["ir.actions.report"]._render_qweb_html(
-            "custom_wms_reports.report_wms_stock_take", session.ids
-        )[0]
+        html = self.env["ir.actions.report"]._render_qweb_html("custom_wms_reports.report_wms_stock_take", session.ids)[
+            0
+        ]
         self.assertIn(b"STOCK TAKE REPORT", html)
         self.assertIn(b"<main>", html)
