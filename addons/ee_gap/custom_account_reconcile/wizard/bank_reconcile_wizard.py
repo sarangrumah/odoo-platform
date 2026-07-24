@@ -60,9 +60,7 @@ class BankReconcileWizard(models.TransientModel):
             exact = not comp_cur.compare_amounts(abs(aml.amount_residual), target)
             select = exact and not preselected
             preselected = preselected or select
-            commands.append(
-                (0, 0, {"aml_id": aml.id, "selected": select})
-            )
+            commands.append((0, 0, {"aml_id": aml.id, "selected": select}))
         return commands
 
     @api.depends("candidate_ids.selected", "amount")
@@ -80,8 +78,7 @@ class BankReconcileWizard(models.TransientModel):
         self.candidate_ids.unlink()
         commands = self._candidate_commands(self.st_line_id, relax=True)
         self.candidate_ids = [
-            c if c[2]["aml_id"] not in keep.ids else (0, 0, dict(c[2], selected=True))
-            for c in commands
+            c if c[2]["aml_id"] not in keep.ids else (0, 0, dict(c[2], selected=True)) for c in commands
         ]
         return {
             "type": "ir.actions.act_window",
@@ -121,7 +118,5 @@ class BankReconcileWizardLine(models.TransientModel):
     account_id = fields.Many2one(related="aml_id.account_id")
     partner_id = fields.Many2one(related="aml_id.partner_id")
     name = fields.Char(related="aml_id.name", string="Label")
-    amount_residual = fields.Monetary(
-        related="aml_id.amount_residual", currency_field="company_currency_id"
-    )
+    amount_residual = fields.Monetary(related="aml_id.amount_residual", currency_field="company_currency_id")
     company_currency_id = fields.Many2one(related="aml_id.company_currency_id")

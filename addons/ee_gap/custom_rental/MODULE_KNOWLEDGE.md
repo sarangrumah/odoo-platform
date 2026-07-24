@@ -76,6 +76,7 @@ This module manages the lifecycle of asset rentals: rentable products with per-p
 - Serial-mode return runs a serial-for-serial check (`_check_returned_serials`) — missing or substituted serials block validation.
 - `custom.rental.schedule.state` has a `late` value not present on `rental.order.state`; do not treat the two selections as identical.
 - Fees are computed only; there is no invoice/journal creation despite the `account` dependency.
+- **Portal sign route uses `type="jsonrpc"`** (`controllers/portal.py` `portal_rental_sign`, `/my/rentals/<id>/sign`). Odoo 19 renamed the old `type="json"` dispatch type to `jsonrpc`; keeping `type="json"` makes the signature-capture call fail.
 
 ## Out of Scope
 - Multi-line rentals: each order is a single line (the schedule view keeps a `line_id` alias reserved for future multi-line support).

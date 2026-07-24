@@ -27,8 +27,7 @@ class AccountPayment(models.Model):
         already = payments.filtered("batch_payment_id")
         if already:
             raise UserError(
-                _("Already in a batch: %s")
-                % ", ".join("%s (%s)" % (p.name, p.batch_payment_id.name) for p in already)
+                _("Already in a batch: %s") % ", ".join("%s (%s)" % (p.name, p.batch_payment_id.name) for p in already)
             )
         batch = self.env["custom.account.batch.payment"].create(
             {

@@ -81,9 +81,7 @@ class AccountMove(models.Model):
             return
         cfg = self._deferred_config()
         if not cfg["journal"]:
-            raise UserError(
-                _("Configure the Deferred journal in Settings → Accounting first.")
-            )
+            raise UserError(_("Configure the Deferred journal in Settings → Accounting first."))
 
         deferral_lines = []  # accumulated Command.create vals for the deferral move
         # recognition buckets: (month_end) -> list of vals
@@ -92,16 +90,11 @@ class AccountMove(models.Model):
 
         for line in lines:
             deferred_acc = (
-                cfg["expense_account"]
-                if line.account_id.internal_group == "expense"
-                else cfg["revenue_account"]
+                cfg["expense_account"] if line.account_id.internal_group == "expense" else cfg["revenue_account"]
             )
             if not deferred_acc:
                 raise UserError(
-                    _(
-                        "Configure the Deferred %s account in Settings → Accounting "
-                        "first (needed by line '%s')."
-                    )
+                    _("Configure the Deferred %s account in Settings → Accounting first (needed by line '%s').")
                     % (line.account_id.internal_group, line.name or line.account_id.code)
                 )
             balance = line.balance  # expense: debit>0; revenue: credit>0 (balance<0)

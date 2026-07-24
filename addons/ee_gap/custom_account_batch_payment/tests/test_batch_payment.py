@@ -50,9 +50,7 @@ class TestBatchPayment(TransactionCase):
         self.assertNotEqual(batch.name, "New")
         self.assertEqual(batch.amount_total, 1000.0)
 
-        batch.export_format_id = self.env.ref(
-            "custom_account_batch_payment.format_mandiri_mcm"
-        )
+        batch.export_format_id = self.env.ref("custom_account_batch_payment.format_mandiri_mcm")
         batch.action_generate_export_file()
         self.assertEqual(batch.state, "sent")
         content = base64.b64decode(batch.export_file).decode("utf-8")
@@ -72,15 +70,11 @@ class TestBatchPayment(TransactionCase):
         self.payments[0].partner_bank_id = False
         batch = self._make_batch()
         batch.action_validate()
-        batch.export_format_id = self.env.ref(
-            "custom_account_batch_payment.format_bri"
-        )
+        batch.export_format_id = self.env.ref("custom_account_batch_payment.format_bri")
         with self.assertRaises(UserError):
             batch.action_generate_export_file()
 
     def test_double_batching_blocked(self):
         self._make_batch()
         with self.assertRaises(UserError):
-            self.env["account.payment"].with_context(
-                active_ids=self.payments.ids
-            ).action_create_batch_from_selection()
+            self.env["account.payment"].with_context(active_ids=self.payments.ids).action_create_batch_from_selection()

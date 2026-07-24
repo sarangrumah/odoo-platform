@@ -22,13 +22,9 @@ class AccountBatchPayment(models.Model):
         check_company=True,
         tracking=True,
     )
-    company_id = fields.Many2one(
-        "res.company", related="journal_id.company_id", store=True
-    )
+    company_id = fields.Many2one("res.company", related="journal_id.company_id", store=True)
     currency_id = fields.Many2one("res.currency", related="journal_id.currency_id")
-    date = fields.Date(
-        required=True, default=fields.Date.context_today, tracking=True
-    )
+    date = fields.Date(required=True, default=fields.Date.context_today, tracking=True)
     batch_type = fields.Selection(
         [("outbound", "Outbound (vendor payments)"), ("inbound", "Inbound (customer payments)")],
         required=True,
@@ -37,12 +33,8 @@ class AccountBatchPayment(models.Model):
     )
     payment_ids = fields.One2many("account.payment", "batch_payment_id", string="Payments")
     payment_count = fields.Integer(compute="_compute_totals")
-    amount_total = fields.Monetary(
-        compute="_compute_totals", currency_field="currency_id", store=False
-    )
-    export_format_id = fields.Many2one(
-        "custom.batch.payment.format", string="Export Format"
-    )
+    amount_total = fields.Monetary(compute="_compute_totals", currency_field="currency_id", store=False)
+    export_format_id = fields.Many2one("custom.batch.payment.format", string="Export Format")
     export_file = fields.Binary(readonly=True, copy=False, attachment=True)
     export_filename = fields.Char(readonly=True, copy=False)
     state = fields.Selection(
@@ -86,34 +78,22 @@ class AccountBatchPayment(models.Model):
         for batch in self:
             if not batch.payment_ids:
                 raise UserError(_("Batch %s has no payments.") % batch.name)
-            bad_state = batch.payment_ids.filtered(
-                lambda p: p.state not in ("in_process", "paid")
-            )
+            bad_state = batch.payment_ids.filtered(lambda p: p.state not in ("in_process", "paid"))
             if bad_state:
-                raise UserError(
-                    _("These payments are not posted: %s")
-                    % ", ".join(bad_state.mapped("name"))
-                )
-            bad_journal = batch.payment_ids.filtered(
-                lambda p: p.journal_id != batch.journal_id
-            )
+                raise UserError(_("These payments are not posted: %s") % ", ".join(bad_state.mapped("name")))
+            bad_journal = batch.payment_ids.filtered(lambda p: p.journal_id != batch.journal_id)
             if bad_journal:
                 raise UserError(
-                    _("These payments use another journal than the batch's: %s")
-                    % ", ".join(bad_journal.mapped("name"))
+                    _("These payments use another journal than the batch's: %s") % ", ".join(bad_journal.mapped("name"))
                 )
-            bad_dir = batch.payment_ids.filtered(
-                lambda p: p.payment_type != batch.batch_type
-            )
+            bad_dir = batch.payment_ids.filtered(lambda p: p.payment_type != batch.batch_type)
             if bad_dir:
                 raise UserError(
                     _("These payments do not match the batch direction (%s): %s")
                     % (batch.batch_type, ", ".join(bad_dir.mapped("name")))
                 )
             if batch.name in (False, _("New")):
-                batch.name = self.env["ir.sequence"].next_by_code(
-                    "custom.account.batch.payment"
-                ) or _("New")
+                batch.name = self.env["ir.sequence"].next_by_code("custom.account.batch.payment") or _("New")
             batch.state = "validated"
         return True
 

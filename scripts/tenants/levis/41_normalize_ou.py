@@ -219,8 +219,8 @@ for code in STORES:
         if rec and not rec.active:
             rec.write({"active": True})
             log.append("  UNARCHIVE %s %s" % (rec._name, rec.id))
-    for config in env["pos.config"].with_context(active_test=False).search(
-        [("warehouse_id", "=", wh.id), ("active", "=", False)]
+    for config in (
+        env["pos.config"].with_context(active_test=False).search([("warehouse_id", "=", wh.id), ("active", "=", False)])
     ):
         config.write({"active": True})
         log.append("  UNARCHIVE %s %s" % (config._name, config.id))

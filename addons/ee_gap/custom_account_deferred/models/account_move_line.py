@@ -21,13 +21,8 @@ class AccountMoveLine(models.Model):
     def _check_deferred_dates(self):
         for line in self:
             if bool(line.deferred_start_date) != bool(line.deferred_end_date):
-                raise ValidationError(
-                    _("Deferred dates: set both start and end, or neither.")
-                )
-            if (
-                line.deferred_start_date
-                and line.deferred_end_date < line.deferred_start_date
-            ):
+                raise ValidationError(_("Deferred dates: set both start and end, or neither."))
+            if line.deferred_start_date and line.deferred_end_date < line.deferred_start_date:
                 raise ValidationError(_("Deferred end date must be on/after the start."))
 
     def _is_deferrable(self):

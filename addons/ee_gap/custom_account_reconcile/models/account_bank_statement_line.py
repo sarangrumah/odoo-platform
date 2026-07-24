@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import Command, _, api, models
+from odoo import Command, _, models
 from odoo.exceptions import UserError
 
 
@@ -21,11 +21,7 @@ class AccountBankStatementLine(models.Model):
         domain = self._get_default_amls_matching_domain()
         # Money-in settles open debits (residual > 0), money-out open credits.
         if not relax:
-            sign_leaf = (
-                ("amount_residual", ">", 0)
-                if self.amount > 0
-                else ("amount_residual", "<", 0)
-            )
+            sign_leaf = ("amount_residual", ">", 0) if self.amount > 0 else ("amount_residual", "<", 0)
             domain = domain + [sign_leaf]
         candidates = Aml.search(domain, limit=limit * 10, order="date desc, id desc")
 
@@ -58,8 +54,10 @@ class AccountBankStatementLine(models.Model):
         comp_cur = self.company_id.currency_id
         target = abs(self.amount)
         exact = self._get_match_candidates(limit=10).filtered(
-            lambda aml: not comp_cur.compare_amounts(abs(aml.amount_residual), target)
-            and (not self.partner_id or aml.partner_id == self.partner_id)
+            lambda aml: (
+                not comp_cur.compare_amounts(abs(aml.amount_residual), target)
+                and (not self.partner_id or aml.partner_id == self.partner_id)
+            )
         )
         return exact if len(exact) == 1 else exact.browse()
 
@@ -81,10 +79,7 @@ class AccountBankStatementLine(models.Model):
         liquidity, suspense, other = self._seek_for_lines()
         if not suspense:
             raise UserError(
-                _(
-                    "Statement line %s has no suspense leg to replace — undo its "
-                    "current matching first."
-                )
+                _("Statement line %s has no suspense leg to replace — undo its current matching first.")
                 % self.display_name
             )
         suspense_balance = sum(suspense.mapped("balance"))
@@ -185,8 +180,7 @@ class AccountBankStatementLine(models.Model):
             "tag": "display_notification",
             "params": {
                 "type": "success" if matched else "warning",
-                "message": _("%s matched, %s skipped (no unambiguous candidate).")
-                % (matched, skipped),
+                "message": _("%s matched, %s skipped (no unambiguous candidate).") % (matched, skipped),
                 "next": {"type": "ir.actions.act_window_close"},
             },
         }

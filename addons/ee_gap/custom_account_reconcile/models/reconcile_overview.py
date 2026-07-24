@@ -32,9 +32,7 @@ class CustomReconcileAccount(models.Model):
         "Zero means everything nets out and only the matching clicks remain.",
     )
     oldest_date = fields.Date(string="Oldest Open Item", readonly=True)
-    currency_id = fields.Many2one(
-        "res.currency", compute="_compute_currency_id", string="Currency"
-    )
+    currency_id = fields.Many2one("res.currency", compute="_compute_currency_id", string="Currency")
 
     @api.depends_context("company")
     def _compute_currency_id(self):
@@ -43,9 +41,12 @@ class CustomReconcileAccount(models.Model):
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
+        # self._table is an internal model attribute (not user input); f-string
+        # interpolation of the view name matches the repo's other _auto=False
+        # report views (e.g. custom_accounting_full.followup_level).
         self.env.cr.execute(
-            """
-            CREATE OR REPLACE VIEW %s AS (
+            f"""
+            CREATE OR REPLACE VIEW {self._table} AS (
                 SELECT
                     aa.id                    AS id,
                     aa.id                    AS account_id,
@@ -62,7 +63,6 @@ class CustomReconcileAccount(models.Model):
                 GROUP BY aa.id
             )
             """
-            % self._table
         )
 
     def action_open_lines(self):

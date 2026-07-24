@@ -56,10 +56,7 @@ missing = [
 if missing:
     raise SystemExit("Not found on this DB: %s" % ", ".join(missing))
 
-log(
-    "%s: expense=%s | revenue=%s | journal=%s"
-    % (company.name, exp.display_name, rev.display_name, jrn.name)
-)
+log("%s: expense=%s | revenue=%s | journal=%s" % (company.name, exp.display_name, rev.display_name, jrn.name))
 if APPLY:
     company.write(
         {

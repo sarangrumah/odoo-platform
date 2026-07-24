@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Account Reconciliation",
-    "summary": "Enterprise-style manual reconciliation menu and wizard "
-    "for Odoo CE (EE-gap closure).",
+    "summary": "Enterprise-style manual reconciliation menu and wizard for Odoo CE (EE-gap closure).",
     "description": """
 Custom Account Reconciliation
 =============================

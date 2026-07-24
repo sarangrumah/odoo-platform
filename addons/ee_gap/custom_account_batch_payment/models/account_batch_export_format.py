@@ -20,9 +20,7 @@ class BatchPaymentFormat(models.Model):
     _order = "name"
 
     name = fields.Char(required=True)
-    code = fields.Char(
-        required=True, index=True, help="Stable identifier, e.g. 'bca_mcm'."
-    )
+    code = fields.Char(required=True, index=True, help="Stable identifier, e.g. 'bca_mcm'.")
     bank_label = fields.Char(help="Bank/portal this layout targets (BCA MCM, Mandiri MCM…).")
     active = fields.Boolean(default=True)
     encoding = fields.Char(default="utf-8")
@@ -34,9 +32,7 @@ class BatchPaymentFormat(models.Model):
     debit_account = fields.Char(help="Source (debit) account number at the bank, if the layout needs it.")
     note = fields.Text()
 
-    _code_uniq = models.Constraint(
-        "unique(code)", "The format code must be unique."
-    )
+    _code_uniq = models.Constraint("unique(code)", "The format code must be unique.")
 
     # ------------------------------------------------------------------
     # Rendering
@@ -100,10 +96,7 @@ class BatchPaymentFormat(models.Model):
         rows = self._rows(batch)
         return self._write_delimited(
             ["Account Number", "Account Holder", "Amount", "Date", "Memo", "Bank BIC"],
-            [
-                [r["account"], r["holder"], "%.2f" % r["amount"], r["date"], r["memo"], r["bic"]]
-                for r in rows
-            ],
+            [[r["account"], r["holder"], "%.2f" % r["amount"], r["date"], r["memo"], r["bic"]] for r in rows],
         )
 
     # -- per-bank baselines (refine against real portal samples) --------
@@ -142,10 +135,7 @@ class BatchPaymentFormat(models.Model):
         rows = self._rows(batch)
         return self._write_delimited(
             ["Account No", "Name", "Amount", "Description", "Date"],
-            [
-                [r["account"], r["holder"], "%.2f" % r["amount"], r["memo"], r["date"]]
-                for r in rows
-            ],
+            [[r["account"], r["holder"], "%.2f" % r["amount"], r["memo"], r["date"]] for r in rows],
         )
 
     def _render_bri(self, batch):

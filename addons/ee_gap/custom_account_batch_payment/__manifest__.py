@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Batch Payments",
-    "summary": "Batch payments with Indonesian bank transfer-file export "
-    "(EE account_batch_payment gap closure).",
+    "summary": "Batch payments with Indonesian bank transfer-file export (EE account_batch_payment gap closure).",
     "description": """
 Custom Batch Payments
 =====================

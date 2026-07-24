@@ -15,9 +15,7 @@ class TestBankReconcile(TransactionCase):
             [("type", "=", "bank"), ("company_id", "=", cls.company.id)], limit=1
         )
         cls.partner = cls.env["res.partner"].create({"name": "BankRec Customer"})
-        cls.product = cls.env["product.product"].create(
-            {"name": "BankRec Service", "type": "service"}
-        )
+        cls.product = cls.env["product.product"].create({"name": "BankRec Service", "type": "service"})
 
     def _invoice(self, amount, inv_date=None):
         inv = self.env["account.move"].create(
@@ -71,12 +69,8 @@ class TestBankReconcile(TransactionCase):
         fee_account = self.env["account.account"].create(
             {"name": "Test Bank Fees", "code": "TSTBANKFEE", "account_type": "expense"}
         )
-        aml = inv.line_ids.filtered(
-            lambda l: l.account_id.account_type == "asset_receivable"
-        )
-        st._reconcile_with_amls(
-            aml, writeoff_vals={"account_id": fee_account.id, "name": "Bank fee"}
-        )
+        aml = inv.line_ids.filtered(lambda l: l.account_id.account_type == "asset_receivable")
+        st._reconcile_with_amls(aml, writeoff_vals={"account_id": fee_account.id, "name": "Bank fee"})
         self.assertTrue(st.is_reconciled)
         self.assertIn(inv.payment_state, ("paid", "in_payment"))
         fee_line = st.move_id.line_ids.filtered(lambda l: l.account_id == fee_account)
@@ -102,11 +96,7 @@ class TestBankReconcile(TransactionCase):
     def test_wizard_preselects_exact(self):
         inv = self._invoice(750000.0)
         st = self._st_line(750000.0, ref=inv.name)
-        wiz = (
-            self.env["custom.bank.reconcile.wizard"]
-            .with_context(default_st_line_id=st.id)
-            .create({})
-        )
+        wiz = self.env["custom.bank.reconcile.wizard"].with_context(default_st_line_id=st.id).create({})
         picked = wiz.candidate_ids.filtered("selected").mapped("aml_id")
         self.assertEqual(picked.move_id, inv)
         self.assertAlmostEqual(wiz.remainder, 0.0, places=2)

@@ -31,9 +31,7 @@ class TestDeferred(TransactionCase):
             [("type", "=", "general"), ("company_id", "=", cls.company.id)], limit=1
         )
         cls.partner = cls.env["res.partner"].create({"name": "Deferred Vendor"})
-        cls.product = cls.env["product.product"].create(
-            {"name": "Annual Service", "type": "service"}
-        )
+        cls.product = cls.env["product.product"].create({"name": "Annual Service", "type": "service"})
 
     def _make_bill(self, price, start, end):
         bill = self.env["account.move"].create(
@@ -71,11 +69,7 @@ class TestDeferred(TransactionCase):
         self.assertEqual(len(recogs), 12)
         # Recognition amounts sum exactly to the deferred amount.
         prepaid = self.company.deferred_expense_account_id
-        total_recognized = sum(
-            l.credit - l.debit
-            for l in recogs.mapped("line_ids")
-            if l.account_id == prepaid
-        )
+        total_recognized = sum(l.credit - l.debit for l in recogs.mapped("line_ids") if l.account_id == prepaid)
         self.assertAlmostEqual(total_recognized, 1200.0, places=2)
         # Past months posted, future months draft/at_date.
         today = fields.Date.context_today(bill)
@@ -99,9 +93,7 @@ class TestDeferred(TransactionCase):
                 "move_type": "in_invoice",
                 "partner_id": self.partner.id,
                 "invoice_date": date(2026, 3, 1),
-                "invoice_line_ids": [
-                    (0, 0, {"product_id": self.product.id, "quantity": 1, "price_unit": 100.0})
-                ],
+                "invoice_line_ids": [(0, 0, {"product_id": self.product.id, "quantity": 1, "price_unit": 100.0})],
             }
         )
         bill.action_post()
