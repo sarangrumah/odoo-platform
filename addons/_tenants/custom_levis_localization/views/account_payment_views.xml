@@ -17,6 +17,9 @@
                        domain="['&amp;', ('plan_id.name', '=', 'Operating Unit'), '|', ('company_id', '=', False), ('company_id', '=', company_id)]"
                        options="{'no_create': True}"/>
                 <field name="destination_account_id"
+                       domain="['&amp;', ('company_ids', 'in', company_id),
+                                '|', ('account_type', 'in', ('asset_receivable', 'liability_payable')),
+                                     ('l10n_allow_payment_destination', '=', True)]"
                        options="{'no_create': True}"/>
                 <field name="l10n_override_outstanding_account_id"
                        options="{'no_create': True}"/>
