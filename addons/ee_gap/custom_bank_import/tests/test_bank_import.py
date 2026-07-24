@@ -193,6 +193,255 @@ class TestBankImport(TransactionCase):
         amounts = sorted(log.statement_id.line_ids.mapped("amount"))
         self.assertEqual(amounts, [-30000.0, 1000000.0])
 
+    def test_brisim_xlsx_autodetect(self):
+        # BRI "BRISIM" export: only Tanggal + Uraian cells are trustworthy;
+        # debet/kredit/saldo live inside the Uraian text, and one Uraian can
+        # embed a second timestamped transaction.
+        import io as _io
+
+        import openpyxl
+
+        wb = openpyxl.Workbook()
+        sh = wb.active
+        sh.append(["Tanggal", "Uraian", "Teller", "Debet", "Kredit", "Saldo"])
+        sh.append(
+            [
+                "01/07/26 03:23:24",
+                "OnUs 1 260630 001999664883 LEVIS GANDARI BRIMTXDT 0.00 "
+                "1,099,249.00 278,074,877.00 AMT:1.100.900,00MDR:1.651,00",
+                "01/07/26",
+                "03:24:00",
+                "OffUs",
+                "1",
+            ]
+        )
+        sh.append(
+            [
+                "14/07/26 08:37:41",
+                "QRISOffUs_3_260713_001999660763_LEVIS GA BRIMTXDT 0.00 449,900.00 "
+                "1,076,852,637.00 AMT:449.900,00MDR:0,00 14/07/26 13:39:49 DEBET BY CEK "
+                "CGZ 006326 SD 6350 1BK 0019052 275,000.00 0.00 1,076,577,637.00 ESB:INDS:0002B00F",
+                "15/07/26",
+                "03:23:47",
+                "OffUs",
+                "1",
+            ]
+        )
+        buf = _io.BytesIO()
+        wb.save(buf)
+        res = self.template.parse_csv(base64.b64encode(buf.getvalue()).decode())
+        self.assertEqual(res["errors"], [])
+        self.assertEqual(len(res["lines"]), 3)
+        first, qris, cek = res["lines"]
+        self.assertEqual(first["date"].isoformat(), "2026-07-01")
+        self.assertEqual(first["amount"], Decimal("1099249.00"))
+        self.assertEqual(first["balance"], Decimal("278074877.00"))
+        self.assertEqual(qris["amount"], Decimal("449900.00"))
+        # embedded transaction gets its own timestamp's date and negative amount
+        self.assertEqual(cek["date"].isoformat(), "2026-07-14")
+        self.assertEqual(cek["amount"], Decimal("-275000.00"))
+        self.assertIn("DEBET BY CEK", cek["ref"])
+
+    def test_bni_trx_inquiry_xls_rows(self):
+        # BNIDirect layout is asserted at row level (building a real BIFF .xls in
+        # a test needs xlwt, which isn't shipped); _read_xls yields exactly this
+        # row shape with native datetimes for Post Date cells.
+        from datetime import datetime as dt
+
+        rows = [
+            [""] * 25,
+            ["", "", "TRANSACTION INQUIRY"] + [""] * 22,
+            [
+                "",
+                "",
+                "No.",
+                "",
+                "",
+                "",
+                "",
+                "Post Date",
+                "Branch",
+                "",
+                "",
+                "Journal No.",
+                "Description",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "Amount",
+                "",
+                "Db/Cr",
+                "Balance",
+            ],
+            [
+                "",
+                "",
+                1.0,
+                "",
+                "",
+                "",
+                "",
+                dt(2026, 7, 2, 5, 28, 6),
+                "Unit E-Banking",
+                "",
+                "",
+                "424575",
+                "TRANSFER DARI | X",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                1.0,
+                "",
+                "C",
+                204656297.0,
+            ],
+            [
+                "",
+                "",
+                2.0,
+                "",
+                "",
+                "",
+                "",
+                dt(2026, 7, 8, 8, 33, 54),
+                "HARMONI",
+                "",
+                "",
+                "418141",
+                "TRANSFER KE | Y",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                275000.0,
+                "",
+                "D",
+                204381299.0,
+            ],
+        ]
+        self.assertTrue(self.template._is_trx_inquiry(rows))
+        res = self.template._parse_trx_inquiry(rows)
+        self.assertEqual(res["errors"], [])
+        self.assertEqual(len(res["lines"]), 2)
+        credit, debit = res["lines"]
+        self.assertEqual(credit["date"].isoformat(), "2026-07-02")
+        self.assertEqual(credit["amount"], Decimal("1"))
+        self.assertEqual(debit["amount"], Decimal("-275000"))
+        self.assertEqual(debit["ref"], "TRANSFER KE | Y")
+
+    def test_mandiri_acc_statement_xls_rows(self):
+        rows = [
+            [""] * 16,
+            ["", "Account No", "", "", "", "", "1680008812008"] + [""] * 9,
+            ["", "Opening Balance", "", "", "", "", "1,171,282,721.98"] + [""] * 9,
+            [
+                "",
+                "Posting Date",
+                "",
+                "",
+                "Remark",
+                "",
+                "",
+                "Reference No",
+                "",
+                "Debit",
+                "",
+                "Credit",
+                "",
+                "",
+                "",
+                "Balance",
+            ],
+            [
+                "",
+                "02/07/2026 04:30:58",
+                "",
+                "",
+                "QR LEVIS",
+                "",
+                "",
+                "-",
+                "",
+                "0.00",
+                "",
+                "1.00",
+                "",
+                "",
+                "",
+                "1,171,282,722.98",
+            ],
+            [
+                "",
+                "10/07/2026 23:59:00",
+                "",
+                "",
+                "Buku Cek 00263001",
+                "",
+                "",
+                "-",
+                "",
+                "25,000.00",
+                "",
+                "0.00",
+                "",
+                "",
+                "",
+                "1,171,257,722.98",
+            ],
+            [""] * 16,
+            ["", "", "No of Debit", "", "", "", "2"] + [""] * 9,
+        ]
+        self.assertTrue(self.template._is_acc_statement(rows))
+        res = self.template._parse_acc_statement(rows)
+        self.assertEqual(res["errors"], [])
+        self.assertEqual(len(res["lines"]), 2)
+        credit, debit = res["lines"]
+        self.assertEqual(credit["date"].isoformat(), "2026-07-02")
+        self.assertEqual(credit["amount"], Decimal("1.00"))
+        self.assertEqual(debit["date"].isoformat(), "2026-07-10")
+        self.assertEqual(debit["amount"], Decimal("-25000.00"))
+        self.assertEqual(debit["ref"], "Buku Cek 00263001")
+
+    def test_wizard_restores_dates_shifted_by_fiscal_lock(self):
+        # Posting shifts locked-period dates to today; the wizard must write the
+        # bank transaction date back (soft lock only — hard lock refuses import).
+        self.env.company.fiscalyear_lock_date = "2026-06-30"
+        csv = (
+            b'"Informasi Rekening - Mutasi Rekening"," "," "," "," ",\n'
+            b'"Periode : 01/06/2026 - 30/06/2026"\n'
+            b'"Tanggal Transaksi","Keterangan","Cabang","Jumlah","Saldo"\n'
+            b'"05/06","BIAYA ADM LOCK","0000","30,000.00 DB","2,313,178.27"\n'
+            b'"Saldo Akhir : 2,313,178.27"\n'
+        )
+        wiz = self.Wizard.create(
+            {
+                "journal_id": self.journal.id,
+                "template_id": self.template.id,
+                "file": base64.b64encode(csv).decode(),
+                "filename": "bca-corp-locked.csv",
+            }
+        )
+        action = wiz.action_import()
+        log = self.Log.browse(action["res_id"])
+        self.assertEqual(log.state, "imported")
+        line = log.statement_id.line_ids
+        self.assertEqual(line.date.isoformat(), "2026-06-05")
+        self.assertEqual(line.move_id.date.isoformat(), "2026-06-05")
+
     # ----- H2H mock adapter -----
 
     def test_h2h_mock_adapter_creates_lines(self):

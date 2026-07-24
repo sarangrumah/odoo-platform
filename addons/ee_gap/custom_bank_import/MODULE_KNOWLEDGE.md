@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_bank_import
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.3.0
 ---
 
 # custom_bank_import
@@ -74,6 +74,9 @@ Both pipelines write to `account.bank.statement` / `account.bank.statement.line`
 - **`status='error'` is sticky** — `_do_sync` only flips back to `active` on successful sync; a paused/error connection requires manual `action_sync_now` or UI reset to retry (the cron skips non-active connections via `[("status", "=", "active")]`).
 - **`adapter.inquiry_statement` date range** uses `last_sync_at.date()` or last 24h — if cron stops for a week, only the last 24h are pulled on resume; older days are lost unless the operator manually back-fills.
 - **`_parse_date` returns False on parse failure**; the row is then added to `errors` and skipped — no partial parsing of malformed dates.
+- **File container is sniffed by magic bytes, not extension** — `_read_rows` routes OLE2 (`D0 CF 11 E0…`) to xlrd, zip (`PK`) to openpyxl (first sheet, `data_only`), anything else to the CSV reader. `.xls`/`.xlsx` uploads therefore work through the same wizard; `_parse_date` accepts native `datetime`/`date` cells.
+- **Three more bank layouts are auto-detected** (like BCA-corp, independent of template config): BRI "BRISIM" XLSX (`Tanggal|Uraian|Teller|Debet|Kredit|Saldo` header — the export is column-shifted: only Tanggal+Uraian are trustworthy, the debet/kredit/saldo triple is regex-extracted from inside the Uraian text, and a single Uraian can embed a second timestamped transaction e.g. "DEBET BY CEK"; NB the export itself omits rows — its running-saldo chain has gaps — so totals may not tie to the real mutasi), BNI "TRANSACTION INQUIRY" XLS (header row located by labels `Post Date`/`Db/Cr`/`Amount`; native datetime cells; sign from Db/Cr C/D), and Mandiri "Acc_Statement" XLS (labels `Posting Date`/`Remark`/`Debit`/`Credit`; all string cells, `dd/mm/YYYY HH:MM:SS` dates, US-separator amounts; `No of Debit` summary block terminates parsing).
+- **Accounting date = bank transaction date, even in soft-locked periods** — core `_post()` silently shifts a statement-line move dated on/before `fiscalyear_lock_date` to today; the wizard writes the parsed transaction date back afterwards with `bypass_lock_check=BYPASS_LOCK_CHECK` (grouped per date). Dates on/before `hard_lock_date` refuse the whole import up front with a UserError.
 - **BCA corporate ("KlikBCA Bisnis" / CorpAcctTrxn) CSV is auto-detected** — `parse_csv` sniffs the signature (`Informasi Rekening` preamble or the `Tanggal Transaksi,Keterangan,Cabang,Jumlah,Saldo` header) and routes to `_parse_bca_corp`, ignoring the template's column-index/date-format config. That layout can't use the generic model: dates are `DD/MM` with the year only in the `Periode :` preamble, and amount+sign are fused in one `Jumlah` cell (`30,000.00 DB` / `10,930,941.82 CR`; CR→+ inflow, DB→− outflow). `Saldo Awal/Mutasi/Saldo Akhir` footer rows terminate parsing. So a mis-mapped "BCA CSV" template (e.g. `%d/%m/%Y` on yearless dates, no amount column) still parses correctly.
 - **`(amount)` parentheses-style negatives** are recognised; trailing `-` (e.g. `1234.56-`) is NOT.
 - **Encoding fallback is `errors="replace"`** — non-UTF-8 bytes silently become `�`, corrupting refs.

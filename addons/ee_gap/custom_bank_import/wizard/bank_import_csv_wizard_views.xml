@@ -22,7 +22,7 @@
     </record>
 
     <record id="action_bank_import_csv_wizard" model="ir.actions.act_window">
-        <field name="name">Import Bank Statement (CSV)</field>
+        <field name="name">Import Bank Statement (CSV/XLS/XLSX)</field>
         <field name="res_model">custom.bank.import.csv.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
