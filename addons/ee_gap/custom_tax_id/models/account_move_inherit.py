@@ -132,6 +132,31 @@ class AccountMove(models.Model):
     # ------------------------------------------------------------------
     # GL posting for the withholding (the "P3 follow-up" — now implemented)
     # ------------------------------------------------------------------
+    def _custom_withholding_journal(self):
+        """Journal for the PPh withholding entry, for this move's company.
+
+        Configurable via ``ir.config_parameter`` ``custom_tax_id.withholding_journal_id``
+        (a journal id), so Accounting/Tax can pin exactly which journal the
+        "Pemotongan PPh" entry posts to instead of relying on whichever general
+        journal happens to be first. Falls back to the first ``general`` journal
+        of the company when the param is unset or points at another company's
+        journal.
+        """
+        self.ensure_one()
+        Journal = self.env["account.journal"].sudo()
+        param = self.env["ir.config_parameter"].sudo().get_param("custom_tax_id.withholding_journal_id")
+        if param:
+            try:
+                pinned = Journal.browse(int(param)).exists()
+            except (TypeError, ValueError):
+                pinned = Journal
+            if pinned and pinned.company_id == self.company_id:
+                return pinned
+        return Journal.search(
+            [("type", "=", "general"), ("company_id", "=", self.company_id.id)],
+            limit=1,
+        )
+
     def _custom_post_withholding_entry(self):
         """Book the PPh withholding to the GL as a separate posted entry.
 
@@ -174,10 +199,7 @@ class AccountMove(models.Model):
         if not total:
             return
 
-        journal = self.env["account.journal"].search(
-            [("type", "=", "general"), ("company_id", "=", self.company_id.id)],
-            limit=1,
-        )
+        journal = self._custom_withholding_journal()
         if not journal:
             _logger.warning(
                 "custom_tax_id: no general journal for company %s; skipping withholding GL entry for %s",
