@@ -1,0 +1,637 @@
+openapi: 3.1.0
+
+info:
+  title: Erajaya — MDM Product Master API
+  version: "19.0.1.0.0"
+  summary: Inbound product-master feed from Levi's MDM HUB into Odoo.
+  description: |
+    Receives item-master JSON pushed by the MDM HUB
+    (MDM HUB → SAP PO → IBM MQ → Mulesoft → Odoo), replacing the SSRS **X101**
+    report as the source of product master data.
+
+    ## Two field-mapping facts that matter more than anything else here
+
+    **`udf2` is the SKU, not `skuCode`.** Odoo keys every product variant on the
+    same value X101 calls PROD SKU, which is composed as
+    `PRODUCT_CODE without dashes + "0" + SIZE + INSEAM`. For the reference item
+    that is `002IJ0027` + `0` + `32` + `28` = `002IJ002703228`, i.e. exactly
+    `udf2`. `skuCode` (`002IJ-00273228`, with the dash) does not occur anywhere in
+    X101, so it is stored as a secondary lookup key and never as the internal
+    reference. **`udf2` is therefore mandatory**; an item without it is rejected.
+
+    **`udf1` is the template.** All sizes of one article share it. Odoo creates one
+    product template per `udf1` and one variant per `udf2` beneath it.
+
+    ## Processing model
+
+    `POST /api/mdm/products` **stages** the message and returns `202` immediately;
+    the product write happens just after, asynchronously. Poll
+    `GET /api/mdm/requests/{requestId}` for the outcome — a `202` means *accepted*,
+    not *applied*.
+
+    ## Idempotency
+
+    Send `X-Request-Id`. A repeat of the same id is answered `200` with
+    `duplicate: true` and does nothing — so a retry after a timeout is safe and is
+    the expected client behaviour. Without the header the SHA-256 of the raw body is
+    used instead, which makes a genuine re-send of unchanged content look like a
+    duplicate too.
+
+    Re-sending the same SKU with **changed** content is not a duplicate: it is an
+    update, and it is applied.
+
+    ## What is not done automatically
+
+    Two incoming fields are recorded but not applied unless Erajaya enables them,
+    because both move money: `baseCost` (writing product cost posts an inventory
+    revaluation entry) and `isActive=No` (archiving cascades to variants and can
+    break open orders). Ask Erajaya before assuming either takes effect.
+
+  contact:
+    name: Erajaya — Platform Integration
+  license:
+    name: Proprietary — Erajaya / PT Sinar Eka Selaras
+
+servers:
+  - url: https://103.130.240.24
+    description: |
+      UAT. TLS uses an internally-issued certificate (the host is addressed by IP,
+      so no public CA can issue for it) — disable certificate verification for UAT,
+      or import the root CA from Erajaya.
+
+security:
+  - ApiKeyBearer: []
+  - ApiKeyHeader: []
+
+tags:
+  - name: Ingest
+    description: Push product master into Odoo.
+  - name: Status
+    description: Ask what happened to a message.
+  - name: Lookup
+    description: Ask whether a SKU is registered.
+
+paths:
+  /api/mdm/ping:
+    get:
+      tags: [Status]
+      summary: Connectivity and credential check
+      description: No side effects. Use it to verify the key and network path.
+      responses:
+        "200":
+          description: Reachable and authenticated.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          pong: { type: boolean, const: true }
+                          enabled:
+                            type: boolean
+                            description: False when the service is switched off; ingest then returns 503.
+                          dryRun:
+                            type: boolean
+                            description: True in shadow mode — messages are validated and mapped but no product is written.
+                          version: { type: string, examples: ["19.0.1.0.0"] }
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    data: { pong: true, enabled: true, dryRun: false, version: "19.0.1.0.0" }
+                    error: null
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/mdm/products:
+    post:
+      tags: [Ingest]
+      summary: Push one item or a batch
+      description: |
+        Accepts a single item object **or** an array of them, so the near-realtime
+        feed can send one message per SKU while an initial load sends batches.
+
+        The whole batch is rejected if any element cannot be keyed — nothing is
+        staged half-way. Within one message a `skuCode` may appear only once.
+      operationId: ingestProducts
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/Item"
+                - type: array
+                  items: { $ref: "#/components/schemas/Item" }
+                  minItems: 1
+                  maxItems: 1000
+            examples:
+              single:
+                summary: One item (the reference payload)
+                value:
+                  skuCode: "002IJ-00273228"
+                  skuName: "BLR MB 5PKT 555 ZLATAN"
+                  classification: "Normal"
+                  detailDesc: "BLR MB 5PKT 555 ZLATAN"
+                  length: 0
+                  width: 0
+                  height: 0
+                  weight: ""
+                  size: "32 28"
+                  brand: "LEVIS"
+                  salePrice: "999"
+                  vendorCode: "LS"
+                  baseCost: "999"
+                  taxCategory: "62034290"
+                  isActive: "Yes"
+                  serialTrackingRequired: "No"
+                  isSaleable: "Yes"
+                  budf3: "A"
+                  udf1: "002IJ-0027"
+                  udf2: "002IJ002703228"
+                  udf3: "00054"
+                  udf4: "Fall"
+                  udf5: "1004"
+                  udf6: "2003"
+                  udf7: "001"
+                  udf8: "MEN"
+                  udf10: "SEASONAL FASHION"
+                  category1: "BOTTOMS"
+                  category2: "LONG BOTTOMS"
+                  upc_ean: "5401231363516"
+              batch:
+                summary: Two sizes of the same article
+                value:
+                  - { udf1: "002IJ-0027", udf2: "002IJ002703228", skuCode: "002IJ-00273228", size: "32 28", upc_ean: "5401231363516", detailDesc: "BLR MB 5PKT 555 ZLATAN", salePrice: "999", category1: "BOTTOMS", category2: "LONG BOTTOMS", udf8: "MEN", isActive: "Yes", isSaleable: "Yes" }
+                  - { udf1: "002IJ-0027", udf2: "002IJ002703230", skuCode: "002IJ-00273230", size: "32 30", upc_ean: "5401231363523", detailDesc: "BLR MB 5PKT 555 ZLATAN", salePrice: "999", category1: "BOTTOMS", category2: "LONG BOTTOMS", udf8: "MEN", isActive: "Yes", isSaleable: "Yes" }
+      responses:
+        "202":
+          description: |
+            Accepted and queued. **Not yet applied** — poll the status endpoint.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/IngestResult" }
+              examples:
+                accepted:
+                  value:
+                    status: ok
+                    data:
+                      requestId: "6daaf1215aaa424abc4126b7840d61c1"
+                      accepted: 1
+                      duplicate: false
+                      skuCodes: ["002IJ-00273228"]
+                    error: null
+        "200":
+          description: |
+            Already received. The original `requestId` is echoed and nothing is done.
+            Deliberately **not** 409 — a retry after a timed-out 202 is correct
+            client behaviour, not an error.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/IngestResult" }
+              examples:
+                duplicate:
+                  value:
+                    status: ok
+                    data: { requestId: "6daaf1215aaa424abc4126b7840d61c1", accepted: 0, duplicate: true }
+                    error: null
+        "400":
+          description: |
+            The message was refused and **nothing was staged**. See `error.code`:
+            `INVALID_PAYLOAD`, `EMPTY_PAYLOAD`, `TOO_MANY_ITEMS`,
+            `MISSING_SKU_CODE`, `DUPLICATE_SKU_IN_BATCH`.
+
+            A body that is not valid JSON at all is rejected earlier still, by the
+            web framework, and comes back as HTTP 400 in a *different* shape —
+            do not parse it as the envelope below.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+              examples:
+                missingSku:
+                  value:
+                    status: error
+                    data: null
+                    error:
+                      code: MISSING_SKU_CODE
+                      message: "Items at position(s) 0 have neither skuCode nor udf2."
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "500": { $ref: "#/components/responses/Internal" }
+        "503": { $ref: "#/components/responses/Disabled" }
+
+  /api/mdm/requests/{requestId}:
+    get:
+      tags: [Status]
+      summary: What happened to a message
+      operationId: getRequestStatus
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Current state, with a per-item breakdown (first 200 items).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/RequestStatus" }
+              examples:
+                partial:
+                  value:
+                    status: ok
+                    data:
+                      requestId: "6daaf1215aaa424abc4126b7840d61c1"
+                      state: partial
+                      dryRun: false
+                      itemCount: 1
+                      ok: 0
+                      duplicate: 0
+                      error: 0
+                      needsReview: 1
+                      attemptCount: 1
+                      lastError: false
+                      receivedAt: "2026-07-27T02:58:53Z"
+                      processedAt: "2026-07-27T02:58:56Z"
+                      items:
+                        - skuCode: "002IJ-00273228"
+                          sku: "002IJ002703228"
+                          state: needs_review
+                          error: "category not in the crosswalk"
+                          productId: 734794
+                    error: null
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/UnknownRequest" }
+
+  /api/mdm/requests/{requestId}/replay:
+    post:
+      tags: [Status]
+      summary: Re-drive a message that did not fully succeed
+      description: |
+        Operations use. Resets the unsuccessful items and processes them again from
+        the stored payload — no re-send is needed from the sender's side.
+      operationId: replayRequest
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Re-queued.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/UnknownRequest" }
+        "409":
+          description: Already `done`, or cancelled — nothing to replay.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/mdm/products/lookup:
+    get:
+      tags: [Lookup]
+      summary: Is this SKU registered?
+      description: |
+        Resolves in exactly the order the sales importer does, so "the API says it
+        exists" and "the importer can find it" can never disagree:
+        barcode → `skuCode` → internal reference → article code.
+
+        When nothing matches, the answer still tells you whether the SKU has been
+        *seen in a sales file* but has no master yet (`pending`) — which is the case
+        worth acting on.
+      operationId: lookupProduct
+      parameters:
+        - { name: skuCode, in: query, schema: { type: string }, description: "MDM skuCode, e.g. 002IJ-00273228" }
+        - { name: sku, in: query, schema: { type: string }, description: "udf2 / PROD SKU, e.g. 002IJ002703228" }
+        - { name: ean, in: query, schema: { type: string }, description: "Any GTIN of the variant" }
+        - { name: code, in: query, schema: { type: string }, description: "udf1 / article code" }
+      responses:
+        "200":
+          description: Found, or not found (with pending info when available).
+          content:
+            application/json:
+              examples:
+                found:
+                  value:
+                    status: ok
+                    data:
+                      found: true
+                      skuCode: "002IJ-00273228"
+                      sku: "002IJ002703228"
+                      productId: 734794
+                      templateId: 63707
+                      code: "002IJ002703228"
+                      name: "[002IJ002703228] BLR MB 5PKT 555 ZLATAN"
+                      active: true
+                      mdmPending: false
+                      source: mdm_api
+                      barcodes: ["5401231363516"]
+                      syncedAt: "2026-07-27T02:58:53Z"
+                    error: null
+                notFoundButSeenInSales:
+                  value:
+                    status: ok
+                    data:
+                      found: false
+                      pending:
+                        state: pending
+                        firstSeen: "2026-07-20T04:11:00Z"
+                        lastSeen: "2026-07-26T09:02:00Z"
+                        occurrences: 14
+                        parkedRows: 14
+                    error: null
+        "400":
+          description: "`MISSING_QUERY` — pass at least one of the parameters."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/mdm/pending:
+    get:
+      tags: [Lookup]
+      summary: SKUs sold but never mastered
+      description: |
+        Every SKU a sales file quoted while the product master did not have it, with
+        how many transactions it is holding up. These transactions post by themselves
+        once the master arrives, so this list is also the backlog that the feed will
+        clear.
+      operationId: listPending
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [pending, registered, replayed, ignored, all], default: pending } }
+        - { name: limit, in: query, schema: { type: integer, default: 200, maximum: 1000 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: Paged list, noisiest SKUs first.
+          content:
+            application/json:
+              examples:
+                sample:
+                  value:
+                    status: ok
+                    data:
+                      count: 1
+                      total: 1
+                      offset: 0
+                      items:
+                        - itemCode: "000YB00010"
+                          compositeCode: "000YB000103410"
+                          ean: "5401231300001"
+                          description: "501 ORIGINAL"
+                          storeCode: "S001"
+                          firstSeen: "2026-07-20T04:11:00Z"
+                          lastSeen: "2026-07-26T09:02:00Z"
+                          occurrences: 14
+                          parkedRows: 14
+                          parkedTransactions: 9
+                          state: pending
+                    error: null
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  securitySchemes:
+    ApiKeyBearer:
+      type: http
+      scheme: bearer
+      description: "`Authorization: Bearer <key>`. The key is issued by Erajaya out of band."
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Equivalent alternative to the bearer form.
+
+  parameters:
+    XRequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema: { type: string, maxLength: 128 }
+      description: |
+        Your own message id. Strongly recommended: it is what makes a retry safe.
+        Re-sending the same id never processes the message twice.
+
+  schemas:
+    Envelope:
+      type: object
+      required: [status, data, error]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        data: {}
+        error: { type: ["object", "null"] }
+
+    ErrorEnvelope:
+      type: object
+      required: [status, data, error]
+      properties:
+        status: { type: string, const: error }
+        data: { type: "null" }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+
+    IngestResult:
+      type: object
+      properties:
+        requestId:
+          type: string
+          description: Use this to poll the status endpoint.
+        accepted:
+          type: integer
+          description: Items staged. Zero on a duplicate.
+        duplicate:
+          type: boolean
+          description: True when this message had already been received.
+        skuCodes:
+          type: array
+          items: { type: string }
+          description: Echo of the first 100 keys, for your own reconciliation.
+
+    RequestStatus:
+      type: object
+      properties:
+        requestId: { type: string }
+        state:
+          type: string
+          enum: [received, queued, processing, done, partial, failed, cancelled]
+          description: |
+            `done` — every item settled cleanly.
+            `partial` — at least one item needs attention (see per-item `state`).
+            `failed` — processing raised; Erajaya retries, and it can be replayed.
+        dryRun: { type: boolean }
+        itemCount: { type: integer }
+        ok: { type: integer }
+        duplicate: { type: integer, description: Items that were unchanged or superseded. }
+        error: { type: integer }
+        needsReview: { type: integer }
+        attemptCount: { type: integer }
+        lastError: { oneOf: [{ type: string }, { type: boolean }] }
+        receivedAt: { type: string, format: date-time }
+        processedAt: { oneOf: [{ type: string, format: date-time }, { type: boolean }] }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ItemResult" }
+
+    ItemResult:
+      type: object
+      properties:
+        skuCode: { type: string }
+        sku: { type: string, description: udf2, the internal reference actually used. }
+        state:
+          type: string
+          enum: [pending, done, duplicate, skipped, needs_review, conflict, error]
+          description: |
+            `done` — created or updated.
+            `duplicate` — identical to what is already stored; nothing written.
+            `skipped` — deliberately not applied. Most often a **stale message**: a
+              newer update for this SKU had already been applied, so this one is
+              ignored rather than allowed to revert it.
+            `needs_review` — applied, but something needs a human. Commonly the
+              category pair is not in the agreed crosswalk yet.
+            `conflict` — **refused**. The GTIN belongs to a different product, or the
+              article code collides with an existing one. Nothing was written to
+              either product; this needs resolving at source.
+            `error` — could not be processed; see `error`.
+        error: { oneOf: [{ type: string }, { type: boolean }] }
+        productId: { oneOf: [{ type: integer }, { type: boolean }] }
+
+    Item:
+      type: object
+      required: [udf1, udf2]
+      description: |
+        One SKU. Unknown fields are accepted and stored verbatim rather than
+        rejected, so the feed can add fields before Erajaya maps them.
+      properties:
+        udf1:
+          type: string
+          description: "**Article / template code.** All sizes of an article share it. Example: `002IJ-0027`."
+          examples: ["002IJ-0027"]
+        udf2:
+          type: string
+          description: |
+            **The SKU. Required.** Equals X101's PROD SKU
+            (`udf1 without dashes + "0" + size + inseam`) and becomes the product's
+            internal reference in Odoo.
+          examples: ["002IJ002703228"]
+        skuCode:
+          type: string
+          description: |
+            Display/composite code. Stored as a secondary lookup key — **not** the
+            internal reference, because this form does not exist in X101.
+          examples: ["002IJ-00273228"]
+        size:
+          type: string
+          description: |
+            Waist and inseam as one string (`"32 28"`, also accepted: `32/28`,
+            `3228`), or a single value (`M`, `L`, `OS`, `34`). It is cross-checked
+            against `udf2`; if the two disagree, `udf2` wins and the item is flagged
+            `needs_review`.
+          examples: ["32 28", "L", "OS"]
+        upc_ean:
+          type: string
+          description: |
+            One GTIN. Send further GTINs for the same SKU in later messages — they
+            **accumulate**; an existing barcode is never replaced. A GTIN already
+            owned by a different product is refused (`conflict`) rather than moved.
+          examples: ["5401231363516"]
+        detailDesc: { type: string, description: Product name. Preferred over skuName. }
+        skuName: { type: string, description: Fallback name when detailDesc is absent. }
+        category1: { type: string, description: "Top level, e.g. BOTTOMS. See the crosswalk note below.", examples: ["BOTTOMS"] }
+        category2: { type: string, description: "Second level, e.g. LONG BOTTOMS.", examples: ["LONG BOTTOMS"] }
+        udf8: { type: string, description: "Gender. Combined with category1 to reach the Odoo category (MEN + BOTTOMS → MENS BOTTOMS).", examples: ["MEN"] }
+        salePrice: { type: string, description: Retail price. Applied on create and on update. }
+        baseCost: { type: string, description: "Cost. **Recorded, not applied** unless Erajaya enables it — writing cost on stocked goods posts a revaluation entry." }
+        isActive: { type: string, enum: ["Yes", "No"], description: "**Recorded, not applied** by default — archiving cascades to variants and can break open orders." }
+        isSaleable: { type: string, enum: ["Yes", "No"], description: Applied. Blocks new sales without touching history. }
+        serialTrackingRequired:
+          type: string
+          enum: ["Yes", "No"]
+          description: |
+            Applied **on creation only**. Changing it later on a product that already
+            has stock is refused by Odoo, so a change arrives as `needs_review`.
+        taxCategory: { type: string, description: "HS code.", examples: ["62034290"] }
+        brand: { type: string, examples: ["LEVIS"] }
+        vendorCode: { type: string, description: Recorded. Creating a supplier link is off by default. }
+        classification: { type: string, examples: ["Normal"] }
+        udf4: { type: string, description: Season., examples: ["Fall"] }
+        udf10: { type: string, description: Segment., examples: ["SEASONAL FASHION"] }
+        weight: { type: string }
+        length: { type: number }
+        width: { type: number }
+        height: { type: number }
+        budf3: { type: string, description: Not mapped — stored verbatim pending clarification. }
+        udf3: { type: string, description: Not mapped — stored verbatim pending clarification. }
+        udf5: { type: string, description: Not mapped — stored verbatim pending clarification. }
+        udf6: { type: string, description: Not mapped — stored verbatim pending clarification. }
+        udf7: { type: string, description: Not mapped — stored verbatim pending clarification. }
+
+  responses:
+    Unauthorized:
+      description: |
+        Bad or missing credential. `error_code` is one of `MISSING_API_KEY`,
+        `BAD_API_KEY`, `NO_API_KEY_CONFIGURED`, `NO_CIDR_CONFIGURED`.
+        Note the shape differs from the normal envelope.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok: { type: boolean, const: false }
+              error_code: { type: string }
+          examples:
+            missing: { value: { ok: false, error_code: MISSING_API_KEY } }
+    Forbidden:
+      description: "`IP_NOT_ALLOWED` — the caller's address is not in the agreed allow-list."
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok: { type: boolean, const: false }
+              error_code: { type: string, const: IP_NOT_ALLOWED }
+    TooLarge:
+      description: "`PAYLOAD_TOO_LARGE` — body above the agreed limit (5 MB by default)."
+    Disabled:
+      description: |
+        `SERVICE_DISABLED` — the endpoint is switched off on this database.
+        Treat as retryable.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    UnknownRequest:
+      description: "`UNKNOWN_REQUEST` — no message with that id."
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Internal:
+      description: |
+        `INTERNAL_ERROR`. Retryable — reuse the same `X-Request-Id` so the retry
+        cannot double-apply.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
