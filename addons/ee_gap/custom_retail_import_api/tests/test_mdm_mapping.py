@@ -131,6 +131,32 @@ class TestMdmMapping(MdmCase):
         self.assertEqual(template.tracking, "none", "changing tracking would break traceability")
         self.assertEqual(template.list_price, 1299.0, "the rest of the update still applies")
 
+    # -- numeric hardening --------------------------------------------------
+    def test_non_finite_numbers_never_reach_a_price(self):
+        """float("nan") raises nothing and stores fine — then breaks every sum.
+
+        NaN compares false against everything including itself, so a NaN list_price
+        would not show up as an outlier in any report; it would just quietly make
+        totals wrong. Non-finite input is treated as unparseable instead, which the
+        data-quality check already reports as an invalid price.
+        """
+        for bad in ("nan", "inf", "-inf", "1e400"):
+            with self.subTest(salePrice=bad):
+                self.env["retail.mdm.request"].sudo().search([]).unlink()
+                request, _dup = self.ingest([item(salePrice=bad, baseCost=bad)], key=f"nan-{bad}")
+                template = self.template("002IJ-0027")
+                self.assertTrue(template, "the product is still created")
+                self.assertEqual(template.list_price, 0.0)
+                self.assertEqual(template.mdm_base_cost, 0.0)
+                # the invariant that actually matters: it is a real number
+                self.assertEqual(template.list_price, template.list_price, "list_price is NaN")
+
+    def test_ordinary_numbers_are_unaffected(self):
+        self.ingest([item(salePrice="749900", baseCost="500000")])
+        template = self.template("002IJ-0027")
+        self.assertEqual(template.list_price, 749900.0)
+        self.assertEqual(template.mdm_base_cost, 500000.0)
+
     # -- size disagreement --------------------------------------------------
     def test_size_disagreeing_with_udf2_is_flagged(self):
         request, _dup = self.ingest([item(size="99 99")])

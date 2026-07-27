@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import uuid
 
 from odoo import SUPERUSER_ID, _, api, fields, models
@@ -45,12 +46,24 @@ def _yes(value):
 
 
 def _num(value):
+    """Parse a numeric payload field, refusing values that are not real numbers.
+
+    ``float()`` cheerfully accepts "nan", "inf", "-inf" and anything that overflows
+    to infinity ("1e400"). These fields become prices, costs and weights: a NaN price
+    raises nothing, stores happily, and then silently poisons every comparison and
+    sum downstream -- NaN compares false against everything, including itself.
+
+    Non-finite values are therefore treated like any other unparseable input: 0.0,
+    which the X101 data-quality check already surfaces as "invalid/zero price" rather
+    than letting it through unnoticed.
+    """
     if value in (None, "", False):
         return 0.0
     try:
-        return float(str(value).strip())
+        parsed = float(str(value).strip())
     except (TypeError, ValueError):
         return 0.0
+    return parsed if math.isfinite(parsed) else 0.0
 
 
 def _text(value, limit=None):
