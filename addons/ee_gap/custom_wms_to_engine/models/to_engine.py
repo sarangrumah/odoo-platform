@@ -65,9 +65,17 @@ class ToEngine(models.AbstractModel):
             if key in seen_keys:
                 continue
             seen_keys.add(key)
-            # Find a donor in the target domain that has stock of the same product
+            # Find a donor in the target domain that has stock of the same
+            # product. The donor must be a *different* bin — the domains can
+            # legitimately overlap (a bin that is both pickable and stocked),
+            # and a transfer from a bin to itself replenishes nothing.
             donor = Quant.search(
-                tgt_dom + [("product_id", "=", q.product_id.id), ("quantity", ">", 0)],
+                tgt_dom
+                + [
+                    ("product_id", "=", q.product_id.id),
+                    ("quantity", ">", 0),
+                    ("location_id", "!=", q.location_id.id),
+                ],
                 limit=1,
             )
             if not donor:

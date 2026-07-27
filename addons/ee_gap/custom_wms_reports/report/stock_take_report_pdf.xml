@@ -79,7 +79,11 @@
                                             <td class="num" t-out="'%.2f' % (ln.expected_qty or 0.0)"/>
                                             <td class="num" t-out="'%.2f' % (ln.counted_qty or 0.0) if ln.status != 'pending' else ''"/>
                                             <td class="num" t-out="'%.2f' % (ln.variance_qty or 0.0) if ln.status != 'pending' else ''"/>
-                                            <td class="num" t-out="'%.1f%%' % (ln.variance_pct or 0.0) if ln.status != 'pending' else ''"/>
+                                            <!-- str.format, not %-formatting: the data loader
+                                                 collapses '%%' in a <template> attribute to a
+                                                 single '%', which then blows up at render time
+                                                 with "incomplete format". -->
+                                            <td class="num" t-out="'{:.1f}%'.format(ln.variance_pct or 0.0) if ln.status != 'pending' else ''"/>
                                             <td t-out="ln.status"/>
                                             <td t-out="ln.counter_user_id.name or ''"/>
                                             <td t-out="ln.remark or ''"/>

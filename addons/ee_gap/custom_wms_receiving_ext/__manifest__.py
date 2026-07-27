@@ -14,6 +14,10 @@ without touching the shared ``custom_barcode`` addon:
   ``stock.lot.expiration_date`` when the scan is applied to the picking.
 - **Supplier batch reference** — new field on ``stock.lot`` and on the scan
   line; filled manually or from the GS1 lot (AI 10) when applied.
+- **Serial / IMEI capture** — GS1 AI 21 becomes the ``stock.lot`` name for
+  serial-tracked products, and a bare 14–16 digit IMEI scan is attributed to
+  the picking's sole serial-tracked product instead of being dropped as
+  "not found".
 - **Receipt template import** — wizard on incoming pickings to upload a
   CSV/XLSX template (barcode/SKU, serial or lot, qty, expiry date, supplier
   batch) that creates move lines + lots in bulk; includes a downloadable
@@ -22,7 +26,7 @@ without touching the shared ``custom_barcode`` addon:
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Barcode",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": [
         "stock",

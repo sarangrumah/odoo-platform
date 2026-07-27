@@ -95,6 +95,103 @@ class TestReceivingExt(TransactionCase):
         )
         self.assertEqual(lot.supplier_batch_ref, "VND-77")
 
+    def _scan_line(self, session, product, qty, lot):
+        return self.env["custom.barcode.scan.line"].create(
+            {
+                "session_id": session.id,
+                "product_id": product.id,
+                "raw_barcode": lot,
+                "quantity": qty,
+                "status": "ok",
+                "x_gs1_parsed": json.dumps({"lot": lot}),
+            }
+        )
+
+    def test_scan_sets_quantity_instead_of_stacking_on_demand(self):
+        picking = self._make_receipt([(self.lot_product, 18)])
+        session = self.env["custom.barcode.scan.session"].create({"picking_id": picking.id})
+        self._scan_line(session, self.lot_product, 18.0, "LOT-FULL")
+        session.action_apply_to_picking()
+        self.assertEqual(
+            sum(picking.move_line_ids.mapped("quantity")),
+            18.0,
+            "the scanned count must SET the received qty, not add to the pre-filled demand",
+        )
+
+    def test_second_scan_session_adds_to_the_first(self):
+        picking = self._make_receipt([(self.lot_product, 20)])
+        first = self.env["custom.barcode.scan.session"].create({"picking_id": picking.id})
+        self._scan_line(first, self.lot_product, 12.0, "LOT-A")
+        first.action_apply_to_picking()
+        second = self.env["custom.barcode.scan.session"].create({"picking_id": picking.id})
+        self._scan_line(second, self.lot_product, 8.0, "LOT-B")
+        second.action_apply_to_picking()
+        self.assertEqual(
+            sum(picking.move_line_ids.mapped("quantity")),
+            20.0,
+            "a second operator's scans must add to what the first already booked",
+        )
+
+    def test_reapplying_the_same_session_is_idempotent(self):
+        picking = self._make_receipt([(self.lot_product, 15)])
+        session = self.env["custom.barcode.scan.session"].create({"picking_id": picking.id})
+        self._scan_line(session, self.lot_product, 15.0, "LOT-IDEM")
+        session.action_apply_to_picking()
+        session.action_apply_to_picking()
+        self.assertEqual(sum(picking.move_line_ids.mapped("quantity")), 15.0)
+
+    def test_gs1_serial_becomes_lot_name(self):
+        picking = self._make_receipt([(self.serial_product, 2)])
+        session = self.env["custom.barcode.scan.session"].create({"picking_id": picking.id})
+        self.env["custom.barcode.scan.line"].create(
+            {
+                "session_id": session.id,
+                "product_id": self.serial_product.id,
+                "raw_barcode": "0112345678901281 21356938035643809",
+                "quantity": 1.0,
+                "status": "ok",
+                "x_gs1_parsed": json.dumps(
+                    {"gtin": "12345678901281", "serial": "356938035643809"}
+                ),
+            }
+        )
+        session.action_apply_to_picking()
+        lot = self.env["stock.lot"].search(
+            [("name", "=", "356938035643809"), ("product_id", "=", self.serial_product.id)]
+        )
+        self.assertTrue(lot, "GS1 AI 21 must become the serial lot name")
+        ml = picking.move_line_ids.filtered(lambda l: l.lot_id == lot)
+        self.assertEqual(len(ml), 1)
+        self.assertEqual(ml.quantity, 1.0, "one serial = one unit")
+
+    def test_bare_imei_scan_resolves_sole_serial_product(self):
+        picking = self._make_receipt([(self.lot_product, 5), (self.serial_product, 1)])
+        session = self.env["custom.barcode.scan.session"].create({"picking_id": picking.id})
+        session.on_barcode_scanned("356938035643817")
+        line = session.line_ids[:1]
+        self.assertEqual(line.status, "ok", "a bare IMEI must not be dropped as not_found")
+        self.assertEqual(line.product_id, self.serial_product)
+        self.assertEqual(line.lot_id.name, "356938035643817")
+
+    def test_bare_imei_stays_not_found_when_ambiguous(self):
+        other_serial = self.env["product.product"].create(
+            {
+                "name": "GR Serial Device 2",
+                "type": "consu",
+                "is_storable": True,
+                "tracking": "serial",
+                "default_code": "GR-DEV-02",
+            }
+        )
+        picking = self._make_receipt([(self.serial_product, 1), (other_serial, 1)])
+        session = self.env["custom.barcode.scan.session"].create({"picking_id": picking.id})
+        session.on_barcode_scanned("356938035643825")
+        self.assertEqual(
+            session.line_ids[:1].status,
+            "not_found",
+            "two serial products on the picking is ambiguous — do not guess",
+        )
+
     def test_import_csv_lot_and_serial(self):
         picking = self._make_receipt([(self.lot_product, 10), (self.serial_product, 2)])
         csv_content = (
