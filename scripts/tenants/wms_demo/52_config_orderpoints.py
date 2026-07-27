@@ -42,14 +42,12 @@ company = wh.company_id
 stock_loc = wh.lot_stock_id
 
 buy_route = env["stock.route"].search([("name", "ilike", "Buy")], limit=1)
-vendor = env["res.partner"].search(
-    [("supplier_rank", ">", 0), ("name", "ilike", "Sport")], limit=1
-) or env["res.partner"].search([("supplier_rank", ">", 0)], limit=1)
+vendor = env["res.partner"].search([("supplier_rank", ">", 0), ("name", "ilike", "Sport")], limit=1) or env[
+    "res.partner"
+].search([("supplier_rank", ">", 0)], limit=1)
 assert vendor, "no supplier partner found"
 
-products = env["product.product"].search(
-    [("is_storable", "=", True), ("type", "=", "consu")]
-)
+products = env["product.product"].search([("is_storable", "=", True), ("type", "=", "consu")])
 
 Orderpoint = env["stock.warehouse.orderpoint"]
 SupplierInfo = env["product.supplierinfo"]
@@ -128,13 +126,10 @@ po_before = set(env["purchase.order"].search([]).ids)
 env["stock.rule"].run_scheduler()
 new_pos = env["purchase.order"].search([("id", "not in", list(po_before))])
 
-below = Orderpoint.search([("location_id", "=", stock_loc.id)]).filtered(
-    lambda o: o.qty_on_hand < o.product_min_qty
-)
+below = Orderpoint.search([("location_id", "=", stock_loc.id)]).filtered(lambda o: o.qty_on_hand < o.product_min_qty)
 print(
     f"[52-orderpoints] {len(below)} SKUs below their minimum; scheduler raised "
-    f"{len(new_pos)} purchase order(s): "
-    + ", ".join(f"{p.name} ({len(p.order_line)} lines)" for p in new_pos[:5])
+    f"{len(new_pos)} purchase order(s): " + ", ".join(f"{p.name} ({len(p.order_line)} lines)" for p in new_pos[:5])
 )
 for op in Orderpoint.search([("location_id", "=", stock_loc.id)], limit=5):
     print(

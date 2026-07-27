@@ -15,7 +15,6 @@ number) instead of failing on existing records.
 """
 
 import base64
-import json
 import logging
 from datetime import date, timedelta
 
@@ -61,9 +60,7 @@ wh = env["stock.warehouse"].search([("code", "=", "JDC")], limit=1)
 assert wh, "warehouse JDC not found — run 10_seed_warehouse.py first"
 company = wh.company_id
 supplier_loc = env.ref("stock.stock_location_suppliers")
-receipt_type = env["stock.picking.type"].search(
-    [("code", "=", "incoming"), ("warehouse_id", "=", wh.id)], limit=1
-)
+receipt_type = env["stock.picking.type"].search([("code", "=", "incoming"), ("warehouse_id", "=", wh.id)], limit=1)
 Product = env["product.product"]
 Picking = env["stock.picking"]
 Move = env["stock.move"]
@@ -76,9 +73,9 @@ if qc_group and env.user not in qc_group.user_ids:
 
 vendor = env["res.partner"].search([("name", "=", "PT Sportindo Distribusi")], limit=1)
 if not vendor:
-    vendor = env["res.partner"].search([("supplier_rank", ">", 0)], limit=1) or env[
-        "res.partner"
-    ].create({"name": "PT Sportindo Distribusi", "supplier_rank": 1})
+    vendor = env["res.partner"].search([("supplier_rank", ">", 0)], limit=1) or env["res.partner"].create(
+        {"name": "PT Sportindo Distribusi", "supplier_rank": 1}
+    )
 
 # --- GTIN-14 aliases so GS1 AI 01 (14 digits) resolves to the EAN-13 variant
 alias_created = 0
@@ -86,12 +83,8 @@ for prod in Product.search([("barcode", "!=", False)]):
     gtin14 = prod.barcode.zfill(14)
     if gtin14 == prod.barcode:
         continue
-    if not env["product.barcode"].search_count(
-        [("product_id", "=", prod.id), ("barcode", "=", gtin14)]
-    ):
-        env["product.barcode"].create(
-            {"product_id": prod.id, "barcode": gtin14, "note": "GTIN-14 (GS1 AI 01)"}
-        )
+    if not env["product.barcode"].search_count([("product_id", "=", prod.id), ("barcode", "=", gtin14)]):
+        env["product.barcode"].create({"product_id": prod.id, "barcode": gtin14, "note": "GTIN-14 (GS1 AI 01)"})
         alias_created += 1
 
 # --- serial/IMEI-tracked product (the sheet asks for IMEI receiving)
@@ -164,13 +157,8 @@ def item_1():
     pkg = PkgType.search([])
     cats = StCat.search([])
     cap_lines = env["stock.storage.category.capacity"].search_count([])
-    bins = env["stock.location"].search(
-        [("usage", "=", "internal"), ("wms_length_mm", ">", 0)]
-    )
-    volumes = {
-        b.display_name: round(b.wms_length_mm * b.wms_width_mm * b.wms_height_mm / 1e9, 3)
-        for b in bins[:3]
-    }
+    bins = env["stock.location"].search([("usage", "=", "internal"), ("wms_length_mm", ">", 0)])
+    volumes = {b.display_name: round(b.wms_length_mm * b.wms_width_mm * b.wms_height_mm / 1e9, 3) for b in bins[:3]}
     rules = env["stock.putaway.rule"].search_count([])
     vol_rules = env["custom.wms.putaway.rule"].search_count(
         [("kind", "in", ("by_volume", "by_dimension")), ("active", "=", True)]
@@ -243,9 +231,7 @@ def item_3():
     s_lot.action_apply_to_picking()
     s_lot.action_complete()
 
-    lot_a = env["stock.lot"].search(
-        [("name", "=", f"{TAG}-BATCH-A"), ("product_id", "=", p0.id)], limit=1
-    )
+    lot_a = env["stock.lot"].search([("name", "=", f"{TAG}-BATCH-A"), ("product_id", "=", p0.id)], limit=1)
     ean_ok = all(ln.status == "ok" and ln.product_id for ln in s_lot.line_ids)
     exp_ok = lot_a and fields.Date.to_date(lot_a.expiration_date) == exp
     batch_ok = lot_a and lot_a.supplier_batch_ref == f"VND-{TAG}"
@@ -258,9 +244,7 @@ def item_3():
     s_imei.action_apply_to_picking()
     s_imei.action_complete()
     serial_lines = s_imei.line_ids.filtered(lambda ln: ln.status == "ok")
-    serial_lots = env["stock.lot"].search(
-        [("name", "in", imeis), ("product_id", "=", imei_product.id)]
-    )
+    serial_lots = env["stock.lot"].search([("name", "in", imeis), ("product_id", "=", imei_product.id)])
     imei_mls = GR_IMEI.move_line_ids.filtered(lambda ml: ml.lot_id)
     imei_ok = len(serial_lots) == 3 and len(imei_mls) == 3 and all(ml.quantity == 1 for ml in imei_mls)
 
@@ -336,8 +320,7 @@ def item_5():
     )
     on_picking = sum(GR_LOT.move_line_ids.mapped("quantity"))
     per_product = {
-        m.product_id.default_code: (m.product_uom_qty, sum(m.move_line_ids.mapped("quantity")))
-        for m in GR_LOT.move_ids
+        m.product_id.default_code: (m.product_uom_qty, sum(m.move_line_ids.mapped("quantity"))) for m in GR_LOT.move_ids
     }
     imei_units = sum(GR_IMEI.move_line_ids.mapped("quantity"))
     ok = abs(scanned - on_picking) < 0.01 and imei_units == 3
@@ -355,9 +338,7 @@ def item_5():
 @step(6, "Barcode generation and sticker printing (IMEI & EAN)")
 def item_6():
     Report = env["ir.actions.report"]
-    barcode_pdf, _t = Report._render_qweb_pdf(
-        "custom_wms_docs.action_report_wms_barcode_list", GR_IMEI.ids
-    )
+    barcode_pdf, _t = Report._render_qweb_pdf("custom_wms_docs.action_report_wms_barcode_list", GR_IMEI.ids)
     wiz = env["custom.wms.label.wizard"].create(
         {
             "picking_id": GR_IMEI.id,
@@ -367,9 +348,7 @@ def item_6():
         }
     )
     act = wiz.action_print()
-    label_pdf, _t2 = Report._render_qweb_pdf(
-        "custom_wms_docs.action_report_wms_product_label", wiz.ids
-    )
+    label_pdf, _t2 = Report._render_qweb_pdf("custom_wms_docs.action_report_wms_product_label", wiz.ids)
     price_wiz = env["custom.wms.label.wizard"].create(
         {
             "product_ids": [(6, 0, lot_products.ids)],
@@ -379,9 +358,7 @@ def item_6():
             "barcode_kind": "QR",
         }
     )
-    price_pdf, _t3 = Report._render_qweb_pdf(
-        "custom_wms_docs.action_report_wms_product_label", price_wiz.ids
-    )
+    price_pdf, _t3 = Report._render_qweb_pdf("custom_wms_docs.action_report_wms_product_label", price_wiz.ids)
     ok = len(barcode_pdf) > 1000 and len(label_pdf) > 1000 and len(price_pdf) > 1000
     return (
         "PASS" if ok else "FAIL",
@@ -420,8 +397,7 @@ def item_7():
                 top = props[0]
                 loc = env["stock.location"].browse(top["location_id"])
                 suggestions.append(
-                    f"{ml.product_id.default_code} -> {loc.display_name} "
-                    f"(score {top['score']}, {top['reason']})"
+                    f"{ml.product_id.default_code} -> {loc.display_name} (score {top['score']}, {top['reason']})"
                 )
                 if ml.location_dest_id.id == top["location_id"]:
                     applied += 1
@@ -447,9 +423,7 @@ for rel in release_pickings:
 @step(8, "Stock replenishment — orders generated automatically")
 def item_8():
     Quant = env["stock.quant"]
-    rule = env["custom.to.rule"].search(
-        [("trigger", "=", "low_water_mark"), ("warehouse_id", "=", wh.id)], limit=1
-    )
+    rule = env["custom.to.rule"].search([("trigger", "=", "low_water_mark"), ("warehouse_id", "=", wh.id)], limit=1)
     if not rule:
         return "FAIL", "no low-water-mark transfer-order rule configured"
 
@@ -460,14 +434,10 @@ def item_8():
     if not donor:
         Quant._update_available_quantity(lot_products[0], hd_bin, 40)
         donor = Quant.search([("location_id", "=", hd_bin.id), ("quantity", ">", 0)], limit=1)
-    low = Quant.search(
-        [("location_id", "=", pick_bin.id), ("product_id", "=", donor.product_id.id)], limit=1
-    )
+    low = Quant.search([("location_id", "=", pick_bin.id), ("product_id", "=", donor.product_id.id)], limit=1)
     if not low:
         Quant._update_available_quantity(donor.product_id, pick_bin, 1)
-        low = Quant.search(
-            [("location_id", "=", pick_bin.id), ("product_id", "=", donor.product_id.id)], limit=1
-        )
+        low = Quant.search([("location_id", "=", pick_bin.id), ("product_id", "=", donor.product_id.id)], limit=1)
     elif low.quantity >= rule.low_water_qty:
         low.inventory_quantity = max(0.0, rule.low_water_qty - 5)
         low.action_apply_inventory()
@@ -547,10 +517,7 @@ def item_10():
         if not quants:
             continue
         total_qty += sum(quants.mapped("quantity"))
-        filled.append(
-            f"{rack.name}: "
-            + ", ".join(f"{q.product_id.default_code} x{int(q.quantity)}" for q in quants)
-        )
+        filled.append(f"{rack.name}: " + ", ".join(f"{q.product_id.default_code} x{int(q.quantity)}" for q in quants))
     ok = bool(filled)
     return (
         "PASS" if ok else "FAIL",
@@ -623,8 +590,7 @@ def item_11():
     by_supplier = Rep._read_group([], groupby=["partner_id"], aggregates=["quantity:sum", "value:sum"])
     by_sku = Rep._read_group([], groupby=["product_id"], aggregates=["quantity:sum", "value:sum"])
     sample = [
-        f"{r.reference} {r.partner_id.name} {r.default_code} qty={r.quantity} value={r.value:,.0f}"
-        for r in rows[:2]
+        f"{r.reference} {r.partner_id.name} {r.default_code} qty={r.quantity} value={r.value:,.0f}" for r in rows[:2]
     ]
     ok = bool(rows)
     return (
@@ -681,9 +647,7 @@ def item_13():
 @step(14, "Report — spot check")
 def item_14():
     plan = env["custom.cycle.count.plan"].search([("warehouse_id", "=", wh.id)], limit=1)
-    sample_size = int(
-        ICP.get_param("custom_wms_reports.spot_check_sample_size", "10")
-    )
+    sample_size = int(ICP.get_param("custom_wms_reports.spot_check_sample_size", "10"))
     original = plan.method
     plan.method = "spot_check"
     wiz = env["custom.cycle.count.start.wizard"].create({"plan_id": plan.id})
@@ -692,9 +656,7 @@ def item_14():
     spot.action_start()
     lines = len(spot.line_ids)
     plan.method = original
-    pdf, _t = env["ir.actions.report"]._render_qweb_pdf(
-        "custom_wms_reports.action_report_wms_stock_take", spot.ids
-    )
+    pdf, _t = env["ir.actions.report"]._render_qweb_pdf("custom_wms_reports.action_report_wms_stock_take", spot.ids)
     ok = 0 < lines <= sample_size
     return (
         "PASS" if ok else "PARTIAL",

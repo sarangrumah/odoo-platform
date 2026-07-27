@@ -98,9 +98,7 @@ class WmsReceiptImportWizard(models.TransientModel):
                 if key in aliases and canonical not in colmap:
                     colmap[canonical] = idx
         if "barcode" not in colmap:
-            raise UserError(
-                _("Missing a product column: the header must contain one of barcode / ean / gtin / sku.")
-            )
+            raise UserError(_("Missing a product column: the header must contain one of barcode / ean / gtin / sku."))
         records = []
         for line_no, row in enumerate(data_rows, start=2):
             if not any(str(c or "").strip() for c in row):
@@ -180,12 +178,18 @@ class WmsReceiptImportWizard(models.TransientModel):
             if not product:
                 product = Product.search([("default_code", "=", rec["barcode"])], limit=1)
             if not product:
-                errors.append(_("Row %(row)s: no product for barcode/SKU %(code)r.", row=rec["line_no"], code=rec["barcode"]))
+                errors.append(
+                    _("Row %(row)s: no product for barcode/SKU %(code)r.", row=rec["line_no"], code=rec["barcode"])
+                )
                 continue
             if not picking.move_ids.filtered(lambda m, p=product: m.product_id == p):
                 errors.append(
-                    _("Row %(row)s: product %(prod)s has no demand line on %(pick)s.",
-                      row=rec["line_no"], prod=product.display_name, pick=picking.name)
+                    _(
+                        "Row %(row)s: product %(prod)s has no demand line on %(pick)s.",
+                        row=rec["line_no"],
+                        prod=product.display_name,
+                        pick=picking.name,
+                    )
                 )
                 continue
 
@@ -203,14 +207,21 @@ class WmsReceiptImportWizard(models.TransientModel):
                     continue
                 if product.tracking == "none":
                     errors.append(
-                        _("Row %(row)s: %(prod)s is not tracked, but a serial was given.",
-                          row=rec["line_no"], prod=product.display_name)
+                        _(
+                            "Row %(row)s: %(prod)s is not tracked, but a serial was given.",
+                            row=rec["line_no"],
+                            prod=product.display_name,
+                        )
                     )
                     continue
             if product.tracking != "none" and not lot_name:
                 errors.append(
-                    _("Row %(row)s: %(prod)s is tracked by %(track)s — a serial/lot is required.",
-                      row=rec["line_no"], prod=product.display_name, track=product.tracking)
+                    _(
+                        "Row %(row)s: %(prod)s is tracked by %(track)s — a serial/lot is required.",
+                        row=rec["line_no"],
+                        prod=product.display_name,
+                        track=product.tracking,
+                    )
                 )
                 continue
             expiry = self._parse_date(rec["expiry"], rec["line_no"], errors)

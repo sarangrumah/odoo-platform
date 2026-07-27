@@ -78,15 +78,11 @@ class TestReceivingExt(TransactionCase):
                 "quantity": 5.0,
                 "status": "ok",
                 "supplier_batch_ref": "VND-77",
-                "x_gs1_parsed": json.dumps(
-                    {"gtin": "12345678901281", "lot": "BATCH-A1", "exp_date": "2027-01-15"}
-                ),
+                "x_gs1_parsed": json.dumps({"gtin": "12345678901281", "lot": "BATCH-A1", "exp_date": "2027-01-15"}),
             }
         )
         session.action_apply_to_picking()
-        lot = self.env["stock.lot"].search(
-            [("name", "=", "BATCH-A1"), ("product_id", "=", self.lot_product.id)]
-        )
+        lot = self.env["stock.lot"].search([("name", "=", "BATCH-A1"), ("product_id", "=", self.lot_product.id)])
         self.assertTrue(lot, "apply should have created the lot")
         self.assertEqual(
             fields.Date.to_date(lot.expiration_date),
@@ -150,9 +146,7 @@ class TestReceivingExt(TransactionCase):
                 "raw_barcode": "0112345678901281 21356938035643809",
                 "quantity": 1.0,
                 "status": "ok",
-                "x_gs1_parsed": json.dumps(
-                    {"gtin": "12345678901281", "serial": "356938035643809"}
-                ),
+                "x_gs1_parsed": json.dumps({"gtin": "12345678901281", "serial": "356938035643809"}),
             }
         )
         session.action_apply_to_picking()
@@ -209,9 +203,7 @@ class TestReceivingExt(TransactionCase):
         )
         wiz.action_import()
 
-        lot = self.env["stock.lot"].search(
-            [("name", "=", "LOT-CSV-1"), ("product_id", "=", self.lot_product.id)]
-        )
+        lot = self.env["stock.lot"].search([("name", "=", "LOT-CSV-1"), ("product_id", "=", self.lot_product.id)])
         self.assertTrue(lot)
         self.assertEqual(fields.Date.to_date(lot.expiration_date), fields.Date.to_date("2027-01-15"))
         self.assertEqual(lot.supplier_batch_ref, "SUP-B9")
@@ -231,9 +223,7 @@ class TestReceivingExt(TransactionCase):
     def test_import_rejects_bad_rows(self):
         picking = self._make_receipt([(self.lot_product, 10)])
         csv_content = (
-            "barcode,serial,lot,qty,expiry,supplier_batch\r\n"
-            "NO-SUCH-BARCODE,,L1,1,,\r\n"
-            "1234567890128,,,3,,\r\n"
+            "barcode,serial,lot,qty,expiry,supplier_batch\r\nNO-SUCH-BARCODE,,L1,1,,\r\n1234567890128,,,3,,\r\n"
         )
         wiz = self.env["custom.wms.receipt.import.wizard"].create(
             {
