@@ -198,35 +198,45 @@ class RetailImportExecutor(models.AbstractModel):
     _X101_LOCK = "retail_import:x101_upsert"
 
     def _x101_lock(self):
-        """Take a session-level advisory lock around a product upsert.
+        """Serialise the writers of the ``tmpl_``/``cat_l*_`` external IDs.
 
-        Both writers of the ``tmpl_``/``cat_l*_`` external IDs -- the XLSX import and
-        the MDM API -- contend for this. It is deliberately *session* level, not
-        transaction level: the upsert commits between batches, and a
-        ``pg_advisory_xact_lock`` would be released by the first of those commits,
-        leaving the rest of the run unprotected.
+        **Transaction-scoped on purpose.** A session-level ``pg_advisory_lock`` would
+        hold across the whole run even where the loader commits between batches, which
+        sounds stronger -- but it leaks. Postgres does not release a session lock on
+        rollback, so a job that dies mid-upsert hands its connection back to the pool
+        still holding it, and the next worker to ask blocks forever. That is not
+        theoretical: it wedged the queue runner here until the connections were killed.
+        A wedged queue is far worse than an imperfect lock.
 
-        Always paired with ``_x101_unlock`` in a finally block. A crashed worker
-        releases it anyway when its connection closes.
+        So the guarantee is scoped honestly:
+
+        * the MDM API path runs with ``commit=False``, i.e. one transaction, and is
+          therefore fully serialised -- which is where concurrency actually bites,
+          because two messages for the same SKU arrive milliseconds apart;
+        * the XLSX path is covered until its first batch commit. Beyond that,
+          correctness rests where it always did: every record is keyed by an
+          ``ir.model.data`` external ID, so a concurrent writer converges on the same
+          rows rather than duplicating them.
+
+        Released automatically at commit or rollback. Nothing to unlock, nothing to leak.
         """
-        self.env.cr.execute("SELECT pg_advisory_lock(hashtext(%s))", (self._X101_LOCK,))
+        self.env.cr.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (self._X101_LOCK,))
 
-    def _x101_unlock(self):
-        try:
-            self.env.cr.execute("SELECT pg_advisory_unlock(hashtext(%s))", (self._X101_LOCK,))
-        except Exception:  # pragma: no cover - never mask the original error
-            _logger.warning("could not release the x101 advisory lock", exc_info=True)
-
-    def _ri_commit(self):
-        """Commit, except under the test runner.
+    def _ri_commit(self, allow=True):
+        """Commit, unless the caller or the test runner forbids it.
 
         The X101 loader commits between batches so a 200k-row file does not hold one
-        giant transaction. Inside a test that would escape the ``TransactionCase``
-        rollback and leak records into the database, so it becomes a no-op -- the same
-        guard ``_sweep_orphan_product_values`` already uses. Commit points and
-        frequency in production are unchanged.
+        giant transaction. Two callers must not do that:
+
+        * a ``TransactionCase``, where a commit escapes the rollback and leaks records
+          into the database -- the same guard ``_sweep_orphan_product_values`` uses;
+        * a queue job, where queue_job replaces ``cr.commit`` with a hard error, since
+          committing mid-job would leave the job record and its work out of step.
+
+        Passing ``allow=False`` also makes the whole run atomic, which is what an MDM
+        message (at most a few hundred items) should be anyway.
         """
-        if not config["test_enable"]:
+        if allow and not config["test_enable"]:
             self.env.cr.commit()
 
     # ==================================================================
@@ -241,19 +251,20 @@ class RetailImportExecutor(models.AbstractModel):
         row_to_line = self._persist_lines(log, records)
         self._x101_upsert_items(records, ns, profile=profile, log=log, row_to_line=row_to_line)
 
-    def _x101_upsert_items(self, records, ns, profile=None, log=None, row_to_line=None):
+    def _x101_upsert_items(self, records, ns, profile=None, log=None, row_to_line=None, commit=True):
         """Upsert X101-shaped item dicts under the shared advisory lock.
 
         Thin wrapper so both callers get the lock without having to remember it; the
-        body is in ``_x101_upsert_items_locked``.
+        body is in ``_x101_upsert_items_locked``. Pass ``commit=False`` from inside a
+        queue job -- queue_job forbids committing mid-job, and it also keeps the
+        advisory lock (transaction-scoped) held for the whole run.
         """
         self._x101_lock()
-        try:
-            return self._x101_upsert_items_locked(records, ns, profile=profile, log=log, row_to_line=row_to_line)
-        finally:
-            self._x101_unlock()
+        return self._x101_upsert_items_locked(
+            records, ns, profile=profile, log=log, row_to_line=row_to_line, commit=commit
+        )
 
-    def _x101_upsert_items_locked(self, records, ns, profile=None, log=None, row_to_line=None):
+    def _x101_upsert_items_locked(self, records, ns, profile=None, log=None, row_to_line=None, commit=True):
         """Upsert X101-shaped item dicts into categories / attributes / templates / variants.
 
         This is the single seam both the XLSX import and the MDM REST API go through,
@@ -391,7 +402,7 @@ class RetailImportExecutor(models.AbstractModel):
                 )
                 self._xid_set(ns, xid, "product.category", rid)
             xid_to_cat[xid] = rid
-        self._ri_commit()
+        self._ri_commit(commit)
 
         # ---- attributes ----
         attr_by_name = {}
@@ -412,7 +423,7 @@ class RetailImportExecutor(models.AbstractModel):
                 if not av:
                     av = self.env["product.attribute.value"].create({"attribute_id": attr.id, "name": v})
                 attr_value_id[(attr_name, v)] = av.id
-        self._ri_commit()
+        self._ri_commit(commit)
 
         # ---- templates ----
         tmpl_xid_to_id = {}
@@ -503,7 +514,7 @@ class RetailImportExecutor(models.AbstractModel):
                 self._xid_set(ns, txid, "product.template", tmpl.id)
                 tmpl_xid_to_id[txid] = tmpl.id
                 created += 1
-            self._ri_commit()
+            self._ri_commit(commit)
         if log is not None:
             log.records_created = created
 
@@ -574,12 +585,12 @@ class RetailImportExecutor(models.AbstractModel):
                     self._x101_register_gtins(vp, sku_gtins.get(v["sku"], ()))
                     variant_ids[v["sku"]] = vp.id
                     matched += 1
-            self._ri_commit()
+            self._ri_commit(commit)
         if log is not None:
             log.records_matched = matched
             log.records_skipped = unmatched
         _logger.info("x101 done: created=%s matched=%s unmatched=%s", created, matched, unmatched)
-        self._sweep_orphan_product_values()
+        self._sweep_orphan_product_values(commit=commit)
 
         template_ids = {}
         for pc in tmpl_meta:
@@ -591,7 +602,7 @@ class RetailImportExecutor(models.AbstractModel):
         # XLSX path, which never populates the "_mdm" key.
         if tmpl_mdm or sku_mdm:
             self._mdm_apply_extended(template_ids, variant_ids, tmpl_mdm, sku_mdm)
-            self._ri_commit()
+            self._ri_commit(commit)
 
         # Link source rows to the product.template they contributed to
         if row_to_line:
@@ -603,7 +614,7 @@ class RetailImportExecutor(models.AbstractModel):
                 skip_ids = [row_to_line[rn].id for rn in skipped_row_nums if rn in row_to_line]
                 if skip_ids:
                     self.env["retail.import.line"].browse(skip_ids).write({"state": "skipped"})
-            self._ri_commit()
+            self._ri_commit(commit)
 
         # Flag data-quality issues on the contributing source lines (runs AFTER
         # linking so it overrides the "ok" state set above). Bumps error_count,
@@ -620,7 +631,7 @@ class RetailImportExecutor(models.AbstractModel):
                 errors.append((rn, f"{pc}: {msg}"))
         if log is not None:
             log.set_errors(errors)
-        self._ri_commit()
+        self._ri_commit(commit)
 
         summary = {
             "created": created,
@@ -682,7 +693,7 @@ class RetailImportExecutor(models.AbstractModel):
             except Exception as e:  # unique(product_id,barcode) race / bad value
                 _logger.debug("x101 gtin alias skip %s on %s: %s", g, variant.id, e)
 
-    def _sweep_orphan_product_values(self):
+    def _sweep_orphan_product_values(self, commit=True):
         """Drop the zero-value product.value rows left behind by variant deletes.
 
         Core writes one product.value per product.product create ("Price update
@@ -708,8 +719,7 @@ class RetailImportExecutor(models.AbstractModel):
         removed = self.env.cr.rowcount
         if removed:
             _logger.info("swept %s orphaned product.value rows", removed)
-        if not config["test_enable"]:
-            self.env.cr.commit()
+        self._ri_commit(commit)
 
     def _x101_backfill_template_attrs(self, tmpl_id, t_sizes, t_inseams, attr_by_name, attr_value_id):
         """Add newly-appearing Size/Inseam values to an EXISTING template so Odoo

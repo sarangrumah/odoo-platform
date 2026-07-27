@@ -25,7 +25,7 @@ import json
 import logging
 import uuid
 
-from odoo import _, api, fields, models
+from odoo import SUPERUSER_ID, _, api, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -127,6 +127,29 @@ class RetailMdmRequest(models.Model):
     # Ingest
     # ------------------------------------------------------------------
     @api.model
+    def _mdm_company(self):
+        """The company this feed belongs to.
+
+        The controller runs ``auth="none"``, so there is no user and ``env.company``
+        is empty -- the company cannot be inferred from the request. It is taken from
+        the X101 import profile instead, which is the same record the external-ID
+        namespace comes from, so the API and the file import always agree on the
+        tenant. ``retail_import.mdm_company_id`` overrides it if a database ever needs
+        that; otherwise the first company is the last resort.
+        """
+        icp = self.env["ir.config_parameter"].sudo()
+        forced = icp.get_param("retail_import.mdm_company_id", "0")
+        Company = self.env["res.company"].sudo()
+        if str(forced).isdigit() and int(forced):
+            company = Company.browse(int(forced))
+            if company.exists():
+                return company
+        profile = self.env["retail.import.profile"].sudo().search([("file_type", "=", "x101")], order="id", limit=1)
+        if profile.company_id:
+            return profile.company_id
+        return Company.search([], order="id", limit=1)
+
+    @api.model
     def ingest(self, items, dedupe_key, source_ip=None, raw=None):
         """Stage a validated batch and enqueue it, or return the existing request.
 
@@ -134,15 +157,22 @@ class RetailMdmRequest(models.Model):
         concurrent request losing the unique-constraint race is answered as a
         duplicate rather than a 500.
         """
-        existing = self.sudo().search(
-            [("company_id", "=", self.env.company.id), ("dedupe_key", "=", dedupe_key)], limit=1
-        )
+        company = self._mdm_company()
+        # with_user, not just sudo(): the controller runs auth="none", so there is no
+        # uid at all. sudo() raises privileges but leaves uid unset, and core stamps
+        # create_uid / product.value.user_id from it -- the latter is NOT NULL, so
+        # creating a variant aborts the transaction. Pin OdooBot as the acting user.
+        self = self.with_user(SUPERUSER_ID).with_company(company)
+        existing = self.sudo().search([("company_id", "=", company.id), ("dedupe_key", "=", dedupe_key)], limit=1)
         if existing:
             return existing, True
 
         vals = {
             "request_id": uuid.uuid4().hex,
             "dedupe_key": dedupe_key,
+            # Set explicitly, never left to the field default: with auth="none" there
+            # is no user for env.company to resolve from.
+            "company_id": company.id,
             "payload": raw if raw is not None else items,
             "item_count": len(items),
             "source_ip": source_ip or False,
@@ -169,9 +199,7 @@ class RetailMdmRequest(models.Model):
                 record = self.sudo().create(vals)
         except Exception:
             # Lost the race against a concurrent identical POST.
-            record = self.sudo().search(
-                [("company_id", "=", self.env.company.id), ("dedupe_key", "=", dedupe_key)], limit=1
-            )
+            record = self.sudo().search([("company_id", "=", company.id), ("dedupe_key", "=", dedupe_key)], limit=1)
             if not record:
                 raise
             return record, True
@@ -187,6 +215,17 @@ class RetailMdmRequest(models.Model):
         )
 
     def enqueue(self):
+        # Opt-in synchronous mode: process in the request instead of deferring to a
+        # worker. Meant for a test or demo database -- notably one that a *different*
+        # Odoo instance's job runner can also see, where the two runners fight over
+        # the same queue -- and for tenants whose volume does not justify a worker.
+        # The caller then waits for the upsert, so leave it off for the real feed.
+        if self._mdm_flag("mdm_sync_processing"):
+            for rec in self:
+                rec.write({"state": "queued"})
+                rec._job_process()
+            return True
+
         for rec in self:
             # Mark queued *before* dispatching. queue_job runs the job inline when
             # ``queue_job__no_delay`` is set (tests, and any caller that wants a
@@ -215,7 +254,9 @@ class RetailMdmRequest(models.Model):
             # The upsert itself takes the shared X101 advisory lock, so a concurrently
             # running file import cannot interleave with this one on the same
             # category/template external IDs.
-            self.env["retail.mdm.processor"]._process(self)
+            # with_company: the job's env has no company either, and the processor
+            # resolves the namespace and the category crosswalk per company.
+            self.env["retail.mdm.processor"].with_company(self.company_id)._process(self)
         except Exception as exc:  # noqa: BLE001
             _logger.exception("MDM request %s failed", self.request_id)
             self.write({"state": "failed", "last_error": str(exc)[:255]})

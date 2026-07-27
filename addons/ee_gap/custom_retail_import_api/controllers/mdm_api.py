@@ -17,6 +17,17 @@ exist, (b) re-wraps the return value in a ``{"jsonrpc", "result"}`` envelope, an
 (c) json-dumps the ``Response`` object ``@secure_endpoint`` returns when it rejects a
 request. ``json2`` returns dicts verbatim and passes ``Response`` objects through.
 
+The two POST routes also declare ``readonly=False``. Odoo 19 hands a route a
+read-only transaction unless it says otherwise, and a multi-worker deployment
+enforces that -- staging a request would fail with "cannot execute INSERT in a
+read-only transaction". A single-worker server happens not to, which is exactly the
+kind of difference that only shows up in production.
+
+One consequence of ``json2``: it parses the request body itself, so a syntactically
+invalid JSON body is rejected by the dispatcher before any handler runs. The caller
+still gets HTTP 400, but with werkzeug's error shape rather than the envelope above.
+Everything past parsing -- wrong shape, missing keys, oversize batch -- is ours.
+
 Authentication is a static API key plus a mandatory IP allow-list, configured per
 database through ``ir.config_parameter``::
 
@@ -114,7 +125,15 @@ class MdmProductApi(http.Controller):
     # ==================================================================
     # POST /api/mdm/products — ingest
     # ==================================================================
-    @http.route("/api/mdm/products", type="json2", auth="none", methods=["POST"], csrf=False, save_session=False)
+    @http.route(
+        "/api/mdm/products",
+        type="json2",
+        auth="none",
+        methods=["POST"],
+        csrf=False,
+        save_session=False,
+        readonly=False,
+    )
     @secure_endpoint(SCOPE)
     def products(self, **_kw):
         return _guard(self._ingest, "/api/mdm/products")
@@ -347,6 +366,7 @@ class MdmProductApi(http.Controller):
         methods=["POST"],
         csrf=False,
         save_session=False,
+        readonly=False,
     )
     @secure_endpoint(SCOPE)
     def request_replay(self, request_id, **_kw):

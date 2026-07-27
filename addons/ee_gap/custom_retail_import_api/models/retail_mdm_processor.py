@@ -46,7 +46,7 @@ class RetailMdmProcessor(models.AbstractModel):
     def _process(self, request):
         """Map, screen and upsert every pending item of ``request``."""
         Executor = self.env["retail.import.executor"]
-        namespace = self._namespace()
+        namespace = self._namespace(request.company_id)
         records = []
 
         for item in request.item_ids.filtered(lambda i: i.state == "pending"):
@@ -60,7 +60,9 @@ class RetailMdmProcessor(models.AbstractModel):
                 records.append((item, record, notes))
 
         if records and not request.dry_run:
-            summary = Executor._x101_upsert_items([r for _i, r, _n in records], namespace)
+            # commit=False: this runs inside a queue job, where queue_job forbids
+            # committing -- and one MDM message should be atomic anyway.
+            summary = Executor._x101_upsert_items([r for _i, r, _n in records], namespace, commit=False)
             self._apply_results(records, summary)
         elif records:
             # Shadow mode: everything above ran (validation, crosswalk, conflict
@@ -77,11 +79,19 @@ class RetailMdmProcessor(models.AbstractModel):
         request._rollup()
         return True
 
-    def _namespace(self):
-        """The external-ID namespace, taken from the X101 profile so both routes match."""
-        profile = self.env["retail.import.profile"].search(
-            [("file_type", "=", "x101"), ("company_id", "=", self.env.company.id)], limit=1
-        )
+    def _namespace(self, company=None):
+        """The external-ID namespace, taken from the X101 profile so both routes match.
+
+        Falls back to a company-agnostic lookup: called from the controller or a job
+        there may be no company in the environment at all.
+        """
+        Profile = self.env["retail.import.profile"].sudo()
+        company = company or self.env.company
+        profile = Profile.browse()
+        if company:
+            profile = Profile.search([("file_type", "=", "x101"), ("company_id", "=", company.id)], limit=1)
+        if not profile:
+            profile = Profile.search([("file_type", "=", "x101")], order="id", limit=1)
         return (profile.namespace if profile else "") or DEFAULT_NAMESPACE
 
     # ------------------------------------------------------------------
