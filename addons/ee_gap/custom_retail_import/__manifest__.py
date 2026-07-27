@@ -38,7 +38,7 @@ Pieces
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Retail",
-    "version": "19.0.0.16.1",
+    "version": "19.0.0.17.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -61,6 +61,7 @@ Pieces
         "views/retail_import_log_views.xml",
         "views/retail_import_feed_views.xml",
         "views/retail_import_mailbox_views.xml",
+        "views/retail_mdm_pending_sku_views.xml",
         "wizard/retail_import_wizard_views.xml",
         "views/menu_views.xml",
     ],

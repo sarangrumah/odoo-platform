@@ -13,3 +13,5 @@ access_retail_mailbox_user,mailbox user read,model_retail_import_mailbox,group_r
 access_retail_mailbox_manager,mailbox manager all,model_retail_import_mailbox,group_retail_import_manager,1,1,1,1
 access_retail_mail_message_user,mail message user read,model_retail_import_mail_message,group_retail_import_user,1,0,0,0
 access_retail_mail_message_manager,mail message manager all,model_retail_import_mail_message,group_retail_import_manager,1,1,1,1
+access_retail_mdm_pending_user,pending sku user read,model_retail_mdm_pending_sku,group_retail_import_user,1,0,0,0
+access_retail_mdm_pending_manager,pending sku manager all,model_retail_mdm_pending_sku,group_retail_import_manager,1,1,1,1
