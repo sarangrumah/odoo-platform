@@ -9,7 +9,7 @@ already produces, so the SSRS **X101** report no longer has to be run to keep Od
 product master current.
 
 ```
-MDM HUB  →  SAP PO  →  IBM MQ  →  Mulesoft  →  POST /api/mdm/products  →  Odoo
+MDM HUB  →  SAP PO  →  IBM MQ  →  Mulesoft  →  POST <base>/products  →  Odoo
 ```
 
 ---
@@ -18,7 +18,8 @@ MDM HUB  →  SAP PO  →  IBM MQ  →  Mulesoft  →  POST /api/mdm/products  �
 
 | | |
 |---|---|
-| Base URL (UAT) | `https://103.130.240.24` |
+| Base URL — UAT | `https://103.130.240.24/api/mdm/uat` |
+| Base URL — production | `https://103.130.240.24/api/mdm` — reserved, currently answers `404 NOT_DEPLOYED` |
 | Auth | `Authorization: Bearer <key>` — or `X-API-Key: <key>` |
 | API key | issued separately, not in this document |
 | IP allow-list | your egress addresses must be registered with Erajaya first |
@@ -27,13 +28,36 @@ MDM HUB  →  SAP PO  →  IBM MQ  →  Mulesoft  →  POST /api/mdm/products  �
 Check the connection before anything else — it has no side effects:
 
 ```bash
-curl -k -H "Authorization: Bearer $KEY" https://103.130.240.24/api/mdm/ping
-# {"status":"ok","data":{"pong":true,"enabled":true,"dryRun":false,"version":"19.0.1.0.0"},"error":null}
+curl -k -H "Authorization: Bearer $KEY" https://103.130.240.24/api/mdm/uat/ping
+# {"status":"ok","data":{"pong":true,"enabled":true,"dryRun":false,
+#  "version":"19.0.1.0.0","environment":"uat","database":"tst_mdm_levis"},"error":null}
 ```
 
 `enabled: false` means Erajaya has the service switched off — ingest will answer 503.
 `dryRun: true` means messages are validated and mapped but **no product is written**;
 that is the shadow phase, and it is expected at the start of the rollout.
+
+---
+
+## 1a. Telling UAT and production apart
+
+They share this host, this port and this certificate. **The path prefix is the only
+thing separating them**, and once your client is configured you cannot see it in a
+response. So the endpoint states which system it is, and it does so on the write path
+as well as on the health check:
+
+```json
+GET  /ping   → {"environment": "uat", "database": "tst_mdm_levis", ...}
+POST /products → 202 {"environment": "uat", "database": "tst_mdm_levis", "requestId": "..."}
+```
+
+Please assert on `environment` before a run rather than trusting the URL your client
+was configured with — that is the whole reason the field exists. An unconfigured
+system answers `"unknown"`, which is deliberately not a reassuring value.
+
+The production base URL is reserved rather than left unrouted: it answers
+`404 NOT_DEPLOYED` today. Switching environments is therefore a change you make, not
+one that happens to you when we deploy.
 
 ---
 
@@ -78,7 +102,7 @@ One item, or an array of them — the near-realtime feed can send one message pe
 while an initial load sends batches (up to 1,000 items, 5 MB per request).
 
 ```bash
-curl -k -X POST https://103.130.240.24/api/mdm/products \
+curl -k -X POST https://103.130.240.24/api/mdm/uat/products \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -H "X-Request-Id: 4f0c1a2e-..." \
@@ -88,7 +112,8 @@ curl -k -X POST https://103.130.240.24/api/mdm/products \
 ```json
 HTTP 202
 {"status":"ok","data":{"requestId":"6daaf1215aaa424abc4126b7840d61c1",
- "accepted":1,"duplicate":false,"skuCodes":["002IJ-00273228"]},"error":null}
+ "accepted":1,"duplicate":false,"skuCodes":["002IJ-00273228"],
+ "environment":"uat","database":"tst_mdm_levis"},"error":null}
 ```
 
 **202 means accepted, not applied.** The message is stored and the product write
@@ -97,7 +122,7 @@ generating a size matrix. Poll for the outcome:
 
 ```bash
 curl -k -H "Authorization: Bearer $KEY" \
-  https://103.130.240.24/api/mdm/requests/6daaf1215aaa424abc4126b7840d61c1
+  https://103.130.240.24/api/mdm/uat/requests/6daaf1215aaa424abc4126b7840d61c1
 ```
 
 ### Retries are safe — please send `X-Request-Id`
@@ -241,11 +266,11 @@ Two endpoints make that visible, and the loop closes by itself:
 ```bash
 # Is this SKU registered?
 curl -k -H "Authorization: Bearer $KEY" \
-  "https://103.130.240.24/api/mdm/products/lookup?skuCode=002IJ-00273228"
+  "https://103.130.240.24/api/mdm/uat/products/lookup?skuCode=002IJ-00273228"
 
 # Everything sold but not yet mastered, busiest first
 curl -k -H "Authorization: Bearer $KEY" \
-  "https://103.130.240.24/api/mdm/pending?limit=50"
+  "https://103.130.240.24/api/mdm/uat/pending?limit=50"
 ```
 
 When `lookup` reports `found: false`, it still tells you whether we have *seen* that

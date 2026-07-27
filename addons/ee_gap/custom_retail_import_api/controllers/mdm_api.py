@@ -111,6 +111,24 @@ def _enabled():
     return _param("mdm_api_enabled", "0") in ("1", "true", "True")
 
 
+def _environment():
+    """Which system the caller has actually reached.
+
+    UAT and production are reachable on the same host and the same certificate,
+    separated only by a path prefix — which the caller cannot see once their client
+    is configured. So the endpoint states it outright, and the database name makes it
+    unambiguous rather than a label someone has to trust. A caller can assert on this
+    before a run and refuse to write to the wrong system.
+
+    Set ``retail_import.mdm_environment`` per database; unset reads as ``unknown``,
+    which is deliberately not a reassuring value.
+    """
+    return {
+        "environment": _param("mdm_environment", "unknown"),
+        "database": request.env.cr.dbname,
+    }
+
+
 def _guard(handler, route):
     try:
         return handler()
@@ -214,6 +232,9 @@ class MdmProductApi(http.Controller):
             "requestId": record.request_id,
             "accepted": 0 if duplicate else len(items),
             "duplicate": duplicate,
+            # Echoed on the write path, not only on /ping: this is the response a
+            # caller sees at the moment master data is about to change.
+            **_environment(),
         }
         if not duplicate:
             data["skuCodes"] = [str(i.get("skuCode") or i.get("udf2") or "") for i in items[:100]]
@@ -434,5 +455,6 @@ class MdmProductApi(http.Controller):
                 "enabled": _enabled(),
                 "dryRun": _param("mdm_dry_run", "0") in ("1", "true", "True"),
                 "version": VERSION,
+                **_environment(),
             }
         )

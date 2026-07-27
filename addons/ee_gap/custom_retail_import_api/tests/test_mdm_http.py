@@ -61,6 +61,27 @@ class TestMdmHttp(HttpCase):
         self.assertEqual(self._get("/api/mdm/ping", key="wrong").status_code, 401)
         self.assertEqual(self._get("/api/mdm/ping", key=None).status_code, 401)
 
+    def test_endpoint_states_which_system_it_is(self):
+        """UAT and production differ only by a path prefix the caller cannot see.
+
+        So the endpoint has to say which system it is, on the write path and not
+        only on a health check — otherwise a misconfigured client has no way to
+        detect that it is about to change live master data.
+        """
+        self.env["ir.config_parameter"].sudo().set_param("retail_import.mdm_environment", "uat")
+
+        ping = self._get("/api/mdm/ping").json()["data"]
+        self.assertEqual(ping["environment"], "uat")
+        self.assertEqual(ping["database"], self.env.cr.dbname)
+
+        accepted = self._post(item(), request_id="http-env").json()["data"]
+        self.assertEqual(accepted["environment"], "uat")
+        self.assertEqual(accepted["database"], self.env.cr.dbname)
+
+    def test_unset_environment_does_not_read_as_reassuring(self):
+        self.env["ir.config_parameter"].sudo().search([("key", "=", "retail_import.mdm_environment")]).unlink()
+        self.assertEqual(self._get("/api/mdm/ping").json()["data"]["environment"], "unknown")
+
     def test_post_without_a_user_still_sets_the_company(self):
         """The regression test for the NOT NULL crash on company_id.
 
