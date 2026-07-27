@@ -41,12 +41,16 @@ export class WmsHhtShell extends Component {
             warehouseId: Number(localStorage.getItem(WAREHOUSE_KEY)) || null,
             user: "",
             banner: null, // {kind: 'ok'|'error', text}
+            // The prompt lives in reactive state: kept on the plain
+            // scanTarget object it went stale, so the box still read "Scan
+            // transfer" after the operator had moved to another screen.
+            scanPrompt: "Scan barcode",
         });
         this.scanRef = useRef("scanInput");
         // The active page registers a handler here, so the single scan box at
         // the top of the shell always drives whatever screen is open — the
         // operator never has to find the right input on a 4" display.
-        this.scanTarget = { handler: null, prompt: "Scan barcode" };
+        this.scanTarget = { handler: null };
 
         this._onOnline = () => (this.state.online = true);
         this._onOffline = () => (this.state.online = false);
@@ -72,10 +76,6 @@ export class WmsHhtShell extends Component {
 
     get current() {
         return MENU.find((m) => m.id === this.state.active) || MENU[0];
-    }
-
-    get scanPrompt() {
-        return this.scanTarget.prompt || "Scan barcode";
     }
 
     async loadWarehouses() {
@@ -117,7 +117,8 @@ export class WmsHhtShell extends Component {
         this.state.active = id;
         this.state.sidebarOpen = false;
         this.state.banner = null;
-        this.scanTarget = { handler: null, prompt: "Scan barcode" };
+        this.scanTarget = { handler: null };
+        this.state.scanPrompt = "Scan barcode";
         this.focusScan();
     }
 
@@ -131,7 +132,8 @@ export class WmsHhtShell extends Component {
 
     /** Pages call this in setup/onMounted to own the shell's scan box. */
     setScanTarget(handler, prompt) {
-        this.scanTarget = { handler, prompt: prompt || "Scan barcode" };
+        this.scanTarget = { handler };
+        this.state.scanPrompt = prompt || "Scan barcode";
         this.focusScan();
     }
 

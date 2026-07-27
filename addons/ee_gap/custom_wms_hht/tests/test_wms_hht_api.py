@@ -258,6 +258,115 @@ class TestWmsHhtApi(TransactionCase):
         self.assertEqual(res["package"]["name"], pack.name)
         self.assertFalse(missing["ok"])
 
+    # -- transfer orders / counting ------------------------------------
+    #
+    # These call the *list* endpoints against populated data on purpose: the
+    # first version of bin2bin_list read `to.picking_id`, a field that does
+    # not exist on custom.transfer.order, and no test noticed because the
+    # fixture had no transfer order to serialise.
+
+    def _transfer_order(self):
+        bin_b = self.env["stock.location"].create(
+            {
+                "name": "HHT-B-01",
+                "usage": "internal",
+                "location_id": self.stock_loc.id,
+                "barcode": "HHT-B-01",
+            }
+        )
+        self.env["stock.quant"]._update_available_quantity(self.plain, self.bin_a, 10)
+        move = self.env["custom.to.engine"].materialize(
+            {
+                "source_location_id": self.bin_a.id,
+                "target_location_id": bin_b.id,
+                "product_id": self.plain.id,
+                "planned_qty": 4.0,
+                "company_id": self.env.company.id,
+            }
+        )
+        return self.env["custom.transfer.order"].search(
+            [("stock_move_id", "=", move.id)], limit=1
+        ), bin_b
+
+    def test_bin2bin_list_serialises_a_real_order(self):
+        order, _bin_b = self._transfer_order()
+        with self._patch_request():
+            res = self.controller.bin2bin_list()
+        self.assertTrue(res["ok"], res.get("error"))
+        names = [o["name"] for o in res["orders"]]
+        self.assertIn(order.name, names)
+
+    def test_bin2bin_execute_moves_the_stock(self):
+        order, bin_b = self._transfer_order()
+        with self._patch_request():
+            res = self.controller.bin2bin_execute(
+                transfer_order_id=order.id,
+                source_barcode="HHT-A-01",
+                target_barcode="HHT-B-01",
+            )
+        self.assertTrue(res["ok"], res.get("error"))
+        self.assertEqual(order.stock_move_id.state, "done")
+        moved = self.env["stock.quant"]._get_available_quantity(self.plain, bin_b)
+        self.assertEqual(moved, 4.0)
+
+    def test_bin2bin_execute_rejects_the_wrong_bin(self):
+        order, _bin_b = self._transfer_order()
+        with self._patch_request():
+            res = self.controller.bin2bin_execute(
+                transfer_order_id=order.id, source_barcode="HHT-B-01"
+            )
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["error_code"], "MISMATCH")
+        self.assertNotEqual(order.stock_move_id.state, "done")
+
+    def _count_session(self):
+        self.env["stock.quant"]._update_available_quantity(self.plain, self.bin_a, 7)
+        plan = self.env["custom.cycle.count.plan"].create(
+            {
+                "name": "HHT Count Plan",
+                "warehouse_id": self.warehouse.id,
+                "method": "random",
+                "company_id": self.env.company.id,
+            }
+        )
+        wiz = self.env["custom.cycle.count.start.wizard"].create(
+            {"plan_id": plan.id, "target_count": 5}
+        )
+        action = wiz.action_start()
+        return self.env["custom.cycle.count.session"].browse(action["res_id"])
+
+    def test_count_lines_and_submit(self):
+        session = self._count_session()
+        with self._patch_request():
+            listed = self.controller.count_sessions()
+            lines = self.controller.count_lines(session_id=session.id)
+            self.assertTrue(lines["ok"], lines.get("error"))
+            self.assertTrue(lines["lines"], "the session should expose its lines")
+            line = lines["lines"][0]
+            res = self.controller.count_submit(line_id=line["id"], quantity=line["expected_qty"] - 1)
+        self.assertTrue(listed["ok"])
+        self.assertTrue(res["ok"], res.get("error"))
+        self.assertEqual(res["line"]["variance_qty"], -1.0)
+
+    def test_every_list_endpoint_answers_ok(self):
+        """Smoke: each screen's first call must not blow up on real data."""
+        self._transfer_order()
+        self._count_session()
+        self._receipt([(self.plain, 2)])
+        self._delivery(self.plain, 1)
+        with self._patch_request():
+            results = {
+                "queue": self.controller.queue(),
+                "warehouses": self.controller.warehouses(),
+                "incoming": self.controller.pickings(code="incoming"),
+                "internal": self.controller.pickings(code="internal"),
+                "outgoing": self.controller.pickings(code="outgoing"),
+                "bin2bin": self.controller.bin2bin_list(),
+                "count": self.controller.count_sessions(),
+            }
+        broken = {k: v.get("error") for k, v in results.items() if not v["ok"]}
+        self.assertFalse(broken, f"list endpoints failing: {broken}")
+
     # -- errors --------------------------------------------------------
 
     def test_business_error_is_json_not_a_traceback(self):

@@ -719,7 +719,9 @@ class WmsHhtApi(http.Controller):
                     "source_barcode": to.source_location_id.barcode or "",
                     "target": to.target_location_id.display_name,
                     "target_barcode": to.target_location_id.barcode or "",
-                    "picking": to.picking_id.name if to.picking_id else "",
+                    # A transfer order carries a stock.move, not a picking —
+                    # the engine materialises bare moves.
+                    "picking": to.stock_move_id.picking_id.name if to.stock_move_id.picking_id else "",
                     "reason": to.rule_id.name or "",
                 }
                 for to in tos

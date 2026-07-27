@@ -60,7 +60,7 @@
                            t-ref="scanInput"
                            autocomplete="off"
                            autofocus="autofocus"
-                           t-att-placeholder="scanPrompt"
+                           t-att-placeholder="state.scanPrompt"
                            t-on-keydown="(ev) => this.onScanKeydown(ev)"/>
                 </section>
 
