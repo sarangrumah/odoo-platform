@@ -154,6 +154,32 @@ $wms-sidebar-w: 208px;
     .wms-hint, .wms-empty { color: $wms-muted; padding: 16px 4px; }
     .wms-hint.inline { padding: 0 8px; }
     .wms-empty.small { padding: 8px 4px; font-size: 13px; }
+    /* A scan that narrowed the list must say so — an operator who cannot see
+     * why the list is short will assume the work went missing. */
+    .wms-filter {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding: 8px 10px;
+        border: 1px solid $wms-accent-dim;
+        border-radius: 8px;
+        background: rgba(34, 197, 94, 0.10);
+        font-size: 13px;
+        color: $wms-text;
+
+        .wms-filter-clear {
+            min-height: 36px;
+            padding: 0 12px;
+            border: 1px solid $wms-border;
+            border-radius: 6px;
+            background: $wms-panel-2;
+            color: $wms-text;
+            font-size: 13px;
+        }
+    }
+
     .wms-section-title {
         margin: 16px 0 6px;
         font-size: 12px;
@@ -254,6 +280,36 @@ $wms-sidebar-w: 208px;
         .wms-proposal-loc { font-weight: 600; }
         .wms-proposal-why { margin-left: auto; font-size: 11px; text-align: right; }
     }
+
+    // Stock-check header: four figures side by side on a 4" display, so the
+    // labels have to be tiny and the numbers big — the operator reads these
+    // at arm's length while holding a carton.
+    .wms-stats {
+        display: flex; gap: 6px; margin-bottom: 10px;
+        .wms-stat {
+            flex: 1; min-width: 0; text-align: center;
+            background: $wms-panel; border: 1px solid $wms-border; border-radius: 8px;
+            padding: 8px 4px;
+            &.accent .wms-stat-value { color: $wms-accent; }
+            &.warn .wms-stat-value { color: $wms-warn; }
+        }
+        .wms-stat-value {
+            display: block; font-size: 19px; font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+        .wms-stat-label {
+            display: block; font-size: 10px; text-transform: uppercase;
+            letter-spacing: 0.5px; color: $wms-muted; margin-top: 2px;
+        }
+    }
+
+    .wms-meta-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;
+        font-size: 13px; margin-bottom: 12px;
+        .wms-name { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    }
+
+    .wms-resv { color: $wms-warn; font-size: 12px; }
 
     .wms-nextpick {
         background: $wms-panel; border: 1px solid $wms-accent-dim; border-radius: 10px;

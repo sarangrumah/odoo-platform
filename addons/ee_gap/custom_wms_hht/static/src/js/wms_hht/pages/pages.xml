@@ -7,8 +7,14 @@
     <t t-name="custom_wms_hht.ReceivePage">
         <div class="wms-page">
             <t t-if="!state.picking">
+                <div class="wms-filter" t-if="state.filter">
+                    <span><i class="fa fa-filter"/> filter: <t t-esc="state.filter"/></span>
+                    <button class="wms-filter-clear" t-on-click="() => this.clearFilter()">
+                        <i class="fa fa-times"/> show all
+                    </button>
+                </div>
                 <div class="wms-hint" t-if="state.loading">Loading receipts…</div>
-                <div class="wms-empty" t-elif="!state.pickings.length">No open receipts.</div>
+                <div class="wms-empty" t-elif="!state.pickings.length" t-esc='state.filter ? "Nothing open matches that scan." : "No open receipts."'/>
                 <t t-foreach="state.pickings" t-as="p" t-key="p.id">
                     <button class="wms-card" t-on-click="() => this.open(p.id)">
                         <div class="wms-card-head">
@@ -98,8 +104,14 @@
     <t t-name="custom_wms_hht.PutawayPage">
         <div class="wms-page">
             <t t-if="!state.picking">
+                <div class="wms-filter" t-if="state.filter">
+                    <span><i class="fa fa-filter"/> filter: <t t-esc="state.filter"/></span>
+                    <button class="wms-filter-clear" t-on-click="() => this.clearFilter()">
+                        <i class="fa fa-times"/> show all
+                    </button>
+                </div>
                 <div class="wms-hint" t-if="state.loading">Loading transfers…</div>
-                <div class="wms-empty" t-elif="!state.pickings.length">Nothing waiting for put-away.</div>
+                <div class="wms-empty" t-elif="!state.pickings.length" t-esc='state.filter ? "Nothing waiting matches that scan." : "Nothing waiting for put-away."'/>
                 <t t-foreach="state.pickings" t-as="p" t-key="p.id">
                     <button class="wms-card" t-on-click="() => this.open(p.id)">
                         <div class="wms-card-head">
@@ -172,8 +184,14 @@
     <t t-name="custom_wms_hht.PickPage">
         <div class="wms-page">
             <t t-if="!state.picking">
+                <div class="wms-filter" t-if="state.filter">
+                    <span><i class="fa fa-filter"/> filter: <t t-esc="state.filter"/></span>
+                    <button class="wms-filter-clear" t-on-click="() => this.clearFilter()">
+                        <i class="fa fa-times"/> show all
+                    </button>
+                </div>
                 <div class="wms-hint" t-if="state.loading">Loading orders…</div>
-                <div class="wms-empty" t-elif="!state.pickings.length">No deliveries to pick.</div>
+                <div class="wms-empty" t-elif="!state.pickings.length" t-esc='state.filter ? "No delivery matches that scan." : "No deliveries to pick."'/>
                 <t t-foreach="state.pickings" t-as="p" t-key="p.id">
                     <button class="wms-card" t-on-click="() => this.open(p.id)">
                         <div class="wms-card-head">
@@ -345,8 +363,14 @@
     <t t-name="custom_wms_hht.CountPage">
         <div class="wms-page">
             <t t-if="!state.session">
+                <div class="wms-filter" t-if="state.filter">
+                    <span><i class="fa fa-filter"/> filter: <t t-esc="state.filter"/></span>
+                    <button class="wms-filter-clear" t-on-click="() => this.clearFilter()">
+                        <i class="fa fa-times"/> show all
+                    </button>
+                </div>
                 <div class="wms-hint" t-if="state.loading">Loading sessions…</div>
-                <div class="wms-empty" t-elif="!state.sessions.length">No open counting session.</div>
+                <div class="wms-empty" t-elif="!state.sessions.length" t-esc='state.filter ? "No count sheet matches that scan." : "No open counting session."'/>
                 <t t-foreach="state.sessions" t-as="s" t-key="s.id">
                     <button class="wms-card" t-on-click="() => this.open(s.id)">
                         <div class="wms-card-head">
@@ -412,8 +436,14 @@
     <t t-name="custom_wms_hht.BinToBinPage">
         <div class="wms-page">
             <t t-if="!state.order">
+                <div class="wms-filter" t-if="state.filter">
+                    <span><i class="fa fa-filter"/> filter: <t t-esc="state.filter"/></span>
+                    <button class="wms-filter-clear" t-on-click="() => this.clearFilter()">
+                        <i class="fa fa-times"/> show all
+                    </button>
+                </div>
                 <div class="wms-hint" t-if="state.loading">Loading transfer orders…</div>
-                <div class="wms-empty" t-elif="!state.orders.length">No replenishment waiting.</div>
+                <div class="wms-empty" t-elif="!state.orders.length" t-esc='state.filter ? "No move matches that scan." : "No replenishment waiting."'/>
                 <t t-foreach="state.orders" t-as="o" t-key="o.id">
                     <button class="wms-card" t-on-click="() => this.open(o)">
                         <div class="wms-card-head">
@@ -462,6 +492,102 @@
                     <div class="wms-name" t-if="state.order.lot">lot <t t-esc="state.order.lot"/></div>
                     <div class="wms-nextpick-qty">move <strong t-esc="qty(state.order.planned_qty)"/></div>
                 </div>
+            </t>
+        </div>
+    </t>
+
+    <t t-name="custom_wms_hht.StockPage">
+        <div class="wms-page">
+            <div class="wms-hint" t-if="!state.result and !state.busy">
+                Scan any product barcode — EAN-13, GTIN-14, a GS1 label, an internal
+                reference or a lot/serial number — to see what it is, how much is on
+                hand and in which bins. Nothing is moved by this screen.
+            </div>
+            <div class="wms-hint" t-if="state.busy">Looking up…</div>
+
+            <t t-if="state.result">
+                <div class="wms-detail-head">
+                    <button class="wms-back" t-on-click="() => this.clear()"><i class="fa fa-times"/></button>
+                    <div>
+                        <div class="wms-detail-title" t-esc="state.result.product.default_code or state.result.product.name"/>
+                        <div class="wms-detail-sub" t-esc="state.result.product.name"/>
+                    </div>
+                </div>
+
+                <!-- Inventory header: the four numbers an operator in an aisle
+                     actually acts on, before any per-bin detail. -->
+                <div class="wms-stats">
+                    <div class="wms-stat">
+                        <span class="wms-stat-value" t-esc="qty(state.result.totals.on_hand)"/>
+                        <span class="wms-stat-label">On hand</span>
+                    </div>
+                    <div class="wms-stat accent">
+                        <span class="wms-stat-value" t-esc="qty(state.result.totals.available)"/>
+                        <span class="wms-stat-label">Available</span>
+                    </div>
+                    <div class="wms-stat" t-att-class="state.result.totals.reserved ? 'warn' : ''">
+                        <span class="wms-stat-value" t-esc="qty(state.result.totals.reserved)"/>
+                        <span class="wms-stat-label">Reserved</span>
+                    </div>
+                    <div class="wms-stat">
+                        <span class="wms-stat-value" t-esc="state.result.totals.bin_count"/>
+                        <span class="wms-stat-label">Bins</span>
+                    </div>
+                </div>
+
+                <div class="wms-meta-grid">
+                    <div><span class="wms-name">Barcode</span> <t t-esc="state.result.product.barcode or '—'"/></div>
+                    <div><span class="wms-name">UoM</span> <t t-esc="state.result.product.uom"/></div>
+                    <div><span class="wms-name">Tracking</span> <t t-esc="state.result.product.tracking"/></div>
+                    <div><span class="wms-name">Category</span> <t t-esc="state.result.product.category or '—'"/></div>
+                    <div t-if="state.result.warehouse"><span class="wms-name">Warehouse</span> <t t-esc="state.result.warehouse"/></div>
+                    <div t-if="state.result.scanned !== state.result.product.barcode">
+                        <span class="wms-name">Scanned</span> <t t-esc="state.result.scanned"/>
+                    </div>
+                </div>
+
+                <!-- Where the engine would put this item now. Shown in the header
+                     block because a stock check is most often the step before a
+                     replenishment decision. -->
+                <div class="wms-section-title" t-if="state.result.suggestions.length">Suggested location</div>
+                <t t-foreach="state.result.suggestions" t-as="s" t-key="s.location_id">
+                    <div class="wms-proposal" t-att-class="s_index === 0 ? 'top' : ''">
+                        <span class="wms-score" t-esc="s.score"/>
+                        <span class="wms-proposal-loc">
+                            <t t-esc="s.barcode or s.location"/>
+                            <i class="fa fa-check-circle" t-if="s.has_stock" title="already holds this product"/>
+                        </span>
+                        <span class="wms-proposal-why" t-esc="s.reason"/>
+                    </div>
+                </t>
+                <div class="wms-empty small" t-if="!state.result.suggestions.length">
+                    No put-away rule matches this product in this warehouse.
+                </div>
+
+                <div class="wms-section-title">Stock by location</div>
+                <div class="wms-empty small" t-if="!state.result.bins.length">
+                    No stock on hand in this warehouse.
+                </div>
+                <t t-foreach="state.result.bins" t-as="b" t-key="b.location_id">
+                    <div class="wms-line tappable" t-on-click="() => this.toggleBin(b.location_id)">
+                        <span class="wms-line-bin" t-esc="b.barcode or b.location"/>
+                        <span class="wms-name" t-esc="b.location"/>
+                        <span class="num">
+                            <t t-esc="qty(b.quantity)"/>
+                            <t t-if="b.reserved">
+                                <span class="wms-resv"> (<t t-esc="qty(b.reserved)"/> resv)</span>
+                            </t>
+                        </span>
+                    </div>
+                    <t t-if="this.isOpen(b.location_id)">
+                        <div class="wms-lot-row" t-foreach="b.lots" t-as="l" t-key="l.name">
+                            <span class="wms-lot-name" t-esc="l.name"/>
+                            <span class="wms-lot-exp" t-if="l.expiration_date">exp <t t-esc="l.expiration_date"/></span>
+                            <span class="num" t-esc="qty(l.quantity)"/>
+                        </div>
+                        <div class="wms-empty small" t-if="!b.lots.length">Not lot-tracked.</div>
+                    </t>
+                </t>
             </t>
         </div>
     </t>

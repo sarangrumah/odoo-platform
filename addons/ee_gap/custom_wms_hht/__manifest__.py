@@ -21,6 +21,8 @@ that actually moves stock through the WMS modules:
   move it bin-to-bin.
 - **Count** — cycle-count / spot-check sessions line by line.
 - **Bin-to-bin** — transfer-order proposals raised by the low-water engine.
+- **Stock check** — scan a product to see its details, the put-away
+  engine's suggested bin, and on-hand/reserved stock per bin. Read-only.
 
 Deliberately a separate module from ``custom_hht_bridge``: the bridge is
 installed on ARKA production databases that have none of the ``custom_wms_*``
@@ -29,7 +31,7 @@ models, and it must not be forced to upgrade for a WMS-only feature.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Mobile",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.3.0",
     "license": "LGPL-3",
     "depends": [
         "custom_hht_bridge",
@@ -68,12 +70,14 @@ models, and it must not be forced to upgrade for a WMS-only feature.
             # This app.
             "custom_wms_hht/static/src/scss/wms_hht.scss",
             "custom_wms_hht/static/src/js/wms_hht/rpc.js",
+            "custom_wms_hht/static/src/js/wms_hht/pickingScan.js",
             "custom_wms_hht/static/src/js/wms_hht/pages/ReceivePage.js",
             "custom_wms_hht/static/src/js/wms_hht/pages/PutawayPage.js",
             "custom_wms_hht/static/src/js/wms_hht/pages/PickPage.js",
             "custom_wms_hht/static/src/js/wms_hht/pages/PackagePage.js",
             "custom_wms_hht/static/src/js/wms_hht/pages/CountPage.js",
             "custom_wms_hht/static/src/js/wms_hht/pages/BinToBinPage.js",
+            "custom_wms_hht/static/src/js/wms_hht/pages/StockPage.js",
             "custom_wms_hht/static/src/js/wms_hht/pages/pages.xml",
             "custom_wms_hht/static/src/js/wms_hht/wms_shell.js",
             "custom_wms_hht/static/src/js/wms_hht/wms_shell.xml",

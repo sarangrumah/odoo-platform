@@ -26,6 +26,10 @@ _logger = logging.getLogger(__name__)
 # default_code can, so products are resolved before lots.
 SCAN_KINDS = ("location", "package", "product", "lot", "picking")
 
+# The states a handheld considers "work still to do". Kept in one place so the
+# list screens, the queue badges and the scan-to-open search cannot drift.
+OPEN_PICKING_STATES = ("assigned", "confirmed", "waiting")
+
 
 def _ok(**payload):
     return dict(payload, ok=True)
@@ -103,6 +107,77 @@ class WmsHhtApi(http.Controller):
             warehouses=[{"id": w.id, "name": w.display_name, "code": w.code} for w in warehouses],
             default_id=default.id if default else False,
         )
+
+    @staticmethod
+    def _resolve_product(code):
+        """Turn one scanned string into a product, however it was encoded.
+
+        EAN-13, the GTIN-14 alias, a GS1 element string, or the internal
+        reference — the receive screen, the stock check and the document
+        search must all agree on what a label means, so they share this.
+        """
+        env = request.env
+        gs1 = env["custom.barcode.scan.session"].parse_gs1(code)
+        lookup = gs1.get("gtin") or code
+        product = env["product.product"]._resolve_barcode(lookup)
+        if not product and gs1.get("gtin"):
+            # GS1 AI 01 is 14 digits; the master data may hold the EAN-13.
+            product = env["product.product"]._resolve_barcode(gs1["gtin"].lstrip("0"))
+        if not product:
+            product = env["product.product"].search([("default_code", "=", code)], limit=1)
+        return product, gs1
+
+    @staticmethod
+    def _find_pickings(base_domain, term, limit=40):
+        """Find every transfer a scanned or typed code could mean.
+
+        An operator scans what is physically in front of them: the transfer
+        label, the vendor's delivery note (which lands in ``origin``), the
+        carrier's tracking number, or — when the paperwork is missing or
+        unreadable — an item out of the carton. Matching only
+        ``stock.picking.name`` made all but the first of those answer "Unknown
+        barcode", so the list just sat there unfiltered and the operator had
+        to scroll: the behaviour reported from the floor.
+
+        Returns ``(pickings, matched_by)``; ``matched_by`` tells the screen why
+        it matched so it can say so instead of silently changing the list.
+        """
+        Picking = request.env["stock.picking"]
+        open_domain = base_domain + [("state", "in", OPEN_PICKING_STATES)]
+
+        # An exact document number is unambiguous and must win over a partial
+        # that happens to also match — scanning WH/IN/00007 never means "the
+        # eleven receipts whose origin contains 7".
+        exact = Picking.search(open_domain + [("name", "=ilike", term)], limit=limit)
+        if exact:
+            return exact, "name"
+
+        text_domain = ["|", "|", ("name", "ilike", term), ("origin", "ilike", term),
+                       ("partner_id.name", "ilike", term)]
+        if "carrier_tracking_ref" in Picking._fields:
+            text_domain = ["|"] + text_domain + [("carrier_tracking_ref", "ilike", term)]
+        text = Picking.search(open_domain + text_domain, limit=limit)
+        if text:
+            return text, "reference"
+
+        product, _gs1 = WmsHhtApi._resolve_product(term)
+        if not product:
+            lot = request.env["stock.lot"].search([("name", "=", term)], limit=1)
+            product = lot.product_id
+        if product:
+            by_product = Picking.search(
+                open_domain + [("move_ids.product_id", "=", product.id)], limit=limit
+            )
+            if by_product:
+                return by_product, "product"
+
+        # Last resort, and deliberately outside the open states: a transfer the
+        # operator is holding paperwork for may already be validated or still
+        # draft. Finding it and being told its state beats "Unknown barcode".
+        closed = Picking.search(
+            base_domain + ["|", ("name", "=ilike", term), ("origin", "ilike", term)], limit=limit
+        )
+        return closed, "closed" if closed else ""
 
     @staticmethod
     def _picking_payload(picking, with_lines=False):
@@ -228,14 +303,7 @@ class WmsHhtApi(http.Controller):
                 if pack:
                     return _ok(kind="package", record=self._package_payload(pack))
             elif kind == "product":
-                gs1 = env["custom.barcode.scan.session"].parse_gs1(code)
-                lookup = gs1.get("gtin") or code
-                product = env["product.product"]._resolve_barcode(lookup)
-                if not product and gs1.get("gtin"):
-                    # GS1 AI 01 is 14 digits; the master data may hold the EAN-13.
-                    product = env["product.product"]._resolve_barcode(gs1["gtin"].lstrip("0"))
-                if not product:
-                    product = env["product.product"].search([("default_code", "=", code)], limit=1)
+                product, gs1 = self._resolve_product(code)
                 if product:
                     return _ok(
                         kind="product",
@@ -263,9 +331,15 @@ class WmsHhtApi(http.Controller):
                         },
                     )
             elif kind == "picking":
-                picking = env["stock.picking"].search([("name", "=", code)], limit=1)
-                if picking:
-                    return _ok(kind="picking", record=self._picking_payload(picking))
+                # Same search the list screens use, so a code that opens a
+                # receipt there is never "unknown" here (and vice versa).
+                pickings, matched_by = self._find_pickings([], code, limit=1)
+                if pickings:
+                    return _ok(
+                        kind="picking",
+                        record=self._picking_payload(pickings[0]),
+                        matched_by=matched_by,
+                    )
 
         return _err(_("Unknown barcode: %s") % code, code="NOT_FOUND", barcode=code)
 
@@ -330,18 +404,33 @@ class WmsHhtApi(http.Controller):
 
     @http.route("/hht/wms/pickings", type="jsonrpc", auth="user", methods=["POST"])
     @guarded
-    def pickings(self, code="incoming", limit=40, warehouse_id=None, **_kw):
+    def pickings(self, code="incoming", limit=40, warehouse_id=None, query=None, **_kw):
+        """The open work list, optionally narrowed by a scan or typed query.
+
+        ``query`` is what the operator scanned on the list screen. The screen
+        opens the document straight away when exactly one transfer matches,
+        and shows the narrowed list when several do.
+        """
         wh = self._warehouse(warehouse_id)
-        domain = [
-            ("state", "in", ("assigned", "confirmed", "waiting")),
-            ("picking_type_id.code", "=", code),
-        ]
+        base = [("picking_type_id.code", "=", code)]
         if wh:
-            domain.append(("picking_type_id.warehouse_id", "=", wh.id))
+            base.append(("picking_type_id.warehouse_id", "=", wh.id))
+
+        term = (query or "").strip()
+        if term:
+            pickings, matched_by = self._find_pickings(base, term, limit=int(limit))
+            return _ok(
+                pickings=[self._picking_payload(p) for p in pickings],
+                query=term,
+                matched_by=matched_by,
+            )
+
         pickings = request.env["stock.picking"].search(
-            domain, limit=int(limit), order="scheduled_date, priority desc"
+            base + [("state", "in", OPEN_PICKING_STATES)],
+            limit=int(limit),
+            order="scheduled_date, priority desc",
         )
-        return _ok(pickings=[self._picking_payload(p) for p in pickings])
+        return _ok(pickings=[self._picking_payload(p) for p in pickings], query="", matched_by="")
 
     @http.route("/hht/wms/picking", type="jsonrpc", auth="user", methods=["POST"])
     @guarded
@@ -430,6 +519,140 @@ class WmsHhtApi(http.Controller):
         return _ok(
             qc_state=picking.wms_qc_state,
             release_picking=self._picking_payload(release) if release else None,
+        )
+
+    # ------------------------------------------------------------------
+    # Stock check
+    # ------------------------------------------------------------------
+
+    @http.route("/hht/wms/stock/lookup", type="jsonrpc", auth="user", methods=["POST"])
+    @guarded
+    def stock_lookup(self, barcode=None, warehouse_id=None, **_kw):
+        """Answer "what is this and where is it?" for a single scanned product.
+
+        Read-only on purpose: an operator standing in an aisle needs to check
+        an item without the risk of moving it. Everything shown here already
+        exists elsewhere in the app — the product resolution is the same one
+        the receive screen uses (EAN-13, GTIN-14 alias, GS1 element string,
+        internal reference), and the bin ranking is the put-away engine's —
+        so a stock check and a real put-away can never disagree.
+        """
+        env = request.env
+        code = (barcode or "").strip()
+        if not code:
+            return _err(_("Empty barcode"), code="EMPTY_BARCODE")
+
+        product, gs1 = self._resolve_product(code)
+        if not product:
+            # A lot/serial label identifies its product just as well, and is
+            # what an operator finds on a box in the aisle.
+            lot = env["stock.lot"].search([("name", "=", code)], limit=1)
+            if lot:
+                product = lot.product_id
+        if not product:
+            return _err(_("Unknown barcode: %s") % code, code="NOT_FOUND", barcode=code)
+
+        wh = self._warehouse(warehouse_id)
+        quant_domain = [("product_id", "=", product.id), ("location_id.usage", "=", "internal")]
+        if wh:
+            quant_domain.append(("location_id", "child_of", wh.view_location_id.id))
+        quants = env["stock.quant"].search(quant_domain)
+
+        # One row per bin: an operator walks to a bin, not to a quant, so
+        # several lots in the same bin must read as one stop with its lots
+        # spelled out underneath.
+        bins = {}
+        for q in quants:
+            row = bins.setdefault(
+                q.location_id.id,
+                {
+                    "location_id": q.location_id.id,
+                    "location": q.location_id.complete_name,
+                    "barcode": q.location_id.barcode or "",
+                    "quantity": 0.0,
+                    "reserved": 0.0,
+                    "lots": [],
+                },
+            )
+            row["quantity"] += q.quantity
+            row["reserved"] += q.reserved_quantity
+            if q.lot_id:
+                row["lots"].append(
+                    {
+                        "name": q.lot_id.name,
+                        "quantity": q.quantity,
+                        "expiration_date": (
+                            q.lot_id.expiration_date and str(q.lot_id.expiration_date)[:10] or ""
+                        ),
+                    }
+                )
+        rows = sorted(bins.values(), key=lambda r: (-r["quantity"], r["location"]))
+        for row in rows:
+            row["available"] = row["quantity"] - row["reserved"]
+            row["lots"].sort(key=lambda l: -l["quantity"])
+
+        on_hand = sum(r["quantity"] for r in rows)
+        reserved = sum(r["reserved"] for r in rows)
+
+        # Bins holding stock, by `parent_path`, so a zone-level suggestion can
+        # be told apart from a genuinely empty one: rules often target a zone
+        # (JDC-HD) while the stock sits in a child bin (JDC-HD-A-01), and
+        # comparing ids alone reports every such zone as empty.
+        stocked_paths = [q.location_id.parent_path or "" for q in quants]
+
+        suggestions = []
+        if wh:
+            seen = set()
+            for p in env["custom.putaway.engine"].propose_for_product(product, wh):
+                # Two rules can rank the same bin; the operator walks there
+                # once, so only the best-scoring proposal for it is shown.
+                if p["location_id"] in seen:
+                    continue
+                seen.add(p["location_id"])
+                loc = env["stock.location"].browse(p["location_id"])
+                prefix = loc.parent_path or ""
+                suggestions.append(
+                    {
+                        "location_id": loc.id,
+                        "location": loc.complete_name,
+                        "barcode": loc.barcode or "",
+                        "score": p["score"],
+                        "reason": p["reason"],
+                        "tier": p.get("tier"),
+                        # Flagging a bin the product already sits in turns a
+                        # bare ranking into an actionable one: consolidating
+                        # into an occupied bin beats opening a new one.
+                        "has_stock": bool(
+                            prefix and any(path.startswith(prefix) for path in stocked_paths)
+                        ),
+                    }
+                )
+                if len(suggestions) == 3:
+                    break
+
+        return _ok(
+            product={
+                "id": product.id,
+                "name": product.display_name,
+                "default_code": product.default_code or "",
+                "barcode": product.barcode or "",
+                "category": product.categ_id.display_name or "",
+                "uom": product.uom_id.name,
+                "tracking": product.tracking,
+                "weight": product.weight or 0.0,
+                "volume": product.volume or 0.0,
+            },
+            scanned=code,
+            gs1=gs1 or {},
+            warehouse=wh.name if wh else "",
+            totals={
+                "on_hand": on_hand,
+                "reserved": reserved,
+                "available": on_hand - reserved,
+                "bin_count": len(rows),
+            },
+            bins=rows,
+            suggestions=suggestions,
         )
 
     # ------------------------------------------------------------------
@@ -629,11 +852,22 @@ class WmsHhtApi(http.Controller):
 
     @http.route("/hht/wms/count/sessions", type="jsonrpc", auth="user", methods=["POST"])
     @guarded
-    def count_sessions(self, **_kw):
-        sessions = request.env["custom.cycle.count.session"].search(
-            [("state", "in", ("draft", "in_progress", "reviewing"))], limit=20
-        )
+    def count_sessions(self, query=None, **_kw):
+        domain = [("state", "in", ("draft", "in_progress", "reviewing"))]
+        term = (query or "").strip()
+        if term:
+            # A count sheet is found by its own number, by the plan it came
+            # from, or by scanning any bin or item that is on it — the three
+            # things an operator can actually read off the floor.
+            product, _gs1 = self._resolve_product(term)
+            sub = ["|", ("name", "ilike", term), ("plan_id.name", "ilike", term)]
+            sub = ["|"] + sub + [("line_ids.location_id.barcode", "=", term)]
+            if product:
+                sub = ["|"] + sub + [("line_ids.product_id", "=", product.id)]
+            domain += sub
+        sessions = request.env["custom.cycle.count.session"].search(domain, limit=20)
         return _ok(
+            query=term,
             sessions=[
                 {
                     "id": s.id,
@@ -701,11 +935,23 @@ class WmsHhtApi(http.Controller):
 
     @http.route("/hht/wms/bin2bin/list", type="jsonrpc", auth="user", methods=["POST"])
     @guarded
-    def bin2bin_list(self, **_kw):
-        tos = request.env["custom.transfer.order"].search(
-            [("state", "in", ("draft", "proposed"))], limit=40
-        )
+    def bin2bin_list(self, query=None, **_kw):
+        domain = [("state", "in", ("draft", "proposed"))]
+        term = (query or "").strip()
+        if term:
+            # Scanning the bin you are standing at is the natural way in here:
+            # it answers "is there anything to move out of / into this bin?".
+            product, _gs1 = self._resolve_product(term)
+            sub = ["|", "|",
+                   ("name", "ilike", term),
+                   ("source_location_id.barcode", "=", term),
+                   ("target_location_id.barcode", "=", term)]
+            if product:
+                sub = ["|"] + sub + [("product_id", "=", product.id)]
+            domain += sub
+        tos = request.env["custom.transfer.order"].search(domain, limit=40)
         return _ok(
+            query=term,
             orders=[
                 {
                     "id": to.id,

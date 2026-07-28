@@ -18,6 +18,7 @@ export class BinToBinPage extends Component {
         this.state = useState({
             loading: true,
             orders: [],
+            filter: "", // scanned code the order list is narrowed by
             order: null,
             step: "source", // source -> target -> done
             sourceScan: "",
@@ -33,7 +34,36 @@ export class BinToBinPage extends Component {
         if (!res.ok) return this.props.notify("error", res.error);
         this.state.orders = res.orders;
         this.state.order = null;
-        this.props.setScanTarget(() => this.props.notify("error", "Pick a transfer order first."), "Select an order");
+        this.state.filter = "";
+        // Scanning the bin the operator is standing at answers "is there
+        // anything to move out of here?" — better than refusing the scan.
+        this.props.setScanTarget((code) => this.findOrder(code), "Scan bin / item / order no.");
+    }
+
+    async findOrder(code) {
+        const res = await call("/hht/wms/bin2bin/list", { query: code });
+        if (!res.ok) return this.props.notify("error", res.error);
+        const hits = res.orders || [];
+        if (!hits.length) return this.props.notify("error", `No move to make for ${code}.`);
+        if (hits.length === 1) {
+            this.state.filter = "";
+            const order = hits[0];
+            this.open(order);
+            // Scanning the source bin is step one anyway — don't make the
+            // operator scan the same label twice.
+            if (order.source_barcode && order.source_barcode === code.trim()) {
+                return this.onScan(code);
+            }
+            return;
+        }
+        this.state.orders = hits;
+        this.state.filter = code;
+        this.props.notify("ok", `${hits.length} moves match ${code} — tap one.`);
+    }
+
+    /** Drop the scan filter and go back to the full order list. */
+    clearFilter() {
+        this.loadList();
     }
 
     open(order) {

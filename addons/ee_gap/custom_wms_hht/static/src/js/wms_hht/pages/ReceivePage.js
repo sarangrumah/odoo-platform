@@ -2,6 +2,7 @@
 // License: LGPL-3
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { call, qty } from "../rpc";
+import { scanIntoPickingList } from "../pickingScan";
 
 export class ReceivePage extends Component {
     static template = "custom_wms_hht.ReceivePage";
@@ -18,6 +19,7 @@ export class ReceivePage extends Component {
         this.state = useState({
             loading: true,
             pickings: [],
+            filter: "", // the scanned code the list is narrowed by, if any
             picking: null,
             lastScan: null,
             manualQty: "",
@@ -34,15 +36,21 @@ export class ReceivePage extends Component {
         if (!res.ok) return this.props.notify("error", res.error);
         this.state.pickings = res.pickings;
         this.state.picking = null;
+        this.state.filter = "";
         // On the list screen a scan jumps straight to the matching receipt —
-        // the operator scans the paperwork instead of hunting in a list.
-        this.props.setScanTarget((code) => this.openByBarcode(code), "Scan receipt / vendor doc");
+        // the operator scans the paperwork instead of hunting in a list. Any
+        // code on that paperwork works (receipt no., PO/origin, vendor,
+        // tracking), and so does an item out of the carton.
+        this.props.setScanTarget((code) => this.openByBarcode(code), "Scan receipt / PO / item");
     }
 
-    async openByBarcode(code) {
-        const res = await call("/hht/wms/scan/resolve", { barcode: code, expect: "picking" });
-        if (!res.ok) return this.props.notify("error", res.error);
-        await this.open(res.record.id);
+    openByBarcode(code) {
+        return scanIntoPickingList(this, "incoming", code);
+    }
+
+    /** Drop the scan filter and go back to the full work list. */
+    clearFilter() {
+        this.loadList();
     }
 
     async open(pickingId) {

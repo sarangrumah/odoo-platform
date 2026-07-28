@@ -9,6 +9,7 @@ import { PickPage } from "./pages/PickPage";
 import { PackagePage } from "./pages/PackagePage";
 import { CountPage } from "./pages/CountPage";
 import { BinToBinPage } from "./pages/BinToBinPage";
+import { StockPage } from "./pages/StockPage";
 
 // A handheld belongs to one warehouse at a time; remembering the choice keeps
 // an operator who reboots the device out of the wrong building's queue.
@@ -23,11 +24,14 @@ const MENU = [
     { id: "package", label: "Package", icon: "fa-cube", badge: null, Comp: PackagePage },
     { id: "count", label: "Stock Count", icon: "fa-list-ol", badge: "count", Comp: CountPage },
     { id: "bin2bin", label: "Bin to Bin", icon: "fa-exchange", badge: "bin2bin", Comp: BinToBinPage },
+    { id: "stock", label: "Stock Check", icon: "fa-search", badge: null, Comp: StockPage },
 ];
 
 export class WmsHhtShell extends Component {
     static template = "custom_wms_hht.WmsHhtShell";
-    static components = { ReceivePage, PutawayPage, PickPage, PackagePage, CountPage, BinToBinPage };
+    static components = {
+        ReceivePage, PutawayPage, PickPage, PackagePage, CountPage, BinToBinPage, StockPage,
+    };
     static props = {};
 
     setup() {

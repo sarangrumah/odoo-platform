@@ -18,6 +18,7 @@ export class CountPage extends Component {
         this.state = useState({
             loading: true,
             sessions: [],
+            filter: "", // scanned code the session list is narrowed by
             session: null,
             lines: [],
             active: null, // line being counted
@@ -34,8 +35,34 @@ export class CountPage extends Component {
         if (!res.ok) return this.props.notify("error", res.error);
         this.state.sessions = res.sessions;
         this.state.session = null;
+        this.state.filter = "";
         this.state.lines = [];
-        this.props.setScanTarget(() => this.props.notify("error", "Open a count session first."), "Open a session");
+        // Refusing every scan until a session is tapped open was the same
+        // dead-end as on Receive: the operator is standing at a bin holding a
+        // scanner, so let the bin (or the item, or the sheet number) find it.
+        this.props.setScanTarget((code) => this.findSession(code), "Scan count sheet / bin / item");
+    }
+
+    async findSession(code) {
+        const res = await call("/hht/wms/count/sessions", { query: code });
+        if (!res.ok) return this.props.notify("error", res.error);
+        const hits = res.sessions || [];
+        if (!hits.length) return this.props.notify("error", `No open count sheet covers ${code}.`);
+        if (hits.length === 1) {
+            this.state.filter = "";
+            // Carry the scan into the session: a bin scan should land on the
+            // line for that bin, not just open the sheet.
+            await this.open(hits[0].id);
+            return this.onScan(code);
+        }
+        this.state.sessions = hits;
+        this.state.filter = code;
+        this.props.notify("ok", `${hits.length} count sheets match ${code} — tap one.`);
+    }
+
+    /** Drop the scan filter and go back to the full session list. */
+    clearFilter() {
+        this.loadSessions();
     }
 
     async open(sessionId) {

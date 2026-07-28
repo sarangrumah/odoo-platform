@@ -2,6 +2,7 @@
 // License: LGPL-3
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { call, qty } from "../rpc";
+import { scanIntoPickingList } from "../pickingScan";
 
 export class PutawayPage extends Component {
     static template = "custom_wms_hht.PutawayPage";
@@ -18,6 +19,7 @@ export class PutawayPage extends Component {
         this.state = useState({
             loading: true,
             pickings: [],
+            filter: "", // the scanned code the list is narrowed by, if any
             picking: null,
             rows: [],
             activeRow: null, // move_line id awaiting a bin scan (override)
@@ -33,14 +35,18 @@ export class PutawayPage extends Component {
         if (!res.ok) return this.props.notify("error", res.error);
         this.state.pickings = res.pickings;
         this.state.picking = null;
+        this.state.filter = "";
         this.state.rows = [];
-        this.props.setScanTarget((code) => this.openByBarcode(code), "Scan transfer");
+        this.props.setScanTarget((code) => this.openByBarcode(code), "Scan transfer / source doc / item");
     }
 
-    async openByBarcode(code) {
-        const res = await call("/hht/wms/scan/resolve", { barcode: code, expect: "picking" });
-        if (!res.ok) return this.props.notify("error", res.error);
-        await this.open(res.record.id);
+    openByBarcode(code) {
+        return scanIntoPickingList(this, "internal", code);
+    }
+
+    /** Drop the scan filter and go back to the full work list. */
+    clearFilter() {
+        this.loadList();
     }
 
     async open(pickingId) {
