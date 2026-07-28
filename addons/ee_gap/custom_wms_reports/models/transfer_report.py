@@ -27,10 +27,18 @@ MOVE_STATE = [
 
 class WmsTransferReport(models.Model):
     _name = "custom.wms.transfer.report"
+    _inherit = ["custom.wms.xlsx.report"]
     _description = "Transfer Report"
     _auto = False
     _rec_name = "reference"
     _order = "date desc, id desc"
+    _depends = {
+        "stock.move": ["date", "reference", "origin", "picking_id", "picking_type_id",
+                       "location_id", "location_dest_id", "product_id", "product_uom_qty",
+                       "quantity", "state", "company_id"],
+        "stock.picking": ["partner_id"],
+        "product.product": ["default_code", "product_tmpl_id"],
+    }
 
     date = fields.Datetime(readonly=True)
     reference = fields.Char(readonly=True)
@@ -81,3 +89,30 @@ class WmsTransferReport(models.Model):
             )
             """
         )
+
+    # ------------------------------------------------------------------
+    # XLSX (barcode) export
+    # ------------------------------------------------------------------
+    def _xlsx_title(self):
+        return "WMS Transfer Report"
+
+    def _xlsx_doc_barcode(self, rec):
+        return rec.picking_id.name or rec.reference or ""
+
+    def _xlsx_columns(self):
+        return [
+            {"label": "Date", "value": lambda r: r.date, "type": "datetime", "width": 17},
+            {"label": "Reference", "value": lambda r: r.reference, "width": 20},
+            {"label": "Source Document", "value": lambda r: r.origin, "width": 18},
+            {"label": "Operation Type", "value": lambda r: r.picking_type_id.display_name, "width": 24},
+            {"label": "Kind", "value": lambda r: dict(TRANSFER_KIND).get(r.transfer_kind, r.transfer_kind),
+             "width": 15},
+            {"label": "Partner", "value": lambda r: r.partner_id.display_name, "width": 28},
+            {"label": "From", "value": lambda r: r.location_id.complete_name, "width": 26},
+            {"label": "To", "value": lambda r: r.location_dest_id.complete_name, "width": 26},
+            {"label": "SKU", "value": lambda r: r.default_code, "width": 14},
+            {"label": "Product", "value": lambda r: r.product_id.display_name, "width": 34},
+            {"label": "Demand", "value": lambda r: r.demand_qty, "type": "number", "width": 12, "total": True},
+            {"label": "Done", "value": lambda r: r.done_qty, "type": "number", "width": 12, "total": True},
+            {"label": "Status", "value": lambda r: dict(MOVE_STATE).get(r.state, r.state), "width": 16},
+        ]

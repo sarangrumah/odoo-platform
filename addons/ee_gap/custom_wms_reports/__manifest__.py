@@ -18,25 +18,33 @@ Closes the reporting gaps of the WMS stack (client requirements 11-15):
   (small random sample) + dedicated report view filtered on it.
 - **Transfer Report** — stock moves by operation type with demand/done qty
   (list + pivot).
+- **Scrap Report** — write-offs per bin / SKU / lot with scrap value and the
+  replenish flag (list + pivot) + printable Scrap Note PDF.
 
-All analysis models are read-only SQL views; use the native list export /
-pivot download for XLSX output.
+All analysis models are read-only SQL views. Each one also exports to
+**XLSX with embedded Code128 barcodes** — one column for the transaction
+(picking / scrap order / count session / bin) and one for the line item
+(lot when tracked, else the product EAN) — so the sheet stays scannable
+outside Odoo. The PDFs carry the same two barcode levels.
 """,
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Reporting",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": [
         "stock_account",
         "purchase_stock",
         "custom_wms_cycle_count",
+        "custom_wms_docs",
     ],
     "capability_tags": ["wms", "reporting"],
     "data": [
         "security/ir.model.access.csv",
         "report/stock_take_report_pdf.xml",
+        "report/scrap_note_pdf.xml",
         "views/purchase_return_report_views.xml",
+        "views/scrap_report_views.xml",
         "views/stock_summary_report_views.xml",
         "views/stock_take_report_views.xml",
         "views/transfer_report_views.xml",

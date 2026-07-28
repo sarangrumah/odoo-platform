@@ -18,10 +18,18 @@ COST_SQL = "COALESCE((pp.standard_price ->> m.company_id::text)::float, 0.0)"
 
 class WmsPurchaseReturnReport(models.Model):
     _name = "custom.wms.purchase.return.report"
+    _inherit = ["custom.wms.xlsx.report"]
     _description = "Purchase Return Report"
     _auto = False
     _rec_name = "reference"
     _order = "date desc, id desc"
+    _depends = {
+        "stock.move": ["date", "reference", "origin", "picking_id", "product_id", "quantity",
+                       "price_unit", "value", "origin_returned_move_id", "location_dest_id",
+                       "state", "company_id"],
+        "stock.picking": ["partner_id"],
+        "product.product": ["default_code", "standard_price", "product_tmpl_id"],
+    }
 
     date = fields.Datetime(readonly=True)
     reference = fields.Char(readonly=True)
@@ -87,3 +95,37 @@ class WmsPurchaseReturnReport(models.Model):
             )
             """
         )
+
+    # ------------------------------------------------------------------
+    # XLSX (barcode) export
+    # ------------------------------------------------------------------
+    def _xlsx_title(self):
+        return "WMS Purchase Return Report"
+
+    def _xlsx_doc_barcode(self, rec):
+        return rec.picking_id.name or rec.reference or ""
+
+    def _xlsx_line_barcode(self, rec):
+        # A return line is keyed on the SKU: the lots are aggregated into a
+        # display string by the view, so there is no single lot to scan.
+        return rec.product_id.barcode or rec.default_code or ""
+
+    def _xlsx_columns(self):
+        return [
+            {"label": "Date", "value": lambda r: r.date, "type": "datetime", "width": 17},
+            {"label": "Reference", "value": lambda r: r.reference, "width": 20},
+            {"label": "Source Document", "value": lambda r: r.origin, "width": 18},
+            {"label": "Supplier", "value": lambda r: r.partner_id.display_name, "width": 30},
+            {"label": "SKU", "value": lambda r: r.default_code, "width": 14},
+            {"label": "Product", "value": lambda r: r.product_id.display_name, "width": 34},
+            {"label": "Category", "value": lambda r: r.categ_id.display_name, "width": 20},
+            {"label": "Lots/Serials", "value": lambda r: r.lot_ids_display, "width": 22},
+            {"label": "Returned Qty", "value": lambda r: r.quantity, "type": "number", "width": 13, "total": True},
+            {"label": "Unit Cost", "value": lambda r: r.unit_cost, "type": "money", "width": 14},
+            {"label": "Return Value", "value": lambda r: r.value, "type": "money", "width": 16, "total": True},
+            {
+                "label": "Linked to Receipt",
+                "value": lambda r: "Yes" if r.is_return_of_receipt else "No",
+                "width": 15,
+            },
+        ]

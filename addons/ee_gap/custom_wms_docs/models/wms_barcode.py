@@ -14,7 +14,11 @@ routinely contain ``/`` (e.g. ``WH/OUT/00007``) and the route uses a
 
 from __future__ import annotations
 
+import logging
+from base64 import b64encode
 from urllib.parse import quote
+
+_logger = logging.getLogger(__name__)
 
 #: Symbologies offered to the user in the label wizard.
 WMS_BARCODE_TYPES = ("Code128", "QR", "datamatrix")
@@ -45,3 +49,53 @@ def wms_barcode_url(
         int(height),
         1 if humanreadable else 0,
     )
+
+
+def wms_barcode_png(
+    env,
+    value: str,
+    barcode_type: str = "Code128",
+    width: int = 600,
+    height: int = 100,
+    humanreadable: bool = False,
+) -> bytes:
+    """Render ``value`` to raw PNG bytes, in-process.
+
+    Same symbologies as :func:`wms_barcode_url`, but rendered through
+    ``ir.actions.report.barcode()`` instead of the HTTP route — so a PDF that
+    embeds the result never makes wkhtmltopdf call back into Odoo, and the
+    same bytes can be dropped straight into an XLSX sheet.
+
+    Returns ``b""`` for an empty payload or a value reportlab refuses (a
+    13-char string handed to ``EAN13``, for instance) — a bad barcode must
+    never take a print job down.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return b""
+    try:
+        return env["ir.actions.report"].barcode(
+            barcode_type or "Code128",
+            text,
+            width=int(width),
+            height=int(height),
+            humanreadable=1 if humanreadable else 0,
+        )
+    except Exception:  # noqa: BLE001 - unrenderable payload, not a failure of the document
+        _logger.warning("WMS: cannot render %s barcode for %r", barcode_type, text)
+        return b""
+
+
+def wms_barcode_data_uri(
+    env,
+    value: str,
+    barcode_type: str = "Code128",
+    width: int = 600,
+    height: int = 100,
+    humanreadable: bool = False,
+) -> str:
+    """:func:`wms_barcode_png` wrapped as a ``data:image/png;base64,`` URI."""
+    png = wms_barcode_png(env, value, barcode_type, width, height, humanreadable)
+    if not png:
+        return ""
+    return "data:image/png;base64,%s" % b64encode(png).decode("ascii")

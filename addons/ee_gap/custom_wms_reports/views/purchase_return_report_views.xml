@@ -6,6 +6,10 @@
         <field name="model">custom.wms.purchase.return.report</field>
         <field name="arch" type="xml">
             <list create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_export_xlsx" type="object" string="Export XLSX (with barcode)"
+                            class="btn-primary"/>
+                </header>
                 <field name="date"/>
                 <field name="reference"/>
                 <field name="partner_id"/>

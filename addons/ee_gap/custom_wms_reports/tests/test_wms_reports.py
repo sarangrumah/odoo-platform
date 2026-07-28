@@ -122,3 +122,104 @@ class TestWmsReports(TransactionCase):
         ]
         self.assertIn(b"STOCK TAKE REPORT", html)
         self.assertIn(b"<main>", html)
+
+    # ------------------------------------------------------------------
+    # Scrap report + Scrap Note
+    # ------------------------------------------------------------------
+    def _validated_scrap(self, qty=3.0):
+        # Top the bin up inside the test: the class-level quant is shared with
+        # the move-based tests, so this helper must not depend on what is left.
+        self.env["stock.quant"]._update_available_quantity(self.product, self.bin, qty)
+        scrap = self.env["stock.scrap"].create(
+            {
+                "product_id": self.product.id,
+                "product_uom_id": self.product.uom_id.id,
+                "scrap_qty": qty,
+                "location_id": self.bin.id,
+                "origin": "RPT-SCRAP",
+            }
+        )
+        scrap.action_validate()
+        self.assertEqual(scrap.state, "done", "scrap did not validate — insufficient quantity?")
+        return scrap
+
+    def test_scrap_report_view(self):
+        scrap = self._validated_scrap(3.0)
+        rows = self.env["custom.wms.scrap.report"].search([("scrap_id", "=", scrap.id)])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows.state, "done")
+        self.assertAlmostEqual(rows.scrap_qty, 3.0, places=3)
+        # 3 x standard_price 25.0
+        self.assertAlmostEqual(rows.scrap_value, 75.0, places=2)
+        self.assertEqual(rows.location_id, self.bin)
+        self.assertEqual(rows.warehouse_id, self.warehouse)
+
+    def test_scrap_note_pdf_renders(self):
+        scrap = self._validated_scrap(2.0)
+        html = self.env["ir.actions.report"]._render_qweb_html(
+            "custom_wms_reports.report_wms_scrap_note", scrap.ids
+        )[0]
+        self.assertIn(b"SCRAP NOTE", html)
+        self.assertIn(b"<main>", html)
+        # Transaction-level barcode is embedded, not fetched over HTTP.
+        self.assertIn(b"data:image/png;base64,", html)
+
+    def test_scrap_note_groups_by_origin(self):
+        first, second = self._validated_scrap(1.0), self._validated_scrap(2.0)
+        both = first | second
+        rows = both._wms_scrap_rows()
+        self.assertEqual(len(rows), 2)
+        totals = both._wms_scrap_totals()
+        self.assertAlmostEqual(totals["total_qty"], 3.0, places=3)
+        self.assertAlmostEqual(totals["total_value"], 75.0, places=2)
+        # One shared origin -> that is the note reference.
+        self.assertEqual(both._wms_scrap_header()["reference"], "RPT-SCRAP")
+
+    # ------------------------------------------------------------------
+    # XLSX export with embedded barcodes
+    # ------------------------------------------------------------------
+    def test_xlsx_export_embeds_barcodes(self):
+        import base64
+        import io
+        import zipfile
+
+        self._validated_scrap(4.0)
+        rows = self.env["custom.wms.scrap.report"].search([("product_id", "=", self.product.id)])
+        self.assertTrue(rows)
+
+        action = rows.action_export_xlsx()
+        self.assertEqual(action["type"], "ir.actions.act_url")
+        attachment = self.env["ir.attachment"].browse(int(action["url"].split("/")[-1].split("?")[0]))
+        data = base64.b64decode(attachment.datas)
+        self.assertTrue(attachment.name.endswith(".xlsx"))
+
+        book = zipfile.ZipFile(io.BytesIO(data))
+        media = [n for n in book.namelist() if n.startswith("xl/media/")]
+        # At least the document barcode and the line-item barcode.
+        self.assertGreaterEqual(len(media), 2, "barcode images must be embedded in the workbook")
+        sheet = book.read("xl/sharedStrings.xml")
+        self.assertIn(b"Document Barcode", sheet)
+        self.assertIn(b"Item Barcode", sheet)
+
+    def test_xlsx_export_falls_back_to_the_whole_report(self):
+        # An empty recordset means "no selection" in the list header, so the
+        # engine exports everything the report holds rather than an empty file.
+        self._validated_scrap(2.0)
+        empty = self.env["custom.wms.scrap.report"].browse()
+        action = empty.action_export_xlsx()
+        attachment = self.env["ir.attachment"].browse(int(action["url"].split("/")[-1].split("?")[0]))
+        self.assertTrue(attachment.datas)
+
+    def test_every_report_declares_an_xlsx_shape(self):
+        for model in (
+            "custom.wms.transfer.report",
+            "custom.wms.stock.summary.report",
+            "custom.wms.stock.take.report",
+            "custom.wms.purchase.return.report",
+            "custom.wms.scrap.report",
+        ):
+            columns = self.env[model]._xlsx_columns()
+            self.assertTrue(columns, "%s declares no XLSX columns" % model)
+            for column in columns:
+                self.assertIn("label", column)
+                self.assertTrue(callable(column["value"]))

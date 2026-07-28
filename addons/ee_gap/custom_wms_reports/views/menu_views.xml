@@ -37,4 +37,10 @@
               action="action_transfer_report"
               sequence="50"/>
 
+    <menuitem id="menu_scrap_report"
+              name="Scrap"
+              parent="menu_wms_reports_root"
+              action="action_scrap_report"
+              sequence="60"/>
+
 </odoo>
