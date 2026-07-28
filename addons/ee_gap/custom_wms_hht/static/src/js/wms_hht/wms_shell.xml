@@ -59,9 +59,18 @@
                            class="wms-scan-input"
                            t-ref="scanInput"
                            autocomplete="off"
+                           autocorrect="off"
+                           autocapitalize="off"
+                           spellcheck="false"
+                           enterkeyhint="go"
                            autofocus="autofocus"
                            t-att-placeholder="state.scanPrompt"
+                           t-on-input="() => this.onScanInput()"
                            t-on-keydown="(ev) => this.onScanKeydown(ev)"/>
+                    <!-- Not decoration: a scanner configured with no suffix,
+                         or a code read off a damaged label and typed by hand,
+                         has no other way to submit. -->
+                    <button class="wms-scan-go" t-on-click="() => this.onScanGo()">Go</button>
                 </section>
 
                 <div class="wms-banner" t-if="state.banner"
@@ -71,7 +80,7 @@
                 </div>
 
                 <main class="wms-content">
-                    <t t-component="current.Comp" t-props="pageProps"/>
+                    <t t-component="current.Comp" t-props="pageProps" t-key="pageKey"/>
                 </main>
             </div>
         </div>

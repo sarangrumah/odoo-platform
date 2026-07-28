@@ -560,7 +560,10 @@
                         <span class="wms-proposal-why" t-esc="s.reason"/>
                     </div>
                 </t>
-                <div class="wms-empty small" t-if="!state.result.suggestions.length">
+                <div class="wms-empty small" t-if="state.result.suggestions_denied">
+                    Put-away suggestions need the Put-away group — stock figures above are complete.
+                </div>
+                <div class="wms-empty small" t-if="!state.result.suggestions.length and !state.result.suggestions_denied">
                     No put-away rule matches this product in this warehouse.
                 </div>
 

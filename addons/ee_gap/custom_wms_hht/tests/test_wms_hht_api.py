@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import odoo.http
 
+from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.custom_wms_hht.controllers import wms_api
@@ -518,6 +519,23 @@ class TestWmsHhtApi(TransactionCase):
         self.assertEqual(by_gs1["product"]["default_code"], "HHT-W1")
         self.assertTrue(by_lot["ok"])
         self.assertEqual(by_lot["product"]["default_code"], "HHT-W1")
+
+    def test_stock_lookup_survives_no_access_to_putaway_config(self):
+        """A stock check is for any operator; losing suggestions must not lose stock."""
+        self.env["stock.quant"]._update_available_quantity(self.plain, self.bin_a, 5)
+        with self._patch_request(), patch.object(
+            type(self.env["custom.putaway.engine"]),
+            "propose_for_product",
+            side_effect=AccessError("no putaway group"),
+        ):
+            res = self.controller.stock_lookup(
+                barcode="4006381333931", warehouse_id=self.warehouse.id
+            )
+        self.assertTrue(res["ok"], res.get("error"))
+        self.assertTrue(res["suggestions_denied"])
+        self.assertEqual(res["suggestions"], [])
+        self.assertEqual(res["totals"]["on_hand"], 5.0)
+        self.assertTrue(res["bins"], "the bins the operator came for must still be there")
 
     def test_stock_lookup_is_read_only(self):
         """A stock check must never move or reserve anything."""

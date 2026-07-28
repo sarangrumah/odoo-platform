@@ -601,6 +601,44 @@ class WmsHhtApi(http.Controller):
         stocked_paths = [q.location_id.parent_path or "" for q in quants]
 
         suggestions = []
+        # Put-away configuration is readable only by the Put-away groups, and
+        # a stock check is meant for any warehouse operator: losing the bin
+        # suggestions must not cost the operator the stock figures they came
+        # for. Degrade to "no suggestions" instead of failing the whole screen.
+        suggestions_denied = False
+        try:
+            self._collect_suggestions(env, product, wh, stocked_paths, suggestions)
+        except AccessError:
+            suggestions_denied = True
+
+        return _ok(
+            product={
+                "id": product.id,
+                "name": product.display_name,
+                "default_code": product.default_code or "",
+                "barcode": product.barcode or "",
+                "category": product.categ_id.display_name or "",
+                "uom": product.uom_id.name,
+                "tracking": product.tracking,
+                "weight": product.weight or 0.0,
+                "volume": product.volume or 0.0,
+            },
+            scanned=code,
+            gs1=gs1 or {},
+            warehouse=wh.name if wh else "",
+            totals={
+                "on_hand": on_hand,
+                "reserved": reserved,
+                "available": on_hand - reserved,
+                "bin_count": len(rows),
+            },
+            bins=rows,
+            suggestions=suggestions,
+            suggestions_denied=suggestions_denied,
+        )
+
+    @staticmethod
+    def _collect_suggestions(env, product, wh, stocked_paths, suggestions):
         if wh:
             seen = set()
             for p in env["custom.putaway.engine"].propose_for_product(product, wh):
@@ -629,31 +667,6 @@ class WmsHhtApi(http.Controller):
                 )
                 if len(suggestions) == 3:
                     break
-
-        return _ok(
-            product={
-                "id": product.id,
-                "name": product.display_name,
-                "default_code": product.default_code or "",
-                "barcode": product.barcode or "",
-                "category": product.categ_id.display_name or "",
-                "uom": product.uom_id.name,
-                "tracking": product.tracking,
-                "weight": product.weight or 0.0,
-                "volume": product.volume or 0.0,
-            },
-            scanned=code,
-            gs1=gs1 or {},
-            warehouse=wh.name if wh else "",
-            totals={
-                "on_hand": on_hand,
-                "reserved": reserved,
-                "available": on_hand - reserved,
-                "bin_count": len(rows),
-            },
-            bins=rows,
-            suggestions=suggestions,
-        )
 
     # ------------------------------------------------------------------
     # Putaway

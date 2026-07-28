@@ -31,7 +31,7 @@ models, and it must not be forced to upgrade for a WMS-only feature.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Mobile",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.4.0",
     "license": "LGPL-3",
     "depends": [
         "custom_hht_bridge",
@@ -70,6 +70,7 @@ models, and it must not be forced to upgrade for a WMS-only feature.
             # This app.
             "custom_wms_hht/static/src/scss/wms_hht.scss",
             "custom_wms_hht/static/src/js/wms_hht/rpc.js",
+            "custom_wms_hht/static/src/js/wms_hht/scanBurst.js",
             "custom_wms_hht/static/src/js/wms_hht/pickingScan.js",
             "custom_wms_hht/static/src/js/wms_hht/pages/ReceivePage.js",
             "custom_wms_hht/static/src/js/wms_hht/pages/PutawayPage.js",
