@@ -79,7 +79,10 @@ ICP = env["ir.config_parameter"].sudo()
 run_no = int(ICP.get_param("wms_poc.run", "0")) + 1
 ICP.set_param("wms_poc.run", str(run_no))
 TAG = f"POC{run_no:02d}"
-RUN_DIR = os.path.join(ARTIFACT_DIR, TAG)
+# Namespaced by database: the filestore volume is shared between tenants, so
+# a run on a second database would otherwise overwrite the first one's
+# evidence pack (both start numbering at POC01).
+RUN_DIR = os.path.join(ARTIFACT_DIR, env.cr.dbname, TAG)
 
 company = env.company
 Report = env["ir.actions.report"]
