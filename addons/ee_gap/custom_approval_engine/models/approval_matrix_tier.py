@@ -110,7 +110,7 @@ class ApprovalMatrixTier(models.Model):
         if self.approver_type == "user":
             return self.approver_ids
         if self.approver_type == "group":
-            return self.approver_group_id.users.filtered(lambda u: not u.share)
+            return self.approver_group_id.user_ids.filtered(lambda u: not u.share)
         if self.approver_type == "manager_of_creator":
             creator = getattr(record, "create_uid", False) or self.env.user
             employee = self.env["hr.employee"].sudo().search([("user_id", "=", creator.id)], limit=1)
