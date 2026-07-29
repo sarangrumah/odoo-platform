@@ -631,7 +631,7 @@ class CustomModuleCapabilityEntry(models.Model):
             group = None
         if not group:
             return
-        admin_users = group.users.filtered(lambda u: u.active and not u.share)
+        admin_users = group.user_ids.filtered(lambda u: u.active and not u.share)
         if not admin_users:
             return
         Activity = self.env["mail.activity"].sudo()

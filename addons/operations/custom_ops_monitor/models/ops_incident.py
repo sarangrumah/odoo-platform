@@ -139,10 +139,10 @@ class OpsIncident(models.Model):
             "custom_ops_monitor.group_ops_engineer",
             raise_if_not_found=False,
         )
-        if not ops_group or not ops_group.users:
+        if not ops_group or not ops_group.user_ids:
             return
         # Round-robin would be nice; for now pick the first ops engineer.
-        user = ops_group.users[0]
+        user = ops_group.user_ids[0]
         self.activity_schedule(
             "mail.mail_activity_data_todo",
             summary=f"Acknowledge: {self.alert_name}",
