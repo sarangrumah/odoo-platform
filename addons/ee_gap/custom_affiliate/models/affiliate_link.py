@@ -33,9 +33,10 @@ class CustomAffiliateLink(models.Model):
     click_count = fields.Integer(compute="_compute_click_count")
     full_url = fields.Char(compute="_compute_full_url")
 
-    _sql_constraints = [
-        ("short_code_uniq", "unique(short_code)", "The short code must be unique."),
-    ]
+    _short_code_uniq = models.Constraint(
+        "unique(short_code)",
+        "The short code must be unique.",
+    )
 
     def _compute_click_count(self):
         Click = self.env["custom.affiliate.click"]

@@ -36,13 +36,10 @@ class CustomLeaveCarryoverPolicy(models.Model):
     is_active = fields.Boolean(string="Active", default=True)
     notes = fields.Text(string="Notes")
 
-    _sql_constraints = [
-        (
-            "uniq_leave_type",
-            "unique(leave_type_id)",
-            "A carry-over policy already exists for this leave type.",
-        ),
-    ]
+    _uniq_leave_type = models.Constraint(
+        "unique(leave_type_id)",
+        "A carry-over policy already exists for this leave type.",
+    )
 
     @api.depends("leave_type_id", "max_carryover_days")
     def _compute_name(self):

@@ -34,9 +34,10 @@ class StorefrontContent(models.Model):
     cta_url = fields.Char(string="CTA URL", default="/products")
     image = fields.Binary(attachment=True)
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code)", "The content block code must be unique."),
-    ]
+    _code_uniq = models.Constraint(
+        "unique(code)",
+        "The content block code must be unique.",
+    )
 
     def _storefront_serialize(self) -> dict:
         self.ensure_one()

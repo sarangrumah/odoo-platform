@@ -35,9 +35,10 @@ class CustomAffiliateConversion(models.Model):
     approve_date = fields.Datetime()
     payout_id = fields.Many2one("custom.affiliate.payout", ondelete="set null")
 
-    _sql_constraints = [
-        ("order_uniq", "unique(sale_order_id)", "An order can be attributed only once."),
-    ]
+    _order_uniq = models.Constraint(
+        "unique(sale_order_id)",
+        "An order can be attributed only once.",
+    )
 
     def action_approve(self):
         self.filtered(lambda c: c.state == "pending").write(

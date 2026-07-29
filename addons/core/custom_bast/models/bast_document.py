@@ -76,9 +76,10 @@ class CustomBastDocument(models.Model):
         required=True,
     )
 
-    _sql_constraints = [
-        ("name_uniq", "unique(name)", "BAST number must be unique."),
-    ]
+    _name_uniq = models.Constraint(
+        "unique(name)",
+        "BAST number must be unique.",
+    )
 
     @api.model
     def _selection_reference_models(self) -> list[tuple[str, str]]:

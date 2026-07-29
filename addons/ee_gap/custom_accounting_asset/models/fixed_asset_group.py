@@ -64,10 +64,7 @@ class CustomFixedAssetGroup(models.Model):
         help="Equity account the revaluation surplus is transferred to on disposal.",
     )
 
-    _sql_constraints = [
-        (
-            "code_company_unique",
-            "UNIQUE(code, company_id)",
-            "Asset group code must be unique per company.",
-        ),
-    ]
+    _code_company_unique = models.Constraint(
+        "UNIQUE(code, company_id)",
+        "Asset group code must be unique per company.",
+    )

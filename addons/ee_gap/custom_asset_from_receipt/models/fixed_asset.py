@@ -33,10 +33,7 @@ class CustomFixedAsset(models.Model):
         string="Linked Rental Assets",
     )
 
-    _sql_constraints = [
-        (
-            "lot_unique_per_asset",
-            "UNIQUE(lot_id)",
-            "A serial/lot can only be converted into one fixed asset.",
-        ),
-    ]
+    _lot_unique_per_asset = models.Constraint(
+        "UNIQUE(lot_id)",
+        "A serial/lot can only be converted into one fixed asset.",
+    )

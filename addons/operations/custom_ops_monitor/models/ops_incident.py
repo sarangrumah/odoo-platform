@@ -46,9 +46,10 @@ class OpsIncident(models.Model):
     fingerprint = fields.Char(index=True, help="Alertmanager fingerprint, for upsert dedup.")
     raw_payload = fields.Text()
 
-    _sql_constraints = [
-        ("fingerprint_uniq", "unique(fingerprint)", "Alertmanager fingerprint must be unique."),
-    ]
+    _fingerprint_uniq = models.Constraint(
+        "unique(fingerprint)",
+        "Alertmanager fingerprint must be unique.",
+    )
 
     @api.depends("alert_name", "tenant_id", "fired_at")
     def _compute_name(self):

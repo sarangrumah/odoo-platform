@@ -220,13 +220,10 @@ class CustomFixedAsset(models.Model):
         copy=False,
     )
 
-    _sql_constraints = [
-        (
-            "code_company_unique",
-            "UNIQUE(code, company_id)",
-            "Asset code must be unique within a company.",
-        ),
-    ]
+    _code_company_unique = models.Constraint(
+        "UNIQUE(code, company_id)",
+        "Asset code must be unique within a company.",
+    )
 
     # ------------------------------------------------------------------
     # Constraints

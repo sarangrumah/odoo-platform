@@ -72,9 +72,10 @@ class BankImportTemplate(models.Model):
     decimal_separator = fields.Char(default=".", size=1, required=True)
     thousand_separator = fields.Char(default=",", size=1)
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code, company_id)", "Template code must be unique per company."),
-    ]
+    _code_uniq = models.Constraint(
+        "unique(code, company_id)",
+        "Template code must be unique per company.",
+    )
 
     # ------------------------------------------------------------------
     # Parsing

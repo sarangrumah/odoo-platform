@@ -59,13 +59,10 @@ class OnboardingPublicSubmission(models.Model):
     )
     rejection_reason = fields.Text()
 
-    _sql_constraints = [
-        (
-            "public_token_uniq",
-            "unique(public_token)",
-            "Submission token must be unique.",
-        ),
-    ]
+    _public_token_uniq = models.Constraint(
+        "unique(public_token)",
+        "Submission token must be unique.",
+    )
 
     # ------------------------------------------------------------------ API
     @api.model

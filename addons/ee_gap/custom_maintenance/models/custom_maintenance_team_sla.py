@@ -49,13 +49,10 @@ class CustomMaintenanceTeamSla(models.Model):
     )
     notes = fields.Text()
 
-    _sql_constraints = [
-        (
-            "team_priority_uniq",
-            "unique(team_id, priority)",
-            "Only one SLA policy is allowed per team and priority.",
-        ),
-    ]
+    _team_priority_uniq = models.Constraint(
+        "unique(team_id, priority)",
+        "Only one SLA policy is allowed per team and priority.",
+    )
 
     @api.constrains("response_hours", "resolve_hours")
     def _check_hours(self):

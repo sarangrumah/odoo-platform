@@ -55,13 +55,10 @@ class HhtSyncQueue(models.Model):
     error = fields.Text()
     batch_id = fields.Char(string="Batch ID", index=True)
 
-    _sql_constraints = [
-        (
-            "client_id_device_uniq",
-            "unique(device_id, client_id)",
-            "Duplicate client_id for the same device.",
-        ),
-    ]
+    _client_id_device_uniq = models.Constraint(
+        "unique(device_id, client_id)",
+        "Duplicate client_id for the same device.",
+    )
 
     def action_retry_failed(self):
         # Re-queues failed items for next processing run.

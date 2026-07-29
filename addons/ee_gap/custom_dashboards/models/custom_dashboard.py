@@ -60,9 +60,10 @@ class CustomDashboard(models.Model):
     last_ai_answer = fields.Html(readonly=True, sanitize=True)
     last_ai_at = fields.Datetime(readonly=True)
 
-    _sql_constraints = [
-        ("share_token_uniq", "unique(share_token)", "Share token must be unique."),
-    ]
+    _share_token_uniq = models.Constraint(
+        "unique(share_token)",
+        "Share token must be unique.",
+    )
 
     @api.depends("tile_ids")
     def _compute_tile_count(self):

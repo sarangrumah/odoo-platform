@@ -112,13 +112,10 @@ class CustomPdpFieldRegistry(models.Model):
     active = fields.Boolean(default=True)
     note = fields.Char()
 
-    _sql_constraints = [
-        (
-            "model_field_unique",
-            "UNIQUE(model_name, field_name)",
-            "Each (model, field) can only be registered once.",
-        ),
-    ]
+    _model_field_unique = models.Constraint(
+        "UNIQUE(model_name, field_name)",
+        "Each (model, field) can only be registered once.",
+    )
 
     @api.depends("model_name", "field_name", "pii_category")
     def _compute_name(self):

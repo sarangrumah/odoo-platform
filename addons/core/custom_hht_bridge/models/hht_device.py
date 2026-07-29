@@ -84,13 +84,10 @@ class HhtDevice(models.Model):
     scan_log_count = fields.Integer(compute="_compute_counts")
     sync_queue_count = fields.Integer(compute="_compute_counts")
 
-    _sql_constraints = [
-        (
-            "device_id_tenant_uniq",
-            "unique(device_id, tenant_id)",
-            "Device ID must be unique per tenant.",
-        ),
-    ]
+    _device_id_tenant_uniq = models.Constraint(
+        "unique(device_id, tenant_id)",
+        "Device ID must be unique per tenant.",
+    )
 
     # ------------------------------------------------------------------
     # Compute

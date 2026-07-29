@@ -21,13 +21,10 @@ class CustomLivechatCannedResponse(models.Model):
     times_used = fields.Integer(string="Times Used", default=0, readonly=True)
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        (
-            "shortcut_unique",
-            "unique(shortcut)",
-            "Each canned response shortcut must be unique.",
-        ),
-    ]
+    _shortcut_unique = models.Constraint(
+        "unique(shortcut)",
+        "Each canned response shortcut must be unique.",
+    )
 
     @api.constrains("shortcut")
     def _check_shortcut(self):

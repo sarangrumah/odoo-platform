@@ -27,10 +27,7 @@ class CustomModuleCapabilityTag(models.Model):
     color = fields.Integer(default=0)
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        (
-            "technical_code_uniq",
-            "unique(technical_code)",
-            "Capability tag technical_code must be unique.",
-        ),
-    ]
+    _technical_code_uniq = models.Constraint(
+        "unique(technical_code)",
+        "Capability tag technical_code must be unique.",
+    )

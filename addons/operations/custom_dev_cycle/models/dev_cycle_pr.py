@@ -50,13 +50,10 @@ class DevCyclePr(models.Model):
     merged_by = fields.Char()
     last_synced_at = fields.Datetime()
 
-    _sql_constraints = [
-        (
-            "cycle_pr_url_uniq",
-            "unique(cycle_id, pr_url)",
-            "A PR URL can only be linked once per dev cycle.",
-        ),
-    ]
+    _cycle_pr_url_uniq = models.Constraint(
+        "unique(cycle_id, pr_url)",
+        "A PR URL can only be linked once per dev cycle.",
+    )
 
     # ------------------------------------------------------------------
     # Auto-transition cycle

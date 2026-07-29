@@ -46,13 +46,10 @@ class CustomEsgAccountMapping(models.Model):
         default=lambda self: self.env.company,
     )
 
-    _sql_constraints = [
-        (
-            "account_factor_uniq",
-            "unique(account_id, factor_id, company_id)",
-            "Same (account, factor) mapping already exists for this company.",
-        ),
-    ]
+    _account_factor_uniq = models.Constraint(
+        "unique(account_id, factor_id, company_id)",
+        "Same (account, factor) mapping already exists for this company.",
+    )
 
     @api.depends("account_id", "factor_id")
     def _compute_name(self):

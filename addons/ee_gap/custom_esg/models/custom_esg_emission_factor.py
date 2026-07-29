@@ -57,13 +57,10 @@ class CustomEsgEmissionFactor(models.Model):
         default=lambda self: self.env.company,
     )
 
-    _sql_constraints = [
-        (
-            "name_category_uniq",
-            "unique(name, category, company_id)",
-            "Emission factor name must be unique within a scope per company.",
-        ),
-    ]
+    _name_category_uniq = models.Constraint(
+        "unique(name, category, company_id)",
+        "Emission factor name must be unique within a scope per company.",
+    )
 
     @api.model
     def compute_emission(self, factor_code_or_id, activity_value):

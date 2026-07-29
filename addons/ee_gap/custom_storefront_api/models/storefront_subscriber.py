@@ -20,9 +20,10 @@ class StorefrontSubscriber(models.Model):
     active = fields.Boolean(default=True)
     source = fields.Char(default="storefront")
 
-    _sql_constraints = [
-        ("email_uniq", "unique(email)", "This email is already subscribed."),
-    ]
+    _email_uniq = models.Constraint(
+        "unique(email)",
+        "This email is already subscribed.",
+    )
 
     @api.model
     def _storefront_subscribe(self, email):

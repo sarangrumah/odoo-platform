@@ -45,18 +45,14 @@ class TenantEnvironment(models.Model):
 
     name = fields.Char(compute="_compute_name", store=True)
 
-    _sql_constraints = [
-        (
-            "prod_unique_per_vps",
-            "EXCLUDE (vps_id WITH =) WHERE (env_type = 'prod')",
-            "A VPS can host at most one production environment.",
-        ),
-        (
-            "env_unique_per_tenant",
-            "unique(tenant_registry_id, env_type)",
-            "A tenant can have at most one environment of each type.",
-        ),
-    ]
+    _prod_unique_per_vps = models.Constraint(
+        "EXCLUDE (vps_id WITH =) WHERE (env_type = 'prod')",
+        "A VPS can host at most one production environment.",
+    )
+    _env_unique_per_tenant = models.Constraint(
+        "unique(tenant_registry_id, env_type)",
+        "A tenant can have at most one environment of each type.",
+    )
 
     @api.depends("tenant_registry_id.slug", "env_type")
     def _compute_name(self):

@@ -62,13 +62,10 @@ class FinanceTravelSettlement(models.Model):
         store=True,
     )
 
-    _sql_constraints = [
-        (
-            "hris_travel_id_uniq",
-            "unique(x_sap_external_id)",
-            "HRIS travel id must be unique.",
-        ),
-    ]
+    _hris_travel_id_uniq = models.Constraint(
+        "unique(x_sap_external_id)",
+        "HRIS travel id must be unique.",
+    )
 
     @api.depends("cash_advance_id.state", "reimbursement_id.state", "realized_amount")
     def _compute_settlement_state(self):

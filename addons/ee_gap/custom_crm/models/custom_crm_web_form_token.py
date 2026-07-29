@@ -45,9 +45,10 @@ class CustomCrmWebFormToken(models.Model):
         help="Optional team to assign newly created leads to.",
     )
 
-    _sql_constraints = [
-        ("token_uniq", "unique(token)", "Token must be unique."),
-    ]
+    _token_uniq = models.Constraint(
+        "unique(token)",
+        "Token must be unique.",
+    )
 
     # ---------- API ----------
 

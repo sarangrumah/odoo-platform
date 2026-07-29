@@ -56,13 +56,10 @@ class BankH2HConnection(models.Model):
     last_error = fields.Text(readonly=True)
     company_id = fields.Many2one("res.company", default=lambda s: s.env.company, required=True)
 
-    _sql_constraints = [
-        (
-            "acct_bank_uniq",
-            "unique(bank_code, account_number, company_id)",
-            "Account number must be unique per bank per company.",
-        ),
-    ]
+    _acct_bank_uniq = models.Constraint(
+        "unique(bank_code, account_number, company_id)",
+        "Account number must be unique per bank per company.",
+    )
 
     # ------------------------------------------------------------------
     # Sync

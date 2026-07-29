@@ -42,10 +42,7 @@ class TenantVpsBootstrapTemplate(models.Model):
     active = fields.Boolean(default=True)
     notes = fields.Text()
 
-    _sql_constraints = [
-        (
-            "kind_version_unique",
-            "unique(script_kind, version)",
-            "A script kind+version pair must be unique.",
-        ),
-    ]
+    _kind_version_unique = models.Constraint(
+        "unique(script_kind, version)",
+        "A script kind+version pair must be unique.",
+    )

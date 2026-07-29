@@ -87,9 +87,10 @@ class CustomHubModuleCatalog(models.Model):
     deployment_count = fields.Integer(compute="_compute_deployment_count", store=False)
     last_scanned = fields.Datetime()
 
-    _sql_constraints = [
-        ("module_name_uniq", "unique(module_name)", "Catalog entry module_name must be unique."),
-    ]
+    _module_name_uniq = models.Constraint(
+        "unique(module_name)",
+        "Catalog entry module_name must be unique.",
+    )
 
     # ------------------------------------------------------------------
     # Computes

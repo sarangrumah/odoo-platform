@@ -182,9 +182,10 @@ class CustomHubIndustryPack(models.Model):
     )
     module_count = fields.Integer(compute="_compute_module_count", store=False)
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code)", "Industry pack code must be unique."),
-    ]
+    _code_uniq = models.Constraint(
+        "unique(code)",
+        "Industry pack code must be unique.",
+    )
 
     @api.depends("module_ids")
     def _compute_module_count(self):

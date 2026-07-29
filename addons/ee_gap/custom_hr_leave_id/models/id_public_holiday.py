@@ -32,13 +32,10 @@ class IdPublicHoliday(models.Model):
     )
     notes = fields.Text(string="Notes")
 
-    _sql_constraints = [
-        (
-            "uniq_date_name",
-            "unique(date, name)",
-            "Holiday with this name and date already exists",
-        ),
-    ]
+    _uniq_date_name = models.Constraint(
+        "unique(date, name)",
+        "Holiday with this name and date already exists",
+    )
 
     @api.depends("date")
     def _compute_year(self):

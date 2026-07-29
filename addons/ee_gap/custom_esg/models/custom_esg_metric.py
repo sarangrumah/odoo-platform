@@ -32,10 +32,7 @@ class CustomEsgMetric(models.Model):
     is_active = fields.Boolean(string="Active", default=True)
     color = fields.Integer(string="Color")
 
-    _sql_constraints = [
-        (
-            "code_uniq",
-            "unique(code)",
-            "ESG metric code must be unique.",
-        ),
-    ]
+    _code_uniq = models.Constraint(
+        "unique(code)",
+        "ESG metric code must be unique.",
+    )

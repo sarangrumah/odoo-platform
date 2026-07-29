@@ -180,9 +180,10 @@ class CustomModuleCapabilityEntry(models.Model):
     last_scanned = fields.Datetime()
     notes = fields.Text()
 
-    _sql_constraints = [
-        ("module_name_uniq", "unique(module_name)", "Capability entry module_name must be unique."),
-    ]
+    _module_name_uniq = models.Constraint(
+        "unique(module_name)",
+        "Capability entry module_name must be unique.",
+    )
 
     # ------------------------------------------------------------------
     # Scanning
