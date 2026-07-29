@@ -151,7 +151,7 @@
                 <filter name="f_rejected" string="Rejected" domain="[('state','=','rejected')]"/>
                 <separator/>
                 <filter name="f_mine" string="My Requests" domain="[('requester_id.user_id','=',uid)]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="g_state" string="Status" context="{'group_by':'state'}"/>
                     <filter name="g_division" string="Division" context="{'group_by':'division_id'}"/>
                     <filter name="g_requester" string="Requester" context="{'group_by':'requester_id'}"/>
