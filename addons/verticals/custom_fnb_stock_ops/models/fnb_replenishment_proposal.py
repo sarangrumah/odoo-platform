@@ -63,7 +63,7 @@ class FnbReplenishmentProposal(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin", "pdp.audited.mixin"]
     _order = "create_date desc, id desc"
 
-    name = fields.Char(required=True, copy=False, default=lambda s: _("New"), readonly=True)
+    name = fields.Char(required=True, copy=False, default=lambda s: s.env._("New"), readonly=True)
     branch_id = fields.Many2one("custom.esb.branch", required=True, ondelete="cascade", index=True, tracking=True)
     company_id = fields.Many2one(related="branch_id.company_id", store=True, index=True)
     target_doc = fields.Selection(

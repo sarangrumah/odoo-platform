@@ -30,7 +30,7 @@ class RecurringPaymentTemplate(models.Model):
     code = fields.Char(
         copy=False,
         readonly=True,
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
     )
     active = fields.Boolean(default=True)
     company_id = fields.Many2one(

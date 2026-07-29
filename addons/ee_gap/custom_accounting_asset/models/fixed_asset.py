@@ -19,7 +19,7 @@ class CustomFixedAsset(models.Model):
     code = fields.Char(
         required=True,
         copy=False,
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
         tracking=True,
     )
     company_id = fields.Many2one(

@@ -63,7 +63,7 @@ class WmsIntegrationEvent(models.Model):
     _inherit = ["mail.thread", "pdp.audited.mixin"]
     _order = "id asc"
 
-    name = fields.Char(required=True, copy=False, readonly=True, default=lambda self: _("New"), index=True)
+    name = fields.Char(required=True, copy=False, readonly=True, default=lambda self: self.env._("New"), index=True)
     event_type = fields.Selection(EVENT_TYPES, required=True, index=True, tracking=True)
     res_model = fields.Char(string="Source Model", index=True)
     res_id = fields.Integer(string="Source ID", index=True)

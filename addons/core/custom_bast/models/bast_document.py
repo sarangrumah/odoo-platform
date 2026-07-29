@@ -16,7 +16,7 @@ class CustomBastDocument(models.Model):
         required=True,
         copy=False,
         readonly=True,
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
         tracking=True,
     )
     reference = fields.Reference(

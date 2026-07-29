@@ -22,7 +22,7 @@ class CycleCountSession(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin", "pdp.audited.mixin"]
     _order = "scheduled_date desc, id desc"
 
-    name = fields.Char(required=True, copy=False, default=lambda s: _("New"))
+    name = fields.Char(required=True, copy=False, default=lambda s: s.env._("New"))
     plan_id = fields.Many2one("custom.cycle.count.plan", ondelete="set null", index=True)
     company_id = fields.Many2one(
         "res.company",

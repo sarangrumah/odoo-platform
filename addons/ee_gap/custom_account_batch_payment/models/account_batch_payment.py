@@ -14,7 +14,7 @@ class AccountBatchPayment(models.Model):
     _inherit = ["mail.thread"]
     _order = "date desc, id desc"
 
-    name = fields.Char(readonly=True, copy=False, default=lambda self: _("New"))
+    name = fields.Char(readonly=True, copy=False, default=lambda self: self.env._("New"))
     journal_id = fields.Many2one(
         "account.journal",
         required=True,

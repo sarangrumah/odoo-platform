@@ -10,7 +10,7 @@ class CustomAffiliatePayout(models.Model):
     _inherit = ["mail.thread"]
     _order = "create_date desc"
 
-    name = fields.Char(required=True, copy=False, default=lambda self: _("New"), readonly=True)
+    name = fields.Char(required=True, copy=False, default=lambda self: self.env._("New"), readonly=True)
     affiliate_id = fields.Many2one("custom.affiliate", string="Affiliate", required=True, ondelete="restrict")
     date_from = fields.Date()
     date_to = fields.Date(default=fields.Date.context_today)

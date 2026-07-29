@@ -33,7 +33,7 @@ class CustomCrmLeadMiningRequest(models.Model):
 
     name = fields.Char(
         string="Reference",
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
         required=True,
         copy=False,
         readonly=True,

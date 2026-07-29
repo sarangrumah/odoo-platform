@@ -27,7 +27,7 @@ class PettyCashRealization(models.Model):
     name = fields.Char(
         string="Reference",
         required=True,
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
         copy=False,
         tracking=True,
     )

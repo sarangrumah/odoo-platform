@@ -72,7 +72,7 @@ class OnboardingJourney(models.Model):
     # ------------------------------------------------------------------ core
     name = fields.Char(
         required=True,
-        default=lambda self: _("New Onboarding"),
+        default=lambda self: self.env._("New Onboarding"),
         tracking=True,
         index=True,
     )

@@ -18,7 +18,7 @@ class CustomMaintenanceTeamSla(models.Model):
 
     name = fields.Char(
         required=True,
-        default=lambda self: _("New SLA Policy"),
+        default=lambda self: self.env._("New SLA Policy"),
     )
     active = fields.Boolean(default=True)
     team_id = fields.Many2one(

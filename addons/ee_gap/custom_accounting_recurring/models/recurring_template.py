@@ -30,7 +30,7 @@ class RecurringJournalTemplate(models.Model):
     code = fields.Char(
         copy=False,
         readonly=True,
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
         help="Sequence reference (REC/YYYYMM/00001).",
     )
     active = fields.Boolean(default=True)

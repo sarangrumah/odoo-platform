@@ -26,7 +26,7 @@ class WmsProductRegistration(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin", "pdp.audited.mixin"]
     _order = "create_date desc, id desc"
 
-    name = fields.Char(required=True, copy=False, readonly=True, default=lambda s: _("New"))
+    name = fields.Char(required=True, copy=False, readonly=True, default=lambda s: s.env._("New"))
     state = fields.Selection(STATES, default="draft", tracking=True, index=True)
     company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company, index=True)
 

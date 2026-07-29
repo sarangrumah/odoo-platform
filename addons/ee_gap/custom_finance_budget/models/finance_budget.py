@@ -23,7 +23,7 @@ class FinanceBudget(models.Model):
     _description = "Finance Cost Budget"
     _order = "budget_year desc, division_id"
 
-    name = fields.Char(required=True, default=lambda self: _("New"))
+    name = fields.Char(required=True, default=lambda self: self.env._("New"))
     active = fields.Boolean(default=True)
     division_id = fields.Many2one("finance.vertical", string="Division", required=True)
     cost_center_code = fields.Char(string="Cost Center")
