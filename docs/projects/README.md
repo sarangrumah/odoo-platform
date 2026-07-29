@@ -13,6 +13,7 @@ single customer asked for it.
 | [`warehouse-jds/`](warehouse-jds/) | JDS — warehouse management | — | none (uses `ee_gap/custom_wms_*`, `core/custom_hht_bridge`) |
 | [`gentlewoman/`](gentlewoman/) | GentleWoman — retail fashion, **pre-implementation** | — | none yet |
 | [`finance-portal/`](finance-portal/) | Finance Portal (Erajaya) | — | none (uses `ee_gap/custom_finance_portal*`) |
+| [`efn-esb/`](efn-esb/) | EFN (Erajaya F&B) — ESB Core integration, **pre-pilot** | dev `rnd_esb` | `verticals/custom_fnb_stock_ops` (engine in `ee_gap/custom_esb_connector`) |
 
 Notes:
 
