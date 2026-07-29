@@ -59,26 +59,81 @@ class CustomFixedAssetDepreciationLine(models.Model):
     def action_reverse(self):
         """Reverse a posted depreciation line.
 
-        Books a reversing journal entry (Dr Accum. / Cr Expense) for the linked
-        move, marks the line reversed and un-posted so the accumulated
-        depreciation drops out and the asset NBV recomputes (feedback Accounting
-        #4/#19). The line is NOT re-posted by the schedule afterwards.
+        Books a reversing journal entry (Dr Accum. / Cr Expense), marks the line
+        reversed and un-posted so the accumulated depreciation drops out and the
+        asset NBV recomputes (feedback Accounting #4/#19). The line is NOT
+        re-posted by the schedule afterwards.
+
+        The monthly entry is normally SHARED by every asset depreciated that
+        period (see ``custom.fixed.asset._post_due_depreciation``), so reversing
+        the whole move would wipe out the period for every other asset too. When
+        the move is shared we therefore book a reversal for this line's amount
+        only; a full ``_reverse_moves`` is used just when the line owns its move
+        outright.
         """
         for line in self:
             if not line.posted:
                 raise UserError(_("Depreciation line #%(seq)s is not posted; nothing to reverse.", seq=line.sequence))
             move = line.move_id
             if move and move.state == "posted":
-                # Full reversal reconciled against the original entry.
-                move._reverse_moves(
-                    [
-                        {
-                            "date": fields.Date.context_today(line),
-                            "ref": _(
-                                "Reversal of Depreciation %(code)s #%(seq)s", code=line.asset_id.code, seq=line.sequence
-                            ),
-                        }
-                    ],
-                    cancel=True,
+                siblings = self.search_count(
+                    [("move_id", "=", move.id), ("id", "!=", line.id), ("reversed", "=", False)]
                 )
+                if siblings:
+                    line._reverse_partial(move)
+                else:
+                    # Sole owner of the entry: full reversal, reconciled against it.
+                    move._reverse_moves(
+                        [
+                            {
+                                "date": fields.Date.context_today(line),
+                                "ref": _(
+                                    "Reversal of Depreciation %(code)s #%(seq)s",
+                                    code=line.asset_id.code,
+                                    seq=line.sequence,
+                                ),
+                            }
+                        ],
+                        cancel=True,
+                    )
             line.write({"posted": False, "reversed": True})
+
+    def _reverse_partial(self, move):
+        """Book a standalone reversal of THIS line only, out of a shared move.
+
+        Dr Accumulated depreciation / Cr Depreciation expense for the line
+        amount. Deliberately NOT reconciled against ``move``: the original entry
+        stays posted and correct for the other assets it covers, so only the net
+        effect of this line is undone.
+        """
+        self.ensure_one()
+        asset = self.asset_id
+        reversal = self.env["account.move"].create(
+            {
+                "date": fields.Date.context_today(self),
+                "journal_id": move.journal_id.id,
+                "company_id": move.company_id.id,
+                "ref": _(
+                    "Reversal of Depreciation %(code)s #%(seq)s (from %(origin)s)",
+                    code=asset.code,
+                    seq=self.sequence,
+                    origin=move.name,
+                ),
+                "line_ids": [
+                    (0, 0, {
+                        "name": _("Reversal Accum. depreciation %(name)s", name=asset.name),
+                        "account_id": asset.depreciation_account_id.id,
+                        "debit": self.amount,
+                        "credit": 0.0,
+                    }),
+                    (0, 0, {
+                        "name": _("Reversal Depreciation %(name)s", name=asset.name),
+                        "account_id": asset.expense_account_id.id,
+                        "debit": 0.0,
+                        "credit": self.amount,
+                    }),
+                ],
+            }
+        )
+        reversal.action_post()
+        return reversal
