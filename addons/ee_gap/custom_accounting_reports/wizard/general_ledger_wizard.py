@@ -48,6 +48,10 @@ class GeneralLedgerWizard(models.TransientModel):
     show_doc_no = fields.Boolean(string="Document No", default=True)
     show_reference = fields.Boolean(string="Reference", default=True)
     show_tax = fields.Boolean(string="Tax Code", default=True)
+    # Off by default: a tax-team specific need, and this module ships to every
+    # tenant — turning it on would silently widen every existing GL export.
+    show_faktur_masukan = fields.Boolean(string="No. FP Masukan", default=False)
+    show_faktur_keluaran = fields.Boolean(string="No. FP Keluaran", default=False)
     show_clearing = fields.Boolean(string="Clearing Doc", default=True)
     show_cost_center = fields.Boolean(string="Cost Center", default=True)
     show_profit_center = fields.Boolean(string="Profit Center", default=True)
