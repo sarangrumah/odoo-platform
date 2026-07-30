@@ -1,14 +1,23 @@
 # -*- coding: utf-8 -*-
-"""Build the delivery-status workbook for the client sheet
-"List Kendala System ODOO" (worksheets EO + FASHION).
+"""Build the delivery-status report for the client sheet
+"List Kendala System ODOO" (worksheets EO + FASHION), as BOTH .xlsx and .html.
 
-One row per request, mirroring docs/kendala-sheet-jul2026-status.md so the two
-never drift. Statuses are a closed set so the summary can be counted from the
-rows rather than typed in by hand.
+One row per request, mirroring docs/kendala-sheet-jul2026-status.md. Both output
+formats are rendered from the single set of tables below, so the spreadsheet and
+the web page cannot drift apart — the reason this is a generator and not a
+hand-maintained file. Statuses are a closed set and the summary counts them from
+the rows rather than being typed in.
+
+    python3 scripts/build_status_delivery.py [output-dir]
 """
+import html
+import sys
+
 import xlsxwriter
 
-OUT = "status-delivery-kendala-jul2026.xlsx"
+OUT_DIR = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "."
+OUT = OUT_DIR + "/status-delivery-kendala-jul2026.xlsx"
+OUT_HTML = OUT_DIR + "/status-delivery-kendala-jul2026.html"
 
 DONE = "Selesai"
 HOLD = "Ditahan"
@@ -311,3 +320,173 @@ ws3.write(r + 1, 3, "Diambil sebelum setiap rollout; ukuran dan integritas gzip 
 
 wb.close()
 print("written:", OUT)
+
+
+# ======================================================================
+# HTML — same tables, standalone file (no CDN, opens straight from disk)
+# ======================================================================
+SLUG = {DONE: "ok", HOLD: "hold", CLIENT: "client", NOREPRO: "nr"}
+
+CSS = """
+:root{--ground:#f6f8fa;--surface:#fff;--alt:#eff3f7;--ink:#111820;--soft:#48555f;
+--faint:#74828d;--rule:#d9e1e8;--soft-rule:#e8eef3;--accent:#2b4a7d;--accent-bg:#e6ecf5;
+--ok:#176e52;--ok-bg:#e2f0ea;--hold:#b4610c;--hold-bg:#fbebda;--nr:#8a4a57;--nr-bg:#f6e6e9;
+--serif:Georgia,"Times New Roman",serif;
+--sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--ground:#0d1319;--surface:#141c24;--alt:#1b242d;
+--ink:#e8edf2;--soft:#a8b5c0;--faint:#7c8b98;--rule:#2a3742;--soft-rule:#202a33;
+--accent:#8fb2e0;--accent-bg:#1c2a3d;--ok:#6fcfa8;--ok-bg:#14302a;--hold:#e9a75c;
+--hold-bg:#35250f;--nr:#de9aa6;--nr-bg:#33191f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:78rem;margin:0 auto;padding:2.5rem 1.25rem 4rem;
+display:flex;flex-direction:column;gap:2.5rem}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;
+text-transform:uppercase;color:var(--faint)}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(1.7rem,4vw,2.6rem);
+line-height:1.12;margin:.5rem 0 0;text-wrap:balance}
+.standfirst{color:var(--soft);max-width:62ch;margin:.6rem 0 0}
+h2{font-family:var(--serif);font-size:1.35rem;font-weight:600;margin:0 0 .9rem;
+padding-bottom:.5rem;border-bottom:2px solid var(--ink)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:.7rem}
+.tile{background:var(--surface);border:1px solid var(--rule);border-top:3px solid var(--h);
+border-radius:3px;padding:.9rem 1rem}
+.tile b{display:block;font-family:var(--mono);font-size:1.8rem;line-height:1;color:var(--h);
+font-variant-numeric:tabular-nums}
+.tile span{display:block;font-size:.82rem;color:var(--soft);margin-top:.25rem}
+.t-ok{--h:var(--ok)}.t-hold{--h:var(--hold)}.t-client{--h:var(--accent)}.t-nr{--h:var(--nr)}
+.scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:52rem;font-size:.85rem}
+th{text-align:left;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;
+color:var(--faint);background:var(--alt);padding:.6rem .8rem;
+border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:.6rem .8rem;border-bottom:1px solid var(--soft-rule);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.no{font-family:var(--mono);color:var(--faint);white-space:nowrap;width:1%}
+.ev{font-size:.8rem;color:var(--soft)}
+code{font-family:var(--mono);font-size:.86em;background:var(--alt);padding:.06em .32em;
+border-radius:2px}
+.chip{display:inline-block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+text-transform:uppercase;font-weight:600;padding:.2rem .45rem;border-radius:2px;white-space:nowrap}
+.c-ok{background:var(--ok-bg);color:var(--ok)}
+.c-hold{background:var(--hold-bg);color:var(--hold)}
+.c-client{background:var(--accent-bg);color:var(--accent)}
+.c-nr{background:var(--nr-bg);color:var(--nr)}
+.note{background:var(--alt);border-radius:3px;padding:.85rem 1rem;font-size:.85rem;color:var(--soft)}
+.note b{color:var(--ink)}
+footer{border-top:1px solid var(--rule);padding-top:1rem;font-family:var(--mono);
+font-size:.72rem;color:var(--faint);display:flex;flex-wrap:wrap;gap:.3rem 1.4rem}
+@media print{body{background:#fff}.wrap{max-width:none;padding:0;gap:1.5rem}
+.scroll{overflow:visible;border:0}table{min-width:0;font-size:8pt}
+h2{break-after:avoid}tr{break-inside:avoid}}
+"""
+
+
+def _chip(status):
+    return '<span class="chip c-%s">%s</span>' % (SLUG[status], html.escape(status))
+
+
+def _rows_table(rows):
+    out = ['<div class="scroll"><table><thead><tr>'
+           "<th>No</th><th>Permintaan Klien</th><th>Status</th>"
+           "<th>Keterangan</th><th>Bukti / Verifikasi</th><th>Commit</th>"
+           "</tr></thead><tbody>"]
+    for no, item, status, ket, bukti, commit in rows:
+        out.append(
+            "<tr><td class='no'>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+            "<td class='ev'>%s</td><td class='no'>%s</td></tr>"
+            % (html.escape(no), html.escape(item), _chip(status), html.escape(ket),
+               html.escape(bukti), ("<code>%s</code>" % html.escape(commit)) if commit else "")
+        )
+    out.append("</tbody></table></div>")
+    return "".join(out)
+
+
+def build_html():
+    counts = {}
+    for _n, _i, st, _k, _b, _c in EO + FASHION:
+        counts[st] = counts.get(st, 0) + 1
+
+    tiles = "".join(
+        '<div class="tile t-%s"><b>%s</b><span>%s</span></div>'
+        % (SLUG[st], counts.get(st, 0), html.escape(lbl))
+        for st, lbl in (
+            (DONE, "Selesai / sudah live"),
+            (HOLD, "Ditahan menunggu keputusan"),
+            (CLIENT, "Menunggu nilai / template klien"),
+            (NOREPRO, "Tidak reproduce di sistem"),
+        )
+    )
+
+    waiting = "".join(
+        "<tr><td class='no'>%s</td><td>%s</td></tr>" % (html.escape(a), html.escape(b))
+        for a, b in WAITING
+    )
+    deploy = "".join(
+        "<tr><td><code>%s</code></td><td class='no'>%s</td><td class='no'>%s</td>"
+        "<td class='ev'>%s</td></tr>"
+        % (html.escape(m), html.escape(v), html.escape(n), html.escape(k))
+        for m, v, n, k in DEPLOY
+    )
+
+    doc = """<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Status Delivery — List Kendala System ODOO</title>
+<style>%s</style></head><body><div class="wrap">
+
+<header>
+  <div class="eyebrow">Status Delivery &middot; 30 Juli 2026</div>
+  <h1>List Kendala System ODOO</h1>
+  <p class="standfirst">Worksheet <b>EO</b> (ARKA-AIM, produksi <code>prd_arkaaim</code>)
+  dan <b>FASHION</b> (Levi&rsquo;s/EBR, produksi <code>prd_levis_begbal</code>).
+  %d permintaan; seluruh item ditandai klien &ldquo;Not Yet&rdquo; pada sheet asli.</p>
+</header>
+
+<section>
+  <h2>Ringkasan</h2>
+  <div class="tiles">%s</div>
+  <p class="note" style="margin-top:.9rem"><b>Sisa development: nol.</b>
+  Seluruh item yang belum tuntas menunggu keputusan atau data dari pihak lain,
+  bukan menunggu pengerjaan. Dua yang ditahan: EO&nbsp;#8 (rekonsiliasi asset,
+  menunggu konfirmasi) dan EO&nbsp;#9 (kode depresiasi siap, posting produksi ditahan
+  &mdash; backlog Juni 2026 Rp565.523.083,57).</p>
+  <p class="note"><b>Perlu disampaikan lebih dulu ke klien.</b> Tiga deliverable akan
+  tampil kosong atau belum bermakna sampai data pendukungnya ada: FASHION&nbsp;#6
+  (On Hand) dan #7 (Purchase Return) menunggu penerimaan barang &amp; retur dicatat di
+  Odoo; kolom <b>Margin</b> pada FASHION&nbsp;#10 menunggu cost produk (0 dari 3.865
+  produk terjual punya cost). Ketiganya sudah menandai keterbatasan itu di dalam
+  report-nya sendiri.</p>
+</section>
+
+<section><h2>Worksheet EO &mdash; ARKA-AIM</h2>%s</section>
+<section><h2>Worksheet FASHION &mdash; Levi&rsquo;s / EBR</h2>%s</section>
+
+<section><h2>Menunggu Klien</h2>
+  <div class="scroll"><table><thead><tr><th>Item</th><th>Yang dibutuhkan</th></tr></thead>
+  <tbody>%s</tbody></table></div>
+</section>
+
+<section><h2>Jejak Deployment</h2>
+  <div class="scroll"><table><thead><tr><th>Modul</th><th>Versi</th><th>Jumlah DB</th>
+  <th>Keterangan</th></tr></thead><tbody>%s</tbody></table></div>
+  <p class="note">Versi seragam di seluruh database yang memasangnya &mdash; nol drift.
+  <b>pg_dump</b> diambil sebelum setiap rollout; ukuran dan integritas gzip diverifikasi.</p>
+</section>
+
+<footer>
+  <span>Dibuat dari scripts/build_status_delivery.py</span>
+  <span>Versi Excel: status-delivery-kendala-jul2026.xlsx</span>
+  <span>Detail teknis: docs/kendala-sheet-jul2026-status.md</span>
+</footer>
+</div></body></html>
+""" % (CSS, len(EO + FASHION), tiles, _rows_table(EO), _rows_table(FASHION), waiting, deploy)
+
+    with open(OUT_HTML, "w", encoding="utf-8") as fh:
+        fh.write(doc)
+    print("written:", OUT_HTML)
+
+
+build_html()
