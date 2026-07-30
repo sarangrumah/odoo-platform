@@ -25,12 +25,19 @@ top-ups sit on top.
    adapter registry (`ppob_mock`, `ppob_http_json`), DP-100% topup wizard.
 4. `custom_ppob_sale` — transaction state machine + dispatch + reaper; **merged
    tax** (vat_mode/dpp/ppn).
-5. `custom_ppob_commission` — commission rules/accruals + settlement (PPh 23 via
+5. `custom_ppob_sla` — declarative throughput/latency targets (provider × class,
+   wildcard fallback) + hourly throughput samples holding **both** the Oracle
+   historical baseline and Odoo actuals.
+6. `custom_ppob_commission` — commission rules/accruals + settlement (PPh 23 via
    `custom_pph_witholding`).
-6. `custom_ppob_rollup` — daily aggregation → summary faktur for e-Faktur.
-7. `custom_ppob_va` — mitra virtual accounts, H2H callbacks, `va_match` reconcile.
-8. `custom_ppob_oracle_bridge` — legacy Oracle EVShop bridge (opt-in, not in the
+7. `custom_ppob_rollup` — daily aggregation → summary faktur for e-Faktur.
+8. `custom_ppob_va` — mitra virtual accounts, H2H callbacks, `va_match` reconcile.
+9. `custom_ppob_oracle_bridge` — legacy Oracle EVShop bridge (opt-in, not in the
    default pack).
+10. `custom_ppob_biller_digiflazz` — first concrete biller adapter
+    (`ppob_digiflazz`). Per-tenant opt-in, not in the pack: which biller a tenant
+    sells through is a commercial decision. **Never run against a live server** —
+    written to the published spec, tested against a mocked HTTP layer.
 
 ## Key design decisions (vs ERA source)
 
@@ -50,6 +57,13 @@ top-ups sit on top.
   (no retry loop) so a non-idempotent `pay()` cannot double-sell; it reuses
   `custom.adapter.config` for per-tenant base_url/credential and writes
   `custom.adapter.call.log`.
+- **`AdapterResult.ok` is TRI-STATE.** `True` = settle, `False` = confirmed
+  failure (refund), **`None` = provider still processing (leave alone)**. Both
+  `_dispatch_one` and the reaper check `is None` FIRST, because `if result.ok:`
+  and `not result.ok` cannot tell None from False — and getting that wrong
+  refunds the mitra on a sale the provider then fulfils, i.e. we pay twice.
+  Any adapter for an async provider must return `ok=None` for pending rather
+  than guessing.
 - **DP topup (D2):** the wizard is self-contained (DP + Pelunasan `in_invoice`
   pair + `account.move._post` hook advancing the bucket). No third-party
   advance-payment module.
@@ -60,6 +74,15 @@ top-ups sit on top.
 - **VA replay (D3):** the H2H controller reuses `custom_core`'s Redis-backed
   `_NonceStore` + IP allowlist. The **hard** idempotency guarantee is the DB
   `UNIQUE(bank_ref)` on `custom.ppob.va.topup`; the nonce is a throttle only.
+- **SLA targets are configuration, not constants (project D4):** throughput and
+  latency targets live in `custom.ppob.sla.target`, scoped provider × class with
+  wildcard fallback (most specific wins). The seeded baseline is **derived, not
+  measured** — `active_hours` and `peak_factor` are visible editable fields, not
+  hidden constants, and `calibration_source` keeps a guess labelled a guess until
+  a human promotes it. The targets are **declarative only**: nothing in dispatch
+  reads them to throttle or reject. `timeout_s_target` and `max_in_flight` in
+  particular record what SHOULD hold — the effective timeout is still
+  `custom.adapter.config.timeout_s`, and no concurrency cap exists anywhere.
 
 ## Gotchas
 
@@ -73,6 +96,17 @@ top-ups sit on top.
   (backward-compatible; defaults False).
 - `custom_ppob_oracle_bridge` runs two 1-minute crons — keep it out of tenants
   that don't use the legacy EVShop pipeline (it is excluded from the seed pack).
+- `custom.adapter.config.retry_count` / `circuit_breaker_threshold` /
+  `circuit_breaker_cooldown_s` are **visible in the UI but inert for PPOB** — the
+  suite deliberately skips the framework's retry loop (D1) and reads only
+  `base_url` / `credential_ref` / `timeout_s`. Setting them does nothing.
+- `custom.ppob.transaction.provider_latency_ms` is adapter RTT, measured around
+  the `pay()`/`inquiry()` call only. Do NOT use `completed_at - dispatched_at` as
+  latency: on cron-polled paths (oracle_bridge, eraspace ingest) that delta is
+  dominated by cron lag, not the provider.
+- `custom.ppob.throughput.sample` reads transactions via raw SQL and therefore
+  calls `env.flush_all()` first — same rule as the raw-SQL financial reports.
+  Removing that flush silently drops transactions written earlier in the cursor.
 
 ## Verification
 

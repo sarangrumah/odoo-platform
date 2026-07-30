@@ -81,3 +81,8 @@ scripts/tenants/levis/out_*.csv
 # reproducible outputs live under scripts/tenants/levis/ (also gitignored above).
 docs/projects/levis/Data XStore (Mentahan)*/
 docs/projects/levis/Data XStore (Mentahan)*.zip
+
+# Word exports of the architecture docs. The .md files next to them are the
+# source of truth; each exported revision is ~1 MB of binary that git can never
+# really delete once committed.
+docs/*.docx
