@@ -81,3 +81,9 @@ scripts/tenants/levis/out_*.csv
 # reproducible outputs live under scripts/tenants/levis/ (also gitignored above).
 docs/projects/levis/Data XStore (Mentahan)*/
 docs/projects/levis/Data XStore (Mentahan)*.zip
+
+# The bare `logs/` rule above matches a directory called logs ANYWHERE, which
+# silently swallowed the Next.js route for the transaction-log screen. Re-include
+# it explicitly: git cannot un-ignore files inside an ignored directory, so the
+# directory itself has to be named.
+!vas-pmo/src/app/(app)/logs/
