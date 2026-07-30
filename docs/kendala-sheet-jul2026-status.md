@@ -18,6 +18,42 @@ Tanggal review & eksekusi: **2026-07-30**. Semua item di sheet ditandai klien
 
 ## 1. Yang sudah diubah
 
+### 1.0b Ronde ketiga (2026-07-30, malam)
+
+**FASHION #4** GL Open Items / Outstanding (as-of), **FASHION #5 & #13** Mapping
+Vendor Bill vs Payment (satu report untuk dua permintaan identik),
+**FASHION #9** Sales report kini membaca POS, **FASHION #10** Sales Detail
+layout X24DN dengan COGS & margin. Commit `5465932`, `ef10d55`.
+`custom_accounting_reports` → **19.0.0.13.0** di 16 DB.
+
+Tiga koreksi terhadap asesmen awal, semuanya ditemukan saat implementasi:
+
+1. **Register ternyata tersimpan.** Sebelumnya dilaporkan "tidak dipersist".
+   Importer menulis `pos_reference` = `{store}-{register}-{txn}` dan **semua
+   16.064 order** parse bersih — ketiga kolom tersedia tanpa mengubah importer.
+2. **Kolom Diskon hampir diserahkan bernilai nol.** `pos_order_line.discount`
+   = 0 di semua 11.496 baris karena diskon X24DN dibukukan sebagai
+   contra-revenue reclass. Nilai sebenarnya ada di `ri_src_discount`:
+   **Rp1.234.678.813** untuk Juni saja.
+3. **EO #10 belum ikut selesai.** Akar masalahnya memang sama dengan FASHION #9
+   (report hanya membaca customer invoice), tapi **obatnya berbeda**: Levi's
+   butuh sumber POS, ARKA tidak punya POS — revenue-nya ada di jurnal saldo
+   awal (`entry`). Framing "satu akar masalah" di ronde pertama benar, tetapi
+   memberi kesan satu perbaikan; yang terkirim baru sisi Levi's.
+
+> **INSIDEN KEDUA — 4 DB sempat down, sudah dipulihkan.** Wizard Sales Detail
+> awalnya memakai `Many2many("pos.config")`. Comodel di-resolve saat **registry
+> dibangun**, bukan saat report dijalankan, sehingga guard runtime tidak
+> menolong: `prd_arkaaim`, `trn_arkaaim`, `trn_arkaaim_begbal`, dan `rnd_ppob`
+> gagal load dengan `unknown comodel_name 'pos.config'` — keempatnya tidak
+> memasang `point_of_sale`, dan modul report ini generik. Diganti filter Store
+> Code bertipe `Char` (lebih cocok juga, klien mengenali store lewat kodenya).
+> Keempatnya pulih, ke-16 DB di-upgrade ulang.
+>
+> **Aturan tambahan:** di shared addon, field relasional **tidak boleh**
+> menunjuk model di luar `depends`-nya. Kolom hilang merusak pembacaan; comodel
+> hilang merusak seluruh registry.
+
 ### 1.0 Ronde kedua (2026-07-30, sore)
 
 Lanjutan setelah ronde pertama: **FASHION #6/#7** (install `custom_wms_reports`
@@ -176,11 +212,11 @@ ada akuntansi existing yang berubah.
 | 7 | Akses closing period | **Menunggu klien** — lock date NULL; perlu konfirmasi periode mana yang ditutup karena lock date memblokir posting |
 | 8 | Nilai perolehan asset selisih vs report | Terkonfirmasi, **belum dikerjakan**. Ternyata **dua** komponen — lihat §3 |
 | 9 | No document depresiasi per bulan | ⏸ Kode **SELESAI** + teruji di DB training; **posting produksi DITAHAN** |
-| 10 | Sales report kosong | Perlu dev. Akar masalah sama dengan FASHION #9 — lihat §3 |
+| 10 | Sales report kosong | **BELUM — obatnya beda dari FASHION #9.** Akar sama (report hanya baca customer invoice), tapi ARKA tidak punya POS: revenue-nya di jurnal saldo awal (`entry`). Perlu report sales berbasis akun revenue GL |
 | 11 | PPh otomatis per kode objek | ✅ **SELESAI** (Batch C). Perlu 1 bill UAT oleh klien |
 | 12 | Due date belum sesuai aturan Erajaya | **Menunggu klien** — 12 payment term sudah ada, perlu aturan eksaknya |
 | 13 | Alamat AIM belum lengkap di Bill/Journal Voucher | **Menunggu klien** — alamat NPWP AIM. Company 1 street hanya `"Erajaya Plaza"` (street2 & zip kosong); company 2 lengkap |
-| 14 | Kolom nomor seri faktur pajak di GL | Dev kecil, belum dikerjakan. `x_custom_nsfp` sudah ada di `account.move` |
+| 14 | Kolom nomor seri faktur pajak di GL | ✅ **SELESAI** — 2 kolom opsional (default off); 408 baris ber-NSFP di prd_levis_begbal |
 | 15 | Format impor PSIAP faktur keluaran | **Menunggu template klien** — 0 hasil "PSIAP" di seluruh addons tree |
 
 ### Worksheet FASHION — Levi's/EBR (`prd_levis_begbal`)
@@ -191,25 +227,42 @@ Item 1 klien berisi 6 sub-request.
 |---|---|---|
 | 1.1 | Rekap PPh + 5 kolom tambahan | ✅ **SUDAH LIVE SEBELUMNYA** — kelima kolom sudah ada. Nol development, cukup ditunjukkan |
 | 1.2 | Report Import PPN Masukan (8 kolom) | ✅ **SELESAI** — report sudah punya persis 8 kolom itu; terblokir bug Batch A, kini terbuka |
-| 1.3 | Report Ekualisasi Biaya vs Objek PPh | Partial. Report ada; kurang 4 kolom (NPWP, COA Expense, No. Dok Jurnal, Nilai PPN) |
+| 1.3 | Report Ekualisasi Biaya vs Objek PPh | ✅ **SELESAI** — 4 kolom ditambah + sumber data dilebarkan (0 → 112 baris) |
 | 1.4 | Report Upload Retur Pajak | **Menunggu template Coretax dari klien** |
 | 1.5 | Report Upload Faktur Keluaran | **Menunggu template XLS Pajakku.** `custom_coretax_pajakku` adalah API adapter, bukan penulis template |
 | 1.6 | Mapping COA jurnal PPh, tetap editable | ✅ **SUDAH TERPENUHI** — 107 rule active, `account_id` NULL = 0. Cukup konfirmasi COA sesuai sheet tim Tax |
-| 2 | Jurnal PPh manual tidak muncul di Rekap PPh | Gap nyata, belum dikerjakan — lihat §3 |
+| 2 | Jurnal PPh manual tidak muncul di Rekap PPh | ✅ **SELESAI** — 50 → 105 baris, tie persis ke GL credit |
 | 3 | Import PPN Masukan keluar Trial Balance | ✅ **SELESAI** (Batch A) |
-| 4 | GL Open items / Outstanding balance | Build baru, belum dikerjakan |
-| 5 | Report mapping vendor bill ↔ payment number | Build baru. **Duplikat item 13** — kerjakan sekali |
-| 6 | On Hand Inventory report | Kode **sudah ada** (`custom.wms.stock.summary.report`), belum diinstall. Keputusan: **install `custom_wms_reports`** |
-| 7 | Purchase Return report | Kode **sudah ada** (`custom.wms.purchase.return.report`), belum diinstall. Sama seperti #6 |
+| 4 | GL Open items / Outstanding balance | ✅ **SELESAI** — as-of per tanggal, tie 0,00 ke GL |
+| 5 | Report mapping vendor bill ↔ payment number | ✅ **SELESAI** — satu report untuk #5 dan #13 |
+| 6 | On Hand Inventory report | ✅ **TERINSTALL** — akan terisi setelah ada penerimaan barang di Odoo |
+| 7 | Purchase Return report | ✅ **TERINSTALL** — akan terisi setelah ada retur di Odoo |
 | 8 | Purchase report keluar Trial Balance | ✅ **SELESAI** (Batch A) |
-| 9 | Sales report kosong | Perlu dev — lihat §3 |
-| 10 | Sales report detail ala X24DN | Build terbesar. Data sebagian besar ada; gap = **Register** (tidak dipersist) dan **COGS per baris + Margin** (COGS periodik per-OU via `levis.cogs.run`) |
-| 11 | Keterangan PPh/PPN hilang saat reset to draft | Bug nyata, belum dikerjakan — lihat §3 |
+| 9 | Sales report kosong | ✅ **SELESAI** — POS jadi sumber kedua; 0 → 11.496 baris |
+| 10 | Sales report detail ala X24DN | ✅ **SELESAI** — 17 kolom; Store/Register/Txn dari `pos_reference`, diskon dari `ri_src_discount`, COGS sebasis `levis.cogs.run`. **Margin belum bermakna** sampai cost produk ada (0 dari 3.865 produk terjual punya cost) — baris ditandai di kolom Catatan |
+| 11 | Keterangan PPh/PPN hilang saat reset to draft | ✅ **SELESAI** — label dipertahankan, jurnal PPh direverse |
 | 12 | Modul Petty Cash all store | ✅ **SUDAH TER-DEPLOY** — `custom_petty_cash` 19.0.0.4.0 terinstall, 0 record. Perlu config per-store + training |
-| 13 | Report payment bill | Duplikat item 5 |
+| 13 | Report payment bill | ✅ **SELESAI** — dikerjakan bersama #5 |
 
-**Rekap:** 8 item selesai/sudah live · 1 tidak reproduce · 9 menunggu input klien ·
-11 sisa development.
+**Rekap (33 entri; item FASHION #1 dihitung 6 sub-request):**
+
+| Status | Jumlah | Item |
+|---|---|---|
+| ✅ Selesai / sudah live | **20** | EO #5, #6, #11, #14 · FASHION 1.1, 1.2, 1.3, 1.6, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 |
+| ⏸ Kode siap, posting ditahan | **1** | EO #9 |
+| Tidak reproduce | **1** | EO #4 |
+| Menunggu nilai/template klien | **8** | EO #1, #2, #7, #12, #13, #15 · FASHION 1.4, 1.5 |
+| Sisa development | **3** | EO #3 (setelah #1), #8, #10 |
+
+Naik dari 9 selesai (akhir ronde pertama) menjadi **20**. Sisa development tinggal
+tiga, semuanya di worksheet EO.
+
+**Tiga report baru akan tampil kosong / belum bermakna sampai data pendukungnya
+ada** — perlu disampaikan ke klien lebih dulu agar tidak dilaporkan sebagai bug
+baru: FASHION #6 (On Hand) dan #7 (Purchase Return) menunggu penerimaan barang &
+retur dicatat di Odoo (`prd_levis_begbal`: 0 `stock_quant`, 0 PO), dan kolom
+**Margin** di FASHION #10 menunggu cost produk (0 dari 3.865 produk terjual punya
+cost). Ketiganya sudah menandai keterbatasan itu di dalam report-nya sendiri.
 
 ---
 
@@ -244,6 +297,14 @@ invoice (revenue ada di move `entry` saldo awal); revenue Levi's ada di **16.064
 `pos.order`**. Report-nya tidak rusak — sumber datanya salah untuk kedua tenant.
 Ini prasyarat FASHION #10.
 
+**Partial reconcile menggantung ke move draft.** Ditemukan saat membangun
+FASHION #4: satu `account.partial.reconcile` senilai **Rp75.405.550** pada akun
+`2103300001 Non trade payable` menghubungkan baris posted dengan move
+`8282/2026/07/042` yang **masih draft**. Report memperlakukannya sebagai masih
+open (benar — lawannya tidak ada di buku), dan itulah yang membuat totalnya tie
+ke GL. Tapi partial-nya sendiri anomali yang perlu diperiksa klien; kelasnya sama
+dengan bug reset-to-draft FASHION #11.
+
 Dua bug lain yang terkonfirmasi tapi belum dikerjakan:
 **FASHION #11** — tidak ada override `button_draft` di `custom_tax_id` maupun
 `custom_levis_localization`, sehingga saat reset to draft JE PPh
@@ -258,11 +319,18 @@ diisi saat bill di-post, jadi JE PPh yang diketik manual tidak terlihat.
 
 **Modul & DB**
 
+Kondisi akhir sesi — seragam, nol drift (disapu ulang per DB):
+
 | Modul | Versi | DB |
 |---|---|---|
-| `custom_accounting_reports` | 19.0.0.9.0 | 11 DB: prd_arkaaim, prd_levis_begbal, prd_levis, prd_levis_AP, prd_detail_levis, trn_arkaaim, trn_arkaaim_begbal, rnd_levis, demo_updated_levis, tst_mdm_levis, tst_mdm_api |
-| `custom_tax_id` | 19.0.0.4.2 | prd_arkaaim |
-| `custom_accounting_asset` | 19.0.0.5.0 | **trn_arkaaim_begbal saja** (produksi sengaja belum) |
+| `custom_accounting_reports` | **19.0.0.13.0** | **16 DB** — 5 produksi (prd_arkaaim, prd_levis_begbal, prd_levis, prd_levis_AP, prd_detail_levis), 2 tenant lain (gentlewoman, rnd_ppob), 2 training (trn_arkaaim, trn_arkaaim_begbal), rnd_levis, demo_updated_levis, 2 tst_mdm, 3 snapshot `*_bak_20260709` |
+| `custom_tax_id` | **19.0.0.5.0** | **14 DB** (semua yang memasang modul) |
+| `custom_wms_reports` + `custom_wms_cycle_count` + `custom_wms_docs` | 19.0.0.2.0 | prd_levis_begbal, rnd_levis |
+| `custom_accounting_asset` | 19.0.0.5.0 | **trn_arkaaim_begbal saja** (produksi sengaja belum — lihat §5) |
+
+Snapshot `*_bak_20260709` ikut di-upgrade: ketiganya DB hidup yang dilayani
+container yang sama, jadi berhenti pristine begitu kode shared berubah dan tidak
+bisa ditinggal rusak. Restore point sebenarnya tetap ada di file `pg_dump`.
 
 `/opt/odoo-platform` disinkronkan untuk ketiga modul (dicek bebas drift terhadap
 git HEAD sebelum overwrite). Container `odoo19-platform-odoo` direstart untuk
@@ -315,8 +383,16 @@ commit — jangan dry-run dulu — supaya tidak ada gap nomor jurnal.
 | FASHION 1.5 | Template XLS Mitra Pajakku |
 | FASHION 1.6 | Konfirmasi COA jurnal PPh sesuai sheet tim Tax |
 
+| FASHION 1.6 (lanjutan) | Keputusan atas **50 withholding line Rp161.676.135,96** di `prd_levis_begbal` yang tidak punya jurnal GL — dibersihkan atau dibukukan? Sekarang dikeluarkan dari Rekap PPh dan ditampilkan sebagai note agar tidak double-count |
+| FASHION #4 (lanjutan) | Periksa partial reconcile **Rp75.405.550** yang menggantung ke move draft `8282/2026/07/042` |
+| FASHION #10 (lanjutan) | Cost produk / penerimaan barang, agar kolom Margin bermakna |
+
 ### Backlog development
 
-Diprioritaskan: FASHION #9 → #10 (sales POS + detail X24DN), FASHION #11 & #2
-(bug PPh), EO #8 (rekonsiliasi asset 2 komponen), EO #14 & FASHION 1.3 (dev kecil),
-FASHION #4 dan #5/#13, serta install `custom_wms_reports` untuk FASHION #6/#7.
+Tersisa **tiga**, semuanya di worksheet EO:
+
+| Item | Pekerjaan |
+|---|---|
+| EO #8 | Rekonsiliasi selisih asset — **dua** komponen: nilai perolehan 34.976.845 dan accum-dep ≈555.011.296 |
+| EO #10 | Report sales berbasis akun revenue GL untuk ARKA (perbaikan POS di FASHION #9 tidak menjangkau tenant tanpa POS) |
+| EO #3 | Verifikasi kartu utang/piutang — terhambat EO #1, jalan setelah listing outstanding datang |
