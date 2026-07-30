@@ -34,6 +34,7 @@ REPORT_MODEL_MAP = {
     "receivable_card": "custom.report.receivable.card",
     "advance": "custom.report.advance",
     "sales": "custom.report.sales",
+    "sales_detail": "custom.report.sales.detail",
     "purchase": "custom.report.purchase",
     "credit_limit": "custom.report.credit.limit",
     "gl_open_items": "custom.report.gl.open.items",

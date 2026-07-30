@@ -54,6 +54,9 @@
                         <t t-elif="report_code == 'sales'">
                             <t t-call="custom_accounting_reports.report_sales"/>
                         </t>
+                        <t t-elif="report_code == 'sales_detail'">
+                            <t t-call="custom_accounting_reports.report_sales_detail"/>
+                        </t>
                         <t t-elif="report_code == 'purchase'">
                             <t t-call="custom_accounting_reports.report_purchase"/>
                         </t>

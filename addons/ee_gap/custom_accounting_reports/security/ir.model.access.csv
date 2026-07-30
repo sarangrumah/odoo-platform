@@ -36,3 +36,4 @@ access_purchase_wizard_user,purchase wizard user,model_custom_report_purchase_wi
 access_credit_limit_wizard_user,credit limit wizard user,model_custom_report_credit_limit_wizard,group_report_user,1,1,1,1
 access_gl_open_items_wizard_user,gl open items wizard user,model_custom_report_gl_open_items_wizard,group_report_user,1,1,1,1
 access_bill_payment_wizard_user,bill payment wizard user,model_custom_report_bill_payment_wizard,group_report_user,1,1,1,1
+access_sales_detail_wizard_user,sales detail wizard user,model_custom_report_sales_detail_wizard,group_report_user,1,1,1,1

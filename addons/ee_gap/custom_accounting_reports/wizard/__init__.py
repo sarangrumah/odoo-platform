@@ -25,3 +25,4 @@ from . import purchase_wizard
 from . import credit_limit_wizard
 from . import gl_open_items_wizard
 from . import bill_payment_wizard
+from . import sales_detail_wizard
