@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_token_admin,vaspmo token admin,model_custom_vaspmo_token,custom_project_portfolio.group_vaspmo_admin,1,1,1,1

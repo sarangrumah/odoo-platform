@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Brand seed. `legal_entity` is filled in ONLY where it has been confirmed:
+             Levi's = Era Busana Retailindo, and the Erajaya Swasembada entities. The rest
+             are deliberately blank rather than guessed — an empty cell is honest, an
+             invented company name would quietly become "data". -->
+
+        <record id="vertical_levis" model="custom.project.vertical">
+            <field name="name">Levi's</field>
+            <field name="code">LEVIS</field>
+            <field name="legal_entity">Era Busana Retailindo</field>
+            <field name="brand_group">retail_fashion</field>
+            <field name="sequence">10</field>
+            <field name="color">4</field>
+        </record>
+
+        <record id="vertical_gtw" model="custom.project.vertical">
+            <field name="name">Gentlewoman</field>
+            <field name="code">GTW</field>
+            <field name="brand_group">retail_fashion</field>
+            <field name="sequence">20</field>
+            <field name="color">9</field>
+        </record>
+
+        <record id="vertical_eraspace" model="custom.project.vertical">
+            <field name="name">Eraspace</field>
+            <field name="code">ERASPACE</field>
+            <field name="legal_entity">Erajaya Swasembada</field>
+            <field name="brand_group">digital</field>
+            <field name="sequence">30</field>
+            <field name="color">1</field>
+        </record>
+
+        <record id="vertical_arkaaim" model="custom.project.vertical">
+            <field name="name">ARKA AIM</field>
+            <field name="code">ARKAAIM</field>
+            <field name="brand_group">digital</field>
+            <field name="sequence">40</field>
+            <field name="color">6</field>
+        </record>
+
+        <record id="vertical_erafone" model="custom.project.vertical">
+            <field name="name">Erafone</field>
+            <field name="code">ERAFONE</field>
+            <field name="brand_group">retail_gadget</field>
+            <field name="sequence">50</field>
+            <field name="color">2</field>
+            <field name="active" eval="False"/>
+        </record>
+
+        <record id="vertical_urban" model="custom.project.vertical">
+            <field name="name">Urban Republic</field>
+            <field name="code">URBAN</field>
+            <field name="brand_group">retail_gadget</field>
+            <field name="sequence">60</field>
+            <field name="color">3</field>
+            <field name="active" eval="False"/>
+        </record>
+
+        <record id="vertical_jds" model="custom.project.vertical">
+            <field name="name">JDS — Warehouse</field>
+            <field name="code">JDS</field>
+            <field name="brand_group">supply_chain</field>
+            <field name="sequence">70</field>
+            <field name="color">7</field>
+        </record>
+
+        <record id="vertical_corp" model="custom.project.vertical">
+            <field name="name">Erajaya Group — Shared Services</field>
+            <field name="code">CORP</field>
+            <field name="legal_entity">Erajaya Swasembada</field>
+            <field name="brand_group">shared</field>
+            <field name="sequence">80</field>
+            <field name="color">8</field>
+        </record>
+
+    </data>
+</odoo>

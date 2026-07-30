@@ -546,6 +546,78 @@ services:
         limits:
           memory: 256m
 
+
+  # ---- VAS PMO (Next.js headless UI + notification BFF) ----
+  # Same shape as `storefront`: baked standalone image, read-only FS, BFF→Odoo over the
+  # internal TLS terminator with the CA pinned. Odoo's notification outbox POSTs back to
+  # this container at /api/notify (HMAC-signed), which is why it also needs the WA and
+  # SMTP credentials.
+  vas-pmo:
+    build:
+      context: ./vas-pmo
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-vas-pmo:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-vas-pmo
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=64m,mode=1777
+      - /app/.next/cache:rw,size=128m
+    depends_on:
+      odoo:
+        condition: service_healthy
+    volumes:
+      # Pin the internal nginx TLS cert so the BFF→Odoo hop runs over TLS.
+      - ./nginx/certs/server.crt:/etc/ssl/odoo-internal.crt:ro
+    environment:
+      PORT: 8080
+      # Next's standalone server binds to $HOSTNAME, which docker sets to the container
+      # id. Without this it listens on that name only and the healthcheck (127.0.0.1)
+      # is refused.
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      ODOO_BASE_URL: ${VAS_PMO_ODOO_BASE_URL:-https://nginx}
+      ODOO_INTERNAL_CA: /etc/ssl/odoo-internal.crt
+      ODOO_TENANT_DB: ${VAS_PMO_TENANT_DB:-rnd_vas_pmo}
+      ODOO_TENANT_HOST: ${VAS_PMO_TENANT_HOST:-}
+      # Shared secret for BOTH directions: Odoo outbox → /api/notify, and BFF → Odoo
+      # /vaspmo/api/hmac/*. Must equal ir.config_parameter
+      # custom_core.secure_endpoint.vaspmo.secret.
+      VAS_PMO_HMAC_SECRET: ${VAS_PMO_HMAC_SECRET}
+      # WhatsApp: WaHub primary, the platform's baileys gateway as fallback.
+      WA_PROVIDER: ${WA_PROVIDER:-wahub}
+      WAHUB_API_URL: ${WAHUB_API_URL:-}
+      WAHUB_APP_ID: ${WAHUB_APP_ID:-}
+      WAHUB_APP_SECRET: ${WAHUB_APP_SECRET:-}
+      BAILEYS_URL: ${VAS_PMO_BAILEYS_URL:-http://baileys:8088}
+      BAILEYS_API_KEY: ${BAILEYS_API_KEY:-}
+      # E-mail
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${VAS_PMO_MAIL_FROM:-VAS PMO <no-reply@vas-pmo.internal>}
+      # Safety valve while onboarding: send everything to one tester instead of the team.
+      NOTIFICATION_TEST_MODE: ${NOTIFICATION_TEST_MODE:-false}
+      NOTIFICATION_TEST_PHONE: ${NOTIFICATION_TEST_PHONE:-}
+      NOTIFICATION_TEST_EMAIL: ${NOTIFICATION_TEST_EMAIL:-}
+    ports:
+      - "${VAS_PMO_PORT:-18110}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
 networks:
   odoo-net:
     driver: bridge
