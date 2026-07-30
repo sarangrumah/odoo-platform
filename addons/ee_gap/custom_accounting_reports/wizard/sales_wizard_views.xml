@@ -9,6 +9,7 @@
                     <group>
                         <field name="date_from"/>
                         <field name="date_to"/>
+                        <field name="basis"/>
                         <field name="group_by"/>
                         <field name="posted_only"/>
                     </group>

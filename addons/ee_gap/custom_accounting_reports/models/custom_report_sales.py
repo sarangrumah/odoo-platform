@@ -63,6 +63,60 @@ class CustomReportSales(models.AbstractModel):
             return row["date"].strftime("%Y-%m") if row["date"] else "—"
         return None
 
+    def _gl_rows(self, filters):
+        """Revenue read straight off the income accounts.
+
+        ARKA-AIM booked its sales as opening-balance journal entries, neither as
+        customer invoices nor through POS: on prd_arkaaim Rp585,585,585 of the
+        Rp735,585,585 total revenue sits in a single ``entry``
+        (MISC/2026/05/0001), so the document-based register showed almost
+        nothing — sheet item EO #10, "sales report kosong sedangkan transaksi
+        ada di detail beginning balance".
+
+        This is an alternative *basis*, chosen in the wizard, not a third source
+        stacked on the other two: an invoice's own revenue line already sits on
+        an income account, so summing both would double-count every tenant that
+        invoices normally and would break the exact tie to GL revenue the
+        document basis gives Levi's.
+        """
+        domain = [
+            ("company_id", "in", filters["company_ids"]),
+            ("date", ">=", filters["date_from"]),
+            ("date", "<=", filters["date_to"]),
+            ("account_id.account_type", "=", "income"),
+        ]
+        if filters.get("posted_only", True):
+            domain.append(("parent_state", "=", "posted"))
+        else:
+            domain.append(("parent_state", "in", ("draft", "posted")))
+        if filters.get("partner_ids"):
+            domain.append(("move_id.partner_id", "in", filters["partner_ids"]))
+
+        rows = []
+        for ml in self.env["account.move.line"].search(domain, order="date, move_id"):
+            # Credit raises revenue; a debit is a reversal or a reclass out.
+            amount = (ml.credit or 0.0) - (ml.debit or 0.0)
+            if not amount:
+                continue
+            rows.append(
+                {
+                    "date": ml.date,
+                    "invoice_no": ml.move_id.name or "",
+                    "customer": ml.partner_id.display_name or ml.move_id.partner_id.display_name or "",
+                    "product": ml.product_id.display_name or "",
+                    "label": ml.name or "",
+                    "quantity": ml.quantity or 0.0,
+                    "price_unit": 0.0,
+                    "discount": 0.0,
+                    "untaxed": amount,
+                    # Tax never sits on the revenue line itself, so there is
+                    # nothing to split out and Total equals Untaxed here.
+                    "tax": 0.0,
+                    "total": amount,
+                }
+            )
+        return rows
+
     def _pos_rows(self, filters):
         """Sold POS lines, shaped like the invoice rows."""
         if "pos.order.line" not in self.env:
@@ -119,6 +173,11 @@ class CustomReportSales(models.AbstractModel):
         if filters.get("partner_ids"):
             domain.append(("move_id.partner_id", "in", filters["partner_ids"]))
 
+        # GL basis replaces the document basis entirely — see _gl_rows.
+        if (filters.get("basis") or "document") == "gl":
+            rows = self._gl_rows(filters)
+            return self._assemble(rows, group_by)
+
         rows = []
         for ml in self.env["account.move.line"].search(domain):
             sign = -1.0 if ml.move_id.move_type == "out_refund" else 1.0
@@ -141,7 +200,10 @@ class CustomReportSales(models.AbstractModel):
             )
 
         rows += self._pos_rows(filters)
+        return self._assemble(rows, group_by)
 
+    def _assemble(self, rows, group_by):
+        """Sort/group rows and append subtotal + grand-total lines."""
         lines = []
         g_qty = g_un = g_tx = g_tot = 0.0
 
