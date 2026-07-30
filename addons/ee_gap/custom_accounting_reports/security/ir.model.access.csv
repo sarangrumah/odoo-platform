@@ -34,3 +34,5 @@ access_db_wizard_user,day book wizard user,model_custom_report_day_book_wizard,g
 access_gl_analysis_user,gl analysis user,model_custom_report_journal_item_analysis,group_report_user,1,0,0,0
 access_purchase_wizard_user,purchase wizard user,model_custom_report_purchase_wizard,group_report_user,1,1,1,1
 access_credit_limit_wizard_user,credit limit wizard user,model_custom_report_credit_limit_wizard,group_report_user,1,1,1,1
+access_gl_open_items_wizard_user,gl open items wizard user,model_custom_report_gl_open_items_wizard,group_report_user,1,1,1,1
+access_bill_payment_wizard_user,bill payment wizard user,model_custom_report_bill_payment_wizard,group_report_user,1,1,1,1

@@ -60,6 +60,12 @@
                         <t t-elif="report_code == 'credit_limit'">
                             <t t-call="custom_accounting_reports.report_credit_limit"/>
                         </t>
+                        <t t-elif="report_code == 'gl_open_items'">
+                            <t t-call="custom_accounting_reports.report_gl_open_items"/>
+                        </t>
+                        <t t-elif="report_code == 'bill_payment'">
+                            <t t-call="custom_accounting_reports.report_bill_payment"/>
+                        </t>
                         <t t-elif="report_code == 'tax'">
                             <t t-call="custom_accounting_reports.report_tax"/>
                         </t>

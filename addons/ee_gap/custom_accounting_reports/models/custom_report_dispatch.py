@@ -36,6 +36,8 @@ REPORT_MODEL_MAP = {
     "sales": "custom.report.sales",
     "purchase": "custom.report.purchase",
     "credit_limit": "custom.report.credit.limit",
+    "gl_open_items": "custom.report.gl.open.items",
+    "bill_payment": "custom.report.bill.payment",
     "tax": "custom.report.tax",
     "faktur_pajak": "custom.report.faktur.pajak",
     "bupot": "custom.report.bupot",
