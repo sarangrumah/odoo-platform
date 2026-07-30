@@ -18,6 +18,42 @@ Tanggal review & eksekusi: **2026-07-30**. Semua item di sheet ditandai klien
 
 ## 1. Yang sudah diubah
 
+### 1.0 Ronde kedua (2026-07-30, sore)
+
+Lanjutan setelah ronde pertama: **FASHION #6/#7** (install `custom_wms_reports`
++ 2 dependensi di `prd_levis_begbal`), **EO #14** (kolom No. FP Masukan /
+Keluaran di GL), **FASHION 1.3** (4 kolom Ekualisasi + pelebaran sumber data),
+**FASHION #2** (Rekap PPh kini menangkap PPh dari native tax & jurnal manual),
+**FASHION #11** (reset to draft tidak lagi menghilangkan keterangan / meng-orphan
+jurnal PPh). Commit `849fadc`, `45b5f78`.
+
+Versi akhir, seragam di semua DB yang memilikinya:
+`custom_accounting_reports` **19.0.0.11.0** (16 DB) ·
+`custom_tax_id` **19.0.0.5.0** (14 DB).
+
+> **INSIDEN — 13 DB sempat rusak, sudah dipulihkan.** `custom_tax_id` 19.0.0.5.0
+> menambah kolom `account_move_line.x_custom_tax_label`. Kode disinkronkan ke
+> `/opt` tetapi `-u` hanya dijalankan di satu DB; karena `/opt` di-mount ke
+> container yang melayani semua tenant, field itu masuk registry semua DB
+> sementara kolomnya hanya ada di satu → **setiap pembacaan vendor bill gagal**
+> di 13 DB, 5 di antaranya produksi. Dipulihkan dengan mengembalikan `/opt` ke
+> git HEAD + restart container (± 15 menit), lalu dirilis ulang secara benar ke
+> **seluruh** DB dalam satu window. Tidak ada data hilang — belum ada yang
+> menulis ke kolom tersebut. Backup diambil sebelum rollout.
+>
+> Efek samping yang ikut ditemukan & diperbaiki: dua field wizard GL
+> (`show_faktur_*`) dari `custom_accounting_reports` 19.0.0.10.0 juga membuat
+> wizard GL gagal di 5 DB yang belum di-`-u` — termasuk `rnd_ppob` dan
+> `gentlewoman`, yang **sebelumnya normal** (kolom lama seperti `show_clearing`
+> ada; hanya kolom baru yang hilang). Jadi ini bukan drift lama seperti dugaan
+> awal. Semuanya sudah di-`-u`.
+>
+> **Aturan yang berlaku sejak sekarang:** perubahan pada shared addon yang
+> **menambah field** tidak bisa dirilis ke sebagian DB. Enumerasi dan
+> otorisasi semua DB pemilik modul lebih dulu; kalau hanya sebagian yang boleh,
+> jangan sinkronkan ke `/opt` sama sekali — uji lewat container sekali pakai.
+> Menyalin ke `/opt` **adalah** langkah deploy, bukan staging.
+
 ### 1.1 Batch A — dispatcher report (commit `5a405ab`)
 
 `addons/ee_gap/custom_accounting_reports` **19.0.0.8.0 → 19.0.0.9.0**
