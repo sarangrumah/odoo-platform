@@ -107,6 +107,7 @@ top-ups sit on top.
 - `custom.ppob.throughput.sample` reads transactions via raw SQL and therefore
   calls `env.flush_all()` first — same rule as the raw-SQL financial reports.
   Removing that flush silently drops transactions written earlier in the cursor.
+- **This module's groups sit on its own `custom_ppob_core.res_groups_privilege_ppob` privilege** ("PPOB") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Verification
 

@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_pdp_retention
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_pdp_retention
@@ -61,6 +61,7 @@ Implements **data retention policies** for UU 27/2022. Operators define one `pdp
 - **`delete` failures are swallowed** (foreign-key constraints, model rules) and just logged; the policy will re-attempt next cron run.
 - **No tombstone**: deleted rows are gone; anonymized rows are not flagged. Re-running anonymization on already-anonymized rows is a no-op but wastes work.
 - **`_compute_eligible` is unstored** but the view will execute it on every list refresh → on a 10M-row table this is a full table scan per policy per render. Consider hiding the column on production lists.
+- **This module's groups sit on its own `custom_pdp_retention.res_groups_privilege_pdp_retention` privilege** ("PDP Retention") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Policy preview / dry-run UI** — count is shown but there is no "show me which 47 rows" button.

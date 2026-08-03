@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T07:43:22Z
 generator: bootstrap-v1
 module: custom_accounting_reports
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.15.0
 ---
 
 # custom_accounting_reports
@@ -92,6 +92,7 @@ Report models are AbstractModels and generally have no stored fields; user input
 - The `custom.report.advance` model auto-detects advance/down-payment accounts by name, which may not cover all chart-of-account edge cases.
 - `custom.report.aged.payable` inherits `custom.report.aged.receivable`, reusing its layout logic.
 - Every run performs a defensive raw-SQL insert into `pdp.audit_log`; failures are logged as warnings and do not block the report.
+- **This module's groups sit on its own `custom_accounting_reports.res_groups_privilege_accounting_reports` privilege** ("Accounting Reports") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - No real-time reporting or live data updates; reports are computed on demand from posted/existing move lines.

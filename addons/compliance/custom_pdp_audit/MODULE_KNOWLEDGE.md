@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_pdp_audit
-manifest_version: 19.0.0.1.1
+manifest_version: 19.0.0.3.0
 ---
 
 # custom_pdp_audit
@@ -61,6 +61,7 @@ The Odoo-side model `pdp.audit.log` (note the dot) is a read-only `_auto=False` 
 - **`request` import is best-effort** — if you call `_pdp_audit_write` outside an HTTP context (cron, RPC), ip/ua/request_id are all NULL. Counted on purpose; no errors.
 - **`res.partner` / `res.users` inheritance is hot** — every login, every contact write is now an audit row. Plan storage (the `pdp.audit_log` table grows fast) and a separate retention story (`custom_pdp_retention` doesn't auto-prune the audit table by design).
 - **Hash chain verification (`pdp.verify_audit_chain`) walks the entire table** — on multi-million-row tables this is slow; consider scheduling off-hours.
+- **This module's groups sit on its own `custom_pdp_audit.res_groups_privilege_pdp_audit` privilege** ("PDP Audit") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Retention/rotation of the audit log itself** — the chain is meant to be append-only forever; offloading to cold storage is operator policy.

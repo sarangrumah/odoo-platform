@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_pph_witholding
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_pph_witholding
@@ -79,6 +79,7 @@ Triggers: manual `custom.apply.witholding.wizard` on any `account.move`; lazy `a
 - **NPWP validation strips `.`/`-`/space** but does NOT strip other Unicode whitespace or zero-width characters; pasted values from PDF may falsely fail.
 - **`_round_half_up_int` rounds to whole rupiah** — fractional withholding is not preserved.
 - **Reverse is a free state transition** with no constraint that the application be in `applied` first; auditors may need additional guardrails.
+- **This module's groups sit on its own `custom_pph_witholding.res_groups_privilege_witholding` privilege** ("PPh Withholding") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Posting withholding tax lines into Odoo accounting** — the engine computes amounts; integrating them into `account.move.tax_line_id` or splitting payments is the consumer's responsibility.
