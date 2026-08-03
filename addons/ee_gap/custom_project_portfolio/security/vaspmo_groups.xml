@@ -2,14 +2,24 @@
 <odoo>
     <data noupdate="1">
 
+        <!-- Own privilege: groups that share one are rendered as a single
+             pick-one dropdown on the user form, so sharing it across modules
+             makes saving a user silently drop every other module's group. -->
+        <record id="res_groups_privilege_vaspmo" model="res.groups.privilege">
+            <field name="name">VAS PMO</field>
+            <field name="sequence">115</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+        </record>
+
         <!-- Odoo 19 replaced ir.module.category + res.groups.category_id with
-             res.groups.privilege + privilege_id. The platform privilege from custom_core
-             is reused so VAS PMO shows up next to the other custom apps. -->
+             res.groups.privilege + privilege_id. The privilege above carries the
+             custom_core category, so VAS PMO still shows up next to the other
+             custom apps on the user form, but as its own selector. -->
 
         <!-- Read-only member of the team. -->
         <record id="group_vaspmo_user" model="res.groups">
             <field name="name">VAS PMO / Member</field>
-            <field name="privilege_id" ref="custom_core.res_groups_privilege_custom_platform"/>
+            <field name="privilege_id" ref="res_groups_privilege_vaspmo"/>
             <field name="comment">Read-only view of every project, task and change request.</field>
             <field name="implied_ids" eval="[(4, ref('project.group_project_user'))]"/>
         </record>
@@ -17,7 +27,7 @@
         <!-- Business Analyst: owns analysis and the weekly report. -->
         <record id="group_vaspmo_ba" model="res.groups">
             <field name="name">VAS PMO / Business Analyst</field>
-            <field name="privilege_id" ref="custom_core.res_groups_privilege_custom_platform"/>
+            <field name="privilege_id" ref="res_groups_privilege_vaspmo"/>
             <field name="comment">Writes impact analysis and the weekly progress report.</field>
             <field name="implied_ids" eval="[(4, ref('custom_project_portfolio.group_vaspmo_user'))]"/>
         </record>
@@ -25,7 +35,7 @@
         <!-- Product Owner: approves change requests, owns project health. -->
         <record id="group_vaspmo_po" model="res.groups">
             <field name="name">VAS PMO / Product Owner</field>
-            <field name="privilege_id" ref="custom_core.res_groups_privilege_custom_platform"/>
+            <field name="privilege_id" ref="res_groups_privilege_vaspmo"/>
             <field name="comment">Approves change requests and owns project health.</field>
             <field name="implied_ids" eval="[(4, ref('custom_project_portfolio.group_vaspmo_ba'))]"/>
         </record>
@@ -33,7 +43,7 @@
         <!-- PO Lead: sees everything, no configuration rights. -->
         <record id="group_vaspmo_lead" model="res.groups">
             <field name="name">VAS PMO / PO Lead</field>
-            <field name="privilege_id" ref="custom_core.res_groups_privilege_custom_platform"/>
+            <field name="privilege_id" ref="res_groups_privilege_vaspmo"/>
             <field name="comment">Portfolio-wide oversight, delivery log and outbox.</field>
             <field name="implied_ids" eval="[(4, ref('custom_project_portfolio.group_vaspmo_po'))]"/>
         </record>
@@ -41,7 +51,7 @@
         <!-- Admin: master data (verticals, stages, notification rules, integrations). -->
         <record id="group_vaspmo_admin" model="res.groups">
             <field name="name">VAS PMO / Administrator</field>
-            <field name="privilege_id" ref="custom_core.res_groups_privilege_custom_platform"/>
+            <field name="privilege_id" ref="res_groups_privilege_vaspmo"/>
             <field name="comment">Master data: verticals, stages and their SLA clock, notification rules.</field>
             <field name="implied_ids" eval="[
                 (4, ref('custom_project_portfolio.group_vaspmo_lead')),
@@ -54,7 +64,7 @@
              brand, not to the VAS team. -->
         <record id="group_vaspmo_vertical_pic" model="res.groups">
             <field name="name">VAS PMO / Brand PIC</field>
-            <field name="privilege_id" ref="custom_core.res_groups_privilege_custom_platform"/>
+            <field name="privilege_id" ref="res_groups_privilege_vaspmo"/>
             <field name="comment">Brand-side contact. Sees only their own vertical's work, to verify it.</field>
         </record>
 
