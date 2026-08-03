@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_pdp_consent
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_pdp_consent
@@ -58,6 +58,7 @@ Provides a customer-facing portal (`/my/consents`) so data subjects can view and
 - `evidence` is `attachment=True` so it lives in filestore, not the DB column — backup strategy must cover both.
 - Portal withdrawal silently redirects to `/my/consents` on auth/ownership failure (no 403); reads like "nothing happened" to the caller.
 - No bulk-grant / migration tool: every consent must be created one record at a time.
+- **This module's groups sit on its own `custom_pdp_consent.res_groups_privilege_pdp_consent` privilege** ("PDP Consent") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Consent collection UI / notice rendering** — this module assumes evidence is captured elsewhere and uploaded as a binary.

@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_coretax
-manifest_version: 19.0.0.2.0
+manifest_version: 19.0.0.4.0
 ---
 
 # custom_coretax
@@ -79,6 +79,7 @@ Every export, import, and sertel access emits an audit row to `pdp.audit_log` (`
 - **Period domain is half-open `[from, to+1month)`** but the "to" boundary uses `date(end_year, end_month+1, 1)` without month-wrap handling beyond the `if end_month == 12` branch — careful when picking `month_to=12` across year boundary in the same wizard run (the wizard requires `year_to`).
 - **Bupot `_no_bupot_unique_per_source` allows the same `no_bupot` to exist twice if one is `received` and one is `issued`** — by design, but be aware in reporting.
 - **`_audit_log_*` uses raw SQL INSERT into `pdp.audit_log`** — `custom_pdp_audit` must be installed and its schema bootstrapped, otherwise the wizard succeeds but the audit row is missing (an `ERROR` log is written).
+- **This module's groups sit on its own `custom_coretax.res_groups_privilege_coretax` privilege** ("Coretax") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Real-time host-to-host submission to DJP** — manual portal upload is the only built-in adapter. The `h2h_aspp` adapter must be implemented in a downstream module (e.g. Pajakku ASPP integration referenced in the platform's Pajakku ASPP scope note).

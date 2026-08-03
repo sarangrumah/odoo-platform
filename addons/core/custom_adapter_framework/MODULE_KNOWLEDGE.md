@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_adapter_framework
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_adapter_framework
@@ -67,6 +67,7 @@ Generic outbound-integration framework. Any module that talks to an external HTT
 - **No tenant_id on call.log** — relies on DB-per-tenant isolation.
 - **`AdapterResponse.error` for non-ok responses is either the JSON `data.error` or `f"HTTP{status_code}"`** — no structured error model.
 - **`time.sleep` in the retry loop blocks the worker** — long retries on slow upstream will tie up a worker thread.
+- **This module's groups sit on its own `custom_adapter_framework.res_groups_privilege_adapter_framework` privilege** ("Adapter Framework") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Inbound webhooks** — this module is outbound only. Inbound is handled by `custom_core.controllers.secure_endpoint`.

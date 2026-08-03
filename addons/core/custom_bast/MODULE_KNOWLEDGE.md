@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_bast
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_bast
@@ -69,6 +69,7 @@ Reusable abstraction for **Berita Acara Serah Terima** (Indonesian-style handove
 - **No `kind`-specific workflow** — a `pickup` and a `delivery` BAST follow exactly the same state machine. Kind is metadata only.
 - **GPS fields are Float(10,7)** — about ±1 cm precision; no validation that they're set together or in valid lat/lon ranges.
 - **Sequence `custom.bast.document`** must be loaded from `data/ir_sequence_data.xml`; if missing, `name` stays as the literal `"New"` and the unique constraint on `name` will collide on the second create.
+- **This module's groups sit on its own `custom_bast.res_groups_privilege_bast` privilege** ("BAST") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Automatic BAST creation** — downstream modules (e.g. rental) must call `create()` themselves; this module does not subscribe to events on referenced docs.

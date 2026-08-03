@@ -41,7 +41,7 @@ server-side on Coretax portal upload. See `data/xsd/README.md`.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Custom Platform/Compliance/Coretax",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.4.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "account", "mail"],
     "capability_tags": ["indonesian-tax", "coretax", "withholding", "accounting", "audit-trail"],

@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_coretax_bupot
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_coretax_bupot
@@ -66,6 +66,7 @@ This is the unified-bupot companion to `custom_coretax` (which itself models the
 - **NITKU is a Char with no format validation** — DJP rules around NITKU length/format are not enforced; bad values will be rejected by DJP, not at write time.
 - **`doc_ref` is `fields.Reference`, not Many2one** — meaning the linked record can be deleted out from under the bupot line silently; no FK enforcement.
 - **`month` selection values are Char `"1".."12"`** (not zero-padded), so `int(period.month):02d` is used everywhere to render — code must not blindly compare `period.month == "01"`.
+- **This module's groups sit on its own `custom_coretax_bupot.res_groups_privilege_bupot` privilege** ("Coretax Bupot") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **PPh21 (Pegawai Tetap / Bukan Tetap)** — handled by `custom_coretax` + HR modules, not here.

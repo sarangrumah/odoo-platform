@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_pdp_core
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_pdp_core
@@ -49,6 +49,7 @@ This is the foundation layer — install it first, define classifications, tag f
 - The `x_pdp_classification_id` column survives module uninstall as `NULL` (because of `ondelete="set null"`), but the FK constraint itself is dropped — re-installing fresh requires re-tagging.
 - No history of classification changes is kept here; only the current value. If you need an audit trail of "field was retagged from `pii` to `sensitive_pii`", rely on the `pdp.audit_log` write events from `custom_pdp_audit`.
 - `pdp.classification.requires_consent` / `requires_masking` are advisory flags — this module does NOT enforce them; downstream modules choose whether to honour.
+- **This module's groups sit on its own `custom_pdp_core.res_groups_privilege_pdp_core` privilege** ("PDP") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Field-level masking/redaction logic** — see `custom_pdp_masking`.

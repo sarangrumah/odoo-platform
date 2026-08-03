@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_ai_bridge
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_ai_bridge
@@ -57,6 +57,7 @@ Provides one abstract service model (`custom.ai`) and one generic "Ask AI" recor
 - **`X-Tenant-Id` is `env.cr.dbname`**, not a slug from `tenant.registry` — works in DB-per-tenant deployments but not in single-DB multi-company setups.
 - **`UserError` on `_chat`/`_recommend`** means failures bubble to the user as red dialogs; not suitable for background cron use without an outer try/except.
 - **`_recommend` payload contains the wizard's raw record dump** (all non-binary fields, recordsets truncated to first 5 ids) — may include PDP-sensitive data; rely on the gateway to redact or pre-filter at the call site.
+- **This module's groups sit on its own `custom_ai_bridge.res_groups_privilege_ai_bridge` privilege** ("AI Bridge") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **AI usage logging / cost tracking** — done elsewhere (`custom_hub_console.custom.hub.ai.usage` rolls up aggregates if the bridge ever exposes `_hub_usage_iter`, which it currently doesn't).
