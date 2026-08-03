@@ -17,7 +17,7 @@ Depends on `custom_core` for HMAC helper and encrypted config storage.
 """,
     "author": "Custom Platform",
     "category": "Custom Platform/AI",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": ["custom_core"],
     "capability_tags": ["ai", "multi-tenant"],

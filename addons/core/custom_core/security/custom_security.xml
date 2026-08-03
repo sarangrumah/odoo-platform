@@ -7,9 +7,16 @@
             <field name="sequence">100</field>
         </record>
 
+        <!-- This privilege belongs to custom_core's own two groups. Do NOT reuse
+             it from another module: groups sharing a privilege are rendered as a
+             single pick-one dropdown on the user form, so saving a user keeps one
+             group and silently drops every other module's. Give each module its
+             own res.groups.privilege and point it at the category below, which is
+             what keeps them grouped together in the form. -->
         <record id="res_groups_privilege_custom_platform" model="res.groups.privilege">
             <field name="name">Custom Platform</field>
             <field name="sequence">100</field>
+            <field name="category_id" ref="module_category_custom_platform"/>
         </record>
 
         <record id="group_custom_user" model="res.groups">
