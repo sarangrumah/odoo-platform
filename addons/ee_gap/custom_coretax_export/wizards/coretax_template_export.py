@@ -337,11 +337,18 @@ class CoretaxTemplateExportWizard(models.TransientModel):
     def _digits(value):
         return (value or "").replace(".", "").replace("-", "").replace(" ", "")
 
+    # Layouts that carry an "NPWP Penandatangan" column, and therefore cannot be
+    # emitted without one. FK/OF and Retur Masukan have no such column, so they
+    # must not be blocked on it.
+    _SIGNER_TEMPLATES = ("bppu", "bp21", "bpnr")
+
     def _pemotong(self):
         """(npwp, nitku_suffix, penandatangan, user_id), validated."""
         self.ensure_one()
         company = self.company_id
-        npwp = company._check_coretax_pemotong()
+        npwp = company._check_coretax_pemotong(
+            require_signer=self.template in self._SIGNER_TEMPLATES
+        )
         return (
             npwp,
             company.x_custom_nitku_suffix or "",
@@ -632,7 +639,8 @@ class CoretaxTemplateExportWizard(models.TransientModel):
         Unlike the bupot templates this is not a flat sheet, so it returns a
         pre-laid-out block that ``_render`` writes verbatim.
         """
-        npwp_pembeli = self.company_id._check_coretax_pemotong()
+        # Retur carries the NPWP Pembeli banner only — no signer column.
+        npwp_pembeli = self.company_id._check_coretax_pemotong(require_signer=False)
         block = [["Retur"], ["NPWP Pembeli", "", npwp_pembeli], [], list(RETUR_COLUMNS)]
         details = [[], ["DetailRetur"], list(RETUR_DETAIL_COLUMNS)]
 

@@ -50,12 +50,14 @@ The pemotong columns are read from ``res.company`` (NPWP via its partner,
 ``x_custom_coretax_user_id``); the counterparty columns from ``res.partner``
 (``x_custom_npwp``, ``x_custom_nitku``, ``x_custom_tin``, …). Both are added by
 ``custom_tax_id``. Each wizard refuses to render when the pemotong identity is
-incomplete rather than emitting a file DJP will bounce.
+incomplete rather than emitting a file DJP will bounce — but only for the fields
+that layout actually carries: ``NPWP Penandatangan`` is a bupot column, so
+e-Faktur Keluaran and Retur Masukan are not blocked on it.
 """,
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Localizations",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.2.0",
     "license": "LGPL-3",
     "depends": [
         "custom_tax_id",
