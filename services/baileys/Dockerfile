@@ -26,5 +26,5 @@ USER baileys
 EXPOSE 8088
 VOLUME ["/var/lib/baileys"]
 HEALTHCHECK --interval=20s --timeout=5s --retries=5 --start-period=10s \
-  CMD wget -qO- http://localhost:8088/healthz >/dev/null 2>&1 || exit 1
+  CMD ["/bin/sh", "-c", "wget -qO- http://localhost:8088/healthz >/dev/null 2>&1 || exit 1"]
 CMD ["node", "src/server.js"]

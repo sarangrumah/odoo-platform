@@ -25,5 +25,5 @@ COPY --from=builder /app/dist ./dist
 USER portal
 EXPOSE 8080
 HEALTHCHECK --interval=20s --timeout=5s --retries=5 --start-period=10s \
-  CMD wget -qO- http://localhost:8080/healthz >/dev/null 2>&1 || exit 1
+  CMD ["/bin/sh", "-c", "wget -qO- http://localhost:8080/healthz >/dev/null 2>&1 || exit 1"]
 CMD ["node", "server/index.mjs"]

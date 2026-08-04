@@ -27,5 +27,5 @@ COPY --from=builder /app/public ./public
 USER shop
 EXPOSE 8080
 HEALTHCHECK --interval=20s --timeout=5s --retries=5 --start-period=20s \
-  CMD wget -qO- http://127.0.0.1:8080/api/health >/dev/null 2>&1 || exit 1
+  CMD ["/bin/sh", "-c", "wget -qO- http://127.0.0.1:8080/api/health >/dev/null 2>&1 || exit 1"]
 CMD ["node", "server.js"]
