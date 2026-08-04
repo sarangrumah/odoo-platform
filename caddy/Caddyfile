@@ -67,25 +67,24 @@
 	# instead of hub-portal's "Cannot GET", and the cutover cannot silently
 	# repoint a URL that Mulesoft is already using.
 	#
-	# UAT -> throwaway container pinned to the tst_mdm_levis database.
-	# handle_path strips the prefix, so it is put back before proxying.
-	handle_path /api/mdm/uat/* {
-		rewrite * /api/mdm{uri}
-		reverse_proxy mdm-test-odoo:8069 {
-			header_up Host {host}
-			header_up X-Real-IP {remote_host}
-			header_up X-Forwarded-For {remote_host}
-		}
-	}
-
-	# Production -> reserved. When custom_retail_import_api is installed on
-	# prd_levis_begbal, replace this with a reverse_proxy to nginx (copy the
-	# transport block from the catch-all at the end of this site). Note the
-	# database still has to be resolved deterministically: this host serves
-	# every tenant DB, and an API call carries no session to choose one.
+	# There was a /api/mdm/uat/* block here proxying to mdm-test-odoo, a
+	# throwaway container pinned to tst_mdm_levis. Removed 2026-08-04: the
+	# container had been crash-looping since 31-Jul (6048 restarts, never once
+	# started) and both it and the tst_mdm_levis database are now gone. A route
+	# to a dead upstream answers 502, which reads like an outage of something
+	# that exists.
+	#
+	# Neither environment is deployed, so the path is claimed and refused
+	# explicitly rather than left to fall through to hub-portal's "Cannot GET".
+	# When custom_retail_import_api is installed, replace this with a
+	# reverse_proxy to nginx (copy the transport block from the catch-all at the
+	# end of this site). Note the database still has to be resolved
+	# deterministically: this host serves every tenant DB, and an API call
+	# carries no session to choose one -- see the X-Odoo-Database header used by
+	# the baileys webhook for the mechanism.
 	handle /api/mdm/* {
 		header Content-Type application/json
-		respond `{"status":"error","data":null,"error":{"code":"NOT_DEPLOYED","message":"The production MDM endpoint is not deployed. UAT is at /api/mdm/uat/."}}` 404
+		respond `{"status":"error","data":null,"error":{"code":"NOT_DEPLOYED","message":"The MDM endpoint is not deployed."}}` 404
 	}
 
 	handle /api/* {
