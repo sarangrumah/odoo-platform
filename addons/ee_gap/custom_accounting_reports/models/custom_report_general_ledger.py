@@ -224,6 +224,25 @@ class CustomReportGeneralLedger(models.AbstractModel):
         return row
 
     # ------------------------------------------------------------------
+    # On-screen table
+    # ------------------------------------------------------------------
+    def _flatten_for_screen(self, lines, columns):
+        """The flat layout is a plain table the engine renders as-is; the
+        grouped one nests its move lines under each account row, so it
+        needs the engine's grouped flattener."""
+        if self._is_flat():
+            return super()._flatten_for_screen(lines, columns)
+        return self._flatten_grouped(
+            lines,
+            columns,
+            "account",
+            lambda line: "[%s] %s" % (line.get("account_code") or "", line.get("account_name") or ""),
+            {"debit": "total_debit", "credit": "total_credit", "balance": "closing"},
+            total_label=lambda line: self.env._("Total %s", line.get("account_code") or ""),
+            opening_field="balance",
+        )
+
+    # ------------------------------------------------------------------
     # Line builders
     # ------------------------------------------------------------------
     def _build_lines(self, filters):
