@@ -328,6 +328,11 @@ def build_workbook(path, plan, odoo, diag):
         ("Odoo", "Sisa POS Receivable setelah blok A", rnd(odoo["posrec"] - a_gross)),
         ("Odoo", "Sisa AR 1106000001 setelah blok B", rnd(odoo["ar"] - b_gross)),
         ("", "", ""),
+        ("SIMULASI SETELAH SEMUA BLOK DI-POSTING", "", ""),
+        ("Odoo", "Bank Suspense 1103000002", odoo["sim_suspense"]),
+        ("Odoo", "MDR Bank 7104000001", odoo["sim_mdr"]),
+        ("Odoo", "Trade Receivables 1106000001", odoo["sim_ar"]),
+        ("", "", ""),
         ("Catatan", "Tender belum tersettle per 31-Jul (tetap open)", diag["unsettled_total"]),
         ("Catatan", "Baris statement yang ditambahkan (BCA 21-31 Jul + BRI 01-31 Jul)", len(plan["block_s"])),
         ("", "", ""),
@@ -444,6 +449,8 @@ def main():
           and am.date between '2026-07-01' and '2026-07-31'""")[0][0])
     odoo = {"ar": rnd(bal.get("1106000001", 0.0)), "suspense": rnd(bal.get("1103000002", 0.0)),
             "posrec": rnd(posrec)}
+    # end state measured by running 81_clearing_juli.py with CLR_DRY=1 CLR_POST=1
+    odoo.update({"sim_suspense": 1530199113.09, "sim_mdr": 94236268.68, "sim_ar": -7731914.00})
 
     plan = {"block_a": block_a, "block_b": block_b, "block_c": block_c,
             "block_d": block_d, "block_s": block_s, "odoo": odoo}
