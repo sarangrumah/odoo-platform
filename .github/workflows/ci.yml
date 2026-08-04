@@ -113,9 +113,19 @@ jobs:
       # behind on cryptography (#78) and how DL3018 hid from container-scan (#80).
       # `dir` is the build context, `name` is the job label and image tag, since
       # some contexts are nested and would make ugly tags.
+      #
+      # `smoke` (optional) is a Python one-liner run inside the built image. It
+      # exists because scanning an image says nothing about whether it still
+      # works: cryptography 50 landed in #74 and broke the pyOpenSSL the base
+      # image ships, which made every Odoo route answer 404 — while trivy,
+      # hadolint and sca-python all stayed green and the container still logged
+      # "HTTP service (werkzeug) running" (#89). Importing the web controllers
+      # walks the chain that broke (web -> base.ir_mail_server -> OpenSSL) and
+      # costs a couple of seconds. `odoo --version` is NOT a substitute: it
+      # exits before any module is loaded.
       matrix:
         include:
-          - {name: odoo, dir: odoo}
+          - {name: odoo, dir: odoo, smoke: "import odoo.addons.web.controllers.database"}
           - {name: ai-gateway, dir: ai-gateway}
           - {name: custom-predictor, dir: custom-predictor}
           - {name: hub-portal, dir: hub-portal}
@@ -130,6 +140,16 @@ jobs:
       - name: Build image
         run: |
           docker build -t local-${{ matrix.name }}:ci ./${{ matrix.dir }}
+      # Values come from the matrix literal above, not from anything a PR author
+      # controls, but they are passed through env rather than interpolated into
+      # the shell so the pattern stays clean for semgrep and for whoever adds
+      # the next smoke command.
+      - name: Smoke-import the image
+        if: matrix.smoke != ''
+        env:
+          IMAGE: local-${{ matrix.name }}:ci
+          SMOKE: ${{ matrix.smoke }}
+        run: docker run --rm --entrypoint python3 "$IMAGE" -c "$SMOKE"
       - name: Hadolint Dockerfile
         uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
         with:
