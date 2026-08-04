@@ -113,10 +113,17 @@ class AccountPaymentRegister(models.TransientModel):
 
         Recomputed from the batch residual on every change, so there is no
         accumulation and removing the fee lines restores the plain amount.
+
+        Adding a fee while several bills are selected also ticks *Group
+        Payments*: paying the bills in one transfer is precisely why a single
+        admin fee is charged, and the ungrouped path (one payment per bill) has
+        nowhere to book it -- see ``_create_payment_vals_from_batch``.
         """
         for wizard in self:
             if not wizard.can_edit_wizard or not wizard.currency_id or not wizard.payment_date:
                 continue
+            if wizard.admin_fee_line_ids and wizard.can_group_payments and not wizard.group_payment:
+                wizard.group_payment = True
             base = wizard._get_total_amounts_to_pay(wizard.batches)["amount_by_default"]
             wizard.amount = base + sum(wizard.admin_fee_line_ids.mapped("amount"))
 
