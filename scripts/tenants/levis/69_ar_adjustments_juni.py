@@ -22,6 +22,13 @@
 # Env flags:  ADJ_DRY=1              -> build, report, roll back
 #             ADJ_POST=1             -> also post the entries (clears/restores the lock date)
 #             SALES_MANUAL_ACCOUNT=  -> revenue account code for entry 4
+#             ADJ_DATE=YYYY-MM-DD    -> posting date (default 2026-06-30)
+#             ADJ_CUTOFF=YYYY-MM-DD  -> as-of date for reading the ledger (default = ADJ_DATE)
+#
+# ADJ_DATE and ADJ_CUTOFF are separate on purpose. The client may want June left
+# untouched and the adjustment recognised in a later period -- but the figures must
+# still be measured at the June close, not at the posting date, or the clearing would
+# be computed against balances that have moved on since.
 import os
 from collections import OrderedDict
 
@@ -30,7 +37,8 @@ log = lambda m: print("[ar-adj] " + m)
 
 COMPANY_ID = 1
 JOURNAL = "GLJV"
-DATE = "2026-06-30"
+DATE = os.environ.get("ADJ_DATE", "2026-06-30")
+CUTOFF = os.environ.get("ADJ_CUTOFF", DATE)
 REF_PREFIX = "EBR-ADJ-AR-JUNI-2026"
 ACC_AR = "1106000001"
 ACC_DEPOSIT = "2103100003"
@@ -149,6 +157,11 @@ def line(code, name, amount, ou=None):
 def create(suffix, narration, lines):
     if not lines:
         return None
+    if DATE != CUTOFF:
+        narration += (
+            " Dibukukan tanggal %s (bukan %s) karena angka Juni tidak boleh berubah; "
+            "seluruh nilai tetap diukur pada posisi %s." % (DATE, CUTOFF, CUTOFF)
+        )
     move = Move.create(
         {
             "journal_id": journal.id,
@@ -176,9 +189,10 @@ env.cr.execute(
          left join account_analytic_account aa on aa.id=k.aid
         where l.account_id=%s and m.state='posted' and m.date <= %s
         group by 1""",
-    (_code2acc[ACC_DEPOSIT].id, DATE),
+    (_code2acc[ACC_DEPOSIT].id, CUTOFF),
 )
 tbfu = {name: float(amt) for name, amt in env.cr.fetchall()}
+log("posting date %s, figures measured as of %s" % (DATE, CUTOFF))
 log("deposit per OU read from ledger: %d OU, total %s" % (len(tbfu), round(sum(tbfu.values()), 2)))
 
 for ou, amt in NO_STORE_SPLIT.items():
@@ -289,18 +303,25 @@ else:
     log("entries left in DRAFT (set ADJ_POST=1 to post)")
 
 
-def bal(code):
+def bal(code, as_of):
     env.cr.execute(
         """select coalesce(sum(l.debit-l.credit),0) from account_move_line l
            join account_move m on m.id=l.move_id
           where m.state='posted' and m.date <= %s and l.account_id=%s and l.company_id=%s""",
-        (DATE, _code2acc[code].id, company.id),
+        (as_of, _code2acc[code].id, company.id),
     )
     return round(float(env.cr.fetchone()[0]), 2)
 
 
+# When the posting date is later than the cut-off, the cut-off balance is what the
+# client sees for the closed period -- it must come out unchanged -- and the posting-date
+# balance is where the adjustment actually lands.
 for code in (ACC_AR, ACC_DEPOSIT, ACC_MDR):
-    log("balance %s = %s" % (code, bal(code)))
+    if DATE == CUTOFF:
+        log("balance %s = %s" % (code, bal(code, DATE)))
+    else:
+        log("balance %s: per %s = %s (harus tidak berubah) | per %s = %s"
+            % (code, CUTOFF, bal(code, CUTOFF), DATE, bal(code, DATE)))
 
 if DRY:
     env.cr.rollback()
