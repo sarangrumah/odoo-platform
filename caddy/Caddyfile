@@ -55,6 +55,38 @@
 	handle /assets/* {
 		reverse_proxy hub-portal:8080
 	}
+	# --- MDM product-master API ------------------------------------------
+	# Both blocks must stay ahead of `handle /api/*` below, which sends
+	# everything under /api to hub-portal. Without them the MDM routes never
+	# reach Odoo at all.
+	#
+	# UAT and production share this host, this certificate and this port, so
+	# the path prefix is the only thing telling them apart. That is why the
+	# production path is claimed here and answered explicitly rather than left
+	# to fall through: a caller pointed at the wrong one gets a clear refusal
+	# instead of hub-portal's "Cannot GET", and the cutover cannot silently
+	# repoint a URL that Mulesoft is already using.
+	#
+	# There was a /api/mdm/uat/* block here proxying to mdm-test-odoo, a
+	# throwaway container pinned to tst_mdm_levis. Removed 2026-08-04: the
+	# container had been crash-looping since 31-Jul (6048 restarts, never once
+	# started) and both it and the tst_mdm_levis database are now gone. A route
+	# to a dead upstream answers 502, which reads like an outage of something
+	# that exists.
+	#
+	# Neither environment is deployed, so the path is claimed and refused
+	# explicitly rather than left to fall through to hub-portal's "Cannot GET".
+	# When custom_retail_import_api is installed, replace this with a
+	# reverse_proxy to nginx (copy the transport block from the catch-all at the
+	# end of this site). Note the database still has to be resolved
+	# deterministically: this host serves every tenant DB, and an API call
+	# carries no session to choose one -- see the X-Odoo-Database header used by
+	# the baileys webhook for the mechanism.
+	handle /api/mdm/* {
+		header Content-Type application/json
+		respond `{"status":"error","data":null,"error":{"code":"NOT_DEPLOYED","message":"The MDM endpoint is not deployed."}}` 404
+	}
+
 	handle /api/* {
 		reverse_proxy hub-portal:8080
 	}
@@ -63,6 +95,20 @@
 	}
 	handle /portal {
 		redir /portal/ 308
+	}
+
+	# VAS PMO headless UI. Next.js is built with basePath=/vaspmo, so it expects to see
+	# the prefix itself — `handle`, not `handle_path`, exactly like File Browser below.
+	# There is no spare hostname to give it: DOMAIN here is a bare IP.
+	handle /vaspmo* {
+		reverse_proxy vas-pmo:8080
+	}
+
+	# File Browser web UI for the /srv/sftp-share/files drop zone. The
+	# container runs with base path `-b /files`, so keep the prefix (use
+	# `handle`, not `handle_path`). Login-gated; used for client file hand-off.
+	handle /files* {
+		reverse_proxy odoo19-platform-filebrowser:80
 	}
 
 	# Forward all remaining traffic to internal nginx, which still enforces
