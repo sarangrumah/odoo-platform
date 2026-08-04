@@ -9,8 +9,8 @@ cryptography==50.0.0          # Fernet for sertel + ir.config_parameter; CVE-202
 # OpenSSL/crypto.py reads _lib.GEN_EMAIL, removed from the 50.x bindings, so
 # `import OpenSSL` raises AttributeError. Odoo core imports it from
 # base/models/ir_mail_server.py, which the `web` module imports in turn — so the
-# whole web module fails to load and EVERY route answers 404. A scan-only CI
-# check cannot see this; it only appears when Odoo actually boots.
+# whole web module fails to load and EVERY route answers 404. container-scan
+# cannot see this: it scans a built image, it never boots Odoo.
 # 26.4.0 is the first release accepting cryptography>=49,<51. Do not "fix" a
 # conflict here by installing a 25.x — those cap cryptography at <47 and will
 # silently downgrade it, undoing the CVE fixes above.
