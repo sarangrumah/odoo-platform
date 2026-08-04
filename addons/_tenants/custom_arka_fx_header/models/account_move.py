@@ -17,8 +17,7 @@ class AccountMove(models.Model):
     x_fx_is_foreign = fields.Boolean(
         string="Foreign Currency Document",
         compute="_compute_x_fx_is_foreign",
-        help="The document is an invoice/bill/receipt written in a currency "
-        "other than the company currency.",
+        help="The document is an invoice/bill/receipt written in a currency other than the company currency.",
     )
     x_fx_rate_company_per_unit = fields.Float(
         string="Rate",
