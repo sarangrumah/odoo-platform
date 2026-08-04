@@ -10,6 +10,7 @@ Brings physical handheld scanners (Zebra TC-series, Honeywell, generic Android
 with DataWedge / keyboard wedge) into the Odoo platform.
 
 Provides:
+
 - ``hht.device``: enrolled device registry with HMAC api_key/secret + CIDR whitelist.
 - ``hht.scan.log``: append-only audit log of every scan with GPS + signature.
 - ``hht.sync.queue``: FIFO journal of events queued by the PWA while offline.

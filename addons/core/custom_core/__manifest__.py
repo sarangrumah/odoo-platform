@@ -6,6 +6,7 @@
 Foundational module for the Custom Odoo 19 Platform.
 
 Provides:
+
 - `custom.mixin.platform`: marker mixin that enforces the `x_custom_` prefix policy
   for fields added on top of Odoo core models (PDP-relevant relations).
 - `custom.ir.config`: helper service to encrypt/decrypt parameters via Fernet

@@ -21,6 +21,7 @@ Bundles four tenant-specific requirements for the Levi's databases
 
 3. **Goods-Receipt GL mode (switchable).** Controlled by the system parameter
    ``custom_levis_localization.suppress_gr_journal``:
+
    * ``0`` (default) — **Automated valuation**: the stock-valuation
      ``account.move`` posts normally at receipt confirm
      (Dr Inventory / Cr Stock Input / GRIR).
@@ -47,22 +48,22 @@ Bundles four tenant-specific requirements for the Levi's databases
    unit", linked PO) degrade gracefully when the source module is absent.
 
 10. **Scrap Batch (multiple products).** ``custom.scrap.batch`` (Inventory >
-   Operations > Scrap Batches) scraps several products in one action: each line
-   drives a real ``stock.scrap`` (on-hand qty + stock valuation layer stay
-   correct) and, on validation, ONE consolidated ``account.move`` is posted —
-   Dr Scrap Loss (P&L) / Cr Stock Valuation grouped per product category. The
-   scrap-loss account code comes from the system parameter
-   ``custom_levis_localization.scrap_loss_account_code``; the store's
-   Operating-Unit analytic is stamped on every line; the entry is idempotent
-   (``ref`` ``SCRAP-VAL:<id>`` + stored ``move_id``). Real-time categories only.
+    Operations > Scrap Batches) scraps several products in one action: each line
+    drives a real ``stock.scrap`` (on-hand qty + stock valuation layer stay
+    correct) and, on validation, ONE consolidated ``account.move`` is posted —
+    Dr Scrap Loss (P&L) / Cr Stock Valuation grouped per product category. The
+    scrap-loss account code comes from the system parameter
+    ``custom_levis_localization.scrap_loss_account_code``; the store's
+    Operating-Unit analytic is stamped on every line; the entry is idempotent
+    (``ref`` ``SCRAP-VAL:<id>`` + stored ``move_id``). Real-time categories only.
 
 11. **Card BIN / MDR configuration.** ``levis.mdr.bin`` (Accounting >
-   Configuration > Card BIN / MDR) maps card BIN ranges to an acquiring bank, an
-   MDR rate (percent + optional fixed fee) and an MDR expense account, with
-   effective dating. On an inbound customer card receipt, entering the *Card BIN*
-   on Register Payment resolves the mapping and nets the MDR off the settlement
-   via the admin-fee channel: Dr Bank (net) / Dr MDR expense / Cr Receivable, the
-   receivable still reconciling in full.
+    Configuration > Card BIN / MDR) maps card BIN ranges to an acquiring bank, an
+    MDR rate (percent + optional fixed fee) and an MDR expense account, with
+    effective dating. On an inbound customer card receipt, entering the *Card BIN*
+    on Register Payment resolves the mapping and nets the MDR off the settlement
+    via the admin-fee channel: Dr Bank (net) / Dr MDR expense / Cr Receivable, the
+    receivable still reconciling in full.
 
 5. **Periodic Inventory Reconciliation.** Because receipts/deliveries do not
    post inventory journals in this setup, GL inventory-asset accounts drift from
@@ -86,12 +87,14 @@ Bundles four tenant-specific requirements for the Levi's databases
 
 9. **Trade / Non-Trade split + Operating-Unit dimension.** The purchase order
    gains a ``Purchase Type`` (Trade / Non-Trade) that drives:
+
    * **Numbering** — separate monthly-reset sequences
      ``PO/T/EBR/YYYY/MM/#####`` (trade) and ``PO/NT/EBR/YYYY/MM/#####``
      (non-trade).
    * **COA mapping** (``levis.purchase.account.map``) — the vendor-bill payable
      account (Trade Payables vs Non-Trade payable) and, for storable lines, the
      GR/IR clearing account used by the goods-receipt valuation journal.
+
    Each store (``stock.warehouse``) becomes a posted **Operating Unit**: it owns
    an analytic account (in the "Operating Unit" plan) stamped on every PO / bill
    / GR-journal line, and a dedicated **purchase journal** so bills, journals
@@ -100,25 +103,25 @@ Bundles four tenant-specific requirements for the Levi's databases
    (already-installed DBs).
 
 12. **Periodic COGS per Operating Unit.** Levi's imports its POS backlog long
-   before the purchase data exists, so at the moment of sale no unit cost is
-   known. Odoo 19 cannot fix that later — ``stock.move.value`` is written once at
-   ``_action_done`` and the ``_run_fifo_vacuum`` that used to revalue past
-   outgoing moves is gone, so a sale made against empty stock stays valued at
-   zero forever. ``levis.cogs.run`` (Accounting > Accounting > Periodic COGS)
-   therefore recognises COGS *periodically*: once the purchases are in and each
-   product carries a cost, it multiplies the quantity sold at each store by that
-   cost, aggregates per (Operating Unit, product category), and generates a DRAFT
-   Dr COGS-<category> / Cr Inventories-<category> entry with the store's OU
-   analytic on both legs. Quantities whose product still has no cost are counted
-   and shown rather than silently contributing zero. No stock moves are created,
-   so the X20 on-hand snapshot stays intact.
+    before the purchase data exists, so at the moment of sale no unit cost is
+    known. Odoo 19 cannot fix that later — ``stock.move.value`` is written once at
+    ``_action_done`` and the ``_run_fifo_vacuum`` that used to revalue past
+    outgoing moves is gone, so a sale made against empty stock stays valued at
+    zero forever. ``levis.cogs.run`` (Accounting > Accounting > Periodic COGS)
+    therefore recognises COGS *periodically*: once the purchases are in and each
+    product carries a cost, it multiplies the quantity sold at each store by that
+    cost, aggregates per (Operating Unit, product category), and generates a DRAFT
+    Dr COGS-<category> / Cr Inventories-<category> entry with the store's OU
+    analytic on both legs. Quantities whose product still has no cost are counted
+    and shown rather than silently contributing zero. No stock moves are created,
+    so the X20 on-hand snapshot stays intact.
 
 13. **Indonesian bank master data.** ``res.bank`` gains ``l10n_id_bi_code``
-   (*Kode BI*) — the 7-digit Bank Indonesia clearing/RTGS participant code, or
-   *sandi bank* — shown on the bank form/list and searchable. The module seeds 181
-   banks (name + SWIFT/BIC + Kode BI) from ``data/res.bank.csv``. Kode BI is the
-   unique key: BIC cannot be, since every BI branch office shares ``INDOIDJA``.
-   Feeds the *Acquiring Bank* on the Card BIN / MDR mapping above.
+    (*Kode BI*) — the 7-digit Bank Indonesia clearing/RTGS participant code, or
+    *sandi bank* — shown on the bank form/list and searchable. The module seeds 181
+    banks (name + SWIFT/BIC + Kode BI) from ``data/res.bank.csv``. Kode BI is the
+    unique key: BIC cannot be, since every BI branch office shares ``INDOIDJA``.
+    Feeds the *Acquiring Bank* on the Card BIN / MDR mapping above.
 
 TENANT-SCOPED: install only on the Levi's tenant databases.
 """,

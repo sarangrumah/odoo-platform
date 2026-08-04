@@ -18,6 +18,7 @@ A full petty-cash cycle for Finance and employees on Odoo 19 Community:
    *Dr Uang Muka Petty Cash (employee) / Cr Bank* through the Bank-Out journal.
 4. **Realisasi** — the employee accounts for the spend
    (``petty.cash.realization``):
+
      * *Pihak ketiga* lines create a full vendor bill (billing → PPN/PPh via
        ``custom_tax_id`` → invoicing → payment against the advance → COA),
        and require the supplier invoice attachment.
@@ -30,6 +31,7 @@ A full petty-cash cycle for Finance and employees on Odoo 19 Community:
    ``custom_accounting_reports`` engine (PDF / XLSX / on-screen table).
 
 Operating-Unit aware: when the Levi's localization is installed the OU
+
 analytic is stamped onto every generated journal item; otherwise the module
 runs unchanged.
 
