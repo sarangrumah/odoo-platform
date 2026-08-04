@@ -41,9 +41,7 @@ class TestPaymentAdminFee(AccountTestInvoicingCommon):
         cls.bill.action_post()
 
     def _wizard(self, moves):
-        return self.env["account.payment.register"].with_context(
-            active_model="account.move", active_ids=moves.ids
-        )
+        return self.env["account.payment.register"].with_context(active_model="account.move", active_ids=moves.ids)
 
     def test_fee_adds_to_cash_out_and_bill_reconciles(self):
         wizard = self._wizard(self.bill).create({})
