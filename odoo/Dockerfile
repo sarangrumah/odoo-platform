@@ -40,6 +40,22 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && update-ca-certificates
 
+# The base image ships rtlcss (RTL stylesheet generation) with a nested
+# postcss 8.5.15, flagged by GHSA-r28c-9q8g-f849 (path traversal via
+# sourceMappingURL auto-loading). rtlcss declares `postcss: ^8.4.21`, so
+# reinstalling the SAME rtlcss version re-resolves that range to a patched
+# 8.5.x. Same spirit as the openssl `--only-upgrade` above: refresh only what
+# is flagged, leave the pinned base layer alone.
+#
+# It must be a global reinstall, not `npm install --prefix <rtlcss dir>
+# postcss@...`: the latter treats rtlcss as a project and also installs its
+# devDependencies (js-yaml, minimatch, serialize-javascript), which drags in
+# five new HIGH advisories. `--omit=dev` keeps the tree to the same six
+# runtime modules the base image had.
+RUN npm install -g --no-audit --no-fund --omit=dev rtlcss@4.3.0 \
+ && npm cache clean --force \
+ && rm -rf /root/.npm
+
 # Python deps tambahan (HTTP client for AI gateway, encryption, XML validation)
 COPY requirements.txt /tmp/requirements.txt
 # --ignore-installed: base image ships some deps (cryptography, phonenumbers,
