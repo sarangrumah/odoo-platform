@@ -41,7 +41,7 @@ class WhatsappSendWizard(models.TransientModel):
     def _onchange_partner_id(self):
         for w in self:
             if w.partner_id and not w.to_phone:
-                w.to_phone = w.partner_id.mobile or w.partner_id.phone or ""
+                w.to_phone = w.partner_id._whatsapp_phone()
 
     def action_send(self):
         self.ensure_one()
