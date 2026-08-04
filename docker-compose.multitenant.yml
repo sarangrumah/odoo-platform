@@ -109,9 +109,17 @@ services:
       # all tenant crons; the orchestrator uses its own APScheduler + the odoo
       # CLI for provisioning, so it has NO dependency on odoo-mgmt cron.
       MAX_CRON_THREADS: "0"
-      # queue_job runner thread requires server-wide load; without it, jobs
-      # are enqueued but never executed by the runner.
-      SERVER_WIDE_MODULES: "base,web,queue_job"
+      # NO queue_job here. The runner is owned by the public `odoo` instance, which
+      # is the one with HTTP workers to actually execute the jobs. Loading it here
+      # too starts a SECOND runner: DBFILTER does not apply to the runner, so this
+      # instance opens every tenant DB and grabs the per-database
+      # pg_try_advisory_lock. Whichever runner loses a lock raises
+      # MasterElectionLost, closes all its connections and restarts
+      # initialize_databases -- forever. With two runners both lose, and NO job runs
+      # in ANY database (silently: the election loss is logged at DEBUG). It also
+      # contradicts MAX_CRON_THREADS=0 above, whose whole point is to keep this
+      # instance from autonomously loading every tenant registry.
+      SERVER_WIDE_MODULES: "base,web"
       # Management instance MUST expose the database manager + accept any DB.
       LIST_DB: "True"
       DBFILTER: "^.*$$"
