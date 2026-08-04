@@ -82,6 +82,7 @@ class DigiflazzAdapter(PPOBProviderAdapter):
                 "ir.config_parameter holding the key." % self.provider.code
             )
         raw = f"{username}{api_key}{suffix}"
+        # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5,semgrep.weak-hash-md5-sha1
         return hashlib.md5(raw.encode("utf-8")).hexdigest()  # nosec B324 - vendor-mandated digest, see docstring
 
     def _timeout(self):

@@ -99,6 +99,10 @@ def _password_ok(user, password):
         except TypeError as exc:
             last_type_error = exc
             continue
+    # The rule fires on the word "credentials" in the message. What is logged is the
+    # TypeError from probing the method's arity -- Python's arity errors carry argument
+    # counts, never argument values, so the password cannot reach the log here.
+    # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
     _logger.error("VAS PMO: no usable _check_credentials signature: %s", last_type_error)
     raise last_type_error or TypeError("No usable _check_credentials signature")
 

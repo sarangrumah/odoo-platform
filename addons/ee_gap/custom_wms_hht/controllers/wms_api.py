@@ -39,6 +39,28 @@ def _err(message, code="ERROR", **extra):
     return dict(extra, ok=False, error=str(message), error_code=code)
 
 
+class _BadQuantity(ValueError):
+    """A quantity arrived over JSON-RPC that must never reach a stock field."""
+
+
+def _qty(value):
+    """Parse a quantity from a JSON-RPC payload, refusing NaN/Inf.
+
+    ``float()`` happily accepts the strings ``"NaN"``, ``"Infinity"`` and
+    ``"-inf"``. A NaN written to a stock quantity poisons every later
+    comparison (``nan == nan`` is False), so the damage surfaces far from the
+    scan that caused it, as unexplained stock that can be neither picked nor
+    counted. Reject at the edge instead.
+    """
+    try:
+        qty = float(value)
+    except (TypeError, ValueError) as exc:
+        raise _BadQuantity(_("Quantity is not a number: %s") % (value,)) from exc
+    if qty != qty or qty in (float("inf"), float("-inf")):
+        raise _BadQuantity(_("Quantity is not a finite number: %s") % (value,))
+    return qty
+
+
 def guarded(fn):
     """Turn business exceptions into a JSON error instead of a 500 + traceback.
 
@@ -49,6 +71,8 @@ def guarded(fn):
     def _inner(self, **kw):
         try:
             return fn(self, **kw)
+        except _BadQuantity as exc:
+            return _err(exc, code="BAD_QUANTITY")
         except (UserError, ValidationError) as exc:
             return _err(exc, code="BUSINESS")
         except AccessError as exc:
@@ -465,7 +489,7 @@ class WmsHhtApi(http.Controller):
             line.unlink()
             return _err(_("Unknown barcode: %s") % code, code="NOT_FOUND", barcode=code)
         if quantity is not None and line.product_id.tracking != "serial":
-            line.quantity = float(quantity)
+            line.quantity = _qty(quantity)
         if supplier_batch:
             line.supplier_batch_ref = supplier_batch
         session.action_apply_to_picking()
@@ -736,7 +760,7 @@ class WmsHhtApi(http.Controller):
                 )
             if not product and not lot:
                 return _err(_("Unknown barcode: %s") % code, code="NOT_FOUND")
-        ml.quantity = float(quantity) if quantity is not None else ml.quantity_product_uom
+        ml.quantity = _qty(quantity) if quantity is not None else ml.quantity_product_uom
         if "picked" in ml.move_id._fields:
             ml.move_id.picked = True
         return _ok(move_line=self._move_line_payload(ml))
@@ -915,7 +939,7 @@ class WmsHhtApi(http.Controller):
         line = request.env["custom.cycle.count.line"].browse(int(line_id)).exists()
         if not line:
             return _err(_("Line not found"), code="NOT_FOUND")
-        line.action_count(float(quantity))
+        line.action_count(_qty(quantity))
         if remark:
             line.remark = remark
         return _ok(

@@ -197,6 +197,9 @@ class TestDigiflazzAdapter(TransactionCase):
             }
         )
         ref_id = txn.digiflazz_ref_id
+        # The adapter must reproduce Digiflazz's own md5 signature; the test asserts
+        # byte-for-byte equality with it, so the algorithm is fixed by the vendor.
+        # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5,semgrep.weak-hash-md5-sha1
         expected = hashlib.md5(f"{_USERNAME}{_API_KEY}{ref_id}".encode("utf-8")).hexdigest()
         self.assertEqual(captured["body"]["sign"], expected)
 
@@ -650,6 +653,9 @@ class TestDigiflazzAdapter(TransactionCase):
         self.assertEqual(result.amount, 500000.0)
         self.assertEqual(captured["url"], "https://api.digiflazz.com/v1/cek-saldo")
         self.assertEqual(captured["body"]["cmd"], "deposit")
+        # The adapter must reproduce Digiflazz's own md5 signature; the test asserts
+        # byte-for-byte equality with it, so the algorithm is fixed by the vendor.
+        # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5,semgrep.weak-hash-md5-sha1
         expected = hashlib.md5(f"{_USERNAME}{_API_KEY}depo".encode("utf-8")).hexdigest()
         self.assertEqual(captured["body"]["sign"], expected)
 
@@ -661,6 +667,9 @@ class TestDigiflazzAdapter(TransactionCase):
         self.assertTrue(result.ok)
         self.assertEqual(captured["url"], "https://api.digiflazz.com/v1/price-list")
         self.assertEqual(captured["body"]["cmd"], "prepaid")
+        # The adapter must reproduce Digiflazz's own md5 signature; the test asserts
+        # byte-for-byte equality with it, so the algorithm is fixed by the vendor.
+        # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5,semgrep.weak-hash-md5-sha1
         expected = hashlib.md5(f"{_USERNAME}{_API_KEY}pricelist".encode("utf-8")).hexdigest()
         self.assertEqual(captured["body"]["sign"], expected)
 
