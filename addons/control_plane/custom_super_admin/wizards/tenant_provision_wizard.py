@@ -79,6 +79,7 @@ class TenantProvisionWizard(models.TransientModel):
         # modules are chosen; otherwise the orchestrator applies its defaults.
         from_defaults = [
             "custom_core",
+            "custom_currency_nbsp",
             "custom_ai_bridge",
             "custom_pdp_core",
             "custom_pdp_audit",
