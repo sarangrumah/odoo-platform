@@ -164,6 +164,9 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           trivyignores: .trivyignore
+          # Package-level suppressions live in Rego because .trivyignore can
+          # only match vulnerability IDs. See the file for the justification.
+          ignore-policy: .trivy/ignore-policy.rego
 
   fs-scan:
     runs-on: ubuntu-latest
