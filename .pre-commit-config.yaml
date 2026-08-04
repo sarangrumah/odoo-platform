@@ -92,7 +92,13 @@ repos:
         #   docker inspect ghcr.io/hadolint/hadolint:<tag> --format '{{index .RepoDigests 0}}'
         # and re-run `pre-commit run hadolint-docker --all-files` before committing.
         entry: ghcr.io/hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d hadolint
-        args: [--ignore=DL3008, --ignore=DL3018, --failure-threshold=warning]
+        # No --ignore flags here on purpose. hadolint auto-discovers
+        # .hadolint.yaml from the working directory (pre-commit runs the
+        # container with the repo root as cwd), and the container-scan job in
+        # ci.yml passes that same file explicitly. Keeping the exclusions in one
+        # file is what stops the two jobs linting the same Dockerfiles under
+        # different rules. Add exclusions to .hadolint.yaml, never here.
+        args: [--failure-threshold=warning]
 
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.35.1
