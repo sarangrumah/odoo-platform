@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
+import time
 from datetime import timedelta
 
 from odoo import _, api, fields, models
@@ -115,8 +116,23 @@ class PpobTransaction(models.Model):
     bucket_id = fields.Many2one("custom.ppob.provider.bucket", readonly=True, copy=False)
     bucket_move_id = fields.Many2one("custom.ppob.provider.bucket.move", readonly=True, copy=False)
     bucket_refund_move_id = fields.Many2one("custom.ppob.provider.bucket.move", readonly=True, copy=False)
-    dispatched_at = fields.Datetime(readonly=True, copy=False)
-    completed_at = fields.Datetime(readonly=True, copy=False)
+    dispatched_at = fields.Datetime(readonly=True, copy=False, index=True)
+    completed_at = fields.Datetime(readonly=True, copy=False, index=True)
+    provider_latency_ms = fields.Integer(
+        string="Provider Latency (ms)",
+        readonly=True,
+        copy=False,
+        help="Round-trip time of the provider adapter call made at dispatch, "
+             "measured around adapter.pay()/inquiry() only -- it excludes the "
+             "wallet + bucket GL posting that precedes it. This is the ADAPTER "
+             "RTT, not the fulfilment time: for providers that accept a "
+             "transaction and settle asynchronously it measures how long they "
+             "took to ACCEPT. Use completed_at - dispatched_at for end-to-end "
+             "time, but note that on cron-polled paths (oracle_bridge) that "
+             "delta is dominated by cron lag. Populated on every adapter, "
+             "unlike custom.adapter.call.log.latency_ms which is only written "
+             "when the provider has an adapter_config_id.",
+    )
     error_code = fields.Char(copy=False, tracking=True)
     error_message = fields.Char(copy=False, tracking=True)
     currency_id = fields.Many2one(
@@ -390,17 +406,38 @@ class PpobTransaction(models.Model):
         )
 
         # 4. Fire the adapter (best-effort; on failure we refund).
+        # The call is timed for SLA measurement (custom_ppob_sla). Timing wraps
+        # ONLY the adapter call so the number is provider RTT, uncontaminated by
+        # the GL posting above. monotonic() is used so an NTP step cannot yield a
+        # negative latency. The failure path is timed too -- a provider timing
+        # out at 15s is exactly the sample the SLA needs to see.
         adapter = provider._get_adapter()
+        t0 = time.monotonic()
         try:
             if self.product_id.inquiry_required and self.state == "pending":
                 result = adapter.inquiry(self)
             else:
                 result = adapter.pay(self)
         except Exception as exc:
+            self.provider_latency_ms = int((time.monotonic() - t0) * 1000)
             _logger.exception("Adapter call raised for txn %s", self.name)
             return self._mark_failed(error_code="ADAPTER_EXC", error_message=str(exc))
+        self.provider_latency_ms = int((time.monotonic() - t0) * 1000)
 
         self.raw_response = json.dumps(result.raw or {})
+        # ok is TRI-STATE. None means "provider accepted it but has not settled
+        # yet" -- leave the transaction in_progress and let the reaper resolve it
+        # via status(). Treating pending as failure would refund a sale the
+        # provider is still going to fulfil: we would hand the mitra their money
+        # back AND deliver the product. `if result.ok:` alone cannot tell None
+        # from False, which is why this is checked first and explicitly.
+        if result.ok is None:
+            self.write({
+                "provider_ref": result.provider_ref or self.provider_ref,
+                "error_code": result.error_code or False,
+                "error_message": result.error_message or False,
+            })
+            return True
         if result.ok:
             return self._mark_success(
                 provider_ref=result.provider_ref,
@@ -507,6 +544,7 @@ class PpobTransaction(models.Model):
                 "bucket_refund_move_id": False,
                 "dispatched_at": False,
                 "completed_at": False,
+                "provider_latency_ms": 0,
             }
         )
         return {
@@ -570,6 +608,17 @@ class PpobTransaction(models.Model):
                 continue
             raw = result.raw or {}
             remote_state = (raw.get("state") or "").lower()
+            # ok=None means the provider says it is STILL PROCESSING. Leave it
+            # alone: refunding here would return the mitra's money on a sale the
+            # provider then completes. `not result.ok` cannot distinguish None
+            # from False, so without this guard every in-flight transaction on an
+            # async provider gets refunded the moment it goes stale.
+            if result.ok is None:
+                _logger.info(
+                    "Provider %s reports %s still in progress; leaving it alone.",
+                    txn.provider_id.code, txn.name,
+                )
+                continue
             if result.ok and remote_state == "success":
                 txn._mark_success(
                     provider_ref=result.provider_ref or txn.provider_ref,

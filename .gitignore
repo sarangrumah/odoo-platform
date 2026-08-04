@@ -82,6 +82,10 @@ scripts/tenants/levis/out_*.csv
 docs/projects/levis/Data XStore (Mentahan)*/
 docs/projects/levis/Data XStore (Mentahan)*.zip
 
+# Word exports of the architecture docs. The .md files next to them are the
+# source of truth; each exported revision is ~1 MB of binary that git can never
+# really delete once committed.
+docs/*.docx
 # The bare `logs/` rule above matches a directory called logs ANYWHERE, which
 # silently swallowed the Next.js route for the transaction-log screen. Re-include
 # it explicitly: git cannot un-ignore files inside an ignored directory, so the

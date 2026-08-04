@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_core
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_core
@@ -53,6 +53,7 @@ None — all three custom models are `AbstractModel`. Only `res.config.settings.
 - **`@secure_endpoint` writes audit rows to `custom.adapter.call.log`** if the model exists, but does NOT require `custom_adapter_framework` as a depend. Audit-log writes happen under `env(su=True)` and silently swallow exceptions.
 - **No PDP audit integration** — `custom_core` is below `custom_pdp_audit` in the stack and cannot reference it.
 - **`_NONCE_TTL_S = 600` and `_TS_DRIFT_MAX_S = 300`** are module-level constants, not config parameters.
+- **`res_groups_privilege_custom_platform` is for custom_core's own two groups only** — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form. When sixteen modules all reused this privilege, saving a user kept one custom group and silently dropped the rest; that is how `custom_accounting_reports.group_report_user` reached 0 members on a production tenant and took the whole Accounting Reports menu down with it. Give a new module its own `res.groups.privilege` and point it at `module_category_custom_platform` — that category, not the privilege, is what keeps the selectors grouped together on the form.
 
 ## Out of Scope
 - **Multi-tenant key rotation** — single master key; rotating it invalidates all previously encrypted parameters.

@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_pdp_dsar
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_pdp_dsar
@@ -61,6 +61,7 @@ It is the operator-facing fulfilment surface for subject rights. Every state tra
 - **Partner matching uses `email =ilike`** — case-insensitive but exact-string; alias `+suffix@` or whitespace will miss. Operator must resolve `partner_id` manually if unmatched.
 - **AI summary uses `custom.ai._chat`**, not the gateway — if `custom_ai_bridge` is installed but `custom.ai` resolves elsewhere, the call shape may mismatch and silently return None.
 - **No portability XML/CSV shape** — `portability` kind shares the same ZIP-of-JSON output as `access`; no machine-portable format negotiated.
+- **This module's groups sit on its own `custom_pdp_dsar.res_groups_privilege_pdp_dsar` privilege** ("PDP DSAR") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Identity verification (KYC) of the requester** — this module accepts whoever calls the endpoint; identity proof workflow lives elsewhere.

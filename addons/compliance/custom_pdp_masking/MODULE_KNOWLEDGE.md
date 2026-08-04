@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_pdp_masking
-manifest_version: 19.0.0.2.0
+manifest_version: 19.0.0.3.0
 ---
 
 # custom_pdp_masking
@@ -71,6 +71,7 @@ A reason-audited `pdp.unmask.wizard` lets privileged users view records in the c
 - **`mask_in_export_only` policy is partly aspirational** — the mixin returns the clear value in this mode, but there is no actual "export" detection that triggers masking on `export_data`. Document carefully before relying on it.
 - **`_apply_pattern("hash", v)` truncates to 12 hex chars** — collision-prone if used as a stable id.
 - **Discovery wizard's `_PATTERN` regex matches substring**, so `phone_number` and `birthday_reminder_email` both match; review suggestions before bulk-creating.
+- **This module's groups sit on its own `custom_pdp_masking.res_groups_privilege_pdp_masking` privilege** ("PDP Masking") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Out of Scope
 - **Export-time masking** — the policy `mask_in_export_only` is wired in name only; actual export interception is not implemented here.

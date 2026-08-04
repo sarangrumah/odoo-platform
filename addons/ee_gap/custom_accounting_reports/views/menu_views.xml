@@ -233,4 +233,22 @@
               parent="menu_custom_reports_root"
               action="action_purchase_wizard"
               sequence="87"/>
+
+    <menuitem id="menu_custom_reports_gl_open_items"
+              name="GL Open Items / Outstanding"
+              parent="menu_custom_reports_root"
+              action="action_gl_open_items_wizard"
+              sequence="35"/>
+
+    <menuitem id="menu_custom_reports_sales_detail"
+              name="Sales Detail (XStore X24DN)"
+              parent="menu_custom_reports_root"
+              action="action_sales_detail_wizard"
+              sequence="86"/>
+
+    <menuitem id="menu_custom_reports_bill_payment"
+              name="Mapping Bill vs Payment"
+              parent="menu_custom_reports_root"
+              action="action_bill_payment_wizard"
+              sequence="88"/>
 </odoo>

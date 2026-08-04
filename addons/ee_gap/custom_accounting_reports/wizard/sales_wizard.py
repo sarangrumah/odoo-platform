@@ -23,6 +23,18 @@ class SalesWizard(models.TransientModel):
         default=lambda self: self.env.companies,
     )
     partner_ids = fields.Many2many("res.partner", string="Customers")
+    basis = fields.Selection(
+        [
+            ("document", "Invoice + POS"),
+            ("gl", "Akun Pendapatan (GL)"),
+        ],
+        string="Sumber Data",
+        default="document",
+        required=True,
+        help="Invoice + POS membaca dokumen penjualan. Pilih Akun Pendapatan (GL) "
+        "bila penjualan dibukukan lewat jurnal — misalnya saldo awal — sehingga "
+        "tidak muncul sebagai invoice maupun transaksi POS.",
+    )
     group_by = fields.Selection(
         [
             ("none", "No grouping"),
@@ -44,6 +56,7 @@ class SalesWizard(models.TransientModel):
             "company_ids": self.company_ids.ids or self.env.companies.ids,
             "partner_ids": self.partner_ids.ids,
             "group_by": self.group_by,
+            "basis": self.basis,
             "posted_only": self.posted_only,
         }
 

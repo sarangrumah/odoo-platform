@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-06-11T00:00:00Z
 generator: claude-code
 module: custom_retail_import
-manifest_version: 19.0.0.9.0
+manifest_version: 19.0.0.21.0
 ---
 
 # custom_retail_import
@@ -85,6 +85,7 @@ Answers the three customer questions: (1) Excel→Odoo adapter = the wizard + pr
 - **X24DN has four discount slots, and at least two are in real use** (1,701 of 11,497 June rows populate `DISCOUNT AMOUNT 2`). `NET DISCOUNT AMOUNT` stays the GL figure; the slots explain it. `_x24_discount_slots` folds them into `ri_discount_type` / `ri_discount_code` / `ri_discount_description` on the line, and the reclass groups by `(income, discount acct, OU, code, description)` so each RIADJ line names its promo (e.g. `LPAID1117 CRM-VIP DISCOUNT`). A slot total that disagrees with `NET DISCOUNT AMOUNT` is counted and reported on the log — never silently reconciled.
 - **`data/retail_import_profiles.xml` is `noupdate="1"`.** Widening a column map only reaches fresh installs; existing tenants need a `migrations/<version>/post-migration.py` that merges the new keys into `column_map_json` (see 19.0.0.10.0 for X48, 19.0.0.12.0 for X24DN).
 - **Known, pre-existing:** X48 refunds are tendered against the store's CASH method, and the refund total lands in `Cash Difference` on the cash journals rather than reducing Cash on hand. Unrelated to the tax/COA work above; not yet fixed.
+- **This module's groups sit on its own `custom_retail_import.res_groups_privilege_retail_import` privilege** ("Retail Import") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 
 ## Related
 - `scripts/tenants/levis/` — Track A ops scripts (fast go-live without the image rebuild): `01_extract_x101.py`+`02_import_to_odoo.py` (products), `03_extract_stores.py`+`04_load_stores.py` (warehouses), `05_load_x20.py` (opening stock).

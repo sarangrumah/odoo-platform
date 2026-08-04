@@ -82,6 +82,7 @@
                         <group string="Timeline" name="timeline">
                             <field name="dispatched_at"/>
                             <field name="completed_at"/>
+                            <field name="provider_latency_ms"/>
                             <field name="error_code"/>
                             <field name="error_message"/>
                         </group>
