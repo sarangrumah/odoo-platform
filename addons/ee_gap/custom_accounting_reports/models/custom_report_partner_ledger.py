@@ -68,6 +68,18 @@ class CustomReportPartnerLedger(models.AbstractModel):
                 row += 1
         return row
 
+    def _flatten_for_screen(self, lines, columns):
+        """Partner sections carry their movements in a nested ``lines``
+        key — see :py:meth:`custom.report.engine._flatten_grouped`."""
+        return self._flatten_grouped(
+            lines,
+            columns,
+            "partner",
+            lambda line: line.get("partner_name") or "",
+            {"debit": "total_debit", "credit": "total_credit", "running_balance": "closing"},
+            opening_field="running_balance",
+        )
+
     def _account_types(self, kind):
         if kind == "receivable":
             return ("asset_receivable",)

@@ -130,6 +130,29 @@ class CustomReportAdvance(models.AbstractModel):
         return row
 
     # ------------------------------------------------------------------
+    # On-screen table
+    # ------------------------------------------------------------------
+    def _flatten_for_screen(self, lines, columns):
+        """Account sections carry their movements in a nested ``lines``
+        key — see :py:meth:`custom.report.engine._flatten_grouped`. The
+        opening figure rides the Balance column here rather than the
+        heading text the Excel body merges it into."""
+        return self._flatten_grouped(
+            lines,
+            columns,
+            "account",
+            lambda line: "[%s] %s" % (line.get("account_code") or "", line.get("account_name") or ""),
+            {
+                "debit": "total_debit",
+                "credit": "total_credit",
+                "residual": "total_residual",
+                "running_balance": "closing",
+            },
+            total_label=lambda line: self.env._("Total %s", line.get("account_code") or ""),
+            opening_field="running_balance",
+        )
+
+    # ------------------------------------------------------------------
     # Status helper
     # ------------------------------------------------------------------
     def _line_status(self, line):

@@ -651,6 +651,11 @@ class CustomReportEngine(models.AbstractModel):
                 missing = value is None or value is False or value == ""
                 value = None if missing else float(value)
             else:
+                # Some reports declare their Date column as ``text`` (their
+                # XLSX body formats it by hand) — do the same here rather
+                # than shipping a raw date object to the client.
+                if isinstance(value, date):
+                    value = self._format_date_id(value)
                 value = value if value not in (None, False) else ""
             values[field] = value
         # Total-type rows often carry only a ``label`` + numbers.
@@ -675,6 +680,64 @@ class CustomReportEngine(models.AbstractModel):
         :py:meth:`_flatten_sectioned`."""
         first_text = self._first_text_field(columns)
         return [self._screen_row(line, columns, first_text) for line in lines if line.get("type") != "coverage"]
+
+    def _flatten_grouped(
+        self,
+        lines,
+        columns,
+        group_type,
+        heading,
+        totals,
+        total_label=None,
+        opening_field=None,
+    ):
+        """Screen flattener for the reports whose ``_build_lines`` nests
+        every movement under a group row — General Ledger (accounts),
+        Partner Ledger (partners), Advance (accounts).
+
+        The default flattener passes rows straight through, which for
+        these reports means one *blank* row per group (the group dict
+        carries none of the column fields) and no movements at all: the
+        Excel export looks right while the screen looks empty. This
+        mirrors the matching :py:meth:`_xlsx_body` instead — group
+        heading, its lines, group total, then the grand total.
+
+        ``heading(line)`` labels the group row, ``totals`` maps a column
+        field onto the group key holding that total, ``total_label(line)``
+        labels the total row, and ``opening_field`` (when set) is the
+        column that shows the group's opening figure on the heading row.
+        """
+        first_text = self._first_text_field(columns)
+        # ``self.env._`` rather than the module-level ``_``: the latter sniffs
+        # the caller frame for a language and logs a warning per row when
+        # called from a lambda.
+        total_label = total_label or (lambda line: self.env._("Total"))
+
+        def totals_row(row_type, label, source):
+            values = {first_text: label}
+            values.update({field: float(source.get(key) or 0.0) for field, key in totals.items()})
+            return {"type": row_type, "level": 0, "values": values}
+
+        out = []
+        for line in lines:
+            ltype = line.get("type")
+            if ltype == "coverage":
+                continue
+            if ltype == group_type:
+                values = {first_text: heading(line)}
+                if opening_field:
+                    values[opening_field] = float(line.get("opening") or 0.0)
+                out.append({"type": "group", "level": 0, "values": values})
+                for nested in line.get("lines", []):
+                    row = self._screen_row(nested, columns, first_text)
+                    row["level"] = 1
+                    out.append(row)
+                out.append(totals_row("total", total_label(line), line))
+            elif ltype == "grand_total":
+                out.append(totals_row("grand_total", line.get("label") or self.env._("Grand Total"), line))
+            else:
+                out.append(self._screen_row(line, columns, first_text))
+        return out
 
     def _text_fields(self, columns):
         """The first two non-numeric column fields — where a group header
