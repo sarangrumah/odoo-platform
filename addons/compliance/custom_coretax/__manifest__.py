@@ -29,7 +29,6 @@ Features
   `pdp.audit_log` (append-only, hash-chained — UU 27/2022).
 
 Notes
-
 -----
 A public REST API for DJP Coretax B2B integration is not confirmed as of
 May 2026. The default workflow is XML upload via the official portal.
