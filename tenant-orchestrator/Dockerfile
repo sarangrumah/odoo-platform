@@ -15,13 +15,17 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 #   to bootstrap freshly-provisioned tenant databases. The /web/database/create
 #   HTTP path is unreliable in Odoo 19 (returns 200 even when ``-i base`` fails).
 #   /var/run/docker.sock is mounted read-only by docker-compose.multitenant.yml.
+#   Keep this version current: the static CLI is a single Go binary, so every
+#   Go stdlib CVE is compiled into it and trivy reports it as a `gobinary`
+#   target. 27.3.1 was built with go1.22.7 and carried 15 HIGH/CRITICAL
+#   findings; 29.7.1 is built with go1.26.5 and carries none.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     ca-certificates \
     curl \
     tini \
  && rm -rf /var/lib/apt/lists/* \
- && curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-27.3.1.tgz \
+ && curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-29.7.1.tgz \
       | tar -xz -C /tmp \
  && mv /tmp/docker/docker /usr/local/bin/docker \
  && rm -rf /tmp/docker \
@@ -30,24 +34,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Install from pyproject.toml rather than repeating the dependency list here.
+# The two lists had already drifted: paramiko was declared in pyproject but
+# never reached the image, so every VPS-provisioning call raised
+# ``RuntimeError: paramiko not installed`` at runtime (app/provisioner_ssh.py),
+# while passlib was installed here but absent from pyproject, so any
+# pyproject-based install broke app/dbops.py. One source of truth prevents both.
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir \
-      fastapi==0.115.4 \
-      uvicorn[standard]==0.32.0 \
-      "pydantic[email]==2.9.2" \
-      pydantic-settings==2.6.0 \
-      httpx[http2]==0.27.2 \
-      psycopg[binary,pool]==3.2.3 \
-      cryptography==50.0.0 \
-      bcrypt==4.2.0 \
-      passlib==1.7.4 \
-      boto3==1.35.54 \
-      structlog==24.4.0 \
-      prometheus-client==0.21.0 \
-      croniter==3.0.4 \
-      apscheduler==3.10.4
-
 COPY app ./app
+RUN pip install --no-cache-dir .
 
 # Drop SUID/SGID bits as a defence-in-depth step
 RUN find / -xdev -perm -4000 -exec chmod u-s {} + 2>/dev/null || true \

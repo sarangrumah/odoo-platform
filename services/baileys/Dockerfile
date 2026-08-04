@@ -19,6 +19,14 @@ RUN addgroup -g 10104 -S baileys \
  && adduser -u 10104 -G baileys -S baileys \
  && mkdir -p /var/lib/baileys \
  && chown -R baileys:baileys /var/lib/baileys
+# node_modules arrives prebuilt from the `deps` stage, so the runtime never runs
+# npm. node:20-alpine bundles it regardless, and npm's own dependency tree (tar,
+# minimatch, glob, brace-expansion, ...) accounts for 18 HIGH/CRITICAL trivy
+# findings unreachable from application code. Drop npm + corepack; patch openssl
+# for CVE-2026-45447.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+ && apk upgrade --no-cache libssl3 libcrypto3
 COPY package.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY src ./src
