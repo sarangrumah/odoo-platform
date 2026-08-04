@@ -337,11 +337,18 @@ class CoretaxTemplateExportWizard(models.TransientModel):
     def _digits(value):
         return (value or "").replace(".", "").replace("-", "").replace(" ", "")
 
+    # Layouts that carry an "NPWP Penandatangan" column, and therefore cannot be
+    # emitted without one. FK/OF and Retur Masukan have no such column, so they
+    # must not be blocked on it.
+    _SIGNER_TEMPLATES = ("bppu", "bp21", "bpnr")
+
     def _pemotong(self):
         """(npwp, nitku_suffix, penandatangan, user_id), validated."""
         self.ensure_one()
         company = self.company_id
-        npwp = company._check_coretax_pemotong()
+        npwp = company._check_coretax_pemotong(
+            require_signer=self.template in self._SIGNER_TEMPLATES
+        )
         return (
             npwp,
             company.x_custom_nitku_suffix or "",
@@ -519,6 +526,28 @@ class CoretaxTemplateExportWizard(models.TransientModel):
         uses = vat.x_custom_dpp_method == "nilai_lain" and bool(vat.x_custom_dpp_factor)
         return dpp, dpp_lain, dpp_lain * vat.amount / 100.0, vat.amount, uses
 
+    @staticmethod
+    def _item_jenis(line):
+        """"Jenis Barang Jasa" for one OF item row: "Jasa" or "Barang".
+
+        A down-payment line carries no product of its own — core builds it from
+        a "fake" SO line — so reading ``line.product_id.type`` reports every
+        down payment as "Barang", even one paid against a pure services order.
+        Fall back to the products of the originating order, which is what the
+        down payment is actually for.
+
+        "Jasa" only when *every* product billed is a service: a mixed order has
+        no single truthful answer, and "Barang" is the safer of the two.
+        """
+        products = line.product_id
+        if not products and "sale_line_ids" in line._fields:
+            products = line.sale_line_ids.order_id.order_line.filtered(
+                lambda sol: sol.product_id and not sol.display_type and not sol.is_downpayment
+            ).product_id
+        if products and all(product.type == "service" for product in products):
+            return "Jasa"
+        return "Barang"
+
     def _rows_fk(self):
         """One FK row per invoice, each followed by its OF item rows."""
         npwp_wp, nitku, _signer, _user = self._pemotong()
@@ -538,7 +567,7 @@ class CoretaxTemplateExportWizard(models.TransientModel):
                 of_rows.append(
                     [
                         "OF",
-                        "Jasa" if line.product_id.type == "service" else "Barang",
+                        self._item_jenis(line),
                         # Kode objek barang/jasa: '000000' is the generic
                         # catch-all in CODE_OF_GOODS / CODE_OF_SERVICES, and
                         # what the client's own samples use throughout.
@@ -610,7 +639,8 @@ class CoretaxTemplateExportWizard(models.TransientModel):
         Unlike the bupot templates this is not a flat sheet, so it returns a
         pre-laid-out block that ``_render`` writes verbatim.
         """
-        npwp_pembeli = self.company_id._check_coretax_pemotong()
+        # Retur carries the NPWP Pembeli banner only — no signer column.
+        npwp_pembeli = self.company_id._check_coretax_pemotong(require_signer=False)
         block = [["Retur"], ["NPWP Pembeli", "", npwp_pembeli], [], list(RETUR_COLUMNS)]
         details = [[], ["DetailRetur"], list(RETUR_DETAIL_COLUMNS)]
 

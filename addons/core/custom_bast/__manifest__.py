@@ -6,6 +6,7 @@
 Reusable abstraction for Indonesian-style handover documents (BAST).
 
 Provides:
+
 - `custom.bast.document`: handover record with kind (pickup/return/delivery/installation/handover),
   parties, dual signatures with timestamps, optional GPS, audit-logged state machine.
 - `custom.bast.line`: itemised lines with condition, photo and optional lot.

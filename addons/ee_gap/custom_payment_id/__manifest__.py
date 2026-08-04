@@ -6,6 +6,7 @@
 Indonesia payment gateway adapter for Odoo 19 payment.* stack.
 
 Phase 3 (Tier 3 EE-gap):
+
 - Extends payment.provider with Midtrans/Xendit/DOKU as additional codes
   and provider-specific configuration fields (server_key, client_key,
   merchant_id, sandbox toggle, webhook_secret).

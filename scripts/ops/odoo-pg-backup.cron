@@ -1,0 +1,15 @@
+# Daily dump of every platform database, with daily/weekly/monthly rotation.
+# Install as /etc/cron.d/odoo-pg-backup (root:root, mode 0644).
+#
+# 02:30 is chosen to sit clear of business hours and of the 07:02 run of the
+# pg-backup-local container, so the two never compete for the same I/O.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+30 2 * * * root /opt/odoo-platform/scripts/ops/pg_backup_all.sh >> /var/log/odoo-pg-backup.log 2>&1
+
+# Verify the result a few hours later and raise a WhatsApp alert if it is not
+# usable. Separate from the dump job on purpose: the failure that matters is the
+# silent one (cron never fired, disk full, dump truncated), and a job cannot
+# report that it did not run.
+5 7 * * * root /opt/odoo-platform/scripts/ops/pg_backup_check.sh >> /var/log/odoo-pg-backup.log 2>&1

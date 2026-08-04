@@ -26,5 +26,18 @@
             <field name="key">custom_levis_localization.scrap_loss_account_code</field>
             <field name="value"></field>
         </record>
+        <!--
+          Clearing account CODE used by Product Category Reclassification when a
+          correction falls in a period that is already closed. Such a correction
+          is booked in the current month as a REVERSAL (Dr account-was / Cr
+          clearing) plus a RE-BOOKING (Dr clearing / Cr account-should-be), so
+          the closed month is never reopened and the clearing account always
+          nets to zero. Empty by default — only required once a closed period is
+          actually involved.
+        -->
+        <record id="param_categ_reclass_clearing_account_code" model="ir.config_parameter">
+            <field name="key">custom_levis_localization.categ_reclass_clearing_account_code</field>
+            <field name="value"></field>
+        </record>
     </data>
 </odoo>

@@ -1,0 +1,14 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_vertical_user,vaspmo vertical user,model_custom_project_vertical,custom_project_portfolio.group_vaspmo_user,1,0,0,0
+access_vertical_pic,vaspmo vertical brand pic,model_custom_project_vertical,custom_project_portfolio.group_vaspmo_vertical_pic,1,0,0,0
+access_vertical_admin,vaspmo vertical admin,model_custom_project_vertical,custom_project_portfolio.group_vaspmo_admin,1,1,1,1
+access_portfolio_user,vaspmo portfolio user,model_custom_project_portfolio,custom_project_portfolio.group_vaspmo_user,1,0,0,0
+access_portfolio_po,vaspmo portfolio po,model_custom_project_portfolio,custom_project_portfolio.group_vaspmo_po,1,1,0,0
+access_portfolio_admin,vaspmo portfolio admin,model_custom_project_portfolio,custom_project_portfolio.group_vaspmo_admin,1,1,1,1
+access_sprint_user,vaspmo sprint user,model_custom_project_sprint,custom_project_portfolio.group_vaspmo_user,1,0,0,0
+access_sprint_ba,vaspmo sprint ba,model_custom_project_sprint,custom_project_portfolio.group_vaspmo_ba,1,1,1,0
+access_sprint_admin,vaspmo sprint admin,model_custom_project_sprint,custom_project_portfolio.group_vaspmo_admin,1,1,1,1
+access_weekly_user,vaspmo weekly user,model_custom_weekly_progress,custom_project_portfolio.group_vaspmo_user,1,0,0,0
+access_weekly_ba,vaspmo weekly ba,model_custom_weekly_progress,custom_project_portfolio.group_vaspmo_ba,1,1,1,0
+access_weekly_lead,vaspmo weekly lead,model_custom_weekly_progress,custom_project_portfolio.group_vaspmo_lead,1,1,1,0
+access_weekly_admin,vaspmo weekly admin,model_custom_weekly_progress,custom_project_portfolio.group_vaspmo_admin,1,1,1,1

@@ -6,6 +6,7 @@
 Bridge between Odoo and the platform AI gateway service.
 
 Features:
+
 - ``custom.ai`` service: ``chat()``, ``recommend(model, res_id, payload)`` calls
   the gateway with HMAC signing.
 - Settings UI under Custom Platform > AI Intelligence for provider override,

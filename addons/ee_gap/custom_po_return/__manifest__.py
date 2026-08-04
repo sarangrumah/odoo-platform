@@ -6,6 +6,7 @@
 Vendor return (retur pembelian / RTV) driven by total quantity instead of per-GR picking.
 
 Provides:
+
 - `custom.po.return`: return document per supplier with multiple product lines.
 - FIFO allocation engine: the system consumes the oldest purchase orders first,
   each slice priced at the original PO unit price, and records which goods

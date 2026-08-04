@@ -86,3 +86,8 @@ docs/projects/levis/Data XStore (Mentahan)*.zip
 # source of truth; each exported revision is ~1 MB of binary that git can never
 # really delete once committed.
 docs/*.docx
+# The bare `logs/` rule above matches a directory called logs ANYWHERE, which
+# silently swallowed the Next.js route for the transaction-log screen. Re-include
+# it explicitly: git cannot un-ignore files inside an ignored directory, so the
+# directory itself has to be named.
+!vas-pmo/src/app/(app)/logs/
