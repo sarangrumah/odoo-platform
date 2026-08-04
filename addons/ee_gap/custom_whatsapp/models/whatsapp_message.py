@@ -11,6 +11,8 @@ import uuid
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+from .res_partner import available_phone_search_fields
+
 _logger = logging.getLogger(__name__)
 
 
@@ -374,15 +376,19 @@ class WhatsappMessage(models.Model):
         else:
             body = f"[{msg_type} message]"
 
-        # Try to resolve the partner by phone.
-        partner = (
-            self.env["res.partner"]
-            .sudo()
-            .search(
-                ["|", ("phone", "ilike", from_phone[-9:]), ("mobile", "ilike", from_phone[-9:])],
-                limit=1,
-            )
-        )
+        # Try to resolve the partner by phone. The domain is built from the
+        # fields this build actually has: Odoo 19 dropped res.partner.mobile,
+        # and naming a missing field in a domain raises ValueError rather than
+        # simply not matching -- which took every inbound message down.
+        # phone_sanitized is searched first because `phone` keeps whatever the
+        # user typed, and a last-9-digits match cannot see past separators.
+        partner = self.env["res.partner"]
+        tail = from_phone[-9:]
+        fields_to_try = available_phone_search_fields(partner)
+        if tail and fields_to_try:
+            domain = ["|"] * (len(fields_to_try) - 1)
+            domain += [(fname, "ilike", tail) for fname in fields_to_try]
+            partner = partner.sudo().search(domain, limit=1)
 
         vals = {
             "account_id": account.id,
