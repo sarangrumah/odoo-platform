@@ -1,38 +1,39 @@
-"""Post-init hook: seed the AIM asset group/location and load the per-unit drone
-fixed-asset register, reconciled to the 31-May-2026 opening-balance GL.
+"""Build the ARKA/AIM fixed-asset register from the client's begbal sheet.
 
-The drones already sit as a lump sum in the AIM opening-balance GL (module
-``custom_arka_aim_opening_balance``): cost 27,110,131,391 (1205104000), accumulated
-depreciation 6,776,493,895 (1205203000). So this loader posts NO acquisition
-journal. For each unit it:
+Source data: the ``Aset Tetap`` sheet of ``TB & Detail AIM ARKA 05 2026``
+(4-Aug-2026), parsed by ``tools/parse_arkaaim_asset_sheet.py`` into
+``data/asset_register_registered.csv`` and
+``data/asset_register_unregistered.csv``. It supersedes the PO-derived register
+(uniform 30-Jan-2025 acquisition date, one asset group), which is kept as
+``data/aim_asset_register.csv`` for reference only.
 
-1. creates a ``custom.fixed.asset`` (draft) at PO unit cost (no GL impact on create);
-2. confirms it -> the base model builds a 48-month straight-line schedule anchored
-   on ``DEP_START`` (specific dates);
-3. marks every schedule line dated <= ``OPEN_DATE`` (31-May-2026) as
-   ``posted=True, move_id=False`` -- i.e. the 12 months of depreciation already
-   embedded in the GL accumulated balance. These lines count into the asset's
-   accumulated depreciation / NBV but are NEVER posted to the GL and are NEVER
-   re-posted by the monthly cron (which only picks up unposted lines). The
-   remaining 36 unposted lines are all dated AFTER the opening date, so the cron
-   depreciates strictly forward.
+Two populations:
 
-Consistent-rate reconciliation (accum applied at the same 12/48 = 25% rate the GL
-uses). Register is booked at PO cost, so all three variances trace to the single
-+34,976,845 cost difference between the PO and the GL:
+* ``Registered Asset`` -- 3,180 AIM units, per-unit acquisition date and cost,
+  straight line over 48 months. They are what the AIM opening balance already
+  carries: cost 27,110,131,391 (``1205104000``) and accumulated depreciation
+  6,776,493,895 (``1205203000``). So this loader posts **no** acquisition
+  journal; it seeds every depreciation line dated on/before ``POSTED_THROUGH``
+  as ``posted=True, move_id=False`` -- counted in accumulated depreciation,
+  never re-posted to the GL, never picked up by the monthly cron.
+* ``Unregistered`` -- 144 AIM spares (the units reclassed to Office Supplies on
+  31-May-2026) and 266 ARKA support items. Neither appears in any GL balance, so
+  they are register-only: ``depreciation_method='none'``, no schedule.
 
-    register cost  27,145,108,236  vs GL 27,110,131,391  -> +34,976,845
-    register accum  6,786,277,059  vs GL  6,776,493,895  -> + 9,783,164  (25%)
-    register NBV   20,358,831,177  vs GL 20,333,637,496  -> +25,193,681  (75%)
+Idempotent: skips the load entirely if any ``custom.fixed.asset`` already
+exists. Companies are resolved by NAME so the module stays portable across
+trn_arkaaim_begbal / prd_arkaaim.
 
-Idempotent: skips entirely if any AIM ``custom.fixed.asset`` already exists.
-Company is resolved by NAME so the module is portable across trn_arkaaim_begbal /
-prd_arkaaim.
+To rebuild a database that already has a register (which requires deleting the
+old one), use ``scripts/tenants/arkaaim/rebuild_asset_register.py`` -- that is a
+deliberate, backed-up operation, not something an install hook should do.
 """
 
 import csv
 import logging
 from datetime import date
+
+from dateutil.relativedelta import relativedelta
 
 from odoo.exceptions import UserError
 from odoo.tools import file_open
@@ -40,32 +41,39 @@ from odoo.tools import file_open
 _logger = logging.getLogger(__name__)
 
 MODULE = "custom_arka_aim_asset_register"
-CSV_PATH = "data/aim_asset_register.csv"
+REGISTERED_CSV = "data/asset_register_registered.csv"
+UNREGISTERED_CSV = "data/asset_register_unregistered.csv"
 
 AIM_COMPANY = "PT Aero Inovasi Media"
-GROUP_CODE = "AIM-FA-OFFC"
-GROUP_NAME = "Office and outlet equipment"
+ARKA_COMPANY = "PT Aero Reksa Kreasi Angkasa"
+OWNER_TO_COMPANY = {"PT AIM": AIM_COMPANY, "ARKA": ARKA_COMPANY}
+
+# AIM chart codes (same numbering as the Erajaya chart); ARKA has its own
+# accounts under the same codes.
+COST_CODE = "1205104000"
+ACCUM_CODE = "1205203000"
+EXPENSE_CODE = "7204103000"
 LOCATION_NAME = "RUKO GUDANG PALEM"
 
-# AIM chart codes (same numbering as the Erajaya chart).
-COST_CODE = "1205104000"  # Fixed Assets - Cost - Office and outlet equipment
-ACCUM_CODE = "1205203000"  # Fixed asset - Accum depre - Office and outlet equipment
-EXPENSE_CODE = "7204103000"  # Depre Exp - Fixed Asset - Office and outlet equipment
+# One asset group per category on the sheet. All three share the same GL
+# accounts -- the split exists so the register reports by category.
+GROUP_CODES = {
+    "Device": "FA-DEVICE",
+    "Komponen Drone": "FA-KOMPONEN",
+    "Alat Pendukung": "FA-PENDUKUNG",
+}
+DEFAULT_LIFE_MONTHS = 48
 
-# Depreciation policy for the drone fleet. The GL accumulated balance
-# (6,776,493,895) is exactly 25% of the cost => 12 months of a 48-month life were
-# depreciated by the opening date. DEP_START is set so the 12 already-elapsed
-# monthly lines land on/just-before OPEN_DATE and the 13th (first forward) line
-# falls in June 2026. CONFIRM WITH FINANCE (flagged in the plan).
-ORIG_LIFE_MONTHS = 48
-DEP_START = date(2025, 6, 30)  # depreciation start month (assumed from the 25% accum)
-OPEN_DATE = date(2026, 5, 31)  # begbal cutover; lines <= this are seeded posted, not GL'd
+OPEN_DATE = date(2026, 5, 31)  # begbal cutover
+POSTED_THROUGH = OPEN_DATE  # months already charged to the GL
+TECHNICAL_JOURNALS = ("EXCH", "CABA", "STJ")
+JOURNAL_PREFERENCE = ("MISC", "JM")
 
 BATCH = 250
 
 
-def _company(env):
-    return env["res.company"].search([("name", "=", AIM_COMPANY)], limit=1)
+def _company(env, name):
+    return env["res.company"].search([("name", "=", name)], limit=1)
 
 
 def _acc(env, company, code):
@@ -76,134 +84,190 @@ def _acc(env, company, code):
     )
 
 
-def seed_group_and_location(env):
-    """Upsert the AIM 'Office and outlet equipment' asset group and the RUKO
-    GUDANG PALEM location. Idempotent and non-destructive (only empty account /
-    journal fields are filled). Returns ``(group, location)`` or ``(False, False)``
-    when the AIM company is absent.
-    """
-    company = _company(env)
-    if not company:
-        _logger.warning("%s: company %r not found -> skip group/location seed", MODULE, AIM_COMPANY)
-        return False, False
+def _journal(env, company):
+    journals = env["account.journal"].search(
+        [("type", "=", "general"), ("company_id", "=", company.id)]
+    )
+    candidates = journals.filtered(lambda journal: journal.code not in TECHNICAL_JOURNALS)
+    for code in JOURNAL_PREFERENCE:
+        match = candidates.filtered(lambda journal, code=code: journal.code == code)
+        if match:
+            return match[0]
+    return candidates[:1]
 
-    Group = env["custom.fixed.asset.group"]
-    Location = env["custom.fixed.asset.location"]
 
-    cost = _acc(env, company, COST_CODE)
-    accum = _acc(env, company, ACCUM_CODE)
-    expense = _acc(env, company, EXPENSE_CODE)
-    journal = env["account.journal"].search([("type", "=", "general"), ("company_id", "=", company.id)], limit=1)
-    account_vals = {
-        "default_asset_account_id": cost.id or False,
-        "default_depreciation_account_id": accum.id or False,
-        "default_expense_account_id": expense.id or False,
-        "default_journal_id": journal.id or False,
+def _read_csv(relpath):
+    with file_open(f"{MODULE}/{relpath}", "r") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _accounts_for(env, company):
+    accounts = {
+        "cost": _acc(env, company, COST_CODE),
+        "accum": _acc(env, company, ACCUM_CODE),
+        "expense": _acc(env, company, EXPENSE_CODE),
     }
+    missing = [key for key, account in accounts.items() if not account]
+    journal = _journal(env, company)
+    if missing or not journal:
+        raise UserError(
+            f"{MODULE}: {company.name} is missing accounts {missing} / general journal -> cannot load register"
+        )
+    return accounts, journal
 
+
+def _ensure_group(env, company, category, accounts, journal):
+    """Upsert one asset group per category. Only empty fields are filled."""
+    Group = env["custom.fixed.asset.group"].with_company(company)
+    code = GROUP_CODES[category]
+    vals = {
+        "default_asset_account_id": accounts["cost"].id,
+        "default_depreciation_account_id": accounts["accum"].id,
+        "default_expense_account_id": accounts["expense"].id,
+        "default_journal_id": journal.id,
+        "default_useful_life_months": DEFAULT_LIFE_MONTHS,
+    }
     group = Group.with_context(active_test=False).search(
-        [("code", "=", GROUP_CODE), ("company_id", "=", company.id)], limit=1
+        [("code", "=", code), ("company_id", "=", company.id)], limit=1
     )
     if group:
-        fill = {f: v for f, v in account_vals.items() if v and not group[f]}
-        if fill:
-            group.write(fill)
-    else:
-        group = Group.create(
-            {
-                "name": GROUP_NAME,
-                "code": GROUP_CODE,
-                "company_id": company.id,
-                "default_useful_life_months": ORIG_LIFE_MONTHS,
-                **{f: v for f, v in account_vals.items() if v},
-            }
-        )
+        group.write({field: value for field, value in vals.items() if value and not group[field]})
+        return group
+    return Group.create({"name": category, "code": code, "company_id": company.id, **vals})
 
+
+def _location(env):
+    Location = env["custom.fixed.asset.location"]
     location = Location.with_context(active_test=False).search([("name", "=", LOCATION_NAME)], limit=1)
-    if not location:
-        location = Location.create({"name": LOCATION_NAME})
-
-    _logger.info("%s: seeded group %s + location %s for %s", MODULE, GROUP_CODE, LOCATION_NAME, company.name)
-    return group, location
+    return location or Location.create({"name": LOCATION_NAME})
 
 
-def _read_csv():
-    with file_open(f"{MODULE}/{CSV_PATH}", "r") as fh:
-        return list(csv.DictReader(fh))
+def seed_group_and_location(env):
+    """Seed the asset groups + location for both companies (called on upgrade).
+
+    Idempotent and non-destructive: creates what is missing and fills only empty
+    account/journal fields, so the wiring self-heals without touching data.
+    """
+    seeded = []
+    for company_name, categories in (
+        (AIM_COMPANY, ("Device", "Komponen Drone")),
+        (ARKA_COMPANY, ("Alat Pendukung",)),
+    ):
+        company = _company(env, company_name)
+        if not company:
+            _logger.warning("%s: company %r not found -> skip group seed", MODULE, company_name)
+            continue
+        accounts, journal = _accounts_for(env, company)
+        for category in categories:
+            seeded.append(_ensure_group(env, company, category, accounts, journal).code)
+    location = _location(env)
+    _logger.info("%s: seeded groups %s + location %s", MODULE, seeded, location.name)
+    return seeded, location
 
 
-def post_init_hook(env):
-    group, location = seed_group_and_location(env)
-    company = _company(env)
-    if not company or not group:
-        _logger.warning("%s: AIM company/group missing -> skip register load", MODULE)
-        return
+def _elapsed_months(start, until=POSTED_THROUGH):
+    """Number of monthly depreciation lines dated on/before `until`."""
+    if start > until:
+        return 0
+    return (until.year - start.year) * 12 + (until.month - start.month) + 1
 
-    Asset = env["custom.fixed.asset"].with_company(company)
-    if Asset.search_count([("company_id", "=", company.id)]):
-        _logger.info("%s: AIM already has fixed assets -> skip register load (idempotent)", MODULE)
-        return
 
-    cost_acc = _acc(env, company, COST_CODE)
-    accum_acc = _acc(env, company, ACCUM_CODE)
-    exp_acc = _acc(env, company, EXPENSE_CODE)
-    journal = env["account.journal"].search([("type", "=", "general"), ("company_id", "=", company.id)], limit=1)
-    missing = [
-        name
-        for name, rec in (("cost", cost_acc), ("accum", accum_acc), ("expense", exp_acc), ("journal", journal))
-        if not rec
-    ]
-    if missing:
-        raise UserError(f"{MODULE}: missing AIM account/journal for {missing} -> cannot load register")
-
-    rows = _read_csv()
-    base_vals = {
+def _asset_vals(row, company, group, location, accounts, journal):
+    """Map one CSV row to ``custom.fixed.asset`` values."""
+    acquisition = date.fromisoformat(row["acq_date"])
+    cost = float(row["cost"] or 0)
+    vals = {
+        "name": row["name"],
+        "code": row["code"],
         "company_id": company.id,
         "group_id": group.id,
         "location_id": location.id if location else False,
-        "posting_date": DEP_START,
-        "depreciation_date_mode": "specific",
-        "useful_life_months": ORIG_LIFE_MONTHS,
-        "asset_account_id": cost_acc.id,
-        "depreciation_account_id": accum_acc.id,
-        "expense_account_id": exp_acc.id,
+        "acquisition_date": acquisition,
+        "acquisition_value": cost,
+        "asset_account_id": accounts["cost"].id,
+        "depreciation_account_id": accounts["accum"].id,
+        "expense_account_id": accounts["expense"].id,
         "journal_id": journal.id,
+        "depreciation_method": "none",
+        "useful_life_months": 0,
     }
-    vals_list = []
+    if row["status"] != "Registered Asset" or cost <= 0:
+        return vals
+
+    # Depreciation starts in the month of acquisition -- the GL shows the first
+    # charge in Jun-2025 for the 18-Jun-2025 fleet. Total life = months already
+    # elapsed at the cutover + the remaining life the client computed (48 for
+    # every unit on the sheet).
+    start = acquisition + relativedelta(day=31)
+    vals.update(
+        {
+            "posting_date": start,
+            "depreciation_date_mode": "specific",
+            "depreciation_method": "straight_line",
+            "useful_life_months": _elapsed_months(start) + int(row["remaining_life"] or 0),
+        }
+    )
+    return vals
+
+
+def load_register(env, rows, posted_through=POSTED_THROUGH):
+    """Create the register records and seed their already-charged history.
+
+    Returns ``(created, seeded_lines)``.
+    """
+    by_company = {}
     for row in rows:
-        unit_cost = float(row["unit_cost"] or 0)
-        vals_list.append(
-            {
-                **base_vals,
-                "name": row["name"],
-                "serial_number": row["serial_number"] or False,
-                "source_group": row["source_group"] or False,
-                "source_desc": row["source_desc"] or False,
-                "acquisition_date": row["acquisition_date"],
-                "acquisition_value": unit_cost,
-                # Zero-value listing-only units have no cost to depreciate.
-                "depreciation_method": "straight_line" if unit_cost > 0 else "none",
-            }
-        )
+        by_company.setdefault(OWNER_TO_COMPANY[row["owner"]], []).append(row)
 
-    assets = Asset.create(vals_list)
-    _logger.info("%s: created %s AIM fixed-asset records", MODULE, len(assets))
+    created = seeded_lines = 0
+    for company_name, company_rows in by_company.items():
+        company = _company(env, company_name)
+        if not company:
+            _logger.warning("%s: company %r not found -> skip %s rows", MODULE, company_name, len(company_rows))
+            continue
+        accounts, journal = _accounts_for(env, company)
+        location = _location(env) if company_name == AIM_COMPANY else False
 
-    # Confirm in batches; for depreciable assets seed the already-elapsed history
-    # lines (date <= OPEN_DATE) as posted-but-un-GL'd so the cron only posts forward.
-    seeded_lines = 0
-    for start in range(0, len(assets), BATCH):
-        chunk = assets[start : start + BATCH]
-        chunk.action_confirm()
-        history = chunk.depreciation_line_ids.filtered(lambda l: l.date <= OPEN_DATE)
-        if history:
-            history.write({"posted": True})
-            seeded_lines += len(history)
-        env.invalidate_all()
+        groups, vals_list = {}, []
+        for row in company_rows:
+            category = row["category"]
+            if category not in groups:
+                groups[category] = _ensure_group(env, company, category, accounts, journal)
+            vals_list.append(_asset_vals(row, company, groups[category], location, accounts, journal))
 
+        Asset = env["custom.fixed.asset"].with_company(company)
+        for start in range(0, len(vals_list), BATCH):
+            assets = Asset.create(vals_list[start : start + BATCH])
+            depreciable = assets.filtered(lambda asset: asset.depreciation_method != "none")
+            if depreciable:
+                depreciable.action_confirm()
+                history = depreciable.depreciation_line_ids.filtered(
+                    lambda line: line.date <= posted_through
+                )
+                if history:
+                    history.write({"posted": True})
+                    seeded_lines += len(history)
+            created += len(assets)
+            env.invalidate_all()
+        _logger.info("%s: %s -> %s assets", MODULE, company_name, len(vals_list))
+
+    return created, seeded_lines
+
+
+def read_register_rows():
+    """The full register population: registered units first, then register-only."""
+    return _read_csv(REGISTERED_CSV) + _read_csv(UNREGISTERED_CSV)
+
+
+def post_init_hook(env):
+    seed_group_and_location(env)
+    if env["custom.fixed.asset"].with_context(active_test=False).search_count([]):
+        _logger.info("%s: fixed assets already exist -> skip register load (idempotent)", MODULE)
+        return
+    created, seeded_lines = load_register(env, read_register_rows())
     _logger.info(
-        "%s: confirmed %s assets, seeded %s opening-depreciation lines (posted, not GL'd)",
+        "%s: created %s assets, seeded %s already-charged depreciation lines",
         MODULE,
-        len(assets),
+        created,
         seeded_lines,
     )
