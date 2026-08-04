@@ -165,6 +165,78 @@ def _resolve_vault_ref(ref: str) -> str:
     return val
 
 
+def _load_known_hosts(client) -> str:
+    """Load the pinned host keys into ``client``. Returns the file path used.
+
+    Returns "" when no file could be loaded, which is not fatal: the caller
+    decides what to do about unknown hosts.
+    """
+    from .config import get_settings
+
+    path = (get_settings().ssh_known_hosts_file or "").strip()
+    if not path:
+        return ""
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        if not os.path.exists(path):
+            # Touch it so paramiko's save_host_keys() has somewhere to write.
+            with open(path, "a", encoding="utf-8"):
+                pass
+        client.load_host_keys(path)
+        return path
+    except OSError as e:
+        # A read-only or missing volume must not take provisioning down; it
+        # degrades to "unknown host" handling, which is still stricter than
+        # the old unconditional auto-add when strict mode is on.
+        log.warning("ssh.known_hosts.unavailable path=%s err=%s", path, e)
+        return ""
+
+
+def _missing_host_key_policy(known_hosts: str):
+    """Pick the policy for a host we have never seen.
+
+    Known hosts are always verified by paramiko against the loaded keys, so a
+    VPS whose key changes is refused either way -- that is the MITM case this
+    exists for. The choice here only covers the *first* sight of a host:
+
+      * strict mode -> reject; the key must be pre-seeded in known_hosts.
+      * otherwise   -> trust on first use and persist it, so every later
+        connection is verified. This keeps first-deploy bootstrap working,
+        which is why AutoAddPolicy was there in the first place, while
+        closing the window where every connection accepted any key forever.
+    """
+    from .config import get_settings
+
+    if get_settings().ssh_strict_host_keys:
+        return paramiko.RejectPolicy()
+    if not known_hosts:
+        # Nowhere to persist: this is the old behaviour, and it is why the
+        # warning is loud. Fix the volume or turn strict mode on.
+        log.warning("ssh.host_key.unpinned: no known_hosts file, host keys cannot be verified")
+        return paramiko.AutoAddPolicy()
+    return _PersistingAutoAdd(known_hosts)
+
+
+class _PersistingAutoAdd(paramiko.MissingHostKeyPolicy if paramiko else object):
+    """Trust on first use, then write the key so it is verified from then on."""
+
+    def __init__(self, path: str) -> None:
+        self._path = path
+
+    def missing_host_key(self, client, hostname, key) -> None:
+        log.warning(
+            "ssh.host_key.pinned_on_first_use host=%s type=%s fp=%s",
+            hostname,
+            key.get_name(),
+            key.get_fingerprint().hex(),
+        )
+        client.get_host_keys().add(hostname, key.get_name(), key)
+        try:
+            client.save_host_keys(self._path)
+        except OSError as e:
+            log.warning("ssh.host_key.persist_failed path=%s err=%s", self._path, e)
+
+
 class RemoteDockerExecutor:
     """Thin paramiko wrapper for running idempotent shell scripts on a VPS.
 
@@ -201,15 +273,15 @@ class RemoteDockerExecutor:
                     f"could not parse ssh key: {e}", public_reason="ssh credential is not usable"
                 ) from e
         client = paramiko.SSHClient()
-        # CodeQL py/paramiko-missing-host-key-validation + bandit B507:
-        # AutoAddPolicy is intentional for first-deploy bootstrap. The host
-        # key is unknown until the tenant VPS finishes its initial boot;
-        # operators provide pre-shared root keys via vault://, not TOFU.
-        # Pinning host keys is tracked as a follow-up (see registry table).
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # lgtm[py/paramiko-missing-host-key-validation]
+        known_hosts = _load_known_hosts(client)
+        client.set_missing_host_key_policy(_missing_host_key_policy(known_hosts))
         log.info(
             "ssh.connect",
-            extra={"host": self.target.hostname, "user": self.target.ssh_user},
+            extra={
+                "host": self.target.hostname,
+                "user": self.target.ssh_user,
+                "known_hosts": known_hosts or "none",
+            },
         )
         client.connect(
             hostname=self.target.hostname,

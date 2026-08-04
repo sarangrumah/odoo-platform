@@ -50,6 +50,14 @@ class Settings(BaseSettings):
     odoo_admin_passwd: str = Field(min_length=8)
     odoo_filestore_root: str = "/var/lib/odoo/filestore"
 
+    # ---- SSH host-key verification ----
+    # Host keys learned on first connect are written here and verified on every
+    # later connect, so a VPS that silently changes identity is refused instead
+    # of trusted. Set ssh_strict_host_keys=True once every VPS has been seen at
+    # least once (or the file is pre-seeded) to also refuse unknown hosts.
+    ssh_known_hosts_file: str = "/var/lib/orchestrator/known_hosts"
+    ssh_strict_host_keys: bool = False
+
     # ---- Operational ----
     log_level: str = "info"
     enable_backup_scheduler: bool = True
