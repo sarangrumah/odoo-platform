@@ -8,7 +8,6 @@ from odoo.tests import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "custom_ppob_sla")
 class TestPpobThroughputSample(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -21,62 +20,83 @@ class TestPpobThroughputSample(TransactionCase):
         cls.bank = Mapping._get_account("cash_bca_escrow", cls.company)
         cls.baseline = cls.env.ref("custom_ppob_sla.sla_target_baseline")
 
-        cls.mitra = cls.env["res.partner"].create({
-            "name": "Mitra Throughput Test",
-            "x_custom_ppob_is_mitra": True,
-            "x_custom_ppob_mitra_code": "MTRTHR1",
-        })
-        cls.vendor = cls.env["res.partner"].create({
-            "name": "Vendor Throughput Test",
-            "x_custom_ppob_is_provider": True,
-        })
-        cls.product = cls.env["custom.ppob.product"].create({
-            "code": "TSELTHR5",
-            "name": "TSEL Pulsa 5k (throughput test)",
-            "class_id": cls.klass.id,
-            "denom": 5000.0,
-            "cost_price_default": 4900.0,
-        })
-        cls.wallet = cls.env["custom.ppob.wallet"].create({
-            "partner_id": cls.mitra.id,
-            "class_id": cls.klass.id,
-        })
-        cls.wallet._atomic_credit(
-            amount=1_000_000.0, reason="seed", counterpart_account=cls.bank, move_type="topup",
+        cls.mitra = cls.env["res.partner"].create(
+            {
+                "name": "Mitra Throughput Test",
+                "x_custom_ppob_is_mitra": True,
+                "x_custom_ppob_mitra_code": "MTRTHR1",
+            }
         )
-        cls.provider = cls.env["custom.ppob.provider"].create({
-            "code": "THRTEST",
-            "name": "Provider Throughput Test",
-            "partner_id": cls.vendor.id,
-            "settlement_mode": "prepaid_deposit",
-            "bucket_mode": "bulky",
-            "adapter_class": "ppob_mock",
-            "mock_outcome": "success",
-        })
+        cls.vendor = cls.env["res.partner"].create(
+            {
+                "name": "Vendor Throughput Test",
+                "x_custom_ppob_is_provider": True,
+            }
+        )
+        cls.product = cls.env["custom.ppob.product"].create(
+            {
+                "code": "TSELTHR5",
+                "name": "TSEL Pulsa 5k (throughput test)",
+                "class_id": cls.klass.id,
+                "denom": 5000.0,
+                "cost_price_default": 4900.0,
+            }
+        )
+        cls.wallet = cls.env["custom.ppob.wallet"].create(
+            {
+                "partner_id": cls.mitra.id,
+                "class_id": cls.klass.id,
+            }
+        )
+        cls.wallet._atomic_credit(
+            amount=1_000_000.0,
+            reason="seed",
+            counterpart_account=cls.bank,
+            move_type="topup",
+        )
+        cls.provider = cls.env["custom.ppob.provider"].create(
+            {
+                "code": "THRTEST",
+                "name": "Provider Throughput Test",
+                "partner_id": cls.vendor.id,
+                "settlement_mode": "prepaid_deposit",
+                "bucket_mode": "bulky",
+                "adapter_class": "ppob_mock",
+                "mock_outcome": "success",
+            }
+        )
         cls.provider.action_ensure_buckets()
         cls.provider.bucket_ids._atomic_credit(
-            dpp_amount=500_000.0, tax_amount=0.0, gross_amount=500_000.0,
-            reason="seed bucket", counterpart_account=cls.bank, move_type="topup",
+            dpp_amount=500_000.0,
+            tax_amount=0.0,
+            gross_amount=500_000.0,
+            reason="seed bucket",
+            counterpart_account=cls.bank,
+            move_type="topup",
         )
-        cls.env["custom.ppob.provider.sku.map"].create({
-            "provider_id": cls.provider.id,
-            "product_id": cls.product.id,
-            "provider_sku": "SKU-THRTEST",
-            "buy_price": 4900.0,
-        })
+        cls.env["custom.ppob.provider.sku.map"].create(
+            {
+                "provider_id": cls.provider.id,
+                "product_id": cls.product.id,
+                "provider_sku": "SKU-THRTEST",
+                "buy_price": 4900.0,
+            }
+        )
 
     def _dispatch(self, count=1):
         Txn = self.env["custom.ppob.transaction"]
         txns = Txn.browse()
         for i in range(count):
-            txn = Txn.create({
-                "mitra_id": self.mitra.id,
-                "product_id": self.product.id,
-                "msisdn": f"0812000{i:04d}",
-                "sell_price": 5000.0,
-                "cost_price": 4900.0,
-                "idempotency_key": f"THR-{i}",
-            })
+            txn = Txn.create(
+                {
+                    "mitra_id": self.mitra.id,
+                    "product_id": self.product.id,
+                    "msisdn": f"0812000{i:04d}",
+                    "sell_price": 5000.0,
+                    "cost_price": 4900.0,
+                    "idempotency_key": f"THR-{i}",
+                }
+            )
             txn._dispatch_one()
             txns |= txn
         return txns
@@ -135,14 +155,16 @@ class TestPpobThroughputSample(TransactionCase):
         self._dispatch(2)
         self.provider.mock_outcome = "fail"
         Txn = self.env["custom.ppob.transaction"]
-        txn = Txn.create({
-            "mitra_id": self.mitra.id,
-            "product_id": self.product.id,
-            "msisdn": "081299999",
-            "sell_price": 5000.0,
-            "cost_price": 4900.0,
-            "idempotency_key": "THR-FAIL",
-        })
+        txn = Txn.create(
+            {
+                "mitra_id": self.mitra.id,
+                "product_id": self.product.id,
+                "msisdn": "081299999",
+                "sell_price": 5000.0,
+                "cost_price": 4900.0,
+                "idempotency_key": "THR-FAIL",
+            }
+        )
         txn._dispatch_one()
         samples = self.Sample._sample_hour(self._current_hour())
         self.assertEqual(samples.txn_count, 3)
@@ -156,8 +178,7 @@ class TestPpobThroughputSample(TransactionCase):
         self._dispatch(3)
         samples = self.Sample._sample_hour(self._current_hour())
         self.assertGreaterEqual(samples.peak_tps, 1.0)
-        self.assertGreater(samples.peak_tps, samples.mean_tps,
-                           "peak must not collapse into the hourly average")
+        self.assertGreater(samples.peak_tps, samples.mean_tps, "peak must not collapse into the hourly average")
 
     def test_sample_flushes_before_raw_sql(self):
         """The transactions above are dispatched in this same cursor; without
@@ -174,11 +195,16 @@ class TestPpobThroughputSample(TransactionCase):
         second = self.Sample._sample_hour(self._current_hour())
         self.assertEqual(first, second, "the same bucket must be updated, not duplicated")
         self.assertEqual(second.txn_count, 2)
-        self.assertEqual(self.Sample.search_count([
-            ("source", "=", "odoo"),
-            ("bucket_start", "=", self._current_hour()),
-            ("provider_id", "=", self.provider.id),
-        ]), 1)
+        self.assertEqual(
+            self.Sample.search_count(
+                [
+                    ("source", "=", "odoo"),
+                    ("bucket_start", "=", self._current_hour()),
+                    ("provider_id", "=", self.provider.id),
+                ]
+            ),
+            1,
+        )
 
     def test_cron_samples_previous_complete_hour_only(self):
         """Sampling in arrears: the hour still in progress can still gain
@@ -198,18 +224,24 @@ class TestPpobThroughputSample(TransactionCase):
         hour = self._current_hour()
         self._dispatch(2)
         odoo_sample = self.Sample._sample_hour(hour)
-        oracle_sample = self.Sample._upsert_samples([{
-            "bucket_start": hour,
-            "provider_id": self.provider.id,
-            "class_id": self.klass.id,
-            "company_id": self.company.id,
-            "txn_count": 2,
-            "success_count": 2,
-            "peak_tps": 2.0,
-        }], source="oracle")
+        oracle_sample = self.Sample._upsert_samples(
+            [
+                {
+                    "bucket_start": hour,
+                    "provider_id": self.provider.id,
+                    "class_id": self.klass.id,
+                    "company_id": self.company.id,
+                    "txn_count": 2,
+                    "success_count": 2,
+                    "peak_tps": 2.0,
+                }
+            ],
+            source="oracle",
+        )
         self.assertNotEqual(odoo_sample, oracle_sample)
-        self.assertEqual(odoo_sample.txn_count, oracle_sample.txn_count,
-                         "parity: the same hour reconciles across both systems")
+        self.assertEqual(
+            odoo_sample.txn_count, oracle_sample.txn_count, "parity: the same hour reconciles across both systems"
+        )
 
     def test_unknown_source_rejected(self):
         with self.assertRaises(UserError):
@@ -251,13 +283,18 @@ class TestPpobThroughputSample(TransactionCase):
     def test_empty_hour_is_not_a_success_rate_breach(self):
         """0 transactions means 0% success by arithmetic -- that is an absence
         of evidence, not a reliability incident."""
-        sample = self.Sample._upsert_samples([{
-            "bucket_start": self._current_hour() - timedelta(hours=5),
-            "provider_id": self.provider.id,
-            "class_id": self.klass.id,
-            "company_id": self.company.id,
-            "txn_count": 0,
-            "success_count": 0,
-        }], source="odoo")
+        sample = self.Sample._upsert_samples(
+            [
+                {
+                    "bucket_start": self._current_hour() - timedelta(hours=5),
+                    "provider_id": self.provider.id,
+                    "class_id": self.klass.id,
+                    "company_id": self.company.id,
+                    "txn_count": 0,
+                    "success_count": 0,
+                }
+            ],
+            source="odoo",
+        )
         self.assertEqual(sample.success_rate_pct, 0.0)
         self.assertEqual(sample.breach, "ok")

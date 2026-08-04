@@ -34,9 +34,20 @@ class WmsScrapReport(models.Model):
     # the same transaction would still read as draft through the view. Naming
     # the underlying models makes the ORM flush them before the query.
     _depends = {
-        "stock.scrap": ["name", "date_done", "origin", "picking_id", "product_id", "lot_id",
-                        "location_id", "scrap_location_id", "scrap_qty", "should_replenish",
-                        "state", "company_id"],
+        "stock.scrap": [
+            "name",
+            "date_done",
+            "origin",
+            "picking_id",
+            "product_id",
+            "lot_id",
+            "location_id",
+            "scrap_location_id",
+            "scrap_qty",
+            "should_replenish",
+            "state",
+            "company_id",
+        ],
         "product.product": ["default_code", "standard_price", "product_tmpl_id"],
     }
 

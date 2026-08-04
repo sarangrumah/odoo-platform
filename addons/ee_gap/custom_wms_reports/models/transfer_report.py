@@ -33,9 +33,20 @@ class WmsTransferReport(models.Model):
     _rec_name = "reference"
     _order = "date desc, id desc"
     _depends = {
-        "stock.move": ["date", "reference", "origin", "picking_id", "picking_type_id",
-                       "location_id", "location_dest_id", "product_id", "product_uom_qty",
-                       "quantity", "state", "company_id"],
+        "stock.move": [
+            "date",
+            "reference",
+            "origin",
+            "picking_id",
+            "picking_type_id",
+            "location_id",
+            "location_dest_id",
+            "product_id",
+            "product_uom_qty",
+            "quantity",
+            "state",
+            "company_id",
+        ],
         "stock.picking": ["partner_id"],
         "product.product": ["default_code", "product_tmpl_id"],
     }
@@ -105,8 +116,11 @@ class WmsTransferReport(models.Model):
             {"label": "Reference", "value": lambda r: r.reference, "width": 20},
             {"label": "Source Document", "value": lambda r: r.origin, "width": 18},
             {"label": "Operation Type", "value": lambda r: r.picking_type_id.display_name, "width": 24},
-            {"label": "Kind", "value": lambda r: dict(TRANSFER_KIND).get(r.transfer_kind, r.transfer_kind),
-             "width": 15},
+            {
+                "label": "Kind",
+                "value": lambda r: dict(TRANSFER_KIND).get(r.transfer_kind, r.transfer_kind),
+                "width": 15,
+            },
             {"label": "Partner", "value": lambda r: r.partner_id.display_name, "width": 28},
             {"label": "From", "value": lambda r: r.location_id.complete_name, "width": 26},
             {"label": "To", "value": lambda r: r.location_dest_id.complete_name, "width": 26},

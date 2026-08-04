@@ -116,8 +116,10 @@ class CustomReportSalesDetail(models.AbstractModel):
             # prefixed with RET- so both spellings must match.
             sub = []
             for code in codes:
-                sub += [("order_id.pos_reference", "=like", "%s-%%" % code),
-                        ("order_id.pos_reference", "=like", "RET-%s-%%" % code)]
+                sub += [
+                    ("order_id.pos_reference", "=like", "%s-%%" % code),
+                    ("order_id.pos_reference", "=like", "RET-%s-%%" % code),
+                ]
             domain += ["|"] * (len(sub) - 1) + sub
         if filters.get("categ_ids"):
             domain.append(("product_id.categ_id", "child_of", filters["categ_ids"]))

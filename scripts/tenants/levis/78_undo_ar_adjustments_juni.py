@@ -27,9 +27,7 @@ REF_PREFIX = "EBR-ADJ-AR-JUNI-2026"
 DRY = os.environ.get("UNDO_DRY") == "1"
 
 company = env["res.company"].browse(COMPANY_ID)
-moves = env["account.move"].search(
-    [("ref", "like", REF_PREFIX + "%"), ("company_id", "=", company.id)]
-)
+moves = env["account.move"].search([("ref", "like", REF_PREFIX + "%"), ("company_id", "=", company.id)])
 if not moves:
     raise SystemExit("no %s* entries found -- nothing to undo" % REF_PREFIX)
 log("found %d entries: %s" % (len(moves), ", ".join(sorted(moves.mapped("ref")))))
@@ -44,9 +42,7 @@ env.cr.execute(
 partials = env.cr.fetchone()[0]
 full = len(lines.filtered(lambda l: l.full_reconcile_id))
 if partials or full:
-    raise SystemExit(
-        "refusing: %d partial / %d full reconciliations point at these lines" % (partials, full)
-    )
+    raise SystemExit("refusing: %d partial / %d full reconciliations point at these lines" % (partials, full))
 log("reconciliation check: clean (0 partial, 0 full)")
 
 # --- guard 2: each entry must be the last of its own sequence prefix --------
@@ -66,14 +62,12 @@ for move in moves:
     )
     if later:
         raise SystemExit(
-            "refusing: %s has %d entries after it in %s -- deleting would leave a gap"
-            % (move.name, later, prefix)
+            "refusing: %s has %d entries after it in %s -- deleting would leave a gap" % (move.name, later, prefix)
         )
 log("sequence check: every entry is the last of its period prefix")
 
 for move in moves:
-    log("will delete %s (%s, %s, %d lines)"
-        % (move.name, move.ref, move.date, len(move.line_ids)))
+    log("will delete %s (%s, %s, %d lines)" % (move.name, move.ref, move.date, len(move.line_ids)))
 
 saved_lock = company.fiscalyear_lock_date
 if saved_lock:
@@ -89,9 +83,7 @@ finally:
         company.sudo().write({"fiscalyear_lock_date": saved_lock})
         log("fiscalyear_lock_date restored to %s" % saved_lock)
 
-left = env["account.move"].search_count(
-    [("ref", "like", REF_PREFIX + "%"), ("company_id", "=", company.id)]
-)
+left = env["account.move"].search_count([("ref", "like", REF_PREFIX + "%"), ("company_id", "=", company.id)])
 log("remaining %s* entries: %d" % (REF_PREFIX, left))
 
 if DRY:

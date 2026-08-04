@@ -9,6 +9,7 @@ then a pivot over one model rather than a bespoke comparison harness.
 Sampling is raw SQL for read_group's sake -- per-second peak and p95 percentile
 are not expressible through the ORM.
 """
+
 import logging
 from datetime import timedelta
 
@@ -27,8 +28,7 @@ class PpobThroughputSample(models.Model):
         required=True,
         index=True,
         readonly=True,
-        help="Start of the hour this sample covers (UTC, half-open interval "
-             "[bucket_start, bucket_start + 1h)).",
+        help="Start of the hour this sample covers (UTC, half-open interval [bucket_start, bucket_start + 1h)).",
     )
     source = fields.Selection(
         selection=[
@@ -39,8 +39,8 @@ class PpobThroughputSample(models.Model):
         index=True,
         readonly=True,
         help="Which system produced this traffic. 'oracle' rows are imported "
-             "from the legacy MSG016T history to establish the D4 baseline; "
-             "'odoo' rows are sampled from custom.ppob.transaction.",
+        "from the legacy MSG016T history to establish the D4 baseline; "
+        "'odoo' rows are sampled from custom.ppob.transaction.",
     )
     provider_id = fields.Many2one(
         comodel_name="custom.ppob.provider",
@@ -69,8 +69,8 @@ class PpobThroughputSample(models.Model):
         string="Peak TPS",
         readonly=True,
         help="Highest number of dispatches landing in any single second of this "
-             "hour. This is a TRUE peak, not the hourly mean -- an hour "
-             "averaging 1 TPS can still contain a 40 TPS second.",
+        "hour. This is a TRUE peak, not the hourly mean -- an hour "
+        "averaging 1 TPS can still contain a 40 TPS second.",
     )
     mean_tps = fields.Float(
         string="Mean TPS",
@@ -89,8 +89,7 @@ class PpobThroughputSample(models.Model):
     gross_amount = fields.Monetary(
         currency_field="currency_id",
         readonly=True,
-        help="Sum of sell_price. Carried so the parallel run can reconcile "
-             "value, not just transaction counts.",
+        help="Sum of sell_price. Carried so the parallel run can reconcile value, not just transaction counts.",
     )
     currency_id = fields.Many2one(
         comodel_name="res.currency",
@@ -116,13 +115,13 @@ class PpobThroughputSample(models.Model):
         ],
         compute="_compute_breach",
         help="Computed live against the current target, NOT stored -- editing a "
-             "target re-evaluates history against it, which is what you want "
-             "while the targets themselves are still being calibrated.",
+        "target re-evaluates history against it, which is what you want "
+        "while the targets themselves are still being calibrated.",
     )
 
     _sample_uniq = models.Constraint(
-        'unique(source, bucket_start, provider_id, class_id, company_id)',
-        'A throughput sample already exists for this source / hour / scope.',
+        "unique(source, bucket_start, provider_id, class_id, company_id)",
+        "A throughput sample already exists for this source / hour / scope.",
     )
 
     # ------------------------------------------------------------------
@@ -140,12 +139,9 @@ class PpobThroughputSample(models.Model):
             if not sample.txn_count:
                 sample.success_rate_pct = 0.0
                 continue
-            sample.success_rate_pct = round(
-                100.0 * (sample.success_count or 0) / sample.txn_count, 2
-            )
+            sample.success_rate_pct = round(100.0 * (sample.success_count or 0) / sample.txn_count, 2)
 
-    @api.depends("provider_id", "class_id", "company_id", "peak_tps",
-                 "p95_latency_ms", "success_rate_pct")
+    @api.depends("provider_id", "class_id", "company_id", "peak_tps", "p95_latency_ms", "success_rate_pct")
     def _compute_breach(self):
         Target = self.env["custom.ppob.sla.target"]
         for sample in self:
@@ -165,8 +161,11 @@ class PpobThroughputSample(models.Model):
                 breaches.append("latency")
             # An empty hour has success_rate 0 by construction; that is not a
             # reliability breach, it is an absence of evidence.
-            if (sample.txn_count and target.success_rate_target_pct
-                    and sample.success_rate_pct < target.success_rate_target_pct):
+            if (
+                sample.txn_count
+                and target.success_rate_target_pct
+                and sample.success_rate_pct < target.success_rate_target_pct
+            ):
                 breaches.append("success_rate")
             if not breaches:
                 sample.breach = "ok"
@@ -196,13 +195,16 @@ class PpobThroughputSample(models.Model):
         written = self.browse()
         for row in rows:
             vals = dict(row, source=source)
-            existing = self.search([
-                ("source", "=", source),
-                ("bucket_start", "=", vals["bucket_start"]),
-                ("provider_id", "=", vals.get("provider_id") or False),
-                ("class_id", "=", vals.get("class_id") or False),
-                ("company_id", "=", vals["company_id"]),
-            ], limit=1)
+            existing = self.search(
+                [
+                    ("source", "=", source),
+                    ("bucket_start", "=", vals["bucket_start"]),
+                    ("provider_id", "=", vals.get("provider_id") or False),
+                    ("class_id", "=", vals.get("class_id") or False),
+                    ("company_id", "=", vals["company_id"]),
+                ],
+                limit=1,
+            )
             if existing:
                 existing.write(vals)
                 written |= existing
@@ -275,20 +277,22 @@ class PpobThroughputSample(models.Model):
         )
         rows = []
         for rec in self.env.cr.dictfetchall():
-            rows.append({
-                "bucket_start": bucket_start,
-                "provider_id": rec["provider_id"],
-                "class_id": rec["class_id"],
-                "company_id": rec["company_id"],
-                "txn_count": rec["txn_count"],
-                "success_count": rec["success_count"],
-                "failed_count": rec["failed_count"],
-                "timeout_count": rec["timeout_count"],
-                "gross_amount": rec["gross_amount"] or 0.0,
-                "avg_latency_ms": rec["avg_latency_ms"] or 0.0,
-                "p95_latency_ms": rec["p95_latency_ms"] or 0.0,
-                "peak_tps": float(rec["peak_tps"] or 0),
-            })
+            rows.append(
+                {
+                    "bucket_start": bucket_start,
+                    "provider_id": rec["provider_id"],
+                    "class_id": rec["class_id"],
+                    "company_id": rec["company_id"],
+                    "txn_count": rec["txn_count"],
+                    "success_count": rec["success_count"],
+                    "failed_count": rec["failed_count"],
+                    "timeout_count": rec["timeout_count"],
+                    "gross_amount": rec["gross_amount"] or 0.0,
+                    "avg_latency_ms": rec["avg_latency_ms"] or 0.0,
+                    "p95_latency_ms": rec["p95_latency_ms"] or 0.0,
+                    "peak_tps": float(rec["peak_tps"] or 0),
+                }
+            )
         return self._upsert_samples(rows, source="odoo")
 
     @api.model

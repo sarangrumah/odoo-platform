@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_retail_import"
 PRIVILEGE = "res_groups_privilege_retail_import"
-GROUPS = ['group_retail_import_user', 'group_retail_import_manager']
+GROUPS = ["group_retail_import_user", "group_retail_import_manager"]
 
 
 def migrate(cr, version):

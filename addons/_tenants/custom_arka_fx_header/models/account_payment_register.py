@@ -26,8 +26,7 @@ class AccountPaymentRegister(models.TransientModel):
     x_fx_is_foreign = fields.Boolean(
         string="Foreign Currency Payment",
         compute="_compute_x_fx_values",
-        help="The documents being paid are written in a currency other than the "
-        "currency the payment is made in.",
+        help="The documents being paid are written in a currency other than the currency the payment is made in.",
     )
     x_fx_rate_payment_per_unit = fields.Float(
         string="Rate",
@@ -71,13 +70,11 @@ class AccountPaymentRegister(models.TransientModel):
                 continue
 
             company = wizard.company_id
-            wizard.x_fx_rate_payment_per_unit = source._convert(
-                1.0, payment, company, wizard.payment_date, round=False
+            wizard.x_fx_rate_payment_per_unit = source._convert(1.0, payment, company, wizard.payment_date, round=False)
+            wizard.x_fx_amount_source = payment._convert(wizard.amount, source, company, wizard.payment_date)
+            wizard.x_fx_rate_missing = not wizard._x_fx_has_rate(source, company) or not wizard._x_fx_has_rate(
+                payment, company
             )
-            wizard.x_fx_amount_source = payment._convert(
-                wizard.amount, source, company, wizard.payment_date
-            )
-            wizard.x_fx_rate_missing = not wizard._x_fx_has_rate(source, company) or not wizard._x_fx_has_rate(payment, company)
 
     @api.model
     def _x_fx_has_rate(self, currency, company):

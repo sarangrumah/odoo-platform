@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Re-verify the June-2026 AR reconciliation against FICO's final workbook and
 build the approval workbook for the adjustment journals.
 
@@ -36,11 +35,11 @@ from openpyxl.styles import Alignment, Font, PatternFill
 
 # --- accounts / constants --------------------------------------------------
 COMPANY_ID = 1
-ACC_AR = "1106000001"          # Trade Receivables - Third Parties
-ACC_DEPOSIT = "2103100003"     # Deposit from customer trade
-ACC_MDR = "7104000001"         # MDR Bank
-ACC_SUSPENSE = "1103000002"    # Bank Suspense Account
-ACC_BCA = "1103019310"         # BCA-IDR-2685151268-MB
+ACC_AR = "1106000001"  # Trade Receivables - Third Parties
+ACC_DEPOSIT = "2103100003"  # Deposit from customer trade
+ACC_MDR = "7104000001"  # MDR Bank
+ACC_SUSPENSE = "1103000002"  # Bank Suspense Account
+ACC_BCA = "1103019310"  # BCA-IDR-2685151268-MB
 CUTOFF = "2026-06-30"
 
 # FICO writes "OLS SES - HEAD QUARTER"; the analytic account is named differently.
@@ -81,8 +80,21 @@ def q(db, sql):
     env = dict(os.environ, PGPASSWORD=pw)
     out = subprocess.check_output(
         [
-            "docker", "exec", "-e", "PGPASSWORD=" + pw, "odoo19-platform-postgres",
-            "psql", "-U", "odoo", "-d", db, "-At", "-F", "\t", "-c", sql,
+            "docker",
+            "exec",
+            "-e",
+            "PGPASSWORD=" + pw,
+            "odoo19-platform-postgres",
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            db,
+            "-At",
+            "-F",
+            "\t",
+            "-c",
+            sql,
         ],
         text=True,
         env=env,
@@ -140,15 +152,15 @@ def read_fico(path):
         rec = dict(
             ou=OU_ALIAS.get(str(name).strip(), str(name).strip()),
             fico_label=str(name).strip(),
-            ar=float(ws.cell(r, 10).value or 0),        # J
-            deposit=float(ws.cell(r, 13).value or 0),   # M
-            finance=float(ws.cell(r, 19).value or 0),   # S
-            mdr=float(ws.cell(r, 22).value or 0),       # V
+            ar=float(ws.cell(r, 10).value or 0),  # J
+            deposit=float(ws.cell(r, 13).value or 0),  # M
+            finance=float(ws.cell(r, 19).value or 0),  # S
+            mdr=float(ws.cell(r, 22).value or 0),  # V
             no_store=float(ws.cell(r, 23).value or 0),  # W
             sales_manual=float(ws.cell(r, 24).value or 0),  # X
-            plus_minus=float(ws.cell(r, 26).value or 0),    # Z
-            residual=float(ws.cell(r, 27).value or 0),      # AA
-            note=ws.cell(r, 29).value or "",                # AC
+            plus_minus=float(ws.cell(r, 26).value or 0),  # Z
+            residual=float(ws.cell(r, 27).value or 0),  # AA
+            note=ws.cell(r, 29).value or "",  # AC
             is_total=str(name).strip().upper() == "GRAND TOTAL",
         )
         stores.append(rec)
@@ -255,8 +267,11 @@ def build_workbook(out, db, bal, deposit_by_ou, statements, stores, total, plan)
         ("HASIL AKHIR PIUTANG 1106000001", bal[ACC_AR][0] + tot_sm - tot_mdr - tot_clearing, ""),
         ("  Outstanding AR versi Finance", total["finance"], ""),
         ("  Selisih tersisa", bal[ACC_AR][0] + tot_sm - tot_mdr - tot_clearing - total["finance"], "= sisa rounding"),
-        ("  Sisa saldo 2103100003 setelah clearing", -(bal[ACC_DEPOSIT][0] + tot_clearing),
-         "Grand Indonesia Rp 1 — piutang tokonya nol, tidak bisa di-clear (FICO juga mencatat -1)"),
+        (
+            "  Sisa saldo 2103100003 setelah clearing",
+            -(bal[ACC_DEPOSIT][0] + tot_clearing),
+            "Grand Indonesia Rp 1 — piutang tokonya nol, tidak bisa di-clear (FICO juga mencatat -1)",
+        ),
         ("", "", ""),
         ("PEMBERSIHAN DUPLIKASI (sudah/akan dieksekusi)", "", "lihat sheet '5. Pembersihan duplikasi'"),
     ]
@@ -308,8 +323,17 @@ def build_workbook(out, db, bal, deposit_by_ou, statements, stores, total, plan)
         money(ws, r, 12, p["selisih"], BAD_FILL if abs(p["selisih"]) > 1 else None)
         r += 1
     ws.cell(r, 1, "TOTAL").font = Font(bold=True)
-    for col, key in ((2, "tbfu_raw"), (4, "tbfu"), (5, "ar"), (7, "sales_manual"), (8, "ar_adj"),
-                     (9, "clearing"), (10, "sisa"), (11, "finance"), (12, "selisih")):
+    for col, key in (
+        (2, "tbfu_raw"),
+        (4, "tbfu"),
+        (5, "ar"),
+        (7, "sales_manual"),
+        (8, "ar_adj"),
+        (9, "clearing"),
+        (10, "sisa"),
+        (11, "finance"),
+        (12, "selisih"),
+    ):
         money(ws, r, col, sum(p[key] for p in plan)).font = Font(bold=True)
     money(ws, r, 6, -sum(p["mdr"] for p in plan)).font = Font(bold=True)
 
@@ -376,15 +400,30 @@ def build_workbook(out, db, bal, deposit_by_ou, statements, stores, total, plan)
     dup = [s for s in statements if s[0] == 12]
     n_dup = dup[0][3] if dup else 0
     data = [
-        ("Bank statement id 12 (Imported, 30-Jun)", "%d baris" % n_dup, "dihapus",
-         "duplikat 1:1 dari EBR GL load di jurnal BNK1"),
-        ("Saldo 1103000002 Bank Suspense (s/d 30-Jun)", bal.get(ACC_SUSPENSE, (0, 0))[0], 0,
-         "seluruh baris berasal dari statement 12"),
-        ("Saldo 1103019310 BCA (s/d 30-Jun)", bal.get(ACC_BCA, (0, 0))[0],
-         bal.get(ACC_BCA, (0, 0))[0] - bal.get(ACC_SUSPENSE, (0, 0))[0] * -1,
-         "berhenti double-count arus kas Juni"),
-        ("Statement Juli (id 17-20)", "tidak disentuh", "tidak disentuh",
-         "EBR GL berhenti 30-Jun, jadi bukan duplikat"),
+        (
+            "Bank statement id 12 (Imported, 30-Jun)",
+            "%d baris" % n_dup,
+            "dihapus",
+            "duplikat 1:1 dari EBR GL load di jurnal BNK1",
+        ),
+        (
+            "Saldo 1103000002 Bank Suspense (s/d 30-Jun)",
+            bal.get(ACC_SUSPENSE, (0, 0))[0],
+            0,
+            "seluruh baris berasal dari statement 12",
+        ),
+        (
+            "Saldo 1103019310 BCA (s/d 30-Jun)",
+            bal.get(ACC_BCA, (0, 0))[0],
+            bal.get(ACC_BCA, (0, 0))[0] - bal.get(ACC_SUSPENSE, (0, 0))[0] * -1,
+            "berhenti double-count arus kas Juni",
+        ),
+        (
+            "Statement Juli (id 17-20)",
+            "tidak disentuh",
+            "tidak disentuh",
+            "EBR GL berhenti 30-Jun, jadi bukan duplikat",
+        ),
     ]
     r = 4
     for label, before, after, note in data:
@@ -493,8 +532,10 @@ def main():
     print("  clearing        %15.2f" % tot_clearing)
     print("  MDR             %15.2f" % tot_mdr)
     print("  sales manual    %15.2f" % tot_sm)
-    print("  AR akhir        %15.2f  (Finance %15.2f, selisih %10.2f)"
-          % (akhir, total["finance"], akhir - total["finance"]))
+    print(
+        "  AR akhir        %15.2f  (Finance %15.2f, selisih %10.2f)"
+        % (akhir, total["finance"], akhir - total["finance"])
+    )
     for p in plan:
         if abs(p["selisih"]) > 1:
             print("  sisa != Finance: %-38s %12.2f" % (p["ou"], p["selisih"]))

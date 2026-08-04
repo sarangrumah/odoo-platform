@@ -29,7 +29,6 @@ import os
 from datetime import date, timedelta
 
 from odoo import fields
-from odoo.exceptions import UserError
 
 logging.getLogger("odoo.addons.custom_wms_putaway").setLevel(logging.ERROR)
 
@@ -239,12 +238,26 @@ def _c():
     PackageType = env["stock.package.type"]
 
     pallet = PackageType.search([("name", "=", "POC Pallet")], limit=1) or PackageType.create(
-        {"name": "POC Pallet", "packaging_length": 1200, "width": 1000, "height": 1500,
-         "base_weight": 25.0, "max_weight": 800.0, "company_id": company.id}
+        {
+            "name": "POC Pallet",
+            "packaging_length": 1200,
+            "width": 1000,
+            "height": 1500,
+            "base_weight": 25.0,
+            "max_weight": 800.0,
+            "company_id": company.id,
+        }
     )
     carton = PackageType.search([("name", "=", "POC Carton")], limit=1) or PackageType.create(
-        {"name": "POC Carton", "packaging_length": 600, "width": 400, "height": 400,
-         "base_weight": 1.0, "max_weight": 25.0, "company_id": company.id}
+        {
+            "name": "POC Carton",
+            "packaging_length": 600,
+            "width": 400,
+            "height": 400,
+            "base_weight": 1.0,
+            "max_weight": 25.0,
+            "company_id": company.id,
+        }
     )
 
     spec = [
@@ -260,9 +273,7 @@ def _c():
                 {"name": name, "allow_new_product": allow, "max_weight": max_weight, "company_id": company.id}
             )
             for package_type, qty in capacities:
-                Capacity.create(
-                    {"storage_category_id": categ.id, "package_type_id": package_type.id, "quantity": qty}
-                )
+                Capacity.create({"storage_category_id": categ.id, "package_type_id": package_type.id, "quantity": qty})
         storage_categories[zone_key] = categ
         # Stamp every bin of the zone so the native putaway rules can filter on it.
         bins[zone_key].write({"storage_category_id": categ.id})
@@ -427,9 +438,9 @@ lots = {}
 @step("E", "PO (Inbound): confirm -> receive -> putaway leg")
 def _e():
     global purchase_order, receipt, internal_putaway
-    vendor = env["res.partner"].search([("name", "=", "PT POC Supplier Utama")], limit=1) or env[
-        "res.partner"
-    ].create({"name": "PT POC Supplier Utama", "supplier_rank": 1, "company_id": False})
+    vendor = env["res.partner"].search([("name", "=", "PT POC Supplier Utama")], limit=1) or env["res.partner"].create(
+        {"name": "PT POC Supplier Utama", "supplier_rank": 1, "company_id": False}
+    )
 
     purchase_order = env["purchase.order"].create(
         {
@@ -438,15 +449,10 @@ def _e():
             "picking_type_id": pick_type_in.id,
             "origin": TAG,
             "order_line": [
-                (0, 0, {"product_id": products["POC-A-001"].id, "product_qty": 60,
-                        "price_unit": 350000.0})
-                ,
-                (0, 0, {"product_id": products["POC-B-002"].id, "product_qty": 40,
-                        "price_unit": 120000.0}),
-                (0, 0, {"product_id": products["POC-C-003"].id, "product_qty": 100,
-                        "price_unit": 45000.0}),
-                (0, 0, {"product_id": products["POC-S-004"].id, "product_qty": 3,
-                        "price_unit": 890000.0}),
+                (0, 0, {"product_id": products["POC-A-001"].id, "product_qty": 60, "price_unit": 350000.0}),
+                (0, 0, {"product_id": products["POC-B-002"].id, "product_qty": 40, "price_unit": 120000.0}),
+                (0, 0, {"product_id": products["POC-C-003"].id, "product_qty": 100, "price_unit": 45000.0}),
+                (0, 0, {"product_id": products["POC-S-004"].id, "product_qty": 3, "price_unit": 890000.0}),
             ],
         }
     )
@@ -508,8 +514,11 @@ def _e():
 
     # Two-step reception: the second leg (Input -> Stock) is the putaway move.
     internal_putaway = env["stock.picking"].search(
-        [("origin", "=", purchase_order.name), ("picking_type_id.code", "=", "internal"),
-         ("state", "not in", ("done", "cancel"))],
+        [
+            ("origin", "=", purchase_order.name),
+            ("picking_type_id.code", "=", "internal"),
+            ("state", "not in", ("done", "cancel")),
+        ],
         limit=1,
     )
     suggestions = env["custom.wms.putaway.suggestion"].search_count([("picking_id", "=", receipt.id)])
@@ -564,14 +573,18 @@ def _f():
             "origin": "%s bin-to-bin" % TAG,
             "company_id": company.id,
             "move_ids": [
-                (0, 0, {
-                    "product_id": products["POC-A-001"].id,
-                    "product_uom_qty": qty,
-                    "product_uom": products["POC-A-001"].uom_id.id,
-                    "location_id": source_bin.id,
-                    "location_dest_id": dest_bin.id,
-                    "company_id": company.id,
-                })
+                (
+                    0,
+                    0,
+                    {
+                        "product_id": products["POC-A-001"].id,
+                        "product_uom_qty": qty,
+                        "product_uom": products["POC-A-001"].uom_id.id,
+                        "location_id": source_bin.id,
+                        "location_dest_id": dest_bin.id,
+                        "company_id": company.id,
+                    },
+                )
             ],
         }
     )
@@ -658,9 +671,7 @@ def _h():
     pick_out.button_validate()
 
     # The push rule has now materialised the delivery order.
-    delivery = pick_out.move_ids.move_dest_ids.picking_id.filtered(
-        lambda p: p.picking_type_id.code == "outgoing"
-    )
+    delivery = pick_out.move_ids.move_dest_ids.picking_id.filtered(lambda p: p.picking_type_id.code == "outgoing")
     if not delivery:
         return "PARTIAL", "pick %s=%s but no OUT leg was pushed" % (pick_out.name, pick_out.state)
     delivery.action_assign()
@@ -712,9 +723,7 @@ def _i():
         {"plan_id": plan.id, "scheduled_date": date.today(), "target_count": 10}
     )
     wizard.action_start()
-    count_session = env["custom.cycle.count.session"].search(
-        [("plan_id", "=", plan.id)], order="id desc", limit=1
-    )
+    count_session = env["custom.cycle.count.session"].search([("plan_id", "=", plan.id)], order="id desc", limit=1)
     if not count_session or not count_session.line_ids:
         return "PARTIAL", "session %s created with no lines (no quants in scope?)" % (
             count_session.name if count_session else "-"
@@ -766,9 +775,7 @@ def _j():
     )
     action = wizard.action_print()
     data = action.get("data") if isinstance(action, dict) else None
-    pdf, _fmt = Report._render_qweb_pdf(
-        "custom_wms_docs.report_wms_product_label", wizard.product_ids.ids, data=data
-    )
+    pdf, _fmt = Report._render_qweb_pdf("custom_wms_docs.report_wms_product_label", wizard.product_ids.ids, data=data)
     artefacts.append(save("J1_product_labels.pdf", pdf))
 
     # Scan sheet: every package + product barcode of the shipment (falling

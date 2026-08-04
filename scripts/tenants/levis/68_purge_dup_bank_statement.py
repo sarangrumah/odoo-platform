@@ -33,8 +33,10 @@ if not statement:
 
 lines = statement.line_ids
 journal_code = lines[:1].journal_id.code if lines else ""
-log("statement %s '%s' date=%s lines=%d journal=%s"
-    % (statement.id, statement.name, statement.date, len(lines), journal_code))
+log(
+    "statement %s '%s' date=%s lines=%d journal=%s"
+    % (statement.id, statement.name, statement.date, len(lines), journal_code)
+)
 
 # ---- guards: refuse to touch anything but the known duplicate -------------
 if len(lines) != EXPECT_LINES:
@@ -87,8 +89,8 @@ try:
     if after["1103000002"] != 0.0:
         log("WARNING 1103000002 is not zero -- other sources may exist")
     env.cr.execute(
-        "select count(*) from account_bank_statement_line l "
-        "join account_move m on m.id=l.move_id where m.date <= %s", (EXPECT_DATE,)
+        "select count(*) from account_bank_statement_line l join account_move m on m.id=l.move_id where m.date <= %s",
+        (EXPECT_DATE,),
     )
     log("remaining statement lines dated <= %s: %s" % (EXPECT_DATE, env.cr.fetchone()[0]))
     env.cr.execute("select id, name, date from account_bank_statement order by id")

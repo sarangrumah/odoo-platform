@@ -68,8 +68,10 @@ class CustomReportPphWithholding(models.AbstractModel):
         """
         if "tax.withholding.rule" not in self.env:
             return {}
-        rules = self.env["tax.withholding.rule"].sudo().search(
-            [("company_id", "in", list(company_ids)), ("account_id", "!=", False)]
+        rules = (
+            self.env["tax.withholding.rule"]
+            .sudo()
+            .search([("company_id", "in", list(company_ids)), ("account_id", "!=", False)])
         )
         mapping = {}
         for rule in rules:

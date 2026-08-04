@@ -85,12 +85,14 @@ class CustomProjectSprint(models.Model):
         code = self._week_code_for(monday)
         sprint = self.search([("week_code", "=", code)], limit=1)
         if not sprint:
-            sprint = self.create({
-                "week_code": code,
-                "date_start": monday,
-                "date_end": friday,
-                "state": "active",
-            })
+            sprint = self.create(
+                {
+                    "week_code": code,
+                    "date_start": monday,
+                    "date_end": friday,
+                    "state": "active",
+                }
+            )
         return sprint
 
     @api.model
@@ -113,19 +115,19 @@ class CustomProjectSprint(models.Model):
         for sprint in active:
             if today <= sprint.date_end:
                 continue  # not finished yet
-            unfinished = sprint.task_ids.filtered(
-                lambda task: not task.stage_id.custom_is_closed_stage
-            )
+            unfinished = sprint.task_ids.filtered(lambda task: not task.stage_id.custom_is_closed_stage)
             # Monday of the week AFTER the one that just ended. Computed from the weekday
             # rather than "+3 days" so a cron that fires late still lands on the next
             # week instead of re-opening the one it just closed.
             next_monday = sprint.date_end + timedelta(days=7 - sprint.date_end.weekday())
             next_sprint = self._get_or_create_week(next_monday)
             if unfinished:
-                unfinished.write({
-                    "custom_sprint_id": next_sprint.id,
-                    "custom_carried_over": True,
-                })
+                unfinished.write(
+                    {
+                        "custom_sprint_id": next_sprint.id,
+                        "custom_carried_over": True,
+                    }
+                )
             sprint.write({"state": "closed"})
             sprint._pdp_audit_write(
                 "sprint_close",
@@ -135,9 +137,9 @@ class CustomProjectSprint(models.Model):
             )
             _logger.info(
                 "VAS PMO: sprint %s closed, %s task(s) carried into %s",
-                sprint.week_code, len(unfinished), next_sprint.week_code,
+                sprint.week_code,
+                len(unfinished),
+                next_sprint.week_code,
             )
         # Make sure the current week exists and is active even if nothing was open.
-        self._get_or_create_week().filtered(lambda s: s.state == "planned").write(
-            {"state": "active"}
-        )
+        self._get_or_create_week().filtered(lambda s: s.state == "planned").write({"state": "active"})

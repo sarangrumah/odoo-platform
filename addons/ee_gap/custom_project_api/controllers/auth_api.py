@@ -17,9 +17,14 @@ def _validator():
 
 
 def _access_ttl():
-    return int(request.env["ir.config_parameter"].sudo().get_param(
-        "custom_project_api.access_ttl", "900",
-    ))
+    return int(
+        request.env["ir.config_parameter"]
+        .sudo()
+        .get_param(
+            "custom_project_api.access_ttl",
+            "900",
+        )
+    )
 
 
 def _serialize_user(user):
@@ -30,9 +35,17 @@ def _serialize_user(user):
         "ba": user.has_group("custom_project_portfolio.group_vaspmo_ba"),
         "brand_pic": user.has_group("custom_project_portfolio.group_vaspmo_vertical_pic"),
     }
-    verticals = request.env["custom.project.vertical"].sudo().search([
-        "|", ("ba_ids", "in", user.id), ("vertical_po_id", "=", user.id),
-    ])
+    verticals = (
+        request.env["custom.project.vertical"]
+        .sudo()
+        .search(
+            [
+                "|",
+                ("ba_ids", "in", user.id),
+                ("vertical_po_id", "=", user.id),
+            ]
+        )
+    )
     return {
         "id": user.id,
         "login": user.login,
@@ -71,7 +84,8 @@ def _password_ok(user, password):
     scoped = user.with_user(user)
     attempts = (
         lambda: scoped._check_credentials(
-            {"type": "password", "password": password}, {"interactive": False},
+            {"type": "password", "password": password},
+            {"interactive": False},
         ),
         lambda: scoped._check_credentials(password, {"interactive": False}),
     )
@@ -90,10 +104,13 @@ def _password_ok(user, password):
 
 
 class VaspmoAuth(http.Controller):
-
     @http.route(
         "/vaspmo/api/auth/login",
-        type="http", auth="public", methods=["POST"], csrf=False, save_session=False,
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+        save_session=False,
     )
     def login(self, **kw):
         body = json_body()
@@ -102,23 +119,33 @@ class VaspmoAuth(http.Controller):
         if not login or not password:
             return err("MISSING_CREDENTIALS", "Login and password are required", status=400)
 
-        user = request.env["res.users"].sudo().search(
-            [("login", "=", login), ("active", "=", True)], limit=1,
+        user = (
+            request.env["res.users"]
+            .sudo()
+            .search(
+                [("login", "=", login), ("active", "=", True)],
+                limit=1,
+            )
         )
         if not user or not _password_ok(user, password):
             # Same message either way: a different answer for "no such user" hands an
             # attacker a list of valid logins.
             return err("INVALID_CREDENTIALS", "Wrong login or password", status=401)
 
-        if not user.has_group("custom_project_portfolio.group_vaspmo_user") and \
-                not user.has_group("custom_project_portfolio.group_vaspmo_vertical_pic"):
+        if not user.has_group("custom_project_portfolio.group_vaspmo_user") and not user.has_group(
+            "custom_project_portfolio.group_vaspmo_vertical_pic"
+        ):
             return err("NO_ACCESS", "This account has no VAS PMO access", status=403)
 
         return ok(_issue_session(user))
 
     @http.route(
         "/vaspmo/api/auth/refresh",
-        type="http", auth="public", methods=["POST"], csrf=False, save_session=False,
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+        save_session=False,
     )
     def refresh(self, **kw):
         body = json_body()
@@ -143,7 +170,11 @@ class VaspmoAuth(http.Controller):
 
     @http.route(
         "/vaspmo/api/auth/logout",
-        type="http", auth="public", methods=["POST"], csrf=False, save_session=False,
+        type="http",
+        auth="public",
+        methods=["POST"],
+        csrf=False,
+        save_session=False,
     )
     def logout(self, **kw):
         body = json_body()
@@ -154,7 +185,11 @@ class VaspmoAuth(http.Controller):
 
     @http.route(
         "/vaspmo/api/auth/me",
-        type="http", auth="jwt_vaspmo", methods=["GET"], csrf=False, save_session=False,
+        type="http",
+        auth="jwt_vaspmo",
+        methods=["GET"],
+        csrf=False,
+        save_session=False,
     )
     def me(self, **kw):
         return ok(_serialize_user(request.env.user))

@@ -39,7 +39,9 @@ class CustomProjectNotifyOutbox(models.Model):
             ("failed", "Failed"),
             ("skipped", "Skipped"),
         ],
-        default="pending", required=True, index=True,
+        default="pending",
+        required=True,
+        index=True,
     )
     attempt = fields.Integer(default=0)
     next_retry_at = fields.Datetime()
@@ -57,15 +59,17 @@ class CustomProjectNotifyOutbox(models.Model):
         if not recipients:
             # Nothing to send is still worth recording: "nobody had a number" is a
             # finding, not a non-event.
-            self.env["custom.project.notify.log"].create({
-                "event": event,
-                "res_model": record._name,
-                "res_id": record.id,
-                "res_label": record.display_name,
-                "channel": "odoo",
-                "success": False,
-                "skipped_reason": _("No recipient could be resolved for this rule set"),
-            })
+            self.env["custom.project.notify.log"].create(
+                {
+                    "event": event,
+                    "res_model": record._name,
+                    "res_id": record.id,
+                    "res_label": record.display_name,
+                    "channel": "odoo",
+                    "success": False,
+                    "skipped_reason": _("No recipient could be resolved for this rule set"),
+                }
+            )
             return self.browse()
 
         payload = {
@@ -78,28 +82,31 @@ class CustomProjectNotifyOutbox(models.Model):
             "context": extra or {},
             "tenant": self.env.cr.dbname,
         }
-        vertical = getattr(record, "custom_vertical_id", None) or \
-            getattr(record, "vertical_id", None)
+        vertical = getattr(record, "custom_vertical_id", None) or getattr(record, "vertical_id", None)
         if vertical:
             payload["vertical"] = {
                 "code": vertical.code,
                 "name": vertical.name,
                 "label": vertical.label_for_message(),
             }
-        return self.create({
-            "event": event,
-            "res_model": record._name,
-            "res_id": record.id,
-            "res_label": record.display_name,
-            "vertical_id": vertical.id if vertical else False,
-            "payload_json": json.dumps(payload, default=str),
-        })
+        return self.create(
+            {
+                "event": event,
+                "res_model": record._name,
+                "res_id": record.id,
+                "res_label": record.display_name,
+                "vertical_id": vertical.id if vertical else False,
+                "payload_json": json.dumps(payload, default=str),
+            }
+        )
 
     @api.model
     def _record_url(self, record):
-        base = self.env["ir.config_parameter"].sudo().get_param(
-            "custom_project_notify.public_base_url"
-        ) or self.env["ir.config_parameter"].sudo().get_param("web.base.url") or ""
+        base = (
+            self.env["ir.config_parameter"].sudo().get_param("custom_project_notify.public_base_url")
+            or self.env["ir.config_parameter"].sudo().get_param("web.base.url")
+            or ""
+        )
         base = base.rstrip("/")
         if record._name == "project.task":
             return f"{base}/tasks/{record.id}"
@@ -125,7 +132,9 @@ class CustomProjectNotifyOutbox(models.Model):
         rows = self.search(
             [
                 ("state", "=", "pending"),
-                "|", ("next_retry_at", "=", False), ("next_retry_at", "<=", now),
+                "|",
+                ("next_retry_at", "=", False),
+                ("next_retry_at", "<=", now),
             ],
             limit=limit,
         )
@@ -174,12 +183,14 @@ class CustomProjectNotifyOutbox(models.Model):
             return
 
         self._record_delivery(response)
-        self.write({
-            "state": "sent",
-            "attempt": self.attempt + 1,
-            "sent_at": fields.Datetime.now(),
-            "error": False,
-        })
+        self.write(
+            {
+                "state": "sent",
+                "attempt": self.attempt + 1,
+                "sent_at": fields.Datetime.now(),
+                "error": False,
+            }
+        )
 
     def _record_delivery(self, response):
         """Mirror the BFF's per-channel result into the delivery log."""
@@ -194,40 +205,44 @@ class CustomProjectNotifyOutbox(models.Model):
 
         if not results:
             # BFF accepted but told us nothing: still record the hand-off.
-            log_model.create({
-                "outbox_id": self.id,
-                "event": self.event,
-                "res_model": self.res_model,
-                "res_id": self.res_id,
-                "res_label": self.res_label,
-                "vertical_id": self.vertical_id.id,
-                "channel": "wa",
-                "transport": "bff",
-                "success": True,
-                "attempt": self.attempt + 1,
-            })
+            log_model.create(
+                {
+                    "outbox_id": self.id,
+                    "event": self.event,
+                    "res_model": self.res_model,
+                    "res_id": self.res_id,
+                    "res_label": self.res_label,
+                    "vertical_id": self.vertical_id.id,
+                    "channel": "wa",
+                    "transport": "bff",
+                    "success": True,
+                    "attempt": self.attempt + 1,
+                }
+            )
             return
 
         for item in results:
-            log_model.create({
-                "outbox_id": self.id,
-                "event": self.event,
-                "res_model": self.res_model,
-                "res_id": self.res_id,
-                "res_label": self.res_label,
-                "vertical_id": self.vertical_id.id,
-                "channel": item.get("channel") or "wa",
-                "transport": item.get("transport"),
-                "recipient_kind": item.get("kind"),
-                "recipient_name": item.get("name"),
-                "recipient_email": item.get("email"),
-                "recipient_phone_masked": log_model.mask_phone(item.get("phone")),
-                "subject": (payload.get("label") or "")[:200],
-                "success": bool(item.get("success")),
-                "skipped_reason": item.get("skipped"),
-                "error_message": (item.get("error") or "")[:200] or False,
-                "attempt": self.attempt + 1,
-            })
+            log_model.create(
+                {
+                    "outbox_id": self.id,
+                    "event": self.event,
+                    "res_model": self.res_model,
+                    "res_id": self.res_id,
+                    "res_label": self.res_label,
+                    "vertical_id": self.vertical_id.id,
+                    "channel": item.get("channel") or "wa",
+                    "transport": item.get("transport"),
+                    "recipient_kind": item.get("kind"),
+                    "recipient_name": item.get("name"),
+                    "recipient_email": item.get("email"),
+                    "recipient_phone_masked": log_model.mask_phone(item.get("phone")),
+                    "subject": (payload.get("label") or "")[:200],
+                    "success": bool(item.get("success")),
+                    "skipped_reason": item.get("skipped"),
+                    "error_message": (item.get("error") or "")[:200] or False,
+                    "attempt": self.attempt + 1,
+                }
+            )
 
     def _mark_failed(self, error):
         self.ensure_one()
@@ -236,15 +251,19 @@ class CustomProjectNotifyOutbox(models.Model):
             self.write({"state": "failed", "attempt": attempt, "error": error[:200]})
             _logger.error(
                 "VAS PMO: giving up on outbox %s after %s attempts: %s",
-                self.id, attempt, error,
+                self.id,
+                attempt,
+                error,
             )
             return
         delay = BACKOFF_MINUTES.get(attempt, 240)
-        self.write({
-            "attempt": attempt,
-            "error": error[:200],
-            "next_retry_at": fields.Datetime.add(fields.Datetime.now(), minutes=delay),
-        })
+        self.write(
+            {
+                "attempt": attempt,
+                "error": error[:200],
+                "next_retry_at": fields.Datetime.add(fields.Datetime.now(), minutes=delay),
+            }
+        )
 
     def action_retry(self):
         """Operator button on a failed row."""

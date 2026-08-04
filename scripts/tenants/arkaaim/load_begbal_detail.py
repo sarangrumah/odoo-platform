@@ -40,9 +40,7 @@ from odoo.addons.custom_arka_aim_opening_balance.hooks import (
 _logger = logging.getLogger(__name__)
 # Defaults to the module's data dir as mounted in the container; override with
 # BEGBAL_DATA_DIR to test CSVs that have not been copied to /opt yet.
-DATA_DIR = os.environ.get(
-    "BEGBAL_DATA_DIR", "/mnt/extra-addons/_tenants/custom_arka_aim_opening_balance/data"
-)
+DATA_DIR = os.environ.get("BEGBAL_DATA_DIR", "/mnt/extra-addons/_tenants/custom_arka_aim_opening_balance/data")
 
 COMPANIES = [
     ("PT Aero Inovasi Media", "opening_detail_aim.csv"),
@@ -97,9 +95,7 @@ def _load_company(env, company_name, filename, resolve_partner):
         # The label carries the original transaction date, document number and
         # counterparty, because an account.move.line has no date of its own and
         # not every "Company BP" name matches a partner record.
-        label = " | ".join(
-            part for part in (row["txn_date"], row["doc_no"], row["notes"], row.get("partner")) if part
-        )
+        label = " | ".join(part for part in (row["txn_date"], row["doc_no"], row["notes"], row.get("partner")) if part)
         lines.append(
             Command.create(
                 {

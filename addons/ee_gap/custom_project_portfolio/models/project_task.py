@@ -40,7 +40,7 @@ class ProjectTask(models.Model):
         string="Vertical",
         index=True,
         help="Brand this work belongs to. Inherited from the project or change request; "
-             "override it only for genuinely cross-brand work.",
+        "override it only for genuinely cross-brand work.",
     )
     custom_vertical_override = fields.Boolean(
         string="Vertical Overridden",
@@ -98,10 +98,12 @@ class ProjectTask(models.Model):
     custom_hold_until = fields.Date(
         string="Hold Expected Until",
         help="Best estimate. Passing it raises a hold_expired notification -- a hold with "
-             "no end date is how work disappears.",
+        "no end date is how work disappears.",
     )
     custom_hold_duration_hours = fields.Float(
-        string="Total Hold (hours)", readonly=True, digits=(10, 2),
+        string="Total Hold (hours)",
+        readonly=True,
+        digits=(10, 2),
     )
     custom_hold_expired_notified = fields.Boolean(readonly=True)
 
@@ -113,7 +115,9 @@ class ProjectTask(models.Model):
     custom_verification_requested_at = fields.Datetime(readonly=True)
     custom_verification_due = fields.Datetime(string="Verification Due", readonly=True)
     custom_user_wait_hours = fields.Float(
-        string="Total User Wait (hours)", readonly=True, digits=(10, 2),
+        string="Total User Wait (hours)",
+        readonly=True,
+        digits=(10, 2),
     )
     custom_verify_reminders_sent = fields.Integer(readonly=True, default=0)
     custom_auto_closed = fields.Boolean(string="Auto-closed", readonly=True)
@@ -141,14 +145,13 @@ class ProjectTask(models.Model):
     @api.depends("depend_on_ids", "depend_on_ids.stage_id")
     def _compute_is_blocked(self):
         for task in self:
-            task.custom_is_blocked = any(
-                not blocker.stage_id.custom_is_closed_stage
-                for blocker in task.depend_on_ids
-            )
+            task.custom_is_blocked = any(not blocker.stage_id.custom_is_closed_stage for blocker in task.depend_on_ids)
 
     @api.depends(
-        "create_date", "custom_closed_at",
-        "custom_hold_duration_hours", "custom_user_wait_hours",
+        "create_date",
+        "custom_closed_at",
+        "custom_hold_duration_hours",
+        "custom_user_wait_hours",
     )
     def _compute_cycle_times(self):
         now = fields.Datetime.now()
@@ -161,8 +164,7 @@ class ProjectTask(models.Model):
             end = task.custom_closed_at or now
             total = (end - start).total_seconds() / 3600.0
             task.custom_lead_time_total = round(max(total, 0.0), 2)
-            team = total - (task.custom_hold_duration_hours or 0.0) \
-                - (task.custom_user_wait_hours or 0.0)
+            team = total - (task.custom_hold_duration_hours or 0.0) - (task.custom_user_wait_hours or 0.0)
             task.custom_cycle_time_team = round(max(team, 0.0), 2)
 
     # ------------------------------------------------------------------
@@ -241,14 +243,16 @@ class ProjectTask(models.Model):
         for task in self:
             allowed = task.stage_id.custom_next_stage_ids
             if task.stage_id and allowed and new_stage not in allowed:
-                raise UserError(_(
-                    "Moving %(task)s from %(from_stage)s straight to %(to_stage)s is not an "
-                    "allowed transition. Allowed: %(allowed)s.",
-                    task=task.name,
-                    from_stage=task.stage_id.name,
-                    to_stage=new_stage.name,
-                    allowed=", ".join(allowed.mapped("name")) or "-",
-                ))
+                raise UserError(
+                    _(
+                        "Moving %(task)s from %(from_stage)s straight to %(to_stage)s is not an "
+                        "allowed transition. Allowed: %(allowed)s.",
+                        task=task.name,
+                        from_stage=task.stage_id.name,
+                        to_stage=new_stage.name,
+                        allowed=", ".join(allowed.mapped("name")) or "-",
+                    )
+                )
 
     def _vaspmo_enter_stage(self, new_stage, now, reason=None, previous=None):
         """Apply everything that entering ``new_stage`` implies.
@@ -262,32 +266,36 @@ class ProjectTask(models.Model):
             values = {"custom_stage_entered_at": now}
             if new_stage.custom_is_hold:
                 if new_stage.custom_require_reason and not (reason or task.custom_hold_reason):
-                    raise UserError(_(
-                        "Putting %s on hold needs a reason — a hold with no reason is how "
-                        "work goes quiet.", task.name
-                    ))
+                    raise UserError(
+                        _(
+                            "Putting %s on hold needs a reason — a hold with no reason is how work goes quiet.",
+                            task.name,
+                        )
+                    )
                 came_from = previous.get(task.id)
-                values.update({
-                    "custom_prev_stage_id": came_from.id if came_from else False,
-                    "custom_hold_since": now,
-                    "custom_hold_by_id": self.env.user.id,
-                    "custom_hold_expired_notified": False,
-                })
+                values.update(
+                    {
+                        "custom_prev_stage_id": came_from.id if came_from else False,
+                        "custom_hold_since": now,
+                        "custom_hold_by_id": self.env.user.id,
+                        "custom_hold_expired_notified": False,
+                    }
+                )
                 if reason:
                     values["custom_hold_reason"] = reason
             elif new_stage.custom_is_waiting_user:
                 owner = task.custom_verification_owner_id
                 if not owner:
                     owner = task.custom_vertical_id.pic_partner_ids[:1]
-                due = self._vaspmo_add_working_days(
-                    now, new_stage.custom_auto_close_days or 5
+                due = self._vaspmo_add_working_days(now, new_stage.custom_auto_close_days or 5)
+                values.update(
+                    {
+                        "custom_verification_requested_at": now,
+                        "custom_verification_due": due,
+                        "custom_verification_owner_id": owner.id if owner else False,
+                        "custom_verify_reminders_sent": 0,
+                    }
                 )
-                values.update({
-                    "custom_verification_requested_at": now,
-                    "custom_verification_due": due,
-                    "custom_verification_owner_id": owner.id if owner else False,
-                    "custom_verify_reminders_sent": 0,
-                })
             elif new_stage.custom_is_closed_stage:
                 values["custom_closed_at"] = now
             task.write(values)
@@ -347,9 +355,7 @@ class ProjectTask(models.Model):
         if "user_ids" in vals:
             for task in self:
                 if set(task.user_ids.ids) != assignees_before.get(task.id, set()):
-                    task._pdp_audit_write(
-                        "assign", task.id, {"user_ids": sorted(task.user_ids.ids)}
-                    )
+                    task._pdp_audit_write("assign", task.id, {"user_ids": sorted(task.user_ids.ids)})
                     task._vaspmo_notify_event("assigned")
 
         return result
@@ -396,9 +402,7 @@ class ProjectTask(models.Model):
         self.ensure_one()
         stage = self.env["project.task.type"]._stage_by_code("waiting_user")
         if not stage:
-            raise UserError(_(
-                "No stage is flagged as Waiting User Verification. Configure one in Settings."
-            ))
+            raise UserError(_("No stage is flagged as Waiting User Verification. Configure one in Settings."))
         self.write({"stage_id": stage.id})
         return True
 
@@ -423,10 +427,12 @@ class ProjectTask(models.Model):
         then closed -- never re-nudged every hour.
         """
         now = fields.Datetime.now()
-        waiting = self.search([
-            ("stage_id.custom_is_waiting_user", "=", True),
-            ("custom_verification_due", "!=", False),
-        ])
+        waiting = self.search(
+            [
+                ("stage_id.custom_is_waiting_user", "=", True),
+                ("custom_verification_due", "!=", False),
+            ]
+        )
         done_stage = self.env["project.task.type"]._stage_by_code("done")
         for task in waiting:
             requested = task.custom_verification_requested_at or now
@@ -437,7 +443,9 @@ class ProjectTask(models.Model):
                     continue
                 task.write({"stage_id": done_stage.id, "custom_auto_closed": True})
                 task._pdp_audit_write(
-                    "auto_close", task.id, None,
+                    "auto_close",
+                    task.id,
+                    None,
                     reason=_("No verification within the agreed window"),
                 )
                 task._vaspmo_notify_event("verify_auto_close")
@@ -452,12 +460,14 @@ class ProjectTask(models.Model):
     def cron_vaspmo_hold_watch(self):
         """Flag holds that outlived their own estimate."""
         today = fields.Date.context_today(self)
-        stale = self.search([
-            ("stage_id.custom_is_hold", "=", True),
-            ("custom_hold_until", "!=", False),
-            ("custom_hold_until", "<", today),
-            ("custom_hold_expired_notified", "=", False),
-        ])
+        stale = self.search(
+            [
+                ("stage_id.custom_is_hold", "=", True),
+                ("custom_hold_until", "!=", False),
+                ("custom_hold_until", "<", today),
+                ("custom_hold_expired_notified", "=", False),
+            ]
+        )
         for task in stale:
             task.custom_hold_expired_notified = True
             task._vaspmo_notify_event("hold_expired")
@@ -466,10 +476,12 @@ class ProjectTask(models.Model):
     def cron_vaspmo_sla(self):
         """H-3 / H-1 / overdue / escalation, but only while the clock is running."""
         now = fields.Datetime.now()
-        candidates = self.search([
-            ("custom_due_sla_date", "!=", False),
-            ("stage_id.custom_sla_clock", "=", "running"),
-        ])
+        candidates = self.search(
+            [
+                ("custom_due_sla_date", "!=", False),
+                ("stage_id.custom_sla_clock", "=", "running"),
+            ]
+        )
         for task in candidates:
             remaining_days = (task.custom_due_sla_date - now).days
             if remaining_days < 0:
@@ -491,6 +503,4 @@ class ProjectTask(models.Model):
     def _check_override_reason(self):
         for task in self:
             if task.custom_vertical_override and not task.custom_vertical_override_reason:
-                raise ValidationError(_(
-                    "Overriding the vertical of %s needs a reason.", task.name
-                ))
+                raise ValidationError(_("Overriding the vertical of %s needs a reason.", task.name))

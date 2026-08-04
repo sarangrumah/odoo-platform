@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_pph_witholding"
 PRIVILEGE = "res_groups_privilege_witholding"
-GROUPS = ['group_witholding_user', 'group_witholding_manager']
+GROUPS = ["group_witholding_user", "group_witholding_manager"]
 
 
 def migrate(cr, version):

@@ -97,6 +97,4 @@ class WmsPutawayRule(models.Model):
             if rec.kind != "sap_storage_search":
                 continue
             if rec.sap_fail_action == "overflow" and not rec.sap_overflow_location_id:
-                raise ValidationError(
-                    _("Rule %s proposes an overflow location but none is set.") % rec.display_name
-                )
+                raise ValidationError(_("Rule %s proposes an overflow location but none is set.") % rec.display_name)

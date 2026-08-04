@@ -123,15 +123,15 @@ class PpobTransaction(models.Model):
         readonly=True,
         copy=False,
         help="Round-trip time of the provider adapter call made at dispatch, "
-             "measured around adapter.pay()/inquiry() only -- it excludes the "
-             "wallet + bucket GL posting that precedes it. This is the ADAPTER "
-             "RTT, not the fulfilment time: for providers that accept a "
-             "transaction and settle asynchronously it measures how long they "
-             "took to ACCEPT. Use completed_at - dispatched_at for end-to-end "
-             "time, but note that on cron-polled paths (oracle_bridge) that "
-             "delta is dominated by cron lag. Populated on every adapter, "
-             "unlike custom.adapter.call.log.latency_ms which is only written "
-             "when the provider has an adapter_config_id.",
+        "measured around adapter.pay()/inquiry() only -- it excludes the "
+        "wallet + bucket GL posting that precedes it. This is the ADAPTER "
+        "RTT, not the fulfilment time: for providers that accept a "
+        "transaction and settle asynchronously it measures how long they "
+        "took to ACCEPT. Use completed_at - dispatched_at for end-to-end "
+        "time, but note that on cron-polled paths (oracle_bridge) that "
+        "delta is dominated by cron lag. Populated on every adapter, "
+        "unlike custom.adapter.call.log.latency_ms which is only written "
+        "when the provider has an adapter_config_id.",
     )
     error_code = fields.Char(copy=False, tracking=True)
     error_message = fields.Char(copy=False, tracking=True)
@@ -432,11 +432,13 @@ class PpobTransaction(models.Model):
         # back AND deliver the product. `if result.ok:` alone cannot tell None
         # from False, which is why this is checked first and explicitly.
         if result.ok is None:
-            self.write({
-                "provider_ref": result.provider_ref or self.provider_ref,
-                "error_code": result.error_code or False,
-                "error_message": result.error_message or False,
-            })
+            self.write(
+                {
+                    "provider_ref": result.provider_ref or self.provider_ref,
+                    "error_code": result.error_code or False,
+                    "error_message": result.error_message or False,
+                }
+            )
             return True
         if result.ok:
             return self._mark_success(
@@ -616,7 +618,8 @@ class PpobTransaction(models.Model):
             if result.ok is None:
                 _logger.info(
                     "Provider %s reports %s still in progress; leaving it alone.",
-                    txn.provider_id.code, txn.name,
+                    txn.provider_id.code,
+                    txn.name,
                 )
                 continue
             if result.ok and remote_state == "success":

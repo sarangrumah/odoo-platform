@@ -156,9 +156,7 @@ class TestWmsReports(TransactionCase):
 
     def test_scrap_note_pdf_renders(self):
         scrap = self._validated_scrap(2.0)
-        html = self.env["ir.actions.report"]._render_qweb_html(
-            "custom_wms_reports.report_wms_scrap_note", scrap.ids
-        )[0]
+        html = self.env["ir.actions.report"]._render_qweb_html("custom_wms_reports.report_wms_scrap_note", scrap.ids)[0]
         self.assertIn(b"SCRAP NOTE", html)
         self.assertIn(b"<main>", html)
         # Transaction-level barcode is embedded, not fetched over HTTP.

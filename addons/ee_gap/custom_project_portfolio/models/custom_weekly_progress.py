@@ -23,13 +23,19 @@ class CustomWeeklyProgress(models.Model):
     _order = "sprint_id desc, vertical_id, id"
 
     sprint_id = fields.Many2one(
-        "custom.project.sprint", string="Sprint", required=True, ondelete="cascade", index=True,
+        "custom.project.sprint",
+        string="Sprint",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     week_code = fields.Char(related="sprint_id.week_code", store=True, readonly=True)
     vertical_id = fields.Many2one("custom.project.vertical", string="Vertical", index=True)
     project_id = fields.Many2one("project.project", string="Project", index=True)
     author_id = fields.Many2one(
-        "res.users", string="Business Analyst", default=lambda self: self.env.user,
+        "res.users",
+        string="Business Analyst",
+        default=lambda self: self.env.user,
     )
 
     progress_pct = fields.Float(string="Progress (%)", digits=(5, 1))
@@ -40,8 +46,12 @@ class CustomWeeklyProgress(models.Model):
 
     # -- automatic half -------------------------------------------------
     done_task_ids = fields.Many2many(
-        "project.task", "custom_weekly_done_rel", "weekly_id", "task_id",
-        string="Closed This Week", readonly=True,
+        "project.task",
+        "custom_weekly_done_rel",
+        "weekly_id",
+        "task_id",
+        string="Closed This Week",
+        readonly=True,
     )
     done_count = fields.Integer(readonly=True)
     done_points = fields.Integer(readonly=True)
@@ -96,9 +106,7 @@ class CustomWeeklyProgress(models.Model):
         self.ensure_one()
         sprint = self.sprint_id
         start = fields.Datetime.to_datetime(sprint.date_start)
-        end = fields.Datetime.to_datetime(sprint.date_end).replace(
-            hour=23, minute=59, second=59
-        )
+        end = fields.Datetime.to_datetime(sprint.date_end).replace(hour=23, minute=59, second=59)
         task_model = self.env["project.task"]
         domain = [("custom_sprint_id", "=", sprint.id)]
         if self.project_id:
@@ -107,20 +115,20 @@ class CustomWeeklyProgress(models.Model):
             domain.append(("custom_vertical_id", "=", self.vertical_id.id))
         tasks = task_model.search(domain)
 
-        closed = tasks.filtered(
-            lambda t: t.custom_closed_at and start <= t.custom_closed_at <= end
-        )
+        closed = tasks.filtered(lambda t: t.custom_closed_at and start <= t.custom_closed_at <= end)
         open_tasks = tasks - closed
         holds = tasks.filtered(lambda t: t.stage_id.custom_is_hold)
         waiting = tasks.filtered(lambda t: t.stage_id.custom_is_waiting_user)
 
         hours = 0.0
         if closed or open_tasks:
-            lines = self.env["account.analytic.line"].search([
-                ("task_id", "in", tasks.ids),
-                ("date", ">=", sprint.date_start),
-                ("date", "<=", sprint.date_end),
-            ])
+            lines = self.env["account.analytic.line"].search(
+                [
+                    ("task_id", "in", tasks.ids),
+                    ("date", ">=", sprint.date_start),
+                    ("date", "<=", sprint.date_end),
+                ]
+            )
             hours = sum(lines.mapped("unit_amount"))
 
         cycle = sum(closed.mapped("custom_cycle_time_team")) / len(closed) if closed else 0.0
@@ -129,28 +137,31 @@ class CustomWeeklyProgress(models.Model):
         blocker_seed = self.blocker
         if not blocker_seed and holds:
             blocker_seed = "\n".join(
-                _("%(name)s on hold since %(since)s — %(reason)s",
-                  name=task.name,
-                  since=fields.Date.to_string(task.custom_hold_since.date())
-                  if task.custom_hold_since else "?",
-                  reason=(task.custom_hold_reason or _("no reason recorded")).strip())
+                _(
+                    "%(name)s on hold since %(since)s — %(reason)s",
+                    name=task.name,
+                    since=fields.Date.to_string(task.custom_hold_since.date()) if task.custom_hold_since else "?",
+                    reason=(task.custom_hold_reason or _("no reason recorded")).strip(),
+                )
                 for task in holds
             )
 
-        self.write({
-            "done_task_ids": [(6, 0, closed.ids)],
-            "done_count": len(closed),
-            "done_points": sum(closed.mapped("custom_story_points")),
-            "carry_over_count": len(open_tasks),
-            "hours_spent": round(hours, 2),
-            "cycle_time_team": round(cycle, 2),
-            "lead_time_total": round(lead, 2),
-            "hold_count": len(holds),
-            "waiting_user_count": len(waiting),
-            "progress_pct": self.project_id.custom_progress if self.project_id else 0.0,
-            "health": self.project_id.custom_health if self.project_id else self.health,
-            "blocker": blocker_seed,
-        })
+        self.write(
+            {
+                "done_task_ids": [(6, 0, closed.ids)],
+                "done_count": len(closed),
+                "done_points": sum(closed.mapped("custom_story_points")),
+                "carry_over_count": len(open_tasks),
+                "hours_spent": round(hours, 2),
+                "cycle_time_team": round(cycle, 2),
+                "lead_time_total": round(lead, 2),
+                "hold_count": len(holds),
+                "waiting_user_count": len(waiting),
+                "progress_pct": self.project_id.custom_progress if self.project_id else 0.0,
+                "health": self.project_id.custom_health if self.project_id else self.health,
+                "blocker": blocker_seed,
+            }
+        )
 
     # ------------------------------------------------------------------
     # Workflow
@@ -159,9 +170,7 @@ class CustomWeeklyProgress(models.Model):
     def action_submit(self):
         for rec in self:
             if not rec.next_week:
-                raise UserError(_(
-                    "Fill in next week's plan for %s before submitting.", rec.display_name
-                ))
+                raise UserError(_("Fill in next week's plan for %s before submitting.", rec.display_name))
             rec.write({"state": "submitted", "submitted_at": fields.Datetime.now()})
             rec._pdp_audit_write("weekly_submit", rec.id, {"state": "submitted"})
             rec._vaspmo_notify_weekly_event("weekly_submitted")
@@ -186,25 +195,33 @@ class CustomWeeklyProgress(models.Model):
         projects = self.env["project.project"].search([("active", "=", True)])
         created = refreshed = 0
         for project in projects:
-            existing = self.search([
-                ("sprint_id", "=", sprint.id), ("project_id", "=", project.id),
-            ], limit=1)
+            existing = self.search(
+                [
+                    ("sprint_id", "=", sprint.id),
+                    ("project_id", "=", project.id),
+                ],
+                limit=1,
+            )
             if existing:
                 if existing.state == "draft":
                     existing._fill_automatic()
                     refreshed += 1
                 continue
-            record = self.create({
-                "sprint_id": sprint.id,
-                "project_id": project.id,
-                "vertical_id": project.custom_vertical_id.id,
-                "author_id": (project.custom_ba_id or project.custom_po_id).id or self.env.uid,
-            })
+            record = self.create(
+                {
+                    "sprint_id": sprint.id,
+                    "project_id": project.id,
+                    "vertical_id": project.custom_vertical_id.id,
+                    "author_id": (project.custom_ba_id or project.custom_po_id).id or self.env.uid,
+                }
+            )
             record._fill_automatic()
             created += 1
         _logger.info(
             "VAS PMO: weekly draft for %s — %s created, %s refreshed",
-            sprint.week_code, created, refreshed,
+            sprint.week_code,
+            created,
+            refreshed,
         )
         # Nudge whoever has not written anything yet.
         pending = self.search([("sprint_id", "=", sprint.id), ("state", "=", "draft")])
@@ -215,7 +232,9 @@ class CustomWeeklyProgress(models.Model):
     def cron_weekly_digest(self):
         """Monday 08:00 — send the recap of the sprint that just closed."""
         sprint = self.env["custom.project.sprint"].search(
-            [("state", "=", "closed")], order="date_start desc", limit=1,
+            [("state", "=", "closed")],
+            order="date_start desc",
+            limit=1,
         )
         if not sprint:
             return

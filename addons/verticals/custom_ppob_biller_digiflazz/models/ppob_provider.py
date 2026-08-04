@@ -15,32 +15,32 @@ class PpobProvider(models.Model):
     digiflazz_username = fields.Char(
         string="Digiflazz Username",
         help="The username configured in Digiflazz > Pengaturan Koneksi API. "
-             "Part of every signature; a wrong value fails as an auth error, "
-             "not a validation error.",
+        "Part of every signature; a wrong value fails as an auth error, "
+        "not a validation error.",
     )
     digiflazz_testing = fields.Boolean(
         string="Digiflazz Development Mode",
         help="Sends testing=true, so Digiflazz simulates instead of really "
-             "selling. The mitra wallet is still debited for real on our side -- "
-             "this flag only changes THEIR behaviour, never ours.",
+        "selling. The mitra wallet is still debited for real on our side -- "
+        "this flag only changes THEIR behaviour, never ours.",
     )
     digiflazz_status_min_age_s = fields.Integer(
         string="Status Min Age (s)",
         default=DEFAULT_STATUS_MIN_AGE_S,
         help="status() refuses to fire until this many seconds after dispatch. "
-             "Digiflazz warns that repeat calls inside 1 minute cause a race "
-             "condition or duplicate processing -- and because a prepaid status "
-             "check IS a re-sent topup, that duplicate would be a real sale. "
-             "Do not lower below 60 without a written answer from Digiflazz.",
+        "Digiflazz warns that repeat calls inside 1 minute cause a race "
+        "condition or duplicate processing -- and because a prepaid status "
+        "check IS a re-sent topup, that duplicate would be a real sale. "
+        "Do not lower below 60 without a written answer from Digiflazz.",
     )
     digiflazz_status_max_age_days = fields.Integer(
         string="Status Max Age (days)",
         default=DEFAULT_STATUS_MAX_AGE_DAYS,
         help="status() refuses beyond this age. Past Digiflazz's retention a "
-             "re-sent ref_id is no longer recognised as the original, so it "
-             "books a BRAND-NEW transaction and charges the deposit. Leaving an "
-             "ancient transaction unresolved for ops is cheap; a silent "
-             "duplicate sale is not.",
+        "re-sent ref_id is no longer recognised as the original, so it "
+        "books a BRAND-NEW transaction and charges the deposit. Leaving an "
+        "ancient transaction unresolved for ops is cheap; a silent "
+        "duplicate sale is not.",
     )
 
     @api.constrains("digiflazz_status_min_age_s", "digiflazz_status_max_age_days", "adapter_class")
@@ -49,15 +49,15 @@ class PpobProvider(models.Model):
             if provider.adapter_class != "ppob_digiflazz":
                 continue
             if provider.digiflazz_status_min_age_s < 1:
-                raise ValidationError(_(
-                    "Digiflazz status min age must be at least 1 second. A "
-                    "status check re-sends the topup; firing it immediately "
-                    "risks a duplicate sale."
-                ))
+                raise ValidationError(
+                    _(
+                        "Digiflazz status min age must be at least 1 second. A "
+                        "status check re-sends the topup; firing it immediately "
+                        "risks a duplicate sale."
+                    )
+                )
             if provider.digiflazz_status_max_age_days < 1:
-                raise ValidationError(_(
-                    "Digiflazz status max age must be at least 1 day."
-                ))
+                raise ValidationError(_("Digiflazz status max age must be at least 1 day."))
 
     def _digiflazz_base_url(self):
         self.ensure_one()
@@ -86,8 +86,9 @@ class PpobProvider(models.Model):
         adapter = self._get_adapter()
         result = adapter.check_balance()
         if not result.ok:
-            raise UserError(_("Digiflazz balance check failed: %s") % (
-                result.error_message or result.error_code or "unknown error"))
+            raise UserError(
+                _("Digiflazz balance check failed: %s") % (result.error_message or result.error_code or "unknown error")
+            )
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",

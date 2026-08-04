@@ -22,7 +22,7 @@ import argparse
 import csv
 import datetime
 import sys
-from collections import Counter, OrderedDict
+from collections import Counter
 from pathlib import Path
 
 import openpyxl

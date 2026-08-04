@@ -237,7 +237,5 @@ class WmsXlsxReport(models.AbstractModel):
             "date": book.add_format({"border": 1, "valign": "vcenter", "num_format": "yyyy-mm-dd"}),
             "datetime": book.add_format({"border": 1, "valign": "vcenter", "num_format": "yyyy-mm-dd hh:mm"}),
             "total_text": book.add_format({"bold": True, "bg_color": "#E8E8E8", "border": 1}),
-            "total_num": book.add_format(
-                {"bold": True, "bg_color": "#E8E8E8", "border": 1, "num_format": "#,##0.00"}
-            ),
+            "total_num": book.add_format({"bold": True, "bg_color": "#E8E8E8", "border": 1, "num_format": "#,##0.00"}),
         }

@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_ppob_core"
 PRIVILEGE = "res_groups_privilege_ppob"
-GROUPS = ['group_ppob_user', 'group_ppob_ops', 'group_ppob_manager', 'group_ppob_api']
+GROUPS = ["group_ppob_user", "group_ppob_ops", "group_ppob_manager", "group_ppob_api"]
 
 
 def migrate(cr, version):

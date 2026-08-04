@@ -54,7 +54,8 @@ class CustomProjectNotifyRule(models.Model):
     event = fields.Selection(NOTIFY_EVENTS, required=True, index=True)
     recipient_kind = fields.Selection(RECIPIENT_KINDS, required=True)
     role_group_id = fields.Many2one(
-        "res.groups", string="Group",
+        "res.groups",
+        string="Group",
         help="Only used when the recipient kind is 'Everyone in a group'.",
     )
     channel_wa = fields.Boolean(string="WhatsApp", default=True)

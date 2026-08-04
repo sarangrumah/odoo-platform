@@ -152,8 +152,7 @@ class WmsHhtApi(http.Controller):
         if exact:
             return exact, "name"
 
-        text_domain = ["|", "|", ("name", "ilike", term), ("origin", "ilike", term),
-                       ("partner_id.name", "ilike", term)]
+        text_domain = ["|", "|", ("name", "ilike", term), ("origin", "ilike", term), ("partner_id.name", "ilike", term)]
         if "carrier_tracking_ref" in Picking._fields:
             text_domain = ["|"] + text_domain + [("carrier_tracking_ref", "ilike", term)]
         text = Picking.search(open_domain + text_domain, limit=limit)
@@ -165,18 +164,14 @@ class WmsHhtApi(http.Controller):
             lot = request.env["stock.lot"].search([("name", "=", term)], limit=1)
             product = lot.product_id
         if product:
-            by_product = Picking.search(
-                open_domain + [("move_ids.product_id", "=", product.id)], limit=limit
-            )
+            by_product = Picking.search(open_domain + [("move_ids.product_id", "=", product.id)], limit=limit)
             if by_product:
                 return by_product, "product"
 
         # Last resort, and deliberately outside the open states: a transfer the
         # operator is holding paperwork for may already be validated or still
         # draft. Finding it and being told its state beats "Unknown barcode".
-        closed = Picking.search(
-            base_domain + ["|", ("name", "=ilike", term), ("origin", "ilike", term)], limit=limit
-        )
+        closed = Picking.search(base_domain + ["|", ("name", "=ilike", term), ("origin", "ilike", term)], limit=limit)
         return closed, "closed" if closed else ""
 
     @staticmethod
@@ -257,9 +252,7 @@ class WmsHhtApi(http.Controller):
             if "wms_qc_state" in Picking._fields
             else [("id", "=", 0)]
         )
-        counts = env["custom.cycle.count.session"].search_count(
-            [("state", "in", ("draft", "in_progress"))]
-        )
+        counts = env["custom.cycle.count.session"].search_count([("state", "in", ("draft", "in_progress"))])
         tos = env["custom.transfer.order"].search_count([("state", "in", ("draft", "proposed"))])
         return _ok(
             warehouse=wh.display_name if wh else "",
@@ -345,9 +338,7 @@ class WmsHhtApi(http.Controller):
 
     @staticmethod
     def _location_payload(loc):
-        quants = request.env["stock.quant"].search(
-            [("location_id", "=", loc.id), ("quantity", "!=", 0)]
-        )
+        quants = request.env["stock.quant"].search([("location_id", "=", loc.id), ("quantity", "!=", 0)])
         return {
             "id": loc.id,
             "name": loc.display_name,
@@ -368,9 +359,7 @@ class WmsHhtApi(http.Controller):
     @staticmethod
     def _package_payload(pack):
         quants = request.env["stock.quant"].search([("package_id", "=", pack.id)])
-        moves = request.env["stock.move.line"].search(
-            [("result_package_id", "=", pack.id)], limit=5, order="id desc"
-        )
+        moves = request.env["stock.move.line"].search([("result_package_id", "=", pack.id)], limit=5, order="id desc")
         return {
             "id": pack.id,
             "name": pack.name,
@@ -581,9 +570,7 @@ class WmsHhtApi(http.Controller):
                     {
                         "name": q.lot_id.name,
                         "quantity": q.quantity,
-                        "expiration_date": (
-                            q.lot_id.expiration_date and str(q.lot_id.expiration_date)[:10] or ""
-                        ),
+                        "expiration_date": (q.lot_id.expiration_date and str(q.lot_id.expiration_date)[:10] or ""),
                     }
                 )
         rows = sorted(bins.values(), key=lambda r: (-r["quantity"], r["location"]))
@@ -660,9 +647,7 @@ class WmsHhtApi(http.Controller):
                         # Flagging a bin the product already sits in turns a
                         # bare ranking into an actionable one: consolidating
                         # into an occupied bin beats opening a new one.
-                        "has_stock": bool(
-                            prefix and any(path.startswith(prefix) for path in stocked_paths)
-                        ),
+                        "has_stock": bool(prefix and any(path.startswith(prefix) for path in stocked_paths)),
                     }
                 )
                 if len(suggestions) == 3:
@@ -893,7 +878,7 @@ class WmsHhtApi(http.Controller):
                     "variance_count": s.variance_count,
                 }
                 for s in sessions
-            ]
+            ],
         )
 
     @http.route("/hht/wms/count/lines", type="jsonrpc", auth="user", methods=["POST"])
@@ -955,10 +940,13 @@ class WmsHhtApi(http.Controller):
             # Scanning the bin you are standing at is the natural way in here:
             # it answers "is there anything to move out of / into this bin?".
             product, _gs1 = self._resolve_product(term)
-            sub = ["|", "|",
-                   ("name", "ilike", term),
-                   ("source_location_id.barcode", "=", term),
-                   ("target_location_id.barcode", "=", term)]
+            sub = [
+                "|",
+                "|",
+                ("name", "ilike", term),
+                ("source_location_id.barcode", "=", term),
+                ("target_location_id.barcode", "=", term),
+            ]
             if product:
                 sub = ["|"] + sub + [("product_id", "=", product.id)]
             domain += sub
@@ -984,7 +972,7 @@ class WmsHhtApi(http.Controller):
                     "reason": to.rule_id.name or "",
                 }
                 for to in tos
-            ]
+            ],
         )
 
     @http.route("/hht/wms/bin2bin/execute", type="jsonrpc", auth="user", methods=["POST"])

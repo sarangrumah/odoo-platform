@@ -2,7 +2,7 @@
 {
     "name": "Custom Project - VAS Notifications (WA + Email + Odoo)",
     "summary": "Rule-driven notifications for project / CR / task / weekly events, queued in "
-               "Odoo and dispatched to the Next.js BFF over HMAC for WhatsApp + e-mail.",
+    "Odoo and dispatched to the Next.js BFF over HMAC for WhatsApp + e-mail.",
     "description": """
 VAS PMO - Notifications
 =======================

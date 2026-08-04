@@ -8,11 +8,17 @@ class ProjectTask(models.Model):
     _inherit = "project.task"
 
     change_request_id = fields.Many2one(
-        "custom.change.request", string="Change Request", index=True, ondelete="set null",
+        "custom.change.request",
+        string="Change Request",
+        index=True,
+        ondelete="set null",
         help="Set when this task exists because a brand asked for a change.",
     )
     custom_cr_code = fields.Char(
-        related="change_request_id.code", store=True, readonly=True, string="CR Number",
+        related="change_request_id.code",
+        store=True,
+        readonly=True,
+        string="CR Number",
     )
 
     @api.onchange("change_request_id")

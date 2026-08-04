@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_pdp_dsar"
 PRIVILEGE = "res_groups_privilege_pdp_dsar"
-GROUPS = ['group_dsar_handler']
+GROUPS = ["group_dsar_handler"]
 
 
 def migrate(cr, version):

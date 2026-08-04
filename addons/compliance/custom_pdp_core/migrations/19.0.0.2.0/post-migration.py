@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_pdp_core"
 PRIVILEGE = "res_groups_privilege_pdp_core"
-GROUPS = ['group_dpo']
+GROUPS = ["group_dpo"]
 
 
 def migrate(cr, version):

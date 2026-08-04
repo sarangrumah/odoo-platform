@@ -15,7 +15,9 @@ class CustomProjectNotifyLog(models.Model):
     _order = "create_date desc, id desc"
 
     outbox_id = fields.Many2one(
-        "custom.project.notify.outbox", ondelete="set null", index=True,
+        "custom.project.notify.outbox",
+        ondelete="set null",
+        index=True,
     )
     event = fields.Char(required=True, index=True)
     res_model = fields.Char(required=True, index=True)
@@ -25,7 +27,8 @@ class CustomProjectNotifyLog(models.Model):
 
     channel = fields.Selection(
         [("wa", "WhatsApp"), ("email", "E-mail"), ("odoo", "Odoo inbox")],
-        required=True, index=True,
+        required=True,
+        index=True,
     )
     transport = fields.Char(help="wahub / baileys / smtp / mail.thread")
     recipient_kind = fields.Char()
