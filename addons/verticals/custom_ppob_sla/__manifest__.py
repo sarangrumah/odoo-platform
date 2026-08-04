@@ -16,7 +16,7 @@ Two models:
 ``custom.ppob.sla.target``
     Declarative targets scoped by **provider x product class**, with wildcard
     fallback (empty provider and/or class matches anything). Resolution picks the
-    most specific row: (provider, class) > (provider, *) > (*, class) > (*, *).
+    most specific row: ``(provider, class) > (provider, *) > (*, class) > (*, *)``.
     A single wildcard baseline row is seeded at install, derived from the
     indicative 10k-50k txn/day in the v2 realignment brief. The peak-TPS
     derivation is NOT a hidden constant: ``active_hours`` and ``peak_factor`` are

@@ -30,7 +30,7 @@ their own docs. Before go-live, run this against a Digiflazz sandbox and expect
 to change the rc mapping in ``constants.py``.
 
 Idempotency: ref_id, and why status() re-sends the sale
-------------------------------------------------------
+-------------------------------------------------------
 Digiflazz deduplicates prepaid transactions by ``ref_id``. Their documented way
 to check a prepaid transaction's status is to **re-send the identical topup
 request with the same ref_id** -- the same call, not a separate read endpoint.
@@ -57,6 +57,7 @@ Two documented hazards are enforced as guards, not comments:
 
 Scope
 -----
+
 * Prepaid topup + status: implemented.
 * Postpaid ``inq-pasca`` / ``pay-pasca`` / ``status-pasca``: implemented.
   ``product.inquiry_required`` is the postpaid marker (the suite has no other),
