@@ -68,16 +68,35 @@ dipulihkan (sudah diverifikasi pasca-eksekusi). `prd_levis` memang tidak punya l
 
 ## Entry SALESMANUAL masih tertunda
 
-Rp 14.608.080 — MM Bekasi 9.052.000 / Paris van Java 3.756.280 / Central Park 1.799.800.
-Belum dibukukan karena **akun pendapatan lawan + perlakuan PPN belum ditandatangani
-Accounting**. Kandidat: `5501000000` Sales Adjustment-manual posting atau `5199000000`
-Gross Sales-Others. Script tidak memisah PPN, jadi kalau angka Finance itu gross incl PPN,
-PPN Keluaran tidak akan terbentuk.
+Penjualan manual Juni yang tidak pernah masuk Odoo, **Rp 14.608.080**:
 
-**Jangan jalankan ulang script 69 untuk ini** — ref-guard `EBR-ADJ-AR-JUNI-2026%` akan
-menolak (`SystemExit`) karena ketiga jurnal sudah ada. Entry ini harus dibuat manual atau
-lewat script terpisah. Kalau dibukukan, clearing MM Bekasi bisa ditambah 4.186.925 sehingga
-total clearing menjadi 671.710.640.
+| Operating Unit | Jumlah |
+|---|---|
+| OLS SES - METROPOLITAN MALL BEKASI | 9.052.000 |
+| OLS SES - PARIS VAN JAVA | 3.756.280 |
+| OLS SES - CENTRAL PARK | 1.799.800 |
+
+Tidak dibukukan pada eksekusi 4-Aug karena approval hanya mencakup clearing, dan dua hal
+berikut **belum dijawab Accounting**:
+
+1. **Akun pendapatan lawan mana?** Kandidat `5501000000` Sales Adjustment-manual posting
+   (paling pas secara nama) atau `5199000000` Gross Sales-Others.
+2. **Bagaimana perlakuan PPN-nya?** Script 69 membukukan Dr 1106000001 / Cr `<akun>`
+   **flat, tanpa memisah PPN**. Kalau angka dari Finance itu gross incl PPN, PPN Keluaran
+   tidak akan terbentuk dan berpotensi kurang lapor di SPT. Kalau memang harus dipisah,
+   script perlu diubah — bukan sekadar mengisi `SALES_MANUAL_ACCOUNT`.
+
+### Jangan jalankan ulang script 69
+
+Ref-guard `EBR-ADJ-AR-JUNI-2026%` sudah `SystemExit` karena ketiga jurnal lain sudah ada,
+jadi mengisi `SALES_MANUAL_ACCOUNT` lalu menjalankan ulang **tidak akan bekerja**. Entry ini
+harus dibuat manual di UI atau lewat script baru yang terpisah.
+
+### Efek kalau nanti dibukukan
+
+Piutang MM Bekasi bertambah sehingga cap-nya longgar: clearing bisa ditambah 4.186.925
+(total menjadi 671.710.640), sisa deposit 2103100003 tinggal Rp 1 milik Grand Indonesia,
+dan deviasi TB terhadap workbook EBR ikut bertambah.
 
 Lihat juga `docs/projects/levis/CONFIG_FOLLOWUPS_STATUS.md` dan memory
 `levis-june-ar-fico-final-rekon`.
