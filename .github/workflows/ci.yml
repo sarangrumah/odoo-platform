@@ -72,6 +72,29 @@ jobs:
           name: sboms
           path: sbom-*.json
 
+  # tenant-orchestrator ships tests but nothing ran them, so regressions in the
+  # one service that holds docker.sock and SSHes into tenant VPSes were caught
+  # by nobody. Odoo addon tests need a live Postgres + Odoo and stay out of CI;
+  # these are plain pytest and have no such excuse.
+  orchestrator-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      # Mirrors the runtime deps pinned in tenant-orchestrator/Dockerfile plus
+      # pytest. Keep in step with that list — the image installs them inline
+      # rather than from a requirements file.
+      - name: Install deps
+        run: |
+          pip install pytest \
+            fastapi uvicorn[standard] "pydantic[email]" pydantic-settings \
+            httpx[http2] "psycopg[binary,pool]" cryptography bcrypt passlib \
+            boto3 structlog prometheus-client croniter apscheduler paramiko
+      - name: Run tests
+        working-directory: tenant-orchestrator
+        run: python -m pytest tests/ -q
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:
