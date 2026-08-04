@@ -110,3 +110,60 @@ class TestSendSandbox(TransactionCase):
         payload = msg._build_payload()
         self.assertEqual(payload["type"], "text")
         self.assertEqual(payload["text"]["body"], "free text")
+
+    def test_sandbox_log_does_not_disclose_number_or_body(self):
+        """Sandbox is exercised with real customer data during UAT.
+
+        The Odoo log is not a sensitive store, so the recipient number and the
+        message text must not land in it in the clear.
+
+        The logger is patched rather than captured: Odoo runs tests at
+        ``--log-level=test`` (level 25), which filters INFO records out before
+        any handler sees them, so assertLogs would observe nothing.
+        """
+        from unittest.mock import patch
+
+        from odoo.addons.custom_whatsapp.models import whatsapp_message as wm
+
+        number = "+6281234567890"
+        secret_body = "Kode OTP anda 998877, jangan dibagikan"
+        msg = self.Message.create(
+            {
+                "account_id": self.account.id,
+                "to_phone": number,
+                "body": secret_body,
+                "direction": "outbound",
+            }
+        )
+
+        emitted = []
+
+        def _capture(fmt, *args):
+            emitted.append(fmt % args)
+
+        with patch.object(wm._logger, "info", _capture):
+            msg.action_send()
+
+        line = "\n".join(x for x in emitted if "[whatsapp sandbox]" in x)
+        self.assertTrue(line, f"sandbox send logged nothing; saw {emitted!r}")
+
+        self.assertNotIn(number, line)
+        self.assertNotIn("6281234567890", line)
+        self.assertNotIn("81234567890", line)
+        self.assertNotIn(secret_body, line)
+        self.assertNotIn("998877", line)
+        # Still traceable: masked number, body length, record id.
+        self.assertIn("62********890", line)
+        self.assertIn(f"body_len={len(secret_body)}", line)
+        self.assertIn(f"msg_id={msg.id}", line)
+
+    def test_mask_phone_shapes(self):
+        from odoo.addons.custom_whatsapp.models.whatsapp_message import _mask_phone
+
+        self.assertEqual(_mask_phone("+6281234567890"), "62********890")
+        self.assertEqual(_mask_phone("081234567890"), "08*******890")
+        self.assertEqual(_mask_phone("+1 (555) 010-9999"), "15******999")
+        # Too short to mask meaningfully -> disclose nothing at all.
+        self.assertEqual(_mask_phone("12345"), "*****")
+        self.assertEqual(_mask_phone(""), "(none)")
+        self.assertEqual(_mask_phone(None), "(none)")
