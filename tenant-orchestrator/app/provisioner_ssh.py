@@ -31,7 +31,26 @@ log = logging.getLogger(__name__)
 
 
 class SSHCredentialError(RuntimeError):
-    """Raised when ssh_credential_ref cannot be resolved."""
+    """Raised when ssh_credential_ref cannot be resolved.
+
+    Carries two messages on purpose. ``str(exc)`` is the diagnostic one and is
+    for logs only -- it names the env var, the key path or the Vault path that
+    failed, which is exactly what an operator needs and exactly what a caller
+    must not see. ``public_reason`` is the category-level sentence that is safe
+    to put in an HTTP response or an SSE frame.
+
+    Before this split every one of these messages was echoed straight back to
+    the client (``yield f"ERROR credential: {e}"``), disclosing server paths,
+    environment variable names and Vault locations to anyone who could reach
+    the endpoint -- CodeQL py/stack-trace-exposure, and it was right.
+    """
+
+    #: Shown to callers when nothing more specific is set.
+    DEFAULT_PUBLIC = "ssh credential could not be resolved"
+
+    def __init__(self, message: str, *, public_reason: str | None = None) -> None:
+        super().__init__(message)
+        self.public_reason = public_reason or self.DEFAULT_PUBLIC
 
 
 @dataclass(frozen=True)
@@ -56,12 +75,14 @@ def resolve_ssh_key(ref: str) -> str:
     NEVER log the returned material.
     """
     if not ref:
-        raise SSHCredentialError("empty ssh_credential_ref")
+        raise SSHCredentialError("empty ssh_credential_ref", public_reason="no ssh credential configured")
     if ref.startswith("env://"):
         var = ref[len("env://") :]
         val = os.environ.get(var)
         if not val:
-            raise SSHCredentialError(f"env var {var} not set")
+            raise SSHCredentialError(
+                f"env var {var} not set", public_reason="ssh credential is not available on the server"
+            )
         return val
     if ref.startswith("file://"):
         path = ref[len("file://") :]
@@ -69,12 +90,17 @@ def resolve_ssh_key(ref: str) -> str:
             # file:///abs/path style
             path = "/" + path.lstrip("/")
         if not os.path.isfile(path):
-            raise SSHCredentialError(f"key file not found: {path}")
+            raise SSHCredentialError(
+                f"key file not found: {path}", public_reason="ssh credential is not available on the server"
+            )
         with open(path, encoding="utf-8") as f:
             return f.read()
     if ref.startswith("vault://"):
         return _resolve_vault_ref(ref)
-    raise SSHCredentialError(f"unsupported credential scheme: {ref.split('://', 1)[0]}")
+    raise SSHCredentialError(
+        f"unsupported credential scheme: {ref.split('://', 1)[0]}",
+        public_reason="ssh credential ref uses an unsupported scheme",
+    )
 
 
 def _resolve_vault_ref(ref: str) -> str:
@@ -93,15 +119,25 @@ def _resolve_vault_ref(ref: str) -> str:
         )
         raise SSHCredentialError(
             "vault:// credential resolver not configured (VAULT_ADDR unset) — "
-            "set up Vault or use file:// / env:// refs for dev"
+            "set up Vault or use file:// / env:// refs for dev",
+            # Names no server path or variable, and the hint is the whole point
+            # of the dev/UAT "skipped" response, so it stays public verbatim.
+            public_reason=(
+                "vault:// credential resolver not configured — set up Vault or use file:// / env:// refs for dev"
+            ),
         )
     vault_token = os.environ.get("VAULT_TOKEN")
     if not vault_token:
-        raise SSHCredentialError("VAULT_TOKEN not set — cannot authenticate to Vault")
+        raise SSHCredentialError(
+            "VAULT_TOKEN not set — cannot authenticate to Vault",
+            public_reason="ssh credential store is not reachable",
+        )
     try:
         import urllib.request  # local import: avoid runtime cost when unused
     except ImportError as e:  # pragma: no cover
-        raise SSHCredentialError(f"urllib unavailable: {e}") from e
+        raise SSHCredentialError(
+            f"urllib unavailable: {e}", public_reason="ssh credential store is not reachable"
+        ) from e
 
     body = ref[len("vault://") :]
     # Allow optional ``#field`` suffix to pick a specific key from the secret.
@@ -116,11 +152,16 @@ def _resolve_vault_ref(ref: str) -> str:
 
             payload = _json.loads(resp.read().decode("utf-8"))
     except Exception as e:  # noqa: BLE001
-        raise SSHCredentialError(f"vault lookup failed: {e}") from e
+        raise SSHCredentialError(
+            f"vault lookup failed: {e}", public_reason="ssh credential store is not reachable"
+        ) from e
     data = (payload.get("data") or {}).get("data") or payload.get("data") or {}
     val = data.get(field)
     if not val:
-        raise SSHCredentialError(f"vault secret at {body} has no '{field}' key")
+        raise SSHCredentialError(
+            f"vault secret at {body} has no '{field}' key",
+            public_reason="ssh credential is not available on the server",
+        )
     return val
 
 
@@ -156,7 +197,9 @@ class RemoteDockerExecutor:
             try:
                 pkey = paramiko.RSAKey.from_private_key(io.StringIO(key_body))
             except Exception as e:
-                raise SSHCredentialError(f"could not parse ssh key: {e}") from e
+                raise SSHCredentialError(
+                    f"could not parse ssh key: {e}", public_reason="ssh credential is not usable"
+                ) from e
         client = paramiko.SSHClient()
         # CodeQL py/paramiko-missing-host-key-validation + bandit B507:
         # AutoAddPolicy is intentional for first-deploy bootstrap. The host
