@@ -353,6 +353,17 @@ services:
       # --- Vault (vault:// ssh credential refs); blank disables resolver ---
       VAULT_ADDR: ${VAULT_ADDR:-}
       VAULT_TOKEN: ${VAULT_TOKEN:-}
+      # --- SSH host-key pinning ---
+      # Keys are learned on first connect and verified afterwards, so a VPS
+      # that changes identity is refused. Set SSH_STRICT_HOST_KEYS=true once
+      # every VPS has been seen (or known_hosts is pre-seeded) to also refuse
+      # first-sight hosts.
+      SSH_KNOWN_HOSTS_FILE: ${SSH_KNOWN_HOSTS_FILE:-/var/lib/orchestrator/known_hosts}
+      SSH_STRICT_HOST_KEYS: ${SSH_STRICT_HOST_KEYS:-false}
+    volumes:
+      # The container is read_only, so the pinned host keys need a real mount
+      # or they cannot be written at all — and pinning would silently no-op.
+      - ./data/orchestrator:/var/lib/orchestrator
     ports:
       - "${TENANT_ORCHESTRATOR_PORT:-18091}:8080"
     healthcheck:

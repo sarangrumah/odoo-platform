@@ -31,7 +31,26 @@ log = logging.getLogger(__name__)
 
 
 class SSHCredentialError(RuntimeError):
-    """Raised when ssh_credential_ref cannot be resolved."""
+    """Raised when ssh_credential_ref cannot be resolved.
+
+    Carries two messages on purpose. ``str(exc)`` is the diagnostic one and is
+    for logs only -- it names the env var, the key path or the Vault path that
+    failed, which is exactly what an operator needs and exactly what a caller
+    must not see. ``public_reason`` is the category-level sentence that is safe
+    to put in an HTTP response or an SSE frame.
+
+    Before this split every one of these messages was echoed straight back to
+    the client (``yield f"ERROR credential: {e}"``), disclosing server paths,
+    environment variable names and Vault locations to anyone who could reach
+    the endpoint -- CodeQL py/stack-trace-exposure, and it was right.
+    """
+
+    #: Shown to callers when nothing more specific is set.
+    DEFAULT_PUBLIC = "ssh credential could not be resolved"
+
+    def __init__(self, message: str, *, public_reason: str | None = None) -> None:
+        super().__init__(message)
+        self.public_reason = public_reason or self.DEFAULT_PUBLIC
 
 
 @dataclass(frozen=True)
@@ -56,12 +75,14 @@ def resolve_ssh_key(ref: str) -> str:
     NEVER log the returned material.
     """
     if not ref:
-        raise SSHCredentialError("empty ssh_credential_ref")
+        raise SSHCredentialError("empty ssh_credential_ref", public_reason="no ssh credential configured")
     if ref.startswith("env://"):
         var = ref[len("env://") :]
         val = os.environ.get(var)
         if not val:
-            raise SSHCredentialError(f"env var {var} not set")
+            raise SSHCredentialError(
+                f"env var {var} not set", public_reason="ssh credential is not available on the server"
+            )
         return val
     if ref.startswith("file://"):
         path = ref[len("file://") :]
@@ -69,12 +90,17 @@ def resolve_ssh_key(ref: str) -> str:
             # file:///abs/path style
             path = "/" + path.lstrip("/")
         if not os.path.isfile(path):
-            raise SSHCredentialError(f"key file not found: {path}")
+            raise SSHCredentialError(
+                f"key file not found: {path}", public_reason="ssh credential is not available on the server"
+            )
         with open(path, encoding="utf-8") as f:
             return f.read()
     if ref.startswith("vault://"):
         return _resolve_vault_ref(ref)
-    raise SSHCredentialError(f"unsupported credential scheme: {ref.split('://', 1)[0]}")
+    raise SSHCredentialError(
+        f"unsupported credential scheme: {ref.split('://', 1)[0]}",
+        public_reason="ssh credential ref uses an unsupported scheme",
+    )
 
 
 def _resolve_vault_ref(ref: str) -> str:
@@ -93,15 +119,25 @@ def _resolve_vault_ref(ref: str) -> str:
         )
         raise SSHCredentialError(
             "vault:// credential resolver not configured (VAULT_ADDR unset) — "
-            "set up Vault or use file:// / env:// refs for dev"
+            "set up Vault or use file:// / env:// refs for dev",
+            # Names no server path or variable, and the hint is the whole point
+            # of the dev/UAT "skipped" response, so it stays public verbatim.
+            public_reason=(
+                "vault:// credential resolver not configured — set up Vault or use file:// / env:// refs for dev"
+            ),
         )
     vault_token = os.environ.get("VAULT_TOKEN")
     if not vault_token:
-        raise SSHCredentialError("VAULT_TOKEN not set — cannot authenticate to Vault")
+        raise SSHCredentialError(
+            "VAULT_TOKEN not set — cannot authenticate to Vault",
+            public_reason="ssh credential store is not reachable",
+        )
     try:
         import urllib.request  # local import: avoid runtime cost when unused
     except ImportError as e:  # pragma: no cover
-        raise SSHCredentialError(f"urllib unavailable: {e}") from e
+        raise SSHCredentialError(
+            f"urllib unavailable: {e}", public_reason="ssh credential store is not reachable"
+        ) from e
 
     body = ref[len("vault://") :]
     # Allow optional ``#field`` suffix to pick a specific key from the secret.
@@ -116,12 +152,121 @@ def _resolve_vault_ref(ref: str) -> str:
 
             payload = _json.loads(resp.read().decode("utf-8"))
     except Exception as e:  # noqa: BLE001
-        raise SSHCredentialError(f"vault lookup failed: {e}") from e
+        raise SSHCredentialError(
+            f"vault lookup failed: {e}", public_reason="ssh credential store is not reachable"
+        ) from e
     data = (payload.get("data") or {}).get("data") or payload.get("data") or {}
     val = data.get(field)
     if not val:
-        raise SSHCredentialError(f"vault secret at {body} has no '{field}' key")
+        raise SSHCredentialError(
+            f"vault secret at {body} has no '{field}' key",
+            public_reason="ssh credential is not available on the server",
+        )
     return val
+
+
+def _load_known_hosts(client) -> str:
+    """Load the pinned host keys into ``client``. Returns the file path used.
+
+    Returns "" when no file could be loaded, which is not fatal: the caller
+    decides what to do about unknown hosts.
+    """
+    from .config import get_settings
+
+    # Keys pinned earlier in this process apply whether or not a file exists,
+    # so a lost or unwritable known_hosts still cannot downgrade us to
+    # accepting a changed key.
+    def _seed_session_keys() -> None:
+        for hostname, key in _SESSION_HOST_KEYS.items():
+            client.get_host_keys().add(hostname, key.get_name(), key)
+
+    path = (get_settings().ssh_known_hosts_file or "").strip()
+    if not path:
+        _seed_session_keys()
+        return ""
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        if not os.path.exists(path):
+            # Touch it so paramiko's save_host_keys() has somewhere to write.
+            with open(path, "a", encoding="utf-8"):
+                pass
+        client.load_host_keys(path)
+        _seed_session_keys()
+        return path
+    except OSError as e:
+        # A read-only or missing volume must not take provisioning down; it
+        # degrades to process-lifetime pinning, which is still far stricter
+        # than the old unconditional auto-add.
+        log.warning("ssh.known_hosts.unavailable path=%s err=%s", path, e)
+        _seed_session_keys()
+        return ""
+
+
+def _missing_host_key_policy(known_hosts: str):
+    """Pick the policy for a host we have never seen.
+
+    Known hosts are always verified by paramiko against the loaded keys, so a
+    VPS whose key changes is refused either way -- that is the MITM case this
+    exists for. The choice here only covers the *first* sight of a host:
+
+      * strict mode -> reject; the key must be pre-seeded in known_hosts.
+      * otherwise   -> trust on first use and pin it, so every later connection
+        is verified. This keeps first-deploy bootstrap working, which is why
+        AutoAddPolicy was there in the first place, while closing the window
+        where every connection accepted any key forever.
+
+    ``paramiko.AutoAddPolicy`` is deliberately never used, not even as a
+    fallback: it re-trusts a changed key silently, which is the whole problem.
+    Without a writable file we still pin for the life of the process.
+    """
+    from .config import get_settings
+
+    if get_settings().ssh_strict_host_keys:
+        return paramiko.RejectPolicy()
+    if not known_hosts:
+        log.warning(
+            "ssh.host_key.not_persisted: no writable known_hosts file — pinning "
+            "only for this process; fix the /var/lib/orchestrator mount"
+        )
+    return _PinOnFirstUse(known_hosts)
+
+
+# Host keys seen during this process, so pinning still works when the
+# known_hosts file is unavailable. Cleared only by a restart.
+_SESSION_HOST_KEYS: dict[str, object] = {}
+
+
+class _PinOnFirstUse(paramiko.MissingHostKeyPolicy if paramiko else object):
+    """Trust a host the first time, then hold it to that key.
+
+    Unlike ``AutoAddPolicy`` this records the key -- on disk when possible and
+    always in ``_SESSION_HOST_KEYS`` -- so the next connection is verified by
+    paramiko rather than waved through.
+    """
+
+    def __init__(self, path: str) -> None:
+        self._path = path
+
+    def missing_host_key(self, client, hostname, key) -> None:
+        seen = _SESSION_HOST_KEYS.get(hostname)
+        if seen is not None and seen != key:
+            # Pinned earlier this process, different key now: refuse, exactly
+            # as paramiko would have if the file had survived.
+            raise paramiko.SSHException(f"host key for {hostname} changed since it was pinned — refusing to connect")
+        log.warning(
+            "ssh.host_key.pinned_on_first_use host=%s type=%s fp=%s",
+            hostname,
+            key.get_name(),
+            key.get_fingerprint().hex(),
+        )
+        _SESSION_HOST_KEYS[hostname] = key
+        client.get_host_keys().add(hostname, key.get_name(), key)
+        if not self._path:
+            return
+        try:
+            client.save_host_keys(self._path)
+        except OSError as e:
+            log.warning("ssh.host_key.persist_failed path=%s err=%s", self._path, e)
 
 
 class RemoteDockerExecutor:
@@ -156,17 +301,19 @@ class RemoteDockerExecutor:
             try:
                 pkey = paramiko.RSAKey.from_private_key(io.StringIO(key_body))
             except Exception as e:
-                raise SSHCredentialError(f"could not parse ssh key: {e}") from e
+                raise SSHCredentialError(
+                    f"could not parse ssh key: {e}", public_reason="ssh credential is not usable"
+                ) from e
         client = paramiko.SSHClient()
-        # CodeQL py/paramiko-missing-host-key-validation + bandit B507:
-        # AutoAddPolicy is intentional for first-deploy bootstrap. The host
-        # key is unknown until the tenant VPS finishes its initial boot;
-        # operators provide pre-shared root keys via vault://, not TOFU.
-        # Pinning host keys is tracked as a follow-up (see registry table).
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # lgtm[py/paramiko-missing-host-key-validation]
+        known_hosts = _load_known_hosts(client)
+        client.set_missing_host_key_policy(_missing_host_key_policy(known_hosts))
         log.info(
             "ssh.connect",
-            extra={"host": self.target.hostname, "user": self.target.ssh_user},
+            extra={
+                "host": self.target.hostname,
+                "user": self.target.ssh_user,
+                "known_hosts": known_hosts or "none",
+            },
         )
         client.connect(
             hostname=self.target.hostname,
