@@ -38,7 +38,7 @@ RUN pip install --no-cache-dir \
       pydantic-settings==2.6.0 \
       httpx[http2]==0.27.2 \
       psycopg[binary,pool]==3.2.3 \
-      cryptography==43.0.3 \
+      cryptography==50.0.0 \
       bcrypt==4.2.0 \
       passlib==1.7.4 \
       boto3==1.35.54 \
