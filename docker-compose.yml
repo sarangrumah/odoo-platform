@@ -166,13 +166,25 @@ services:
     volumes:
       - ./addons:/mnt/extra-addons:ro
       - ./data/odoo-filestore:/var/lib/odoo
-      # Shared FTPS drop folder: custom_retail_import local feed reads
-      # /mnt/data_levis/data and archives to /mnt/data_levis/archive.
-      - ./data/data_levis:/mnt/data_levis
+      # The SFTP share IS the drop folder: custom_retail_import's local feed reads
+      # /mnt/data_levis/data and archives to /mnt/data_levis/archive, and the
+      # retail.import.mailbox IMAP bridge backs up to /mnt/data_levis/mailbox.
+      #
+      # Must be /srv/sftp-share/files, not ./data/data_levis. The latter resolves to
+      # an empty, root-owned directory the odoo uid cannot write, which silently
+      # breaks both the mailbox and every retail.import.feed -- diagnosed and fixed
+      # on the runtime host 2026-07-24, but the fix never came back to this file.
+      - /srv/sftp-share/files:/mnt/data_levis
     extra_hosts:
       - "erp_dev_aimarka:127.0.0.1"
     ports:
-      - "${ODOO_HTTP_PORT:-18069}:8069"
+      # Loopback only. Nothing on the ingress path uses this host port -- Caddy
+      # proxies to nginx:443 and nginx has `upstream odoo_app { server odoo:8069; }`,
+      # both by container name over odoo-net. Published on 0.0.0.0 it exposed an
+      # instance running list_db=true with dbfilter=^.*$$ (every tenant database
+      # selectable from its login page) to the whole LAN. ufw cannot gate this:
+      # Docker DNATs in nat PREROUTING, before filter INPUT.
+      - "127.0.0.1:${ODOO_HTTP_PORT:-18069}:8069"
       - "${ODOO_LONGPOLL_PORT:-18072}:8072"
     healthcheck:
       test: ["CMD", "/usr/local/bin/custom-healthcheck.sh"]
@@ -374,6 +386,12 @@ services:
       # internal Odoo service URL; override in .env for multi-tenant
       # routing (e.g. when each tenant has its own Odoo mgmt instance).
       ODOO_WEBHOOK_BASE: ${BAILEYS_ODOO_WEBHOOK_BASE:-http://odoo:8069}
+      # Which tenant database owns whatsapp.account. REQUIRED here, because this
+      # Odoo runs dbfilter = ^.*$$ over ~24 databases: without it Odoo cannot
+      # resolve a database for an anonymous POST and answers 404 "No database is
+      # selected", which looks like a missing route. Sent as X-Odoo-Database
+      # (Odoo 19 does not honour ?db=).
+      ODOO_WEBHOOK_DB: ${BAILEYS_ODOO_WEBHOOK_DB:-}
     volumes:
       - ./data/baileys:/var/lib/baileys
     ports:
@@ -552,6 +570,92 @@ services:
   # internal TLS terminator with the CA pinned. Odoo's notification outbox POSTs back to
   # this container at /api/notify (HMAC-signed), which is why it also needs the WA and
   # SMTP credentials.
+  # Single-database Odoo listener for VAS PMO.
+  #
+  # The shared `odoo` service runs DBFILTER=^.*$$, so more than one database matches and
+  # Odoo cannot pick one for an auth='public' route -- every /vaspmo/api/* call answers
+  # 404. Changing DBFILTER on the shared service would change how every tenant resolves,
+  # so this pins the filter on a listener of its own instead. Same image, same addons,
+  # no published port: only the BFF talks to it, over the internal bridge.
+  odoo-vaspmo:
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo-vaspmo
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # DB
+      HOST: postgres
+      PORT: 5432
+      USER: ${POSTGRES_USER:-odoo}
+      PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Odoo
+      ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD}
+      WORKERS: ${WORKERS:-0}
+      MAX_CRON_THREADS: 1
+      LIST_DB: ${LIST_DB:-False}
+      WITHOUT_DEMO: ${WITHOUT_DEMO:-all}
+      LIMIT_TIME_CPU: ${LIMIT_TIME_CPU:-600}
+      LIMIT_TIME_REAL: ${LIMIT_TIME_REAL:-1200}
+      LIMIT_MEMORY_SOFT: ${LIMIT_MEMORY_SOFT:-2147483648}
+      LIMIT_MEMORY_HARD: ${LIMIT_MEMORY_HARD:-2684354560}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PROXY_MODE: ${PROXY_MODE:-True}
+      DBFILTER: ^${VAS_PMO_TENANT_DB:-rnd_vas_pmo}$$
+      # Pinned literal, NOT ${SERVER_WIDE_MODULES}. The .env value carries queue_job,
+      # and DBFILTER does not apply to the job runner: this container would start a
+      # SECOND runner over every database. The two runners then fight over the
+      # per-database pg_try_advisory_lock, both lose the master election, and both
+      # loop in initialize_databases forever -- no job runs anywhere. VAS PMO does
+      # not use queue_job.
+      SERVER_WIDE_MODULES: base,web
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # Retail import: IMAP mailbox that receives the nightly Levi's X-center reports.
+      # Read by retail.import.mailbox._password(); keeps the secret out of the database.
+      LEVIS_MAIL_PASSWORD: ${LEVIS_MAIL_PASSWORD:-}
+      # AI gateway
+      AI_GATEWAY_URL: http://ai-gateway:8080
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
+      # Tenant orchestrator (custom_super_admin client signs /v1/* with this)
+      ORCHESTRATOR_SHARED_SECRET: ${ORCHESTRATOR_SHARED_SECRET}
+      # Coretax
+      CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY}
+      # Baileys (custom_whatsapp pre-fill defaults on whatsapp.account)
+      BAILEYS_INTERNAL_URL: ${BAILEYS_INTERNAL_URL:-http://baileys:8088}
+      BAILEYS_SHARED_SECRET: ${BAILEYS_SHARED_SECRET:-}
+    volumes:
+      - ./addons:/mnt/extra-addons:ro
+      - ./data/odoo-filestore:/var/lib/odoo
+      # Shared drop folder: custom_retail_import local feed reads
+      # /mnt/data_levis/data and archives to /mnt/data_levis/archive.
+      # Mapped to the SFTP/File Browser share so nightly SFTP uploads and the
+      # retail.import.mailbox IMAP bridge land in the same place the feed polls.
+      - /srv/sftp-share/files:/mnt/data_levis
+    extra_hosts:
+      - "erp_dev_aimarka:127.0.0.1"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/custom-healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
   vas-pmo:
     build:
       context: ./vas-pmo
@@ -607,7 +711,7 @@ services:
     ports:
       - "${VAS_PMO_PORT:-18110}:8080"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/vaspmo/api/health"]
       interval: 20s
       timeout: 5s
       retries: 5
