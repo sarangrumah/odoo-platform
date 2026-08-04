@@ -62,6 +62,41 @@ class SaleOrder(models.Model):
             parts.append(self.x_custom_dp_note)
         return ", ".join(parts)
 
+    def _custom_down_payment_description(self, dp_marker=""):
+        """Description printed on the down-payment invoice line.
+
+        Core labels that line "Down payment of 50.00%", and that wording reaches
+        both the invoice PDF and the Faktur Pajak "Nama Barang Jasa" cell — the
+        coretax exporter reads ``line.product_id.name or line.name`` and a DP
+        line carries no product, so it falls through to the name. ARKA bills the
+        customer for the show, so the products being down-paid lead and the down
+        payment itself is reduced to a trailing marker.
+
+        Deliberately a SINGLE line: the same string lands in one cell of the
+        coretax import file, where an embedded newline is not safe. The invoice
+        PDF wraps it to the column width instead.
+
+        Returns "" when the company gate is off or the order has no product
+        line, so the caller keeps the core wording.
+        """
+        self.ensure_one()
+        if not self.company_id.x_custom_show_date_enabled:
+            return ""
+        names = []
+        for line in self.order_line:
+            if line.display_type or line.is_downpayment:
+                continue
+            # First line only: the event block appended by sale_order_line.py is
+            # already printed in full under every real product line, and would
+            # bloat the Faktur Pajak cell if repeated here.
+            label = (line.name or line.product_id.name or "").split("\n")[0].strip()
+            if label and label not in names:
+                names.append(label)
+        if not names:
+            return ""
+        description = ", ".join(names)
+        return "%s %s" % (description, dp_marker) if dp_marker else description
+
     @api.depends("company_id", "company_id.x_custom_show_date_enabled")
     def _compute_x_custom_show_date_required(self):
         for order in self:

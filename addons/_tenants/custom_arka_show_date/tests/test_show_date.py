@@ -109,6 +109,67 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         so.write({"x_custom_show_date": False})
         self.assertNotIn("Event", so.order_line[0].name)
 
+    def _make_dp_invoice(self, so, method="percentage", amount=50.0):
+        wizard = (
+            self.env["sale.advance.payment.inv"]
+            .with_company(self.company)
+            .sudo()
+            .with_context(active_ids=so.ids, active_model="sale.order")
+            .create(
+                {
+                    "advance_payment_method": method,
+                    **({"amount": amount} if method == "percentage" else {"fixed_amount": amount}),
+                }
+            )
+        )
+        return wizard._create_invoices(so)
+
+    # (7) DP invoice line is labelled with the products, not "Down payment of X%"
+    def test_down_payment_line_uses_product_description(self):
+        so = self._make_so(self.show)
+        so.action_confirm()
+        dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(
+            lambda line: line.display_type == "product"
+        )
+        self.assertEqual(dp_line.name, "%s (Uang Muka 50%%)" % self.product.name)
+        # Single line: this same string is one cell in the coretax import file.
+        self.assertNotIn("\n", dp_line.name)
+        self.assertNotIn("Down payment", dp_line.name)
+
+    # (8) every product line of the order is listed, deduplicated, in order.
+    # Core splits the down payment into one invoice line per tax grouping, so an
+    # order whose products carry different taxes yields several DP lines; each
+    # one describes the whole order, which is what the client's paperwork shows.
+    def test_down_payment_line_lists_all_products(self):
+        so = self._make_so(self.show)
+        so.sudo().write({"order_line": [(0, 0, {"product_id": self.product_b.id, "product_uom_qty": 1})]})
+        so.action_confirm()
+        dp_lines = self._make_dp_invoice(so).invoice_line_ids.filtered(
+            lambda line: line.display_type == "product"
+        )
+        expected = "%s, %s (Uang Muka 50%%)" % (self.product.name, self.product_b.name)
+        self.assertTrue(dp_lines)
+        self.assertEqual(set(dp_lines.mapped("name")), {expected})
+
+    # (9) fixed-amount DP gets a marker without a percentage
+    def test_down_payment_fixed_amount_marker(self):
+        so = self._make_so(self.show)
+        so.action_confirm()
+        dp_line = self._make_dp_invoice(so, method="fixed", amount=100.0).invoice_line_ids.filtered(
+            lambda line: line.display_type == "product"
+        )
+        self.assertEqual(dp_line.name, "%s (Uang Muka)" % self.product.name)
+
+    # (10) flag off -> core "Down payment of X%" wording is left intact
+    def test_down_payment_line_untouched_when_flag_off(self):
+        self.company.x_custom_show_date_enabled = False
+        so = self._make_so(self.show)
+        so.action_confirm()
+        dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(
+            lambda line: line.display_type == "product"
+        )
+        self.assertIn("Down payment", dp_line.name)
+
     # (6) flag off -> standard behaviour (anchored to invoice_date)
     def test_non_flagged_anchors_to_invoice_date(self):
         self.company.x_custom_show_date_enabled = False
