@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Payment Admin Fees",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "summary": "Multi-COA admin/bank fee lines on the Register Payment wizard.",
     "description": """
 Payment Admin Fees
