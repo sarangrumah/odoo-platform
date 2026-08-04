@@ -4,6 +4,17 @@
 httpx[http2]==0.27.2          # AI gateway client
 redis==5.1.1                  # session cache + queue_job (vendored later)
 cryptography==50.0.0          # Fernet for sertel + ir.config_parameter; CVE-2024-12797, CVE-2026-26007, GHSA-537c-gmf6-5ccf (48.0.1); CVE-2026-69247/69248/69249 (50.0.0 — 69247 needs 50.x, the other two land in 49.0.0)
+# MUST be bumped together with cryptography. The base image ships Ubuntu's
+# python3-openssl (pyOpenSSL 23.2.0), which cryptography 50 breaks outright:
+# OpenSSL/crypto.py reads _lib.GEN_EMAIL, removed from the 50.x bindings, so
+# `import OpenSSL` raises AttributeError. Odoo core imports it from
+# base/models/ir_mail_server.py, which the `web` module imports in turn — so the
+# whole web module fails to load and EVERY route answers 404. A scan-only CI
+# check cannot see this; it only appears when Odoo actually boots.
+# 26.4.0 is the first release accepting cryptography>=49,<51. Do not "fix" a
+# conflict here by installing a 25.x — those cap cryptography at <47 and will
+# silently downgrade it, undoing the CVE fixes above.
+pyOpenSSL==26.4.0
 pyjwt==2.13.0                 # JWT for AI gateway auth (alt to HMAC); CVE-2026-32597 (`crit` header)
 xmlschema==3.4.1              # Coretax XSD validation
 signxml==4.4.0                # Sertel XAdES signing (DJP requirement); CVE-2025-48994, CVE-2025-48995
