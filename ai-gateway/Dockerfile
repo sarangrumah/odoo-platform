@@ -55,6 +55,6 @@ EXPOSE 8080
 
 # Healthcheck handled by compose; image-level fallback
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-  CMD curl -fsS http://localhost:8080/health || exit 1
+  CMD ["/bin/sh", "-c", "curl -fsS http://localhost:8080/health || exit 1"]
 
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

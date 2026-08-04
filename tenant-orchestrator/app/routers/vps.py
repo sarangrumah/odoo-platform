@@ -57,7 +57,8 @@ def _credential_skip_response(detail: str) -> JSONResponse:
     the SSH credential could not be resolved (typical in dev / UAT).
 
     ``detail`` must already be a sanitised, human-friendly string (e.g.
-    ``SSHCredentialError`` messages, which we construct ourselves).
+    ``SSHCredentialError.public_reason``, never ``str(exc)`` -- the latter
+    names the env var, key path or Vault path that failed and is log-only).
     """
     return JSONResponse(
         status_code=200,
@@ -159,7 +160,7 @@ def register_vps(body: VPSRegisterRequest, request: Request) -> dict:
         # Logs hostname + resolution error only, never the credential value.
         # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         log.info("vps.register.credential_skip host=%s err=%s", target.hostname, e)
-        return _credential_skip_response(str(e))
+        return _credential_skip_response(e.public_reason)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, _opaque_error(e, label="SSH connect failed")) from e
     log.info("vps.registered host=%s actor=%s", target.hostname, actor)
@@ -191,7 +192,7 @@ def bootstrap_vps(vps_id: int, body: BootstrapRequest, request: Request) -> Stre
                     body_text = _render_template(s, ctx)
                     yield from ex.run_script(s.replace(".template", ""), body_text)
         except SSHCredentialError as e:
-            yield f"ERROR credential: {e}"
+            yield f"ERROR credential: {e.public_reason}"
         except Exception as e:  # noqa: BLE001
             yield _opaque_error(e, label="ERROR bootstrap")
 
@@ -218,7 +219,7 @@ def deploy_stack(vps_id: int, body: DeployStackRequest, request: Request) -> Str
                 body_text = _render_template("deploy_odoo.sh.template", ctx)
                 yield from ex.run_script("deploy_odoo.sh", body_text)
         except SSHCredentialError as e:
-            yield f"ERROR credential: {e}"
+            yield f"ERROR credential: {e.public_reason}"
         except Exception as e:  # noqa: BLE001
             yield _opaque_error(e, label="ERROR deploy_stack")
 
@@ -249,7 +250,7 @@ echo "[sync_addons] DONE"
                 yield "=== sync_addons ==="
                 yield from ex.run_script("sync_addons.sh", script)
         except SSHCredentialError as e:
-            yield f"ERROR credential: {e}"
+            yield f"ERROR credential: {e.public_reason}"
         except Exception as e:  # noqa: BLE001
             yield _opaque_error(e, label="ERROR sync_addons")
 
@@ -289,7 +290,10 @@ def health(
         return {
             "ok": False,
             "skipped": True,
-            "reason": (f"ssh credential could not be resolved — configure vault:// or use file:// ref. detail: {e}"),
+            "reason": (
+                f"ssh credential could not be resolved — configure vault:// or use file:// ref. "
+                f"detail: {e.public_reason}"
+            ),
         }
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": _opaque_error(e, label="health probe failed")}
@@ -324,7 +328,7 @@ echo "[decommission] DONE"
         # Logs vps_id + resolution error only, never the credential value.
         # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         log.info("vps.decommission.credential_skip vps_id=%s err=%s", vps_id, e)
-        return _credential_skip_response(str(e))
+        return _credential_skip_response(e.public_reason)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, _opaque_error(e, label="decommission failed")) from e
     rc_line = next((l for l in lines if l.startswith("__EXIT__")), "__EXIT__ -1")
