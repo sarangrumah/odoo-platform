@@ -49,6 +49,16 @@ RUN pip3 install --no-cache-dir --break-system-packages --ignore-installed \
        -r /tmp/requirements.txt \
  && rm -f /tmp/requirements.txt
 
+# The base image ships rtlcss (Odoo's RTL asset generator) with a nested
+# postcss 8.5.15, vulnerable to GHSA-r28c-9q8g-f849 (path traversal via
+# sourceMappingURL). rtlcss is already at its latest 4.3.0 — only the nested
+# dep is stale, and its range (^8.4.21) accepts the fix. Drop the nested copy
+# and pin the patched postcss as a sibling in the global node_modules, which
+# rtlcss resolves upward to. Pinned, not @latest, so rebuilds are deterministic.
+RUN rm -rf /usr/local/lib/node_modules/rtlcss/node_modules/postcss \
+ && npm install -g --no-audit --no-fund postcss@8.5.25 \
+ && npm cache clean --force
+
 # Strip SUID binaries (CIS hardening)
 RUN find / -xdev -perm -4000 -type f -exec chmod u-s {} + 2>/dev/null || true \
  && find / -xdev -perm -2000 -type f -exec chmod g-s {} + 2>/dev/null || true

@@ -84,24 +84,39 @@ jobs:
   container-scan:
     runs-on: ubuntu-latest
     strategy:
+      # Every Dockerfile in the repo is listed here. It used to be odoo,
+      # ai-gateway and custom-predictor only, which left 6 images built and
+      # shipped but never scanned — that is how tenant-orchestrator sat 4 majors
+      # behind on cryptography (#78) and how DL3018 hid from container-scan (#80).
+      # `dir` is the build context, `name` is the job label and image tag, since
+      # some contexts are nested and would make ugly tags.
       matrix:
-        image: [odoo, ai-gateway, custom-predictor]
+        include:
+          - {name: odoo, dir: odoo}
+          - {name: ai-gateway, dir: ai-gateway}
+          - {name: custom-predictor, dir: custom-predictor}
+          - {name: hub-portal, dir: hub-portal}
+          - {name: storefront, dir: storefront}
+          - {name: tenant-orchestrator, dir: tenant-orchestrator}
+          - {name: baileys, dir: services/baileys}
+          - {name: finance-sap-bridge, dir: services/finance-sap-bridge}
+          - {name: odoo-exporter, dir: observability/odoo-exporter}
       fail-fast: false
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build image
         run: |
-          docker build -t local-${{ matrix.image }}:ci ./${{ matrix.image }}
+          docker build -t local-${{ matrix.name }}:ci ./${{ matrix.dir }}
       - name: Hadolint Dockerfile
         uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
         with:
-          dockerfile: ${{ matrix.image }}/Dockerfile
+          dockerfile: ${{ matrix.dir }}/Dockerfile
           config: .hadolint.yaml
           failure-threshold: warning
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: local-${{ matrix.image }}:ci
+          image-ref: local-${{ matrix.name }}:ci
           severity: HIGH,CRITICAL
           exit-code: '1'
           ignore-unfixed: true
