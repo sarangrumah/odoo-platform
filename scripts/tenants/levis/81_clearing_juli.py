@@ -1,8 +1,8 @@
-# Execute the July-2026 clearing plan built by 78_prep_clearing_juli.py.
+# Execute the July-2026 clearing plan built by 80_prep_clearing_juli.py.
 #
 #   CLR_JSON=/tmp/clearing_juli.json \
 #   docker exec -i odoo19-platform-odoo odoo shell -d prd_levis_begbal --no-http \
-#       < scripts/tenants/levis/79_clearing_juli.py
+#       < scripts/tenants/levis/81_clearing_juli.py
 #
 # Everything is created as DRAFT unless CLR_POST=1. Idempotent: the ref guard
 # refuses to build a block twice.

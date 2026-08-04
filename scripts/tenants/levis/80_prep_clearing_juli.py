@@ -4,10 +4,10 @@
 Runs on the HOST (plain python3 + openpyxl). Reads only; the database is read
 through ``docker exec ... psql`` so the ORM is never touched here. Output:
 
-  * a JSON plan consumed by ``79_clearing_juli.py`` (odoo shell)
+  * a JSON plan consumed by ``81_clearing_juli.py`` (odoo shell)
   * a validation workbook for Accounting/FICO
 
-    python3 scripts/tenants/levis/78_prep_clearing_juli.py \
+    python3 scripts/tenants/levis/80_prep_clearing_juli.py \
         --ebr '/path/07. REPORT EBR PERIODE JULI 2026 (2).xlsx' \
         --bca-csv '/path/MUTASI REKENING BCA EBR 01 - 31 JULI 2026.csv' \
         --db prd_levis_begbal \
@@ -134,7 +134,7 @@ def build_settlement(wb):
     # Deliberately NOT split per POS-receivable account here. EBR's tender-type
     # column disagrees with X70D on 35 store/day combinations (offsetting inside
     # the same day) and is empty for PASKAL 24-Jul, so crediting EBR's split
-    # would over-credit one account and leave another open. 79_clearing_juli.py
+    # would over-credit one account and leave another open. 81_clearing_juli.py
     # resolves the split from the open RIREC lines of that store and day; the
     # workbook still shows EBR's own split for reference.
     credits = collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
@@ -263,7 +263,7 @@ def missing_bri_lines(wb):
     Two reasons this is a full-month rebuild and not a 25-31 top-up: the Drive
     folder only carries the JUNE BRISIM file, and the BRISIM import already in
     Odoo dropped roughly half of every day's rows (172 lines against the 318 the
-    bank shows for 01-24 Jul). 79_clearing_juli.py therefore replaces the July
+    bank shows for 01-24 Jul). 81_clearing_juli.py therefore replaces the July
     IBRI statement instead of appending to it.
     """
     out = []
