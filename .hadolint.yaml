@@ -1,6 +1,13 @@
-# Hadolint config — referenced by .github/workflows/ci.yml (container-scan job).
+# Hadolint config — the SINGLE SOURCE OF TRUTH for hadolint rules.
 #
-# Two warning-level rules are globally ignored:
+# Read by both consumers, so they cannot drift apart:
+#   * .github/workflows/ci.yml, container-scan job, via `config: .hadolint.yaml`
+#   * .pre-commit-config.yaml, hadolint-docker hook — hadolint auto-discovers
+#     this file from the working directory, which pre-commit sets to the repo
+#     root. That hook therefore passes only --failure-threshold and NO
+#     --ignore flags; put every exclusion here instead.
+#
+# Three warning-level rules are globally ignored:
 #
 #   DL3008 — "Pin versions in apt get install"
 #     Triggers on `apt-get install <pkg>` without `<pkg>=<version>` pin.
@@ -10,6 +17,15 @@
 #     point releases shift versions frequently, breaking the build whenever
 #     the base image moves. We accept "latest from base image" semantics here.
 #
+#   DL3018 — "Pin versions in apk add"
+#     The Alpine twin of DL3008, and it fires in exactly one place:
+#     services/baileys/Dockerfile installs `git` so npm can resolve Baileys'
+#     git-hosted sub-dependencies. Alpine drops old package versions from its
+#     repos on every point release, so an `=<version>` pin there breaks the
+#     build sooner than apt pins would. Same trade-off as DL3008, same call.
+#     Previously this lived only in .pre-commit-config.yaml's args, which is
+#     why the two configs disagreed; it is here now so they cannot.
+#
 #   DL3013 — "Pin versions in pip"
 #     Triggers on `pip install <pkg>` without `<pkg>==<version>` pin OR
 #     `-r requirements.txt`. Our actual app dependencies ARE pinned (see e.g.
@@ -17,10 +33,11 @@
 #     `-r /tmp/requirements.txt`). The lint trigger is on `pip install --upgrade
 #     pip` — we accept the unpinned pip self-upgrade.
 #
-# All other hadolint rules remain active. Re-enable either of the above if
-# the project moves toward fully-deterministic image builds (e.g. with apt-pin
+# All other hadolint rules remain active. Re-enable any of the above if the
+# project moves toward fully-deterministic image builds (e.g. with apt-pin
 # files or a hash-pinned base image).
 
 ignored:
   - DL3008
   - DL3013
+  - DL3018
