@@ -173,8 +173,16 @@ def _load_known_hosts(client) -> str:
     """
     from .config import get_settings
 
+    # Keys pinned earlier in this process apply whether or not a file exists,
+    # so a lost or unwritable known_hosts still cannot downgrade us to
+    # accepting a changed key.
+    def _seed_session_keys() -> None:
+        for hostname, key in _SESSION_HOST_KEYS.items():
+            client.get_host_keys().add(hostname, key.get_name(), key)
+
     path = (get_settings().ssh_known_hosts_file or "").strip()
     if not path:
+        _seed_session_keys()
         return ""
     try:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -183,12 +191,14 @@ def _load_known_hosts(client) -> str:
             with open(path, "a", encoding="utf-8"):
                 pass
         client.load_host_keys(path)
+        _seed_session_keys()
         return path
     except OSError as e:
         # A read-only or missing volume must not take provisioning down; it
-        # degrades to "unknown host" handling, which is still stricter than
-        # the old unconditional auto-add when strict mode is on.
+        # degrades to process-lifetime pinning, which is still far stricter
+        # than the old unconditional auto-add.
         log.warning("ssh.known_hosts.unavailable path=%s err=%s", path, e)
+        _seed_session_keys()
         return ""
 
 
@@ -200,37 +210,59 @@ def _missing_host_key_policy(known_hosts: str):
     exists for. The choice here only covers the *first* sight of a host:
 
       * strict mode -> reject; the key must be pre-seeded in known_hosts.
-      * otherwise   -> trust on first use and persist it, so every later
-        connection is verified. This keeps first-deploy bootstrap working,
-        which is why AutoAddPolicy was there in the first place, while
-        closing the window where every connection accepted any key forever.
+      * otherwise   -> trust on first use and pin it, so every later connection
+        is verified. This keeps first-deploy bootstrap working, which is why
+        AutoAddPolicy was there in the first place, while closing the window
+        where every connection accepted any key forever.
+
+    ``paramiko.AutoAddPolicy`` is deliberately never used, not even as a
+    fallback: it re-trusts a changed key silently, which is the whole problem.
+    Without a writable file we still pin for the life of the process.
     """
     from .config import get_settings
 
     if get_settings().ssh_strict_host_keys:
         return paramiko.RejectPolicy()
     if not known_hosts:
-        # Nowhere to persist: this is the old behaviour, and it is why the
-        # warning is loud. Fix the volume or turn strict mode on.
-        log.warning("ssh.host_key.unpinned: no known_hosts file, host keys cannot be verified")
-        return paramiko.AutoAddPolicy()
-    return _PersistingAutoAdd(known_hosts)
+        log.warning(
+            "ssh.host_key.not_persisted: no writable known_hosts file — pinning "
+            "only for this process; fix the /var/lib/orchestrator mount"
+        )
+    return _PinOnFirstUse(known_hosts)
 
 
-class _PersistingAutoAdd(paramiko.MissingHostKeyPolicy if paramiko else object):
-    """Trust on first use, then write the key so it is verified from then on."""
+# Host keys seen during this process, so pinning still works when the
+# known_hosts file is unavailable. Cleared only by a restart.
+_SESSION_HOST_KEYS: dict[str, object] = {}
+
+
+class _PinOnFirstUse(paramiko.MissingHostKeyPolicy if paramiko else object):
+    """Trust a host the first time, then hold it to that key.
+
+    Unlike ``AutoAddPolicy`` this records the key -- on disk when possible and
+    always in ``_SESSION_HOST_KEYS`` -- so the next connection is verified by
+    paramiko rather than waved through.
+    """
 
     def __init__(self, path: str) -> None:
         self._path = path
 
     def missing_host_key(self, client, hostname, key) -> None:
+        seen = _SESSION_HOST_KEYS.get(hostname)
+        if seen is not None and seen != key:
+            # Pinned earlier this process, different key now: refuse, exactly
+            # as paramiko would have if the file had survived.
+            raise paramiko.SSHException(f"host key for {hostname} changed since it was pinned — refusing to connect")
         log.warning(
             "ssh.host_key.pinned_on_first_use host=%s type=%s fp=%s",
             hostname,
             key.get_name(),
             key.get_fingerprint().hex(),
         )
+        _SESSION_HOST_KEYS[hostname] = key
         client.get_host_keys().add(hostname, key.get_name(), key)
+        if not self._path:
+            return
         try:
             client.save_host_keys(self._path)
         except OSError as e:

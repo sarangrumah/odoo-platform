@@ -42,15 +42,15 @@ def test_default_mode_pins_on_first_use(tmp_path):
     client = paramiko.SSHClient()
     path = provisioner_ssh._load_known_hosts(client)
     policy = provisioner_ssh._missing_host_key_policy(path)
-    assert isinstance(policy, provisioner_ssh._PersistingAutoAdd)
+    assert isinstance(policy, provisioner_ssh._PinOnFirstUse)
     assert not isinstance(policy, paramiko.AutoAddPolicy)
 
     key = paramiko.ECDSAKey.generate()
     policy.missing_host_key(client, "vps-a.example.com", key)
 
-    # Persisted...
-    body = (tmp_path / "known_hosts").read_text()
-    assert "vps-a.example.com" in body
+    # Persisted as a real known_hosts entry, not just a substring somewhere.
+    entries = paramiko.HostKeys(str(tmp_path / "known_hosts"))
+    assert entries.lookup("vps-a.example.com") is not None
     # ...and a fresh client now knows the host, so paramiko verifies it
     # instead of asking the policy again.
     reloaded = paramiko.SSHClient()
@@ -76,11 +76,29 @@ def test_a_changed_host_key_is_not_silently_accepted(tmp_path):
     assert entry[original.get_name()] != impostor
 
 
-def test_missing_known_hosts_file_degrades_but_warns(monkeypatch, caplog):
+def test_missing_known_hosts_file_still_pins_for_the_process(monkeypatch):
+    """No writable file must not mean "accept anything", as it used to."""
     monkeypatch.setattr(config, "_settings", None)
     monkeypatch.setenv("SSH_KNOWN_HOSTS_FILE", "")
+    provisioner_ssh._SESSION_HOST_KEYS.clear()
+
     client = paramiko.SSHClient()
     assert provisioner_ssh._load_known_hosts(client) == ""
     policy = provisioner_ssh._missing_host_key_policy("")
-    # Provisioning still works, but the operator is told it is unverified.
-    assert isinstance(policy, paramiko.AutoAddPolicy)
+    # Never AutoAddPolicy: that re-trusts a changed key silently.
+    assert not isinstance(policy, paramiko.AutoAddPolicy)
+
+    original = paramiko.ECDSAKey.generate()
+    policy.missing_host_key(client, "vps-c.example.com", original)
+
+    # Same key again is fine; a different one for the same host is refused.
+    policy.missing_host_key(client, "vps-c.example.com", original)
+    impostor = paramiko.ECDSAKey.generate()
+    with pytest.raises(paramiko.SSHException, match="changed since it was pinned"):
+        policy.missing_host_key(client, "vps-c.example.com", impostor)
+
+    # And a later client inherits the pin even with no file on disk.
+    fresh = paramiko.SSHClient()
+    provisioner_ssh._load_known_hosts(fresh)
+    assert fresh.get_host_keys().lookup("vps-c.example.com") is not None
+    provisioner_ssh._SESSION_HOST_KEYS.clear()
