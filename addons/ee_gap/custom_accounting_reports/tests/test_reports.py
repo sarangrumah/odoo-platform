@@ -553,6 +553,44 @@ class TestCustomReports(TransactionCase):
         gl_grouped = self.env["custom.report.general.ledger"]
         self.assertEqual(len(gl_grouped._xlsx_columns()), 8)
 
+    def test_grouped_screen_tables_carry_values(self):
+        """Reports that nest their movements under a group row (GL,
+        Partner Ledger) must render those movements on screen — the
+        default flattener used to emit one blank row per group while the
+        Excel export looked fine."""
+        today = date.today()
+        self._post_move(
+            [(self.acc_recv, 1000.0, 0.0), (self.acc_revenue, 0.0, 1000.0)],
+            dt=today,
+            partner=self.partner_a,
+            ref="SCREEN1",
+        )
+        options = {
+            "date_from": date(today.year, 1, 1).isoformat(),
+            "date_to": today.isoformat(),
+            "company_ids": [self.company.id],
+            "posted_only": True,
+        }
+        for model, group_label in (
+            ("custom.report.general.ledger", "["),
+            ("custom.report.partner.ledger", self.partner_a.name),
+        ):
+            table = self.env[model].get_report_table(options)
+            types = [row["type"] for row in table["lines"]]
+            self.assertIn("group", types, "%s must emit group heading rows." % model)
+            data_rows = [row for row in table["lines"] if row["type"] == "data"]
+            self.assertTrue(data_rows, "%s must emit its nested movements." % model)
+            self.assertTrue(
+                any(v not in (None, "", 0) for row in data_rows for v in row["values"].values()),
+                "%s movement rows must carry values, not blanks." % model,
+            )
+            heading = next(row for row in table["lines"] if row["type"] == "group")
+            self.assertTrue(
+                any(group_label in str(v) for v in heading["values"].values()),
+                "%s heading row must name its group." % model,
+            )
+            self.assertEqual(types[-1], "grand_total")
+
     # ------------------------------------------------------------------
     # 7) Aged receivable detail: one row per open document, grouped by
     #    partner.
