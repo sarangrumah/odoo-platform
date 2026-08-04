@@ -64,7 +64,10 @@ services:
       DBFILTER: "^%d$$"
       # Trust Caddy's X-Forwarded headers; Caddy is the public-facing TLS terminator.
       PROXY_MODE: "True"
-      LIST_DB: "False"     # multitenant: never list DBs publicly
+      # Multitenant default: never list DBs publicly. Set ODOO_PUBLIC_LIST_DB=True
+      # in .env to open /web/database/manager on the public instance — note the
+      # DBFILTER above still scopes the visible list to the requested hostname.
+      LIST_DB: "${ODOO_PUBLIC_LIST_DB:-False}"
 
   # Private management Odoo instance used ONLY by the tenant-orchestrator to
   # provision/drop/upgrade per-tenant databases. Shares postgres + redis with

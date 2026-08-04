@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA Show Date",
-    "version": "19.0.1.4.0",
+    "version": "19.0.1.5.0",
     "summary": "Show-date, event and DP fields on quotation/SO/customer invoice, "
     "with payment terms anchored to the show date. PT ARKA only.",
     "description": """
@@ -27,7 +27,8 @@ line's description::
 The description is a stored compute with ``readonly=False``, so the block is
 rebuilt whenever the event data changes but manual edits survive in between. It
 travels to the customer invoice through the standard ``_prepare_invoice_line``.
-The event block is not repeated on the down-payment line (see below).
+The down-payment line carries the same event data in its own one-line form
+(see below).
 
 Down-payment line description
 -----------------------------
@@ -36,15 +37,17 @@ wording is what the customer sees on the invoice PDF *and* in the Faktur Pajak
 "Nama Barang Jasa" cell — ``custom_coretax_export`` reads
 ``line.product_id.name or line.name``, and a DP line carries no product, so it
 falls through to the name. For flagged companies the line is relabelled with the
-products being down-paid instead::
+products being down-paid followed by the event detail instead::
 
-    Jasa Drone Show 250 Unit, Biaya Luar Kota (Uang Muka 50%)
+    Jasa Drone Show 250 Unit, Biaya Luar Kota, Event Danone,
+    Lokasi Taman Bhagawan Bali, 07.08.26 (Uang Muka 50%)
 
 Rewriting the stored ``name`` fixes both printouts from one place;
 ``custom_report_templates`` and ``custom_coretax_export`` are shared addons and
 stay untouched. The string is deliberately kept to a single line because it
 lands in one cell of the coretax import file. A fixed-amount down payment gets
-``(Uang Muka)`` with no percentage. The journal item carries the same label; the
+``(Uang Muka)`` with no percentage, and ``x_custom_dp_note`` is left out of this
+line because the trailing marker already states the down payment. The journal item carries the same label; the
 down payment stays identifiable in the GL through account 2108100001 and the
 order's "Down Payments" section.
 
