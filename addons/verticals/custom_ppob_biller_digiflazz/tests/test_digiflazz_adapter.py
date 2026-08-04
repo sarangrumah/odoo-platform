@@ -20,6 +20,16 @@ from odoo.tools import mute_logger
 _API_KEY = "test-api-key-123"
 _USERNAME = "dfuser"
 
+# Known-answer vectors for the two fixed-suffix signatures, i.e.
+# md5(_USERNAME + _API_KEY + suffix) as Digiflazz defines it.
+#
+# Frozen rather than recomputed with hashlib in the assertion: recomputing it
+# here would restate the implementation instead of pinning the wire format, so
+# reversing the concatenation order in BOTH places would still pass. A literal
+# digest is what a protocol conformance test should assert against.
+_SIGN_DEPOSIT = "c08c792ff375c4a65b427e148ccee1fb"  # suffix "depo"
+_SIGN_PRICELIST = "4da1ec46a20b1ab2a80ecf98d3d61d19"  # suffix "pricelist"
+
 
 class _FakeResponse:
     def __init__(self, payload, status_code=200, content=b"x", raise_value_error=False):
@@ -653,11 +663,7 @@ class TestDigiflazzAdapter(TransactionCase):
         self.assertEqual(result.amount, 500000.0)
         self.assertEqual(captured["url"], "https://api.digiflazz.com/v1/cek-saldo")
         self.assertEqual(captured["body"]["cmd"], "deposit")
-        # The adapter must reproduce Digiflazz's own md5 signature; the test asserts
-        # byte-for-byte equality with it, so the algorithm is fixed by the vendor.
-        # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5,semgrep.weak-hash-md5-sha1
-        expected = hashlib.md5(f"{_USERNAME}{_API_KEY}depo".encode("utf-8")).hexdigest()
-        self.assertEqual(captured["body"]["sign"], expected)
+        self.assertEqual(captured["body"]["sign"], _SIGN_DEPOSIT)
 
     def test_price_list_signs_with_pricelist_suffix(self):
         adapter = self.provider._get_adapter()
@@ -667,11 +673,7 @@ class TestDigiflazzAdapter(TransactionCase):
         self.assertTrue(result.ok)
         self.assertEqual(captured["url"], "https://api.digiflazz.com/v1/price-list")
         self.assertEqual(captured["body"]["cmd"], "prepaid")
-        # The adapter must reproduce Digiflazz's own md5 signature; the test asserts
-        # byte-for-byte equality with it, so the algorithm is fixed by the vendor.
-        # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5,semgrep.weak-hash-md5-sha1
-        expected = hashlib.md5(f"{_USERNAME}{_API_KEY}pricelist".encode("utf-8")).hexdigest()
-        self.assertEqual(captured["body"]["sign"], expected)
+        self.assertEqual(captured["body"]["sign"], _SIGN_PRICELIST)
 
     def test_topup_is_refused_rather_than_faked(self):
         adapter = self.provider._get_adapter()
