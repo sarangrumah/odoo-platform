@@ -27,6 +27,24 @@ _CATEGORY_PURPOSE = {
 _BULK_ASYNC_THRESHOLD = 5
 
 
+def _mask_phone(number: str | None) -> str:
+    """Render a recipient number for a log line without disclosing it.
+
+    ``+6281234567890`` -> ``62********890``. Enough to correlate a log entry
+    with a record while reading, not enough to contact anyone or to identify
+    the subscriber from the log alone.
+
+    No ``+`` is prepended: the input may be in local form (``0812...``) and a
+    leading plus would imply a country code that is not there.
+    """
+    digits = "".join(ch for ch in (number or "") if ch.isdigit())
+    if not digits:
+        return "(none)"
+    if len(digits) <= 5:
+        return "*" * len(digits)
+    return f"{digits[:2]}{'*' * (len(digits) - 5)}{digits[-3:]}"
+
+
 class WhatsappMessage(models.Model):
     _name = "whatsapp.message"
     _description = "WhatsApp Message"
@@ -192,12 +210,18 @@ class WhatsappMessage(models.Model):
         # Sandbox mode: synthesise a message id and short-circuit.
         if account.sandbox_mode:
             fake_id = f"sandbox-{uuid.uuid4().hex[:16]}"
+            # The recipient number is masked and the body is reduced to its
+            # length: sandbox mode is normally exercised with real customer
+            # data during UAT, and Odoo's log is not treated as a sensitive
+            # store. The message id and the record are how you trace a send;
+            # neither needs the subscriber's number or the text itself.
             _logger.info(
-                "[whatsapp sandbox] account=%s to=%s template=%s body=%s -> %s",
+                "[whatsapp sandbox] account=%s msg_id=%s to=%s template=%s body_len=%s -> %s",
                 account.name,
-                self.to_phone,
+                self.id,
+                _mask_phone(self.to_phone),
                 self.template_id.name if self.template_id else None,
-                (self.body or "")[:120],
+                len(self.body or ""),
                 fake_id,
             )
             self.write(
