@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-06-09T00:00:00Z
 generator: hand-authored
 module: custom_arka_show_date
-manifest_version: 19.0.1.0.0
+manifest_version: 19.0.1.5.0
 ---
 
 # custom_arka_show_date
@@ -29,6 +29,33 @@ multi-company tenant DB (e.g. AIM + ARKA): only the flagged company is affected.
    it for `date_ref`, so every `date_maturity` and the early-payment
    `discount_date` are anchored to the show date. Non-flagged companies are
    untouched (pure pass-through).
+
+## Event Description Block (1.3+)
+The order also captures `x_custom_event_name`, `x_custom_event_location` and
+`x_custom_dp_note`. `sale.order._custom_event_description()` joins them with the
+show date (`dd.mm.yy`) into one string, which `sale.order.line._compute_name()`
+appends as a second line under every product line's description. It reaches the
+customer invoice through the standard `_prepare_invoice_line`.
+
+## Down-Payment Line Description (1.4+, event detail added in 1.5)
+`sale.advance.payment.inv._prepare_down_payment_invoice_line_values()` replaces
+core's "Down payment of 50.00%" with
+`sale.order._custom_down_payment_description(marker)`:
+
+    <product names>, <event block> (Uang Muka 50%)
+
+Both the invoice PDF and the Faktur Pajak read this one stored `name` — the
+coretax exporter uses `line.product_id.name or line.name`, and a DP line has no
+product — so rewriting it fixes both printouts without touching the shared
+`custom_report_templates` / `custom_coretax_export` addons.
+
+Two constraints hold this shape:
+- **Single line, always.** The string lands in one cell of the coretax import
+  file, where an embedded newline is not safe. The event block is therefore
+  taken once from the order, not from each product line's multi-line `name`.
+- **`x_custom_dp_note` is excluded** here (`include_dp_note=False`), because the
+  trailing marker already states the down payment; including it would print
+  "DP 50% (Uang Muka 50%)". A fixed-amount DP gets `(Uang Muka)`, no percentage.
 
 ## Key Models
 - `res.company` (inherited) — `x_custom_show_date_enabled` (Boolean gate flag).

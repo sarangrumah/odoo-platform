@@ -131,7 +131,7 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(
             lambda line: line.display_type == "product"
         )
-        self.assertEqual(dp_line.name, "%s (Uang Muka 50%%)" % self.product.name)
+        self.assertEqual(dp_line.name, "%s, 01.09.26 (Uang Muka 50%%)" % self.product.name)
         # Single line: this same string is one cell in the coretax import file.
         self.assertNotIn("\n", dp_line.name)
         self.assertNotIn("Down payment", dp_line.name)
@@ -147,7 +147,7 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         dp_lines = self._make_dp_invoice(so).invoice_line_ids.filtered(
             lambda line: line.display_type == "product"
         )
-        expected = "%s, %s (Uang Muka 50%%)" % (self.product.name, self.product_b.name)
+        expected = "%s, %s, 01.09.26 (Uang Muka 50%%)" % (self.product.name, self.product_b.name)
         self.assertTrue(dp_lines)
         self.assertEqual(set(dp_lines.mapped("name")), {expected})
 
@@ -158,7 +158,31 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         dp_line = self._make_dp_invoice(so, method="fixed", amount=100.0).invoice_line_ids.filtered(
             lambda line: line.display_type == "product"
         )
-        self.assertEqual(dp_line.name, "%s (Uang Muka)" % self.product.name)
+        self.assertEqual(dp_line.name, "%s, 01.09.26 (Uang Muka)" % self.product.name)
+
+    # (9b) the event detail rides the DP line, so it reaches the invoice PDF and
+    # the Faktur Pajak "Nama Barang Jasa" cell (which reads this very string).
+    def test_down_payment_line_carries_event_detail(self):
+        so = self._make_so(self.show)
+        so.write(
+            {
+                "x_custom_event_name": "Danone",
+                "x_custom_event_location": "Taman Bhagawan Bali",
+                "x_custom_dp_note": "DP 50%",
+            }
+        )
+        so.action_confirm()
+        dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(
+            lambda line: line.display_type == "product"
+        )
+        self.assertEqual(
+            dp_line.name,
+            "%s, Event Danone, Lokasi Taman Bhagawan Bali, 01.09.26 (Uang Muka 50%%)" % self.product.name,
+        )
+        # The trailing marker already says it — the free-text DP note is dropped
+        # here so the cell does not read "DP 50% (Uang Muka 50%)".
+        self.assertNotIn("DP 50% ", dp_line.name)
+        self.assertNotIn("\n", dp_line.name)
 
     # (10) flag off -> core "Down payment of X%" wording is left intact
     def test_down_payment_line_untouched_when_flag_off(self):
