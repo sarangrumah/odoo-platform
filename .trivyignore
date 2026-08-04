@@ -1,6 +1,11 @@
 # Trivy ignore list — justify EVERY entry
 # Format: <CVE-ID>
 # Each entry MUST have a comment line above explaining justification + expiry.
+#
+# This file can ONLY suppress by vulnerability ID. To suppress a whole package,
+# do not paste its CVE list here — it goes stale as soon as a new one is
+# published. Add a rule to .trivy/ignore-policy.rego instead, which matches on
+# the package. (linux-libc-dev is already handled there.)
 
 # Example:
 # # justification: false positive — affects only debian buster, we run bookworm. expires 2026-12-31
