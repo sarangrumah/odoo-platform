@@ -18,6 +18,7 @@ exactly that. The retry loop is still omitted because a blind retry cannot know
 whether the ref_id it is re-sending is still within Digiflazz's retention
 window; only status(), which checks the age guards, may re-send.
 """
+
 import hashlib
 import json
 import logging
@@ -58,7 +59,6 @@ class DigiflazzError(Exception):
 
 @register_adapter("ppob_digiflazz")
 class DigiflazzAdapter(PPOBProviderAdapter):
-
     # ------------------------------------------------------------------
     # Signing & transport
     # ------------------------------------------------------------------
@@ -68,6 +68,10 @@ class DigiflazzAdapter(PPOBProviderAdapter):
 
         ``suffix`` is the ref_id for transactions, or a fixed word for the
         read-only endpoints ("depo", "pricelist").
+
+        MD5 is dictated by the Digiflazz API contract -- their gateway rejects
+        any other digest -- so this is protocol interop, not a hash we chose.
+        The API key never leaves the request signature, and the call rides TLS.
         """
         username = self.provider.digiflazz_username or ""
         api_key = self.provider._digiflazz_api_key()
@@ -78,7 +82,8 @@ class DigiflazzAdapter(PPOBProviderAdapter):
                 "ir.config_parameter holding the key." % self.provider.code
             )
         raw = f"{username}{api_key}{suffix}"
-        return hashlib.md5(raw.encode("utf-8")).hexdigest()
+        # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5,semgrep.weak-hash-md5-sha1
+        return hashlib.md5(raw.encode("utf-8")).hexdigest()  # nosec B324 - vendor-mandated digest, see docstring
 
     def _timeout(self):
         cfg = self.provider.adapter_config_id
@@ -92,15 +97,17 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         if not cfg:
             return
         try:
-            self.provider.env["custom.adapter.call.log"].sudo().create({
-                "config_id": cfg.id,
-                "endpoint": path,
-                "request_hash": hashlib.sha256(body or b"").hexdigest() if body else "",
-                "response_status": status_code,
-                "latency_ms": latency_ms,
-                "error": (error or "")[:512] if error else False,
-                "ok": ok,
-            })
+            self.provider.env["custom.adapter.call.log"].sudo().create(
+                {
+                    "config_id": cfg.id,
+                    "endpoint": path,
+                    "request_hash": hashlib.sha256(body or b"").hexdigest() if body else "",
+                    "response_status": status_code,
+                    "latency_ms": latency_ms,
+                    "error": (error or "")[:512] if error else False,
+                    "ok": ok,
+                }
+            )
         except Exception as exc:  # pragma: no cover - never block the business call
             _logger.error("digiflazz adapter call log write failed: %s", exc)
 
@@ -132,8 +139,7 @@ class DigiflazzAdapter(PPOBProviderAdapter):
             return resp.status_code, {"error": "Digiflazz returned a non-JSON response"}
 
         ok = 200 <= resp.status_code < 300
-        self._log_call(path, body, resp.status_code, latency_ms,
-                       None if ok else f"HTTP{resp.status_code}", ok)
+        self._log_call(path, body, resp.status_code, latency_ms, None if ok else f"HTTP{resp.status_code}", ok)
         data = parsed.get("data") if isinstance(parsed, dict) else None
         if data is None:
             # No "data" wrapper: either an error envelope or something
@@ -170,16 +176,26 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         price = data.get("price")
 
         if status == STATUS_SUCCESS:
-            return AdapterResult(ok=True, provider_ref=provider_ref, serial_token=sn,
-                                 amount=price, raw=data)
+            return AdapterResult(ok=True, provider_ref=provider_ref, serial_token=sn, amount=price, raw=data)
         if status == STATUS_PENDING:
-            return AdapterResult(ok=None, provider_ref=provider_ref, serial_token=sn,
-                                 amount=price, raw=data,
-                                 error_code=rc, error_message=data.get("message"))
+            return AdapterResult(
+                ok=None,
+                provider_ref=provider_ref,
+                serial_token=sn,
+                amount=price,
+                raw=data,
+                error_code=rc,
+                error_message=data.get("message"),
+            )
         if status == STATUS_FAILED:
-            return AdapterResult(ok=False, provider_ref=provider_ref, amount=price, raw=data,
-                                 error_code=rc or "DIGIFLAZZ_FAIL",
-                                 error_message=data.get("message") or "Digiflazz returned Gagal")
+            return AdapterResult(
+                ok=False,
+                provider_ref=provider_ref,
+                amount=price,
+                raw=data,
+                error_code=rc or "DIGIFLAZZ_FAIL",
+                error_message=data.get("message") or "Digiflazz returned Gagal",
+            )
         # An unrecognised status is NOT a failure -- refunding on a status we do
         # not understand could refund a successful sale. Treat it as pending and
         # make a human look. This is the branch most likely to fire in
@@ -187,11 +203,18 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         _logger.warning(
             "Digiflazz %s returned unrecognised status %r (rc=%s) for ref %s; "
             "treating as pending for the reaper to resolve.",
-            self.provider.code, status, rc, provider_ref,
+            self.provider.code,
+            status,
+            rc,
+            provider_ref,
         )
-        return AdapterResult(ok=None, provider_ref=provider_ref, raw=data,
-                             error_code=rc or "DIGIFLAZZ_UNKNOWN_STATUS",
-                             error_message=data.get("message") or f"Unknown status: {status!r}")
+        return AdapterResult(
+            ok=None,
+            provider_ref=provider_ref,
+            raw=data,
+            error_code=rc or "DIGIFLAZZ_UNKNOWN_STATUS",
+            error_message=data.get("message") or f"Unknown status: {status!r}",
+        )
 
     # ------------------------------------------------------------------
     # Request builders
@@ -245,12 +268,9 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         if not self._is_postpaid(transaction):
             raise NotImplementedError(
                 "Digiflazz has no prepaid inquiry endpoint. Product %s is marked "
-                "inquiry_required but is not a postpaid product."
-                % transaction.product_id.code
+                "inquiry_required but is not a postpaid product." % transaction.product_id.code
             )
-        status_code, data = self._post(
-            PATH_TRANSACTION, self._transaction_payload(transaction, CMD_INQUIRY_POSTPAID)
-        )
+        status_code, data = self._post(PATH_TRANSACTION, self._transaction_payload(transaction, CMD_INQUIRY_POSTPAID))
         return self._result_from(status_code, data)
 
     def pay(self, transaction):
@@ -262,9 +282,7 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         asked for would be worse than letting Digiflazz reject it explicitly.
         """
         commands = CMD_PAY_POSTPAID if self._is_postpaid(transaction) else None
-        status_code, data = self._post(
-            PATH_TRANSACTION, self._transaction_payload(transaction, commands)
-        )
+        status_code, data = self._post(PATH_TRANSACTION, self._transaction_payload(transaction, commands))
         return self._result_from(status_code, data)
 
     def status(self, provider_ref):
@@ -285,13 +303,15 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         transaction = self._find_transaction(provider_ref)
         if not transaction:
             return AdapterResult(
-                ok=None, raw={"state": "unknown"},
+                ok=None,
+                raw={"state": "unknown"},
                 error_code="DIGIFLAZZ_TXN_NOT_FOUND",
                 error_message=(
                     "No transaction found for ref_id %s. A prepaid status check "
                     "must re-send the original topup, which needs the SKU and "
                     "customer number -- the ref alone is not enough."
-                ) % provider_ref,
+                )
+                % provider_ref,
             )
 
         blocked = self._status_guard(transaction)
@@ -304,9 +324,7 @@ class DigiflazzAdapter(PPOBProviderAdapter):
             )
         else:
             # A re-send, safe only because ref_id is stable and within retention.
-            status_code, data = self._post(
-                PATH_TRANSACTION, self._transaction_payload(transaction)
-            )
+            status_code, data = self._post(PATH_TRANSACTION, self._transaction_payload(transaction))
         result = self._result_from(status_code, data)
         # The reaper reads raw["state"] to decide; translate Digiflazz's
         # vocabulary into the engine's rather than making the reaper speak it.
@@ -333,7 +351,8 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         dispatched = transaction.dispatched_at
         if not dispatched:
             return AdapterResult(
-                ok=None, raw={"state": "unknown"},
+                ok=None,
+                raw={"state": "unknown"},
                 error_code="DIGIFLAZZ_NOT_DISPATCHED",
                 error_message="Transaction %s was never dispatched." % transaction.name,
             )
@@ -341,14 +360,16 @@ class DigiflazzAdapter(PPOBProviderAdapter):
         min_age = max(int(self.provider.digiflazz_status_min_age_s or 0), 0)
         if now - dispatched < timedelta(seconds=min_age):
             return AdapterResult(
-                ok=None, raw={"state": "too_soon"},
+                ok=None,
+                raw={"state": "too_soon"},
                 error_code="DIGIFLAZZ_STATUS_TOO_SOON",
                 error_message=(
                     "Refusing to check %s: dispatched less than %ss ago. A "
                     "prepaid status check re-sends the topup, and Digiflazz "
                     "warns that repeat calls inside a minute can duplicate the "
                     "transaction."
-                ) % (transaction.name, min_age),
+                )
+                % (transaction.name, min_age),
             )
 
         max_age_days = max(int(self.provider.digiflazz_status_max_age_days or 0), 0)
@@ -356,17 +377,20 @@ class DigiflazzAdapter(PPOBProviderAdapter):
             _logger.error(
                 "Digiflazz: %s is older than %s days; refusing to re-send its "
                 "ref_id because that would book a NEW sale. Resolve it manually.",
-                transaction.name, max_age_days,
+                transaction.name,
+                max_age_days,
             )
             return AdapterResult(
-                ok=None, raw={"state": "too_old"},
+                ok=None,
+                raw={"state": "too_old"},
                 error_code="DIGIFLAZZ_STATUS_TOO_OLD",
                 error_message=(
                     "Refusing to check %s: dispatched more than %s days ago. "
                     "Past Digiflazz's retention a re-sent ref_id is not "
                     "recognised as the original and books a BRAND-NEW charged "
                     "transaction. Resolve this one manually."
-                ) % (transaction.name, max_age_days),
+                )
+                % (transaction.name, max_age_days),
             )
         return None
 
@@ -383,31 +407,45 @@ class DigiflazzAdapter(PPOBProviderAdapter):
 
     def check_balance(self):
         """cek-saldo. Read-only: moves no money, creates no transaction."""
-        status_code, data = self._post(PATH_CEK_SALDO, {
-            "cmd": "deposit",
-            "username": self.provider.digiflazz_username or "",
-            "sign": self._sign(SIGN_SUFFIX_DEPOSIT),
-        })
+        status_code, data = self._post(
+            PATH_CEK_SALDO,
+            {
+                "cmd": "deposit",
+                "username": self.provider.digiflazz_username or "",
+                "sign": self._sign(SIGN_SUFFIX_DEPOSIT),
+            },
+        )
         if not 200 <= status_code < 300:
-            return AdapterResult(ok=False, raw=data, error_code=f"HTTP{status_code}",
-                                 error_message=(data or {}).get("message") or "cek-saldo failed")
+            return AdapterResult(
+                ok=False,
+                raw=data,
+                error_code=f"HTTP{status_code}",
+                error_message=(data or {}).get("message") or "cek-saldo failed",
+            )
         deposit = (data or {}).get("deposit")
         if deposit is None:
-            return AdapterResult(ok=False, raw=data, error_code="DIGIFLAZZ_NO_DEPOSIT",
-                                 error_message=(data or {}).get("message")
-                                 or "cek-saldo response carried no deposit")
+            return AdapterResult(
+                ok=False,
+                raw=data,
+                error_code="DIGIFLAZZ_NO_DEPOSIT",
+                error_message=(data or {}).get("message") or "cek-saldo response carried no deposit",
+            )
         return AdapterResult(ok=True, amount=deposit, raw=data)
 
     def price_list(self, cmd="prepaid"):
         """price-list. Read-only catalogue fetch, for SKU-map maintenance."""
         if cmd not in ("prepaid", "pasca"):
             raise DigiflazzError("price_list cmd must be 'prepaid' or 'pasca', got %r" % cmd)
-        status_code, data = self._post(PATH_PRICE_LIST, {
-            "cmd": cmd,
-            "username": self.provider.digiflazz_username or "",
-            "sign": self._sign(SIGN_SUFFIX_PRICELIST),
-        })
+        status_code, data = self._post(
+            PATH_PRICE_LIST,
+            {
+                "cmd": cmd,
+                "username": self.provider.digiflazz_username or "",
+                "sign": self._sign(SIGN_SUFFIX_PRICELIST),
+            },
+        )
         if not 200 <= status_code < 300:
-            return AdapterResult(ok=False, raw={"data": data}, error_code=f"HTTP{status_code}",
-                                 error_message="price-list failed")
+            return AdapterResult(
+                ok=False, raw={"data": data}, error_code=f"HTTP{status_code}", error_message="price-list failed"
+            )
         return AdapterResult(ok=True, raw={"data": data})

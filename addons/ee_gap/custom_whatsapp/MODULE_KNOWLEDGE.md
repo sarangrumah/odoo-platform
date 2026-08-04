@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_whatsapp
-manifest_version: 19.0.0.2.0
+manifest_version: 19.0.0.4.0
 ---
 
 # custom_whatsapp
@@ -68,8 +68,11 @@ This is the BRD-canonical landing place for any "send WhatsApp" requirement — 
 - **Webhook always returns 200** even when dispatch raises (logged via `_logger.exception`) to avoid Meta's aggressive retries. Failed inbound storage will not be re-driven.
 - **Per-account circuit breaker is in-process** (`_CB_STATE` dict at module scope) — does not survive worker restarts and is not shared across multiple Odoo workers; each worker counts independently.
 - **Sandbox mode is default True** — production rollout requires explicitly flipping the flag per account.
+- **Nothing sensitive may go into the sandbox log line.** It used to print the recipient's real number and the first 120 characters of the body; sandbox is normally exercised with live customer data during UAT, and the Odoo log is not a sensitive store. `_do_send` now logs `_mask_phone(to_phone)` (`62********890`), `body_len` and the record id. Keep it that way if the line is ever extended.
 - **Marketing consent is hard-gated** (UserError); utility/authentication only log-warn. Make sure vertical modules surface the UserError to the operator.
 - **Partner phone matching is last-9-digit `ilike`** — collisions are possible for short numbers; `_record_inbound` picks `limit=1` without disambiguation.
+- **`res.partner.mobile` does not exist in Odoo 19.** Reading it raises `AttributeError`; naming it in a domain raises `ValueError` rather than simply not matching, which took every inbound message down. All five sites now go through `res_partner.py`: `partner._whatsapp_phone()` to pick a number to send to, `available_phone_search_fields()` to build a domain. Both filter against `_fields`, so an older build that still has `mobile` keeps preferring it.
+- **Inbound matching searches `phone_sanitized` first.** `phone` stores whatever the user typed (`+62 812-3456-7890`), so a last-9-digits `ilike` cannot see past the separators; `phone_sanitized` is the same number in E.164. Do not drop it from `_SEARCH_PHONE_FIELDS` without replacing the normalisation.
 - **Template send currently omits `{{n}}` variable substitution** — `_build_payload` for approved templates only sends `name` + `language`, no `components`/`parameters`. Templates with variables will be rejected by Meta.
 - **Twilio provider slot is configured but `_get_api_url` only builds Meta Graph URLs** — selecting `twilio` will misroute.
 

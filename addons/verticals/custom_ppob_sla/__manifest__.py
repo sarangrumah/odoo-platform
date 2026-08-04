@@ -2,8 +2,8 @@
 {
     "name": "Custom PPOB - SLA Targets & Throughput",
     "summary": "Declarative per-provider/class throughput + latency targets, and "
-               "hourly throughput sampling that holds both the Oracle historical "
-               "baseline and Odoo actuals for parallel-run parity.",
+    "hourly throughput sampling that holds both the Oracle historical "
+    "baseline and Odoo actuals for parallel-run parity.",
     "description": """
 Custom PPOB Suite - SLA Targets & Throughput
 ============================================

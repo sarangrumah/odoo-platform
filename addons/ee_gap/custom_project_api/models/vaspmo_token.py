@@ -28,24 +28,29 @@ class CustomVaspmoToken(models.Model):
     @api.model
     def _issue(self, user, user_agent=None, ip=None):
         raw = secrets.token_urlsafe(48)
-        self.create({
-            "user_id": user.id,
-            "token_hash": self._hash(raw),
-            "ua_hash": self._hash(user_agent) if user_agent else False,
-            "ip_hash": self._hash(ip) if ip else False,
-            "expires_at": fields.Datetime.add(fields.Datetime.now(), days=REFRESH_TTL_DAYS),
-        })
+        self.create(
+            {
+                "user_id": user.id,
+                "token_hash": self._hash(raw),
+                "ua_hash": self._hash(user_agent) if user_agent else False,
+                "ip_hash": self._hash(ip) if ip else False,
+                "expires_at": fields.Datetime.add(fields.Datetime.now(), days=REFRESH_TTL_DAYS),
+            }
+        )
         return raw
 
     @api.model
     def _resolve(self, raw):
         if not raw:
             return self.browse()
-        return self.search([
-            ("token_hash", "=", self._hash(raw)),
-            ("revoked", "=", False),
-            ("expires_at", ">", fields.Datetime.now()),
-        ], limit=1)
+        return self.search(
+            [
+                ("token_hash", "=", self._hash(raw)),
+                ("revoked", "=", False),
+                ("expires_at", ">", fields.Datetime.now()),
+            ],
+            limit=1,
+        )
 
     def _rotate(self, user_agent=None, ip=None):
         """Single-use refresh: the presented token dies as the new one is born."""

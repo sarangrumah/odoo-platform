@@ -86,8 +86,8 @@ class RetailImportRecon(models.Model):
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute(
-            """
-            CREATE OR REPLACE VIEW %s AS (
+            f"""
+            CREATE OR REPLACE VIEW {self._table} AS (
             WITH src AS (
                 SELECT
                     l.log_id,
@@ -208,5 +208,4 @@ class RetailImportRecon(models.Model):
             ) po ON TRUE
             )
         """
-            % self._table
         )

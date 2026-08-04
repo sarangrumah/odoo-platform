@@ -43,8 +43,10 @@ class ProductTemplate(models.Model):
             return False
         if self.env["pos.order.line"].sudo().search_count([("product_id", "in", variants.ids)], limit=1):
             return True
-        if self.env["stock.move"].sudo().search_count(
-            [("product_id", "in", variants.ids), ("state", "=", "done")], limit=1
+        if (
+            self.env["stock.move"]
+            .sudo()
+            .search_count([("product_id", "in", variants.ids), ("state", "=", "done")], limit=1)
         ):
             return True
         return bool(
@@ -90,8 +92,7 @@ class ProductTemplate(models.Model):
                         "→ Product Category Reclassification instead: it shows the "
                         "impact per day and per store, books the correction, and "
                         "routes it to Finance for approval.",
-                        products=", ".join(blocked.mapped("display_name")[:5])
-                        + ("…" if len(blocked) > 5 else ""),
+                        products=", ".join(blocked.mapped("display_name")[:5]) + ("…" if len(blocked) > 5 else ""),
                         categ=new_categ.display_name,
                     )
                 )

@@ -23,26 +23,35 @@ class CustomChangeRequest(models.Model):
 
     name = fields.Char(required=True, tracking=True)
     code = fields.Char(
-        readonly=True, copy=False, index=True,
+        readonly=True,
+        copy=False,
+        index=True,
         help="Official number quoted in correspondence with the brand (CR-YYYY-NNNN).",
     )
     active = fields.Boolean(default=True)
 
     vertical_id = fields.Many2one(
-        "custom.project.vertical", string="Vertical", required=True, index=True, tracking=True,
+        "custom.project.vertical",
+        string="Vertical",
+        required=True,
+        index=True,
+        tracking=True,
     )
     project_id = fields.Many2one(
-        "project.project", string="Project",
+        "project.project",
+        string="Project",
         help="Optional. A change request can exist without a project behind it.",
     )
     requester_partner_id = fields.Many2one(
-        "res.partner", string="Requested By", tracking=True,
+        "res.partner",
+        string="Requested By",
+        tracking=True,
         help="Who asked, on the brand side.",
     )
     request_date = fields.Datetime(
-        default=fields.Datetime.now, required=True,
-        help="When the brand asked. The response SLA runs from here, not from when work "
-             "started.",
+        default=fields.Datetime.now,
+        required=True,
+        help="When the brand asked. The response SLA runs from here, not from when work started.",
     )
 
     cr_type = fields.Selection(
@@ -53,15 +62,22 @@ class CustomChangeRequest(models.Model):
             ("data_fix", "Data fix"),
             ("new_feature", "New feature"),
         ],
-        string="Type", default="enhancement", required=True, tracking=True,
+        string="Type",
+        default="enhancement",
+        required=True,
+        tracking=True,
     )
     priority = fields.Selection(
         [("low", "Low"), ("medium", "Medium"), ("high", "High"), ("critical", "Critical")],
-        default="medium", required=True, tracking=True,
+        default="medium",
+        required=True,
+        tracking=True,
     )
     impact = fields.Selection(
         [("low", "Low"), ("medium", "Medium"), ("high", "High"), ("critical", "Critical")],
-        default="medium", required=True, tracking=True,
+        default="medium",
+        required=True,
+        tracking=True,
         help="Blast radius if this goes wrong. Drives how many approval tiers are needed.",
     )
 
@@ -78,7 +94,8 @@ class CustomChangeRequest(models.Model):
     po_id = fields.Many2one("res.users", string="Product Owner", tracking=True)
 
     stage_id = fields.Many2one(
-        "project.task.type", string="Stage",
+        "project.task.type",
+        string="Stage",
         domain="[('custom_applies_to','in',['cr','both'])]",
         tracking=True,
     )
@@ -90,10 +107,15 @@ class CustomChangeRequest(models.Model):
             ("approved", "Approved"),
             ("rejected", "Rejected"),
         ],
-        default="draft", required=True, tracking=True, index=True,
+        default="draft",
+        required=True,
+        tracking=True,
+        index=True,
     )
     approval_ids = fields.One2many(
-        "custom.change.request.approval", "request_id", string="Approvals",
+        "custom.change.request.approval",
+        "request_id",
+        string="Approvals",
     )
     approval_progress = fields.Char(compute="_compute_approval_progress")
     reject_reason = fields.Text()
@@ -130,9 +152,7 @@ class CustomChangeRequest(models.Model):
     def _compute_task_stats(self):
         for rec in self:
             rec.task_count = len(rec.task_ids)
-            rec.task_done_count = len(
-                rec.task_ids.filtered(lambda t: t.stage_id.custom_is_closed_stage)
-            )
+            rec.task_done_count = len(rec.task_ids.filtered(lambda t: t.stage_id.custom_is_closed_stage))
 
     @api.depends("approval_ids.state", "impact")
     def _compute_approval_progress(self):
@@ -152,9 +172,7 @@ class CustomChangeRequest(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("code"):
-                vals["code"] = self.env["ir.sequence"].next_by_code(
-                    "custom.change.request"
-                ) or "CR-NEW"
+                vals["code"] = self.env["ir.sequence"].next_by_code("custom.change.request") or "CR-NEW"
             if not vals.get("stage_id"):
                 intake = self.env["project.task.type"]._stage_by_code("backlog")
                 if intake:
@@ -179,7 +197,8 @@ class CustomChangeRequest(models.Model):
             for rec in self:
                 old = stage_before.get(rec.id)
                 rec._pdp_audit_write(
-                    "stage_change", rec.id,
+                    "stage_change",
+                    rec.id,
                     {"stage_id": [old.name if old else None, rec.stage_id.name]},
                 )
                 if rec.stage_id.custom_is_waiting_user:
@@ -203,14 +222,15 @@ class CustomChangeRequest(models.Model):
         for rec in self:
             if rec.approval_state in ("waiting_approval", "approved"):
                 if not rec.impact_analysis:
-                    raise ValidationError(_(
-                        "%s cannot go for approval without an impact analysis — that "
-                        "analysis is the reason a change request exists.", rec.code
-                    ))
+                    raise ValidationError(
+                        _(
+                            "%s cannot go for approval without an impact analysis — that "
+                            "analysis is the reason a change request exists.",
+                            rec.code,
+                        )
+                    )
                 if not rec.effort_estimate_days:
-                    raise ValidationError(_(
-                        "%s needs an effort estimate before approval.", rec.code
-                    ))
+                    raise ValidationError(_("%s needs an effort estimate before approval.", rec.code))
 
     @api.constrains("approval_state", "reject_reason")
     def _check_reject_reason(self):
@@ -226,12 +246,12 @@ class CustomChangeRequest(models.Model):
         for rec in self:
             if not rec.first_response_at:
                 now = fields.Datetime.now()
-                rec.write({
-                    "first_response_at": now,
-                    "sla_response_met": bool(
-                        rec.sla_response_due and now <= rec.sla_response_due
-                    ),
-                })
+                rec.write(
+                    {
+                        "first_response_at": now,
+                        "sla_response_met": bool(rec.sla_response_due and now <= rec.sla_response_due),
+                    }
+                )
 
     def action_start_analysis(self):
         """Triage decision: this request is real, a BA picks it up."""
@@ -239,11 +259,13 @@ class CustomChangeRequest(models.Model):
             if rec.approval_state != "draft":
                 raise UserError(_("%s has already left intake.", rec.code))
             analysis_stage = self.env["project.task.type"]._stage_by_code("analysis")
-            rec.write({
-                "approval_state": "analysis",
-                "ba_id": rec.ba_id.id or self.env.uid,
-                "stage_id": analysis_stage.id or rec.stage_id.id,
-            })
+            rec.write(
+                {
+                    "approval_state": "analysis",
+                    "ba_id": rec.ba_id.id or self.env.uid,
+                    "stage_id": analysis_stage.id or rec.stage_id.id,
+                }
+            )
             rec._stamp_first_response()
             rec._pdp_audit_write("cr_triage", rec.id, {"approval_state": "analysis"})
             rec._cr_notify_event("cr_analysis")
@@ -269,9 +291,7 @@ class CustomChangeRequest(models.Model):
         if self.impact in THIRD_TIER_IMPACT:
             owner = self.vertical_id.vertical_po_id or self.po_id or self.env.user
             lines.append({"tier": 3, "role": "vertical_owner", "user_id": owner.id})
-        self.env["custom.change.request.approval"].create([
-            dict(line, request_id=self.id) for line in lines
-        ])
+        self.env["custom.change.request.approval"].create([dict(line, request_id=self.id) for line in lines])
         self._cr_external_approval_hook()
 
     def _cr_external_approval_hook(self):
@@ -281,9 +301,7 @@ class CustomChangeRequest(models.Model):
     def action_approve(self):
         """Approve the caller's own pending tier."""
         for rec in self:
-            line = rec.approval_ids.filtered(
-                lambda a: a.state == "pending" and a.user_id == self.env.user
-            )[:1]
+            line = rec.approval_ids.filtered(lambda a: a.state == "pending" and a.user_id == self.env.user)[:1]
             if not line:
                 line = rec.approval_ids.filtered(lambda a: a.state == "pending")[:1]
             if not line:
@@ -294,15 +312,13 @@ class CustomChangeRequest(models.Model):
     def action_reject(self):
         for rec in self:
             if not rec.reject_reason:
-                raise UserError(_(
-                    "Say why %s is rejected — the brand will ask.", rec.code
-                ))
-            rec.approval_ids.filtered(lambda a: a.state == "pending").write(
-                {"state": "rejected"}
-            )
+                raise UserError(_("Say why %s is rejected — the brand will ask.", rec.code))
+            rec.approval_ids.filtered(lambda a: a.state == "pending").write({"state": "rejected"})
             rec.write({"approval_state": "rejected"})
             rec._pdp_audit_write(
-                "cr_reject", rec.id, {"approval_state": "rejected"},
+                "cr_reject",
+                rec.id,
+                {"approval_state": "rejected"},
                 reason=rec.reject_reason,
             )
             rec._cr_notify_event("cr_reject")
@@ -320,20 +336,20 @@ class CustomChangeRequest(models.Model):
         if self.approval_state != "approved":
             raise UserError(_("Only an approved request can spawn tasks."))
         if not self.project_id:
-            raise UserError(_(
-                "Point %s at a project first — a task needs somewhere to live.", self.code
-            ))
+            raise UserError(_("Point %s at a project first — a task needs somewhere to live.", self.code))
         dev_stage = self.env["project.task.type"]._stage_by_code("analysis")
-        task = self.env["project.task"].create({
-            "name": f"{self.code} — {self.name}",
-            "project_id": self.project_id.id,
-            "change_request_id": self.id,
-            "custom_vertical_id": self.vertical_id.id,
-            "custom_source": "cr",
-            "custom_priority": self.priority,
-            "stage_id": dev_stage.id if dev_stage else False,
-            "user_ids": [(6, 0, self.ba_id.ids)] if self.ba_id else False,
-        })
+        task = self.env["project.task"].create(
+            {
+                "name": f"{self.code} — {self.name}",
+                "project_id": self.project_id.id,
+                "change_request_id": self.id,
+                "custom_vertical_id": self.vertical_id.id,
+                "custom_source": "cr",
+                "custom_priority": self.priority,
+                "stage_id": dev_stage.id if dev_stage else False,
+                "user_ids": [(6, 0, self.ba_id.ids)] if self.ba_id else False,
+            }
+        )
         return {
             "type": "ir.actions.act_window",
             "res_model": "project.task",
@@ -361,11 +377,13 @@ class CustomChangeRequest(models.Model):
     def cron_intake_sla(self):
         """Flag intake that nobody has triaged inside the response SLA."""
         now = fields.Datetime.now()
-        stale = self.search([
-            ("approval_state", "=", "draft"),
-            ("sla_response_due", "<", now),
-            ("first_response_at", "=", False),
-        ])
+        stale = self.search(
+            [
+                ("approval_state", "=", "draft"),
+                ("sla_response_due", "<", now),
+                ("first_response_at", "=", False),
+            ]
+        )
         for rec in stale:
             rec._cr_notify_event("cr_intake_overdue")
         if stale:

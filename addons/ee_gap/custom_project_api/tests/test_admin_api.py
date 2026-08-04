@@ -18,30 +18,33 @@ from odoo.tests import HttpCase, tagged
 
 @tagged("post_install", "-at_install", "vaspmo")
 class TestAdminApi(HttpCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.password = "VasPmoTest!2026"
-        cls.admin_user = cls.env["res.users"].create({
-            "name": "VAS Admin (test)",
-            "login": "vaspmo.admin@test.invalid",
-            "email": "vaspmo.admin@test.invalid",
-            "password": cls.password,
-            "group_ids": [
-                (4, cls.env.ref("custom_project_portfolio.group_vaspmo_admin").id),
-            ],
-        })
+        cls.admin_user = cls.env["res.users"].create(
+            {
+                "name": "VAS Admin (test)",
+                "login": "vaspmo.admin@test.invalid",
+                "email": "vaspmo.admin@test.invalid",
+                "password": cls.password,
+                "group_ids": [
+                    (4, cls.env.ref("custom_project_portfolio.group_vaspmo_admin").id),
+                ],
+            }
+        )
         cls.member_password = "VasPmoMember!2026"
-        cls.member_user = cls.env["res.users"].create({
-            "name": "VAS Member (test)",
-            "login": "vaspmo.member@test.invalid",
-            "email": "vaspmo.member@test.invalid",
-            "password": cls.member_password,
-            "group_ids": [
-                (4, cls.env.ref("custom_project_portfolio.group_vaspmo_user").id),
-            ],
-        })
+        cls.member_user = cls.env["res.users"].create(
+            {
+                "name": "VAS Member (test)",
+                "login": "vaspmo.member@test.invalid",
+                "email": "vaspmo.member@test.invalid",
+                "password": cls.member_password,
+                "group_ids": [
+                    (4, cls.env.ref("custom_project_portfolio.group_vaspmo_user").id),
+                ],
+            }
+        )
         cls.hold_stage = cls.env.ref("custom_project_portfolio.stage_hold")
 
     def _token(self, login, password):
@@ -64,7 +67,8 @@ class TestAdminApi(HttpCase):
     def test_login_returns_roles(self):
         token = self._token(self.admin_user.login, self.password)
         response = self.url_open(
-            "/vaspmo/api/auth/me", headers={"Authorization": f"Bearer {token}"},
+            "/vaspmo/api/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("admin", response.json()["data"]["roles"])
@@ -92,7 +96,8 @@ class TestAdminApi(HttpCase):
 
         self.hold_stage.invalidate_recordset()
         self.assertEqual(
-            self.hold_stage.custom_sla_clock, "paused",
+            self.hold_stage.custom_sla_clock,
+            "paused",
             "A refused write must leave the stage exactly as it was — otherwise the API "
             "says 'rejected' and saves the change anyway, and every cycle-time number "
             "downstream is wrong.",
@@ -119,7 +124,8 @@ class TestAdminApi(HttpCase):
     def test_master_data_is_admin_only(self):
         token = self._token(self.member_user.login, self.member_password)
         response = self.url_open(
-            "/vaspmo/api/admin/verticals", headers={"Authorization": f"Bearer {token}"},
+            "/vaspmo/api/admin/verticals",
+            headers={"Authorization": f"Bearer {token}"},
         )
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["error"]["code"], "FORBIDDEN")

@@ -14,13 +14,12 @@ class CustomProjectVertical(models.Model):
     name = fields.Char(required=True, help="Brand name as people actually say it.")
     code = fields.Char(
         required=True,
-        help="Short uppercase key (LEVIS, ERASPACE, ...). Used in badges, message "
-             "templates and record prefixes.",
+        help="Short uppercase key (LEVIS, ERASPACE, ...). Used in badges, message templates and record prefixes.",
     )
     legal_entity = fields.Char(
         string="Legal Entity",
         help="Registered company behind the brand. Deliberately blank when unconfirmed "
-             "-- an empty cell is honest, a guessed one is not.",
+        "-- an empty cell is honest, a guessed one is not.",
     )
     brand_group = fields.Selection(
         [
@@ -34,18 +33,24 @@ class CustomProjectVertical(models.Model):
         required=True,
     )
     vertical_po_id = fields.Many2one(
-        "res.users", string="Vertical PO",
+        "res.users",
+        string="Vertical PO",
         help="Product Owner accountable for this brand.",
     )
     ba_ids = fields.Many2many(
-        "res.users", "custom_vertical_ba_rel", "vertical_id", "user_id",
+        "res.users",
+        "custom_vertical_ba_rel",
+        "vertical_id",
+        "user_id",
         string="Business Analysts",
     )
     pic_partner_ids = fields.Many2many(
-        "res.partner", "custom_vertical_pic_rel", "vertical_id", "partner_id",
+        "res.partner",
+        "custom_vertical_pic_rel",
+        "vertical_id",
+        "partner_id",
         string="Brand PIC",
-        help="Brand-side contacts. These are the people notified when work reaches "
-             "Waiting User Verification.",
+        help="Brand-side contacts. These are the people notified when work reaches Waiting User Verification.",
     )
     color = fields.Integer(default=0, help="Kanban / badge colour index.")
     sequence = fields.Integer(default=10)
@@ -82,9 +87,7 @@ class CustomProjectVertical(models.Model):
     def _check_code(self):
         for rec in self:
             if rec.code and (" " in rec.code or rec.code != rec.code.upper()):
-                raise ValidationError(
-                    _("Vertical code must be uppercase without spaces: %s", rec.code)
-                )
+                raise ValidationError(_("Vertical code must be uppercase without spaces: %s", rec.code))
 
     @api.depends("code", "name")
     def _compute_display_name(self):

@@ -246,9 +246,7 @@ class TestWmsHhtApi(TransactionCase):
     def test_receive_scan_sets_quantity_and_validates(self):
         picking = self._receipt([(self.plain, 6)])
         with self._patch_request():
-            res = self.controller.receive_scan(
-                picking_id=picking.id, barcode="4006381333931", quantity=6
-            )
+            res = self.controller.receive_scan(picking_id=picking.id, barcode="4006381333931", quantity=6)
             self.assertTrue(res["ok"], res.get("error"))
             self.assertEqual(sum(picking.move_line_ids.mapped("quantity")), 6.0)
             done = self.controller.receive_validate(picking_id=picking.id)
@@ -357,9 +355,7 @@ class TestWmsHhtApi(TransactionCase):
                 "company_id": self.env.company.id,
             }
         )
-        return self.env["custom.transfer.order"].search(
-            [("stock_move_id", "=", move.id)], limit=1
-        ), bin_b
+        return self.env["custom.transfer.order"].search([("stock_move_id", "=", move.id)], limit=1), bin_b
 
     def test_bin2bin_list_serialises_a_real_order(self):
         order, _bin_b = self._transfer_order()
@@ -394,9 +390,7 @@ class TestWmsHhtApi(TransactionCase):
     def test_bin2bin_execute_rejects_the_wrong_bin(self):
         order, _bin_b = self._transfer_order()
         with self._patch_request():
-            res = self.controller.bin2bin_execute(
-                transfer_order_id=order.id, source_barcode="HHT-B-01"
-            )
+            res = self.controller.bin2bin_execute(transfer_order_id=order.id, source_barcode="HHT-B-01")
         self.assertFalse(res["ok"])
         self.assertEqual(res["error_code"], "MISMATCH")
         self.assertNotEqual(order.stock_move_id.state, "done")
@@ -411,9 +405,7 @@ class TestWmsHhtApi(TransactionCase):
                 "company_id": self.env.company.id,
             }
         )
-        wiz = self.env["custom.cycle.count.start.wizard"].create(
-            {"plan_id": plan.id, "target_count": 5}
-        )
+        wiz = self.env["custom.cycle.count.start.wizard"].create({"plan_id": plan.id, "target_count": 5})
         action = wiz.action_start()
         return self.env["custom.cycle.count.session"].browse(action["res_id"])
 
@@ -453,9 +445,7 @@ class TestWmsHhtApi(TransactionCase):
         self.env["stock.quant"]._update_available_quantity(self.plain, self.bin_a, 7)
         self.env["stock.quant"]._update_available_quantity(self.plain, bin_b, 3)
         with self._patch_request():
-            res = self.controller.stock_lookup(
-                barcode="4006381333931", warehouse_id=self.warehouse.id
-            )
+            res = self.controller.stock_lookup(barcode="4006381333931", warehouse_id=self.warehouse.id)
         self.assertTrue(res["ok"])
         self.assertEqual(res["product"]["default_code"], "HHT-P1")
         self.assertEqual(res["totals"]["on_hand"], 10)
@@ -468,9 +458,7 @@ class TestWmsHhtApi(TransactionCase):
     def test_stock_lookup_subtracts_reserved_stock(self):
         self._delivery(self.plain, 4)  # puts 4 in bin_a and reserves them
         with self._patch_request():
-            res = self.controller.stock_lookup(
-                barcode="HHT-P1", warehouse_id=self.warehouse.id
-            )
+            res = self.controller.stock_lookup(barcode="HHT-P1", warehouse_id=self.warehouse.id)
         self.assertTrue(res["ok"])
         self.assertEqual(res["totals"]["on_hand"], 4)
         self.assertEqual(res["totals"]["reserved"], 4)
@@ -483,16 +471,10 @@ class TestWmsHhtApi(TransactionCase):
             self.env["stock.lot"].create({"name": name, "product_id": self.product.id})
             for name in ("HHT-LOT-A", "HHT-LOT-B")
         ]
-        self.env["stock.quant"]._update_available_quantity(
-            self.product, self.bin_a, 5, lot_id=lot_a
-        )
-        self.env["stock.quant"]._update_available_quantity(
-            self.product, self.bin_a, 2, lot_id=lot_b
-        )
+        self.env["stock.quant"]._update_available_quantity(self.product, self.bin_a, 5, lot_id=lot_a)
+        self.env["stock.quant"]._update_available_quantity(self.product, self.bin_a, 2, lot_id=lot_b)
         with self._patch_request():
-            res = self.controller.stock_lookup(
-                barcode="5901234123457", warehouse_id=self.warehouse.id
-            )
+            res = self.controller.stock_lookup(barcode="5901234123457", warehouse_id=self.warehouse.id)
         self.assertTrue(res["ok"])
         self.assertEqual(len(res["bins"]), 1)
         row = res["bins"][0]
@@ -502,19 +484,11 @@ class TestWmsHhtApi(TransactionCase):
     def test_stock_lookup_accepts_gs1_and_lot_labels(self):
         """The aisle label may be a GS1 string or a bare lot — both identify
         the product just as well as its EAN."""
-        lot = self.env["stock.lot"].create(
-            {"name": "HHT-LOT-GS1", "product_id": self.product.id}
-        )
-        self.env["stock.quant"]._update_available_quantity(
-            self.product, self.bin_a, 1, lot_id=lot
-        )
+        lot = self.env["stock.lot"].create({"name": "HHT-LOT-GS1", "product_id": self.product.id})
+        self.env["stock.quant"]._update_available_quantity(self.product, self.bin_a, 1, lot_id=lot)
         with self._patch_request():
-            by_gs1 = self.controller.stock_lookup(
-                barcode="0105901234123457", warehouse_id=self.warehouse.id
-            )
-            by_lot = self.controller.stock_lookup(
-                barcode="HHT-LOT-GS1", warehouse_id=self.warehouse.id
-            )
+            by_gs1 = self.controller.stock_lookup(barcode="0105901234123457", warehouse_id=self.warehouse.id)
+            by_lot = self.controller.stock_lookup(barcode="HHT-LOT-GS1", warehouse_id=self.warehouse.id)
         self.assertTrue(by_gs1["ok"])
         self.assertEqual(by_gs1["product"]["default_code"], "HHT-W1")
         self.assertTrue(by_lot["ok"])
@@ -523,14 +497,15 @@ class TestWmsHhtApi(TransactionCase):
     def test_stock_lookup_survives_no_access_to_putaway_config(self):
         """A stock check is for any operator; losing suggestions must not lose stock."""
         self.env["stock.quant"]._update_available_quantity(self.plain, self.bin_a, 5)
-        with self._patch_request(), patch.object(
-            type(self.env["custom.putaway.engine"]),
-            "propose_for_product",
-            side_effect=AccessError("no putaway group"),
+        with (
+            self._patch_request(),
+            patch.object(
+                type(self.env["custom.putaway.engine"]),
+                "propose_for_product",
+                side_effect=AccessError("no putaway group"),
+            ),
         ):
-            res = self.controller.stock_lookup(
-                barcode="4006381333931", warehouse_id=self.warehouse.id
-            )
+            res = self.controller.stock_lookup(barcode="4006381333931", warehouse_id=self.warehouse.id)
         self.assertTrue(res["ok"], res.get("error"))
         self.assertTrue(res["suggestions_denied"])
         self.assertEqual(res["suggestions"], [])
@@ -542,9 +517,7 @@ class TestWmsHhtApi(TransactionCase):
         self.env["stock.quant"]._update_available_quantity(self.plain, self.bin_a, 6)
         before = self.env["stock.move.line"].search_count([])
         with self._patch_request():
-            res = self.controller.stock_lookup(
-                barcode="HHT-P1", warehouse_id=self.warehouse.id
-            )
+            res = self.controller.stock_lookup(barcode="HHT-P1", warehouse_id=self.warehouse.id)
         self.assertTrue(res["ok"])
         self.assertEqual(self.env["stock.move.line"].search_count([]), before)
         quant = self.env["stock.quant"].search(
@@ -581,9 +554,7 @@ class TestWmsHhtApi(TransactionCase):
         )
         self.env["stock.quant"]._update_available_quantity(self.plain, child, 9)
         with self._patch_request():
-            res = self.controller.stock_lookup(
-                barcode="HHT-P1", warehouse_id=self.warehouse.id
-            )
+            res = self.controller.stock_lookup(barcode="HHT-P1", warehouse_id=self.warehouse.id)
         self.assertTrue(res["ok"])
         zone_rows = [s for s in res["suggestions"] if s["location_id"] == zone.id]
         self.assertTrue(zone_rows, "the zone rule should have been proposed")
@@ -605,18 +576,14 @@ class TestWmsHhtApi(TransactionCase):
                 }
             )
         with self._patch_request():
-            res = self.controller.stock_lookup(
-                barcode="HHT-P1", warehouse_id=self.warehouse.id
-            )
+            res = self.controller.stock_lookup(barcode="HHT-P1", warehouse_id=self.warehouse.id)
         self.assertTrue(res["ok"])
         ids = [s["location_id"] for s in res["suggestions"]]
         self.assertEqual(len(ids), len(set(ids)), "a bin must not be suggested twice")
 
     def test_stock_lookup_reports_unknown_barcode(self):
         with self._patch_request():
-            res = self.controller.stock_lookup(
-                barcode="0000000000000", warehouse_id=self.warehouse.id
-            )
+            res = self.controller.stock_lookup(barcode="0000000000000", warehouse_id=self.warehouse.id)
         self.assertFalse(res["ok"])
         self.assertEqual(res["error_code"], "NOT_FOUND")
 
@@ -624,9 +591,7 @@ class TestWmsHhtApi(TransactionCase):
         """A product with nothing on hand is a valid answer, not a failure —
         "none here" is exactly what the operator walked over to find out."""
         with self._patch_request():
-            res = self.controller.stock_lookup(
-                barcode="HHT-P1", warehouse_id=self.warehouse.id
-            )
+            res = self.controller.stock_lookup(barcode="HHT-P1", warehouse_id=self.warehouse.id)
         self.assertTrue(res["ok"])
         self.assertEqual(res["totals"]["on_hand"], 0)
         self.assertEqual(res["bins"], [])

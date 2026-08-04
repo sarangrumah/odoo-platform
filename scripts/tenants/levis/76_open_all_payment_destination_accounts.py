@@ -39,8 +39,7 @@ if UNDO:
 else:
     todo = all_accounts.filtered(lambda a: not a.l10n_allow_payment_destination)
     todo.l10n_allow_payment_destination = True
-    log("flagged %d new account(s); already on: %d"
-        % (len(todo), len(all_accounts) - len(todo)))
+    log("flagged %d new account(s); already on: %d" % (len(todo), len(all_accounts) - len(todo)))
 
 on = Acc.search_count([("l10n_allow_payment_destination", "=", True)])
 log("==== total flagged now: %d / %d ====" % (on, len(all_accounts)))

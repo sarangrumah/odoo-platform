@@ -120,18 +120,26 @@ class CustomFixedAssetDepreciationLine(models.Model):
                     origin=move.name,
                 ),
                 "line_ids": [
-                    (0, 0, {
-                        "name": _("Reversal Accum. depreciation %(name)s", name=asset.name),
-                        "account_id": asset.depreciation_account_id.id,
-                        "debit": self.amount,
-                        "credit": 0.0,
-                    }),
-                    (0, 0, {
-                        "name": _("Reversal Depreciation %(name)s", name=asset.name),
-                        "account_id": asset.expense_account_id.id,
-                        "debit": 0.0,
-                        "credit": self.amount,
-                    }),
+                    (
+                        0,
+                        0,
+                        {
+                            "name": _("Reversal Accum. depreciation %(name)s", name=asset.name),
+                            "account_id": asset.depreciation_account_id.id,
+                            "debit": self.amount,
+                            "credit": 0.0,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "name": _("Reversal Depreciation %(name)s", name=asset.name),
+                            "account_id": asset.expense_account_id.id,
+                            "debit": 0.0,
+                            "credit": self.amount,
+                        },
+                    ),
                 ],
             }
         )

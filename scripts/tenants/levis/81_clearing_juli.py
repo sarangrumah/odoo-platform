@@ -47,8 +47,11 @@ env = env(context=dict(env.context, allowed_company_ids=[COMPANY_ID]))
 
 
 def account(code):
-    acc = env["account.account"].with_company(company).search(
-        [("code", "=", code), ("company_ids", "in", COMPANY_ID)], limit=1)
+    acc = (
+        env["account.account"]
+        .with_company(company)
+        .search([("code", "=", code), ("company_ids", "in", COMPANY_ID)], limit=1)
+    )
     if not acc:
         raise Exception("account %s not found" % code)
     return acc
@@ -79,8 +82,9 @@ def an_dist(store):
 
 
 def already(tag):
-    return bool(env["account.move"].search_count(
-        [("company_id", "=", COMPANY_ID), ("ref", "like", "%s-%s-%%" % (REF, tag))]))
+    return bool(
+        env["account.move"].search_count([("company_id", "=", COMPANY_ID), ("ref", "like", "%s-%s-%%" % (REF, tag))])
+    )
 
 
 created = OrderedDict()
@@ -96,35 +100,43 @@ def block_s():
     for code, lines in per_journal.items():
         jrn = journal(code)
         replace = any(r.get("replace_month") for r in lines)
-        domain = [("journal_id", "=", jrn.id),
-                  ("date", ">=", "2026-07-01" if replace else min(r["date"] for r in lines)),
-                  ("date", "<=", "2026-07-31")]
+        domain = [
+            ("journal_id", "=", jrn.id),
+            ("date", ">=", "2026-07-01" if replace else min(r["date"] for r in lines)),
+            ("date", "<=", "2026-07-31"),
+        ]
         existing = env["account.bank.statement.line"].search(domain)
         if existing and not replace:
-            log("block S: %s already has %d lines from %s -- skipped"
-                % (code, len(existing), min(r["date"] for r in lines)))
+            log(
+                "block S: %s already has %d lines from %s -- skipped"
+                % (code, len(existing), min(r["date"] for r in lines))
+            )
             continue
         if existing:
             reconciled = existing.filtered("is_reconciled")
             if reconciled:
-                raise Exception("%s: %d July lines already reconciled, refusing to replace"
-                                % (code, len(reconciled)))
+                raise Exception("%s: %d July lines already reconciled, refusing to replace" % (code, len(reconciled)))
             statements = existing.statement_id
             log("block S: %s replacing %d incomplete July lines" % (code, len(existing)))
             existing.move_id.button_draft()
             existing.unlink()
             statements.filtered(lambda s: not s.line_ids).unlink()
-        stmt = env["account.bank.statement"].create({
-            "name": "%s %s..%s (clearing Juli)" % (code, lines[0]["date"], lines[-1]["date"]),
-            "journal_id": jrn.id,
-        })
-        vals = [{
-            "journal_id": jrn.id,
-            "statement_id": stmt.id,
-            "date": r["date"],
-            "payment_ref": r["ref"] or "-",
-            "amount": r["amount"],
-        } for r in lines]
+        stmt = env["account.bank.statement"].create(
+            {
+                "name": "%s %s..%s (clearing Juli)" % (code, lines[0]["date"], lines[-1]["date"]),
+                "journal_id": jrn.id,
+            }
+        )
+        vals = [
+            {
+                "journal_id": jrn.id,
+                "statement_id": stmt.id,
+                "date": r["date"],
+                "payment_ref": r["ref"] or "-",
+                "amount": r["amount"],
+            }
+            for r in lines
+        ]
         made |= env["account.bank.statement.line"].create(vals)
         log("block S: %s +%d lines, net %.2f" % (code, len(vals), sum(r["amount"] for r in lines)))
     created["S"] = made
@@ -145,13 +157,17 @@ def block_d():
 # --------------------------------------------------------- POS line matching
 def open_posrec():
     """(store, date) -> [line] of still-open July POS receivable debits."""
-    lines = env["account.move.line"].search([
-        ("company_id", "=", COMPANY_ID),
-        ("parent_state", "=", "posted"),
-        ("account_id", "in", [a.id for a in POS_ACC.values()]),
-        ("date", ">=", "2026-07-01"), ("date", "<=", "2026-07-31"),
-        ("debit", ">", 0), ("reconciled", "=", False),
-    ])
+    lines = env["account.move.line"].search(
+        [
+            ("company_id", "=", COMPANY_ID),
+            ("parent_state", "=", "posted"),
+            ("account_id", "in", [a.id for a in POS_ACC.values()]),
+            ("date", ">=", "2026-07-01"),
+            ("date", "<=", "2026-07-31"),
+            ("debit", ">", 0),
+            ("reconciled", "=", False),
+        ]
+    )
     by_id = {i: n for n, i in analytic.items()}
     out = defaultdict(list)
     for line in lines:
@@ -212,34 +228,57 @@ def block_a():
                     if amount <= 0.004:
                         continue
                     credited += amount
-                    lines.append((0, 0, {
-                        "account_id": acc_id,
-                        "name": "Settlement %s %s (%s)" % (row["bank"], c["date"], row["store"]),
-                        "credit": round(amount, 2),
-                        "analytic_distribution": dist,
-                    }))
+                    lines.append(
+                        (
+                            0,
+                            0,
+                            {
+                                "account_id": acc_id,
+                                "name": "Settlement %s %s (%s)" % (row["bank"], c["date"], row["store"]),
+                                "credit": round(amount, 2),
+                                "analytic_distribution": dist,
+                            },
+                        )
+                    )
             if credited <= 0.004:
                 continue
             mdr = round(row["mdr"] * credited / row["gross"], 2) if row["gross"] else 0.0
-            lines.append((0, 0, {
-                "account_id": ACC[ACC_SUSPENSE].id,
-                "name": "Cash in %s %s (%s)" % (row["bank"], sdate, row["store"]),
-                "debit": round(credited - mdr, 2),
-                "analytic_distribution": dist,
-            }))
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": ACC[ACC_SUSPENSE].id,
+                        "name": "Cash in %s %s (%s)" % (row["bank"], sdate, row["store"]),
+                        "debit": round(credited - mdr, 2),
+                        "analytic_distribution": dist,
+                    },
+                )
+            )
             if mdr:
-                lines.append((0, 0, {
-                    "account_id": ACC[ACC_MDR].id,
-                    "name": "MDR %s %s (%s)" % (row["bank"], sdate, row["store"]),
-                    "debit": mdr,
-                    "analytic_distribution": dist,
-                }))
+                lines.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": ACC[ACC_MDR].id,
+                            "name": "MDR %s %s (%s)" % (row["bank"], sdate, row["store"]),
+                            "debit": mdr,
+                            "analytic_distribution": dist,
+                        },
+                    )
+                )
         if not lines:
             continue
-        moves |= env["account.move"].create({
-            "company_id": COMPANY_ID, "journal_id": GLJV.id, "date": sdate,
-            "ref": "%s-A-%s" % (REF, sdate), "line_ids": lines,
-        })
+        moves |= env["account.move"].create(
+            {
+                "company_id": COMPANY_ID,
+                "journal_id": GLJV.id,
+                "date": sdate,
+                "ref": "%s-A-%s" % (REF, sdate),
+                "line_ids": lines,
+            }
+        )
     created["A"] = moves
     total = sum(moves.mapped("line_ids").mapped("credit"))
     log("block A: %d entries, credit %.2f" % (len(moves), total))
@@ -262,26 +301,52 @@ def block_b():
         lines = []
         for row in per_date[sdate]:
             dist = an_dist(row["store"])
-            lines.append((0, 0, {
-                "account_id": ACC[ACC_AR].id,
-                "name": "Collection AR Juni %s %s (%s)" % (row["bank"], sdate, row["store"]),
-                "credit": row["gross"], "analytic_distribution": dist,
-            }))
-            lines.append((0, 0, {
-                "account_id": ACC[ACC_SUSPENSE].id,
-                "name": "Cash in %s %s (%s)" % (row["bank"], sdate, row["store"]),
-                "debit": row["cash_in"], "analytic_distribution": dist,
-            }))
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": ACC[ACC_AR].id,
+                        "name": "Collection AR Juni %s %s (%s)" % (row["bank"], sdate, row["store"]),
+                        "credit": row["gross"],
+                        "analytic_distribution": dist,
+                    },
+                )
+            )
+            lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "account_id": ACC[ACC_SUSPENSE].id,
+                        "name": "Cash in %s %s (%s)" % (row["bank"], sdate, row["store"]),
+                        "debit": row["cash_in"],
+                        "analytic_distribution": dist,
+                    },
+                )
+            )
             if row["mdr"]:
-                lines.append((0, 0, {
-                    "account_id": ACC[ACC_MDR].id,
-                    "name": "MDR %s %s (%s)" % (row["bank"], sdate, row["store"]),
-                    "debit": row["mdr"], "analytic_distribution": dist,
-                }))
-        moves |= env["account.move"].create({
-            "company_id": COMPANY_ID, "journal_id": GLJV.id, "date": sdate,
-            "ref": "%s-B-%s" % (REF, sdate), "line_ids": lines,
-        })
+                lines.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": ACC[ACC_MDR].id,
+                            "name": "MDR %s %s (%s)" % (row["bank"], sdate, row["store"]),
+                            "debit": row["mdr"],
+                            "analytic_distribution": dist,
+                        },
+                    )
+                )
+        moves |= env["account.move"].create(
+            {
+                "company_id": COMPANY_ID,
+                "journal_id": GLJV.id,
+                "date": sdate,
+                "ref": "%s-B-%s" % (REF, sdate),
+                "line_ids": lines,
+            }
+        )
     created["B"] = moves
     log("block B: %d entries, credit %.2f" % (len(moves), sum(moves.mapped("line_ids").mapped("credit"))))
 
@@ -300,14 +365,19 @@ def block_c():
         for row in per_date[sdate]:
             amount = abs(row["amount"])
             target = ACC[ACC_BANK_CHARGE] if row["kind"] == "BANK ADMIN" else ACC[ACC_BCA_MAIN]
-            lines.append((0, 0, {"account_id": target.id, "name": row["desc"][:120] or row["kind"],
-                                 "debit": amount}))
-            lines.append((0, 0, {"account_id": ACC[ACC_SUSPENSE].id,
-                                 "name": "%s %s" % (row["kind"], sdate), "credit": amount}))
-        moves |= env["account.move"].create({
-            "company_id": COMPANY_ID, "journal_id": GLJV.id, "date": sdate,
-            "ref": "%s-C-%s" % (REF, sdate), "line_ids": lines,
-        })
+            lines.append((0, 0, {"account_id": target.id, "name": row["desc"][:120] or row["kind"], "debit": amount}))
+            lines.append(
+                (0, 0, {"account_id": ACC[ACC_SUSPENSE].id, "name": "%s %s" % (row["kind"], sdate), "credit": amount})
+            )
+        moves |= env["account.move"].create(
+            {
+                "company_id": COMPANY_ID,
+                "journal_id": GLJV.id,
+                "date": sdate,
+                "ref": "%s-C-%s" % (REF, sdate),
+                "line_ids": lines,
+            }
+        )
     created["C"] = moves
     log("block C: %d entries, %.2f" % (len(moves), sum(moves.mapped("line_ids").mapped("debit"))))
 
@@ -327,11 +397,16 @@ if POST and moves:
     log("posted %d entries" % len(moves))
     # reconcile the POS receivables per account (no partner on either side)
     for code, acc in POS_ACC.items():
-        lines = env["account.move.line"].search([
-            ("company_id", "=", COMPANY_ID), ("parent_state", "=", "posted"),
-            ("account_id", "=", acc.id), ("reconciled", "=", False),
-            ("date", ">=", "2026-07-01"), ("date", "<=", "2026-07-31"),
-        ])
+        lines = env["account.move.line"].search(
+            [
+                ("company_id", "=", COMPANY_ID),
+                ("parent_state", "=", "posted"),
+                ("account_id", "=", acc.id),
+                ("reconciled", "=", False),
+                ("date", ">=", "2026-07-01"),
+                ("date", "<=", "2026-07-31"),
+            ]
+        )
         if len(lines) > 1 and lines.filtered(lambda l: l.credit):
             lines.reconcile()
     log("POS receivable reconciled")
@@ -342,7 +417,9 @@ for code in (ACC_SUSPENSE, ACC_MDR, ACC_AR, ACC_BCA_MAIN):
     acc = ACC[code]
     env.cr.execute(
         """select coalesce(sum(debit - credit), 0) from account_move_line
-           where account_id = %s and parent_state = 'posted' and date < '2026-08-01'""", (acc.id,))
+           where account_id = %s and parent_state = 'posted' and date < '2026-08-01'""",
+        (acc.id,),
+    )
     log("balance %s = %.2f" % (code, env.cr.fetchone()[0]))
 
 env.cr.execute(
@@ -350,7 +427,8 @@ env.cr.execute(
        from account_move_line aml
        where aml.account_id in %s and aml.parent_state = 'posted' and not aml.reconciled
          and aml.date between '2026-07-01' and '2026-07-31'""",
-    (tuple(a.id for a in POS_ACC.values()),))
+    (tuple(a.id for a in POS_ACC.values()),),
+)
 residual, count = env.cr.fetchone()
 log("POS receivable Juli still open: %.2f on %d lines" % (residual, count))
 

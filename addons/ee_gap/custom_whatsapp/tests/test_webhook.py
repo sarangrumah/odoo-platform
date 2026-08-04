@@ -108,3 +108,58 @@ class TestWebhook(TransactionCase):
             },
         )
         self.assertEqual(new_msg.body, "[image message]")
+
+    def test_inbound_matches_partner_by_phone(self):
+        """Odoo 19 dropped res.partner.mobile.
+
+        The matcher used to name it in the domain, which raises ValueError
+        rather than simply not matching, so every inbound message blew up.
+        """
+        partner = self.env["res.partner"].create({"name": "Inbound Customer", "phone": "+62 812-3456-7890"})
+        msg = self.Message._record_inbound(
+            self.account,
+            {
+                "from": "6281234567890",
+                "id": "wamid.INBOUND1",
+                "type": "text",
+                "text": {"body": "halo"},
+            },
+        )
+        self.assertEqual(msg.to_partner_id, partner)
+        self.assertEqual(msg.direction, "inbound")
+
+    def test_inbound_without_a_matching_partner_still_records(self):
+        """An unknown number must store the message, not raise."""
+        msg = self.Message._record_inbound(
+            self.account,
+            {
+                "from": "6289999999999",
+                "id": "wamid.INBOUND2",
+                "type": "text",
+                "text": {"body": "siapa ini"},
+            },
+        )
+        self.assertFalse(msg.to_partner_id)
+        self.assertEqual(msg.direction, "inbound")
+
+    def test_whatsapp_phone_helper_prefers_a_present_field(self):
+        Partner = self.env["res.partner"]
+        self.assertNotIn("mobile", Partner._fields, "Odoo 19 should not have res.partner.mobile")
+        p = Partner.create({"name": "Phone Only", "phone": " +6281100002222 "})
+        self.assertEqual(p._whatsapp_phone(), "+6281100002222")
+        blank = Partner.create({"name": "No Phone"})
+        self.assertEqual(blank._whatsapp_phone(), "")
+
+    def test_inbound_matches_a_formatted_number(self):
+        """`phone` holds what the user typed; separators must not defeat matching."""
+        partner = self.env["res.partner"].create({"name": "Formatted Customer", "phone": "+62 811-2222-3333"})
+        msg = self.Message._record_inbound(
+            self.account,
+            {
+                "from": "6281122223333",
+                "id": "wamid.INBOUND3",
+                "type": "text",
+                "text": {"body": "tes format"},
+            },
+        )
+        self.assertEqual(msg.to_partner_id, partner)

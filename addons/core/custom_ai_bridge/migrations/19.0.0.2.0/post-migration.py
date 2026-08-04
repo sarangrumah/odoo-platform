@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_ai_bridge"
 PRIVILEGE = "res_groups_privilege_ai_bridge"
-GROUPS = ['group_custom_ai_user']
+GROUPS = ["group_custom_ai_user"]
 
 
 def migrate(cr, version):

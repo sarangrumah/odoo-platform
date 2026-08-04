@@ -516,8 +516,8 @@ class CustomFixedAsset(models.Model):
         Set ``custom_accounting_asset.group_depreciation_moves`` to ``0`` on a
         tenant whose Accounting genuinely wants one entry per asset.
         """
-        param = self.env["ir.config_parameter"].sudo().get_param(
-            "custom_accounting_asset.group_depreciation_moves", "1"
+        param = (
+            self.env["ir.config_parameter"].sudo().get_param("custom_accounting_asset.group_depreciation_moves", "1")
         )
         return str(param).strip().lower() in ("1", "true", "yes")
 
@@ -544,9 +544,7 @@ class CustomFixedAsset(models.Model):
         for asset in self:
             if asset.state != "running":
                 continue
-            due = asset.depreciation_line_ids.filtered(
-                lambda l: not l.posted and not l.reversed and l.date <= as_of
-            )
+            due = asset.depreciation_line_ids.filtered(lambda l: not l.posted and not l.reversed and l.date <= as_of)
             for line in due:
                 key = (
                     asset.company_id.id,
@@ -594,18 +592,26 @@ class CustomFixedAsset(models.Model):
                     "company_id": company_id,
                     "ref": ref,
                     "line_ids": [
-                        (0, 0, {
-                            "name": expense_label,
-                            "account_id": expense_id,
-                            "debit": total,
-                            "credit": 0.0,
-                        }),
-                        (0, 0, {
-                            "name": accum_label,
-                            "account_id": accum_id,
-                            "debit": 0.0,
-                            "credit": total,
-                        }),
+                        (
+                            0,
+                            0,
+                            {
+                                "name": expense_label,
+                                "account_id": expense_id,
+                                "debit": total,
+                                "credit": 0.0,
+                            },
+                        ),
+                        (
+                            0,
+                            0,
+                            {
+                                "name": accum_label,
+                                "account_id": accum_id,
+                                "debit": 0.0,
+                                "credit": total,
+                            },
+                        ),
                     ],
                 }
             )

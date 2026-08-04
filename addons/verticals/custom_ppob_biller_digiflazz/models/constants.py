@@ -16,7 +16,7 @@ PATH_PRICE_LIST = "/price-list"
 
 # Signature suffixes. Transactions sign with the ref_id itself rather than a
 # constant, so they have no entry here.
-SIGN_SUFFIX_DEPOSIT = "depo"      # NOT "deposit" -- the docs are explicit
+SIGN_SUFFIX_DEPOSIT = "depo"  # NOT "deposit" -- the docs are explicit
 SIGN_SUFFIX_PRICELIST = "pricelist"
 
 # commands values on /transaction. Prepaid topup sends NO commands key at all.
@@ -35,7 +35,7 @@ STATUS_FAILED = "Gagal"
 TERMINAL_STATUSES = (STATUS_SUCCESS, STATUS_FAILED)
 
 # Documented operational hazards, enforced as guards in the adapter.
-DEFAULT_STATUS_MIN_AGE_S = 60        # "<1 menit ... race condition atau duplikasi"
-DEFAULT_STATUS_MAX_AGE_DAYS = 90     # beyond retention a re-send BOOKS A NEW SALE
+DEFAULT_STATUS_MIN_AGE_S = 60  # "<1 menit ... race condition atau duplikasi"
+DEFAULT_STATUS_MAX_AGE_DAYS = 90  # beyond retention a re-send BOOKS A NEW SALE
 
 DEFAULT_TIMEOUT_S = 30

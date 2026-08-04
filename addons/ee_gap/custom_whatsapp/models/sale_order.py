@@ -14,7 +14,7 @@ class SaleOrder(models.Model):
         """Open the WhatsApp send wizard pre-filled from this order."""
         self.ensure_one()
         partner = self.partner_id
-        phone = partner.mobile or partner.phone
+        phone = partner._whatsapp_phone()
         if not phone:
             raise UserError(_("Customer %s has no phone/mobile set; cannot send WhatsApp.") % partner.display_name)
 

@@ -346,9 +346,7 @@ class CoretaxTemplateExportWizard(models.TransientModel):
         """(npwp, nitku_suffix, penandatangan, user_id), validated."""
         self.ensure_one()
         company = self.company_id
-        npwp = company._check_coretax_pemotong(
-            require_signer=self.template in self._SIGNER_TEMPLATES
-        )
+        npwp = company._check_coretax_pemotong(require_signer=self.template in self._SIGNER_TEMPLATES)
         return (
             npwp,
             company.x_custom_nitku_suffix or "",
@@ -528,7 +526,7 @@ class CoretaxTemplateExportWizard(models.TransientModel):
 
     @staticmethod
     def _item_jenis(line):
-        """"Jenis Barang Jasa" for one OF item row: "Jasa" or "Barang".
+        """ "Jenis Barang Jasa" for one OF item row: "Jasa" or "Barang".
 
         A down-payment line carries no product of its own — core builds it from
         a "fake" SO line — so reading ``line.product_id.type`` reports every

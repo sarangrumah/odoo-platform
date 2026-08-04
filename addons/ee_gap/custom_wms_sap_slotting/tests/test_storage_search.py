@@ -20,7 +20,9 @@ class TestSapStorageSearch(TransactionCase):
         cls.stock = cls.warehouse.lot_stock_id
 
         ref = cls.env.ref
-        cls.types = {code: ref(f"custom_wms_sap_slotting.stype_{code.lower()}") for code in ("FO1", "FO2", "AC1", "AP1", "FL1")}
+        cls.types = {
+            code: ref(f"custom_wms_sap_slotting.stype_{code.lower()}") for code in ("FO1", "FO2", "AC1", "AP1", "FL1")
+        }
         cls.sections = {code: ref(f"custom_wms_sap_slotting.ssec_{code.lower()}") for code in ("RU1", "SS1", "GA2")}
 
         # One bin per bucket, each holding exactly one unit of the test product.
@@ -99,11 +101,11 @@ class TestSapStorageSearch(TransactionCase):
         expected = [
             # (bin, score, type step, section step)
             ("FO1-RU1", 100),  # i=0 j=0 -- exact
-            ("FO1-SS1", 97),   # i=0 j=3 -- GA2/SL1 buckets do not exist, skipped free
-            ("FO2-GA2", 87),   # i=1 j=1 -- first storage-type fallback
-            ("AC1-RU1", 76),   # i=2 j=0
-            ("AP1-RU1", 64),   # i=3 j=0
-            ("FL1-GA2", 51),   # i=4 j=1 -- floor, last resort
+            ("FO1-SS1", 97),  # i=0 j=3 -- GA2/SL1 buckets do not exist, skipped free
+            ("FO2-GA2", 87),  # i=1 j=1 -- first storage-type fallback
+            ("AC1-RU1", 76),  # i=2 j=0
+            ("AP1-RU1", 64),  # i=3 j=0
+            ("FL1-GA2", 51),  # i=4 j=1 -- floor, last resort
         ]
         for bin_name, score in expected:
             proposals = self._propose()

@@ -80,7 +80,9 @@ def verify_hmac():
 
     raw = request.httprequest.get_data() or b""
     expected = hmac.new(
-        secret.encode("utf-8"), timestamp.encode("ascii") + raw, hashlib.sha256,
+        secret.encode("utf-8"),
+        timestamp.encode("ascii") + raw,
+        hashlib.sha256,
     ).hexdigest()
     if not hmac.compare_digest(expected, signature):
         return err("BAD_SIGNATURE", "Signature mismatch", status=401)
@@ -92,7 +94,11 @@ class VaspmoPreflight(http.Controller):
 
     @http.route(
         ["/vaspmo/api/<path:subpath>"],
-        type="http", auth="public", methods=["OPTIONS"], csrf=False, save_session=False,
+        type="http",
+        auth="public",
+        methods=["OPTIONS"],
+        csrf=False,
+        save_session=False,
     )
     def preflight(self, subpath=None, **kw):
         return request.make_response("", headers=_cors_headers(), status=204)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""""Jenis Barang Jasa" resolution for e-Faktur Keluaran OF item rows.
+""" "Jenis Barang Jasa" resolution for e-Faktur Keluaran OF item rows.
 
 The interesting case is the down-payment line, which carries no product of its
 own and used to be reported as "Barang" regardless of what was being sold.
@@ -31,9 +31,7 @@ class TestCoretaxItemJenis(AccountTestInvoicingCommon):
                     "move_type": "out_invoice",
                     "partner_id": self.partner_a.id,
                     "invoice_date": "2026-07-01",
-                    "invoice_line_ids": [
-                        (0, 0, {"product_id": product.id, "quantity": 1, "price_unit": 100.0})
-                    ],
+                    "invoice_line_ids": [(0, 0, {"product_id": product.id, "quantity": 1, "price_unit": 100.0})],
                 }
             )
         )

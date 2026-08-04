@@ -32,10 +32,7 @@ class CustomChangeRequest(models.Model):
             "effort_days": self.effort_estimate_days,
             "need_downtime": self.need_downtime,
             "reject_reason": self.reject_reason or "",
-            "sla_response_due": (
-                fields.Datetime.to_string(self.sla_response_due)
-                if self.sla_response_due else ""
-            ),
+            "sla_response_due": (fields.Datetime.to_string(self.sla_response_due) if self.sla_response_due else ""),
             "project": self.project_id.display_name or "",
         }
 

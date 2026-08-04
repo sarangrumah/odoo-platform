@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_coretax"
 PRIVILEGE = "res_groups_privilege_coretax"
-GROUPS = ['group_user', 'group_admin']
+GROUPS = ["group_user", "group_admin"]
 
 
 def migrate(cr, version):

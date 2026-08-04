@@ -27,7 +27,7 @@ class CustomProjectPortfolio(models.Model):
         compute="_compute_health",
         store=True,
         help="Worst health among the portfolio's projects -- a portfolio is only as "
-             "healthy as its most troubled project.",
+        "healthy as its most troubled project.",
     )
 
     _code_uniq = models.Constraint(

@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_pdp_consent"
 PRIVILEGE = "res_groups_privilege_pdp_consent"
-GROUPS = ['group_consent_manager']
+GROUPS = ["group_consent_manager"]
 
 
 def migrate(cr, version):

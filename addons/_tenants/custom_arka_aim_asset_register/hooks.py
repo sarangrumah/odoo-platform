@@ -85,9 +85,7 @@ def _acc(env, company, code):
 
 
 def _journal(env, company):
-    journals = env["account.journal"].search(
-        [("type", "=", "general"), ("company_id", "=", company.id)]
-    )
+    journals = env["account.journal"].search([("type", "=", "general"), ("company_id", "=", company.id)])
     candidates = journals.filtered(lambda journal: journal.code not in TECHNICAL_JOURNALS)
     for code in JOURNAL_PREFERENCE:
         match = candidates.filtered(lambda journal, code=code: journal.code == code)
@@ -241,9 +239,7 @@ def load_register(env, rows, posted_through=POSTED_THROUGH):
             depreciable = assets.filtered(lambda asset: asset.depreciation_method != "none")
             if depreciable:
                 depreciable.action_confirm()
-                history = depreciable.depreciation_line_ids.filtered(
-                    lambda line: line.date <= posted_through
-                )
+                history = depreciable.depreciation_line_ids.filtered(lambda line: line.date <= posted_through)
                 if history:
                     history.write({"posted": True})
                     seeded_lines += len(history)

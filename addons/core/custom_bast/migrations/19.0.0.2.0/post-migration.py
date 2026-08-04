@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_bast"
 PRIVILEGE = "res_groups_privilege_bast"
-GROUPS = ['group_bast_user', 'group_bast_manager']
+GROUPS = ["group_bast_user", "group_bast_manager"]
 
 
 def migrate(cr, version):

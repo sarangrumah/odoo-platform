@@ -128,9 +128,7 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
     def test_down_payment_line_uses_product_description(self):
         so = self._make_so(self.show)
         so.action_confirm()
-        dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(
-            lambda line: line.display_type == "product"
-        )
+        dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(lambda line: line.display_type == "product")
         self.assertEqual(dp_line.name, "%s, 01.09.26 (Uang Muka 50%%)" % self.product.name)
         # Single line: this same string is one cell in the coretax import file.
         self.assertNotIn("\n", dp_line.name)
@@ -144,9 +142,7 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         so = self._make_so(self.show)
         so.sudo().write({"order_line": [(0, 0, {"product_id": self.product_b.id, "product_uom_qty": 1})]})
         so.action_confirm()
-        dp_lines = self._make_dp_invoice(so).invoice_line_ids.filtered(
-            lambda line: line.display_type == "product"
-        )
+        dp_lines = self._make_dp_invoice(so).invoice_line_ids.filtered(lambda line: line.display_type == "product")
         expected = "%s, %s, 01.09.26 (Uang Muka 50%%)" % (self.product.name, self.product_b.name)
         self.assertTrue(dp_lines)
         self.assertEqual(set(dp_lines.mapped("name")), {expected})
@@ -172,9 +168,7 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
             }
         )
         so.action_confirm()
-        dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(
-            lambda line: line.display_type == "product"
-        )
+        dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(lambda line: line.display_type == "product")
         self.assertEqual(
             dp_line.name,
             "%s, Event Danone, Lokasi Taman Bhagawan Bali, 01.09.26 (Uang Muka 50%%)" % self.product.name,
@@ -189,9 +183,7 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         self.company.x_custom_show_date_enabled = False
         so = self._make_so(self.show)
         so.action_confirm()
-        dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(
-            lambda line: line.display_type == "product"
-        )
+        dp_line = self._make_dp_invoice(so).invoice_line_ids.filtered(lambda line: line.display_type == "product")
         self.assertIn("Down payment", dp_line.name)
 
     # (6) flag off -> standard behaviour (anchored to invoice_date)

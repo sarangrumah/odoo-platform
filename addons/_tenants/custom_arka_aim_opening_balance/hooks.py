@@ -143,9 +143,7 @@ def _post_company_opening(env, company, relpath):
         # An account.move.line has no date of its own, so the original
         # transaction date, document number and counterparty live in the label.
         label = " | ".join(
-            part
-            for part in (row.get("txn_date"), row.get("doc_no"), row.get("notes"), row.get("partner"))
-            if part
+            part for part in (row.get("txn_date"), row.get("doc_no"), row.get("notes"), row.get("partner")) if part
         )
         lines.append(
             Command.create(

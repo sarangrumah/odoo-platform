@@ -10,7 +10,6 @@ from odoo.tests import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "vaspmo")
 class TestStageClock(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -20,10 +19,12 @@ class TestStageClock(TransactionCase):
         cls.stage_hold = cls.env.ref("custom_project_portfolio.stage_hold")
         cls.stage_waiting = cls.env.ref("custom_project_portfolio.stage_waiting_user")
         cls.stage_done = cls.env.ref("custom_project_portfolio.stage_done")
-        cls.project = cls.env["project.project"].create({
-            "name": "PPOB Biller Rollout",
-            "custom_vertical_id": cls.vertical.id,
-        })
+        cls.project = cls.env["project.project"].create(
+            {
+                "name": "PPOB Biller Rollout",
+                "custom_vertical_id": cls.vertical.id,
+            }
+        )
 
     def _task(self, **kw):
         values = {
@@ -36,8 +37,7 @@ class TestStageClock(TransactionCase):
 
     def test_vertical_inherited_from_project(self):
         task = self._task()
-        self.assertEqual(task.custom_vertical_id, self.vertical,
-                         "A task must inherit its brand from the project.")
+        self.assertEqual(task.custom_vertical_id, self.vertical, "A task must inherit its brand from the project.")
 
     def test_sprint_assigned_on_create(self):
         task = self._task()
@@ -53,10 +53,12 @@ class TestStageClock(TransactionCase):
         task = self._task()
         # Pretend the task has been sitting in Development for four hours.
         task.custom_stage_entered_at = fields.Datetime.now() - timedelta(hours=4)
-        task.write({
-            "stage_id": self.stage_hold.id,
-            "custom_hold_reason": "Menunggu data toko dari brand",
-        })
+        task.write(
+            {
+                "stage_id": self.stage_hold.id,
+                "custom_hold_reason": "Menunggu data toko dari brand",
+            }
+        )
         self.assertEqual(task.stage_id, self.stage_hold)
         self.assertEqual(task.custom_prev_stage_id, self.stage_dev)
         self.assertTrue(task.custom_hold_since)
@@ -67,19 +69,18 @@ class TestStageClock(TransactionCase):
         task.custom_stage_entered_at = fields.Datetime.now() - timedelta(hours=3)
         task.action_vaspmo_resume()
         self.assertEqual(task.stage_id, self.stage_dev)
-        self.assertGreaterEqual(task.custom_hold_duration_hours, 2.9,
-                                "Hold time must be booked to the hold bucket.")
+        self.assertGreaterEqual(task.custom_hold_duration_hours, 2.9, "Hold time must be booked to the hold bucket.")
         self.assertEqual(task.custom_user_wait_hours, 0.0)
 
     def test_waiting_user_books_time_to_the_user(self):
         task = self._task(stage_id=self.stage_uat.id)
         task.write({"stage_id": self.stage_waiting.id})
-        self.assertTrue(task.custom_verification_due,
-                        "Asking the brand to verify must set a deadline.")
+        self.assertTrue(task.custom_verification_due, "Asking the brand to verify must set a deadline.")
         task.custom_stage_entered_at = fields.Datetime.now() - timedelta(hours=6)
         task.write({"stage_id": self.stage_done.id})
-        self.assertGreaterEqual(task.custom_user_wait_hours, 5.9,
-                                "Waiting on the brand is booked to the user, not the team.")
+        self.assertGreaterEqual(
+            task.custom_user_wait_hours, 5.9, "Waiting on the brand is booked to the user, not the team."
+        )
         self.assertEqual(task.custom_hold_duration_hours, 0.0)
         self.assertTrue(task.custom_closed_at)
 
@@ -99,8 +100,11 @@ class TestStageClock(TransactionCase):
         task.invalidate_recordset()
 
         self.assertGreater(task.custom_user_wait_hours, 7.0)
-        self.assertGreater(task.custom_lead_time_total, task.custom_cycle_time_team,
-                           "Total lead time must exceed team cycle time once the user waited.")
+        self.assertGreater(
+            task.custom_lead_time_total,
+            task.custom_cycle_time_team,
+            "Total lead time must exceed team cycle time once the user waited.",
+        )
         self.assertAlmostEqual(
             task.custom_lead_time_total - task.custom_cycle_time_team,
             task.custom_user_wait_hours,
@@ -109,8 +113,7 @@ class TestStageClock(TransactionCase):
         )
 
     def test_illegal_transition_is_refused(self):
-        task = self._task(stage_id=self.env.ref(
-            "custom_project_portfolio.stage_backlog").id)
+        task = self._task(stage_id=self.env.ref("custom_project_portfolio.stage_backlog").id)
         with self.assertRaises(UserError):
             task.write({"stage_id": self.stage_done.id})
 
@@ -118,21 +121,24 @@ class TestStageClock(TransactionCase):
         task = self._task(stage_id=self.stage_uat.id)
         task.write({"stage_id": self.stage_waiting.id})
         # Pretend the verification window has passed.
-        task.write({
-            "custom_verification_due": fields.Datetime.now() - timedelta(hours=1),
-        })
+        task.write(
+            {
+                "custom_verification_due": fields.Datetime.now() - timedelta(hours=1),
+            }
+        )
         self.env["project.task"].cron_vaspmo_verification()
         self.assertEqual(task.stage_id, self.stage_done)
-        self.assertTrue(task.custom_auto_closed,
-                        "Silence past the window closes the item, and says so.")
+        self.assertTrue(task.custom_auto_closed, "Silence past the window closes the item, and says so.")
 
     def test_hold_expiry_is_flagged_once(self):
         task = self._task()
-        task.write({
-            "stage_id": self.stage_hold.id,
-            "custom_hold_reason": "Menunggu izin",
-            "custom_hold_until": fields.Date.context_today(task) - timedelta(days=1),
-        })
+        task.write(
+            {
+                "stage_id": self.stage_hold.id,
+                "custom_hold_reason": "Menunggu izin",
+                "custom_hold_until": fields.Date.context_today(task) - timedelta(days=1),
+            }
+        )
         self.env["project.task"].cron_vaspmo_hold_watch()
         self.assertTrue(task.custom_hold_expired_notified)
         # Second run must not re-flag: the search excludes already-notified holds.
@@ -143,5 +149,4 @@ class TestStageClock(TransactionCase):
         task = self._task()
         friday = fields.Datetime.to_datetime("2026-07-31 09:00:00")  # a Friday
         due = task._vaspmo_add_working_days(friday, 1)
-        self.assertEqual(due.date().isoformat(), "2026-08-03",
-                         "One working day after Friday is Monday, not Saturday.")
+        self.assertEqual(due.date().isoformat(), "2026-08-03", "One working day after Friday is Monday, not Saturday.")

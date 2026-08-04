@@ -138,9 +138,9 @@ class LevisCategReclass(models.Model):
     def _default_journal(self):
         Journal = self.env["account.journal"]
         company = self.env.company
-        return Journal.search(
-            [("code", "=", "GLJV"), ("company_id", "=", company.id)], limit=1
-        ) or Journal.search([("type", "=", "general"), ("company_id", "=", company.id)], limit=1)
+        return Journal.search([("code", "=", "GLJV"), ("company_id", "=", company.id)], limit=1) or Journal.search(
+            [("type", "=", "general"), ("company_id", "=", company.id)], limit=1
+        )
 
     @api.depends("line_ids.amount", "line_ids.kind", "line_ids.is_period_closed", "line_ids.is_matched")
     def _compute_totals(self):
@@ -199,8 +199,10 @@ class LevisCategReclass(models.Model):
     # ------------------------------------------------------------------
     def _products(self):
         self.ensure_one()
-        return self.env["product.product"].with_context(active_test=False).search(
-            [("product_tmpl_id", "in", self.product_tmpl_ids.ids)]
+        return (
+            self.env["product.product"]
+            .with_context(active_test=False)
+            .search([("product_tmpl_id", "in", self.product_tmpl_ids.ids)])
         )
 
     _CATEG_FIELD = {
@@ -385,10 +387,7 @@ class LevisCategReclass(models.Model):
         applied = self.search(
             [("state", "=", "applied"), ("company_id", "=", self.company_id.id), ("id", "!=", self.id)]
         )
-        return {
-            (line.product_id.id, line.origin_date, line.kind)
-            for line in applied.mapped("line_ids")
-        }
+        return {(line.product_id.id, line.origin_date, line.kind) for line in applied.mapped("line_ids")}
 
     # ------------------------------------------------------------------
     # Compute
@@ -461,8 +460,7 @@ class LevisCategReclass(models.Model):
             lines._check_against_gl()
 
             rec.product_ids = [
-                (0, 0, {"product_tmpl_id": tmpl.id, "old_categ_id": tmpl.categ_id.id})
-                for tmpl in rec.product_tmpl_ids
+                (0, 0, {"product_tmpl_id": tmpl.id, "old_categ_id": tmpl.categ_id.id}) for tmpl in rec.product_tmpl_ids
             ]
             if not lines:
                 warnings.append(
@@ -576,12 +574,17 @@ class LevisCategReclass(models.Model):
         by_period = defaultdict(lambda: defaultdict(float))
         for line in lines:
             period = line.origin_date.strftime("%Y-%m")
-            key = (line.posting_date, period, line.source_account_id.id, line.target_account_id.id,
-                   line.analytic_account_id.id)
+            key = (
+                line.posting_date,
+                period,
+                line.source_account_id.id,
+                line.target_account_id.id,
+                line.analytic_account_id.id,
+            )
             by_period[(line.posting_date, period)][key[2:]] += line.amount
 
         moves = self.env["account.move"]
-        for (posting_date, period) in sorted(by_period):
+        for posting_date, period in sorted(by_period):
             reversal_lines, rebooking_lines = [], []
             for (source_id, target_id, analytic_id), amount in by_period[(posting_date, period)].items():
                 if float_is_zero(amount, precision_rounding=currency.rounding):

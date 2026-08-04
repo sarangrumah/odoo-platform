@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_pdp_audit"
 PRIVILEGE = "res_groups_privilege_pdp_audit"
-GROUPS = ['group_audit_viewer']
+GROUPS = ["group_audit_viewer"]
 
 
 def migrate(cr, version):

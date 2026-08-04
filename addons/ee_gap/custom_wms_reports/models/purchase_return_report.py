@@ -24,9 +24,20 @@ class WmsPurchaseReturnReport(models.Model):
     _rec_name = "reference"
     _order = "date desc, id desc"
     _depends = {
-        "stock.move": ["date", "reference", "origin", "picking_id", "product_id", "quantity",
-                       "price_unit", "value", "origin_returned_move_id", "location_dest_id",
-                       "state", "company_id"],
+        "stock.move": [
+            "date",
+            "reference",
+            "origin",
+            "picking_id",
+            "product_id",
+            "quantity",
+            "price_unit",
+            "value",
+            "origin_returned_move_id",
+            "location_dest_id",
+            "state",
+            "company_id",
+        ],
         "stock.picking": ["partner_id"],
         "product.product": ["default_code", "standard_price", "product_tmpl_id"],
     }

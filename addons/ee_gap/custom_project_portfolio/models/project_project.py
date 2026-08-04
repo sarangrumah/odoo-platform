@@ -10,10 +10,14 @@ class ProjectProject(models.Model):
     _inherit = ["project.project", "pdp.audited.mixin"]
 
     custom_vertical_id = fields.Many2one(
-        "custom.project.vertical", string="Vertical", index=True,
+        "custom.project.vertical",
+        string="Vertical",
+        index=True,
     )
     custom_portfolio_id = fields.Many2one(
-        "custom.project.portfolio", string="Portfolio", index=True,
+        "custom.project.portfolio",
+        string="Portfolio",
+        index=True,
     )
     custom_po_id = fields.Many2one("res.users", string="Product Owner")
     custom_ba_id = fields.Many2one("res.users", string="Business Analyst")
@@ -37,20 +41,30 @@ class ProjectProject(models.Model):
         help="Maximum in-flight tasks per active stage. 0 disables the check.",
     )
     custom_progress = fields.Float(
-        string="Progress (%)", compute="_compute_progress", store=True, digits=(5, 1),
+        string="Progress (%)",
+        compute="_compute_progress",
+        store=True,
+        digits=(5, 1),
     )
     custom_task_overdue_count = fields.Integer(
-        compute="_compute_progress", store=True, string="Overdue Tasks",
+        compute="_compute_progress",
+        store=True,
+        string="Overdue Tasks",
     )
     custom_task_hold_count = fields.Integer(
-        compute="_compute_progress", store=True, string="Tasks On Hold",
+        compute="_compute_progress",
+        store=True,
+        string="Tasks On Hold",
     )
     custom_task_waiting_user_count = fields.Integer(
-        compute="_compute_progress", store=True, string="Tasks Awaiting User",
+        compute="_compute_progress",
+        store=True,
+        string="Tasks Awaiting User",
     )
 
     @api.depends(
-        "task_ids.stage_id", "task_ids.custom_due_sla_date",
+        "task_ids.stage_id",
+        "task_ids.custom_due_sla_date",
         "task_ids.stage_id.custom_is_closed_stage",
     )
     def _compute_progress(self):
@@ -60,27 +74,30 @@ class ProjectProject(models.Model):
             total = len(tasks)
             done = len(tasks.filtered(lambda t: t.stage_id.custom_is_closed_stage))
             project.custom_progress = round(done * 100.0 / total, 1) if total else 0.0
-            project.custom_task_overdue_count = len(tasks.filtered(
-                lambda t: t.custom_due_sla_date
-                and t.custom_due_sla_date < now
-                and not t.stage_id.custom_is_closed_stage
-                and t.stage_id.custom_sla_clock == "running"
-            ))
-            project.custom_task_hold_count = len(
-                tasks.filtered(lambda t: t.stage_id.custom_is_hold)
+            project.custom_task_overdue_count = len(
+                tasks.filtered(
+                    lambda t: (
+                        t.custom_due_sla_date
+                        and t.custom_due_sla_date < now
+                        and not t.stage_id.custom_is_closed_stage
+                        and t.stage_id.custom_sla_clock == "running"
+                    )
+                )
             )
-            project.custom_task_waiting_user_count = len(
-                tasks.filtered(lambda t: t.stage_id.custom_is_waiting_user)
-            )
+            project.custom_task_hold_count = len(tasks.filtered(lambda t: t.stage_id.custom_is_hold))
+            project.custom_task_waiting_user_count = len(tasks.filtered(lambda t: t.stage_id.custom_is_waiting_user))
 
     @api.constrains("custom_health", "custom_health_note")
     def _check_health_note(self):
         for project in self:
             if project.custom_health != "on_track" and not project.custom_health_note:
-                raise ValidationError(_(
-                    "Project %s is no longer on track — say why. A red light with no "
-                    "explanation cannot be acted on.", project.name
-                ))
+                raise ValidationError(
+                    _(
+                        "Project %s is no longer on track — say why. A red light with no "
+                        "explanation cannot be acted on.",
+                        project.name,
+                    )
+                )
 
     @api.model_create_multi
     def create(self, vals_list):
