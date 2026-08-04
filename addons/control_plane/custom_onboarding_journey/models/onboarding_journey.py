@@ -72,7 +72,7 @@ class OnboardingJourney(models.Model):
     # ------------------------------------------------------------------ core
     name = fields.Char(
         required=True,
-        default=lambda self: _("New Onboarding"),
+        default=lambda self: self.env._("New Onboarding"),
         tracking=True,
         index=True,
     )
@@ -191,13 +191,10 @@ class OnboardingJourney(models.Model):
         store=True,
     )
 
-    _sql_constraints = [
-        (
-            "public_status_token_uniq",
-            "unique(public_status_token)",
-            "Each onboarding journey must have a unique public status token.",
-        ),
-    ]
+    _public_status_token_uniq = models.Constraint(
+        "unique(public_status_token)",
+        "Each onboarding journey must have a unique public status token.",
+    )
 
     # ------------------------------------------------------------------ computes
     @api.depends("brd_recommendation_ids.estimated_md")

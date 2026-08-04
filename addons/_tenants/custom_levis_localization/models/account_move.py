@@ -216,9 +216,16 @@ class AccountMove(models.Model):
         return default
 
     def _edo_gl_lines(self):
-        """Journal items shown in the GL table (excludes section/note rows)."""
+        """Journal items shown in the GL table (excludes section/note rows).
+
+        Ordered to mirror the vendor-bill screen so Accounting can review the
+        print-out against the form: product/invoice lines first (in their own
+        sequence), then tax lines, then the payment-term / payable line.
+        """
         self.ensure_one()
-        return self.line_ids.filtered(lambda l: l.display_type not in ("line_section", "line_note"))
+        lines = self.line_ids.filtered(lambda l: l.display_type not in ("line_section", "line_note"))
+        rank = {"product": 0, "tax": 1, "payment_term": 2}
+        return lines.sorted(key=lambda l: (rank.get(l.display_type, 3), l.sequence, l.id))
 
     # ------------------------------------------------------------------
     # Header meta

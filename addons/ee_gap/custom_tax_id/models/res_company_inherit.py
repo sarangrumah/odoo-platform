@@ -36,8 +36,16 @@ class ResCompany(models.Model):
         help="User Id registered on Coretax, emitted in the 'User Id' column.",
     )
 
-    def _check_coretax_pemotong(self):
-        """Guard the export wizards: refuse to emit a file DJP will reject."""
+    def _check_coretax_pemotong(self, require_signer=True):
+        """Guard the export wizards: refuse to emit a file DJP will reject.
+
+        ``require_signer`` exists because only the bupot layouts carry an "NPWP
+        Penandatangan" column. e-Faktur Keluaran (FK/OF) and Retur Masukan take
+        the pemotong's NPWP and NITKU but never the signer, so demanding it
+        there blocks a perfectly valid export on a field the file will not hold.
+        Defaults to True: a caller that has not thought about it gets the strict
+        check.
+        """
         self.ensure_one()
         partner = self.partner_id
         npwp = (partner.x_custom_npwp or "").replace(".", "").replace("-", "")
@@ -46,7 +54,7 @@ class ResCompany(models.Model):
             missing.append(_("NPWP Pemotong (pada partner perusahaan)"))
         if not self.x_custom_nitku_suffix:
             missing.append(_("NITKU Pemotong (6 Digit)"))
-        if not self.x_custom_npwp_penandatangan:
+        if require_signer and not self.x_custom_npwp_penandatangan:
             missing.append(_("NPWP Penandatangan"))
         if missing:
             raise ValidationError(

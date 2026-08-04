@@ -6,6 +6,7 @@
 Bridge between Odoo and the platform AI gateway service.
 
 Features:
+
 - ``custom.ai`` service: ``chat()``, ``recommend(model, res_id, payload)`` calls
   the gateway with HMAC signing.
 - Settings UI under Custom Platform > AI Intelligence for provider override,
@@ -17,7 +18,7 @@ Depends on `custom_core` for HMAC helper and encrypted config storage.
 """,
     "author": "Custom Platform",
     "category": "Custom Platform/AI",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": ["custom_core"],
     "capability_tags": ["ai", "multi-tenant"],

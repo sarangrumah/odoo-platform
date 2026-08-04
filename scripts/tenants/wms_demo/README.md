@@ -152,6 +152,31 @@ batch lots + expiration dates.
 
 ---
 
+## 4b. POC scenario by transaction category (`80_poc_scenario.py`)
+
+`70_scenario_test.py` walks the client's 15-point requirement sheet against the
+JD Sport dataset. `80_poc_scenario.py` is the **category-based POC**: it builds
+its own warehouse (`POC`, 2-step in / 2-step out) and walks Warehouse →
+Location → Storage Category → Putaway → PO inbound → Internal transfer →
+Delivery order → Picking out → Cycle count → Print label → Scrap → Reporting,
+printing PASS/PARTIAL/FAIL per category and writing every PDF and XLSX to
+`/var/lib/odoo/poc_wms/POC<nn>/`.
+
+```bash
+docker exec -i odoo19-platform-odoo-mgmt odoo shell -d demo_wms --no-http \
+    < scripts/tenants/wms_demo/80_poc_scenario.py
+```
+
+Full write-up (including the reporting/barcode matrix and the platform gotchas
+it surfaced): `docs/projects/warehouse-jds/WMS-POC-Scenario.md`.
+
+> PDFs rendered from `odoo shell --no-http` take ~60 s each because wkhtmltopdf
+> has no HTTP server to call back to. The output is correct; over real HTTP the
+> same documents take 3-6 s. Core Odoo reports are slower still under the same
+> conditions.
+
+---
+
 ## 5. Notes / extending
 
 - Putaway `auto_apply_suggestions` is **off** so reviewers can see suggestions on

@@ -75,9 +75,25 @@ addons/compliance/custom_coretax/data/sertel/*.pfx
 # ----- Generated extract artifacts (reproducible via 01_extract_x101.py) -----
 scripts/tenants/levis/out_*.csv
 
+# ----- ARKA-AIM client source workbooks (local-only) -----
+# The raw client xlsx stays out of git; the CSVs derived from it under
+# addons/_tenants/custom_arka_aim_*/data/ are module SEEDS read by their
+# post_init_hook, so those must stay committed.
+imports/arka_aim/
+
 # ----- Levis raw XStore migration source data (large, local-only) -----
 # The "Mentahan" (raw) XStore export + its zip are ~56MB of source data for the
 # one-off migration extract. Keep them local; do not bloat git history. The
 # reproducible outputs live under scripts/tenants/levis/ (also gitignored above).
 docs/projects/levis/Data XStore (Mentahan)*/
 docs/projects/levis/Data XStore (Mentahan)*.zip
+
+# Word exports of the architecture docs. The .md files next to them are the
+# source of truth; each exported revision is ~1 MB of binary that git can never
+# really delete once committed.
+docs/*.docx
+# The bare `logs/` rule above matches a directory called logs ANYWHERE, which
+# silently swallowed the Next.js route for the transaction-log screen. Re-include
+# it explicitly: git cannot un-ignore files inside an ignored directory, so the
+# directory itself has to be named.
+!vas-pmo/src/app/(app)/logs/

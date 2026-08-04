@@ -7,6 +7,7 @@ Foundation module providing a reusable adapter pattern for outbound integrations
 (Coretax, Pajakku, Bank H2H, PPOB providers, etc.).
 
 Provides:
+
 - `custom.adapter.config`: per-tenant per-adapter configuration record
 - `custom.adapter.call.log`: append-only call log
 - `BaseAdapter`: Python base class with HTTP, HMAC signing, retry with exponential
@@ -16,7 +17,7 @@ Provides:
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Custom Platform/Core",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "custom_pdp_audit"],
     "capability_tags": ["audit-trail", "multi-tenant", "approval-workflow"],

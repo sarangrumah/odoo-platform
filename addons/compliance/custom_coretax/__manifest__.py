@@ -4,7 +4,7 @@
     "summary": "Indonesian Coretax DJP compliance: NSFP, e-Faktur XML export/import, Bukti Potong, Sertel storage",
     "description": """
 Custom Coretax — Indonesia DJP Compliance Module
-=============================================
+================================================
 
 Implements the Coretax DJP (Direktorat Jenderal Pajak) compliance surface
 for the Custom Odoo 19 Platform, aligned with PER-11/PJ/2025 (effective
@@ -12,6 +12,7 @@ for the Custom Odoo 19 Platform, aligned with PER-11/PJ/2025 (effective
 
 Features
 --------
+
 - NSFP (Nomor Seri Faktur Pajak) lifecycle on `account.move` (17-digit
   format: 2 transaction-code + 2 status-code + 13 serial). NSFP is
   assigned by DJP *after* approval on the Coretax portal; the field is
@@ -41,7 +42,7 @@ server-side on Coretax portal upload. See `data/xsd/README.md`.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Custom Platform/Compliance/Coretax",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.4.0",
     "license": "LGPL-3",
     "depends": ["custom_core", "account", "mail"],
     "capability_tags": ["indonesian-tax", "coretax", "withholding", "accounting", "audit-trail"],

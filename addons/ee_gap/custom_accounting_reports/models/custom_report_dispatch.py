@@ -9,12 +9,15 @@ builds its context, then hands off to a router QWeb template that
 in turn includes the per-report layout.
 """
 
+import logging
 from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 from .custom_report_general_ledger import GL_OPTIONAL_COLUMNS
+
+_logger = logging.getLogger(__name__)
 
 
 REPORT_MODEL_MAP = {
@@ -31,6 +34,11 @@ REPORT_MODEL_MAP = {
     "receivable_card": "custom.report.receivable.card",
     "advance": "custom.report.advance",
     "sales": "custom.report.sales",
+    "sales_detail": "custom.report.sales.detail",
+    "purchase": "custom.report.purchase",
+    "credit_limit": "custom.report.credit.limit",
+    "gl_open_items": "custom.report.gl.open.items",
+    "bill_payment": "custom.report.bill.payment",
     "tax": "custom.report.tax",
     "faktur_pajak": "custom.report.faktur.pajak",
     "bupot": "custom.report.bupot",
@@ -39,6 +47,7 @@ REPORT_MODEL_MAP = {
     "nsfp_monitoring": "custom.report.nsfp.monitoring",
     "npwp_quality": "custom.report.npwp.quality",
     "dpp_nilai_lain": "custom.report.dpp.nilai.lain",
+    "ppn_masukan_import": "custom.report.ppn.masukan.import",
     "faktur_pengganti": "custom.report.faktur.pengganti",
     "ekualisasi_omzet": "custom.report.ekualisasi.omzet",
     "pph_equalisasi": "custom.report.pph.equalisasi",
@@ -59,14 +68,31 @@ class CustomReportDispatch(models.AbstractModel):
     _name = "report.custom_accounting_reports.report_dispatch"
     _description = "Custom Financial Report Dispatcher"
 
+    @api.model
+    def _resolve_model_name(self, report_code):
+        """Map ``report_code`` to its AbstractModel name.
+
+        An unregistered code falls back to the Trial Balance so a stale wizard
+        never hard-errors — but it is logged, because that fallback is silent
+        from the user's side: they ask for e.g. the Purchase register and get a
+        Trial Balance back with no clue why. Three reports (purchase,
+        credit_limit, ppn_masukan_import) shipped unregistered and reached
+        users exactly this way, so keep the warning when adding new reports.
+        """
+        model_name = REPORT_MODEL_MAP.get(report_code)
+        if not model_name:
+            _logger.warning(
+                "Report code %r is not in REPORT_MODEL_MAP — falling back to "
+                "the Trial Balance. Register the report's code to fix this.",
+                report_code,
+            )
+            model_name = "custom.report.trial.balance"
+        return model_name
+
     def _get_report_values(self, docids, data=None):
         data = data or {}
         report_code = data.get("report_code") or "trial_balance"
-        model_name = REPORT_MODEL_MAP.get(
-            report_code,
-            "custom.report.trial.balance",
-        )
-        report = self.env[model_name]
+        report = self.env[self._resolve_model_name(report_code)]
         ctx = report._compute(data.get("options") or data.get("filters"))
         return {
             "doc_ids": docids,
@@ -80,7 +106,7 @@ class CustomReportDispatch(models.AbstractModel):
     # On-screen table / export entry points (called by the OWL client)
     # ------------------------------------------------------------------
     def _report_model(self, report_code):
-        return self.env[REPORT_MODEL_MAP.get(report_code, "custom.report.trial.balance")]
+        return self.env[self._resolve_model_name(report_code)]
 
     @api.model
     def get_report_table(self, report_code, options=None, context_extra=None):

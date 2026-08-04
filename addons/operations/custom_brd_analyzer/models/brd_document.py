@@ -30,7 +30,7 @@ class BrdDocument(models.Model):
 
     name = fields.Char(
         required=True,
-        default=lambda self: _("New BRD"),
+        default=lambda self: self.env._("New BRD"),
         tracking=True,
     )
     reference = fields.Char(

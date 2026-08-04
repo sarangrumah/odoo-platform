@@ -151,7 +151,9 @@ class CustomSurveyNpsSummary(models.Model):
                     "%.2f" % (rec.nps_score or 0.0),
                 ]
             )
-        data = buf.getvalue().encode("utf-8")
+        # utf-8-sig, not utf-8: the BOM tells Excel the file is UTF-8 instead of
+        # letting it fall back to the system codepage and render mojibake.
+        data = buf.getvalue().encode("utf-8-sig")
         attachment = (
             self.env["ir.attachment"]
             .sudo()

@@ -37,15 +37,11 @@ class CustomAttendanceOvertimeRule(models.Model):
     )
     note = fields.Text(string="Notes")
 
-    _sql_constraints = [
-        (
-            "threshold_positive",
-            "CHECK(threshold_hours >= 0)",
-            "Threshold hours must be non-negative.",
-        ),
-        (
-            "multiplier_positive",
-            "CHECK(multiplier > 0)",
-            "Multiplier must be greater than zero.",
-        ),
-    ]
+    _threshold_positive = models.Constraint(
+        "CHECK(threshold_hours >= 0)",
+        "Threshold hours must be non-negative.",
+    )
+    _multiplier_positive = models.Constraint(
+        "CHECK(multiplier > 0)",
+        "Multiplier must be greater than zero.",
+    )

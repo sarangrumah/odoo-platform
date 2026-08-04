@@ -59,13 +59,10 @@ class CustomBupotUnifikasi(models.Model):
     )
     rejection_note = fields.Text()
 
-    _sql_constraints = [
-        (
-            "period_unique",
-            "UNIQUE(company_id, month, year)",
-            "Only one Bukti Potong period per company per month is allowed.",
-        ),
-    ]
+    _period_unique = models.Constraint(
+        "UNIQUE(company_id, month, year)",
+        "Only one Bukti Potong period per company per month is allowed.",
+    )
 
     @api.depends("month", "year", "company_id")
     def _compute_name(self):

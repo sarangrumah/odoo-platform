@@ -13,7 +13,7 @@ class CustomPoReturn(models.Model):
 
     name = fields.Char(
         string="Reference",
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
         copy=False,
         readonly=True,
     )

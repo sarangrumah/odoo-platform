@@ -29,21 +29,10 @@ _NO_CODE = "￿"
 
 
 class StockPicking(models.Model):
-    _inherit = "stock.picking"
-
-    # ------------------------------------------------------------------
-    # Barcode helper (callable from QWeb: ``o._wms_barcode_url(o.name)``)
-    # ------------------------------------------------------------------
-    def _wms_barcode_url(
-        self,
-        value: str,
-        barcode_type: str = "Code128",
-        width: int = 600,
-        height: int = 100,
-        humanreadable: bool = False,
-    ) -> str:
-        """Thin model-side proxy over :func:`wms_barcode_url` for templates."""
-        return wms_barcode_url(value, barcode_type, width, height, humanreadable)
+    _name = "stock.picking"
+    # ``wms.barcode.mixin`` supplies ``_wms_barcode_url`` / ``_wms_barcode_src``
+    # / ``_wms_barcode_png`` to both this model and the QWeb templates.
+    _inherit = ["stock.picking", "wms.barcode.mixin"]
 
     # ------------------------------------------------------------------
     # Small field-probing helpers (optional modules)
@@ -112,13 +101,18 @@ class StockPicking(models.Model):
         rows: list[dict] = []
         for seq, line in enumerate(self._wms_pick_lines(), start=1):
             location = line.location_id
+            item_value = self._wms_item_barcode_value(line.product_id, line.lot_id)
             rows.append(
                 {
                     "seq": seq,
+                    # Line-item barcode: what the handheld scans back on this
+                    # row (lot when tracked, else EAN, else internal ref).
+                    "item_barcode_value": item_value,
+                    "item_barcode": self._wms_item_barcode_src(item_value),
                     "line": line,
                     "location": location,
                     "location_name": location.complete_name or location.display_name or "",
-                    "location_qr": wms_barcode_url(
+                    "location_qr": self._wms_barcode_src(
                         location.barcode or location.complete_name or "",
                         "QR",
                         width=120,

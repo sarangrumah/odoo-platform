@@ -173,7 +173,37 @@ class PutawayEngine(models.AbstractModel):
         """
         if not move_line or not move_line.product_id:
             return []
-        warehouse = move_line.picking_id.picking_type_id.warehouse_id
+        return self._propose(move_line, move_line.picking_id.picking_type_id.warehouse_id)
+
+    @api.model
+    def propose_for_product(self, product, warehouse, quantity=1.0, from_location=None):
+        """Rank bins for a bare product, with no move line behind it.
+
+        The handheld's stock-check screen asks "where would this go?" about a
+        product the operator has merely scanned — there is no transfer, so
+        ``propose`` has no move line to read the warehouse or quantity from.
+        Scoring itself is unchanged: it runs against an in-memory move line, so
+        a rule that inspects ``location_id`` or the put-away quantity behaves
+        exactly as it would during a real receipt.
+        """
+        if not product or not warehouse:
+            return []
+        move_line = self.env["stock.move.line"].new(
+            {
+                "product_id": product.id,
+                "quantity": quantity,
+                "location_id": (from_location or warehouse.lot_stock_id).id,
+                "location_dest_id": warehouse.lot_stock_id.id,
+            }
+        )
+        return self._propose(move_line, warehouse)
+
+    @api.model
+    def _propose(self, move_line, warehouse):
+        """Shared ranking body — ``warehouse`` is passed in because a scanned
+        product has no picking to derive it from."""
+        if not move_line or not move_line.product_id:
+            return []
         Strategy = self.env["custom.wms.putaway.strategy"]
         strategies = Strategy.search([("active", "=", True), ("warehouse_id", "=", warehouse.id)])
         proposals: list[dict] = []

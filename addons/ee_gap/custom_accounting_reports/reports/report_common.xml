@@ -54,11 +54,29 @@
                         <t t-elif="report_code == 'sales'">
                             <t t-call="custom_accounting_reports.report_sales"/>
                         </t>
+                        <t t-elif="report_code == 'sales_detail'">
+                            <t t-call="custom_accounting_reports.report_sales_detail"/>
+                        </t>
+                        <t t-elif="report_code == 'purchase'">
+                            <t t-call="custom_accounting_reports.report_purchase"/>
+                        </t>
+                        <t t-elif="report_code == 'credit_limit'">
+                            <t t-call="custom_accounting_reports.report_credit_limit"/>
+                        </t>
+                        <t t-elif="report_code == 'gl_open_items'">
+                            <t t-call="custom_accounting_reports.report_gl_open_items"/>
+                        </t>
+                        <t t-elif="report_code == 'bill_payment'">
+                            <t t-call="custom_accounting_reports.report_bill_payment"/>
+                        </t>
                         <t t-elif="report_code == 'tax'">
                             <t t-call="custom_accounting_reports.report_tax"/>
                         </t>
                         <t t-elif="report_code == 'faktur_pajak'">
                             <t t-call="custom_accounting_reports.report_faktur_pajak"/>
+                        </t>
+                        <t t-elif="report_code == 'ppn_masukan_import'">
+                            <t t-call="custom_accounting_reports.report_ppn_masukan_import"/>
                         </t>
                         <t t-elif="report_code == 'bupot'">
                             <t t-call="custom_accounting_reports.report_bupot"/>

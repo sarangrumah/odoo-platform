@@ -38,9 +38,23 @@ class PurchaseOrder(models.Model):
         "non-trade GR/IR). Drives the PO numbering and account mapping.",
     )
 
+    l10n_ou_analytic_display = fields.Many2one(
+        "account.analytic.account",
+        string="Operating Unit",
+        compute="_compute_l10n_ou_analytic_display",
+        help="Operating-Unit analytic of the destination warehouse (Deliver To). "
+        "This is what gets stamped on every PO line; pick the store's Receipt "
+        "operation type in Deliver To to book the purchase on that store.",
+    )
+
     # ------------------------------------------------------------------
     # Operating Unit (store) analytic
     # ------------------------------------------------------------------
+    @api.depends("picking_type_id")
+    def _compute_l10n_ou_analytic_display(self):
+        for order in self:
+            order.l10n_ou_analytic_display = order._levis_ou_analytic()
+
     def _levis_ou_analytic(self):
         """Operating-Unit analytic account of this PO's store, if any."""
         self.ensure_one()

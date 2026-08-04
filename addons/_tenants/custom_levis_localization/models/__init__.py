@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from . import res_bank
 from . import res_company
+from . import account_account
 from . import levis_purchase_account_map
 from . import stock_warehouse
 from . import purchase_order
@@ -17,3 +18,4 @@ from . import levis_mdr_bin
 from . import account_payment_register
 from . import pos_session
 from . import product_product
+from . import categ_reclass

@@ -56,7 +56,7 @@
                 <filter name="f_error" string="Errors" domain="[('status','=','error')]"/>
                 <filter name="f_push" string="Push" domain="[('direction','=','push')]"/>
                 <filter name="f_pull" string="Pull" domain="[('direction','=','pull')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="g_dir" string="Direction" context="{'group_by':'direction'}"/>
                     <filter name="g_op" string="Operation" context="{'group_by':'operation'}"/>
                     <filter name="g_status" string="Status" context="{'group_by':'status'}"/>

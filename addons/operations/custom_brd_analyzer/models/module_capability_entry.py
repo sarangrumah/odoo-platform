@@ -180,9 +180,10 @@ class CustomModuleCapabilityEntry(models.Model):
     last_scanned = fields.Datetime()
     notes = fields.Text()
 
-    _sql_constraints = [
-        ("module_name_uniq", "unique(module_name)", "Capability entry module_name must be unique."),
-    ]
+    _module_name_uniq = models.Constraint(
+        "unique(module_name)",
+        "Capability entry module_name must be unique.",
+    )
 
     # ------------------------------------------------------------------
     # Scanning
@@ -631,7 +632,7 @@ class CustomModuleCapabilityEntry(models.Model):
             group = None
         if not group:
             return
-        admin_users = group.users.filtered(lambda u: u.active and not u.share)
+        admin_users = group.user_ids.filtered(lambda u: u.active and not u.share)
         if not admin_users:
             return
         Activity = self.env["mail.activity"].sudo()

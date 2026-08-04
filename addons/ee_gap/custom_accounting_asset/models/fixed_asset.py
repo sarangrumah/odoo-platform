@@ -19,7 +19,7 @@ class CustomFixedAsset(models.Model):
     code = fields.Char(
         required=True,
         copy=False,
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
         tracking=True,
     )
     company_id = fields.Many2one(
@@ -220,13 +220,10 @@ class CustomFixedAsset(models.Model):
         copy=False,
     )
 
-    _sql_constraints = [
-        (
-            "code_company_unique",
-            "UNIQUE(code, company_id)",
-            "Asset code must be unique within a company.",
-        ),
-    ]
+    _code_company_unique = models.Constraint(
+        "UNIQUE(code, company_id)",
+        "Asset code must be unique within a company.",
+    )
 
     # ------------------------------------------------------------------
     # Constraints
@@ -508,33 +505,100 @@ class CustomFixedAsset(models.Model):
     # ------------------------------------------------------------------
     # Posting due depreciation lines
     # ------------------------------------------------------------------
+    def _group_depreciation_moves(self):
+        """Whether to book ONE journal entry per period instead of one per asset.
+
+        Default ON. A per-asset entry means 3,300+ documents a month on a real
+        register (ARKA-AIM carries 3,328 running assets), which is not what
+        Accounting asks for — they want a single monthly depreciation document
+        they can point at, and the per-asset detail stays in this subledger.
+
+        Set ``custom_accounting_asset.group_depreciation_moves`` to ``0`` on a
+        tenant whose Accounting genuinely wants one entry per asset.
+        """
+        param = (
+            self.env["ir.config_parameter"].sudo().get_param("custom_accounting_asset.group_depreciation_moves", "1")
+        )
+        return str(param).strip().lower() in ("1", "true", "yes")
+
     def _post_due_depreciation(self, as_of=None):
         """Post all unposted depreciation lines whose date is <= ``as_of``.
-        Creates one ``account.move`` per line: DR expense / CR accumulated.
+
+        Books DR expense / CR accumulated depreciation. Lines are grouped into
+        one ``account.move`` per (company, journal, expense account, accumulated
+        account, date) — so a monthly run yields one document per date rather
+        than one per asset. See :meth:`_group_depreciation_moves` to opt out.
+
+        Grouping keys on the exact line ``date`` rather than on the month, so
+        assets whose schedule falls on a different day of the month keep their
+        own correctly-dated entry instead of being pulled into someone else's
+        accounting date.
         """
         as_of = as_of or fields.Date.context_today(self)
         AccountMove = self.env["account.move"]
-        posted_count = 0
+        grouped = self._group_depreciation_moves()
+
+        # Collect due lines across the whole recordset first: grouping has to
+        # span assets, so this cannot be done inside a per-asset loop.
+        buckets = {}
         for asset in self:
             if asset.state != "running":
                 continue
-            due = asset.depreciation_line_ids.filtered(
-                lambda l: not l.posted and not l.reversed and l.date <= as_of
-            ).sorted("date")
+            due = asset.depreciation_line_ids.filtered(lambda l: not l.posted and not l.reversed and l.date <= as_of)
             for line in due:
-                move_vals = {
-                    "date": line.date,
-                    "journal_id": asset.journal_id.id,
-                    "company_id": asset.company_id.id,
-                    "ref": _("Depreciation %(code)s #%(seq)s", code=asset.code, seq=line.sequence),
+                key = (
+                    asset.company_id.id,
+                    asset.journal_id.id,
+                    asset.expense_account_id.id,
+                    asset.depreciation_account_id.id,
+                    line.date,
+                    # Without grouping, the line's own id keeps every bucket
+                    # singular and restores the one-move-per-line behaviour.
+                    None if grouped else line.id,
+                )
+                buckets.setdefault(key, self.env["custom.fixed.asset.depreciation.line"])
+                buckets[key] |= line
+
+        posted_count = 0
+        for key in sorted(buckets, key=lambda k: (k[4], k[0], k[1])):
+            company_id, journal_id, expense_id, accum_id, date, _singleton = key
+            lines = buckets[key]
+            total = sum(lines.mapped("amount"))
+            if not total:
+                continue
+
+            if len(lines) == 1:
+                asset = lines.asset_id
+                ref = _(
+                    "Depreciation %(code)s #%(seq)s",
+                    code=asset.code,
+                    seq=lines.sequence,
+                )
+                expense_label = _("Depreciation %(name)s", name=asset.name)
+                accum_label = _("Accum. depreciation %(name)s", name=asset.name)
+            else:
+                ref = _(
+                    "Depreciation %(date)s (%(count)s assets)",
+                    date=date,
+                    count=len(lines.asset_id),
+                )
+                expense_label = _("Depreciation %(date)s", date=date)
+                accum_label = _("Accum. depreciation %(date)s", date=date)
+
+            move = AccountMove.create(
+                {
+                    "date": date,
+                    "journal_id": journal_id,
+                    "company_id": company_id,
+                    "ref": ref,
                     "line_ids": [
                         (
                             0,
                             0,
                             {
-                                "name": _("Depreciation %(name)s", name=asset.name),
-                                "account_id": asset.expense_account_id.id,
-                                "debit": line.amount,
+                                "name": expense_label,
+                                "account_id": expense_id,
+                                "debit": total,
                                 "credit": 0.0,
                             },
                         ),
@@ -542,20 +606,20 @@ class CustomFixedAsset(models.Model):
                             0,
                             0,
                             {
-                                "name": _("Accum. depreciation %(name)s", name=asset.name),
-                                "account_id": asset.depreciation_account_id.id,
+                                "name": accum_label,
+                                "account_id": accum_id,
                                 "debit": 0.0,
-                                "credit": line.amount,
+                                "credit": total,
                             },
                         ),
                     ],
                 }
-                move = AccountMove.create(move_vals)
-                move.action_post()
-                line.write({"posted": True, "move_id": move.id})
-                posted_count += 1
-            # If schedule fully consumed -> nothing else to do; the asset
-            # remains running until explicitly disposed.
+            )
+            move.action_post()
+            lines.write({"posted": True, "move_id": move.id})
+            posted_count += len(lines)
+        # If a schedule is fully consumed -> nothing else to do; the asset
+        # remains running until explicitly disposed.
         return posted_count
 
     @api.model

@@ -5,7 +5,7 @@
     "transact against Odoo as the switcher (Revamp II).",
     "description": """
 Custom PPOB Suite - PPS Gateway (Revamp II: Odoo as switcher)
-============================================================
+=============================================================
 Revamp II makes Odoo REPLACE the vendor PPS/EVShop switcher. ERASPACE POS keeps
 its existing integration and simply re-points its base URL to Odoo: this module
 exposes the SAME PPS H2H API surface as a drop-in and maps every request onto
@@ -14,6 +14,7 @@ adapter registry. Odoo fulfils to real billers itself (its own adapters); the
 vendor PPS is NOT called downstream.
 
 Endpoints (mimicking the PPS contract, MD5-signed per the vendor spec):
+
   * POST /pps/sell                  -> create + dispatch a transaction (RC 9/0/1)
   * POST /pps/statustrx             -> latest status of a Sell
   * POST /pps/statustrxwithdeposit  -> + the mitra deposit (wallet balance)
@@ -21,13 +22,16 @@ Endpoints (mimicking the PPS contract, MD5-signed per the vendor spec):
   * POST /pps/inquiry-pln (JSON)    -> PLN inquiry (meter/name/tariff)
   * POST /pps/game-list   (JSON)    -> catalog of game products + dynamic fields
   * POST /pps/direct-topup(JSON)    -> game top-up with dynamic field payload
+
 Async: Sell returns pending, the engine drives to terminal, and a cron fires the
 GET Callback to the POS callback URL within the SLA; StatusTrx is the fallback.
 
 Security note: the PPS contract mandates **MD5** signatures (per-endpoint
 formulas). MD5 is cryptographically weak; it is confined to
 ``controllers/pps_signature.py`` and compensated by IP allowlist + replay guard
+
 + timestamp/notrx freshness. The platform HMAC-SHA256 convention is NOT diluted
+
 -- nothing outside this module imports ``pps_signature``.
 
 Real biller integration is a separate concern: each biller is a

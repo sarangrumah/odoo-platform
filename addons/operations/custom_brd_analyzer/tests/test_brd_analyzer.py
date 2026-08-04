@@ -65,6 +65,14 @@ MOCK_AI_RESPONSE = {
 
 @tagged("post_install", "-at_install")
 class TestBrdAnalyzer(TransactionCase):
+    def _seed_entry(self, vals):
+        """Upsert a capability entry, mirroring the catalog scan's own logic."""
+        existing = self.Entry.search([("module_name", "=", vals["module_name"])], limit=1)
+        if existing:
+            existing.write(vals)
+            return existing
+        return self.Entry.create(vals)
+
     def setUp(self):
         super().setUp()
         self.Document = self.env["brd.document"]
@@ -72,8 +80,12 @@ class TestBrdAnalyzer(TransactionCase):
         self.Entry = self.env["custom.module.capability.entry"]
         self.Tag = self.env["custom.module.capability.tag"]
 
-        # Seed catalog entries so AI mapping resolves to real records.
-        self.entry_rental = self.Entry.create(
+        # Seed catalog entries so AI mapping resolves to real records. The
+        # catalog scan that runs on install already holds a row for every
+        # module present, so upsert rather than create — module_name is
+        # unique, and creating blindly collides on any database that has been
+        # scanned (which is every real one).
+        self.entry_rental = self._seed_entry(
             {
                 "module_name": "custom_rental",
                 "category": "ee_gap",
@@ -83,7 +95,7 @@ class TestBrdAnalyzer(TransactionCase):
                 "models_own": ["rental.contract"],
             }
         )
-        self.entry_core = self.Entry.create(
+        self.entry_core = self._seed_entry(
             {
                 "module_name": "custom_core",
                 "category": "core",

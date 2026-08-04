@@ -19,9 +19,13 @@ import os
 env = env  # noqa: F821  (injected by odoo shell)
 log = lambda m: print("[np_goods] " + m)
 
-# The six goods observed in the Jun-2026 X24DN with a TS code (Rp 8.243.227 of revenue).
+# The six goods observed in the Jun-2026 X24DN with a TS code (Rp 8.243.227 of revenue),
+# plus the two patches found in Jul/Aug-2026 (TS1000413 Patches S, TS1000415 PATCH DARAHKU
+# BIRU SINGLE, Rp 2.792.790 -- already moved to Miscellaneous on prd_levis_begbal by
+# levis.categ.reclass CATREC/2026/0002; listing them here stops the next import from
+# filing new ones under Labor (Service) again).
 # Override per-tenant via env if the list ever grows.
-DEFAULT = "TS1000382,TS1000418,TS1000283,TS1000402,TS1000431,TS1000174"
+DEFAULT = "TS1000382,TS1000418,TS1000283,TS1000402,TS1000431,TS1000174,TS1000413,TS1000415"
 CODES = os.environ.get("NP_GOODS_CODES", DEFAULT)
 
 icp = env["ir.config_parameter"].sudo()

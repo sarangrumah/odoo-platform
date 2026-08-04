@@ -6,6 +6,7 @@ import hashlib
 import logging
 
 from odoo import _, fields, models
+from odoo.addons.account.models.account_move import BYPASS_LOCK_CHECK
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ class BankImportCsvWizard(models.TransientModel):
 
     journal_id = fields.Many2one("account.journal", required=True, domain=[("type", "=", "bank")])
     template_id = fields.Many2one("custom.bank.import.template", required=True)
-    file = fields.Binary(string="CSV File", required=True)
+    file = fields.Binary(string="Statement File", required=True)
     filename = fields.Char()
     statement_name = fields.Char(default="Imported")
 
@@ -82,12 +83,30 @@ class BankImportCsvWizard(models.TransientModel):
                 % (len(errors), log.id)
             )
 
+        # The accounting date must stay the bank's transaction date. A soft
+        # fiscalyear lock would otherwise make core _post() silently shift
+        # locked-period lines to today; the hard lock is non-negotiable.
+        hard_lock = self.journal_id.company_id.hard_lock_date
+        if hard_lock:
+            violating = sorted({ln["date"] for ln in lines if ln["date"] <= hard_lock})
+            if violating:
+                raise UserError(
+                    _(
+                        "The file contains %(count)s transaction dates up to %(worst)s, "
+                        "on or before the hard lock date (%(lock)s). These periods are "
+                        "permanently closed and cannot be imported.",
+                        count=len(violating),
+                        worst=violating[-1],
+                        lock=hard_lock,
+                    )
+                )
+
         Statement = self.env["account.bank.statement"]
         StatementLine = self.env["account.bank.statement.line"]
         statement = Statement.create(
             {
                 "name": self.statement_name or self.filename or "Bank Import",
-                "date": lines[0]["date"],
+                "date": max(ln["date"] for ln in lines),
                 "journal_id": self.journal_id.id,
             }
         )
@@ -103,7 +122,17 @@ class BankImportCsvWizard(models.TransientModel):
                     "amount": float(ln["amount"]),
                 }
             )
-        StatementLine.create(line_vals)
+        st_lines = StatementLine.create(line_vals)
+
+        # Restore transaction dates that _post() shifted out of soft-locked
+        # periods. Grouped writes keep this cheap on multi-hundred-line files.
+        shifted = {}
+        for st_line, ln in zip(st_lines, lines):
+            if st_line.date != ln["date"]:
+                shifted.setdefault(ln["date"], StatementLine.browse())
+                shifted[ln["date"]] |= st_line
+        for target_date, recs in shifted.items():
+            recs.with_context(bypass_lock_check=BYPASS_LOCK_CHECK).write({"date": target_date})
 
         state = "partial" if errors else "imported"
         log = Log.create(

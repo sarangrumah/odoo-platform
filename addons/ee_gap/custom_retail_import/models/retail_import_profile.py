@@ -129,9 +129,10 @@ class RetailImportProfile(models.Model):
     sample_file = fields.Binary(string="Sample File", attachment=True)
     sample_filename = fields.Char()
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code, company_id)", "Profile code must be unique per company."),
-    ]
+    _code_uniq = models.Constraint(
+        "unique(code, company_id)",
+        "Profile code must be unique per company.",
+    )
 
     # ------------------------------------------------------------------
     # Column map

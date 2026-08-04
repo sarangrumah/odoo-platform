@@ -17,3 +17,9 @@ access_levis_cogs_run_acct,levis.cogs.run account,model_levis_cogs_run,account.g
 access_levis_cogs_run_line_acct,levis.cogs.run.line account,model_levis_cogs_run_line,account.group_account_manager,1,1,1,1
 access_levis_cogs_run_stock,levis.cogs.run stock,model_levis_cogs_run,stock.group_stock_manager,1,0,0,0
 access_levis_cogs_run_line_stock,levis.cogs.run.line stock,model_levis_cogs_run_line,stock.group_stock_manager,1,0,0,0
+access_levis_categ_reclass_acct,levis.categ.reclass account,model_levis_categ_reclass,account.group_account_manager,1,1,1,1
+access_levis_categ_reclass_line_acct,levis.categ.reclass.line account,model_levis_categ_reclass_line,account.group_account_manager,1,1,1,1
+access_levis_categ_reclass_product_acct,levis.categ.reclass.product account,model_levis_categ_reclass_product,account.group_account_manager,1,1,1,1
+access_levis_categ_reclass_stock,levis.categ.reclass stock,model_levis_categ_reclass,stock.group_stock_manager,1,0,0,0
+access_levis_categ_reclass_line_stock,levis.categ.reclass.line stock,model_levis_categ_reclass_line,stock.group_stock_manager,1,0,0,0
+access_levis_categ_reclass_product_stock,levis.categ.reclass.product stock,model_levis_categ_reclass_product,stock.group_stock_manager,1,0,0,0

@@ -68,7 +68,7 @@ class BrdReportController(http.Controller):
             ],
         )
 
-    @http.route("/brd/<int:doc_id>/share", type="json", auth="user", methods=["POST"])
+    @http.route("/brd/<int:doc_id>/share", type="jsonrpc", auth="user", methods=["POST"])
     def report_share_create(self, doc_id, **kwargs):
         doc = self._get_doc_for_user(doc_id)
         if not doc:

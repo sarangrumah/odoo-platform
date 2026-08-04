@@ -53,13 +53,10 @@ class CustomExpenseCorporateCard(models.Model):
         compute="_compute_expense_count",
     )
 
-    _sql_constraints = [
-        (
-            "unique_masked_per_employee",
-            "unique(employee_id, masked_number, company_id)",
-            "A corporate card with this masked number is already registered for this employee.",
-        ),
-    ]
+    _unique_masked_per_employee = models.Constraint(
+        "unique(employee_id, masked_number, company_id)",
+        "A corporate card with this masked number is already registered for this employee.",
+    )
 
     @api.constrains("masked_number")
     def _check_masked_number(self):

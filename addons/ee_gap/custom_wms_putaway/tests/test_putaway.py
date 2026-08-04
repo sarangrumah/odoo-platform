@@ -96,6 +96,28 @@ class TestPutaway(TransactionCase):
         self.assertIn("Fixed", reason)
         self.assertEqual(location, self.loc_a)
 
+    def test_propose_for_product_ranks_without_a_move_line(self):
+        """The handheld's stock-check screen asks for a bin with no transfer
+        behind it — same ranking, warehouse passed in instead of derived."""
+        self._rule(kind="fixed_location", target_location_id=self.loc_a.id)
+        engine = self.env["custom.putaway.engine"]
+        proposals = engine.propose_for_product(self.product, self.warehouse)
+        self.assertTrue(proposals)
+        self.assertEqual(proposals[0]["location_id"], self.loc_a.id)
+        self.assertEqual(proposals[0]["score"], 100)
+        # And it agrees with what a real move line would have produced.
+        self.assertEqual(
+            [p["location_id"] for p in proposals],
+            [p["location_id"] for p in engine.propose(self._make_move_line(qty=1.0))],
+        )
+
+    def test_propose_for_product_needs_a_warehouse(self):
+        self._rule(kind="fixed_location", target_location_id=self.loc_a.id)
+        engine = self.env["custom.putaway.engine"]
+        empty = self.env["stock.warehouse"].browse()
+        self.assertEqual(engine.propose_for_product(self.product, empty), [])
+        self.assertEqual(engine.propose_for_product(self.env["product.product"].browse(), self.warehouse), [])
+
     def test_nearest_empty_strategy(self):
         rule = self._rule(
             kind="nearest_empty",

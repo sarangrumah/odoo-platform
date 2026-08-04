@@ -23,7 +23,7 @@ class FinanceBudget(models.Model):
     _description = "Finance Cost Budget"
     _order = "budget_year desc, division_id"
 
-    name = fields.Char(required=True, default=lambda self: _("New"))
+    name = fields.Char(required=True, default=lambda self: self.env._("New"))
     active = fields.Boolean(default=True)
     division_id = fields.Many2one("finance.vertical", string="Division", required=True)
     cost_center_code = fields.Char(string="Cost Center")
@@ -55,18 +55,14 @@ class FinanceBudget(models.Model):
         compute="_compute_consumption",
     )
 
-    _sql_constraints = [
-        (
-            "division_year_company_uniq",
-            "unique(division_id, budget_year, company_id)",
-            "A budget already exists for this division/year/company.",
-        ),
-        (
-            "sap_external_id_uniq",
-            "unique(x_sap_external_id)",
-            "SAP external id must be unique.",
-        ),
-    ]
+    _division_year_company_uniq = models.Constraint(
+        "unique(division_id, budget_year, company_id)",
+        "A budget already exists for this division/year/company.",
+    )
+    _sap_external_id_uniq = models.Constraint(
+        "unique(x_sap_external_id)",
+        "SAP external id must be unique.",
+    )
 
     # ------------------------------------------------------------------
     def _consumed(self, division, year, company, states, exclude=None):

@@ -31,13 +31,10 @@ class FinanceSyncedMixin(models.AbstractModel):
         help="Stable key from SAP/Kafka used for idempotent upsert.",
     )
 
-    _sql_constraints = [
-        (
-            "sap_external_id_uniq",
-            "unique(x_sap_external_id)",
-            "SAP external id must be unique per reference list.",
-        ),
-    ]
+    _sap_external_id_uniq = models.Constraint(
+        "unique(x_sap_external_id)",
+        "SAP external id must be unique per reference list.",
+    )
 
 
 class FinanceVertical(models.Model):

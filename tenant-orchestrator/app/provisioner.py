@@ -29,6 +29,9 @@ log = structlog.get_logger()
 # Modules installed automatically on every fresh tenant DB
 DEFAULT_TENANT_MODULES = [
     "custom_core",
+    # Without this, every Rupiah amount a fresh tenant prints carries Odoo's
+    # U+00A0 separator and shows up as a stray "Â" in PDFs and Excel exports.
+    "custom_currency_nbsp",
     "custom_ai_bridge",
     "custom_pdp_core",
     "custom_pdp_audit",

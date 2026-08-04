@@ -232,3 +232,46 @@ class TestWmsDocs(TransactionCase):
         self.assertEqual(kind, "html")
         self.assertIn(b"<main>", html)
         self.assertIn(b"DOC-A", html)
+
+    # ------------------------------------------------------------------
+    # 5. Barcode rendering helpers
+    # ------------------------------------------------------------------
+    def test_barcode_png_and_data_uri(self):
+        png = self.picking._wms_barcode_png("WH/OUT/00007")
+        self.assertTrue(png.startswith(b"\x89PNG"), "must be a real PNG, not a URL")
+        uri = self.picking._wms_barcode_src("WH/OUT/00007")
+        self.assertTrue(uri.startswith("data:image/png;base64,"))
+        # An unrenderable payload degrades to nothing rather than exploding.
+        self.assertEqual(self.picking._wms_barcode_png(""), b"")
+        self.assertEqual(self.picking._wms_barcode_src(False), "")
+
+    def test_item_barcode_prefers_lot_then_ean(self):
+        line = self.picking.move_line_ids.filtered(lambda ml: ml.product_id == self.p_a_a)[:1]
+        self.assertEqual(
+            self.picking._wms_item_barcode_value(self.p_a_a, False),
+            self.p_a_a.barcode,
+            "an untracked line is keyed on the product EAN",
+        )
+        if line.lot_id:
+            self.assertEqual(
+                self.picking._wms_item_barcode_value(self.p_a_a, line.lot_id),
+                line.lot_id.name,
+                "a tracked line is keyed on the lot the handheld scans back",
+            )
+
+    def test_item_barcode_falls_back_to_code128(self):
+        # "RPT/NOT-AN-EAN" cannot be an EAN-13, so 'auto' must degrade to
+        # Code128 instead of returning an empty image.
+        self.assertTrue(self.picking._wms_item_barcode_src("RPT/NOT-AN-EAN").startswith("data:image/png;base64,"))
+
+    def test_picking_list_carries_line_item_barcodes(self):
+        rows = self.picking._wms_pick_rows()
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertIn("item_barcode", row)
+            self.assertIn("item_barcode_value", row)
+        html = self.env["ir.actions.report"]._render_qweb_html(
+            "custom_wms_docs.report_wms_picking_list", self.picking.ids
+        )[0]
+        self.assertIn(b"Item Barcode", html)
+        self.assertIn(b"data:image/png;base64,", html)

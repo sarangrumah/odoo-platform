@@ -20,6 +20,11 @@ _NONCE_CACHE: dict = {}
 _NONCE_TTL_S = 600
 _TS_DRIFT_MAX_S = 300
 
+# Per-scope authentication modes. "hmac" is the platform standard and the default:
+# a scope that never sets <scope>.auth_mode takes a byte-identical code path to the
+# one that existed before api_key mode was added.
+_AUTH_MODES = ("hmac", "api_key")
+
 
 class _NonceStore:
     _redis_client = None
@@ -94,6 +99,40 @@ def _check_ip_whitelist(allowed_cidrs: str, remote: str) -> bool:
     return False
 
 
+def _verify_api_key(scope: str) -> Optional[str]:
+    """Static-key auth. Returns an error code, or None when the caller is allowed.
+
+    Deliberately weaker than HMAC: the key does not bind the body and there is no
+    replay window. The compensating control is the CIDR allow-list, which is
+    therefore MANDATORY in this mode -- an unset allow-list is a misconfiguration,
+    not "allow all". This is the one place where api_key mode is stricter than hmac.
+
+    Keys live in ``<scope>.api_keys`` (plural, comma-separated) so a rotation is
+    "old,new" -> deploy -> "new". The HMAC ``.secret`` is never reused, so a scope
+    cannot end up half-migrated between the two modes.
+    """
+    if not _get_param(scope, "allowed_cidrs", "").strip():
+        return "NO_CIDR_CONFIGURED"
+    configured = [k.strip() for k in _get_param(scope, "api_keys", "").split(",") if k.strip()]
+    if not configured:
+        return "NO_API_KEY_CONFIGURED"
+    headers = request.httprequest.headers
+    presented = (headers.get("X-API-Key") or "").strip()
+    if not presented:
+        auth = (headers.get("Authorization") or "").strip()
+        if auth[:7].lower() == "bearer ":
+            presented = auth[7:].strip()
+    if not presented:
+        return "MISSING_API_KEY"
+    # compare_digest against every configured key, without short-circuiting, so the
+    # loop's timing does not leak which key (or how many) matched.
+    ok = False
+    for key in configured:
+        if hmac.compare_digest(key, presented):
+            ok = True
+    return None if ok else "BAD_API_KEY"
+
+
 def _verify_hmac(scope: str, body: bytes, signature: str, timestamp: str) -> Optional[str]:
     if not signature or not timestamp:
         return "MISSING_AUTH_HEADERS"
@@ -160,9 +199,23 @@ def secure_endpoint(scope_name: str):
                     status=403,
                 )
             body = httpreq.get_data() or b""
-            signature = httpreq.headers.get("X-Signature", "")
-            timestamp = httpreq.headers.get("X-Timestamp", "")
-            err = _verify_hmac(scope_name, body, signature, timestamp)
+            max_body = _get_param(scope_name, "max_body_bytes", "")
+            if max_body.strip().isdigit() and len(body) > int(max_body.strip()):
+                _logger.warning("secure_endpoint %s: body %s bytes over limit %s", scope_name, len(body), max_body)
+                _log_attempt(scope_name, httpreq.path, b"", 413, "PAYLOAD_TOO_LARGE")
+                return request.make_json_response(
+                    {"ok": False, "error_code": "PAYLOAD_TOO_LARGE"},
+                    status=413,
+                )
+            mode = (_get_param(scope_name, "auth_mode", "hmac") or "hmac").strip().lower()
+            if mode not in _AUTH_MODES:
+                err = "BAD_AUTH_MODE"
+            elif mode == "api_key":
+                err = _verify_api_key(scope_name)
+            else:
+                signature = httpreq.headers.get("X-Signature", "")
+                timestamp = httpreq.headers.get("X-Timestamp", "")
+                err = _verify_hmac(scope_name, body, signature, timestamp)
             if err:
                 _logger.warning("secure_endpoint %s rejected: %s", scope_name, err)
                 _log_attempt(scope_name, httpreq.path, body, 401, err)

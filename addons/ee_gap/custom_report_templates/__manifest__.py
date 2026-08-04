@@ -18,7 +18,7 @@ ad-hoc header/footer/XPath tweaks on top.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Custom Platform/EE Gap",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.5.0",
     "license": "LGPL-3",
     "depends": ["account", "sale", "purchase", "custom_core", "custom_home_console"],
     "capability_tags": ["reporting", "branding"],

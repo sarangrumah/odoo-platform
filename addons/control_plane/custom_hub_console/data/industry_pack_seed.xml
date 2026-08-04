@@ -79,4 +79,13 @@
         <field name="icon">📱</field>
         <field name="description">Bill payment / top-up reseller: mitra wallets, provider deposit inventory, transaction dispatch with failover, margin VAT (PMK-63), commissions with PPh 23, daily e-Faktur rollup, and bank virtual-account top-up.</field>
     </record>
+
+    <record id="pack_vas_pmo" model="custom.hub.industry.pack">
+        <field name="name">VAS PMO (Product Owner delivery)</field>
+        <field name="code">vas_pmo</field>
+        <field name="vertical">Internal — Product Owner / PMO</field>
+        <field name="sequence">90</field>
+        <field name="icon">📡</field>
+        <field name="description">Project, change-request and task management for a Product Owner team: brand verticals, weekly sprints and weekly progress reports, Hold and Waiting-User-Verification stages with per-stage SLA clock semantics, rule-driven WhatsApp + e-mail notifications, and a headless Next.js UI on top of the REST API.</field>
+    </record>
 </odoo>

@@ -8,6 +8,7 @@ Custom HR Payroll (Indonesia)
 
 Indonesian payroll engine — self-contained, does not require Odoo EE
 ``hr_payroll``. Stays current with PP 58/2023 (TER) and UU HPP 2021.
+
 - TER (PP 58/2023) monthly withholding per Kategori A/B/C.
 - Annual progressive (UU HPP) for December reconciliation.
 - BPJS Kesehatan 1%/4% capped Rp 12M; JHT 2%/3.7%; JKK 0.24-1.74%;

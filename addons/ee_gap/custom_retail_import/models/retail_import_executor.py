@@ -24,17 +24,25 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import defaultdict
 from datetime import datetime
 
-from odoo import _, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
-from odoo.tools import config
+from odoo.tools import config, float_compare
 
 _logger = logging.getLogger(__name__)
 
 BATCH = 200
 LINE_BATCH = 500
+
+# MDM sends size as one string ("32 28", "32/28", "M"). Split on any of the
+# separators seen in the feed; "-" is included because _x24_codepart treats a lone
+# "-" as "no value" anyway.
+_MDM_SIZE_SPLIT = re.compile(r"[\s/xX*\-]+")
+# "34.0" arriving as a JSON string rather than a number.
+_MDM_INT_FLOAT = re.compile(r"\d+\.0+")
 
 
 class RetailImportExecutor(models.AbstractModel):
@@ -50,14 +58,24 @@ class RetailImportExecutor(models.AbstractModel):
         log.ensure_one()
         profile = log.profile_id
         file_b64 = log.source_b64()
+        now = fields.Datetime.now
         if not file_b64:
-            log.write({"state": "failed", "error_message": "No stored source file on log."})
+            log.write({"state": "failed", "error_message": "No stored source file on log.", "finished_at": now()})
             return log
-        log.state = "running"
+        # started_at/finished_at existed on the model but nothing ever wrote them, so
+        # a long import gave no way to tell "still running" from "died an hour ago"
+        # without reading the server log.
+        log.write({"state": "running", "started_at": now(), "finished_at": False})
         self.env.cr.commit()
         handler = getattr(self, f"_load_{profile.file_type}", None)
         if handler is None:
-            log.write({"state": "failed", "error_message": f"No executor for file_type {profile.file_type!r}."})
+            log.write(
+                {
+                    "state": "failed",
+                    "error_message": f"No executor for file_type {profile.file_type!r}.",
+                    "finished_at": now(),
+                }
+            )
             return log
         try:
             handler(profile, file_b64, log)
@@ -67,11 +85,12 @@ class RetailImportExecutor(models.AbstractModel):
         except Exception as e:  # pragma: no cover - defensive
             self.env.cr.rollback()
             _logger.exception("Retail import failed (log %s)", log.id)
-            log.write({"state": "failed", "error_message": str(e)})
+            log.write({"state": "failed", "error_message": str(e), "finished_at": now()})
             self.env.cr.commit()
             return log
         if log.state == "running":
             log.state = "partial" if log.error_count else "imported"
+        log.finished_at = now()
         self.env.cr.commit()
         return log
 
@@ -186,6 +205,51 @@ class RetailImportExecutor(models.AbstractModel):
             vals["aggregate_key"] = aggregate_key
         self.env["retail.import.line"].browse(line_ids).write(vals)
 
+    #: Advisory-lock key shared by every writer of the X101 product external IDs.
+    _X101_LOCK = "retail_import:x101_upsert"
+
+    def _x101_lock(self):
+        """Serialise the writers of the ``tmpl_``/``cat_l*_`` external IDs.
+
+        **Transaction-scoped on purpose.** A session-level ``pg_advisory_lock`` would
+        hold across the whole run even where the loader commits between batches, which
+        sounds stronger -- but it leaks. Postgres does not release a session lock on
+        rollback, so a job that dies mid-upsert hands its connection back to the pool
+        still holding it, and the next worker to ask blocks forever. That is not
+        theoretical: it wedged the queue runner here until the connections were killed.
+        A wedged queue is far worse than an imperfect lock.
+
+        So the guarantee is scoped honestly:
+
+        * the MDM API path runs with ``commit=False``, i.e. one transaction, and is
+          therefore fully serialised -- which is where concurrency actually bites,
+          because two messages for the same SKU arrive milliseconds apart;
+        * the XLSX path is covered until its first batch commit. Beyond that,
+          correctness rests where it always did: every record is keyed by an
+          ``ir.model.data`` external ID, so a concurrent writer converges on the same
+          rows rather than duplicating them.
+
+        Released automatically at commit or rollback. Nothing to unlock, nothing to leak.
+        """
+        self.env.cr.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (self._X101_LOCK,))
+
+    def _ri_commit(self, allow=True):
+        """Commit, unless the caller or the test runner forbids it.
+
+        The X101 loader commits between batches so a 200k-row file does not hold one
+        giant transaction. Two callers must not do that:
+
+        * a ``TransactionCase``, where a commit escapes the rollback and leaks records
+          into the database -- the same guard ``_sweep_orphan_product_values`` uses;
+        * a queue job, where queue_job replaces ``cr.commit`` with a hard error, since
+          committing mid-job would leave the job record and its work out of step.
+
+        Passing ``allow=False`` also makes the whole run atomic, which is what an MDM
+        message (at most a few hundred items) should be anyway.
+        """
+        if allow and not config["test_enable"]:
+            self.env.cr.commit()
+
     # ==================================================================
     # X101 — Products (categories / attributes / templates / variants)
     # ==================================================================
@@ -196,6 +260,56 @@ class RetailImportExecutor(models.AbstractModel):
         log.line_count = len(records)
 
         row_to_line = self._persist_lines(log, records)
+        self._x101_upsert_items(records, ns, profile=profile, log=log, row_to_line=row_to_line)
+
+    def _x101_upsert_items(self, records, ns, profile=None, log=None, row_to_line=None, commit=True):
+        """Upsert X101-shaped item dicts under the shared advisory lock.
+
+        Thin wrapper so both callers get the lock without having to remember it; the
+        body is in ``_x101_upsert_items_locked``. Pass ``commit=False`` from inside a
+        queue job -- queue_job forbids committing mid-job, and it also keeps the
+        advisory lock (transaction-scoped) held for the whole run.
+        """
+        self._x101_lock()
+        return self._x101_upsert_items_locked(
+            records, ns, profile=profile, log=log, row_to_line=row_to_line, commit=commit
+        )
+
+    def _x101_upsert_items_locked(self, records, ns, profile=None, log=None, row_to_line=None, commit=True):
+        """Upsert X101-shaped item dicts into categories / attributes / templates / variants.
+
+        This is the single seam both the XLSX import and the MDM REST API go through,
+        so a product created by either route is identical -- same category xids, same
+        Size/Inseam attribute values, same variant match, same GTIN aliases.
+
+        ``records`` is a list of dicts carrying the logical keys that
+        ``retail.import.profile.read_records`` produces for an X101 file::
+
+            product_code, description, category, klass, subclass, sku, size, inseam,
+            gtin, retail_price, price_eff, _row
+
+        plus, from the MDM API path only, an optional ``_mdm`` sub-dict with the
+        extended attributes (brand, season, cost, ...). The XLSX path never sets it.
+
+        ``profile``, ``log`` and ``row_to_line`` are all OPTIONAL. The API path passes
+        none of them: it gets the same product writes with no ``retail.import.line``
+        bookkeeping, and pre-normalises amounts/dates itself.
+
+        Returns a summary dict::
+
+            {"created": n, "matched": n, "unmatched": n,
+             "templates": {product_code: template_id},
+             "variants":  {sku: product_id},
+             "quality":   {product_code: [data-quality messages]}}
+        """
+
+        def _amt(value):
+            return float(profile._parse_amount(value)) if profile is not None else float(value or 0.0)
+
+        def _effdate(value):
+            # NB: not named _eff -- the variant loop below rebinds that name
+            # (``for _eff, v in sku_best.values()``) in this same scope.
+            return (profile._parse_date(value) or None) if profile is not None else (value or None)
 
         # ---- aggregate (mirror of 01_extract_x101.py) ----
         sku_best = {}  # sku -> (eff, dict)
@@ -205,6 +319,8 @@ class RetailImportExecutor(models.AbstractModel):
         tmpl_variants = defaultdict(set)
         tmpl_rows = defaultdict(list)  # pc -> [row_nums] for post-load line linking
         skipped_row_nums = []
+        tmpl_mdm = {}  # pc  -> extended attrs from the MDM payload (API path only)
+        sku_mdm = {}  # sku -> extended attrs from the MDM payload (API path only)
         for r in records:
             pc = r.get("product_code")
             sku = r.get("sku")
@@ -219,8 +335,11 @@ class RetailImportExecutor(models.AbstractModel):
             gtin = str(r.get("gtin") or "").strip()
             if gtin:
                 sku_gtins[sku].add(gtin)  # keep EVERY GTIN so all scanned codes resolve
-            retail = float(profile._parse_amount(r.get("retail_price")))
-            eff = profile._parse_date(r.get("price_eff")) or None
+            retail = _amt(r.get("retail_price"))
+            eff = _effdate(r.get("price_eff"))
+            if r.get("_mdm"):
+                sku_mdm[sku] = r["_mdm"]
+                tmpl_mdm[pc] = r["_mdm"]
 
             prev = sku_best.get(sku)
             prev_eff = prev[0] if prev else None
@@ -294,7 +413,7 @@ class RetailImportExecutor(models.AbstractModel):
                 )
                 self._xid_set(ns, xid, "product.category", rid)
             xid_to_cat[xid] = rid
-        self.env.cr.commit()
+        self._ri_commit(commit)
 
         # ---- attributes ----
         attr_by_name = {}
@@ -315,7 +434,7 @@ class RetailImportExecutor(models.AbstractModel):
                 if not av:
                     av = self.env["product.attribute.value"].create({"attribute_id": attr.id, "name": v})
                 attr_value_id[(attr_name, v)] = av.id
-        self.env.cr.commit()
+        self._ri_commit(commit)
 
         # ---- templates ----
         tmpl_xid_to_id = {}
@@ -325,7 +444,10 @@ class RetailImportExecutor(models.AbstractModel):
         svc_keywords, svc_codes = self._x101_service_matchers()
         bad_quality = defaultdict(list)  # pc -> [data-quality messages] for line flagging
         items = sorted(tmpl_meta.items())
+        reprice = self._x101_update_price_enabled()
+        repriced = 0
         for start in range(0, len(items), BATCH):
+            repricing = {}  # tmpl_id -> price from the file, applied in bulk per batch
             for pc, m in items[start : start + BATCH]:
                 txid = self._safe_xid("tmpl_", pc)
                 vset = tmpl_variants[pc]
@@ -338,6 +460,16 @@ class RetailImportExecutor(models.AbstractModel):
                     self._x101_backfill_template_attrs(
                         tmpl_xid_to_id[txid], t_sizes, t_inseams, attr_by_name, attr_value_id
                     )
+                    if reprice:
+                        # Only the create path below ever set list_price, so a re-import
+                        # of a corrected file never moved the price of a product that
+                        # already existed. Opt-in because this addon is shared by every
+                        # tenant: switching it on decides that the file, not the
+                        # database, owns the price.
+                        if not m["retail"] or m["retail"] <= 0:
+                            bad_quality[pc].append("invalid/zero price")
+                        else:
+                            repricing[tmpl_xid_to_id[txid]] = m["retail"]
                     continue
                 attr_lines = []
                 if t_sizes:
@@ -406,10 +538,16 @@ class RetailImportExecutor(models.AbstractModel):
                 self._xid_set(ns, txid, "product.template", tmpl.id)
                 tmpl_xid_to_id[txid] = tmpl.id
                 created += 1
-            self.env.cr.commit()
-        log.records_created = created
+            repriced += self._x101_apply_repricing(repricing)
+            self._ri_commit(commit)
+            self.env.invalidate_all()
+        if log is not None:
+            log.records_created = created
+        if reprice:
+            _logger.info("x101 repricing: %s templates updated from the file", repriced)
 
         # ---- variants: match auto-generated by (size, inseam) and set sku/barcode ----
+        variant_ids = {}  # sku -> product.product id, for the summary
         size_val_id = {v: i for (a, v), i in attr_value_id.items() if a == "Size"}
         inseam_val_id = {v: i for (a, v), i in attr_value_id.items() if a == "Inseam"}
         by_tmpl = defaultdict(list)
@@ -423,7 +561,15 @@ class RetailImportExecutor(models.AbstractModel):
             if not tmpl_ids:
                 unmatched += sum(len(by_tmpl[x]) for x in batch_xids)
                 continue
-            variants = self.env["product.product"].search([("product_tmpl_id", "in", tmpl_ids)])
+            # The mail context matters as much here as it does on the template create
+            # below: without it every default_code/barcode write logs a tracking
+            # message, and a full X101 touches a quarter of a million variants.
+            variants = (
+                self.env["product.product"]
+                .with_context(tracking_disable=True, mail_notrack=True)
+                .search([("product_tmpl_id", "in", tmpl_ids)])
+            )
+            pending_gtins = []  # [(variant, gtins)] -> registered in one pass per batch
             var_index = {}
             var_by_tmpl = defaultdict(list)
             used_by_tmpl = defaultdict(set)  # attribute-value ids that actually distinguish variants
@@ -471,27 +617,45 @@ class RetailImportExecutor(models.AbstractModel):
                                 vp.write({k: x for k, x in updates.items() if k != "barcode"})
                     # Fix A: register EVERY GTIN of this sku as an alternate barcode so a
                     # POS scan of any of them resolves (the variant's single ``barcode``
-                    # field only holds one). Dedup against primary + existing aliases.
-                    self._x101_register_gtins(vp, sku_gtins.get(v["sku"], ()))
+                    # field only holds one). Deferred to one bulk pass per batch --
+                    # see _x101_register_gtins_bulk for why.
+                    pending_gtins.append((vp, sku_gtins.get(v["sku"], ())))
+                    variant_ids[v["sku"]] = vp.id
                     matched += 1
-            self.env.cr.commit()
-        log.records_matched = matched
-        log.records_skipped = unmatched
+            self._x101_register_gtins_bulk(pending_gtins)
+            self._ri_commit(commit)
+            # The ORM cache never shrinks on its own and this loop walks the whole
+            # catalogue: without this the process grows past a gigabyte on a full run.
+            self.env.invalidate_all()
+        if log is not None:
+            log.records_matched = matched
+            log.records_skipped = unmatched
         _logger.info("x101 done: created=%s matched=%s unmatched=%s", created, matched, unmatched)
-        self._sweep_orphan_product_values()
+        self._sweep_orphan_product_values(commit=commit)
+
+        template_ids = {}
+        for pc in tmpl_meta:
+            tmpl_id = tmpl_xid_to_id.get(self._safe_xid("tmpl_", pc))
+            if tmpl_id:
+                template_ids[pc] = tmpl_id
+
+        # Extended MDM attributes (brand, season, cost, active, ...). A no-op for the
+        # XLSX path, which never populates the "_mdm" key.
+        if tmpl_mdm or sku_mdm:
+            self._mdm_apply_extended(template_ids, variant_ids, tmpl_mdm, sku_mdm)
+            self._ri_commit(commit)
 
         # Link source rows to the product.template they contributed to
         if row_to_line:
             for pc, row_nums in tmpl_rows.items():
-                txid = self._safe_xid("tmpl_", pc)
-                tmpl_id = tmpl_xid_to_id.get(txid)
+                tmpl_id = template_ids.get(pc)
                 if tmpl_id:
                     self._link_lines(row_to_line, row_nums, "product.template", tmpl_id, aggregate_key=pc)
             if skipped_row_nums:
                 skip_ids = [row_to_line[rn].id for rn in skipped_row_nums if rn in row_to_line]
                 if skip_ids:
                     self.env["retail.import.line"].browse(skip_ids).write({"state": "skipped"})
-            self.env.cr.commit()
+            self._ri_commit(commit)
 
         # Flag data-quality issues on the contributing source lines (runs AFTER
         # linking so it overrides the "ok" state set above). Bumps error_count,
@@ -500,13 +664,48 @@ class RetailImportExecutor(models.AbstractModel):
         for pc, msgs in bad_quality.items():
             msg = "; ".join(sorted(set(msgs)))
             row_nums = tmpl_rows.get(pc, [])
-            line_ids = [row_to_line[rn].id for rn in row_nums if rn in row_to_line]
-            if line_ids:
-                self.env["retail.import.line"].browse(line_ids).write({"state": "error", "error_message": msg})
+            if row_to_line:
+                line_ids = [row_to_line[rn].id for rn in row_nums if rn in row_to_line]
+                if line_ids:
+                    self.env["retail.import.line"].browse(line_ids).write({"state": "error", "error_message": msg})
             for rn in row_nums:
                 errors.append((rn, f"{pc}: {msg}"))
-        log.set_errors(errors)
-        self.env.cr.commit()
+        if log is not None:
+            log.set_errors(errors)
+        self._ri_commit(commit)
+
+        summary = {
+            "created": created,
+            "matched": matched,
+            "unmatched": unmatched,
+            "templates": template_ids,
+            "variants": variant_ids,
+            "quality": dict(bad_quality),
+        }
+        # Master data just landed: any X24DN transaction parked for one of these SKUs
+        # can now be posted. Fires for BOTH callers -- that is the point of the seam.
+        self._x101_notify_master_registered(summary, sku_gtins)
+        return summary
+
+    def _x101_notify_master_registered(self, summary, sku_gtins=None):
+        """Tell the pending-SKU registry which codes/GTINs now exist, and replay.
+
+        Soft-guarded: ``retail.mdm.pending.sku`` is added by the same module version
+        that adds this call, but the guard keeps the loader working against a database
+        that has not been upgraded yet (the registry is inert, the import is not).
+        """
+        if "retail.mdm.pending.sku" not in self.env:
+            return
+        codes = set(summary.get("variants") or ()) | set(summary.get("templates") or ())
+        gtins = set()
+        for values in (sku_gtins or {}).values():
+            gtins.update(values)
+        if not codes and not gtins:
+            return
+        try:
+            self.env["retail.mdm.pending.sku"]._resolve_and_replay(codes, gtins)
+        except Exception:  # never let the registry break a successful product load
+            _logger.exception("pending-sku resolve/replay failed after X101 upsert")
 
     # ------------------------------------------------------------------
     # X101 helpers — multi-GTIN (Fix A) + variant backfill (Fix B)
@@ -535,7 +734,98 @@ class RetailImportExecutor(models.AbstractModel):
             except Exception as e:  # unique(product_id,barcode) race / bad value
                 _logger.debug("x101 gtin alias skip %s on %s: %s", g, variant.id, e)
 
-    def _sweep_orphan_product_values(self):
+    def _x101_update_price_enabled(self):
+        """Whether a re-import may move ``list_price`` on templates that already exist.
+
+        Default OFF. The create path has always written ``list_price``, but the
+        already-registered path did not, so no X101 re-import has ever changed the
+        price of an existing product -- a corrected file silently left the old number
+        (or a 0,00 from a source row with no price) in place. Turning this on is a
+        decision that the file owns the price, which is not safe to assume for a
+        database whose prices were touched by hand, and this addon is shared by every
+        tenant. So it is per-database opt-in, like the other ``retail_import.*``
+        switches.
+        """
+        return self.env["ir.config_parameter"].sudo().get_param("retail_import.x101_update_price", "0") in (
+            "1",
+            "True",
+            "true",
+        )
+
+    def _x101_apply_repricing(self, repricing):
+        """Write ``{tmpl_id: price}`` with one UPDATE per distinct price. Returns the count.
+
+        Reads the current prices in a single query and writes only what actually
+        differs, so a re-import of an unchanged file costs one SELECT per batch and
+        touches nothing -- no write_date churn, no needless recompute of anything
+        related to list_price.
+        """
+        if not repricing:
+            return 0
+        Template = self.env["product.template"].with_context(tracking_disable=True, mail_notrack=True)
+        current = {t["id"]: t["list_price"] for t in Template.browse(list(repricing)).read(["list_price"])}
+        by_price = defaultdict(list)
+        for tmpl_id, price in repricing.items():
+            if tmpl_id in current and float_compare(current[tmpl_id], price, precision_digits=2) != 0:
+                by_price[price].append(tmpl_id)
+        for price, ids in by_price.items():
+            Template.browse(ids).write({"list_price": price})
+        return sum(len(ids) for ids in by_price.values())
+
+    def _x101_register_gtins_bulk(self, pairs):
+        """Batch version of :meth:`_x101_register_gtins` for a whole template batch.
+
+        ``pairs`` is ``[(variant, gtins), ...]``. The per-variant version is correct
+        but pathologically slow on a full X101, and it was measured: sampling
+        ``pg_stat_activity`` during a 260k-sku run put ~78% of database time on the
+        barcode path alone. Three costs, all per single alias:
+
+        * ``variant.barcode_ids`` re-reads the o2m for every variant, because the
+          preceding ``vp.write()`` invalidated the cache the batched search filled;
+        * each ``create()`` is one INSERT in its own subtransaction -- the ``except``
+          makes Postgres take a savepoint per row;
+        * each ``create()`` flushes the pending variant writes, and that flush fires
+          core's ``@api.constrains('barcode') _check_barcode_uniqueness``, which
+          read_groups ``product_product`` and probes ``product_uom`` once per barcode.
+
+        Doing it once per batch collapses all three: one o2m read, one multi-create,
+        one constraint pass. On a unique-constraint collision we fall back to the
+        per-variant path so a single bad row still cannot lose the rest of the batch.
+        """
+        pairs = [(v, g) for v, g in pairs if g]
+        if not pairs:
+            return
+        Barcode = self.env["product.barcode"].sudo()
+        variant_ids = [v.id for v, _ in pairs]
+        have = defaultdict(set)
+        for row in Barcode.search_read([("product_id", "in", variant_ids)], ["product_id", "barcode"]):
+            have[row["product_id"]].add(row["barcode"])
+        vals_list = []
+        for variant, gtins in pairs:
+            seen = have[variant.id]
+            if variant.barcode:
+                seen.add(variant.barcode)
+            for g in gtins:
+                g = (g or "").strip()
+                if not g or g in seen:
+                    continue
+                seen.add(g)  # also dedups a GTIN repeated across skus in this batch
+                vals_list.append({"product_id": variant.id, "barcode": g, "note": "X101 GTIN"})
+        if not vals_list:
+            return
+        try:
+            with self.env.cr.savepoint():
+                Barcode.create(vals_list)
+        except Exception as e:
+            _logger.warning(
+                "x101 gtin alias bulk insert of %s rows failed (%s); retrying one by one",
+                len(vals_list),
+                e,
+            )
+            for variant, gtins in pairs:
+                self._x101_register_gtins(variant, gtins)
+
+    def _sweep_orphan_product_values(self, commit=True):
         """Drop the zero-value product.value rows left behind by variant deletes.
 
         Core writes one product.value per product.product create ("Price update
@@ -561,8 +851,7 @@ class RetailImportExecutor(models.AbstractModel):
         removed = self.env.cr.rowcount
         if removed:
             _logger.info("swept %s orphaned product.value rows", removed)
-        if not config["test_enable"]:
-            self.env.cr.commit()
+        self._ri_commit(commit)
 
     def _x101_backfill_template_attrs(self, tmpl_id, t_sizes, t_inseams, attr_by_name, attr_value_id):
         """Add newly-appearing Size/Inseam values to an EXISTING template so Odoo
@@ -928,6 +1217,162 @@ class RetailImportExecutor(models.AbstractModel):
         s = str(v).strip()
         return "" if s in ("", "-") else s
 
+    @classmethod
+    def _mdm_split_size(cls, size, prod_sku=None, tmpl_code=None):
+        """Split MDM's single ``size`` string into the (Size, Inseam) pair X101 uses.
+
+        ``("32 28", "002IJ002703228", "002IJ-0027") -> ("32", "28")``
+
+        The returned strings must be byte-identical to the values the XLSX import
+        creates, or the API would build a second set of ``product.attribute.value``
+        records and the variant matcher would stop resolving.
+
+        Rather than trust a free-text size string, the split is **validated against
+        the SKU itself**. X101's PROD SKU is composed as::
+
+            PROD SKU == PRODUCT_CODE without dashes + "0" + SIZE + INSEAM
+
+        (verified against all 214,305 rows of the material master, zero exceptions),
+        so the tail after the code is exactly the concatenation we must reproduce.
+
+        Returns ``(size, inseam, ok)``. ``ok`` is False when the tokens could not be
+        reconciled with the SKU -- the caller marks the item needs_review rather than
+        guessing, because a wrong split silently creates a duplicate variant.
+        """
+
+        def _norm(part):
+            # _x24_codepart only de-floats real floats; JSON can carry the same value
+            # as the string "34.0", which must still become "34" to match X101.
+            token = cls._x24_codepart(part)
+            if _MDM_INT_FLOAT.fullmatch(token):
+                token = token.split(".", 1)[0]
+            return token
+
+        raw = "" if size is None else str(size).strip()
+        tokens = [t for t in (_norm(p) for p in _MDM_SIZE_SPLIT.split(raw)) if t]
+
+        tail = None
+        if prod_sku and tmpl_code:
+            prefix = str(tmpl_code).replace("-", "")
+            sku = str(prod_sku).strip()
+            # The "0" separator is part of the composition rule.
+            if sku.upper().startswith(prefix.upper() + "0"):
+                tail = sku[len(prefix) + 1 :]
+
+        if tail is None:
+            # No SKU to validate against (e.g. a unit test or a partial payload):
+            # fall back to positional tokens.
+            if len(tokens) >= 2:
+                return tokens[0], tokens[1], True
+            return (tokens[0] if tokens else raw), "", bool(tokens)
+
+        if not tokens:
+            return raw, "", False
+
+        if "".join(tokens) == tail:
+            # Tokens reconcile with the SKU. The one ambiguous shape is a single
+            # four-digit numeric token ("3228") -- MDM omitted the separator, and a
+            # Levi's waist is two digits, so it is a waist/inseam pair.
+            if len(tokens) == 1 and len(tail) == 4 and tail.isdigit():
+                return tail[:2], tail[2:], True
+            return tokens[0], (tokens[1] if len(tokens) > 1 else ""), True
+
+        # Tokens contradict the SKU. The SKU wins -- it is what X101 and every X24DN
+        # composite lookup are built from -- but the item is flagged for review rather
+        # than silently accepted, because one of the two source fields is wrong.
+        if len(tail) == 4 and tail.isdigit():
+            return tail[:2], tail[2:], False
+        if tail:
+            return tail, "", False
+        return tokens[0], (tokens[1] if len(tokens) > 1 else ""), False
+
+    def _x24_record_pending(self, r, line=None):
+        """Register an unresolvable X24DN sales row in the pending-SKU registry.
+
+        Soft-guarded on the model's presence so the loader still runs against a
+        database that has not been upgraded to this module version yet.
+        """
+        if "retail.mdm.pending.sku" not in self.env:
+            return
+        try:
+            self.env["retail.mdm.pending.sku"]._record(r, line=line)
+        except Exception:  # a registry failure must never break the import
+            _logger.exception("pending-sku record failed for row %s", r.get("_row"))
+
+    def _x24_autoregister_product(self, profile, ns, r, prod_dc, prod_bc):
+        """Create a minimal product for an unregistered X24DN merchandise row.
+
+        Only reachable with ``x24_strict_product`` AND
+        ``x24_autoregister_from_sales`` both on. The product is flagged
+        ``mdm_pending`` and filed under the holding category
+        (``retail_import.mdm_pending_categ_id``) so its revenue is quarantined until
+        MDM sends the real master, which then upgrades this same record in place.
+        """
+        Product = self.env["product.product"]
+        code = str(r.get("item_code") or "").strip()
+        ean = str(r.get("ean") or "").strip()
+        w = self._x24_codepart(r.get("waist"))
+        ins = self._x24_codepart(r.get("inseam"))
+        composite = (code + w + ins) if code else ""
+        key = composite or code or ean
+        if not key:
+            return Product.browse()
+        xid = self._safe_xid("x24prod_", key)
+        pid = self._xid_get(ns, xid, "product.product")
+        if pid:
+            product = Product.browse(pid)
+        else:
+            vals = {
+                "name": (str(r.get("item_description") or "").strip() or key)[:200],
+                "default_code": composite or code or False,
+                "type": "consu",
+                "is_storable": True,
+                "sale_ok": True,
+                "purchase_ok": True,
+                "list_price": float(profile._parse_amount(r.get("retail_price")) or 0),
+                "mdm_pending": True,
+                "mdm_source": "x24_autoregister",
+                "mdm_raw_json": {k: v for k, v in r.items() if k != "_row"},
+            }
+            categ = self._mdm_pending_category()
+            if categ:
+                vals["categ_id"] = categ.id
+            tmpl = (
+                self.env["product.template"]
+                .with_context(tracking_disable=True, mail_create_nolog=True, mail_create_nosubscribe=True)
+                .create(vals)
+            )
+            product = tmpl.product_variant_id
+            if ean and not product.barcode and not Product.search_count([("barcode", "=", ean)]):
+                try:
+                    product.barcode = ean
+                except Exception:
+                    pass
+            self._xid_set(ns, xid, "product.product", product.id)
+            _logger.info("x24 auto-registered pending product %s (%s)", key, product.id)
+        # Record it as pending too, so the ops report shows what is quarantined and
+        # the master arriving still triggers the in-place upgrade.
+        self._x24_record_pending(r)
+        for cache, cache_key in ((prod_dc, composite or code), (prod_bc, ean)):
+            if cache_key:
+                cache[cache_key] = product
+        return product
+
+    def _mdm_pending_category(self):
+        """The holding category for auto-registered products. Created on demand."""
+        icp = self.env["ir.config_parameter"].sudo()
+        categ_id = icp.get_param("retail_import.mdm_pending_categ_id", "0")
+        Category = self.env["product.category"]
+        if str(categ_id).isdigit() and int(categ_id):
+            categ = Category.browse(int(categ_id))
+            if categ.exists():
+                return categ
+        categ = Category.search([("name", "=", "MDM Pending")], limit=1)
+        if not categ:
+            categ = Category.create({"name": "MDM Pending"})
+        icp.set_param("retail_import.mdm_pending_categ_id", str(categ.id))
+        return categ
+
     def _x24_is_non_merch(self, r):
         """True for ancillary POS lines that never appear in the X101 garment
         master (paid carrier bags, tailoring services) — flagged by CATEGORY == 'NP'.
@@ -1247,7 +1692,18 @@ class RetailImportExecutor(models.AbstractModel):
             orders[key].append(r)
         return orders
 
-    def _post_x24(self, profile, records, log, row_to_line):
+    def _post_x24(self, profile, records, log, row_to_line, replay=False):
+        """Post X24DN rows as pos.order.
+
+        ``replay=True`` re-enters with the parked rows of an already-processed log,
+        once the missing products have arrived in the master. Two things change, and
+        only two: the whole-file guard is skipped (it exists to stop a *second file*
+        being imported, not to stop a parked transaction being finished), and the log
+        counters are merged instead of overwritten. Every other safety property is
+        unchanged and is what makes replay idempotent -- in particular the per-order
+        xid guard below skips transactions that already posted, and a transaction
+        whose lines still do not all resolve is parked again rather than half-posted.
+        """
         ns = profile.namespace
         Product = self.env["product.product"]
         Order = self.env["pos.order"]
@@ -1255,13 +1711,14 @@ class RetailImportExecutor(models.AbstractModel):
         icp = self.env["ir.config_parameter"].sudo()
 
         # Whole-file idempotency guard (mirror _load_x20).
-        prior = self.env["retail.import.log"].search(
-            [("profile_id", "=", profile.id), ("state", "=", "imported"), ("id", "!=", log.id)], limit=1
-        )
-        if prior:
-            raise UserError(
-                _("X24 already posted (log #%s). Archive it before re-posting to avoid duplicate sales.") % prior.id
+        if not replay:
+            prior = self.env["retail.import.log"].search(
+                [("profile_id", "=", profile.id), ("state", "=", "imported"), ("id", "!=", log.id)], limit=1
             )
+            if prior:
+                raise UserError(
+                    _("X24 already posted (log #%s). Archive it before re-posting to avoid duplicate sales.") % prior.id
+                )
 
         # Ensure each tender method books to its own GL receivable account so the
         # session-close journal splits cash / card / e-wallet instead of piling every
@@ -1289,6 +1746,7 @@ class RetailImportExecutor(models.AbstractModel):
         tenders = {} if decouple else self._x24_tender_index(profile)
         orders = self._x24_group_orders(records)
         strict_products = self._x24_strict_product_enabled()
+        autoregister = strict_products and self._mdm_flag("x24_autoregister_from_sales")
 
         cfg_cache, sess_cache, method_cache = {}, {}, {}
         prod_bc, prod_dc = {}, {}
@@ -1362,6 +1820,13 @@ class RetailImportExecutor(models.AbstractModel):
             # services) never live in the X101 garment master, so let them fall through to
             # the lazy-create path below instead of detonating the entire sale.
             if strict_products and not self._x24_is_non_merch(r):
+                if autoregister:
+                    # Post the sale now against a minimal product parked in a holding
+                    # category, so its revenue does not land in a real Gross Sales
+                    # bucket before MDM confirms the taxonomy. When the master arrives
+                    # the template is upgraded in place -- same record id, so the
+                    # pos.order.line written here stays valid.
+                    return self._x24_autoregister_product(profile, ns, r, prod_dc, prod_bc)
                 return Product.browse()
             # Lazy-create a non-merchandise product (carrier bags, vouchers, etc. sold at
             # POS but absent from the X101 master) so the order is complete and balances
@@ -1447,8 +1912,9 @@ class RetailImportExecutor(models.AbstractModel):
                     if not prod:
                         missing.append(str(r.get("item_code") or r.get("ean") or "?"))
                         rn = r.get("_row")
-                        if rn in row_to_line:
-                            row_to_line[rn].write(
+                        line = row_to_line.get(rn)
+                        if line:
+                            line.write(
                                 {
                                     "state": "error",
                                     "error_message": f"not in X101 master: ean={r.get('ean')!r} code={r.get('item_code')!r}"[
@@ -1456,6 +1922,10 @@ class RetailImportExecutor(models.AbstractModel):
                                     ],
                                 }
                             )
+                        # Remember the SKU so the master arriving later can replay this
+                        # transaction automatically instead of waiting for someone to
+                        # notice it in the log.
+                        self._x24_record_pending(r, line)
                         continue
                     qty = float(profile._parse_amount(r.get("net_qty")))
                     incl = float(profile._parse_amount(r.get("total_amount")))
@@ -1677,11 +2147,45 @@ class RetailImportExecutor(models.AbstractModel):
         if self._x24_discount_reclass_enabled():
             self._post_x24_discount_reclass(profile, records, posted_disc, log)
 
-        self.env.cr.commit()
-        log.records_created = created
-        log.records_skipped = skipped
-        log.set_errors(errors)
-        _logger.info("x24 POST: %s orders created, %s rows skipped, %s errors", created, skipped, len(errors))
+        self._ri_commit()
+        if replay:
+            # The log already carries the counts of the original run; a replay only
+            # ever converts parked rows into posted ones, so add rather than replace
+            # and recompute the error state from what is actually still parked.
+            log.records_created += created
+            log.records_skipped = max(0, log.records_skipped - created)
+            self._x24_refresh_log_errors(log)
+        else:
+            log.records_created = created
+            log.records_skipped = skipped
+            log.set_errors(errors)
+        _logger.info(
+            "x24 %s: %s orders created, %s rows skipped, %s errors",
+            "REPLAY" if replay else "POST",
+            created,
+            skipped,
+            len(errors),
+        )
+        return {"created": created, "skipped": skipped, "errors": errors}
+
+    def _x24_refresh_log_errors(self, log):
+        """Recompute a log's error state from its lines after a partial replay.
+
+        ``set_errors`` takes the errors of one run; after a replay the truth is
+        whatever rows are *still* in error. When the last one clears, the log moves
+        from ``partial`` back to ``imported``.
+        """
+        Line = self.env["retail.import.line"]
+        remaining = Line.search([("log_id", "=", log.id), ("state", "=", "error")], order="row_number")
+        log.error_count = len(remaining)
+        if remaining:
+            log.raw_payload = "\n".join(f"row {ln.row_number}: {ln.error_message or ''}" for ln in remaining[:200])
+            if log.state == "imported":
+                log.state = "partial"
+        else:
+            log.raw_payload = False
+            if log.state == "partial":
+                log.state = "imported"
 
     def _ri_backdate_session_payments(self, session, gl_date, tag):
         """Re-stamp the settlement records the POS close emits alongside its own entry.

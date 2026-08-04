@@ -49,9 +49,10 @@ class CustomAdapterConfig(models.Model):
     last_health_ok = fields.Boolean(readonly=True)
     notes = fields.Text()
 
-    _sql_constraints = [
-        ("name_uniq", "unique(name)", "Adapter config name must be unique."),
-    ]
+    _name_uniq = models.Constraint(
+        "unique(name)",
+        "Adapter config name must be unique.",
+    )
 
     @api.model
     def _selection_adapter_type(self) -> list[tuple[str, str]]:

@@ -130,11 +130,16 @@ _SEED_PACK_MODULES = {
     # PPOB (Payment Point Online Bank) vertical. custom_ppob_oracle_bridge is
     # intentionally omitted -- it is a per-tenant opt-in (legacy EVShop bridge
     # with two 1-minute crons), enabled only where needed.
+    # Biller adapters (custom_ppob_biller_*) are omitted for the same reason:
+    # which biller a tenant sells through is a per-tenant commercial decision,
+    # not a property of the vertical. Note the consequence -- the pack alone
+    # cannot sell anything; a tenant must add at least one biller adapter.
     "ppob": [
         "custom_ppob_core",
         "custom_ppob_provider",
         "custom_ppob_wallet",
         "custom_ppob_sale",
+        "custom_ppob_sla",
         "custom_ppob_commission",
         "custom_ppob_rollup",
         "custom_ppob_va",
@@ -182,9 +187,10 @@ class CustomHubIndustryPack(models.Model):
     )
     module_count = fields.Integer(compute="_compute_module_count", store=False)
 
-    _sql_constraints = [
-        ("code_uniq", "unique(code)", "Industry pack code must be unique."),
-    ]
+    _code_uniq = models.Constraint(
+        "unique(code)",
+        "Industry pack code must be unique.",
+    )
 
     @api.depends("module_ids")
     def _compute_module_count(self):

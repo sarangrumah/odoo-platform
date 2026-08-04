@@ -68,23 +68,18 @@ class CustomEsgMateriality(models.Model):
         default=lambda self: self.env.company,
     )
 
-    _sql_constraints = [
-        (
-            "topic_year_company_uniq",
-            "unique(topic_id, assessment_year, company_id)",
-            "A topic can only be assessed once per year per company.",
-        ),
-        (
-            "sh_range_chk",
-            "CHECK(stakeholder_importance >= 1 AND stakeholder_importance <= 10)",
-            "Stakeholder importance must be between 1 and 10.",
-        ),
-        (
-            "bi_range_chk",
-            "CHECK(business_impact >= 1 AND business_impact <= 10)",
-            "Business impact must be between 1 and 10.",
-        ),
-    ]
+    _topic_year_company_uniq = models.Constraint(
+        "unique(topic_id, assessment_year, company_id)",
+        "A topic can only be assessed once per year per company.",
+    )
+    _sh_range_chk = models.Constraint(
+        "CHECK(stakeholder_importance >= 1 AND stakeholder_importance <= 10)",
+        "Stakeholder importance must be between 1 and 10.",
+    )
+    _bi_range_chk = models.Constraint(
+        "CHECK(business_impact >= 1 AND business_impact <= 10)",
+        "Business impact must be between 1 and 10.",
+    )
 
     @api.depends("topic_id", "assessment_year")
     def _compute_name(self):

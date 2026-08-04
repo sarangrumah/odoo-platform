@@ -12,7 +12,7 @@ class WmsHdPallet(models.Model):
     _inherit = ["mail.thread"]
     _order = "create_date desc, id desc"
 
-    name = fields.Char(required=True, copy=False, default=lambda s: _("New"))
+    name = fields.Char(required=True, copy=False, default=lambda s: s.env._("New"))
     barcode = fields.Char(index=True, copy=False)
     company_id = fields.Many2one(
         "res.company",

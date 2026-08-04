@@ -23,7 +23,10 @@ class WmsPutawaySuggestion(models.Model):
     _order = "create_date desc, id desc"
     _check_company_auto = True
 
-    name = fields.Char(default=lambda s: _("Suggestion"), tracking=True)
+    # env._ rather than _: a field default runs with no request frame for
+    # translate.py to sniff a language from, which logs a warning with a full
+    # stack dump on every create. env._ takes the language from the env.
+    name = fields.Char(default=lambda s: s.env._("Suggestion"), tracking=True)
     company_id = fields.Many2one(
         "res.company",
         required=True,

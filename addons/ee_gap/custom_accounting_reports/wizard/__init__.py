@@ -13,6 +13,7 @@ from . import advance_wizard
 from . import sales_wizard
 from . import tax_report_wizard
 from . import faktur_pajak_wizard
+from . import ppn_masukan_import_wizard
 from . import bupot_wizard
 from . import spt_ppn_wizard
 from . import pph_withholding_wizard
@@ -22,3 +23,6 @@ from . import p3p4_wizards
 from . import day_book_wizard
 from . import purchase_wizard
 from . import credit_limit_wizard
+from . import gl_open_items_wizard
+from . import bill_payment_wizard
+from . import sales_detail_wizard

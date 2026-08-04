@@ -57,13 +57,10 @@ class LevisPurchaseAccountMap(models.Model):
         "purchases (informational; product/category accounts still win).",
     )
 
-    _sql_constraints = [
-        (
-            "company_type_uniq",
-            "unique(company_id, purchase_type)",
-            "Only one account mapping per company and purchase type is allowed.",
-        )
-    ]
+    _company_type_uniq = models.Constraint(
+        "unique(company_id, purchase_type)",
+        "Only one account mapping per company and purchase type is allowed.",
+    )
 
     def name_get(self):
         labels = dict(self._fields["purchase_type"]._description_selection(self.env))

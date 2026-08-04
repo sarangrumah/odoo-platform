@@ -22,7 +22,7 @@ class TransferOrder(models.Model):
     _inherit = ["mail.thread", "mail.activity.mixin", "pdp.audited.mixin"]
     _order = "create_date desc, id desc"
 
-    name = fields.Char(required=True, copy=False, default=lambda s: _("New"))
+    name = fields.Char(required=True, copy=False, default=lambda s: s.env._("New"))
     rule_id = fields.Many2one("custom.to.rule", ondelete="set null", index=True)
     company_id = fields.Many2one(
         "res.company",

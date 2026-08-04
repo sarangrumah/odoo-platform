@@ -12,7 +12,7 @@ The generic ``custom.report.partner.ledger`` is left untouched.
 
 from datetime import date as date_cls, timedelta
 
-from odoo import models
+from odoo import _, models
 
 
 class CustomReportPartnerCardBase(models.AbstractModel):
@@ -101,6 +101,63 @@ class CustomReportPartnerCardBase(models.AbstractModel):
                 _write_totals(line, fmts["total_num"], fmts["total_text"])
                 row += 1
         return row
+
+    # ------------------------------------------------------------------
+    # On-screen flattening
+    # ------------------------------------------------------------------
+    def _flatten_for_screen(self, lines, columns):
+        """Expand the per-partner blocks into display rows.
+
+        ``_build_lines`` returns one ``partner`` row per counterparty holding
+        its movements in a nested ``lines`` list — a shape the engine's default
+        flattener knows nothing about, so it emitted one blank row per partner
+        and the card looked empty on screen even though every figure was
+        present (sheet item EO #3, "kartu utang dan piutang belum terintegrasi
+        dengan data yang telah dilakukan input"). The XLSX export has its own
+        body writer and was never affected, which is why the gap only showed in
+        the UI.
+        """
+        first_text, second_text = self._text_fields(columns)
+        # Name the balance column explicitly: the last numeric column is
+        # "Amount (Doc Curr.)", so picking it positionally would file the
+        # opening/closing balance under the document-currency column.
+        fields_present = {c["field"] for c in columns}
+        balance_field = "running_balance" if "running_balance" in fields_present else None
+        rows = []
+
+        for line in lines:
+            if line.get("type") != "partner":
+                rows.append(self._screen_row(line, columns, first_text))
+                continue
+
+            header = {first_text: line.get("partner_name") or "—"}
+            if second_text and second_text != first_text:
+                header[second_text] = _("Saldo awal: %s", self._format_amount(line.get("opening") or 0.0))
+            if balance_field:
+                header[balance_field] = line.get("opening") or 0.0
+            row = self._screen_row(header, columns, first_text)
+            row["type"] = "header"
+            row["level"] = 0
+            rows.append(row)
+
+            for movement in line.get("lines") or []:
+                child = self._screen_row(movement, columns, first_text)
+                child["level"] = 1
+                rows.append(child)
+
+            total = {
+                first_text: _("Total %s", line.get("partner_name") or "—"),
+                "debit": line.get("total_debit") or 0.0,
+                "credit": line.get("total_credit") or 0.0,
+            }
+            if balance_field:
+                total[balance_field] = line.get("closing") or 0.0
+            trow = self._screen_row(total, columns, first_text)
+            trow["type"] = "total"
+            trow["level"] = 0
+            rows.append(trow)
+
+        return rows
 
     # ------------------------------------------------------------------
     # Line builder

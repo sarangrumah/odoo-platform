@@ -4,6 +4,7 @@
     "summary": "Template gallery, A/B testing, and UU PDP-compliant unsubscribe on top of mass_mailing",
     "description": """
 Custom Email Marketing extends standard CE `mass_mailing` with:
+
 - Template gallery (categorised reusable HTML templates with thumbnails) +
   one-click "Apply Template" wizard on the mailing form.
 - A/B testing harness (`custom.email.ab.test`) with split-send 50/50,

@@ -23,7 +23,7 @@ requires for wkhtmltopdf to render without stalling on an asset callback.
 """,
     "author": "Custom Platform",
     "category": "Inventory/Warehouse",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",

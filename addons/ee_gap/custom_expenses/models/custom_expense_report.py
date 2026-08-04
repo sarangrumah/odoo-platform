@@ -16,7 +16,7 @@ class CustomExpenseReport(models.Model):
     name = fields.Char(
         string="Reference",
         required=True,
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
         tracking=True,
         copy=False,
     )

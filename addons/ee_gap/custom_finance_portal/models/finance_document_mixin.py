@@ -44,7 +44,7 @@ class FinanceDocumentMixin(models.AbstractModel):
     name = fields.Char(
         string="Reference",
         required=True,
-        default=lambda self: _("New"),
+        default=lambda self: self.env._("New"),
         copy=False,
         tracking=True,
         index=True,

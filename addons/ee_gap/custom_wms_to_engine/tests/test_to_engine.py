@@ -55,6 +55,25 @@ class TestToEngine(TransactionCase):
         self.assertTrue(proposals, "Low-water rule should yield a proposal")
         self.assertEqual(proposals[0]["product_id"], self.product.id)
 
+    def test_low_water_never_proposes_a_bin_to_itself(self):
+        # Overlapping domains: the same bin is both below the mark and a donor.
+        self.env["stock.quant"]._update_available_quantity(self.product, self.src_loc, 2.0)
+        both = "[('location_id','in',[%d,%d])]" % (self.src_loc.id, self.tgt_loc.id)
+        rule = self.env["custom.to.rule"].create(
+            {
+                "name": "overlapping domains",
+                "trigger": "low_water_mark",
+                "source_location_domain": both,
+                "target_location_domain": both,
+                "low_water_qty": 5.0,
+            }
+        )
+        proposals = self.env["custom.to.engine"].evaluate_rule(rule)
+        self.assertFalse(
+            [p for p in proposals if p["source_location_id"] == p["target_location_id"]],
+            "a transfer from a bin to itself replenishes nothing",
+        )
+
     def test_manual_wizard_creates_to_and_move(self):
         self.env["stock.quant"]._update_available_quantity(self.product, self.src_loc, 10.0)
         wiz = self.env["custom.transfer.order.manual.wizard"].create(

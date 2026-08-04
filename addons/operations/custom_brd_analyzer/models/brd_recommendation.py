@@ -175,13 +175,10 @@ class BrdRecommendation(models.Model):
             else:
                 rec.impact_severity = "low"
 
-    _sql_constraints = [
-        (
-            "name_doc_uniq",
-            "unique(document_id, name)",
-            "Each recommendation name must be unique within a single BRD.",
-        ),
-    ]
+    _name_doc_uniq = models.Constraint(
+        "unique(document_id, name)",
+        "Each recommendation name must be unique within a single BRD.",
+    )
 
     @api.constrains("name")
     def _check_name_format(self):

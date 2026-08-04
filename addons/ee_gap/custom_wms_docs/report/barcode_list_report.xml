@@ -7,23 +7,29 @@
         <html>
             <head>
                 <meta charset="utf-8"/>
-                <style>
-                    @page { margin: 10mm; }
-                    * { box-sizing: border-box; }
-                    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; margin: 0; padding: 0; }
-                    h1 { font-size: 16px; margin: 0 0 2px 0; }
-                    .muted { color: #666; }
-                    table.grid { width: 100%; border-collapse: collapse; }
-                    table.grid td { width: 50%; border: 1px solid #b0b0b0; padding: 5px; vertical-align: top; page-break-inside: avoid; }
-                    .kind { font-size: 9px; text-transform: uppercase; color: #666; letter-spacing: 0.5px; }
-                    .label { font-weight: bold; font-size: 10px; }
-                    .value { font-family: "Courier New", monospace; font-size: 11px; margin-top: 2px; }
-                    .codes { margin-top: 3px; }
-                    .codes img { vertical-align: middle; }
-                </style>
             </head>
             <body>
                 <main>
+                <!-- The style and charset live INSIDE <main>, not in <head>:
+                     ir_actions_report._prepare_html keeps only the children of
+                     <main> and writes them to a bare .html file, so anything in
+                     <head> is silently dropped — the report would print
+                     unstyled and non-ASCII text would come out mojibake. -->
+                    <meta charset="utf-8"/>
+                    <style>
+                        @page { margin: 10mm; }
+                        * { box-sizing: border-box; }
+                        body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; margin: 0; padding: 0; }
+                        h1 { font-size: 16px; margin: 0 0 2px 0; }
+                        .muted { color: #666; }
+                        table.grid { width: 100%; border-collapse: collapse; }
+                        table.grid td { width: 50%; border: 1px solid #b0b0b0; padding: 5px; vertical-align: top; page-break-inside: avoid; }
+                        .kind { font-size: 9px; text-transform: uppercase; color: #666; letter-spacing: 0.5px; }
+                        .label { font-weight: bold; font-size: 10px; }
+                        .value { font-family: "Courier New", monospace; font-size: 11px; margin-top: 2px; }
+                        .codes { margin-top: 3px; }
+                        .codes img { vertical-align: middle; }
+                    </style>
                     <t t-foreach="docs" t-as="o">
                         <div class="page" style="page-break-after: always;">
                             <h1>BARCODE SCAN SHEET</h1>

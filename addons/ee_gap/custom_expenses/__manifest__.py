@@ -43,6 +43,7 @@ Part of the Custom Platform — multi-tenant Odoo 19 for Indonesian SMB.
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/expense_config.xml",
+        "data/expense_mileage_product.xml",
         "views/hr_expense_views.xml",
         "views/custom_expense_corporate_card_views.xml",
         "views/custom_expense_report_views.xml",

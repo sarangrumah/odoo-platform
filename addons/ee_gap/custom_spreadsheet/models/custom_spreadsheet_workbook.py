@@ -341,7 +341,10 @@ class CustomSpreadsheetWorkbook(models.Model):
                     row.append(val)
                 writer.writerow(row)
 
-        content = buf.getvalue().encode("utf-8")
+        # utf-8-sig, not utf-8: the BOM tells Excel the file is UTF-8 instead of
+        # letting it fall back to the system codepage and render mojibake. The
+        # import wizard decodes with utf-8-sig, so a round-trip is unaffected.
+        content = buf.getvalue().encode("utf-8-sig")
         fname = "%s.csv" % (self.name or "workbook")
         attachment = self.env["ir.attachment"].create(
             {

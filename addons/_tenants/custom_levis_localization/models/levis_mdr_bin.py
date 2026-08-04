@@ -59,13 +59,10 @@ class LevisMdrBin(models.Model):
     date_start = fields.Date(string="Effective From")
     date_end = fields.Date(string="Effective To")
 
-    _sql_constraints = [
-        (
-            "bin_range_order",
-            "CHECK(bin_from <= bin_to)",
-            "BIN From must be less than or equal to BIN To.",
-        ),
-    ]
+    _bin_range_order = models.Constraint(
+        "CHECK(bin_from <= bin_to)",
+        "BIN From must be less than or equal to BIN To.",
+    )
 
     def _compute_mdr(self, amount):
         """Fee for ``amount`` under this mapping: amount * % + fixed."""

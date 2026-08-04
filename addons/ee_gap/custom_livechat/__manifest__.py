@@ -8,6 +8,7 @@ im_livechat documented at
 https://www.odoo.com/documentation/19.0/applications/websites/livechat.html.
 
 Tier 3 features:
+
 - Convert an active chat channel into a helpdesk ticket (escalation) with
   priority + last 50 message transcript attached as description.
 - Canned responses with shortcut, category, language and usage count plus a

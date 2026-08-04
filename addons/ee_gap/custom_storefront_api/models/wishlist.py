@@ -21,13 +21,10 @@ class CustomWishlist(models.Model):
     product_tmpl_id = fields.Many2one("product.template", string="Product", required=True, ondelete="cascade")
     product_id = fields.Many2one("product.product", string="Variant", ondelete="cascade")
 
-    _sql_constraints = [
-        (
-            "partner_product_uniq",
-            "unique(partner_id, product_tmpl_id)",
-            "This product is already in the wishlist.",
-        ),
-    ]
+    _partner_product_uniq = models.Constraint(
+        "unique(partner_id, product_tmpl_id)",
+        "This product is already in the wishlist.",
+    )
 
     @api.model
     def _storefront_add(self, partner, product_tmpl_id, product_id=None):

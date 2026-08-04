@@ -118,9 +118,9 @@ class PurchaseOrder(models.Model):
                         "product_id": pol.product_id.id,
                         "name": pol.name,
                         "product_uom_qty": pol.product_qty,
-                        "product_uom": pol.product_uom.id,
+                        "product_uom_id": pol.product_uom_id.id,
                         "price_unit": pol.price_unit,
-                        "tax_id": [(6, 0, [])],
+                        "tax_ids": [(6, 0, [])],
                     },
                 )
             )

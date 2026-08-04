@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA-AIM Foreign-Currency Invoice Header",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "summary": "Show the foreign-currency total and the applied exchange rate in the "
-    "invoice/bill header, for every accounting user.",
+    "invoice/bill header and in the Register Payment popup, for every accounting user.",
     "description": """
 ARKA-AIM Foreign-Currency Invoice Header
 ========================================
@@ -41,6 +41,20 @@ the rate actually used by the accounting engine is changed. The block carries no
 ``groups`` restriction, so it survives for users who lack
 ``base.group_multi_currency``.
 
+Register Payment popup
+----------------------
+The bank journals here are locked to the company currency, so paying a CNY bill
+opens a wizard denominated in IDR. Odoo already converts the CNY residual into
+IDR at the payment date, but the popup shows no trace of that, so a user cannot
+tell a correct conversion from a missing one. The same block is therefore added
+to the wizard::
+
+    Open Amount  CN¥ 20,000.00   Rate  1 CNY = 2,672.29 IDR   Settles  CN¥ 20,000.00
+
+plus a red banner for the one case where the proposed amount really would be the
+raw foreign figure: no ``res.currency.rate`` row exists for the document
+currency, so ``res.currency._convert`` silently falls back to 1:1.
+
 TENANT-SCOPED: built for the arkaaim tenant DBs (prd_arkaaim, trn_arkaaim).
 It is inert on any document whose currency equals the company currency, so it
 is harmless anywhere, but it is deliberately kept out of the shared addon paths.
@@ -51,6 +65,7 @@ is harmless anywhere, but it is deliberately kept out of the shared addon paths.
     "depends": ["account"],
     "data": [
         "views/account_move_views.xml",
+        "views/account_payment_register_views.xml",
     ],
     "installable": True,
     "auto_install": False,

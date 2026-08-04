@@ -4,7 +4,7 @@
     "summary": "Reference vertical template used as a starting point",
     "description": """
 Custom Vertical (Example)
-======================
+=========================
 
 Reference implementation that demonstrates how to:
 
@@ -14,6 +14,7 @@ Reference implementation that demonstrates how to:
 * Ship form-view extensions using Odoo 19 syntax (`<list>` not `<tree>`)
 
 Copy this folder under `addons/verticals/<slug>` and follow
+
 `addons/verticals/_template/README.md`.
 """,
     "author": "Custom Platform Team",

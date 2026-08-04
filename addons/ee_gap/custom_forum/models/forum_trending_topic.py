@@ -49,13 +49,10 @@ class ForumTrendingTopic(models.Model):
     view_count = fields.Integer(string="Views (window)", default=0)
     rank = fields.Integer(string="Rank", default=0)
 
-    _sql_constraints = [
-        (
-            "uniq_forum_tag_period",
-            "unique(forum_id, tag_id, period)",
-            "Trending entry must be unique per (forum, tag, period).",
-        ),
-    ]
+    _uniq_forum_tag_period = models.Constraint(
+        "unique(forum_id, tag_id, period)",
+        "Trending entry must be unique per (forum, tag, period).",
+    )
 
     @api.depends("forum_id", "tag_id", "period", "score")
     def _compute_display_name(self):

@@ -14,7 +14,7 @@ class EliminationProposal(models.Model):
     _order = "date_to desc, id desc"
 
     name = fields.Char(
-        default=lambda self: _("Elimination Draft"),
+        default=lambda self: self.env._("Elimination Draft"),
         copy=False,
     )
     chart_id = fields.Many2one(

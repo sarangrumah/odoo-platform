@@ -52,9 +52,10 @@ class CustomAffiliate(models.Model):
     )
     currency_id = fields.Many2one("res.currency", default=lambda self: self.env.company.currency_id)
 
-    _sql_constraints = [
-        ("affiliate_code_uniq", "unique(affiliate_code)", "The affiliate code must be unique."),
-    ]
+    _affiliate_code_uniq = models.Constraint(
+        "unique(affiliate_code)",
+        "The affiliate code must be unique.",
+    )
 
     @api.model
     def _default_code(self):

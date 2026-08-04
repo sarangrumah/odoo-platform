@@ -40,13 +40,10 @@ class CustomHubAiUsage(models.Model):
         digits=(5, 2),
     )
 
-    _sql_constraints = [
-        (
-            "tenant_date_model_uniq",
-            "unique(tenant_id, date, model_name)",
-            "An AI usage aggregate row must be unique per (tenant, date, model).",
-        ),
-    ]
+    _tenant_date_model_uniq = models.Constraint(
+        "unique(tenant_id, date, model_name)",
+        "An AI usage aggregate row must be unique per (tenant, date, model).",
+    )
 
     @api.depends("input_tokens", "cache_read_tokens", "cache_creation_tokens")
     def _compute_cache_hit_rate(self):

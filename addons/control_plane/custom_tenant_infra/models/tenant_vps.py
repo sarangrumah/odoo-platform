@@ -104,9 +104,10 @@ class TenantVps(models.Model):
         store=False,
     )
 
-    _sql_constraints = [
-        ("hostname_unique", "unique(hostname)", "VPS hostname must be unique."),
-    ]
+    _hostname_unique = models.Constraint(
+        "unique(hostname)",
+        "VPS hostname must be unique.",
+    )
 
     # ------------------------------------------------------------------
 

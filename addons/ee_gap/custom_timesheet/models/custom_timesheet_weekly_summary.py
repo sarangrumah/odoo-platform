@@ -51,13 +51,10 @@ class CustomTimesheetWeeklySummary(models.Model):
     )
     company_id = fields.Many2one("res.company", default=lambda self: self.env.company, required=True)
 
-    _sql_constraints = [
-        (
-            "uniq_project_week",
-            "unique(project_id, week_start, company_id)",
-            "A weekly summary already exists for this project and week.",
-        ),
-    ]
+    _uniq_project_week = models.Constraint(
+        "unique(project_id, week_start, company_id)",
+        "A weekly summary already exists for this project and week.",
+    )
 
     @api.depends("project_id", "week_start")
     def _compute_name(self):

@@ -29,6 +29,8 @@ GL_OPTIONAL_COLUMNS = (
     "doc_no",
     "reference",
     "tax",
+    "faktur_masukan",
+    "faktur_keluaran",
     "clearing",
     "cost_center",
     "profit_center",
@@ -50,6 +52,8 @@ _FLAT_ORDER = (
     "doc_no",
     "reference",
     "tax",
+    "faktur_masukan",
+    "faktur_keluaran",
     "clearing",
     "branch",
     "cost_center",
@@ -117,6 +121,20 @@ class CustomReportGeneralLedger(models.AbstractModel):
             "doc_no": {"header": "Document No", "field": "doc_no", "kind": "text", "width": 18},
             "reference": {"header": "Reference", "field": "reference", "kind": "text", "width": 18},
             "tax": {"header": "Tax Code", "field": "tax_code", "kind": "text", "width": 12},
+            # Nomor Seri Faktur Pajak, split by direction so Tax can reconcile
+            # pajak masukan (purchases) against pajak keluaran (sales) in one pull.
+            "faktur_masukan": {
+                "header": "No. FP Masukan",
+                "field": "faktur_masukan",
+                "kind": "text",
+                "width": 22,
+            },
+            "faktur_keluaran": {
+                "header": "No. FP Keluaran",
+                "field": "faktur_keluaran",
+                "kind": "text",
+                "width": 22,
+            },
             "clearing": {"header": "Clearing Doc", "field": "clearing", "kind": "text", "width": 16},
             "branch": {"header": self._branch_column_header(), "field": "branch", "kind": "text", "width": 28},
             "cost_center": {"header": "Cost Center", "field": "cost_center", "kind": "text", "width": 18},
@@ -473,6 +491,12 @@ class CustomReportGeneralLedger(models.AbstractModel):
             user = users.get(r["create_uid"])
             tax = taxes.get(r["tax_line_id"])
             cost, profit, branch = self._split_analytic(r.get("analytic_distribution"), analytics, plan_kind)
+            # One NSFP field on the move serves both directions — it holds the
+            # supplier's faktur on a purchase and our own issued faktur on a
+            # sale — so split it by move_type. ``_opt`` keeps this working when
+            # custom_coretax is not installed (no hard dependency).
+            nsfp = self._opt(move, "x_custom_nsfp")
+            move_type = move.move_type if move else ""
             lines.append(
                 {
                     "date": r["date"],
@@ -484,6 +508,8 @@ class CustomReportGeneralLedger(models.AbstractModel):
                     "doc_no": (move.name if move else "") or "",
                     "reference": r["aml_ref"] or (move.ref if move else "") or "",
                     "tax_code": tax.name if tax else "",
+                    "faktur_masukan": nsfp if move_type in ("in_invoice", "in_refund") else "",
+                    "faktur_keluaran": nsfp if move_type in ("out_invoice", "out_refund") else "",
                     "clearing": r["matching_number"] or "",
                     "branch": branch,
                     "cost_center": cost,
