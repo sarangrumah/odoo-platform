@@ -12,16 +12,31 @@
                     <group>
                         <field name="company_ids" widget="many2many_tags"/>
                         <field name="partner_ids" widget="many2many_tags"/>
-                        <field name="detail_mode"/>
+                        <field name="detail_mode"
+                               invisible="context.get('ar_aging_export')"/>
                     </group>
                 </group>
                 <footer>
+                    <!-- The same wizard drives two reports; the menu that
+                         opened it decides which set of buttons shows. -->
                     <button string="View" name="action_view"
-                            type="object" class="btn-primary"/>
+                            type="object" class="btn-primary"
+                            invisible="context.get('ar_aging_export')"/>
                     <button string="Print PDF" name="action_print"
-                            type="object" class="btn-secondary"/>
+                            type="object" class="btn-secondary"
+                            invisible="context.get('ar_aging_export')"/>
                     <button string="Export Excel" name="action_export_xlsx"
-                            type="object" class="btn-secondary"/>
+                            type="object" class="btn-secondary"
+                            invisible="context.get('ar_aging_export')"/>
+                    <button string="View" name="action_view_ar_aging"
+                            type="object" class="btn-primary"
+                            invisible="not context.get('ar_aging_export')"/>
+                    <button string="Print PDF" name="action_print_ar_aging"
+                            type="object" class="btn-secondary"
+                            invisible="not context.get('ar_aging_export')"/>
+                    <button string="Export Excel" name="action_export_ar_aging_xlsx"
+                            type="object" class="btn-secondary"
+                            invisible="not context.get('ar_aging_export')"/>
                     <button string="Cancel" class="btn-secondary"
                             special="cancel"/>
                 </footer>
@@ -34,5 +49,13 @@
         <field name="res_model">custom.report.aged.receivable.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
+    </record>
+
+    <record id="action_ar_aging_export_wizard" model="ir.actions.act_window">
+        <field name="name">AR Aging Export</field>
+        <field name="res_model">custom.report.aged.receivable.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'ar_aging_export': 1}</field>
     </record>
 </odoo>

@@ -10,6 +10,7 @@ from . import custom_report_profit_loss_branch
 from . import custom_report_cash_flow
 from . import custom_report_aged_receivable
 from . import custom_report_aged_payable
+from . import custom_report_ar_aging_export
 from . import custom_report_partner_ledger
 from . import custom_report_partner_card
 from . import custom_report_advance

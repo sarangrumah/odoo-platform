@@ -642,6 +642,100 @@ class TestCustomReports(TransactionCase):
         self.assertAlmostEqual(grp["subtotal"]["total"], 250.0, places=2)
 
     # ------------------------------------------------------------------
+    # 7b) AR Aging Export: one flat row per open document, outstanding
+    #     dropped into a day-precise overdue bucket.
+    # ------------------------------------------------------------------
+    def test_ar_aging_export(self):
+        today = date.today()
+        partner = self.Partner.create({"name": "AgingExportP"})
+        # Two documents, deliberately in different buckets: five days overdue
+        # (a single-day bucket) and not due at all.
+        due_overdue = today - timedelta(days=5)
+        due_future = today + timedelta(days=10)
+        for label, due, amount in (
+            ("od5", due_overdue, 500.0),
+            ("notdue", due_future, 300.0),
+        ):
+            move = self.Move.create(
+                {
+                    "journal_id": self.j_misc.id,
+                    "date": today - timedelta(days=5),
+                    "company_id": self.company.id,
+                    "partner_id": partner.id,
+                    "line_ids": [
+                        Command.create(
+                            {
+                                "account_id": self.acc_recv.id,
+                                "name": label,
+                                "debit": amount,
+                                "credit": 0.0,
+                                "partner_id": partner.id,
+                                "date_maturity": due,
+                            }
+                        ),
+                        Command.create(
+                            {
+                                "account_id": self.acc_revenue.id,
+                                "name": label,
+                                "debit": 0.0,
+                                "credit": amount,
+                                "partner_id": partner.id,
+                            }
+                        ),
+                    ],
+                }
+            )
+            move.action_post()
+
+        report = self.env["custom.report.ar.aging.export"]
+        lines = report._build_lines(self._filters())
+        rows = [r for r in lines if r.get("partner_name") == "AgingExportP"]
+        self.assertEqual(len(rows), 2, "One row per open receivable line.")
+
+        by_bucket = {}
+        for row in rows:
+            bucket = next(code for code in ("od_5", "od_le_0") if row[code])
+            by_bucket[bucket] = row
+        self.assertEqual(set(by_bucket), {"od_5", "od_le_0"})
+        self.assertAlmostEqual(by_bucket["od_5"]["od_5"], 500.0, places=2)
+        self.assertEqual(by_bucket["od_5"]["overdue"], "5")
+        self.assertAlmostEqual(by_bucket["od_le_0"]["od_le_0"], 300.0, places=2)
+        # Not yet due => a negative overdue count, never a positive bucket.
+        self.assertEqual(by_bucket["od_le_0"]["overdue"], "-10")
+
+        for row in rows:
+            self.assertAlmostEqual(
+                row["original_amount"] - row["paid_amount"],
+                row["outstanding_amount"],
+                places=2,
+                msg="Original - Paid must reconcile to Outstanding.",
+            )
+
+        total = lines[-1]
+        self.assertEqual(total["type"], "grand_total")
+        self.assertAlmostEqual(
+            total["outstanding_amount"],
+            sum(r["outstanding_amount"] for r in lines[:-1]),
+            places=2,
+        )
+        # The bucket grid must account for the whole outstanding balance —
+        # checked on this partner's rows so fixtures posted by setUpClass
+        # cannot skew it.
+        bucket_codes = [c["field"] for c in report._xlsx_columns() if c["field"].startswith("od_")]
+        self.assertAlmostEqual(
+            sum(row[code] for row in rows for code in bucket_codes),
+            800.0,
+            places=2,
+        )
+
+        # The screen payload is flat: the parent aged-AR flattener would walk
+        # partner groups that do not exist here.
+        columns = report._xlsx_columns()
+        screen = report._flatten_for_screen(lines, columns)
+        self.assertEqual(len(screen), len(lines))
+        self.assertEqual(screen[-1]["type"], "grand_total")
+
+    # ------------------------------------------------------------------
     # 8) Kartu Utang / Kartu Piutang: side-restricted partner cards.
     # ------------------------------------------------------------------
     def test_partner_cards(self):

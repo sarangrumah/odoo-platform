@@ -42,6 +42,9 @@
                         <t t-elif="report_code == 'aged_payable'">
                             <t t-call="custom_accounting_reports.report_aged_payable"/>
                         </t>
+                        <t t-elif="report_code == 'ar_aging_export'">
+                            <t t-call="custom_accounting_reports.report_ar_aging_export"/>
+                        </t>
                         <t t-elif="report_code == 'partner_ledger'">
                             <t t-call="custom_accounting_reports.report_partner_ledger"/>
                         </t>

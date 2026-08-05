@@ -70,3 +70,49 @@ class AgedReceivableWizard(models.TransientModel):
             aging_detail=self.detail_mode == "detail",
         )
         return report._xlsx_action(options, filename)
+
+    # ------------------------------------------------------------------
+    # AR Aging Export
+    # ------------------------------------------------------------------
+    # Finance's per-document collection worklist. It reuses this wizard's
+    # filters rather than shipping a TransientModel of its own: this addon is
+    # installed on every tenant, and a new transient table would force an
+    # ``-u`` across all of them. The menu points here with
+    # ``ar_aging_export`` in the context, which is what swaps the buttons.
+    _AR_AGING_CODE = "ar_aging_export"
+
+    def _ar_aging_options(self):
+        return {
+            **self._build_filters(),
+            "date_from": date(1970, 1, 1).isoformat(),
+            "date_to": self.date_to.isoformat(),
+        }
+
+    def action_view_ar_aging(self):
+        self.ensure_one()
+        title = self.env["custom.report.ar.aging.export"]._report_title
+        return {
+            "type": "ir.actions.client",
+            "tag": "custom_report_table",
+            "name": title,
+            "params": {
+                "report_code": self._AR_AGING_CODE,
+                "options": self._ar_aging_options(),
+                "context_extra": {},
+                "title": title,
+            },
+        }
+
+    def action_print_ar_aging(self):
+        self.ensure_one()
+        data = {
+            "report_code": self._AR_AGING_CODE,
+            "doc_model": self._name,
+            "options": self._ar_aging_options(),
+        }
+        return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)
+
+    def action_export_ar_aging_xlsx(self):
+        self.ensure_one()
+        filename = "AR_Aging_Export_%s.xlsx" % self.date_to
+        return self.env["custom.report.ar.aging.export"]._xlsx_action(self._ar_aging_options(), filename)
