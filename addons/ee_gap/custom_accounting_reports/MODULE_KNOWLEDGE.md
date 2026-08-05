@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T07:43:22Z
 generator: bootstrap-v1
 module: custom_accounting_reports
-manifest_version: 19.0.0.17.0
+manifest_version: 19.0.0.18.0
 ---
 
 # custom_accounting_reports
@@ -104,6 +104,7 @@ Report models are AbstractModels and generally have no stored fields; user input
 - The AR Aging Export **PDF deliberately drops the 15 bucket columns** (34 columns is unreadable on paper) and prints the document trail + amount summary + overdue day count instead. The Excel export and the on-screen table carry the full grid.
 - Its `Tax No` column reads `x_custom_nsfp` through `_opt`, so it stays blank rather than crashing on tenants without `custom_coretax`; `No. SO` / `No. DO` degrade the same way when `sale` / `stock` are absent.
 - Every run performs a defensive raw-SQL insert into `pdp.audit_log`; failures are logged as warnings and do not block the report.
+- **A hook that sets `active` on a data-file record needs `noupdate="1"` to survive.** The XStore menu was archived by `hooks.sync_pos_only_menus`, then silently un-archived by the next `-u`, because loading `menu_views.xml` rewrites a plain menuitem. It bit prd_arkaaim and trn_arkaaim on the 0.16.0 → 0.17.0 upgrade. The menuitem now sits in its own `<data noupdate="1">` block — the cost is that renaming or re-sequencing it takes a migration script. The same trap applies to any record whose runtime state a hook owns.
 - **`AR Aging Export` is a second aging report on purpose, not a duplicate.** `custom.report.aged.receivable` answers "how old is my AR" in seven wide buckets; `custom.report.ar.aging.export` (which inherits it) is Finance's per-document collection worklist — one row per open receivable line with the commercial trail (customer PO / SO / DO), the DPP/PPN split, original/paid/outstanding, and **fifteen** overdue buckets whose edges come from Finance's own workbook (day-by-day for the first week, then widening). Do not "simplify" the two into one.
 - **It reuses the Aged Receivable wizard rather than shipping its own.** This addon is installed on every tenant, so a new `TransientModel` would force an `-u` across all of them. The menu points at the same wizard with `{'ar_aging_export': 1}` in the context, and the view swaps the buttons on that key. Its `date_from` is pinned to 1970 — an aging worklist is as-of-a-date, not a period.
 - **A new report code must be registered in TWO places.** `REPORT_MODEL_MAP` in `models/custom_report_dispatch.py` *and* the `t-elif` chain in `reports/report_common.xml`. Miss the first and the code silently falls back to Trial Balance; miss the second and the PDF renders empty.

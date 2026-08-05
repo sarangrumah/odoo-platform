@@ -20,12 +20,26 @@ POS_ONLY_MENUS = ("menu_custom_reports_sales_detail",)
 
 
 def sync_pos_only_menus(env):
-    """Archive the POS-only report menus unless this tenant has POS. Idempotent."""
+    """Archive the POS-only report menus unless this tenant has POS. Idempotent.
+
+    Also pins each menu's ``ir.model.data`` row with ``noupdate``. Without
+    that, loading ``menu_views.xml`` on the next ``-u`` rewrites the plain
+    menuitem and silently un-archives it — and a same-version ``-u`` runs no
+    migration, so nothing would put it back. The ``<data noupdate="1">`` block
+    in the XML only covers rows created from now on; existing tenants keep
+    whatever flag they were created with, so it is set here explicitly.
+    """
     has_pos = "pos.order.line" in env
     for xmlid in POS_ONLY_MENUS:
         menu = env.ref("custom_accounting_reports.%s" % xmlid, raise_if_not_found=False)
         if menu and menu.active != has_pos:
             menu.active = has_pos
+        imd = env["ir.model.data"].search(
+            [("module", "=", "custom_accounting_reports"), ("name", "=", xmlid), ("model", "=", "ir.ui.menu")],
+            limit=1,
+        )
+        if imd and not imd.noupdate:
+            imd.noupdate = True
 
 
 def post_init_hook(env):
