@@ -8,8 +8,8 @@
         { "code": "ap", "label": "AP / Purchase testing", "db": "prd_levis_AP", "visibility": "internal" },
         { "code": "detail", "label": "GL detail working copy", "db": "prd_detail_levis", "visibility": "internal" },
         { "code": "pre-begbal", "label": "Pre-opening-balance copy", "db": "prd_levis", "visibility": "internal" },
-        { "code": "demo", "label": "Demo", "db": "demo_updated_levis", "visibility": "internal" },
-        { "code": "rnd", "label": "R&D", "db": "rnd_levis", "visibility": "internal" }
+        { "code": "demo", "label": "Demo", "db": "demo_updated_levis" },
+        { "code": "rnd", "label": "R&D", "db": "rnd_levis" }
       ]
     },
     {
@@ -26,8 +26,8 @@
       "name": "Warehouse Management",
       "targets": [
         { "code": "prod", "label": "Production", "db": "prd_wms", "visibility": "internal" },
-        { "code": "demo", "label": "Demo", "db": "demo_wms", "visibility": "internal" },
-        { "code": "rnd", "label": "R&D", "db": "rnd_wms", "visibility": "internal" }
+        { "code": "demo", "label": "Demo", "db": "demo_wms" },
+        { "code": "rnd", "label": "R&D", "db": "rnd_wms" }
       ]
     },
     {
@@ -40,22 +40,22 @@
     {
       "slug": "ppob",
       "name": "PPOB",
-      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_ppob", "visibility": "internal" }]
+      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_ppob" }]
     },
     {
       "slug": "esb",
       "name": "EFN — ESB integration",
-      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_esb", "visibility": "internal" }]
+      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_esb" }]
     },
     {
       "slug": "vaspmo",
       "name": "VAS PMO",
-      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_vas_pmo", "visibility": "internal" }]
+      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_vas_pmo" }]
     },
     {
       "slug": "sandbox",
       "name": "Sandbox",
-      "targets": [{ "code": "demo", "label": "Demo", "db": "demo", "visibility": "internal" }]
+      "targets": [{ "code": "demo", "label": "Demo", "db": "demo" }]
     }
   ]
 }
