@@ -11,7 +11,12 @@ export function middleware(request: NextRequest) {
     request.cookies.has("vaspmo_at") || request.cookies.has("vaspmo_rt");
   if (hasSession) return NextResponse.next();
 
-  const login = new URL("/login", request.url);
+  // The basePath has to be written in by hand. `nextUrl.pathname` comes with it already
+  // stripped, and `NextResponse.redirect` takes an absolute URL, so neither end puts it
+  // back: an anonymous hit on /vaspmo/board would be sent to /login, which the shared
+  // Caddy hands to Odoo instead of to this app. `next` stays prefix-free on purpose --
+  // the post-login `redirect()` is basePath-aware and would double it.
+  const login = new URL(`${request.nextUrl.basePath}/login`, request.url);
   login.searchParams.set("next", request.nextUrl.pathname);
   return NextResponse.redirect(login);
 }
