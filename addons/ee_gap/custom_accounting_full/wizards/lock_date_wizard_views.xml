@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_account_lock_date_wizard_form" model="ir.ui.view">
+        <field name="name">custom.account.lock.date.wizard.form</field>
+        <field name="model">custom.account.lock.date.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Lock Dates">
+                <group>
+                    <field name="company_id" options="{'no_create': True, 'no_open': True}"/>
+                </group>
+                <group string="Lock Dates">
+                    <field name="fiscalyear_lock_date"/>
+                    <field name="tax_lock_date"/>
+                    <field name="sale_lock_date"/>
+                    <field name="purchase_lock_date"/>
+                </group>
+                <field name="draft_move_count" invisible="1"/>
+                <div class="alert alert-warning" role="alert" invisible="draft_move_count == 0">
+                    <field name="draft_move_count" nolabel="1" class="oe_inline"/>
+                    draft journal entry(ies) are dated on or before the Global Lock Date.
+                    Locking does not delete them — posting one later will push its
+                    accounting date past the lock instead. Post or delete them first
+                    if the period is meant to be final.
+                </div>
+                <separator string="Current Lock Dates"/>
+                <field name="company_summary" nolabel="1" readonly="1"/>
+                <footer>
+                    <button name="action_apply" type="object" string="Apply"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button special="cancel" string="Cancel" class="btn-secondary"
+                            data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_account_lock_date_wizard" model="ir.actions.act_window">
+        <field name="name">Lock Dates</field>
+        <field name="res_model">custom.account.lock.date.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

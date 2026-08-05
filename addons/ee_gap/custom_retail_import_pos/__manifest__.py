@@ -36,7 +36,7 @@ What it does
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Retail",
-    "version": "19.0.0.4.0",
+    "version": "19.0.0.5.0",
     "license": "LGPL-3",
     "depends": [
         "custom_retail_import",
@@ -44,6 +44,7 @@ What it does
     ],
     "capability_tags": ["data-import", "retail", "pos", "accounting"],
     "data": [],
+    "post_init_hook": "post_init_hook",
     "installable": True,
     "application": False,
     "auto_install": True,
