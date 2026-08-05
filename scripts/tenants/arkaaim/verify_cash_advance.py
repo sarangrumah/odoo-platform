@@ -38,17 +38,26 @@ for cid in (1, 2):
 
     ca = e["petty.cash.type"].search([("company_id", "=", cid), ("code", "=", "CA")], limit=1)
     check("CA type exists", bool(ca))
+    # Assert the SHAPE, not one tenant's codes: prd_arkaaim runs the 10-digit
+    # Erajaya chart and trn_arkaaim the 8-digit PSAK one, so a hardcoded code
+    # would only ever be right on one of them.
+    ca_code = ca.advance_account_id.with_company(company).code
+    check("CA advance account set", bool(ca_code), ca_code)
+    check("CA account reconcilable", ca.advance_account_id.reconcile)
     check(
-        "CA -> 1109000002",
-        ca.advance_account_id.with_company(company).code == "1109000002",
-        ca.advance_account_id.with_company(company).code,
+        "CA account is an asset",
+        ca.advance_account_id.account_type.startswith("asset"),
+        ca.advance_account_id.account_type,
     )
     check("advance account belongs to this company", cid in ca.advance_account_id.company_ids.ids)
     check("payment journal is dedicated PCPAY", ca.payment_journal_id.code == "PCPAY", ca.payment_journal_id.code)
     check("bank-out != payment journal", ca.bank_out_journal_id != ca.payment_journal_id)
 
     pc = e["petty.cash.type"].search([("company_id", "=", cid), ("code", "=", "PC")], limit=1)
-    check("PC -> 1115200001", pc.advance_account_id.with_company(company).code == "1115200001")
+    pc_code = pc.advance_account_id.with_company(company).code
+    check("PC advance account set", bool(pc_code), pc_code)
+    check("PC account reconcilable", pc.advance_account_id.reconcile)
+    check("CA and PC use different accounts", ca.advance_account_id != pc.advance_account_id)
     check(
         "PC bank-out != payment journal", pc.bank_out_journal_id != pc.payment_journal_id, pc.bank_out_journal_id.code
     )
