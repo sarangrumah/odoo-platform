@@ -246,11 +246,18 @@
               action="action_gl_open_items_wizard"
               sequence="35"/>
 
-    <menuitem id="menu_custom_reports_sales_detail"
-              name="Sales Detail (XStore X24DN)"
-              parent="menu_custom_reports_root"
-              action="action_sales_detail_wizard"
-              sequence="86"/>
+    <!-- noupdate: hooks.sync_pos_only_menus archives this menu on tenants with
+         no POS, and a plain menuitem is rewritten on every -u — which silently
+         un-archived it again. noupdate pins the record after creation so the
+         hook's decision survives. Renaming or re-sequencing it now needs a
+         migration script, which is the price of the flag. -->
+    <data noupdate="1">
+        <menuitem id="menu_custom_reports_sales_detail"
+                  name="Sales Detail (XStore X24DN)"
+                  parent="menu_custom_reports_root"
+                  action="action_sales_detail_wizard"
+                  sequence="86"/>
+    </data>
 
     <menuitem id="menu_custom_reports_bill_payment"
               name="Mapping Bill vs Payment"
