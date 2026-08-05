@@ -226,3 +226,29 @@ X24 sales, X70D tenders, **X48 returns** (refund pos.orders) and **X31 discounts
 period-correct (SQL re-stamp), per-tender receivable split, balanced. See memory
 `x24-phase5-pos-posting` and `levis-txn-reset`.
 """
+
+## Purge a mis-entered PO Return — `82_purge_rtv_00005.py`
+One-off correction for `prd_levis_begbal`, 05-Aug-2026: the team keyed `RTV/2026/00005`
+while logged in as the shared Administrator account, then manually undid the stock with a
+counter-receipt. The owner asked for full erasure rather than a cancelled trail.
+
+Removes, in order: the two `GR-VAL`/`GR-RET-VAL` valuation entries (`force_delete` — they
+are mid-chain, so a permanent `STJ/2026/08/` numbering gap is left on purpose), then the
+`custom.po.return` header/lines/allocations, then the three pickings and their moves.
+
+The stock side is done with **raw SQL, not the ORM**: `stock.move.line.unlink()` calls
+`_update_reserved_quantity(-qty)` for lines whose source is an internal location, which
+would drive the quant's `reserved_quantity` negative. The quants are already correct
+(the return move and the counter-receipt cancel out) and must not be touched.
+
+Hard guards on name/date/`create_uid`/amount/document ids abort on any mismatch, and the
+run self-verifies that quants, the two GL account balances and `qty_received` are byte-for-byte
+unchanged before committing — otherwise it rolls back. Back up first, then:
+```
+docker exec -i -e RTV_DRY=1 odoo19-platform-odoo odoo shell -d prd_levis_begbal --no-http \
+    < scripts/tenants/levis/82_purge_rtv_00005.py    # report + rollback (default)
+docker exec -i -e RTV_DRY=0 odoo19-platform-odoo odoo shell -d prd_levis_begbal --no-http \
+    < scripts/tenants/levis/82_purge_rtv_00005.py    # execute
+```
+Already executed on `prd_levis_begbal`; `custom.po.return` is empty and the RTV sequence
+was rolled back to `number_next = 1`.
