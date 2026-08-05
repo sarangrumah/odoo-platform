@@ -50,9 +50,7 @@ class ProductTemplate(models.Model):
 class ProductProduct(models.Model):
     _inherit = "product.product"
 
-    wms_storage_type_id = fields.Many2one(
-        related="product_tmpl_id.wms_storage_type_id", store=True, readonly=False
-    )
+    wms_storage_type_id = fields.Many2one(related="product_tmpl_id.wms_storage_type_id", store=True, readonly=False)
     wms_storage_section_id = fields.Many2one(
         related="product_tmpl_id.wms_storage_section_id", store=True, readonly=False
     )

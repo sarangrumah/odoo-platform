@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T08:56:04Z
 generator: bootstrap-v1
 module: custom_levis_localization
-manifest_version: 19.0.1.0.0
+manifest_version: 19.0.1.24.0
 ---
 
 # Levi's Localization (`custom_levis_localization`)
@@ -102,6 +102,35 @@ This module implements five specific requirements for the Levi's tenant: HS Code
 - **EBR account codes**: trade payable `2103100001`, non-trade payable
   `2103300001`, non-trade GR/IR `2103300008`. Trade GR/IR stays per product
   category (`account_stock_variation_id`, e.g. `2103109121` textile).
+
+## Feature 8 — Admin fees (and card MDR) on payment registration
+- **Models**: `levis.payment.register.fee` (TransientModel, one fee line on the
+  wizard) and `account.payment.register` (`_inherit`), in
+  `models/account_payment_register.py`.
+- Each fee line carries its own COA, label and amount; the wizard total
+  (`amount`) is recomputed as `<batch residual> + Σ fees` by
+  `_onchange_admin_fee_line_ids`, so amounts never accumulate and clearing the
+  lines restores the plain residual. The fees ride Odoo's native
+  `write_off_line_vals` channel (`_prepare_admin_fee_write_off_vals`), so the
+  counterpart still equals the bill residual and the bill reconciles in full.
+- A **negative** amount nets the fee off an inbound receipt — that is how the
+  `is_mdr` lines produced by `_onchange_x_card_bin` book card MDR, resolved
+  against `levis.mdr.bin`. MDR lines are read-only in the list.
+- **Several bills at once**: core leaves `group_payment` False for a multi-bill
+  selection (one payment per bill), and a single fee cannot be split across
+  them. Adding a fee line therefore ticks *Group Payments*, so one payment
+  settles every selected bill with the fee charged once — the case that matters,
+  since batching bills into one transfer is what saves the fee. Unticking
+  *Group Payments* while fees exist raises in
+  `_create_payment_vals_from_batch` rather than splitting the fee. Bills from
+  **different partners** build more than one batch, so `can_edit_wizard` is
+  False and the whole section stays hidden; register per partner.
+- `_assert_admin_fee_balance` rejects a hand-edited `Amount` that no longer
+  equals residual + fees, which would otherwise mis-reconcile the bill silently.
+- **Tenant-neutral twin**: `custom_payment_admin_fee` (ee_gap) is the same
+  feature without MDR/BIN and Operating Unit. Never install both on one
+  database — both inherit the wizard and inject an "Admin Fees" group, so the
+  section renders twice and the two onchange handlers fight over `amount`.
 
 ## Feature 13 — Indonesian bank master data (Kode BI)
 - **Field**: `res.bank.l10n_id_bi_code` ("Kode BI") — the 7-digit Bank Indonesia

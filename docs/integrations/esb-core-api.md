@@ -936,4 +936,3 @@ The full per-endpoint index is in the appendix below.
 | POST | `/external/general/sales-menu-completion` | Sales Menu Completion |
 | GET | `/extv1/sales/sales-menu-summary/` | Sales Menu Summary |
 | GET | `/report/sales-payment-summary` | Sales Payment Summary |
-

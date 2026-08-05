@@ -27,8 +27,13 @@ class AuthJwtValidator(models.Model):
         login = payload.get("sub") or payload.get("login")
         if not login:
             return None
-        user = self.env["res.users"].sudo().search(
-            [("login", "=", login), ("active", "=", True)], limit=1,
+        user = (
+            self.env["res.users"]
+            .sudo()
+            .search(
+                [("login", "=", login), ("active", "=", True)],
+                limit=1,
+            )
         )
         if not user:
             _logger.info("VAS PMO: JWT sub %s does not match an active user", login)

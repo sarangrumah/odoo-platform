@@ -1,6 +1,6 @@
 {
     "name": "ARKA-AIM Opening Balances (31 May 2026)",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "summary": "Beginning balances for AIM & ARKA companies as of 31 May 2026.",
     "description": """
 ARKA-AIM Opening Balances

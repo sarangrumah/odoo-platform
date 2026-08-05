@@ -52,8 +52,7 @@ class StockLocation(models.Model):
     wms_volume_ccm = fields.Float(
         string="Bin Volume (cm3)",
         default=0.0,
-        help="Usable volume of the bin in cubic centimetres. Falls back to "
-        "length x width x height when left at zero.",
+        help="Usable volume of the bin in cubic centimetres. Falls back to length x width x height when left at zero.",
     )
 
     @api.constrains("wms_volume_ccm")

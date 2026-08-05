@@ -2,7 +2,7 @@
 {
     "name": "Custom Project - Change Requests (VAS)",
     "summary": "Change Request as its own record: intake triage, impact analysis, tiered "
-               "approval, official numbering, and the tasks it spawns.",
+    "approval, official numbering, and the tasks it spawns.",
     "description": """
 VAS PMO - Change Requests
 =========================

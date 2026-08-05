@@ -56,9 +56,7 @@ class VaspmoNotifySource(models.AbstractModel):
         # this keeps working on a tenant still on an older release.
         phone = False
         if partner:
-            phone = partner.phone or (
-                partner.mobile if "mobile" in partner._fields else False
-            )
+            phone = partner.phone or (partner.mobile if "mobile" in partner._fields else False)
         if not email and not phone:
             return None
         return {
@@ -116,13 +114,18 @@ class VaspmoNotifySource(models.AbstractModel):
                 context = dict(self._vaspmo_event_context(event) or {})
                 context.update(extra or {})
                 self.env["custom.project.notify.outbox"].sudo().enqueue(
-                    self, event, recipients, extra=context,
+                    self,
+                    event,
+                    recipients,
+                    extra=context,
                 )
             return True
         except Exception:  # noqa: BLE001 - notification must never break the transaction
             _logger.exception(
                 "VAS PMO: failed to queue notification %s for %s,%s",
-                event, self._name, self.id,
+                event,
+                self._name,
+                self.id,
             )
             return False
 
@@ -138,9 +141,7 @@ class VaspmoNotifySource(models.AbstractModel):
         self.ensure_one()
         if not hasattr(self, "message_post"):
             return
-        label = dict(
-            self.env["custom.project.notify.rule"]._fields["event"].selection
-        ).get(event, event)
+        label = dict(self.env["custom.project.notify.rule"]._fields["event"].selection).get(event, event)
         self.message_post(
             body=_("<p><b>%(label)s</b> — %(name)s</p>", label=label, name=self.display_name),
             partner_ids=partners.ids,
@@ -148,9 +149,7 @@ class VaspmoNotifySource(models.AbstractModel):
         )
         if event in ("verify_request", "overdue", "escalation", "cr_submit", "hold_expired"):
             for partner in partners:
-                user = self.env["res.users"].sudo().search(
-                    [("partner_id", "=", partner.id)], limit=1
-                )
+                user = self.env["res.users"].sudo().search([("partner_id", "=", partner.id)], limit=1)
                 if not user:
                     continue
                 try:

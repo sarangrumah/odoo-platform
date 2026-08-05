@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_adapter_framework"
 PRIVILEGE = "res_groups_privilege_adapter_framework"
-GROUPS = ['group_adapter_admin']
+GROUPS = ["group_adapter_admin"]
 
 
 def migrate(cr, version):

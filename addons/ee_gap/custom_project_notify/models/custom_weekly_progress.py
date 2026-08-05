@@ -20,12 +20,8 @@ class CustomWeeklyProgress(models.Model):
             "assignee": self.author_id,
             "ba": self.author_id,
             "po": project.custom_po_id if project else self.env["res.users"],
-            "portfolio_owner": (
-                project.custom_portfolio_id.owner_id if project else self.env["res.users"]
-            ),
-            "vertical_owner": (
-                self.vertical_id.vertical_po_id if self.vertical_id else self.env["res.users"]
-            ),
+            "portfolio_owner": (project.custom_portfolio_id.owner_id if project else self.env["res.users"]),
+            "vertical_owner": (self.vertical_id.vertical_po_id if self.vertical_id else self.env["res.users"]),
         }
 
     def _vaspmo_event_context(self, event):

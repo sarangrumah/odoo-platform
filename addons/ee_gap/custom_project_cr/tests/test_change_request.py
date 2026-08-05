@@ -8,15 +8,16 @@ from odoo.tests import TransactionCase, tagged
 
 @tagged("post_install", "-at_install", "vaspmo")
 class TestChangeRequest(TransactionCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.vertical = cls.env.ref("custom_project_portfolio.vertical_levis")
-        cls.project = cls.env["project.project"].create({
-            "name": "X70D rollout batch 2",
-            "custom_vertical_id": cls.vertical.id,
-        })
+        cls.project = cls.env["project.project"].create(
+            {
+                "name": "X70D rollout batch 2",
+                "custom_vertical_id": cls.vertical.id,
+            }
+        )
 
     def _cr(self, **kw):
         values = {
@@ -41,8 +42,9 @@ class TestChangeRequest(TransactionCase):
         self.assertTrue(cr.sla_response_due)
         self.assertGreater(cr.sla_response_due, cr.request_date)
         low = self._cr(priority="low")
-        self.assertGreater(low.sla_response_due, cr.sla_response_due,
-                           "A low-priority ask gets a longer response window.")
+        self.assertGreater(
+            low.sla_response_due, cr.sla_response_due, "A low-priority ask gets a longer response window."
+        )
 
     def test_triage_stamps_first_response(self):
         cr = self._cr()
@@ -60,10 +62,12 @@ class TestChangeRequest(TransactionCase):
     def test_two_tiers_for_low_impact(self):
         cr = self._cr(impact="low")
         cr.action_start_analysis()
-        cr.write({
-            "impact_analysis": "<p>Backward compatible column, feature-flagged.</p>",
-            "effort_estimate_days": 4.5,
-        })
+        cr.write(
+            {
+                "impact_analysis": "<p>Backward compatible column, feature-flagged.</p>",
+                "effort_estimate_days": 4.5,
+            }
+        )
         cr.action_submit_for_approval()
         self.assertEqual(len(cr.approval_ids), 2)
         self.assertEqual(cr.approval_progress, "0/2")
@@ -73,8 +77,7 @@ class TestChangeRequest(TransactionCase):
         cr.action_start_analysis()
         cr.write({"impact_analysis": "<p>Touches money.</p>", "effort_estimate_days": 8.0})
         cr.action_submit_for_approval()
-        self.assertEqual(len(cr.approval_ids), 3,
-                         "Critical impact pulls in the vertical owner.")
+        self.assertEqual(len(cr.approval_ids), 3, "Critical impact pulls in the vertical owner.")
 
     def test_tiers_must_approve_in_order(self):
         cr = self._cr(impact="critical")
@@ -113,8 +116,7 @@ class TestChangeRequest(TransactionCase):
         task = cr.task_ids
         self.assertEqual(len(task), 1)
         self.assertEqual(task.custom_source, "cr")
-        self.assertEqual(task.custom_vertical_id, self.vertical,
-                         "A task inherits the brand from its request.")
+        self.assertEqual(task.custom_vertical_id, self.vertical, "A task inherits the brand from its request.")
         self.assertEqual(task.custom_cr_code, cr.code)
 
     def test_cannot_spawn_before_approval(self):

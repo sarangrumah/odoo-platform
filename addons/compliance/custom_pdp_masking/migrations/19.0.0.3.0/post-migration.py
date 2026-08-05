@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_pdp_masking"
 PRIVILEGE = "res_groups_privilege_pdp_masking"
-GROUPS = ['group_view_pii']
+GROUPS = ["group_view_pii"]
 
 
 def migrate(cr, version):

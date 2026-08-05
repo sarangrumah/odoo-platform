@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_accounting_reports"
 PRIVILEGE = "res_groups_privilege_accounting_reports"
-GROUPS = ['group_report_user', 'group_report_admin']
+GROUPS = ["group_report_user", "group_report_admin"]
 
 
 def migrate(cr, version):

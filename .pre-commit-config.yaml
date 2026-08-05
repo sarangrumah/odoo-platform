@@ -80,7 +80,25 @@ repos:
     rev: v2.13.1-beta
     hooks:
       - id: hadolint-docker
-        args: [--ignore=DL3008, --ignore=DL3018, --failure-threshold=warning]
+        # `rev` above pins only the hook DEFINITION. The upstream hook's entry is
+        # `ghcr.io/hadolint/hadolint hadolint` — no tag — so Docker silently
+        # resolved it to :latest, and the linter version floated. hadolint 2.15.1
+        # tightened DL3025 and turned this job red with no commit to this repo
+        # (fixed in #77). Pin the image by digest so the linter can only change
+        # when someone changes this line.
+        #
+        # To bump: pick a tag, then
+        #   docker pull ghcr.io/hadolint/hadolint:<tag>
+        #   docker inspect ghcr.io/hadolint/hadolint:<tag> --format '{{index .RepoDigests 0}}'
+        # and re-run `pre-commit run hadolint-docker --all-files` before committing.
+        entry: ghcr.io/hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d hadolint
+        # No --ignore flags here on purpose. hadolint auto-discovers
+        # .hadolint.yaml from the working directory (pre-commit runs the
+        # container with the repo root as cwd), and the container-scan job in
+        # ci.yml passes that same file explicitly. Keeping the exclusions in one
+        # file is what stops the two jobs linting the same Dockerfiles under
+        # different rules. Add exclusions to .hadolint.yaml, never here.
+        args: [--failure-threshold=warning]
 
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.35.1

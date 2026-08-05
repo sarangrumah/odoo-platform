@@ -15,7 +15,14 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_project_portfolio"
 PRIVILEGE = "res_groups_privilege_vaspmo"
-GROUPS = ['group_vaspmo_user', 'group_vaspmo_ba', 'group_vaspmo_po', 'group_vaspmo_lead', 'group_vaspmo_admin', 'group_vaspmo_vertical_pic']
+GROUPS = [
+    "group_vaspmo_user",
+    "group_vaspmo_ba",
+    "group_vaspmo_po",
+    "group_vaspmo_lead",
+    "group_vaspmo_admin",
+    "group_vaspmo_vertical_pic",
+]
 
 
 def migrate(cr, version):

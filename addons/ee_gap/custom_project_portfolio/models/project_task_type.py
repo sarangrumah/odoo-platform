@@ -21,7 +21,7 @@ class ProjectTaskType(models.Model):
     custom_code = fields.Char(
         string="Stage Code",
         help="Stable key used by the REST API and the Jira status map, so renaming a "
-             "stage for humans does not break integrations.",
+        "stage for humans does not break integrations.",
     )
     custom_applies_to = fields.Selection(
         [
@@ -43,8 +43,7 @@ class ProjectTaskType(models.Model):
         string="SLA Clock",
         default="running",
         required=True,
-        help="How elapsed time in this stage is treated. This single field is what makes "
-             "team metrics honest.",
+        help="How elapsed time in this stage is treated. This single field is what makes team metrics honest.",
     )
     custom_is_hold = fields.Boolean(
         string="Is Hold",
@@ -62,7 +61,7 @@ class ProjectTaskType(models.Model):
         string="Auto-close After (working days)",
         default=0,
         help="Only meaningful on a Waiting-User-Verification stage: silence for this many "
-             "working days closes the item automatically, with a notification.",
+        "working days closes the item automatically, with a notification.",
     )
     custom_require_reason = fields.Boolean(
         string="Reason Required",
@@ -74,8 +73,7 @@ class ProjectTaskType(models.Model):
         "stage_id",
         "next_stage_id",
         string="Allowed Next Stages",
-        help="Leave empty to allow any transition. Filled in, it stops work from skipping "
-             "stages.",
+        help="Leave empty to allow any transition. Filled in, it stops work from skipping stages.",
     )
 
     _custom_code_uniq = models.Constraint(
@@ -87,18 +85,11 @@ class ProjectTaskType(models.Model):
     def _check_clock_coherence(self):
         for rec in self:
             if rec.custom_is_hold and rec.custom_sla_clock != "paused":
-                raise ValidationError(
-                    _("Stage %s is marked as Hold, so its SLA clock must be 'paused'.", rec.name)
-                )
+                raise ValidationError(_("Stage %s is marked as Hold, so its SLA clock must be 'paused'.", rec.name))
             if rec.custom_is_waiting_user and rec.custom_sla_clock != "user_side":
-                raise ValidationError(
-                    _("Stage %s waits on the user, so its SLA clock must be 'user side'.",
-                      rec.name)
-                )
+                raise ValidationError(_("Stage %s waits on the user, so its SLA clock must be 'user side'.", rec.name))
             if rec.custom_is_hold and rec.custom_is_waiting_user:
-                raise ValidationError(
-                    _("A stage cannot be both Hold and Waiting User Verification.")
-                )
+                raise ValidationError(_("A stage cannot be both Hold and Waiting User Verification."))
 
     @api.model
     def _stage_by_code(self, code):

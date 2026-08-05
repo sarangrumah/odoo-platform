@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.23.0",
+    "version": "19.0.1.24.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",

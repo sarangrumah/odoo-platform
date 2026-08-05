@@ -75,15 +75,11 @@ addons/compliance/custom_coretax/data/sertel/*.pfx
 # ----- Generated extract artifacts (reproducible via 01_extract_x101.py) -----
 scripts/tenants/levis/out_*.csv
 
-# ----- ARKA-AIM client source extracts (local-only) -----
-# Client-supplied working data, not module data: neither manifest loads these and
-# no code references them by name. The SEEDS in the same folders -- aim_asset_register.csv,
-# opening_balance_*.csv, missing_accounts.csv -- ARE committed, so ignore the four
-# files by name rather than the data/ directory, or the module loses its seeds.
-addons/_tenants/custom_arka_aim_asset_register/data/asset_register_registered.csv
-addons/_tenants/custom_arka_aim_asset_register/data/asset_register_unregistered.csv
-addons/_tenants/custom_arka_aim_opening_balance/data/opening_detail_aim.csv
-addons/_tenants/custom_arka_aim_opening_balance/data/opening_detail_arka.csv
+# ----- ARKA-AIM client source workbooks (local-only) -----
+# The raw client xlsx stays out of git; the CSVs derived from it under
+# addons/_tenants/custom_arka_aim_*/data/ are module SEEDS read by their
+# post_init_hook, so those must stay committed.
+imports/arka_aim/
 
 # ----- Levis raw XStore migration source data (large, local-only) -----
 # The "Mentahan" (raw) XStore export + its zip are ~56MB of source data for the

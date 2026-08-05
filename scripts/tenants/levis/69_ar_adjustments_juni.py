@@ -120,9 +120,7 @@ AR_PER_OU = OrderedDict(
 
 company = env["res.company"].browse(COMPANY_ID)
 Move = env["account.move"].with_company(company)
-journal = env["account.journal"].search(
-    [("code", "=", JOURNAL), ("company_id", "=", company.id)], limit=1
-)
+journal = env["account.journal"].search([("code", "=", JOURNAL), ("company_id", "=", company.id)], limit=1)
 if not journal:
     raise SystemExit("journal %s not found" % JOURNAL)
 if Move.search_count([("ref", "like", REF_PREFIX + "%"), ("company_id", "=", company.id)]):
@@ -134,8 +132,18 @@ for code in (ACC_AR, ACC_DEPOSIT, ACC_MDR):
         raise SystemExit("account %s not in COA" % code)
 
 _ou = {a.name: a for a in env["account.analytic.account"].search([])}
-missing = [o for o in set(list(NO_STORE_SPLIT) + list(MDR) + list(SALES_MANUAL) + list(AR_PER_OU)
-                          + [NO_STORE_OU] + [x for p in PLUS_MINUS for x in p[:2]]) if o not in _ou]
+missing = [
+    o
+    for o in set(
+        list(NO_STORE_SPLIT)
+        + list(MDR)
+        + list(SALES_MANUAL)
+        + list(AR_PER_OU)
+        + [NO_STORE_OU]
+        + [x for p in PLUS_MINUS for x in p[:2]]
+    )
+    if o not in _ou
+]
 if missing:
     raise SystemExit("analytic accounts not found: %s" % ", ".join(sorted(missing)))
 ad = lambda ou: {str(_ou[ou].id): 100.0}
@@ -174,8 +182,10 @@ def create(suffix, narration, lines):
         }
     )
     # draft moves have no sequence number yet -- fall back to the ref
-    log("%s %s: %d lines, debit %s" % (suffix, move.name or move.ref, len(move.line_ids),
-                                       sum(move.line_ids.mapped("debit"))))
+    log(
+        "%s %s: %d lines, debit %s"
+        % (suffix, move.name or move.ref, len(move.line_ids), sum(move.line_ids.mapped("debit")))
+    )
     return move
 
 
@@ -252,8 +262,10 @@ if SALES_MANUAL_ACCOUNT:
         )
     )
 else:
-    log("SALES_MANUAL_ACCOUNT not set -> entry 4 skipped (total %s pending Accounting sign-off)"
-        % sum(SALES_MANUAL.values()))
+    log(
+        "SALES_MANUAL_ACCOUNT not set -> entry 4 skipped (total %s pending Accounting sign-off)"
+        % sum(SALES_MANUAL.values())
+    )
 
 # --- 1. clearing ----------------------------------------------------------
 clearing_lines = []
@@ -320,8 +332,10 @@ for code in (ACC_AR, ACC_DEPOSIT, ACC_MDR):
     if DATE == CUTOFF:
         log("balance %s = %s" % (code, bal(code, DATE)))
     else:
-        log("balance %s: per %s = %s (harus tidak berubah) | per %s = %s"
-            % (code, CUTOFF, bal(code, CUTOFF), DATE, bal(code, DATE)))
+        log(
+            "balance %s: per %s = %s (harus tidak berubah) | per %s = %s"
+            % (code, CUTOFF, bal(code, CUTOFF), DATE, bal(code, DATE))
+        )
 
 if DRY:
     env.cr.rollback()

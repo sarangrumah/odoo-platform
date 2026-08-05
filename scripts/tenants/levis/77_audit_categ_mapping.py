@@ -85,8 +85,10 @@ first_sale = {}
 for product, is_return, subtotal, discount in grouped:
     if not product:
         continue
-    base = Executor._ri_category_account(company, product, "return") if is_return else Executor._ri_income_account(
-        company, product
+    base = (
+        Executor._ri_category_account(company, product, "return")
+        if is_return
+        else Executor._ri_income_account(company, product)
     )
     if base:
         expected[base] -= subtotal
@@ -172,12 +174,19 @@ for account in accounts:
     else:
         clean = False
     print("%-12s %-42s %s %s %s" % (code(account), (account.name or "")[:42], money(exp), money(act), money(diff)))
-print("\n%s" % ("CLEAN — every revenue account matches its products' categories." if clean else
-                "DIFFERENCES FOUND — see the suspect list below."))
+print(
+    "\n%s"
+    % (
+        "CLEAN — every revenue account matches its products' categories."
+        if clean
+        else "DIFFERENCES FOUND — see the suspect list below."
+    )
+)
 if reclass_refs:
-    print("note: %s EBR-RECLASS entry/entries are excluded above (structural "
-          "Sales Return -> Gross Sales netting from 66_reclass_sales_structure.py)."
-          % len(reclass_refs))
+    print(
+        "note: %s EBR-RECLASS entry/entries are excluded above (structural "
+        "Sales Return -> Gross Sales netting from 66_reclass_sales_structure.py)." % len(reclass_refs)
+    )
 
 # ---------------------------------------------------------------------------
 # 3. Suspect products
@@ -250,12 +259,15 @@ for title, bucket, cap in (
         amounts = " ".join(
             "%s %s" % (code(acc), money(bal).strip()) for acc, bal in per_product[product].items() if abs(bal) >= 1
         )
-        print("   %-14s %-44s %-28s %s" % (
-            product.default_code or "-",
-            (product.display_name or "")[:44],
-            product.categ_id.complete_name[:28],
-            amounts,
-        ))
+        print(
+            "   %-14s %-44s %-28s %s"
+            % (
+                product.default_code or "-",
+                (product.display_name or "")[:44],
+                product.categ_id.complete_name[:28],
+                amounts,
+            )
+        )
     print("")
 
 # ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_coretax_bupot"
 PRIVILEGE = "res_groups_privilege_bupot"
-GROUPS = ['group_bupot_user', 'group_bupot_manager']
+GROUPS = ["group_bupot_user", "group_bupot_manager"]
 
 
 def migrate(cr, version):

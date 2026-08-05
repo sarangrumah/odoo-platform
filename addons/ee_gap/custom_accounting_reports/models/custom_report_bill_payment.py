@@ -113,8 +113,9 @@ class CustomReportBillPayment(models.AbstractModel):
 
             seen_bills += 1
             if not allocations:
-                rows.append(dict(base, payment_no="", payment_date=None, payment_journal="",
-                                 payment_method="", allocated=0.0))
+                rows.append(
+                    dict(base, payment_no="", payment_date=None, payment_journal="", payment_method="", allocated=0.0)
+                )
                 g_residual += residual
                 continue
 

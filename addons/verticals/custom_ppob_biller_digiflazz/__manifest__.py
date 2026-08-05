@@ -2,7 +2,7 @@
 {
     "name": "Custom PPOB - Biller: Digiflazz",
     "summary": "Digiflazz H2H provider adapter (prepaid topup, postpaid inquiry "
-               "and payment) with MD5 signing and ref_id idempotency.",
+    "and payment) with MD5 signing and ref_id idempotency.",
     "description": """
 Custom PPOB Suite - Biller: Digiflazz
 =====================================

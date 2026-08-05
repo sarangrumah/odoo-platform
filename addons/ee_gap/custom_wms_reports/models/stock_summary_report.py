@@ -21,8 +21,15 @@ class WmsStockSummaryReport(models.Model):
     _rec_name = "product_id"
     _order = "warehouse_id, location_id, default_code"
     _depends = {
-        "stock.quant": ["location_id", "product_id", "lot_id", "quantity", "reserved_quantity",
-                        "in_date", "company_id"],
+        "stock.quant": [
+            "location_id",
+            "product_id",
+            "lot_id",
+            "quantity",
+            "reserved_quantity",
+            "in_date",
+            "company_id",
+        ],
         "product.product": ["default_code", "standard_price", "product_tmpl_id"],
     }
 
@@ -97,10 +104,14 @@ class WmsStockSummaryReport(models.Model):
             {"label": "Category", "value": lambda r: r.categ_id.display_name, "width": 20},
             {"label": "Lot/Serial", "value": lambda r: r.lot_id.name, "width": 18},
             {"label": "On Hand", "value": lambda r: r.quantity, "type": "number", "width": 12, "total": True},
-            {"label": "Reserved", "value": lambda r: r.reserved_quantity, "type": "number", "width": 12,
-             "total": True},
-            {"label": "Available", "value": lambda r: r.available_quantity, "type": "number", "width": 12,
-             "total": True},
+            {"label": "Reserved", "value": lambda r: r.reserved_quantity, "type": "number", "width": 12, "total": True},
+            {
+                "label": "Available",
+                "value": lambda r: r.available_quantity,
+                "type": "number",
+                "width": 12,
+                "total": True,
+            },
             {"label": "Unit Cost", "value": lambda r: r.unit_cost, "type": "money", "width": 14},
             {"label": "Stock Value", "value": lambda r: r.value, "type": "money", "width": 16, "total": True},
             {"label": "Entry Date", "value": lambda r: r.in_date, "type": "datetime", "width": 17},

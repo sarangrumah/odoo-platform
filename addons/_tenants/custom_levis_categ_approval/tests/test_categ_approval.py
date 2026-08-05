@@ -216,9 +216,7 @@ class TestCategApproval(AccountTestInvoicingCommon):
     def test_06_pending_approvers_get_an_activity(self):
         # Pin the cap above whatever the host database's Accounting Manager
         # group happens to hold, so this asserts the fan-out path itself.
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_levis_categ_approval.activity_fanout_max", "500"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_levis_categ_approval.activity_fanout_max", "500")
         self._sell(self.patch, 3)
         rec = self._reclass()
         rec.action_compute()
@@ -232,9 +230,7 @@ class TestCategApproval(AccountTestInvoicingCommon):
     def test_06b_a_crowded_tier_gets_a_chatter_note_not_a_to_do_each(self):
         # account.group_account_manager really does hold dozens of people on the
         # Levi's databases; forty ignorable to-dos is not a notification.
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_levis_categ_approval.activity_fanout_max", "0"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_levis_categ_approval.activity_fanout_max", "0")
         self._sell(self.patch, 3)
         rec = self._reclass()
         rec.action_compute()
@@ -242,9 +238,7 @@ class TestCategApproval(AccountTestInvoicingCommon):
 
         todo = self.env.ref("mail.mail_activity_data_todo")
         self.assertFalse(request.activity_ids.filtered(lambda a: a.activity_type_id == todo))
-        self.assertTrue(
-            request.message_ids.filtered(lambda m: "too many for individual to-dos" in (m.body or ""))
-        )
+        self.assertTrue(request.message_ids.filtered(lambda m: "too many for individual to-dos" in (m.body or "")))
 
     def test_07_tier_one_alone_is_not_enough(self):
         self._sell(self.patch, 3)

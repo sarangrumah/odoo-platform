@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Build the July-2026 clearing plan for prd_levis_begbal from EBR's workbook.
 
 Runs on the HOST (plain python3 + openpyxl). Reads only; the database is read
@@ -104,7 +103,7 @@ def sheet_rows(wb, name):
     rows = [["" if c is None else c for c in r] for r in ws.iter_rows(values_only=True)]
     hdr = SHEET_HEADER_ROW[name]
     head = [str(c).strip() for c in rows[hdr]]
-    return [dict(zip(head, r)) for r in rows[hdr + 1:] if any(str(c).strip() for c in r)]
+    return [dict(zip(head, r)) for r in rows[hdr + 1 :] if any(str(c).strip() for c in r)]
 
 
 def day(raw):
@@ -118,9 +117,27 @@ def bank_of_status(status):
 
 def psql(db, sql):
     out = subprocess.run(
-        ["docker", "exec", "-i", "-e", "PGPASSWORD=" + os.environ["PGPASSWORD"],
-         "odoo19-platform-postgres", "psql", "-U", "odoo", "-d", db, "-At", "-F", "\t", "-c", sql],
-        capture_output=True, text=True, check=True,
+        [
+            "docker",
+            "exec",
+            "-i",
+            "-e",
+            "PGPASSWORD=" + os.environ["PGPASSWORD"],
+            "odoo19-platform-postgres",
+            "psql",
+            "-U",
+            "odoo",
+            "-d",
+            db,
+            "-At",
+            "-F",
+            "\t",
+            "-c",
+            sql,
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
     return [line.split("\t") for line in out.splitlines() if line]
 
@@ -139,8 +156,8 @@ def build_settlement(wb):
     # workbook still shows EBR's own split for reference.
     credits = collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
     ebr_split = collections.Counter()  # (store, trans date, account) -> amount
-    gross = collections.defaultdict(collections.Counter)          # store -> date -> gross
-    bank_of = collections.defaultdict(collections.Counter)        # store -> date -> bank
+    gross = collections.defaultdict(collections.Counter)  # store -> date -> gross
+    bank_of = collections.defaultdict(collections.Counter)  # store -> date -> bank
     unsettled = collections.Counter()
     unknown_tender = collections.Counter()
     for r in cs:
@@ -177,17 +194,27 @@ def build_settlement(wb):
             amount = num(r.get("AMOUNT PAYMENT"))
             mdr = num(r.get("MDR"))
             if flow in ("ATS", "BANK ADMIN"):
-                ats.append({
-                    "date": day(r[dcol]), "bank": bank, "kind": flow,
-                    "desc": str(r.get("Keterangan") or r.get("Uraian Transaksi") or "")[:120],
-                    "amount": rnd(num(r.get("Jumlah")) or num(r.get("Debet")) or amount),
-                })
+                ats.append(
+                    {
+                        "date": day(r[dcol]),
+                        "bank": bank,
+                        "kind": flow,
+                        "desc": str(r.get("Keterangan") or r.get("Uraian Transaksi") or "")[:120],
+                        "amount": rnd(num(r.get("Jumlah")) or num(r.get("Debet")) or amount),
+                    }
+                )
                 continue
             if "COLLECTION" in note:
-                block_b.append({
-                    "date": day(r[dcol]), "bank": bank, "store": store,
-                    "gross": rnd(amount), "mdr": rnd(mdr), "cash_in": rnd(amount - mdr),
-                })
+                block_b.append(
+                    {
+                        "date": day(r[dcol]),
+                        "bank": bank,
+                        "store": store,
+                        "gross": rnd(amount),
+                        "mdr": rnd(mdr),
+                        "cash_in": rnd(amount - mdr),
+                    }
+                )
                 continue
             if store:
                 mdr_month[store] += mdr
@@ -206,12 +233,17 @@ def build_settlement(wb):
                 mdr = rnd(mdr_month.get(store, 0.0) * g / total_gross) if total_gross else 0.0
                 mdr_left = rnd(mdr_left - mdr)
             lines = [{"date": d, "amount": rnd(v)} for d, v in sorted(per_date[sdate].items())]
-            block_a.append({
-                "date": sdate, "store": store,
-                "bank": bank_of[store].get((sdate, "bank"), ""),
-                "gross": rnd(g), "mdr": rnd(mdr), "cash_in": rnd(g - mdr),
-                "credits": lines,
-            })
+            block_a.append(
+                {
+                    "date": sdate,
+                    "store": store,
+                    "bank": bank_of[store].get((sdate, "bank"), ""),
+                    "gross": rnd(g),
+                    "mdr": rnd(mdr),
+                    "cash_in": rnd(g - mdr),
+                    "credits": lines,
+                }
+            )
     block_a.sort(key=lambda r: (r["date"], r["store"]))
     block_b.sort(key=lambda r: (r["date"], r["store"]))
     diag = {
@@ -237,7 +269,7 @@ def missing_bca_lines(path):
             break
     if hdr is None:
         raise SystemExit("BCA CSV: header row not found")
-    for r in rows[hdr + 1:]:
+    for r in rows[hdr + 1 :]:
         if len(r) < 5 or not r[0].strip():
             continue
         raw = r[0].strip()
@@ -252,8 +284,7 @@ def missing_bca_lines(path):
         amt = r[3].strip()
         sign = -1 if amt.upper().endswith("DB") else 1
         value = num(re.sub(r"\s*(CR|DB)$", "", amt, flags=re.I))
-        out.append({"journal": "IBCA", "date": d, "ref": r[1].strip()[:200],
-                    "amount": rnd(sign * value)})
+        out.append({"journal": "IBCA", "date": d, "ref": r[1].strip()[:200], "amount": rnd(sign * value)})
     return out
 
 
@@ -275,8 +306,15 @@ def missing_bri_lines(wb):
         amount = credit - debit
         if not amount:
             continue
-        out.append({"journal": "IBRI", "date": d, "replace_month": True,
-                    "ref": str(r.get("Uraian Transaksi", ""))[:200], "amount": rnd(amount)})
+        out.append(
+            {
+                "journal": "IBRI",
+                "date": d,
+                "replace_month": True,
+                "ref": str(r.get("Uraian Transaksi", ""))[:200],
+                "amount": rnd(amount),
+            }
+        )
     return out
 
 
@@ -337,15 +375,21 @@ def build_workbook(path, plan, odoo, diag):
         ("Catatan", "Baris statement yang ditambahkan (BCA 21-31 Jul + BRI 01-31 Jul)", len(plan["block_s"])),
         ("", "", ""),
         ("PERLU KEPUTUSAN ACCOUNTING", "", ""),
-        ("1", "Statement BRI Juli di Odoo hanya 172 baris dari 416 baris mutasi bank "
-              "(setiap hari terpotong ~separuh) -- statement Juli IBRI diganti penuh "
-              "dari sheet MUTASI BRI", ""),
-        ("2", "BRI 27-Jul 'CAIR CEK UNTUK RTGS' -- rekening tujuan belum dipastikan, "
-              "jadi tetap menggantung di 1103000002 Bank Suspense", 1533030000.0),
-        ("3", "AR 1106000001 menjadi minus karena entry SALESMANUAL Juni "
-              "(Rp 14.608.080) belum dibukukan", ""),
-        ("4", "AEON BSD CITY 06/07-Jul: klasifikasi tender EBR beda dengan X70D, "
-              "sisa tidak ter-clearing", 1400925.0),
+        (
+            "1",
+            "Statement BRI Juli di Odoo hanya 172 baris dari 416 baris mutasi bank "
+            "(setiap hari terpotong ~separuh) -- statement Juli IBRI diganti penuh "
+            "dari sheet MUTASI BRI",
+            "",
+        ),
+        (
+            "2",
+            "BRI 27-Jul 'CAIR CEK UNTUK RTGS' -- rekening tujuan belum dipastikan, "
+            "jadi tetap menggantung di 1103000002 Bank Suspense",
+            1533030000.0,
+        ),
+        ("3", "AR 1106000001 menjadi minus karena entry SALESMANUAL Juni (Rp 14.608.080) belum dibukukan", ""),
+        ("4", "AEON BSD CITY 06/07-Jul: klasifikasi tender EBR beda dengan X70D, sisa tidak ter-clearing", 1400925.0),
     ]
     for r in rows:
         ws.append(r)
@@ -357,42 +401,64 @@ def build_workbook(path, plan, odoo, diag):
     ws.column_dimensions["B"].width = 62
     ws.column_dimensions["C"].width = 20
 
-    sheet("A - SETTLEMENT JULI",
-          ["Tgl settle", "Toko", "Bank", "Bruto", "MDR", "Cash in", "Jml baris kredit"],
-          [(r["date"], r["store"], r["bank"], r["gross"], r["mdr"], r["cash_in"], len(r["credits"]))
-           for r in plan["block_a"]],
-          [12, 36, 8, 18, 14, 18, 16])
-    sheet("A - RINCIAN KREDIT",
-          ["Tgl settle", "Toko", "Tgl transaksi", "Jumlah"],
-          [(r["date"], r["store"], c["date"], c["amount"])
-           for r in plan["block_a"] for c in r["credits"]],
-          [12, 36, 14, 18])
-    sheet("A - SPLIT TENDER EBR",
-          ["Toko", "Tgl transaksi", "Akun POS Receivable", "Jumlah menurut EBR"],
-          diag["ebr_split"], [36, 14, 22, 20])
-    sheet("B - AR JUNI",
-          ["Tanggal", "Bank", "Toko", "Bruto", "MDR", "Cash in"],
-          [(r["date"], r["bank"], r["store"], r["gross"], r["mdr"], r["cash_in"]) for r in plan["block_b"]],
-          [12, 8, 36, 18, 14, 18])
-    sheet("C - ATS & BIAYA BANK",
-          ["Tanggal", "Bank", "Jenis", "Keterangan", "Jumlah"],
-          [(r["date"], r["bank"], r["kind"], r["desc"], r["amount"]) for r in plan["block_c"]],
-          [12, 8, 12, 70, 18])
-    sheet("D - OU PASKAL",
-          ["ID baris", "Tanggal", "Akun", "Uraian", "Debit", "OU tujuan"],
-          [(r["id"], r["date"], r["account"], r["name"], r["debit"], r["analytic"]) for r in plan["block_d"]],
-          [10, 12, 14, 42, 18, 26])
-    sheet("S - STATEMENT TAMBAHAN",
-          ["Journal", "Tanggal", "Keterangan", "Jumlah"],
-          [(r["journal"], r["date"], r["ref"], r["amount"]) for r in plan["block_s"]],
-          [10, 12, 80, 18])
-    sheet("BELUM TERSETTLE",
-          ["Toko", "Jumlah"],
-          sorted(diag["unsettled_per_store"].items(), key=lambda kv: -kv[1]),
-          [36, 18])
+    sheet(
+        "A - SETTLEMENT JULI",
+        ["Tgl settle", "Toko", "Bank", "Bruto", "MDR", "Cash in", "Jml baris kredit"],
+        [
+            (r["date"], r["store"], r["bank"], r["gross"], r["mdr"], r["cash_in"], len(r["credits"]))
+            for r in plan["block_a"]
+        ],
+        [12, 36, 8, 18, 14, 18, 16],
+    )
+    sheet(
+        "A - RINCIAN KREDIT",
+        ["Tgl settle", "Toko", "Tgl transaksi", "Jumlah"],
+        [(r["date"], r["store"], c["date"], c["amount"]) for r in plan["block_a"] for c in r["credits"]],
+        [12, 36, 14, 18],
+    )
+    sheet(
+        "A - SPLIT TENDER EBR",
+        ["Toko", "Tgl transaksi", "Akun POS Receivable", "Jumlah menurut EBR"],
+        diag["ebr_split"],
+        [36, 14, 22, 20],
+    )
+    sheet(
+        "B - AR JUNI",
+        ["Tanggal", "Bank", "Toko", "Bruto", "MDR", "Cash in"],
+        [(r["date"], r["bank"], r["store"], r["gross"], r["mdr"], r["cash_in"]) for r in plan["block_b"]],
+        [12, 8, 36, 18, 14, 18],
+    )
+    sheet(
+        "C - ATS & BIAYA BANK",
+        ["Tanggal", "Bank", "Jenis", "Keterangan", "Jumlah"],
+        [(r["date"], r["bank"], r["kind"], r["desc"], r["amount"]) for r in plan["block_c"]],
+        [12, 8, 12, 70, 18],
+    )
+    sheet(
+        "D - OU PASKAL",
+        ["ID baris", "Tanggal", "Akun", "Uraian", "Debit", "OU tujuan"],
+        [(r["id"], r["date"], r["account"], r["name"], r["debit"], r["analytic"]) for r in plan["block_d"]],
+        [10, 12, 14, 42, 18, 26],
+    )
+    sheet(
+        "S - STATEMENT TAMBAHAN",
+        ["Journal", "Tanggal", "Keterangan", "Jumlah"],
+        [(r["journal"], r["date"], r["ref"], r["amount"]) for r in plan["block_s"]],
+        [10, 12, 80, 18],
+    )
+    sheet(
+        "BELUM TERSETTLE",
+        ["Toko", "Jumlah"],
+        sorted(diag["unsettled_per_store"].items(), key=lambda kv: -kv[1]),
+        [36, 18],
+    )
     if diag["unknown_tender"]:
-        sheet("TENDER TIDAK DIKENAL", ["Toko | Tanggal | Metode", "Jumlah"],
-              sorted(diag["unknown_tender"].items(), key=lambda kv: -kv[1]), [60, 18])
+        sheet(
+            "TENDER TIDAK DIKENAL",
+            ["Toko | Tanggal | Metode", "Jumlah"],
+            sorted(diag["unknown_tender"].items(), key=lambda kv: -kv[1]),
+            [60, 18],
+        )
     wb.save(path)
 
 
@@ -413,7 +479,9 @@ def main():
     block_s = missing_bca_lines(args.bca_csv) + missing_bri_lines(wb)
 
     # --- block D: July RIREC POS-receivable lines without an OU analytic ----
-    rows = psql(args.db, """
+    rows = psql(
+        args.db,
+        """
         select aml.id, am.date, aa.code_store->>'1', aml.name, aml.debit
         from account_move_line aml
         join account_move am on am.id = aml.move_id
@@ -423,9 +491,19 @@ def main():
           and am.date between '2026-07-01' and '2026-07-31'
           and aa.code_store->>'1' like '110600010%'
           and aml.analytic_distribution is null
-        order by aml.id""")
-    block_d = [{"id": int(r[0]), "date": r[1], "account": r[2], "name": r[3],
-                "debit": float(r[4]), "analytic": "OLS SES - PASKAL BANDUNG"} for r in rows]
+        order by aml.id""",
+    )
+    block_d = [
+        {
+            "id": int(r[0]),
+            "date": r[1],
+            "account": r[2],
+            "name": r[3],
+            "debit": float(r[4]),
+            "analytic": "OLS SES - PASKAL BANDUNG",
+        }
+        for r in rows
+    ]
 
     # --- validate every store name against the analytic accounts ------------
     known = {r[0] for r in psql(args.db, "select name->>'en_US' from account_analytic_account")}
@@ -433,34 +511,52 @@ def main():
     if unknown:
         sys.exit("store names with no analytic account: " + ", ".join(unknown))
 
-    bal = {r[0]: float(r[1]) for r in psql(args.db, """
+    bal = {
+        r[0]: float(r[1])
+        for r in psql(
+            args.db,
+            """
         select aa.code_store->>'1', sum(aml.debit - aml.credit)
         from account_move_line aml join account_move am on am.id = aml.move_id
         join account_account aa on aa.id = aml.account_id
         where aml.parent_state = 'posted' and am.date < '2026-08-01'
           and aa.code_store->>'1' in ('1106000001', '1103000002')
-        group by 1""")}
-    posrec = float(psql(args.db, """
+        group by 1""",
+        )
+    }
+    posrec = float(
+        psql(
+            args.db,
+            """
         select coalesce(sum(aml.amount_residual), 0)
         from account_move_line aml join account_move am on am.id = aml.move_id
         join account_account aa on aa.id = aml.account_id
         where aml.parent_state = 'posted' and not aml.reconciled
           and aa.code_store->>'1' like '110600010%'
-          and am.date between '2026-07-01' and '2026-07-31'""")[0][0])
-    odoo = {"ar": rnd(bal.get("1106000001", 0.0)), "suspense": rnd(bal.get("1103000002", 0.0)),
-            "posrec": rnd(posrec)}
+          and am.date between '2026-07-01' and '2026-07-31'""",
+        )[0][0]
+    )
+    odoo = {"ar": rnd(bal.get("1106000001", 0.0)), "suspense": rnd(bal.get("1103000002", 0.0)), "posrec": rnd(posrec)}
     # end state measured by running 81_clearing_juli.py with CLR_DRY=1 CLR_POST=1
     odoo.update({"sim_suspense": 1530199113.09, "sim_mdr": 94236268.68, "sim_ar": -7731914.00})
 
-    plan = {"block_a": block_a, "block_b": block_b, "block_c": block_c,
-            "block_d": block_d, "block_s": block_s, "odoo": odoo}
+    plan = {
+        "block_a": block_a,
+        "block_b": block_b,
+        "block_c": block_c,
+        "block_d": block_d,
+        "block_s": block_s,
+        "odoo": odoo,
+    }
     with open(args.json, "w") as fh:
         json.dump(plan, fh)
     build_workbook(args.xlsx, plan, odoo, diag)
 
     a_gross = sum(r["gross"] for r in block_a)
     print(f"block A  {len(block_a):5d} rows  gross {a_gross:>20,.2f}  mdr {sum(r['mdr'] for r in block_a):>16,.2f}")
-    print(f"block B  {len(block_b):5d} rows  gross {sum(r['gross'] for r in block_b):>20,.2f}  mdr {sum(r['mdr'] for r in block_b):>16,.2f}")
+    print(
+        f"block B  {len(block_b):5d} rows  gross {sum(r['gross'] for r in block_b):>20,.2f}  mdr {sum(r['mdr'] for r in block_b):>16,.2f}"
+    )
     print(f"block C  {len(block_c):5d} rows        {sum(r['amount'] for r in block_c):>20,.2f}")
     print(f"block D  {len(block_d):5d} lines       {sum(r['debit'] for r in block_d):>20,.2f}")
     print(f"block S  {len(block_s):5d} statement lines")

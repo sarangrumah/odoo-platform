@@ -116,9 +116,7 @@ class TestPutaway(TransactionCase):
         engine = self.env["custom.putaway.engine"]
         empty = self.env["stock.warehouse"].browse()
         self.assertEqual(engine.propose_for_product(self.product, empty), [])
-        self.assertEqual(
-            engine.propose_for_product(self.env["product.product"].browse(), self.warehouse), []
-        )
+        self.assertEqual(engine.propose_for_product(self.env["product.product"].browse(), self.warehouse), [])
 
     def test_nearest_empty_strategy(self):
         rule = self._rule(

@@ -80,28 +80,30 @@ for company in companies:
     )
 
     if not account:
-        print("SKIP  company %s (%s): account %s not found in its CoA"
-              % (company.id, company.name, DP_ACCOUNT_CODE))
+        print("SKIP  company %s (%s): account %s not found in its CoA" % (company.id, company.name, DP_ACCOUNT_CODE))
         continue
 
     if account.account_type != EXPECTED_TYPE:
         # Guard: a receivable/revenue account here would silently recreate the
         # very problem this script fixes, and a payable type would also drag in
         # the due-date rule.
-        print("SKIP  company %s (%s): account %s has type %r, expected %r"
-              % (company.id, company.name, DP_ACCOUNT_CODE,
-                 account.account_type, EXPECTED_TYPE))
+        print(
+            "SKIP  company %s (%s): account %s has type %r, expected %r"
+            % (company.id, company.name, DP_ACCOUNT_CODE, account.account_type, EXPECTED_TYPE)
+        )
         continue
 
     if current and current.id == account.id:
-        print("OK    company %s (%s): already set to %s (id %s)"
-              % (company.id, company.name, DP_ACCOUNT_CODE, account.id))
+        print(
+            "OK    company %s (%s): already set to %s (id %s)" % (company.id, company.name, DP_ACCOUNT_CODE, account.id)
+        )
         continue
 
     was = ("%s (id %s)" % (current.code, current.id)) if current else "NOT SET"
-    print("SET   company %s (%s): %s -> %s (id %s, %s)"
-          % (company.id, company.name, was, DP_ACCOUNT_CODE, account.id,
-             account.account_type))
+    print(
+        "SET   company %s (%s): %s -> %s (id %s, %s)"
+        % (company.id, company.name, was, DP_ACCOUNT_CODE, account.id, account.account_type)
+    )
     if COMMIT:
         company.downpayment_account_id = account.id
     changed += 1

@@ -12,7 +12,10 @@ class CustomChangeRequestApproval(models.Model):
     _order = "request_id, tier"
 
     request_id = fields.Many2one(
-        "custom.change.request", required=True, ondelete="cascade", index=True,
+        "custom.change.request",
+        required=True,
+        ondelete="cascade",
+        index=True,
     )
     tier = fields.Integer(required=True)
     role = fields.Selection(
@@ -26,7 +29,8 @@ class CustomChangeRequestApproval(models.Model):
     user_id = fields.Many2one("res.users", string="Approver", required=True)
     state = fields.Selection(
         [("pending", "Pending"), ("approved", "Approved"), ("rejected", "Rejected")],
-        default="pending", required=True,
+        default="pending",
+        required=True,
     )
     decided_at = fields.Datetime(readonly=True)
     note = fields.Char()
@@ -40,17 +44,19 @@ class CustomChangeRequestApproval(models.Model):
         for line in self:
             if line.state != "pending":
                 raise UserError(_("This tier has already been decided."))
-            earlier = line.request_id.approval_ids.filtered(
-                lambda a: a.tier < line.tier and a.state != "approved"
-            )
+            earlier = line.request_id.approval_ids.filtered(lambda a: a.tier < line.tier and a.state != "approved")
             if earlier:
-                raise UserError(_(
-                    "Tier %(tier)s cannot approve before tier %(earlier)s has.",
-                    tier=line.tier, earlier=min(earlier.mapped("tier")),
-                ))
+                raise UserError(
+                    _(
+                        "Tier %(tier)s cannot approve before tier %(earlier)s has.",
+                        tier=line.tier,
+                        earlier=min(earlier.mapped("tier")),
+                    )
+                )
             line.write({"state": "approved", "decided_at": fields.Datetime.now()})
             line._pdp_audit_write(
-                "cr_tier_approve", line.id,
+                "cr_tier_approve",
+                line.id,
                 {"tier": line.tier, "user_id": line.user_id.id},
             )
             request = line.request_id

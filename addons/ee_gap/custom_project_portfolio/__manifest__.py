@@ -2,7 +2,7 @@
 {
     "name": "Custom Project - VAS Portfolio, Verticals & SLA Clock",
     "summary": "Brand verticals, portfolios, weekly sprints, Hold / Waiting-User-Verification "
-               "stages with per-stage SLA clock semantics, and weekly progress reports.",
+    "stages with per-stage SLA clock semantics, and weekly progress reports.",
     "description": """
 VAS PMO - Portfolio, Verticals & SLA Clock
 ==========================================

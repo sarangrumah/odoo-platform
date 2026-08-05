@@ -39,11 +39,20 @@ class WmsStockTakeReport(models.Model):
     _rec_name = "session_id"
     _order = "counted_at desc, id desc"
     _depends = {
-        "custom.cycle.count.line": ["session_id", "counted_at", "counter_user_id", "location_id",
-                                    "product_id", "lot_id", "status", "expected_qty",
-                                    "counted_qty", "variance_qty", "variance_pct"],
-        "custom.cycle.count.session": ["plan_id", "state", "warehouse_id", "scheduled_date",
-                                       "company_id"],
+        "custom.cycle.count.line": [
+            "session_id",
+            "counted_at",
+            "counter_user_id",
+            "location_id",
+            "product_id",
+            "lot_id",
+            "status",
+            "expected_qty",
+            "counted_qty",
+            "variance_qty",
+            "variance_pct",
+        ],
+        "custom.cycle.count.session": ["plan_id", "state", "warehouse_id", "scheduled_date", "company_id"],
         "product.product": ["default_code", "standard_price", "product_tmpl_id"],
     }
 
@@ -128,14 +137,17 @@ class WmsStockTakeReport(models.Model):
             {"label": "SKU", "value": lambda r: r.default_code, "width": 14},
             {"label": "Product", "value": lambda r: r.product_id.display_name, "width": 34},
             {"label": "Lot/Serial", "value": lambda r: r.lot_id.name, "width": 18},
-            {"label": "System Qty", "value": lambda r: r.expected_qty, "type": "number", "width": 12,
-             "total": True},
-            {"label": "Counted Qty", "value": lambda r: r.counted_qty, "type": "number", "width": 12,
-             "total": True},
+            {"label": "System Qty", "value": lambda r: r.expected_qty, "type": "number", "width": 12, "total": True},
+            {"label": "Counted Qty", "value": lambda r: r.counted_qty, "type": "number", "width": 12, "total": True},
             {"label": "Variance", "value": lambda r: r.variance_qty, "type": "number", "width": 12, "total": True},
             {"label": "Variance %", "value": lambda r: r.variance_pct, "type": "money", "width": 12},
             {"label": "Unit Cost", "value": lambda r: r.unit_cost, "type": "money", "width": 14},
-            {"label": "Variance Value", "value": lambda r: r.variance_value, "type": "money", "width": 16,
-             "total": True},
+            {
+                "label": "Variance Value",
+                "value": lambda r: r.variance_value,
+                "type": "money",
+                "width": 16,
+                "total": True,
+            },
             {"label": "Status", "value": lambda r: dict(STATUS).get(r.status, r.status), "width": 16},
         ]

@@ -15,7 +15,7 @@ a deliberate manual re-assignment survives. Idempotent.
 
 MODULE = "custom_pdp_retention"
 PRIVILEGE = "res_groups_privilege_pdp_retention"
-GROUPS = ['group_retention_admin']
+GROUPS = ["group_retention_admin"]
 
 
 def migrate(cr, version):
