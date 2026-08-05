@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Deliberately NOT noupdate: this has to run again on every upgrade.
+
+         The stage records in vaspmo_stage_data.xml are noupdate="1", so a database that
+         was installed before user_id was set explicitly keeps its stage owner forever
+         and the whole board stays invisible to everyone but the installing user. This
+         call repairs those, and is a no-op once the stages are already shared. -->
+    <function model="project.task.type" name="_vaspmo_make_stages_shared"/>
+</odoo>
