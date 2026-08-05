@@ -48,6 +48,12 @@
               action="action_aged_receivable_wizard"
               sequence="60"/>
 
+    <menuitem id="menu_custom_reports_ar_aging_export"
+              name="AR Aging Export"
+              parent="menu_custom_reports_root"
+              action="action_ar_aging_export_wizard"
+              sequence="65"/>
+
     <menuitem id="menu_custom_reports_aged_payable"
               name="Aged Payable"
               parent="menu_custom_reports_root"

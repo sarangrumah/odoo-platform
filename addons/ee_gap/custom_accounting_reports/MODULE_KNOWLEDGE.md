@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T07:43:22Z
 generator: bootstrap-v1
 module: custom_accounting_reports
-manifest_version: 19.0.0.15.0
+manifest_version: 19.0.0.17.0
 ---
 
 # custom_accounting_reports
@@ -31,6 +31,7 @@ All report models are `AbstractModel`s that inherit `custom.report.engine` (the 
 - `custom.report.partner.ledger` — Partner Ledger.
 - `custom.report.partner.card.base` — Partner card base, subclassed by `custom.report.payable.card` and `custom.report.receivable.card`.
 - `custom.report.aged.receivable` — Aged Receivable; `custom.report.aged.payable` inherits it.
+- `custom.report.ar.aging.export` — AR Aging Export. Inherits `custom.report.aged.receivable` for its open-line query, but replaces the layout: one **flat** row per open receivable line carrying the commercial trail (customer PO / SO / DO), the tax split (DPP / PPN / Full), the settlement figures (Original / Paid / Outstanding) and fifteen *overdue-day* buckets (`<= 0`, then 1…7 day by day, `8-14`, `15-30`, `31-60`, `61-90`, `91-120`, `121-360`, `> 360`). Reached from the **AR Aging Export** menu, which opens the Aged Receivable wizard with `ar_aging_export` in the context.
 - `custom.report.advance` — Uang Muka / Down-Payment ledger (auto-detects advance accounts).
 - `custom.report.sales` — Sales report.
 - `custom.report.tax` — Tax report (PPN / PPh subtotals; cross-references Coretax).
@@ -98,7 +99,14 @@ Report models are AbstractModels and generally have no stored fields; user input
 - Inside those flatteners, use `self.env._("fmt %s", arg)` — the module-level `_()` sniffs the caller frame for a language and logs a warning with a full stack trace **per row** when called from a lambda.
 - The `custom.report.advance` model auto-detects advance/down-payment accounts by name, which may not cover all chart-of-account edge cases.
 - `custom.report.aged.payable` inherits `custom.report.aged.receivable`, reusing its layout logic.
+- **`custom.report.ar.aging.export` inherits the aged-AR report but must NOT inherit its layout hooks.** It reuses `_open_lines` / `_account_type` only; `_build_lines`, `_flatten_for_screen`, `_classify_bucket` and `_xlsx_body` are all replaced, because the parent's versions walk a partner-grouped bucket matrix this report does not build. In particular `_flatten_for_screen` restores the *engine's* pass-through flattener by hand — calling `super()` there yields blank rows.
+- **The AR Aging Export ships no wizard of its own.** It drives `custom.report.aged.receivable.wizard` through the `ar_aging_export` context key set by its menu action, which swaps the footer buttons (`action_view_ar_aging` / `action_print_ar_aging` / `action_export_ar_aging_xlsx`) and hides `detail_mode`. That is deliberate: a new `TransientModel` would force an `-u` on every tenant that has this addon installed.
+- The AR Aging Export **PDF deliberately drops the 15 bucket columns** (34 columns is unreadable on paper) and prints the document trail + amount summary + overdue day count instead. The Excel export and the on-screen table carry the full grid.
+- Its `Tax No` column reads `x_custom_nsfp` through `_opt`, so it stays blank rather than crashing on tenants without `custom_coretax`; `No. SO` / `No. DO` degrade the same way when `sale` / `stock` are absent.
 - Every run performs a defensive raw-SQL insert into `pdp.audit_log`; failures are logged as warnings and do not block the report.
+- **`AR Aging Export` is a second aging report on purpose, not a duplicate.** `custom.report.aged.receivable` answers "how old is my AR" in seven wide buckets; `custom.report.ar.aging.export` (which inherits it) is Finance's per-document collection worklist — one row per open receivable line with the commercial trail (customer PO / SO / DO), the DPP/PPN split, original/paid/outstanding, and **fifteen** overdue buckets whose edges come from Finance's own workbook (day-by-day for the first week, then widening). Do not "simplify" the two into one.
+- **It reuses the Aged Receivable wizard rather than shipping its own.** This addon is installed on every tenant, so a new `TransientModel` would force an `-u` across all of them. The menu points at the same wizard with `{'ar_aging_export': 1}` in the context, and the view swaps the buttons on that key. Its `date_from` is pinned to 1970 — an aging worklist is as-of-a-date, not a period.
+- **A new report code must be registered in TWO places.** `REPORT_MODEL_MAP` in `models/custom_report_dispatch.py` *and* the `t-elif` chain in `reports/report_common.xml`. Miss the first and the code silently falls back to Trial Balance; miss the second and the PDF renders empty.
 - **`Sales Detail (XStore X24DN)` is archived on tenants without POS.** It reads `pos.order.line` and the `ri_src_*` columns `custom_retail_import_pos` adds, so on ARKA-AIM — which runs the importer without `point_of_sale` on purpose — it could only ever render empty. The menu cannot be gated declaratively (`groups="point_of_sale...."` would need a dependency this module must not have), so `hooks.sync_pos_only_menus` resolves `active` at install/upgrade, and `custom_retail_import_pos`'s own `post_init_hook` re-shows it if POS arrives later. Add any further POS-only menu to `hooks.POS_ONLY_MENUS`.
 - **This module's groups sit on its own `custom_accounting_reports.res_groups_privilege_accounting_reports` privilege** ("Accounting Reports") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
 

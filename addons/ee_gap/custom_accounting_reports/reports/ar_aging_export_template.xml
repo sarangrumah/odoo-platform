@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- AR Aging Export.
+             The 15 overdue buckets are deliberately left out of the PDF: at 34
+             columns they are unreadable on paper. The PDF prints the document
+             trail plus the amount summary and the overdue day count (which is
+             what the bucket is derived from anyway); the Excel export and the
+             on-screen table carry the full bucket grid. -->
+        <template id="report_ar_aging_export">
+            <t t-call="custom_accounting_reports.report_header"/>
+            <div style="font-size: 10px; margin-bottom: 6px;">
+                AR Aging Export at <strong t-out="date_to_id"/>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 8px;">
+                <thead>
+                    <tr style="background-color: #D9E1F2;">
+                        <th style="border: 1px solid #999; padding: 3px; text-align: left;">Customer Name</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: left;">No Invoice</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: left;">No. SO</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: left;">No. DO</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: center;">Invoice Date</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: center;">Due Date</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: right;">DPP</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: right;">PPN</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: center;">Overdue</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: center;">Aging Days</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: right;">Original</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: right;">Paid</th>
+                        <th style="border: 1px solid #999; padding: 3px; text-align: right;">Outstanding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="lines" t-as="row"
+                        t-att-style="'background-color: #F2F2F2; font-weight: bold;' if row.get('type') == 'grand_total' else ''">
+                        <td style="border: 1px solid #999; padding: 3px;" t-out="row['partner_name']"/>
+                        <td style="border: 1px solid #999; padding: 3px;" t-out="row.get('doc_no') or ''"/>
+                        <td style="border: 1px solid #999; padding: 3px;" t-out="row.get('so_no') or ''"/>
+                        <td style="border: 1px solid #999; padding: 3px;" t-out="row.get('do_no') or ''"/>
+                        <td style="border: 1px solid #999; padding: 3px; text-align: center;" t-out="row.get('invoice_date') or ''"/>
+                        <td style="border: 1px solid #999; padding: 3px; text-align: center;" t-out="row.get('due_date') or ''"/>
+                        <td style="border: 1px solid #999; padding: 3px; text-align: right;">
+                            <span t-out="row.get('dpp')"
+                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                        </td>
+                        <td style="border: 1px solid #999; padding: 3px; text-align: right;">
+                            <span t-out="row.get('ppn')"
+                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                        </td>
+                        <td style="border: 1px solid #999; padding: 3px; text-align: center;" t-out="row.get('overdue') or ''"/>
+                        <td style="border: 1px solid #999; padding: 3px; text-align: center;" t-out="row.get('aging_days') or ''"/>
+                        <td style="border: 1px solid #999; padding: 3px; text-align: right;">
+                            <span t-out="row.get('original_amount')"
+                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                        </td>
+                        <td style="border: 1px solid #999; padding: 3px; text-align: right;">
+                            <span t-out="row.get('paid_amount')"
+                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                        </td>
+                        <td style="border: 1px solid #999; padding: 3px; text-align: right;">
+                            <span t-out="row.get('outstanding_amount')"
+                                  t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <t t-call="custom_accounting_reports.report_footer_signature"/>
+        </template>
+    </data>
+</odoo>

@@ -29,6 +29,7 @@ REPORT_MODEL_MAP = {
     "cash_flow": "custom.report.cash.flow",
     "aged_receivable": "custom.report.aged.receivable",
     "aged_payable": "custom.report.aged.payable",
+    "ar_aging_export": "custom.report.ar.aging.export",
     "partner_ledger": "custom.report.partner.ledger",
     "payable_card": "custom.report.payable.card",
     "receivable_card": "custom.report.receivable.card",
