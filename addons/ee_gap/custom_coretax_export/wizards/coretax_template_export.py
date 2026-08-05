@@ -13,13 +13,18 @@ misspelled in the template itself, and Coretax matches on the header text.
 from __future__ import annotations
 
 import base64
-import io
 import logging
 
 from odoo import _, fields, models
 from odoo.addons.custom_tax_id.models.uom_inherit import CORETAX_UOM_FALLBACK
 from odoo.exceptions import UserError
 from odoo.tools import html2plaintext
+
+# The FK/OF layout and the helpers it shares with the other templates now live
+# in the builder mixin, so all four e-Faktur entry points run one copy. Re-export
+# the column tuples here: they were part of this module's namespace long before
+# the split, and importers outside the addon may still reach for them.
+from ..models.coretax_fk_builder import FK_COLUMNS, OF_COLUMNS  # noqa: F401
 
 _logger = logging.getLogger(__name__)
 
@@ -118,63 +123,6 @@ BPNR_COLUMNS = (
     "Referensi 5",
 )
 
-FK_COLUMNS = (
-    "FK",
-    "NPWP_WP",
-    "ID_TKU_WP",
-    "KD_JENIS_TRANSAKSI",
-    "FG_PENGGANTI",
-    "NOMOR_FAKTUR",
-    "MASA_PAJAK",
-    "TAHUN_PAJAK",
-    "TANGGAL_FAKTUR",
-    "NPWP",
-    "JENIS_IDENTITAS",
-    "NIK_NOMOR_PASSPORT",
-    "KODE_NEGARA",
-    "NAMA",
-    "EMAIL_PEMBELI",
-    "ALAMAT_PEMBELI",
-    "TKU_PEMBELI",
-    "JUMLAH_DPP",
-    "JUMLAH_DPP_LAIN",
-    "JUMLAH_PPN",
-    "JUMLAH_PPNBM",
-    "ID_KETERANGAN_TAMBAHAN",
-    "FG_UANG_MUKA",
-    "NOMOR_FAKTUR_UM_SEBELUMNYA",
-    "UANG_MUKA_DPP",
-    "UANG_MUKA_DPP_LAIN",
-    "UANG_MUKA_PPN",
-    "UANG_MUKA_PPNBM",
-    "REFERENSI",
-    "KODE_DOKUMEN_PENDUKUNG",
-    "BRANCH/FIELD_TAMBAHAN_1",
-    "FIELD_TAMBAHAN_2",
-    "FIELD_TAMBAHAN_3",
-    "FIELD_TAMBAHAN_4",
-    "FIELD_TAMBAHAN_5",
-)
-
-OF_COLUMNS = (
-    "OF",
-    "BARANG_JASA",
-    "KODE_OBJEK",
-    "NAMA",
-    "SATUAN",
-    "HARGA_SATUAN",
-    "JUMLAH_BARANG",
-    "HARGA_TOTAL",
-    "DISKON",
-    "CHECK_DPP_LAIN",
-    "DPP",
-    "DPP_LAIN",
-    "TARIF_PPN",
-    "PPN",
-    "TARIF_PPNBM",
-    "PPNBM",
-)
-
 RETUR_COLUMNS = (
     "Baris",
     "Nomor Faktur",
@@ -265,6 +213,10 @@ DOC_REF_OTHER = "07"
 
 class CoretaxTemplateExportWizard(models.TransientModel):
     _name = "custom.coretax.template.export.wizard"
+    # The FK/OF layout plus the render and formatting helpers are shared with the
+    # invoice-driven entry points; inheriting the builder keeps every one of them
+    # reachable on ``self``, exactly where the other _rows_* builders expect.
+    _inherit = "custom.coretax.fk.builder"
     _description = "Coretax Import File Export (DJP Templates)"
 
     template = fields.Selection(
@@ -324,18 +276,7 @@ class CoretaxTemplateExportWizard(models.TransientModel):
         self.ensure_one()
         return self.tanggal_pemotongan or self._period_bounds()[1]
 
-    @staticmethod
-    def _fmt_date(value):
-        """DJP asks for dd/mm/yyyy and matches it as text.
-
-        Writing a real date cell would let Excel's locale decide the rendering,
-        which is exactly how import files get silently rejected.
-        """
-        return value.strftime("%d/%m/%Y") if value else ""
-
-    @staticmethod
-    def _digits(value):
-        return (value or "").replace(".", "").replace("-", "").replace(" ", "")
+    # ``_fmt_date`` and ``_digits`` come from ``custom.coretax.fk.builder``.
 
     # Layouts that carry an "NPWP Penandatangan" column, and therefore cannot be
     # emitted without one. FK/OF and Retur Masukan have no such column, so they
@@ -508,128 +449,17 @@ class CoretaxTemplateExportWizard(models.TransientModel):
             order="invoice_date, name",
         )
 
-    @staticmethod
-    def _line_vat(line):
-        """(dpp, dpp_lain, ppn, tarif_ppn, uses_dpp_lain) for one invoice line.
-
-        ``dpp`` is the contractual base; ``dpp_lain`` is the PMK 131/2024 "nilai
-        lain" base the PPN is actually charged on. When no nilai-lain tax
-        applies the two coincide and CHECK_DPP_LAIN is 'N'.
-        """
-        dpp = line.price_subtotal
-        vat = line.tax_ids.filtered(lambda t: t.amount_type == "percent" and t.amount > 0)[:1]
-        if not vat:
-            return dpp, 0.0, 0.0, 0.0, False
-        dpp_lain = vat._dpp_adjust(dpp)
-        uses = vat.x_custom_dpp_method == "nilai_lain" and bool(vat.x_custom_dpp_factor)
-        return dpp, dpp_lain, dpp_lain * vat.amount / 100.0, vat.amount, uses
-
-    @staticmethod
-    def _item_jenis(line):
-        """ "Jenis Barang Jasa" for one OF item row: "Jasa" or "Barang".
-
-        A down-payment line carries no product of its own — core builds it from
-        a "fake" SO line — so reading ``line.product_id.type`` reports every
-        down payment as "Barang", even one paid against a pure services order.
-        Fall back to the products of the originating order, which is what the
-        down payment is actually for.
-
-        "Jasa" only when *every* product billed is a service: a mixed order has
-        no single truthful answer, and "Barang" is the safer of the two.
-        """
-        products = line.product_id
-        if not products and "sale_line_ids" in line._fields:
-            products = line.sale_line_ids.order_id.order_line.filtered(
-                lambda sol: sol.product_id and not sol.display_type and not sol.is_downpayment
-            ).product_id
-        if products and all(product.type == "service" for product in products):
-            return "Jasa"
-        return "Barang"
+    # ``_line_vat`` and ``_item_jenis`` come from ``custom.coretax.fk.builder``.
 
     def _rows_fk(self):
-        """One FK row per invoice, each followed by its OF item rows."""
-        npwp_wp, nitku, _signer, _user = self._pemotong()
-        rows = []
-        for move in self._vat_moves(("out_invoice",)):
-            partner = move.partner_id.commercial_partner_id
-            items = move.invoice_line_ids.filtered(lambda l: l.display_type == "product")
-            if not items:
-                continue
-            totals = [0.0, 0.0, 0.0]
-            of_rows = []
-            for line in items:
-                dpp, dpp_lain, ppn, tarif, uses = self._line_vat(line)
-                totals[0] += dpp
-                totals[1] += dpp_lain
-                totals[2] += ppn
-                of_rows.append(
-                    [
-                        "OF",
-                        self._item_jenis(line),
-                        # Kode objek barang/jasa: '000000' is the generic
-                        # catch-all in CODE_OF_GOODS / CODE_OF_SERVICES, and
-                        # what the client's own samples use throughout.
-                        "000000",
-                        line.product_id.name or line.name or "",
-                        line.product_uom_id.x_custom_coretax_code or CORETAX_UOM_FALLBACK,
-                        line.price_unit,
-                        line.quantity,
-                        line.price_unit * line.quantity,
-                        0,  # Diskon — already netted into price_subtotal
-                        "Y" if uses else "N",
-                        dpp,
-                        dpp_lain,
-                        tarif,
-                        ppn,
-                        0,
-                        0,
-                    ]
-                )
-            rows.append(
-                [
-                    "FK",
-                    npwp_wp,
-                    nitku,
-                    # KD_JENIS_TRANSAKSI 04 = "Other Tax Base" (DPP Nilai Lain),
-                    # 01 = to another party. Chosen per invoice from whether any
-                    # line actually rides a nilai-lain tax.
-                    "04" if any(r[9] == "Y" for r in of_rows) else "01",
-                    "0",  # FG_PENGGANTI — replacements go through the Faktur
-                    # Pengganti wizard, which owns the 01/02 status code.
-                    "",  # NOMOR_FAKTUR — assigned by Coretax on import
-                    self.masa_pajak,
-                    str(self.tahun_pajak),
-                    self._fmt_date(move.invoice_date),
-                    self._digits(partner.x_custom_npwp),
-                    "",  # JENIS_IDENTITAS
-                    "",  # NIK_NOMOR_PASSPORT
-                    partner.country_id.x_custom_code_alpha3 or "",
-                    partner.name or "",
-                    partner.email or "",
-                    self._partner_address(partner),
-                    partner._custom_coretax_nitku()[-6:] if partner.x_custom_npwp else "",
-                    totals[0],
-                    totals[1],
-                    totals[2],
-                    0,  # JUMLAH_PPNBM
-                    "",  # ID_KETERANGAN_TAMBAHAN
-                    "0",  # FG_UANG_MUKA
-                    "",
-                    0,
-                    0,
-                    0,
-                    0,
-                    move.ref or move.name or "",
-                    "",  # KODE_DOKUMEN_PENDUKUNG
-                    "HO",  # BRANCH
-                    "",
-                    "",
-                    "",
-                    "",
-                ]
-            )
-            rows.extend(of_rows)
-        return [FK_COLUMNS, OF_COLUMNS], rows
+        """One FK row per invoice, each followed by its OF item rows.
+
+        ``_vat_moves`` already bounds the search to the selected masa pajak and
+        to posted invoices, so the per-invoice MASA_PAJAK / TAHUN_PAJAK the
+        builder derives from ``invoice_date`` are provably the wizard's own
+        values — this path keeps emitting exactly what it did before.
+        """
+        return self._coretax_fk_rows(self._vat_moves(("out_invoice",)), company=self.company_id)
 
     def _rows_retur(self):
         """Retur Masukan: banner, Retur table, END sentinel, DetailRetur table.
@@ -737,42 +567,7 @@ class CoretaxTemplateExportWizard(models.TransientModel):
             )
         return [TAXLIST_COLUMNS], rows
 
-    @staticmethod
-    def _partner_address(partner):
-        parts = [
-            partner.street,
-            partner.street2,
-            partner.city,
-            partner.state_id.name,
-            partner.zip,
-        ]
-        return ", ".join([p for p in parts if p])
-
-    # ------------------------------------------------------------------ render
-
-    def _render(self, header_rows, data_rows, sheet_name):
-        """Header rows first (row 1..n), then data. No banner, no formatting."""
-        import xlsxwriter
-
-        output = io.BytesIO()
-        workbook = xlsxwriter.Workbook(output, {"in_memory": True})
-        sheet = workbook.add_worksheet(sheet_name[:31])
-        # Everything is written as text or number exactly as built; a bold
-        # header is cosmetic and Coretax ignores it.
-        bold = workbook.add_format({"bold": True})
-
-        row = 0
-        for header in header_rows:
-            for col, value in enumerate(header):
-                sheet.write(row, col, value, bold)
-            row += 1
-        for data in data_rows:
-            for col, value in enumerate(data):
-                sheet.write(row, col, value)
-            row += 1
-
-        workbook.close()
-        return output.getvalue()
+    # ``_partner_address`` and ``_render`` come from ``custom.coretax.fk.builder``.
 
     # ------------------------------------------------------------------ action
 
