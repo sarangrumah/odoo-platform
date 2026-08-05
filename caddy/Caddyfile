@@ -26,6 +26,69 @@
 	# connecting to a bare IP per RFC 6066 don't include SNI, which would
 	# otherwise cause Caddy to abort the handshake).
 	default_sni {$DOMAIN:localhost.localdomain}
+
+	servers {
+		# eal-hub.erajaya.com is proxied by Cloudflare, so every request on that
+		# host arrives from a Cloudflare edge address and `{remote_host}` is that
+		# edge, not the visitor. Without this, `{client_ip}` — and therefore every
+		# rate-limit bucket, every deny-by-IP decision, and the X-Forwarded-For
+		# Odoo records in its audit trail — collapses onto a handful of Cloudflare
+		# IPs shared by all visitors.
+		#
+		# Declaring the ranges as trusted is what makes CF-Connecting-IP safe to
+		# believe: an untrusted client can forge that header freely, so Caddy only
+		# honours it from these peers. The bare-IP site in this same file is NOT
+		# behind Cloudflare — connections there come direct, the peer is untrusted,
+		# and `{client_ip}` correctly falls back to the socket address.
+		#
+		# Ranges from https://www.cloudflare.com/ips-v4 + ips-v6 (fetched
+		# 2026-08-06). Cloudflare adds ranges occasionally; refresh them with
+		# scripts/security/refresh_cloudflare_ranges.sh — a stale list does not
+		# break traffic, it just makes those requests fall back to the edge IP.
+		trusted_proxies static \
+			173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 \
+			141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 \
+			197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 \
+			104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 \
+			2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 \
+			2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers CF-Connecting-IP X-Forwarded-For
+	}
+}
+
+# ============================================================
+# Response security headers — imported by every site in this file.
+#
+# The front door does NOT pass through the internal nginx hop (see the
+# reverse_proxy comment at the end of the (front_door) snippet), so the header
+# set in nginx/conf.d/odoo.conf never applied to eal-hub.erajaya.com. This
+# snippet is that header set, moved to the hop that actually serves the domain.
+#
+# Content-Security-Policy is deliberately NARROW: only the three directives
+# that cost nothing to enforce in front of Odoo's backoffice. `frame-ancestors`
+# is the one that matters for phishing — it stops an attacker's page from
+# framing the real login form and harvesting keystrokes over the top of it
+# (X-Frame-Options below says the same thing for older browsers). A full
+# script-src policy cannot be enforced here: Odoo's web client ships inline
+# handlers and evaluates compiled QWeb templates, so `unsafe-inline
+# unsafe-eval` would have to be granted anyway and the directive would buy
+# nothing while risking a white-screen backoffice.
+# ============================================================
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Content-Security-Policy "frame-ancestors 'self'; object-src 'none'; base-uri 'self'"
+		# Upstreams announce themselves otherwise: Next.js sends X-Powered-By and
+		# Odoo/Werkzeug sends a versioned Server header, which tells a scanner
+		# exactly which CVE list to work through.
+		-Server
+		-X-Powered-By
+	}
 }
 
 # ============================================================
@@ -43,6 +106,72 @@
 # ============================================================
 (front_door) {
 	encode zstd gzip
+	import security_headers
+
+	# Cap on request bodies. Odoo's own import wizard is the largest legitimate
+	# upload (base_import/execute_import shows up in the access log daily), and
+	# nginx allowed 200m for it, so this is the same ceiling — not a tightening.
+	# Its job is to stop an unauthenticated client from making a worker hold an
+	# arbitrarily large body in memory.
+	request_body {
+		max_size 200MB
+	}
+
+	# --- Known-scanner paths ------------------------------------------------
+	# This origin is scanned continuously for PHP webshells and leaked secrets;
+	# the access log for a single day carries hundreds of hits like
+	# /files/zehir.php, /files/xmlrpc.php, /files/vendor/phpunit/phpunit and
+	# /.env. Nothing in this stack is PHP and no dotfile is ever served, so
+	# every one of these is hostile by construction.
+	#
+	# Answering them here matters for three reasons: the request never reaches
+	# File Browser or Odoo, the WAF further down is not spending CPU on
+	# guaranteed-bad traffic, and the log line is attributable to one rule
+	# instead of being buried in application 404s.
+	#
+	# `path_regexp` with (?i) rather than `path`: `path` is case-sensitive and
+	# these scanners rotate case (/WP-admin, /.ENV) specifically to slip past
+	# literal matchers. This block is FIRST in the snippet on purpose — sibling
+	# `handle` blocks are mutually exclusive and evaluated in source order, so it
+	# shadows /files*, /portal/* and the Odoo catch-all below.
+	# `(^|/)` rather than `^/`: the scanners walk these names under EVERY prefix
+	# they find, and /files* answers 200 with the File Browser SPA for any path
+	# beneath it, so /files/vendor/phpunit/phpunit looked served. Anchoring at the
+	# root missed the entire subtree that was actually being probed.
+	@scanner_probe path_regexp (?i)(^|/)(\.env|\.git|\.aws|\.ssh|\.svn|\.hg|\.htaccess|\.htpasswd|\.vscode|\.idea|\.DS_Store|wp-|wordpress|phpmyadmin|pma/|myadmin|mysqladmin|adminer|vendor/phpunit|cgi-bin/|actuator/|solr/|jenkins/|hudson/|struts|manager/html|_ignition/|telescope/|debug/default/view)
+	handle @scanner_probe {
+		respond "Not found" 404 {
+			close
+		}
+	}
+	# Any .php URL, and any dotfile at any depth. Kept separate from the list
+	# above only because the pattern is positional rather than a prefix.
+	# `path_regexp` matches the PATH only, never the query string, so there is no
+	# point anchoring on `?`; `/` covers the /shell.php/foo form scanners use.
+	@php_or_dotfile path_regexp (?i)(\.php[0-9]?($|/)|/\.(env|git|aws|ssh|svn|hg|htaccess|htpasswd))
+	handle @php_or_dotfile {
+		respond "Not found" 404 {
+			close
+		}
+	}
+
+	# --- Odoo RPC endpoints -------------------------------------------------
+	# /xmlrpc/* and /jsonrpc are Odoo's unauthenticated-by-default RPC surface:
+	# one POST carries database, login, password and a model call, which makes
+	# them the preferred target for credential stuffing because there is no CSRF
+	# token, no session and no HTML to parse. Nothing legitimately calls them
+	# through this host — the whole access log contains a single /xmlrpc hit and
+	# it was a scanner, hub-portal's JSON-RPC goes over the internal network via
+	# its own BFF (/api/odoo/jsonrpc), and the MDM integration was specified on
+	# /api/mdm/*. Machine clients that need RPC should be given a tenant
+	# hostname, which reaches the public odoo instance directly.
+	#
+	# To reopen: delete this block. It shadows the Odoo catch-all, nothing else.
+	@odoo_rpc path /xmlrpc /xmlrpc/* /jsonrpc /jsonrpc/*
+	handle @odoo_rpc {
+		header Content-Type application/json
+		respond `{"error":"RPC is not exposed on this host"}` 403
+	}
 
 	# Erajaya Odoo Hub portal (landing + admin console) is mounted at /portal/*.
 	# The portal is a thin SPA + BFF; the BFF in turn signs HMAC calls to the
@@ -174,8 +303,15 @@
 	# this host.
 	reverse_proxy odoo-front:8069 {
 		header_up Host {host}
-		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
+		# {client_ip}, not {remote_host}: on eal-hub.erajaya.com the socket peer is
+		# a Cloudflare edge node. {client_ip} resolves to CF-Connecting-IP for the
+		# trusted ranges declared in the global block and to the socket address
+		# everywhere else. Sending exactly ONE value also removes the ambiguity in
+		# how Odoo reads the chain — werkzeug's ProxyFix (PROXY_MODE=True) takes the
+		# rightmost entry, so a single entry means the audit trail and the login
+		# rate-limit key agree on who the visitor was.
+		header_up X-Real-IP {client_ip}
+		header_up X-Forwarded-For {client_ip}
 		header_up X-Forwarded-Proto {scheme}
 		transport http {
 			read_timeout 720s
@@ -241,11 +377,19 @@ eal-hub.erajaya.com {
 {$DOMAIN:localhost.localdomain}:8443 {
 	encode zstd gzip
 	tls internal
+	import security_headers
 
 	reverse_proxy storefront:8080 {
 		header_up Host {host}
-		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
+		# {client_ip}, not {remote_host}: on eal-hub.erajaya.com the socket peer is
+		# a Cloudflare edge node. {client_ip} resolves to CF-Connecting-IP for the
+		# trusted ranges declared in the global block and to the socket address
+		# everywhere else. Sending exactly ONE value also removes the ambiguity in
+		# how Odoo reads the chain — werkzeug's ProxyFix (PROXY_MODE=True) takes the
+		# rightmost entry, so a single entry means the audit trail and the login
+		# rate-limit key agree on who the visitor was.
+		header_up X-Real-IP {client_ip}
+		header_up X-Forwarded-For {client_ip}
 		header_up X-Forwarded-Proto {scheme}
 	}
 
