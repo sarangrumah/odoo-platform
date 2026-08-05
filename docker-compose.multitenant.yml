@@ -36,14 +36,26 @@ services:
       tenant-orchestrator:
         condition: service_healthy
     environment:
-      ACME_EMAIL: ${ACME_EMAIL:-}
+      # The Caddyfile keys its whole site block on {$DOMAIN}. Without this the
+      # container falls back to the placeholder default (localhost.localdomain),
+      # every request to the real host matches no route, and Caddy answers an
+      # empty 200 (logged as "NOP") — a dead site that still looks healthy.
+      DOMAIN: ${DOMAIN:-localhost.localdomain}
+      # Must be non-empty: the Caddyfile default {$ACME_EMAIL:admin@localhost}
+      # only applies when the variable is UNSET, and `email` with no argument
+      # is a fatal parse error.
+      ACME_EMAIL: ${ACME_EMAIL:-admin@localhost}
     volumes:
-      - ./caddy/Caddyfile.multitenant:/etc/caddy/Caddyfile:ro
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./data/caddy/data:/data
       - ./data/caddy/config:/config
     ports:
       - "${CADDY_HTTP_PORT:-80}:80"
       - "${CADDY_HTTPS_PORT:-443}:443"
+      # Storefront TLS vhost — the Caddyfile serves {$DOMAIN}:8443 for the
+      # storefront. Omitting it here silently drops the storefront on the next
+      # `up`, since the container is recreated from THIS definition.
+      - "${CADDY_STOREFRONT_PORT:-8443}:8443"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:2019/config/"]
       interval: 30s
@@ -69,12 +81,18 @@ services:
       # DBFILTER above still scopes the visible list to the requested hostname.
       LIST_DB: "${ODOO_PUBLIC_LIST_DB:-False}"
 
-  # Private management Odoo instance used ONLY by the tenant-orchestrator to
-  # provision/drop/upgrade per-tenant databases. Shares postgres + redis with
-  # the public ``odoo`` service (so DBs created here are immediately visible
-  # to public traffic) but has LIST_DB=True and DBFILTER=^.*$ to expose the
-  # database manager + per-DB JSON-RPC. No host port is published — reachable
-  # only via the odoo-net bridge from the orchestrator container.
+  # Management Odoo instance. Provisions/drops/upgrades per-tenant databases
+  # for the tenant-orchestrator. Shares postgres + redis with the public
+  # ``odoo`` service (so DBs created here are immediately visible to public
+  # traffic) but has LIST_DB=True and DBFILTER=^.*$ to expose the database
+  # manager + per-DB JSON-RPC.
+  #
+  # NO LONGER PRIVATE. caddy/Caddyfile routes the whole {$DOMAIN} (bare-IP)
+  # host here, because the public odoo's dbfilter = ^%d$ cannot serve any DB
+  # on that host and 303s every path to /web/database/selector. That makes the
+  # database manager -- and a login into any tenant DB -- reachable from the
+  # internet, guarded by ODOO_ADMIN_PASSWD / per-DB credentials alone. Add a
+  # `remote_ip` matcher to that Caddy block to scope it back down.
   odoo-mgmt:
     image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo:latest
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo-mgmt
@@ -126,7 +144,10 @@ services:
       # Management instance MUST expose the database manager + accept any DB.
       LIST_DB: "True"
       DBFILTER: "^.*$$"
-      PROXY_MODE: "False"
+      # Caddy fronts this instance for the bare-IP host (see caddy/Caddyfile):
+      # it terminates TLS, so without proxy_mode Odoo builds its redirects from
+      # the internal http:// hop and bounces the browser out of https.
+      PROXY_MODE: "True"
       WITHOUT_DEMO: ${WITHOUT_DEMO:-all}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
@@ -149,10 +170,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
-    # ADMIN-ONLY port published on loopback. Database manager + cross-tenant
-    # JSON-RPC live here. Production hardening: leave as 127.0.0.1 binding so
-    # the manager is never publicly reachable. The default 18079 is overrideable
-    # via ODOO_MGMT_PORT in .env.
+    # Loopback port for admin access without going through Caddy (SSH tunnel:
+    # ssh -L 18079:127.0.0.1:18079 <host>). Keep the 127.0.0.1 binding — it is
+    # not what protects the manager any more (Caddy fronts this instance on the
+    # {$DOMAIN} host, see the note above), but it keeps this direct port off the
+    # LAN. The default 18079 is overrideable via ODOO_MGMT_PORT in .env.
     ports:
       - "127.0.0.1:${ODOO_MGMT_PORT:-18079}:8069"
     networks: [odoo-net]
