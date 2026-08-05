@@ -22,7 +22,7 @@ class HelpdeskTicket(models.Model):
         partner = self.partner_id
         if not partner:
             raise UserError(_("Ticket has no customer set."))
-        phone = partner.mobile or partner.phone
+        phone = partner._whatsapp_phone()
         if not phone:
             raise UserError(_("Customer %s has no phone/mobile set; cannot send WhatsApp.") % partner.display_name)
 

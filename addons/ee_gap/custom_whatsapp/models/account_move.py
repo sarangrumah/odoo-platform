@@ -17,7 +17,7 @@ class AccountMove(models.Model):
             raise UserError(_("Only customer invoices/refunds can be sent via WhatsApp."))
 
         partner = self.partner_id
-        phone = partner.mobile or partner.phone
+        phone = partner._whatsapp_phone()
         if not phone:
             raise UserError(_("Customer %s has no phone/mobile set; cannot send WhatsApp.") % partner.display_name)
 

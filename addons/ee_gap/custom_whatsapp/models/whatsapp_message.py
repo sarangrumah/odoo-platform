@@ -11,6 +11,8 @@ import uuid
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+from .res_partner import available_phone_search_fields
+
 _logger = logging.getLogger(__name__)
 
 
@@ -25,6 +27,24 @@ _CATEGORY_PURPOSE = {
 # Above this count, action_send_bulk dispatches via queue_job instead of
 # blocking the calling request.
 _BULK_ASYNC_THRESHOLD = 5
+
+
+def _mask_phone(number: str | None) -> str:
+    """Render a recipient number for a log line without disclosing it.
+
+    ``+6281234567890`` -> ``62********890``. Enough to correlate a log entry
+    with a record while reading, not enough to contact anyone or to identify
+    the subscriber from the log alone.
+
+    No ``+`` is prepended: the input may be in local form (``0812...``) and a
+    leading plus would imply a country code that is not there.
+    """
+    digits = "".join(ch for ch in (number or "") if ch.isdigit())
+    if not digits:
+        return "(none)"
+    if len(digits) <= 5:
+        return "*" * len(digits)
+    return f"{digits[:2]}{'*' * (len(digits) - 5)}{digits[-3:]}"
 
 
 class WhatsappMessage(models.Model):
@@ -192,12 +212,18 @@ class WhatsappMessage(models.Model):
         # Sandbox mode: synthesise a message id and short-circuit.
         if account.sandbox_mode:
             fake_id = f"sandbox-{uuid.uuid4().hex[:16]}"
+            # The recipient number is masked and the body is reduced to its
+            # length: sandbox mode is normally exercised with real customer
+            # data during UAT, and Odoo's log is not treated as a sensitive
+            # store. The message id and the record are how you trace a send;
+            # neither needs the subscriber's number or the text itself.
             _logger.info(
-                "[whatsapp sandbox] account=%s to=%s template=%s body=%s -> %s",
+                "[whatsapp sandbox] account=%s msg_id=%s to=%s template=%s body_len=%s -> %s",
                 account.name,
-                self.to_phone,
+                self.id,
+                _mask_phone(self.to_phone),
                 self.template_id.name if self.template_id else None,
-                (self.body or "")[:120],
+                len(self.body or ""),
                 fake_id,
             )
             self.write(
@@ -350,15 +376,19 @@ class WhatsappMessage(models.Model):
         else:
             body = f"[{msg_type} message]"
 
-        # Try to resolve the partner by phone.
-        partner = (
-            self.env["res.partner"]
-            .sudo()
-            .search(
-                ["|", ("phone", "ilike", from_phone[-9:]), ("mobile", "ilike", from_phone[-9:])],
-                limit=1,
-            )
-        )
+        # Try to resolve the partner by phone. The domain is built from the
+        # fields this build actually has: Odoo 19 dropped res.partner.mobile,
+        # and naming a missing field in a domain raises ValueError rather than
+        # simply not matching -- which took every inbound message down.
+        # phone_sanitized is searched first because `phone` keeps whatever the
+        # user typed, and a last-9-digits match cannot see past separators.
+        partner = self.env["res.partner"]
+        tail = from_phone[-9:]
+        fields_to_try = available_phone_search_fields(partner)
+        if tail and fields_to_try:
+            domain = ["|"] * (len(fields_to_try) - 1)
+            domain += [(fname, "ilike", tail) for fname in fields_to_try]
+            partner = partner.sudo().search(domain, limit=1)
 
         vals = {
             "account_id": account.id,
