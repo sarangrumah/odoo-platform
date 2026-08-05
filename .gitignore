@@ -81,6 +81,17 @@ scripts/tenants/levis/out_*.csv
 # post_init_hook, so those must stay committed.
 imports/arka_aim/
 
+# ----- UA e-commerce WMS source workbook (client-supplied, local-only) -----
+# The extracted CSVs under imports/ua-ecommerce/ ARE committed; the .xlsx they
+# come from is not. Regenerate with scripts/tenants/wms_ecomm/01_extract_workbook.py.
+imports/ua-ecommerce/source/
+
+# ----- Local working artifacts of the /opt runtime checkout (never committed) -----
+# Ad-hoc DB dumps taken before risky migrations, and COA scratch exports. Both are
+# rooted at the repo top level so the rules stay anchored with a leading slash.
+/backups/
+/scratch_coa/
+
 # ----- Levis raw XStore migration source data (large, local-only) -----
 # The "Mentahan" (raw) XStore export + its zip are ~56MB of source data for the
 # one-off migration extract. Keep them local; do not bloat git history. The
