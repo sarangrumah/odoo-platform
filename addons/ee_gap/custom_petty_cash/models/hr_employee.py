@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Per-employee analytic account so a single petty-cash account can be sliced
 by employee (a dedicated "Employee" analytic plan, separate from the
-"Operating Unit" plan)."""
+"Operating Unit" plan), plus the employee-level advance ceiling."""
 
 from __future__ import annotations
 
@@ -21,13 +21,33 @@ class HrEmployee(models.Model):
         "petty-cash journal items so the shared advance account can be "
         "reported per employee.",
     )
+    pc_advance_limit = fields.Monetary(
+        string="Cash Advance Ceiling",
+        currency_field="pc_currency_id",
+        help="Maximum total open advances this employee may hold, in company "
+        "currency. 0 = fall through to the job position's ceiling, then the "
+        "advance type's.",
+    )
+    pc_currency_id = fields.Many2one("res.currency", compute="_compute_pc_currency_id")
+
+    def _compute_pc_currency_id(self):
+        for rec in self:
+            rec.pc_currency_id = rec.company_id.currency_id or self.env.company.currency_id
 
     def _pc_employee_plan(self):
-        """Get-or-create the dedicated 'Employee' analytic plan."""
+        """Get-or-create the dedicated 'Employee' analytic plan.
+
+        The plan name is configurable so a tenant whose analytic plans are
+        already named differently does not end up with a second, near-duplicate
+        plan.
+        """
+        plan_name = (
+            self.env["ir.config_parameter"].sudo().get_param("custom_petty_cash.employee_plan_name") or PC_EMPLOYEE_PLAN
+        )
         Plan = self.env["account.analytic.plan"].sudo()
-        plan = Plan.search([("name", "=", PC_EMPLOYEE_PLAN)], limit=1)
+        plan = Plan.search([("name", "=", plan_name)], limit=1)
         if not plan:
-            plan = Plan.create({"name": PC_EMPLOYEE_PLAN})
+            plan = Plan.create({"name": plan_name})
         return plan
 
     def _pc_get_analytic_account(self):

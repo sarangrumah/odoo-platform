@@ -57,10 +57,14 @@
                         <group>
                             <group>
                                 <field name="employee_id" readonly="state != 'draft'"/>
+                                <field name="advance_type_id" readonly="state != 'draft'"
+                                       options="{'no_create': True}"/>
+                                <field name="pc_ou_allowed_ids" invisible="1"/>
                                 <field name="l10n_ou_analytic_id" readonly="state != 'draft'"/>
                                 <field name="purpose" readonly="state not in ('draft', 'to_approve')"/>
                                 <field name="company_id" groups="base.group_multi_company"/>
-                                <field name="currency_id" invisible="1"/>
+                                <field name="currency_id" groups="base.group_multi_currency"/>
+                                <field name="company_currency_id" invisible="1"/>
                             </group>
                             <group>
                                 <field name="request_date" readonly="state != 'draft'"/>
@@ -79,6 +83,8 @@
                                 <field name="amount_disbursed"/>
                                 <field name="amount_realized"/>
                                 <field name="amount_outstanding"/>
+                                <field name="amount_outstanding_company"
+                                       invisible="currency_id == company_currency_id"/>
                             </group>
                         </group>
                         <notebook>
@@ -121,11 +127,14 @@
                       decoration-muted="state in ('settled', 'cancelled')">
                     <field name="name"/>
                     <field name="employee_id"/>
+                    <field name="advance_type_id" optional="show"/>
                     <field name="l10n_ou_analytic_id" optional="show"/>
                     <field name="request_date"/>
                     <field name="realization_deadline" optional="show"/>
                     <field name="amount_requested" sum="Requested"/>
-                    <field name="amount_outstanding" sum="Outstanding"/>
+                    <field name="amount_outstanding"/>
+                    <field name="amount_outstanding_company" sum="Outstanding" optional="show"/>
+                    <field name="company_currency_id" column_invisible="1"/>
                     <field name="is_overdue" optional="hide"/>
                     <field name="currency_id" column_invisible="1"/>
                     <field name="state" widget="badge"/>
@@ -149,6 +158,7 @@
                                     <span t-if="record.is_overdue.raw_value" class="float-end badge text-bg-danger">Overdue</span>
                                 </div>
                                 <div><field name="employee_id"/></div>
+                                <div class="text-muted"><field name="advance_type_id"/></div>
                                 <div class="text-muted"><field name="l10n_ou_analytic_id"/></div>
                                 <div>
                                     Outstanding: <field name="amount_outstanding"/>
@@ -168,6 +178,7 @@
                 <search>
                     <field name="name"/>
                     <field name="employee_id"/>
+                    <field name="advance_type_id"/>
                     <field name="l10n_ou_analytic_id"/>
                     <filter name="my_requests" string="My Requests"
                             domain="[('employee_id.user_id', '=', uid)]"/>
@@ -184,6 +195,7 @@
                             domain="[('state', 'in', ('disbursed', 'in_realization')), ('amount_outstanding', '!=', 0)]"/>
                     <group>
                         <filter name="group_employee" string="Employee" context="{'group_by': 'employee_id'}"/>
+                        <filter name="group_type" string="Type" context="{'group_by': 'advance_type_id'}"/>
                         <filter name="group_ou" string="Operating Unit" context="{'group_by': 'l10n_ou_analytic_id'}"/>
                         <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
                     </group>
@@ -192,13 +204,13 @@
         </record>
 
         <record id="action_petty_cash_request" model="ir.actions.act_window">
-            <field name="name">Petty Cash Requests</field>
+            <field name="name">Cash Advance Requests</field>
             <field name="res_model">petty.cash.request</field>
             <field name="view_mode">kanban,list,form</field>
             <field name="search_view_id" ref="view_petty_cash_request_search"/>
             <field name="context">{'search_default_my_requests': 1}</field>
             <field name="help" type="html">
-                <p class="o_view_nocontent_smiling_face">Create a petty cash request</p>
+                <p class="o_view_nocontent_smiling_face">Create a cash advance request</p>
             </field>
         </record>
     </data>

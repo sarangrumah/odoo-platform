@@ -16,5 +16,6 @@ REPORT_MODEL_MAP.update(
     {
         "petty_cash_outstanding": "petty.cash.report.outstanding",
         "petty_cash_aging": "petty.cash.report.aging",
+        "petty_cash_statement": "petty.cash.report.statement",
     }
 )

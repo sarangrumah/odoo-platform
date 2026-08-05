@@ -25,6 +25,7 @@ class PettyCashReportOutstanding(models.AbstractModel):
         return [
             {"header": "Employee", "field": "employee_name", "kind": "text", "width": 26},
             {"header": "Reference", "field": "reference", "kind": "text", "width": 18},
+            {"header": "Type", "field": "type_name", "kind": "text", "width": 16},
             {"header": "Operating Unit", "field": "ou_name", "kind": "text", "width": 22},
             {"header": "Request Date", "field": "request_date", "kind": "date", "width": 12},
             {"header": "Deadline", "field": "deadline", "kind": "date", "width": 12},
@@ -42,6 +43,8 @@ class PettyCashReportOutstanding(models.AbstractModel):
         ]
         if filters.get("employee_ids"):
             domain.append(("employee_id", "in", filters["employee_ids"]))
+        if filters.get("advance_type_ids"):
+            domain.append(("advance_type_id", "in", filters["advance_type_ids"]))
         return self.env["petty.cash.request"].search(domain, order="employee_id, request_date, id")
 
     def _build_lines(self, filters):
@@ -64,19 +67,20 @@ class PettyCashReportOutstanding(models.AbstractModel):
                     "type": "data",
                     "employee_name": emp.name or "—",
                     "reference": req.name,
+                    "type_name": req.advance_type_id.name or "",
                     "ou_name": req.l10n_ou_analytic_id.name or "",
                     "request_date": req.request_date,
                     "deadline": req.realization_deadline,
                     "age_days": str(max(age, 0)),
                     "disbursed": req.amount_disbursed,
                     "realized": req.amount_realized,
-                    "outstanding": req.amount_outstanding,
+                    "outstanding": req.amount_outstanding_company,
                     "status": "Overdue" if overdue else "Open",
                 }
             )
             bucket["disbursed"] += req.amount_disbursed
             bucket["realized"] += req.amount_realized
-            bucket["outstanding"] += req.amount_outstanding
+            bucket["outstanding"] += req.amount_outstanding_company
 
         lines = []
         g_disb = g_real = g_out = 0.0

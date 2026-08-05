@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Petty cash request — pengajuan + pencairan (Bank Out) + settlement.
+"""Cash advance / petty cash request — pengajuan + pencairan (Bank Out) + settlement.
 
 Lifecycle::
 
@@ -9,14 +9,18 @@ Lifecycle::
 Approval routes through the generic ``custom_approval_engine`` matrix; when
 no matrix matches the request is approved directly by a Finance user.
 
-Accounting (per employee, via the Petty Cash Advance account)::
+Accounting (per employee, via the advance account of the request's type)::
 
-    Disburse    Dr Uang Muka Petty Cash / Cr Bank
+    Disburse    Dr Uang Muka / Cr Bank
     Realize 3rd Dr Expense+PPN / Cr AP   then   Dr AP / Cr Uang Muka
     Realize exp Dr Expense / Cr Uang Muka
     Return      Dr Bank / Cr Uang Muka
     Reimburse   Dr Uang Muka / Cr Bank
     Settle      advance lines net to zero and are reconciled
+
+Every generated journal item carries ``currency_id`` + ``amount_currency`` so a
+foreign-currency advance books its IDR counter-value correctly and settles
+through the company's exchange-difference journal.
 """
 
 from __future__ import annotations
@@ -26,12 +30,15 @@ from datetime import timedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+DEFAULT_OU_PLAN = "Operating Unit"
+
 
 class PettyCashRequest(models.Model):
     _name = "petty.cash.request"
-    _description = "Petty Cash Request"
+    _description = "Cash Advance / Petty Cash Request"
     _inherit = ["mail.thread", "mail.activity.mixin", "approval.mixin", "pdp.audited.mixin"]
     _order = "request_date desc, id desc"
+    _check_company_auto = True
 
     name = fields.Char(
         string="Reference",
@@ -60,12 +67,33 @@ class PettyCashRequest(models.Model):
         required=True,
         default=lambda self: self.env.company.currency_id,
     )
+    company_currency_id = fields.Many2one(related="company_id.currency_id", string="Company Currency")
+    advance_type_id = fields.Many2one(
+        "petty.cash.type",
+        string="Type",
+        index=True,
+        tracking=True,
+        check_company=True,
+        domain="[('company_id', '=', company_id)]",
+        default=lambda self: self._default_advance_type(),
+        help="Kind of advance — drives which advance account, journals and "
+        "limits apply. Leave empty to fall back to the company-wide "
+        "configuration in Accounting Settings.",
+    )
+    advance_type_kind = fields.Selection(related="advance_type_id.kind", store=True, string="Type Kind")
+    pc_ou_allowed_ids = fields.Many2many(
+        "account.analytic.account",
+        string="Allowed Operating Units",
+        compute="_compute_pc_ou_allowed",
+        compute_sudo=True,
+        help="Technical: drives the Operating Unit domain. See _compute_pc_ou_allowed.",
+    )
     l10n_ou_analytic_id = fields.Many2one(
         "account.analytic.account",
         string="Operating Unit",
-        domain="[('plan_id.name', '=', 'Operating Unit')]",
+        domain="[('id', 'in', pc_ou_allowed_ids)]",
         tracking=True,
-        help="Operating Unit the petty cash is requested for. Stamped onto "
+        help="Operating Unit the advance is requested for. Stamped onto "
         "every generated journal item when the localization is installed.",
     )
     request_date = fields.Date(
@@ -114,9 +142,18 @@ class PettyCashRequest(models.Model):
         currency_field="currency_id",
         compute="_compute_amounts",
         store=True,
-        help="Net balance of the advance account still tied to this request "
-        "(positive = employee holds cash to return; negative = company owes "
-        "the employee).",
+        help="Net balance of the advance account still tied to this request, "
+        "in the request's own currency (positive = employee holds cash to "
+        "return; negative = company owes the employee).",
+    )
+    amount_outstanding_company = fields.Monetary(
+        string="Outstanding (Company Currency)",
+        currency_field="company_currency_id",
+        compute="_compute_amounts",
+        store=True,
+        help="The same balance in company currency. This is the figure to "
+        "aggregate — summing amount_outstanding across requests in different "
+        "currencies is meaningless.",
     )
 
     state = fields.Selection(
@@ -151,7 +188,10 @@ class PettyCashRequest(models.Model):
         "move_ids.state",
         "move_ids.line_ids.debit",
         "move_ids.line_ids.credit",
+        "move_ids.line_ids.amount_currency",
         "advance_account_id",
+        "advance_type_id",
+        "currency_id",
         "realization_ids.state",
         "realization_ids.amount_total",
     )
@@ -160,11 +200,46 @@ class PettyCashRequest(models.Model):
             adv_lines = rec._advance_move_lines(posted_only=True)
             debit = sum(adv_lines.mapped("debit"))
             credit = sum(adv_lines.mapped("credit"))
-            rec.amount_disbursed = debit
-            rec.amount_outstanding = debit - credit
+            rec.amount_outstanding_company = debit - credit
+            if rec.currency_id == rec.company_id.currency_id:
+                rec.amount_disbursed = debit
+                rec.amount_outstanding = debit - credit
+            else:
+                # Foreign-currency advance: debit-credit is the IDR
+                # counter-value; showing it under the request's own currency
+                # label would be off by the exchange rate. Read the document
+                # amounts instead.
+                same = adv_lines.filtered(lambda line: line.currency_id == rec.currency_id)
+                rec.amount_disbursed = sum(line.amount_currency for line in same if line.amount_currency > 0)
+                rec.amount_outstanding = sum(same.mapped("amount_currency"))
             rec.amount_realized = sum(
                 rec.realization_ids.filtered(lambda r: r.state == "posted").mapped("amount_total")
             )
+
+    @api.depends("company_id")
+    def _compute_pc_ou_allowed(self):
+        """Resolve which analytic accounts the Operating Unit field may offer.
+
+        The plan was hard-coded to "Operating Unit", which is how the Levi's
+        localization names it. ARKA-AIM has no such plan (only "Project"), so
+        the field was a dead control there. The plan name is now a parameter,
+        and an unresolvable plan *widens* to every analytic account rather than
+        blocking the field — a misconfiguration should not make the document
+        un-fillable.
+        """
+        params = self.env["ir.config_parameter"].sudo()
+        plan_name = (
+            params.get_param("custom_petty_cash.ou_plan_name")
+            or params.get_param("custom_accounting_reports.branch_plan_name")
+            or DEFAULT_OU_PLAN
+        )
+        Analytic = self.env["account.analytic.account"]
+        plan = self.env["account.analytic.plan"].sudo().search([("name", "=", plan_name)], limit=1)
+        for rec in self:
+            domain = [("plan_id", "=", plan.id)] if plan else []
+            if rec.company_id:
+                domain = domain + ["|", ("company_id", "=", False), ("company_id", "=", rec.company_id.id)]
+            rec.pc_ou_allowed_ids = Analytic.search(domain)
 
     def _compute_is_overdue(self):
         today = fields.Date.context_today(self)
@@ -201,19 +276,111 @@ class PettyCashRequest(models.Model):
             lines = lines.filtered(lambda l: l.parent_state == "posted")
         return lines
 
+    # Resolution is always request → type → company. The ``res.company``
+    # fields predate ``petty.cash.type`` and are kept as the bottom of the
+    # chain so tenants configured before 0.5.0 keep working untouched with
+    # ``advance_type_id`` unset.
     def _pc_advance_account(self, soft=False):
         self.ensure_one()
-        account = self.advance_account_id or self.company_id.petty_cash_advance_account_id
+        account = (
+            self.advance_account_id
+            or self.advance_type_id.advance_account_id
+            or self.company_id.petty_cash_advance_account_id
+        )
         if not account and not soft:
-            raise UserError(_("Set a Petty Cash Advance account on the request or in Accounting Settings first."))
+            raise UserError(_("Set an Advance account on the request, on its Type, or in Accounting Settings first."))
         return account
 
     def _pc_bank_journal(self):
         self.ensure_one()
-        journal = self.bank_journal_id or self.company_id.petty_cash_bank_out_journal_id
+        journal = (
+            self.bank_journal_id
+            or self.advance_type_id.bank_out_journal_id
+            or self.company_id.petty_cash_bank_out_journal_id
+        )
         if not journal:
-            raise UserError(_("Set a Petty Cash Bank-Out journal on the request or in Accounting Settings first."))
+            raise UserError(_("Set a Bank-Out journal on the request, on its Type, or in Accounting Settings first."))
+        # A journal pinned to one currency forces that currency onto its
+        # liquidity line; a mismatch fails deep inside account.move with an
+        # opaque message, so refuse it up front.
+        if journal.currency_id and journal.currency_id != self.currency_id:
+            raise UserError(
+                _(
+                    "Journal %(journal)s only accepts %(jcur)s, but this request is in %(rcur)s.",
+                    journal=journal.name,
+                    jcur=journal.currency_id.name,
+                    rcur=self.currency_id.name,
+                )
+            )
         return journal
+
+    def _pc_payment_journal(self):
+        """Journal used to pay third-party bills out of the advance.
+
+        Resolved here rather than on the realization so every account/journal
+        lookup is type-aware in one place.
+        """
+        self.ensure_one()
+        journal = self.advance_type_id.payment_journal_id or self.company_id.petty_cash_payment_journal_id
+        if not journal:
+            raise UserError(
+                _(
+                    "Set a Payment journal on the advance Type or in Accounting Settings "
+                    "before posting third-party lines."
+                )
+            )
+        return journal
+
+    def _pc_expense_journal(self):
+        self.ensure_one()
+        journal = self.advance_type_id.expense_journal_id or self.company_id.petty_cash_expense_journal_id
+        if not journal:
+            journal = self.env["account.journal"].search(
+                [("type", "=", "general"), ("company_id", "=", self.company_id.id)], limit=1
+            )
+        if not journal:
+            raise UserError(_("No general journal found for the expense entry. Configure an Expense journal."))
+        return journal
+
+    # ------------------------------------------------------------------
+    # Currency helpers
+    # ------------------------------------------------------------------
+    def _pc_conv(self, amount, date=None):
+        """Convert ``amount`` from the request currency to company currency."""
+        self.ensure_one()
+        company_currency = self.company_id.currency_id
+        if self.currency_id == company_currency:
+            return company_currency.round(amount)
+        return self.currency_id._convert(
+            amount,
+            company_currency,
+            self.company_id,
+            date or fields.Date.context_today(self),
+        )
+
+    def _pc_leg(self, amount_cur, amount_comp):
+        """Move-line ``vals`` fragment for one side of a balanced pair.
+
+        ``amount_cur`` is signed in the *request* currency and ``amount_comp``
+        signed in *company* currency, both positive on the debit side — Odoo's
+        invariant is ``sign(amount_currency) == sign(debit - credit)``.
+
+        ``currency_id`` is always set, even when it equals the company
+        currency: Odoo stores it on same-currency lines too, and leaving it
+        empty parks ``amount_currency`` at 0, which breaks foreign-currency
+        reconciliation and the FX revaluation report.
+
+        Callers must convert **once** per pair and pass the two halves of that
+        single figure, otherwise independent rounding leaves the move unbalanced
+        by a cent.
+        """
+        self.ensure_one()
+        return {
+            "currency_id": self.currency_id.id,
+            "amount_currency": amount_cur,
+            "debit": amount_comp if amount_comp > 0 else 0.0,
+            "credit": -amount_comp if amount_comp < 0 else 0.0,
+        }
 
     def _pc_employee_partner(self):
         self.ensure_one()
@@ -271,18 +438,60 @@ class PettyCashRequest(models.Model):
     # ------------------------------------------------------------------
     # CRUD / onchange
     # ------------------------------------------------------------------
+    @api.model
+    def _default_advance_type(self):
+        Type = self.env["petty.cash.type"]
+        company = self.env.company
+        return Type.search([("company_id", "=", company.id), ("is_default", "=", True)], limit=1) or Type.search(
+            [("company_id", "=", company.id)], limit=1
+        )
+
+    def _pc_type_sequence_code(self, vals):
+        """Sequence to number a request created with ``vals``."""
+        type_id = vals.get("advance_type_id")
+        if type_id:
+            pc_type = self.env["petty.cash.type"].browse(type_id)
+            if pc_type.sequence_id:
+                return pc_type.sequence_id
+        return self.env["ir.sequence"].search([("code", "=", "petty.cash.request")], limit=1)
+
+    def _pc_assign_default_type(self):
+        """Back-fill ``advance_type_id`` on records that predate the field."""
+        Type = self.env["petty.cash.type"]
+        for rec in self.filtered(lambda r: not r.advance_type_id):
+            rec.advance_type_id = Type.search(
+                [("company_id", "=", rec.company_id.id), ("is_default", "=", True)], limit=1
+            ) or Type.search([("company_id", "=", rec.company_id.id)], limit=1)
+        return True
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals.get("name") == _("New"):
-                vals["name"] = self.env["ir.sequence"].next_by_code("petty.cash.request") or _("New")
+                sequence = self._pc_type_sequence_code(vals)
+                vals["name"] = (sequence and sequence.next_by_id()) or _("New")
         return super().create(vals_list)
 
     @api.onchange("company_id")
     def _onchange_company_defaults(self):
         for rec in self:
-            rec.advance_account_id = rec.company_id.petty_cash_advance_account_id
-            rec.bank_journal_id = rec.company_id.petty_cash_bank_out_journal_id
+            if rec.advance_type_id.company_id != rec.company_id:
+                rec.advance_type_id = False
+            if not rec.advance_type_id:
+                rec.advance_type_id = self.env["petty.cash.type"].search(
+                    [("company_id", "=", rec.company_id.id), ("is_default", "=", True)], limit=1
+                )
+            rec._onchange_advance_type_defaults()
+
+    @api.onchange("advance_type_id")
+    def _onchange_advance_type_defaults(self):
+        for rec in self:
+            rec.advance_account_id = (
+                rec.advance_type_id.advance_account_id or rec.company_id.petty_cash_advance_account_id
+            )
+            rec.bank_journal_id = (
+                rec.advance_type_id.bank_out_journal_id or rec.company_id.petty_cash_bank_out_journal_id
+            )
 
     @api.constrains("line_ids", "amount_requested")
     def _check_breakdown_total(self):
@@ -299,6 +508,133 @@ class PettyCashRequest(models.Model):
                     )
 
     # ------------------------------------------------------------------
+    # Limit control
+    # ------------------------------------------------------------------
+    def _pc_outstanding_limit(self):
+        """Ceiling on the employee's total open advances, in company currency.
+
+        Resolved employee → job → type; ``0.0`` means "no limit at this level"
+        and falls through to the next. Returns 0.0 when nothing is set.
+        """
+        self.ensure_one()
+        employee = self.employee_id
+        return (
+            employee.pc_advance_limit
+            or employee.job_id.pc_advance_limit
+            or self.advance_type_id.limit_outstanding
+            or 0.0
+        )
+
+    def _pc_open_peers(self):
+        """The employee's other advances whose money is already committed.
+
+        ``approved`` is deliberately included: the cash has not left yet, but
+        it is spoken for. Excluding it would let two requests submitted the
+        same afternoon each slip under the ceiling.
+        """
+        self.ensure_one()
+        return self.search(
+            [
+                ("id", "!=", self.id or 0),
+                ("employee_id", "=", self.employee_id.id),
+                ("company_id", "=", self.company_id.id),
+                ("state", "in", ("approved", "disbursed", "in_realization")),
+            ]
+        )
+
+    def _pc_committed_company(self):
+        """How much of the ceiling this request is currently consuming.
+
+        An ``approved`` request has no journal entries yet, so its GL
+        outstanding is zero — but the money is spoken for. Fall back to the
+        requested amount until disbursement gives us a real balance, otherwise
+        two same-day requests would each see an empty ledger and both pass.
+        """
+        self.ensure_one()
+        if self.state == "approved":
+            return self._pc_conv(self.amount_requested, self.request_date)
+        return self.amount_outstanding_company
+
+    def _pc_check_limits(self, stage):
+        """Enforce the advance ceilings. ``stage`` is 'submit' or 'disburse'."""
+        self.ensure_one()
+        mode = self.advance_type_id.limit_enforcement or "off"
+        if mode == "off":
+            return True
+        if self.env.user.has_group("custom_petty_cash.group_petty_cash_limit_override"):
+            return True
+
+        pc_type = self.advance_type_id
+        company_currency = self.company_id.currency_id
+        amount = self._pc_conv(self.amount_requested, self.request_date)
+        peers = self._pc_open_peers()
+        problems = []
+
+        if pc_type.limit_per_request and company_currency.compare_amounts(amount, pc_type.limit_per_request) > 0:
+            problems.append(
+                _(
+                    "Requested %(amount)s exceeds the per-request limit %(limit)s for type %(type)s.",
+                    amount=self._pc_money(amount),
+                    limit=self._pc_money(pc_type.limit_per_request),
+                    type=pc_type.name,
+                )
+            )
+
+        ceiling = self._pc_outstanding_limit()
+        if ceiling:
+            open_total = sum(peer._pc_committed_company() for peer in peers)
+            if company_currency.compare_amounts(open_total + amount, ceiling) > 0:
+                problems.append(
+                    _(
+                        "Total open advances would reach %(total)s, over the %(limit)s ceiling for %(employee)s.",
+                        total=self._pc_money(open_total + amount),
+                        limit=self._pc_money(ceiling),
+                        employee=self.employee_id.name,
+                    )
+                )
+
+        if pc_type.max_open_requests and len(peers) >= pc_type.max_open_requests:
+            problems.append(
+                _(
+                    "%(employee)s already holds %(count)s open advances (maximum %(max)s).",
+                    employee=self.employee_id.name,
+                    count=len(peers),
+                    max=pc_type.max_open_requests,
+                )
+            )
+
+        if pc_type.block_when_overdue:
+            today = fields.Date.context_today(self)
+            overdue = peers.filtered(
+                lambda r: (
+                    r.realization_deadline
+                    and r.realization_deadline < today
+                    and not r.currency_id.is_zero(r.amount_outstanding)
+                )
+            )
+            if overdue:
+                problems.append(
+                    _(
+                        "Advance(s) past their realization deadline and not yet cleared: %s.",
+                        ", ".join(overdue.mapped("name")),
+                    )
+                )
+
+        if not problems:
+            return True
+        message = "\n".join([_("Cash advance limit check failed:")] + ["• %s" % p for p in problems])
+        if mode == "block":
+            raise UserError(message)
+        self.message_post(body=message, subtype_xmlid="mail.mt_note")
+        return True
+
+    def _pc_money(self, amount):
+        """Format ``amount`` in company currency for a user-facing message."""
+        self.ensure_one()
+        currency = self.company_id.currency_id
+        return "%s %s" % (currency.symbol or currency.name, "{:,.2f}".format(currency.round(amount)))
+
+    # ------------------------------------------------------------------
     # Workflow — approval
     # ------------------------------------------------------------------
     def action_submit(self):
@@ -307,6 +643,10 @@ class PettyCashRequest(models.Model):
                 raise UserError(_("Only draft requests can be submitted."))
             if rec.amount_requested <= 0:
                 raise UserError(_("Enter the amount requested before submitting."))
+            # Checked here so the employee learns early, while they can still
+            # fix the amount; re-checked at disbursement, which is the
+            # authoritative gate.
+            rec._pc_check_limits("submit")
             rec.state = "to_approve"
             # Auto-create + submit an approval request when a matrix matches;
             # otherwise the request just waits for a Finance user to approve.
@@ -341,6 +681,10 @@ class PettyCashRequest(models.Model):
         self.ensure_one()
         if self.state != "approved":
             raise UserError(_("Approve the request before disbursing."))
+        # The authoritative gate: both the amount and the employee's other
+        # open advances can have moved since submission, and this is the
+        # moment the cash actually leaves.
+        self._pc_check_limits("disburse")
         amount = self.amount_requested
         if amount <= 0:
             raise UserError(_("Nothing to disburse."))
@@ -360,7 +704,9 @@ class PettyCashRequest(models.Model):
 
         self.disburse_move_id = move.id
         if not self.realization_deadline:
-            days = int(self.env["ir.config_parameter"].sudo().get_param("custom_petty_cash.realization_days") or 14)
+            days = self.advance_type_id.realization_days or int(
+                self.env["ir.config_parameter"].sudo().get_param("custom_petty_cash.realization_days") or 14
+            )
             self.realization_deadline = fields.Date.context_today(self) + timedelta(days=days)
         self.state = "disbursed"
         self.message_post(
@@ -375,7 +721,11 @@ class PettyCashRequest(models.Model):
         bank_account = journal.default_account_id
         if not bank_account:
             raise UserError(_("Journal %s has no bank/cash account configured.") % journal.name)
-        label = _("Petty Cash disbursement — %s") % self.name
+        label = _("Cash advance disbursement — %s") % self.name
+        date = fields.Date.context_today(self)
+        # One conversion, split into the two legs — converting each side
+        # independently can round apart and leave the move unbalanced.
+        amount_company = self._pc_conv(amount, date)
         move = (
             self.env["account.move"]
             .with_company(self.company_id)
@@ -383,7 +733,7 @@ class PettyCashRequest(models.Model):
                 {
                     "move_type": "entry",
                     "journal_id": journal.id,
-                    "date": fields.Date.context_today(self),
+                    "date": date,
                     "ref": self.name,
                     "petty_cash_request_id": self.id,
                     "line_ids": [
@@ -393,8 +743,7 @@ class PettyCashRequest(models.Model):
                                     "name": label,
                                     "account_id": advance.id,
                                     "partner_id": partner.id,
-                                    "debit": amount,
-                                    "credit": 0.0,
+                                    **self._pc_leg(amount, amount_company),
                                 }
                             )
                         ),
@@ -403,8 +752,7 @@ class PettyCashRequest(models.Model):
                                 "name": label,
                                 "account_id": bank_account.id,
                                 "partner_id": partner.id,
-                                "debit": 0.0,
-                                "credit": amount,
+                                **self._pc_leg(-amount, -amount_company),
                             }
                         ),
                     ],
@@ -494,6 +842,12 @@ class PettyCashRequest(models.Model):
         return self._action_open_move(move)
 
     def _book_bank_advance_transfer(self, amount, direction):
+        """Move ``amount`` (positive, request currency) between bank and advance.
+
+        ``direction='return'`` credits the advance, ``'reimburse'`` debits it.
+        Expressing the pair as one signed number rather than four dr/cr
+        variables keeps the currency legs impossible to get out of step.
+        """
         self.ensure_one()
         advance = self._pc_advance_account()
         journal = self._pc_bank_journal()
@@ -501,14 +855,14 @@ class PettyCashRequest(models.Model):
         bank_account = journal.default_account_id
         if not bank_account:
             raise UserError(_("Journal %s has no bank/cash account configured.") % journal.name)
+        date = fields.Date.context_today(self)
+        amount_company = self._pc_conv(amount, date)
         if direction == "return":
-            label = _("Petty Cash return — %s") % self.name
-            advance_dr, advance_cr = 0.0, amount
-            bank_dr, bank_cr = amount, 0.0
+            label = _("Cash advance return — %s") % self.name
+            advance_cur, advance_comp = -amount, -amount_company
         else:
-            label = _("Petty Cash reimbursement — %s") % self.name
-            advance_dr, advance_cr = amount, 0.0
-            bank_dr, bank_cr = 0.0, amount
+            label = _("Cash advance reimbursement — %s") % self.name
+            advance_cur, advance_comp = amount, amount_company
         move = (
             self.env["account.move"]
             .with_company(self.company_id)
@@ -516,7 +870,7 @@ class PettyCashRequest(models.Model):
                 {
                     "move_type": "entry",
                     "journal_id": journal.id,
-                    "date": fields.Date.context_today(self),
+                    "date": date,
                     "ref": self.name,
                     "petty_cash_request_id": self.id,
                     "line_ids": [
@@ -526,8 +880,7 @@ class PettyCashRequest(models.Model):
                                     "name": label,
                                     "account_id": advance.id,
                                     "partner_id": partner.id,
-                                    "debit": advance_dr,
-                                    "credit": advance_cr,
+                                    **self._pc_leg(advance_cur, advance_comp),
                                 }
                             )
                         ),
@@ -536,8 +889,7 @@ class PettyCashRequest(models.Model):
                                 "name": label,
                                 "account_id": bank_account.id,
                                 "partner_id": partner.id,
-                                "debit": bank_dr,
-                                "credit": bank_cr,
+                                **self._pc_leg(-advance_cur, -advance_comp),
                             }
                         ),
                     ],
@@ -559,17 +911,53 @@ class PettyCashRequest(models.Model):
                     amt=self.amount_outstanding,
                 )
             )
+        if self.currency_id != self.company_id.currency_id and not self.company_id.currency_exchange_journal_id:
+            raise UserError(
+                _(
+                    "Company %s has no Exchange Difference journal. A foreign-currency "
+                    "advance cannot be settled without one.",
+                    self.company_id.name,
+                )
+            )
         # Reconcile the advance-account lines so the ledger closes for this request.
         adv_lines = self._advance_move_lines(posted_only=True).filtered(lambda l: not l.reconciled)
         if adv_lines and adv_lines.mapped("account_id").reconcile:
             try:
-                adv_lines.reconcile()
+                result = adv_lines.reconcile()
             except UserError:
                 # Non-fatal: settlement stands even if auto-reconcile can't match.
                 pass
+            else:
+                self._pc_tag_exchange_moves(result)
         self.state = "settled"
         self.message_post(body=_("Settled — advance cleared."), subtype_xmlid="mail.mt_note")
         return True
+
+    def _pc_tag_exchange_moves(self, reconcile_result):
+        """Tag the FX entry ``reconcile()`` may have created with this request.
+
+        Settling a foreign-currency advance nets the document currency to zero
+        while the company-currency legs still differ; Odoo books the remainder
+        through the exchange-difference journal. Untagged, that entry would be
+        invisible on the smart button and missing from the Kartu Uang Muka —
+        making the card look like it does not close.
+
+        The return shape differs between the full and partial reconcile paths,
+        so read it defensively.
+        """
+        self.ensure_one()
+        if not isinstance(reconcile_result, dict):
+            return
+        partials = reconcile_result.get("exchange_partials")
+        moves = self.env["account.move"]
+        if partials is not None:
+            moves |= partials.mapped("exchange_move_id")
+        full = reconcile_result.get("full_reconcile")
+        if full is not None:
+            moves |= full.mapped("exchange_move_id")
+        moves = moves.filtered(lambda m: not m.petty_cash_request_id)
+        if moves:
+            moves.write({"petty_cash_request_id": self.id})
 
     # ------------------------------------------------------------------
     # Cancel / reset

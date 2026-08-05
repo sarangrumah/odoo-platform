@@ -8,7 +8,7 @@
             <field name="context">{'module': 'account', 'bin_size': False}</field>
         </record>
 
-        <menuitem id="menu_petty_cash_root" name="Petty Cash"
+        <menuitem id="menu_petty_cash_root" name="Cash Advance"
                   web_icon="account,static/description/icon.png"
                   sequence="55"
                   groups="custom_petty_cash.group_petty_cash_user"/>
@@ -24,6 +24,9 @@
         <menuitem id="menu_petty_cash_reporting" name="Reporting"
                   parent="menu_petty_cash_root" sequence="30"
                   groups="custom_petty_cash.group_petty_cash_finance"/>
+        <menuitem id="menu_petty_cash_statement" name="Kartu Uang Muka"
+                  parent="menu_petty_cash_reporting"
+                  action="action_petty_cash_statement" sequence="5"/>
         <menuitem id="menu_petty_cash_outstanding" name="Outstanding"
                   parent="menu_petty_cash_reporting"
                   action="action_petty_cash_outstanding" sequence="10"/>
@@ -34,6 +37,9 @@
         <menuitem id="menu_petty_cash_config_root" name="Configuration"
                   parent="menu_petty_cash_root" sequence="90"
                   groups="custom_petty_cash.group_petty_cash_finance"/>
+        <menuitem id="menu_petty_cash_types" name="Advance Types"
+                  parent="menu_petty_cash_config_root"
+                  action="action_petty_cash_type" sequence="5"/>
         <menuitem id="menu_petty_cash_settings" name="Settings"
                   parent="menu_petty_cash_config_root"
                   action="action_petty_cash_config" sequence="10"/>

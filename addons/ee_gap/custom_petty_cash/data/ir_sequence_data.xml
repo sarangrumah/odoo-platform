@@ -9,6 +9,17 @@
             <field name="company_id" eval="False"/>
         </record>
 
+        <!-- Numbering for a "Cash Advance" type. Assign it on the type
+             (petty.cash.type.sequence_id); requests whose type carries no
+             sequence keep falling back to seq_petty_cash_request. -->
+        <record id="seq_cash_advance_request" model="ir.sequence">
+            <field name="name">Cash Advance Request</field>
+            <field name="code">petty.cash.request.cash.advance</field>
+            <field name="prefix">CA/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
         <record id="seq_petty_cash_realization" model="ir.sequence">
             <field name="name">Petty Cash Realization</field>
             <field name="code">petty.cash.realization</field>

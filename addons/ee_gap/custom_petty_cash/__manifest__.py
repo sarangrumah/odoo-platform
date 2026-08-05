@@ -1,16 +1,23 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "Custom Petty Cash",
-    "summary": "Employee petty cash advances: request, Finance approval, Bank-Out "
-    "disbursement, realization (third-party vendor bill or plain expense), "
-    "return/top-up settlement, plus outstanding & aging monitoring.",
+    "name": "Custom Cash Advance & Petty Cash",
+    "summary": "Employee cash advances / petty cash: typed request, Finance approval, "
+    "Bank-Out disbursement, realization (third-party vendor bill or plain expense), "
+    "return/top-up settlement, advance ceilings, and Kartu Uang Muka / outstanding / "
+    "aging monitoring — multi-currency throughout.",
     "description": """
-Custom Petty Cash — Uang Muka Operasional
-==========================================
+Custom Cash Advance & Petty Cash — Uang Muka Karyawan
+======================================================
 
-A full petty-cash cycle for Finance and employees on Odoo 19 Community:
+Odoo (Community *and* Enterprise) ships no cash-advance concept at all: the
+Expenses app only knows "paid by employee, reimburse me" — money always moves
+*after* the spend. This module supplies the advance cycle for Finance and
+employees on Odoo 19 Community:
 
-1. **Pengajuan** — an employee requests petty cash for an Operating Unit
+0. **Jenis uang muka** — each ``petty.cash.type`` maps a kind of advance
+   (Cash Advance, Petty Cash, Travel…) to its own advance account, journals
+   and ceilings, per company.
+1. **Pengajuan** — an employee requests an advance for an Operating Unit
    (``petty.cash.request``), optionally broken down into estimate lines.
 2. **Review & Approval** — Finance reviews; approval routes through the
    generic ``custom_approval_engine`` matrix (multi-tier, delegation, SLA).
@@ -26,9 +33,18 @@ A full petty-cash cycle for Finance and employees on Odoo 19 Community:
 5. **Pengembalian / Top-up** — leftover cash is returned to the bank, or a
    shortfall is topped up, until the employee advance nets to zero and the
    request is settled (advance lines auto-reconciled).
-6. **Monitoring** — kanban/list dashboards by state, a per-employee
-   **Outstanding** ledger and an **Aging** report, both reusing the
-   ``custom_accounting_reports`` engine (PDF / XLSX / on-screen table).
+6. **Monitoring** — kanban/list dashboards by state, plus three reports on the
+   ``custom_accounting_reports`` engine (PDF / XLSX / on-screen table): the
+   **Kartu Uang Muka** movement card, the per-employee **Outstanding** ledger
+   and an **Aging** report.
+7. **Kontrol** — per-employee / per-position / per-type ceilings, a cap on
+   simultaneous open advances, and a block on borrowing again while an
+   advance is past its realization deadline. Off by default; Finance opts in
+   per type.
+
+Multi-currency throughout: every generated journal item carries
+``currency_id`` + ``amount_currency``, so a foreign-currency advance books its
+correct counter-value and settles through the exchange-difference journal.
 
 Operating-Unit aware: when the Levi's localization is installed the OU
 
@@ -40,7 +56,7 @@ Part of the Custom Platform — multi-tenant Odoo 19 for Indonesian SMB.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.4.0",
+    "version": "19.0.0.5.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -54,8 +70,10 @@ Part of the Custom Platform — multi-tenant Odoo 19 for Indonesian SMB.
         "custom_accounting_reports",
     ],
     "capability_tags": [
-        "petty-cash",
         "cash-advance",
+        "petty-cash",
+        "employee-advance",
+        "multi-currency",
         "approval-workflow",
         "audit-trail",
         "accounting",
@@ -67,11 +85,13 @@ Part of the Custom Platform — multi-tenant Odoo 19 for Indonesian SMB.
         "data/ir_sequence_data.xml",
         "data/mail_template_data.xml",
         "data/ir_cron_data.xml",
+        "views/petty_cash_type_views.xml",
         "views/petty_cash_request_views.xml",
         "views/petty_cash_realization_views.xml",
         "views/report_views.xml",
         "views/res_config_settings_views.xml",
         "reports/petty_cash_templates.xml",
+        "reports/petty_cash_vouchers.xml",
         "views/menu_views.xml",
     ],
     "installable": True,

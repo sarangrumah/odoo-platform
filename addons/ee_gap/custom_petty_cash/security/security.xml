@@ -21,6 +21,14 @@
             <field name="implied_ids" eval="[(4, ref('group_petty_cash_user')), (4, ref('base.group_user'))]"/>
             <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
         </record>
+
+        <!-- Deliberately granted to nobody by default: this is the named
+             exception that lets a request past its advance ceiling. -->
+        <record id="group_petty_cash_limit_override" model="res.groups">
+            <field name="name">Petty Cash / Limit Override</field>
+            <field name="privilege_id" ref="res_groups_privilege_petty_cash"/>
+            <field name="implied_ids" eval="[(4, ref('group_petty_cash_finance'))]"/>
+        </record>
     </data>
     <!-- Every internal user is made a 'Petty Cash / User' by the module's
          post_init_hook (ORM write on base.group_user.implied_ids), which is

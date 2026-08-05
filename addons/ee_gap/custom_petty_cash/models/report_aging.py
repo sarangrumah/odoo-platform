@@ -50,6 +50,8 @@ class PettyCashReportAging(models.AbstractModel):
         ]
         if filters.get("employee_ids"):
             domain.append(("employee_id", "in", filters["employee_ids"]))
+        if filters.get("advance_type_ids"):
+            domain.append(("advance_type_id", "in", filters["advance_type_ids"]))
         return self.env["petty.cash.request"].search(domain, order="employee_id, id")
 
     def _build_lines(self, filters):
@@ -57,9 +59,11 @@ class PettyCashReportAging(models.AbstractModel):
         bucket_codes = [c for c, _, _, _ in BUCKETS]
         by_emp = {}
         for req in self._open_requests(filters):
-            outstanding = req.amount_outstanding
-            if req.currency_id.is_zero(outstanding):
+            if req.currency_id.is_zero(req.amount_outstanding):
                 continue
+            # Bucket in company currency — the columns are summed across
+            # employees who may hold advances in different currencies.
+            outstanding = req.amount_outstanding_company
             emp = req.employee_id
             disb_date = req.disburse_move_id.date or req.request_date
             age = (as_of - disb_date).days if disb_date else 0

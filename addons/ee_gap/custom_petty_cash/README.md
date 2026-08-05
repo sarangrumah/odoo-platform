@@ -1,9 +1,18 @@
-# Custom Petty Cash
+# Custom Cash Advance & Petty Cash
 
-Employee petty-cash advances with a full Finance cycle on Odoo 19 Community.
+Employee cash advances (uang muka karyawan) with a full Finance cycle on
+Odoo 19 Community.
+
+> Odoo has no cash-advance feature in **either** edition. The Expenses app only
+> models "the employee already paid, reimburse them", so money always moves
+> *after* the spend. This module supplies the other direction. The OCA
+> reference module `hr_expense_advance_clearing` is not available on 19.0 —
+> Odoo 19 removed `hr.expense.sheet`.
 
 ## Flow
 
+0. **Type** (`petty.cash.type`) — Cash Advance, Petty Cash, Travel… Each type
+   carries its own advance account, journals, sequence and ceilings, per company.
 1. **Request** (`petty.cash.request`) — an employee asks for cash for an
    Operating Unit, optionally with an estimate breakdown.
 2. **Approval** — routed through `custom_approval_engine`'s matrix; when no
@@ -20,18 +29,43 @@ Employee petty-cash advances with a full Finance cycle on Odoo 19 Community.
    (`Dr Bank / Cr Uang Muka`) or a shortfall reimbursed
    (`Dr Uang Muka / Cr Bank`); when the advance nets to zero the request is
    settled and the advance lines are reconciled.
-6. **Monitoring** — kanban/list dashboards, an **Outstanding** ledger and an
-   **Aging** report (PDF / XLSX / on-screen table via `custom_accounting_reports`).
+6. **Monitoring** — kanban/list dashboards plus three reports (PDF / XLSX /
+   on-screen table via `custom_accounting_reports`): **Kartu Uang Muka** (the
+   per-employee movement card with a running balance), the **Outstanding**
+   ledger and an **Aging** report.
+7. **Vouchers** — printable Bukti Pencairan, Bukti Pertanggungjawaban and
+   Bukti Penyelesaian with signature blocks.
 
-## Configuration (Accounting → Settings → Petty Cash)
+## Multi-currency
+
+Every generated journal item carries `currency_id` and `amount_currency`, so an
+advance in a foreign currency books its correct counter-value and settles
+through the company's exchange-difference journal. `amount_outstanding` is in
+the request's currency; `amount_outstanding_company` is the figure to aggregate.
+
+## Limits
+
+Optional ceilings, resolved **employee → job position → type**, plus a cap on
+simultaneous open advances and a block on borrowing again while an advance is
+past its realization deadline. Enforcement is per type: `off` (default), `warn`
+(chatter note) or `block`. `Petty Cash / Limit Override` grants exceptions and
+is deliberately assigned to nobody out of the box.
+
+## Configuration
+
+Accounts and journals resolve **request → type → company**, so the per-type
+setup (Cash Advance → Configuration → Advance Types) is the normal place to
+configure them. The company-level fields under Accounting → Settings remain as
+a fallback for tenants configured before types existed.
 
 | Setting | Purpose |
 |---|---|
-| Advance Account | Reconcilable "Uang Muka Petty Cash" (per employee). |
+| Advance Account | Reconcilable "Uang Muka" account, debited per employee. |
 | Bank-Out Journal | Funds disbursement / receives returns. |
-| Payment Journal | Pays third-party bills out of the advance (its outstanding accounts are auto-pointed at the advance account). |
+| Payment Journal | Pays third-party bills out of the advance. **Must be dedicated** — posting a realization repoints this journal's outstanding accounts at the advance account. |
 | Expense Journal | Miscellaneous journal for expense entries (falls back to the first `general` journal). |
 | Realization Deadline (days) | Default deadline after disbursement; drives the overdue filter + reminder cron. |
+| Operating Unit Analytic Plan | Which analytic plan the OU field offers. Defaults to "Operating Unit"; an unknown name widens rather than blocks. |
 | Disburse via account.payment | Book disbursement as a bank-reconcilable payment instead of a direct entry. |
 
 ## Operating Unit
@@ -45,3 +79,5 @@ too. Without the localization the module runs unchanged.
 
 * **Petty Cash / User** — employees: own requests/realizations only.
 * **Petty Cash / Finance** — review, approve, disburse, post, settle, reports.
+* **Petty Cash / Limit Override** — may raise a request past its ceiling.
+  Granted to nobody by default; it is meant to be a named exception.

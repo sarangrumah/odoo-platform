@@ -1,6 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+        <!-- Kartu Uang Muka (statement) wizard -->
+        <record id="view_petty_cash_statement_wizard_form" model="ir.ui.view">
+            <field name="name">petty.cash.statement.wizard.form</field>
+            <field name="model">petty.cash.statement.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Kartu Uang Muka">
+                    <group>
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                        <group>
+                            <field name="company_ids" widget="many2many_tags"
+                                   groups="base.group_multi_company"/>
+                            <field name="employee_ids" widget="many2many_tags"/>
+                            <field name="advance_type_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                    <footer>
+                        <button name="action_view" type="object" string="View" class="btn-primary"/>
+                        <button name="action_print" type="object" string="Print PDF"/>
+                        <button name="action_export_xlsx" type="object" string="Export Excel"/>
+                        <button string="Cancel" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_petty_cash_statement" model="ir.actions.act_window">
+            <field name="name">Kartu Uang Muka</field>
+            <field name="res_model">petty.cash.statement.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
         <!-- Outstanding wizard -->
         <record id="view_petty_cash_outstanding_wizard_form" model="ir.ui.view">
             <field name="name">petty.cash.outstanding.wizard.form</field>
