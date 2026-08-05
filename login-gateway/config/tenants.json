@@ -1,0 +1,59 @@
+{
+  "verticals": [
+    {
+      "slug": "levis",
+      "name": "Levi's Indonesia",
+      "targets": [
+        { "code": "prod", "label": "Production", "db": "prd_levis_begbal" },
+        { "code": "prod-ap", "label": "Production — Account Payable", "db": "prd_levis_AP" },
+        { "code": "prod-detail", "label": "Production — Detail", "db": "prd_detail_levis" },
+        { "code": "prod-legacy", "label": "Production (legacy)", "db": "prd_levis" },
+        { "code": "demo", "label": "Demo", "db": "demo_updated_levis" },
+        { "code": "rnd", "label": "R&D", "db": "rnd_levis" }
+      ]
+    },
+    {
+      "slug": "arkaaim",
+      "name": "ARKA-AIM",
+      "targets": [
+        { "code": "prod", "label": "Production", "db": "prd_arkaaim" },
+        { "code": "training", "label": "Training", "db": "trn_arkaaim" },
+        { "code": "training-begbal", "label": "Training — Opening Balance", "db": "trn_arkaaim_begbal" }
+      ]
+    },
+    {
+      "slug": "wms",
+      "name": "Warehouse Management",
+      "targets": [
+        { "code": "prod", "label": "Production", "db": "prd_wms" },
+        { "code": "demo", "label": "Demo", "db": "demo_wms" },
+        { "code": "rnd", "label": "R&D", "db": "rnd_wms" }
+      ]
+    },
+    {
+      "slug": "ppob",
+      "name": "PPOB",
+      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_ppob" }]
+    },
+    {
+      "slug": "esb",
+      "name": "EFN — ESB Integration",
+      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_esb" }]
+    },
+    {
+      "slug": "vaspmo",
+      "name": "VAS PMO",
+      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_vas_pmo" }]
+    },
+    {
+      "slug": "gw",
+      "name": "Gentle Woman",
+      "targets": [{ "code": "prod", "label": "Production", "db": "gentlewoman" }]
+    },
+    {
+      "slug": "sandbox",
+      "name": "Sandbox",
+      "targets": [{ "code": "demo", "label": "Demo", "db": "demo" }]
+    }
+  ]
+}

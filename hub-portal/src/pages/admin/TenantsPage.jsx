@@ -101,7 +101,6 @@ export function TenantsPage() {
               <tr style={{ textAlign: 'left', color: tokens.muted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 <th style={{ padding: '8px 0', fontWeight: 600 }}>Slug</th>
                 <th style={{ padding: '8px 0', fontWeight: 600 }}>Display name</th>
-                <th style={{ padding: '8px 0', fontWeight: 600 }}>Database</th>
                 <th style={{ padding: '8px 0', fontWeight: 600 }}>Plan</th>
                 <th style={{ padding: '8px 0', fontWeight: 600 }}>State</th>
                 <th style={{ padding: '8px 0', fontWeight: 600 }}></th>
@@ -112,7 +111,6 @@ export function TenantsPage() {
                 <tr key={t.slug} style={{ borderTop: `1px solid ${tokens.border}` }}>
                   <td style={{ padding: '12px 0', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: tokens.brand, fontWeight: 600 }}>{t.slug}</td>
                   <td style={{ padding: '12px 0' }}>{t.display_name}</td>
-                  <td style={{ padding: '12px 0', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: tokens.muted }}>{t.db_name}</td>
                   <td style={{ padding: '12px 0', color: tokens.muted }}>{t.plan_tier || '—'}</td>
                   <td style={{ padding: '12px 0' }}>
                     <Pill tone={t.state === 'active' ? 'ok' : t.state === 'suspended' ? 'warn' : 'neutral'}>

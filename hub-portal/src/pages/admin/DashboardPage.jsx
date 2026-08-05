@@ -161,7 +161,7 @@ export function DashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           {tenants.slice(0, 5).map((t, i) => (
             <div key={t.slug} style={{
-              display: 'grid', gridTemplateColumns: '20px 1fr 1.5fr 1fr 120px',
+              display: 'grid', gridTemplateColumns: '20px 1fr 1.5fr 1fr',
               alignItems: 'center', gap: 12, padding: '10px 0',
               borderBottom: i < Math.min(tenants.length, 5) - 1 ? `1px solid ${tokens.border}` : 'none',
               fontSize: 13,
@@ -171,8 +171,7 @@ export function DashboardPage() {
                 {t.slug}
               </code>
               <div style={{ color: tokens.muted, fontSize: 12 }}>{t.display_name}</div>
-              <div style={{ fontSize: 12, color: tokens.muted }}>{t.plan_tier || '—'}</div>
-              <div style={{ fontSize: 11, color: tokens.muted, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace' }}>{t.db_name}</div>
+              <div style={{ fontSize: 12, color: tokens.muted, textAlign: 'right' }}>{t.plan_tier || '—'}</div>
             </div>
           ))}
         </div>

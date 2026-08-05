@@ -732,6 +732,58 @@ services:
       resources:
         limits:
           memory: 512m
+  # Front-door tenant chooser. Replaces Odoo's database selector at the root of
+  # the public hostnames: the user picks a vertical and an environment, this app
+  # turns that into a database name server-side, bootstraps an Odoo session
+  # already pinned to it, and hands the browser on to Odoo's own /web/login.
+  # No database name ever reaches the client. See login-gateway/README.md.
+  #
+  # Depends on odoo-front, which only exists in docker-compose.multitenant.yml —
+  # so the dependency is declared there, not here, to keep the base file usable
+  # on its own.
+  login-gateway:
+    build:
+      context: ./login-gateway
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-login-gateway:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-login-gateway
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=64m,mode=1777
+      - /app/.next/cache:rw,size=64m
+    volumes:
+      # Bind-mounted over the copy baked into the image so publishing a new
+      # environment is an edit + `docker compose restart`, not a rebuild. The
+      # app re-reads the file per request, so even the restart is optional.
+      - ./login-gateway/config:/app/config:ro
+    environment:
+      PORT: 8080
+      # Next's standalone server binds to $HOSTNAME, which docker sets to the
+      # container id. Without this it listens on that name only and the
+      # healthcheck (127.0.0.1) is refused.
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      # Must be an Odoo whose dbfilter accepts every tenant DB. odoo-front is
+      # the one — the public `odoo` runs ^%d$ and would refuse them all here.
+      ODOO_FRONT_URL: ${LOGIN_GATEWAY_ODOO_URL:-http://odoo-front:8069}
+      TENANTS_CONFIG_PATH: /app/config/tenants.json
+    ports:
+      - "${LOGIN_GATEWAY_PORT:-18120}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/signin/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
 networks:
   odoo-net:

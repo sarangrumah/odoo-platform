@@ -28,20 +28,21 @@
 	default_sni {$DOMAIN:localhost.localdomain}
 }
 
-{$DOMAIN:localhost.localdomain} {
+# ============================================================
+# Shared route table for the front-door hosts.
+#
+# Two hostnames serve exactly the same application surface: the bare-IP
+# host (legacy, being retired) and eal-hub.erajaya.com (the real domain,
+# fronted by Cloudflare). Keeping the routes in one snippet means the two
+# cannot drift apart, and retiring the IP host later is a matter of
+# deleting its site block rather than re-deriving what it used to serve.
+#
+# TLS is deliberately NOT part of the snippet: the two hosts terminate
+# differently (internal CA vs the Sectigo wildcard), so each site block
+# states its own.
+# ============================================================
+(front_door) {
 	encode zstd gzip
-
-	# TLS mode:
-	#   * Default below = Caddy's internal CA (self-signed). Safe everywhere,
-	#     works without a public DNS name. Browser will show "not trusted"
-	#     unless you import the local root from /data/caddy/pki/.
-	#   * For real Let's Encrypt certs on an internet-reachable host,
-	#     comment `tls internal` and uncomment `tls {$ACME_EMAIL}` below,
-	#     then ensure DOMAIN + ACME_EMAIL are set in .env.
-	#   * For LE staging during cutover, swap this file for Caddyfile.staging
-	#     (see docs/runbooks/tls-renewal.md).
-	tls internal
-	# tls {$ACME_EMAIL}
 
 	# Erajaya Odoo Hub portal (landing + admin console) is mounted at /portal/*.
 	# The portal is a thin SPA + BFF; the BFF in turn signs HMAC calls to the
@@ -111,24 +112,60 @@
 		reverse_proxy odoo19-platform-filebrowser:80
 	}
 
-	# All remaining traffic on the bare-IP host goes to the PRIVATE mgmt Odoo.
+	# --- Tenant chooser -----------------------------------------------------
+	# The root of both front-door hosts used to be Odoo's database selector,
+	# i.e. a public list of every client's database plus the database manager.
+	# It is now the login gateway: pick a vertical and an environment, and the
+	# gateway resolves that to a database SERVER-SIDE, bootstraps an Odoo
+	# session already pinned to it, and forwards the browser to /web/login.
+	# See login-gateway/README.md for why it has to work that way.
+	#
+	# Next.js is built with basePath=/signin, so it expects to see the prefix
+	# itself — `handle`, not `handle_path`, same as /vaspmo and /files above.
+	handle / {
+		redir /signin/ 302
+	}
+	handle /signin* {
+		reverse_proxy login-gateway:8080
+	}
+
+	# Odoo redirects any request it cannot resolve a database for to
+	# /web/database/selector. That is precisely "this session has no tenant
+	# yet", so point it at the chooser instead of at a 404. Session expiry and
+	# logout both land here, which is what makes the flow self-healing.
+	handle /web/database/selector* {
+		redir /signin/ 302
+	}
+
+	# Everything else under /web/database/ is the database manager: create,
+	# drop, backup, restore, duplicate. It has no business on a public host.
+	# odoo-front runs LIST_DB=False so Odoo refuses these itself; this block is
+	# the belt to that pair of braces. Admins reach the real manager through
+	# odoo-mgmt on 127.0.0.1:18079 over an SSH tunnel.
+	handle /web/database/* {
+		respond "Not available" 403
+	}
+
+	# All remaining traffic on the front-door hosts goes to odoo-front.
 	#
 	# Why not the public odoo: it runs dbfilter = ^%d$ (tenant isolation — a
-	# hostname may only reach the DB of the same name). DOMAIN here is a bare
-	# IP and no database is named after it, so the public instance answers
-	# EVERY path on this host with 303 -> /web/database/selector. Nothing can
-	# be logged into through it; routing this host to nginx/odoo served no one.
+	# hostname may only reach the DB of the same name). Neither front-door host
+	# is named after a database — one is a bare IP, the other is
+	# eal-hub.erajaya.com — so the public instance answers EVERY path on them
+	# with 303 -> /web/database/selector. Nothing can be logged into through it.
 	#
-	# odoo-mgmt runs dbfilter = ^.*$, so this host lists all databases in the
-	# manager AND can complete a login into the one you pick. Per-tenant
-	# routing is untouched: tenants reach the public odoo by their own
-	# hostname (dbfilter matches the DB name), never through this IP.
+	# Why not odoo-mgmt, which this used to point at: it can serve every DB,
+	# but only because it also runs LIST_DB=True — it hands the database
+	# manager and the full tenant list to anyone who asks. odoo-front is the
+	# same dbfilter WITHOUT the manager (docker-compose.multitenant.yml), and
+	# with real HTTP workers; mgmt runs WORKERS=0 and was never sized for
+	# end-user traffic. Per-tenant routing is untouched: tenants reach the
+	# public odoo by their own hostname, never through the front door.
 	#
 	# NOTE: this bypasses the internal nginx hop, so the rate-limit and the
 	# extra security headers defined in nginx/conf.d/odoo.conf do not apply to
-	# this host. mgmt runs WORKERS=0 (threaded) — fine for admin/DB work, not
-	# sized for bulk end-user traffic.
-	reverse_proxy odoo-mgmt:8069 {
+	# this host.
+	reverse_proxy odoo-front:8069 {
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}
 		header_up X-Forwarded-For {remote_host}
@@ -146,6 +183,46 @@
 		format json
 		level INFO
 	}
+}
+
+# ============================================================
+# Front door #1 — eal-hub.erajaya.com (public, via Cloudflare)
+# ============================================================
+# DNS for this name is proxied by Cloudflare (orange cloud), so the
+# certificate a browser sees belongs to Cloudflare, not to us. The cert
+# configured below is the ORIGIN certificate: the one Cloudflare itself
+# validates on the CF -> origin hop. Without it Caddy has no site matching
+# SNI `eal-hub.erajaya.com`, aborts the handshake, and Cloudflare answers
+# HTTP 525 (SSL handshake failed) to every visitor.
+#
+# The Sectigo wildcard is used rather than ACME because HTTP-01/TLS-ALPN-01
+# cannot complete through a proxying Cloudflare — the challenge terminates at
+# the edge, not here. A publicly-trusted cert also means Cloudflare's SSL mode
+# can stay on "Full (strict)".
+#
+# Cert files live under the bind-mounted ./data/caddy/data volume so they can
+# be replaced at renewal without recreating the container (see
+# docs/runbooks/tls-renewal.md). fullchain.pem must carry the leaf FIRST and
+# then the Sectigo intermediates; a leaf-only file makes Cloudflare's strict
+# mode fail even though a browser might accept it.
+eal-hub.erajaya.com {
+	tls /data/certs/star.erajaya.com/fullchain.pem /data/certs/star.erajaya.com/privkey.pem
+
+	import front_door
+}
+
+# ============================================================
+# Front door #2 — bare-IP host (LEGACY, to be retired)
+# ============================================================
+# Kept alive during the domain cutover so anything still pointed at
+# https://{$DOMAIN}/ keeps working, and so there is a way in that does not
+# depend on Cloudflare. `tls internal` means a browser warning; that is
+# accepted for the transition. To retire it, delete this block — the routes
+# themselves live in the (front_door) snippet above and are unaffected.
+{$DOMAIN:localhost.localdomain} {
+	tls internal
+
+	import front_door
 }
 
 # ============================================================

@@ -84,8 +84,12 @@ async function odooSearchRead(req, res, model, fields, options = {}) {
   }
 }
 
+// NOTE: no `db_name`. Tenant database names are deliberately not published to
+// any browser — that is the whole point of the login gateway that replaced
+// Odoo's database selector on this host. `slug` identifies a tenant for the UI;
+// anything that genuinely needs the database name does the lookup server-side.
 app.get('/api/tenants', (req, res) => odooSearchRead(req, res, 'tenant.registry',
-  ['id', 'slug', 'display_name', 'db_name', 'state', 'plan_tier', 'create_date'], { order: 'display_name' }));
+  ['id', 'slug', 'display_name', 'state', 'plan_tier', 'create_date'], { order: 'display_name' }));
 
 app.get('/api/users', (req, res) => odooSearchRead(req, res, 'res.users',
   ['id', 'name', 'login', 'active'], { domain: [['active', '=', true]], limit: 100 }));

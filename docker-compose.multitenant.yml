@@ -87,12 +87,12 @@ services:
   # traffic) but has LIST_DB=True and DBFILTER=^.*$ to expose the database
   # manager + per-DB JSON-RPC.
   #
-  # NO LONGER PRIVATE. caddy/Caddyfile routes the whole {$DOMAIN} (bare-IP)
-  # host here, because the public odoo's dbfilter = ^%d$ cannot serve any DB
-  # on that host and 303s every path to /web/database/selector. That makes the
-  # database manager -- and a login into any tenant DB -- reachable from the
-  # internet, guarded by ODOO_ADMIN_PASSWD / per-DB credentials alone. Add a
-  # `remote_ip` matcher to that Caddy block to scope it back down.
+  # PRIVATE AGAIN (restored 2026-08-05). It was briefly the front-door upstream,
+  # which put the database manager -- and a login into any tenant DB -- on the
+  # public internet behind nothing but ODOO_ADMIN_PASSWD. The front door now
+  # goes to `odoo-front` below (LIST_DB=False), and this instance is reachable
+  # only on 127.0.0.1:${ODOO_MGMT_PORT} again. Its LIST_DB=True is kept because
+  # the tenant-orchestrator drives db create/drop/duplicate through it.
   odoo-mgmt:
     image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo:latest
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo-mgmt
@@ -183,6 +183,93 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+
+  # Front-door Odoo: the instance every human logs into through Caddy.
+  #
+  # Why it exists as a THIRD instance rather than reusing one of the other two:
+  #   - the public `odoo` runs dbfilter = ^%d$ (a hostname may only reach the DB
+  #     of the same name). Neither front-door host is named after a database, so
+  #     it can serve none of them there.
+  #   - `odoo-mgmt` can serve all of them, but only because it also runs
+  #     LIST_DB=True, i.e. it hands out the database manager and the full list of
+  #     tenant DBs to anyone who asks. That is exactly what we are hiding.
+  # So: same dbfilter as mgmt, WITHOUT the database manager. The DB for a browser
+  # session is chosen by the login-gateway (see login-gateway/README.md), which
+  # bootstraps `session.db` server-side and hands the cookie to the browser; the
+  # tenant DB name never reaches the client.
+  odoo-front:
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo-front
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      HOST: postgres
+      PORT: 5432
+      USER: ${POSTGRES_USER:-odoo}
+      PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ODOO_ADMIN_PASSWD: ${ODOO_ADMIN_PASSWD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET}
+      CORETAX_SERTEL_MASTER_KEY: ${CORETAX_SERTEL_MASTER_KEY:-}
+      # Unlike odoo-mgmt (WORKERS=0, admin work only) this one carries real
+      # end-user traffic, so it needs prefork workers.
+      WORKERS: ${ODOO_FRONT_WORKERS:-4}
+      # MUST be 0, and SERVER_WIDE_MODULES MUST stay base,web — same reasons as
+      # spelled out on odoo-mgmt above: a second cron thread cross-invalidates
+      # the shared registry, and a second queue_job runner makes BOTH runners
+      # lose the per-database advisory lock, after which no job runs in any DB.
+      MAX_CRON_THREADS: "0"
+      SERVER_WIDE_MODULES: "base,web"
+      # The whole point of this instance: serve any tenant DB, list none of them.
+      # With LIST_DB=False Odoo refuses /web/database/* outright, so even if a
+      # Caddy rule is lost the manager does not come back.
+      LIST_DB: "False"
+      DBFILTER: "^.*$$"
+      # Caddy terminates TLS in front; without proxy_mode Odoo builds redirects
+      # from the internal http:// hop and bounces the browser out of https.
+      PROXY_MODE: "True"
+      WITHOUT_DEMO: ${WITHOUT_DEMO:-all}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ./addons:/mnt/extra-addons:ro
+      # Same filestore as `odoo` and `odoo-mgmt` — they share Postgres, so
+      # ir.attachment rows point at files in this directory. A split mount
+      # serves 404s on assets and the "CSS error, using old style" fallback.
+      - ./data/odoo-filestore:/var/lib/odoo
+    extra_hosts:
+      - "erp_dev_aimarka:127.0.0.1"
+    healthcheck:
+      # NOT /web/database/selector (odoo-mgmt's probe): with LIST_DB=False that
+      # route is gone. /web/health is auth='none', db-less and always 200.
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8069/web/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    # No `ports:`. Reachable only from inside odoo-net, via Caddy.
+    networks: [odoo-net]
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # The gateway is only useful once odoo-front exists, which is here.
+  login-gateway:
+    depends_on:
+      odoo-front:
+        condition: service_healthy
 
   # Re-point the orchestrator at the private management Odoo.
   #
