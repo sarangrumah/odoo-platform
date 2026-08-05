@@ -42,6 +42,7 @@ class PettyCashRealization(models.Model):
     employee_id = fields.Many2one(related="request_id.employee_id", store=True, string="Employee")
     company_id = fields.Many2one(related="request_id.company_id", store=True, string="Company")
     currency_id = fields.Many2one(related="request_id.currency_id", store=True)
+    advance_type_id = fields.Many2one(related="request_id.advance_type_id", store=True, string="Type")
     l10n_ou_analytic_id = fields.Many2one(related="request_id.l10n_ou_analytic_id", store=True, string="Operating Unit")
     date = fields.Date(string="Realization Date", default=fields.Date.context_today, required=True, tracking=True)
     line_ids = fields.One2many("petty.cash.realization.line", "realization_id", string="Lines")
@@ -119,6 +120,15 @@ class PettyCashRealization(models.Model):
         third_party = self.line_ids.filtered(lambda l: l.line_type == "third_party")
         expense = self.line_ids.filtered(lambda l: l.line_type == "expense")
 
+        if third_party and self.advance_type_id and not self.advance_type_id.allow_third_party:
+            raise UserError(
+                _(
+                    "Advance type %s does not allow third-party realization — "
+                    "record these as plain expense lines instead.",
+                    self.advance_type_id.name,
+                )
+            )
+
         for partner in third_party.mapped("partner_id"):
             self._post_vendor_bill(partner, third_party.filtered(lambda l: l.partner_id == partner))
         if expense:
@@ -179,6 +189,12 @@ class PettyCashRealization(models.Model):
         move = self.env["account.move"].with_company(self.company_id)
         if "l10n_purchase_type" in move._fields:
             move_vals["l10n_purchase_type"] = "non_trade"
+        # Only stamp the currency when it is NOT the company currency: an IDR
+        # bill then takes byte-identical the code path it took before, which
+        # keeps FX-header add-ons (custom_arka_fx_header) out of the way for
+        # the overwhelmingly common case.
+        if self.currency_id and self.currency_id != self.company_id.currency_id:
+            move_vals["currency_id"] = self.currency_id.id
         # OU + Employee are stamped directly into each line's
         # analytic_distribution (see request._pc_line_analytic); we deliberately
         # do NOT set the header l10n_ou_analytic_id, so the localization's
@@ -193,11 +209,7 @@ class PettyCashRealization(models.Model):
         journal so the counterpart hits the advance account
         (Dr AP / Cr Uang Muka Petty Cash), then reconciles the bill."""
         self.ensure_one()
-        journal = self.company_id.petty_cash_payment_journal_id
-        if not journal:
-            raise UserError(
-                _("Set a Petty Cash Payment journal in Accounting Settings before posting third-party lines.")
-            )
+        journal = self.request_id._pc_payment_journal()
         advance = self.request_id._pc_advance_account()
         self._configure_payment_journal(journal, advance)
 
@@ -241,21 +253,17 @@ class PettyCashRealization(models.Model):
         request = self.request_id
         advance = request._pc_advance_account()
         partner = request._pc_employee_partner()
-        journal = self.company_id.petty_cash_expense_journal_id or self.env["account.journal"].search(
-            [("type", "=", "general"), ("company_id", "=", self.company_id.id)], limit=1
-        )
-        if not journal:
-            raise UserError(
-                _("No general journal found for the expense entry. Configure a Petty Cash Expense journal.")
-            )
+        journal = request._pc_expense_journal()
 
         move_lines = []
-        total = 0.0
+        total_cur = total_company = 0.0
         for line in lines:
             if not line.account_id:
                 raise UserError(_("Expense line '%s' needs an account.") % (line.name or "?"))
             amount = line.price_total  # tax-inclusive for non-creditable petty expenses
-            total += amount
+            amount_company = request._pc_conv(amount, self.date)
+            total_cur += amount
+            total_company += amount_company
             move_lines.append(
                 fields.Command.create(
                     request._pc_line_analytic(
@@ -263,20 +271,21 @@ class PettyCashRealization(models.Model):
                             "name": line.name or self.name,
                             "account_id": line.account_id.id,
                             "partner_id": partner.id,
-                            "debit": amount,
-                            "credit": 0.0,
+                            **request._pc_leg(amount, amount_company),
                         }
                     )
                 )
             )
+        # Credit the SUM of the per-line conversions, never a fresh conversion
+        # of the total — the two can differ by a rounding unit and the move
+        # would refuse to post.
         move_lines.append(
             fields.Command.create(
                 {
-                    "name": _("Petty Cash realization — %s") % self.name,
+                    "name": _("Cash advance realization — %s") % self.name,
                     "account_id": advance.id,
                     "partner_id": partner.id,
-                    "debit": 0.0,
-                    "credit": total,
+                    **request._pc_leg(-total_cur, -total_company),
                 }
             )
         )

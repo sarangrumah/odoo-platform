@@ -33,6 +33,21 @@ class ResConfigSettings(models.TransientModel):
         "employee must submit the realization. Drives the overdue filter "
         "and reminder cron.",
     )
+    petty_cash_ou_plan_name = fields.Char(
+        string="Operating Unit Analytic Plan",
+        config_parameter="custom_petty_cash.ou_plan_name",
+        help="Name of the analytic plan the Operating Unit field should offer "
+        "on a request. Defaults to 'Operating Unit'; set it to whatever this "
+        "tenant actually calls that dimension (ARKA-AIM uses 'Project'). An "
+        "unknown plan name widens the field to every analytic account rather "
+        "than blocking it.",
+    )
+    petty_cash_employee_plan_name = fields.Char(
+        string="Employee Analytic Plan",
+        config_parameter="custom_petty_cash.employee_plan_name",
+        help="Analytic plan holding the per-employee accounts used to slice "
+        "the shared advance account. Created on first use if missing.",
+    )
     petty_cash_disburse_via_payment = fields.Boolean(
         string="Disburse via account.payment",
         config_parameter="custom_petty_cash.disburse_via_payment",

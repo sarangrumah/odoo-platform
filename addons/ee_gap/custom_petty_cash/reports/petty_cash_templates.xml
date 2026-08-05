@@ -14,6 +14,9 @@
                 <t t-elif="report_code == 'petty_cash_aging'">
                     <t t-call="custom_petty_cash.report_petty_cash_aging"/>
                 </t>
+                <t t-elif="report_code == 'petty_cash_statement'">
+                    <t t-call="custom_petty_cash.report_petty_cash_statement"/>
+                </t>
             </xpath>
         </template>
 
@@ -25,6 +28,7 @@
                     <tr>
                         <th>Employee</th>
                         <th>Reference</th>
+                        <th>Type</th>
                         <th>Operating Unit</th>
                         <th>Deadline</th>
                         <th class="text-end">Disbursed</th>
@@ -38,6 +42,7 @@
                         t-att-style="line.get('type') in ('subtotal','grand_total') and 'font-weight:bold;background:#f2f2f2;' or ''">
                         <td t-esc="line.get('employee_name')"/>
                         <td t-esc="line.get('reference')"/>
+                        <td t-esc="line.get('type_name')"/>
                         <td t-esc="line.get('ou_name')"/>
                         <td t-esc="line.get('deadline')"/>
                         <td class="text-end">
@@ -91,86 +96,87 @@
             <t t-call="custom_accounting_reports.report_footer_signature"/>
         </template>
 
-        <!-- ============================================================
-             Disbursement voucher (Bukti Pencairan Petty Cash).
-             Self-contained wrapper with <main> (no web.html_container) so
-             wkhtmltopdf never makes the stalling asset callback.
-             ============================================================ -->
-        <record id="action_report_disbursement_voucher" model="ir.actions.report">
-            <field name="name">Petty Cash Voucher</field>
-            <field name="model">petty.cash.request</field>
-            <field name="report_type">qweb-pdf</field>
-            <field name="report_name">custom_petty_cash.report_disbursement_voucher</field>
-            <field name="report_file">custom_petty_cash.report_disbursement_voucher</field>
-            <field name="binding_model_id" ref="model_petty_cash_request"/>
-            <field name="binding_type">report</field>
-            <field name="print_report_name">'Petty Cash Voucher - %s' % (object.name)</field>
-        </record>
-
-        <template id="report_disbursement_voucher">
-            <html>
-                <head>
-                    <meta charset="utf-8"/>
-                    <style>
-                        @page { margin: 14mm; }
-                        body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
-                        table { border-collapse: collapse; width: 100%; }
-                        td, th { padding: 4px 6px; }
-                        .box td { border: 1px solid #999; }
-                        .title { font-size: 20px; font-weight: bold; margin-bottom: 10px; }
-                        .lbl { color: #555; width: 30%; }
-                    </style>
-                </head>
-                <body>
-                    <main>
-                        <t t-foreach="docs" t-as="doc">
-                            <div class="page" style="page-break-after: always;">
-                                <div class="title">Bukti Pencairan Petty Cash</div>
-                                <table class="box">
-                                    <tr><td class="lbl">Reference</td><td t-esc="doc.name"/></tr>
-                                    <tr><td class="lbl">Employee</td><td t-esc="doc.employee_id.name"/></tr>
-                                    <tr><td class="lbl">Operating Unit</td><td t-esc="doc.l10n_ou_analytic_id.name or ''"/></tr>
-                                    <tr><td class="lbl">Request Date</td><td t-esc="doc.request_date"/></tr>
-                                    <tr><td class="lbl">Realization Deadline</td><td t-esc="doc.realization_deadline or ''"/></tr>
-                                    <tr><td class="lbl">Purpose</td><td t-esc="doc.purpose or ''"/></tr>
-                                    <tr>
-                                        <td class="lbl">Amount</td>
-                                        <td>
-                                            <span t-esc="doc.amount_requested"
-                                                  t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
-                                        </td>
-                                    </tr>
-                                </table>
-                                <div t-if="doc.line_ids" style="margin-top:12px;">
-                                    <strong>Estimate Breakdown</strong>
-                                    <table class="box" style="margin-top:4px;">
-                                        <thead>
-                                            <tr><th>Description</th><th>Account</th><th class="text-end">Amount</th></tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr t-foreach="doc.line_ids" t-as="l">
-                                                <td t-esc="l.name"/>
-                                                <td t-esc="l.account_id.display_name or ''"/>
-                                                <td class="text-end">
-                                                    <span t-esc="l.amount"
-                                                          t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <table style="margin-top:48px;">
-                                    <tr>
-                                        <td style="text-align:center;">Requested by<br/><br/><br/>__________________</td>
-                                        <td style="text-align:center;">Approved by<br/><br/><br/>__________________</td>
-                                        <td style="text-align:center;">Received by<br/><br/><br/>__________________</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </t>
-                    </main>
-                </body>
-            </html>
+        <!-- Kartu Uang Muka — nested blocks, one table per employee.
+             Cannot reuse the flat `t-foreach="lines"` shape of the two reports
+             above: _build_lines emits per-employee blocks holding their own
+             movement list. -->
+        <template id="report_petty_cash_statement">
+            <t t-call="custom_accounting_reports.report_header"/>
+            <t t-foreach="lines" t-as="blk">
+                <t t-if="blk.get('type') == 'partner'">
+                    <h5 style="margin-top:14px;" t-esc="blk.get('partner_name')"/>
+                    <table class="table table-sm" style="width:100%;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Document</th>
+                                <th>Movement</th>
+                                <th>Request</th>
+                                <th>Description</th>
+                                <th class="text-end">Disbursement</th>
+                                <th class="text-end">Realization / Return</th>
+                                <th class="text-end">Balance</th>
+                            </tr>
+                            <tr style="font-style:italic;">
+                                <td colspan="7">Saldo Awal</td>
+                                <td class="text-end">
+                                    <span t-esc="blk.get('opening')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="blk.get('lines') or []" t-as="ml">
+                                <td t-esc="ml.get('date')"/>
+                                <td t-esc="ml.get('doc_no')"/>
+                                <td t-esc="ml.get('movement')"/>
+                                <td t-esc="ml.get('request_ref')"/>
+                                <td t-esc="ml.get('label')"/>
+                                <td class="text-end">
+                                    <span t-esc="ml.get('debit')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="ml.get('credit')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="ml.get('running_balance')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr style="font-weight:bold;background:#f2f2f2;">
+                                <td colspan="5">Total</td>
+                                <td class="text-end">
+                                    <span t-esc="blk.get('total_debit')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="blk.get('total_credit')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-esc="blk.get('closing')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </t>
+                <t t-else="">
+                    <table class="table table-sm" style="width:100%;">
+                        <tr style="font-weight:bold;background:#e9e9e9;">
+                            <td colspan="5" t-esc="blk.get('label') or 'Grand Total'"/>
+                            <td class="text-end">
+                                <span t-esc="blk.get('total_debit')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="blk.get('total_credit')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="blk.get('closing')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                        </tr>
+                    </table>
+                </t>
+            </t>
+            <t t-call="custom_accounting_reports.report_footer_signature"/>
         </template>
+
     </data>
 </odoo>
