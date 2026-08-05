@@ -1,32 +1,59 @@
-/* Design tokens and primitives lifted from vas-pmo/src/app/globals.css so the
-   two front-door pages look like one product. Only the primitives this page
-   actually uses are kept — card, form controls, button, alert, login shell. */
+/* EAL-Hub front door.
+ *
+ * The palette is the Erajaya Active Lifestyle logo's own: the red and blue of
+ * the swoosh, on a neutral slate. The teal this file used to carry came from
+ * vas-pmo and fought with the red as soon as the real logo went on the page.
+ *
+ * --brand is decorative (glows, rules, accents). --brand-strong is anything a
+ * user reads white text off: it is darkened to clear 4.5:1, which the logo red
+ * on its own does not.
+ */
 
 :root {
-  --ground: #f4f7f7;
+  --ground: #eef1f5;
   --panel: #ffffff;
-  --ink: #11262b;
-  --ink-soft: #33484e;
-  --muted: #5c7076;
-  --line: #dde6e7;
-  --line-soft: #eaf0f0;
-  --accent: #0d6e78;
-  --accent-ink: #0a585f;
+  --panel-soft: #f7f9fc;
+  --ink: #16202e;
+  --ink-soft: #3a4757;
+  --muted: #6b7889;
+  --line: #dfe4ec;
+  --line-soft: #eef1f5;
+
+  --brand: #e8342c;
+  --brand-strong: #c8271f;
+  --brand-deep: #1f3a93;
+  --odoo: #714b67;
+
   --crit: #b23a3a;
-  --crit-soft: #fae7e7;
-  --shadow: 0 1px 2px rgba(17, 38, 43, 0.06), 0 8px 24px -18px rgba(17, 38, 43, 0.28);
+  --crit-soft: #fdecec;
+  --crit-line: #f2c4c4;
+
+  --shadow: 0 1px 2px rgba(16, 32, 46, 0.05), 0 24px 60px -32px rgba(16, 32, 46, 0.45);
   --ui: "Segoe UI", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
   --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Consolas, Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: #0c1618; --panel: #122023;
-    --ink: #e4edee; --ink-soft: #c3d3d5; --muted: #8aa1a6;
-    --line: #1f3439; --line-soft: #1a2c31;
-    --accent: #42b3bd; --accent-ink: #7fd0d7;
-    --crit: #e08585; --crit-soft: #351a1a;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px -18px rgba(0, 0, 0, 0.8);
+    --ground: #0b1119;
+    --panel: #141d29;
+    --panel-soft: #101825;
+    --ink: #e6ecf3;
+    --ink-soft: #c2ccd9;
+    --muted: #8593a5;
+    --line: #24303f;
+    --line-soft: #1b2531;
+
+    --brand: #f2554d;
+    --brand-strong: #d8352c;
+    --brand-deep: #4966c4;
+    --odoo: #b98cae;
+
+    --crit: #f08b8b;
+    --crit-soft: #2c1618;
+    --crit-line: #5a2a2a;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 24px 60px -32px rgba(0, 0, 0, 0.9);
   }
 }
 
@@ -38,49 +65,420 @@ body {
   color: var(--ink);
   font-family: var(--ui);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
+a { color: var(--brand-strong); }
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------- shell -- */
+
+.wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.sheet {
+  width: min(940px, 100%);
+  display: grid;
+  grid-template-columns: 1.02fr 1fr;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* -------------------------------------------------------- brand panel --- */
+
+.brand-panel {
+  position: relative;
+  padding: 40px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  color: #eef2f8;
+  /* Always dark, in both colour schemes — this is the logo's own field, and
+     eal-logo-dark.png is drawn for it. */
+  background:
+    radial-gradient(120% 90% at 10% -10%, rgba(232, 52, 44, 0.42), transparent 58%),
+    radial-gradient(90% 80% at 100% 100%, rgba(31, 58, 147, 0.5), transparent 60%),
+    linear-gradient(160deg, #16223a 0%, #101827 55%, #0c121c 100%);
+}
+
+.brand-panel .eal-logo { width: min(220px, 70%); height: auto; display: block; }
+
+.brand-panel h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.brand-panel h1 .hub { color: #ff8b84; }
+
+.brand-panel p {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  color: rgba(238, 242, 248, 0.72);
+  max-width: 34ch;
+}
+
+.brand-rule {
+  width: 46px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-deep));
+}
+
+.brand-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  color: rgba(238, 242, 248, 0.6);
+}
+.brand-foot .odoo-mark { height: 15px; width: auto; color: #c9a6c0; }
+
+/* --------------------------------------------------------- form panel --- */
+
+.form-panel {
+  padding: 40px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  background: var(--panel);
+}
+
+/* Shown only when the brand panel is not — see the media query at the end. */
+.brand-compact { display: none; align-items: baseline; gap: 12px; }
+.brand-compact .eal-logo { height: 54px; width: auto; }
+.brand-caption {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.brand-compact .eal-logo.on-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  .brand-compact .eal-logo.on-light { display: none; }
+  .brand-compact .eal-logo.on-dark { display: block; }
+}
+
+.form-panel h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.form-panel .lede { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.staff-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.staff-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.stackv { display: flex; flex-direction: column; gap: 16px; }
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+select {
+  width: 100%;
+  height: 42px;
+  padding: 0 38px 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 14px;
+  /* The native arrow sits differently on every platform and cannot be styled;
+     replace it with one chevron that matches the rest of the form. */
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 17px center, right 12px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 0.12s ease;
+}
+select:hover { border-color: var(--muted); }
+
+.btn {
+  font-family: var(--ui);
+  font-size: 14px;
+  font-weight: 600;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.pri {
+  width: 100%;
+  background: var(--brand-strong);
+  border-color: var(--brand-strong);
+  color: #fff;
+}
+.btn.pri:hover { background: var(--brand); border-color: var(--brand); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled:hover { background: var(--brand-strong); border-color: var(--brand-strong); }
+
+.alert {
+  padding: 11px 13px;
+  border-radius: 9px;
+  font-size: 13px;
+  background: var(--crit-soft);
+  color: var(--crit);
+  border: 1px solid var(--crit-line);
+}
+
+.hint { margin: 0; font-size: 12px; color: var(--muted); }
+
+.panel-foot {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.panel-foot a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--line); }
+.panel-foot a:hover { color: var(--brand-strong); border-bottom-color: var(--brand-strong); }
+
+/* -------------------------------------------------------- version page -- */
+
+.page {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.page-head .eal-logo { height: 38px; width: auto; }
+.page-head .eal-logo.on-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  .page-head .eal-logo.on-light { display: none; }
+  .page-head .eal-logo.on-dark { display: block; }
+}
+.page-head h1 { margin: 4px 0 0; font-size: 22px; letter-spacing: -0.015em; }
+
 .card {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
   box-shadow: var(--shadow);
 }
 .card > header {
-  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-  padding: 12px 15px; border-bottom: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line-soft);
 }
 .card > header h2 { margin: 0; font-size: 13.5px; font-weight: 700; }
-.card .body { padding: 15px; }
+.card .body { padding: 16px; }
 
-.eyebrow {
-  font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--muted);
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line-soft);
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
 }
-.dim { color: var(--muted); }
-.stackv { display: flex; flex-direction: column; gap: 14px; }
-
-select {
-  width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px;
-  background: var(--panel); color: var(--ink); font-family: var(--ui); font-size: 13.5px;
+.fact { background: var(--panel); padding: 14px 16px; }
+.fact dt {
+  margin: 0 0 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
-label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 5px; }
+.fact dd { margin: 0; font-size: 15px; font-weight: 600; }
+.fact dd .sub { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+.fact dd .odoo-mark { height: 15px; width: auto; color: var(--odoo); vertical-align: -2px; }
 
-.btn {
-  font-family: var(--ui); font-size: 12.5px; font-weight: 600; padding: 7px 13px;
-  border-radius: 6px; border: 1px solid var(--line); background: var(--panel);
-  color: var(--ink-soft); cursor: pointer;
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+input[type="search"] {
+  flex: 1 1 220px;
+  height: 38px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 14px;
 }
-.btn:hover { border-color: var(--accent); color: var(--accent-ink); }
-.btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.toolbar select { width: auto; flex: 0 0 auto; height: 38px; }
 
-.alert {
-  padding: 10px 13px; border-radius: 7px; font-size: 13px;
-  background: var(--crit-soft); color: var(--crit); border: 1px solid var(--crit);
+.bucket { margin: 0 0 6px; }
+.bucket-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 18px 0 7px;
+}
+.bucket-head h3 { margin: 0; font-size: 13px; font-weight: 700; }
+.bucket-head .count { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+.mod {
+  border-top: 1px solid var(--line-soft);
+}
+.mod:first-child { border-top: 0; }
+/* Grid, not flex: the name/version line and the summary line have to be two
+   rows even though they are siblings, and a flex row cannot be told "this child
+   starts a new line" without wrapping every other child too. */
+.mod > summary {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 3px;
+  align-items: baseline;
+  padding: 11px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+.mod > summary::-webkit-details-marker { display: none; }
+.mod > summary::before {
+  content: "›";
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.12s ease;
+}
+.mod[open] > summary::before { transform: rotate(90deg); }
+.mod > summary:hover { background: var(--panel-soft); }
+.mod .mod-head {
+  grid-column: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mod .mod-name { font-weight: 600; }
+.mod .mod-tech { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.mod .mod-ver {
+  grid-column: 3;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.mod .mod-sum {
+  grid-column: 2 / -1;
+  font-size: 12.5px;
+  color: var(--muted);
 }
 
-.login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-.login-card { width: min(380px, 100%); }
+.changes { margin: 0; padding: 2px 16px 16px 40px; list-style: none; }
+.changes li {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 12.5px;
+  border-left: 2px solid var(--line);
+  padding-left: 12px;
+  margin-left: -12px;
+}
+.changes .when { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.changes .what { color: var(--ink-soft); }
+.changes .sha { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.changes .none { display: block; color: var(--muted); border-left: 0; }
+
+.note {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 12px 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* ------------------------------------------------------------ responsive - */
+
+@media (max-width: 860px) {
+  .wrap { padding: 16px; align-items: start; padding-top: 6vh; }
+  .sheet { grid-template-columns: 1fr; width: min(440px, 100%); }
+  /* Collapsed, not stacked: a 40vh block of gradient above the form is a wall
+     between the user and the thing they came to do. */
+  .brand-panel { display: none; }
+  .brand-compact { display: flex; }
+  .form-panel { padding: 28px 22px; gap: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

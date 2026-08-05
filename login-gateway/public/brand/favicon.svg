@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="EAL-Hub">
+  <!-- A 16px-legible reduction of the Erajaya swoosh: the two red arcs, the
+       blue ellipse and the red dot, with the wordmark dropped. The dark plate
+       keeps it visible in both light and dark browser chrome. -->
+  <rect width="64" height="64" rx="14" fill="#141d29"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M14 40 Q22 20 40 17" stroke="#E8342C" stroke-width="6"/>
+    <path d="M18 43 Q25 27 36 25" stroke="#E8342C" stroke-width="5"/>
+    <path d="M23 41 Q34 24 47 30 Q56 35 44 42" stroke="#1F3A93" stroke-width="6"/>
+  </g>
+  <circle cx="36" cy="45" r="5.5" fill="#E8342C"/>
+</svg>

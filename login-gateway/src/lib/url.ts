@@ -8,6 +8,18 @@ import { headers } from "next/headers";
 export const BASE_PATH = "/signin";
 
 /**
+ * Path to a file in public/.
+ *
+ * Next prepends basePath to routes and to static imports, but NOT to a plain
+ * string in `<img src>` — `/brand/eal-logo.png` would 404 because the file is
+ * actually served at /signin/brand/eal-logo.png. Everything under public/ must
+ * go through here.
+ */
+export function asset(path: string): string {
+  return `${BASE_PATH}${path}`;
+}
+
+/**
  * Builds an absolute URL on the origin the browser actually used.
  *
  * `redirect("/web/login")` would be resolved against basePath and send the
