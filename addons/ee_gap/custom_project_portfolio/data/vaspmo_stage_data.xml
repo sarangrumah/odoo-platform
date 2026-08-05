@@ -9,6 +9,7 @@
         <record id="stage_backlog" model="project.task.type">
             <field name="name">Backlog</field>
             <field name="custom_code">backlog</field>
+            <field name="user_id" eval="False"/>
             <field name="sequence">10</field>
             <field name="custom_applies_to">both</field>
             <field name="custom_sla_clock">running</field>
@@ -17,6 +18,7 @@
         <record id="stage_analysis" model="project.task.type">
             <field name="name">Analisis (BA)</field>
             <field name="custom_code">analysis</field>
+            <field name="user_id" eval="False"/>
             <field name="sequence">20</field>
             <field name="custom_applies_to">both</field>
             <field name="custom_sla_clock">running</field>
@@ -25,6 +27,7 @@
         <record id="stage_dev" model="project.task.type">
             <field name="name">Development</field>
             <field name="custom_code">dev</field>
+            <field name="user_id" eval="False"/>
             <field name="sequence">30</field>
             <field name="custom_applies_to">both</field>
             <field name="custom_sla_clock">running</field>
@@ -33,6 +36,7 @@
         <record id="stage_uat" model="project.task.type">
             <field name="name">UAT</field>
             <field name="custom_code">uat</field>
+            <field name="user_id" eval="False"/>
             <field name="sequence">40</field>
             <field name="custom_applies_to">both</field>
             <field name="custom_sla_clock">running</field>
@@ -41,6 +45,7 @@
         <record id="stage_waiting_user" model="project.task.type">
             <field name="name">Waiting User Verification</field>
             <field name="custom_code">waiting_user</field>
+            <field name="user_id" eval="False"/>
             <field name="sequence">50</field>
             <field name="custom_applies_to">both</field>
             <field name="custom_sla_clock">user_side</field>
@@ -51,6 +56,7 @@
         <record id="stage_done" model="project.task.type">
             <field name="name">Selesai</field>
             <field name="custom_code">done</field>
+            <field name="user_id" eval="False"/>
             <field name="sequence">60</field>
             <field name="custom_applies_to">both</field>
             <field name="custom_sla_clock">stopped</field>
@@ -63,6 +69,7 @@
         <record id="stage_hold" model="project.task.type">
             <field name="name">Hold</field>
             <field name="custom_code">hold</field>
+            <field name="user_id" eval="False"/>
             <field name="sequence">90</field>
             <field name="custom_applies_to">both</field>
             <field name="custom_sla_clock">paused</field>

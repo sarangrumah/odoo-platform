@@ -59,6 +59,7 @@ the Business Analyst.
         "security/ir.model.access.csv",
         "security/vaspmo_rules.xml",
         "data/vaspmo_stage_data.xml",
+        "data/vaspmo_stage_fixup.xml",
         "data/vaspmo_vertical_data.xml",
         "data/vaspmo_cron.xml",
         "views/custom_project_vertical_views.xml",

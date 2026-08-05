@@ -95,3 +95,28 @@ class ProjectTaskType(models.Model):
     def _stage_by_code(self, code):
         """Resolve a stage by its stable code. Returns an empty recordset if absent."""
         return self.search([("custom_code", "=", code)], limit=1)
+
+    @api.model
+    def _vaspmo_make_stages_shared(self):
+        """Clear the stage owner on every VAS PMO stage.
+
+        ``project.task.type.user_id`` defaults to ``self.env.uid``, and a stage that has
+        an owner is a *personal* stage: the global record rule
+        ``project.task_type_visibility_rule`` restricts it to ``user_id in (False,
+        user.id)``. Being global, that rule is AND-ed, so not even the project manager
+        group can see past it. Seeding these stages during install therefore made all
+        seven the private property of the installing user, which hides the whole board
+        from the team and makes the stage CMS unsavable.
+
+        Odoo's own shared stages dodge this by carrying ``project_ids``, which blanks
+        ``user_id`` through ``_compute_user_id``. VAS PMO stages are deliberately global
+        (they apply to every project and to change requests), so the owner is cleared
+        directly instead.
+
+        Called from data on every install and upgrade, because the stage records live in
+        a ``noupdate="1"`` block and would otherwise keep the owner they were born with.
+        """
+        stages = self.sudo().search([("custom_code", "!=", False), ("user_id", "!=", False)])
+        if stages:
+            stages.write({"user_id": False})
+        return True
