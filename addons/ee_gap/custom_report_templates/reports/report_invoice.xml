@@ -43,21 +43,29 @@
                 <t t-set="qty_field" t-value="'quantity'"/>
             </t>
 
+            <!-- Bank accounts as their own band (opt-in per company). When it is
+                 on, the OTHER COMMENTS box below drops its bank lines so the
+                 number is not printed twice. -->
+            <t t-if="company.report_show_bank_block" t-call="custom_report_templates.bank_block"/>
+
             <!-- Comments + totals (side-by-side via table, not Bootstrap grid) -->
             <table style="width: 100%; border-collapse: collapse;">
                 <tr>
                     <td style="width: 55%; vertical-align: top; padding-right: 10px;">
                         <t t-call="custom_report_templates.comments_box">
                             <!-- Per-invoice recipient bank wins; the company-wide text is the
-                                 fallback for invoices that don't nominate one. -->
-                            <div t-if="o.partner_bank_id">
-                                <div t-out="o.partner_bank_id.bank_id.name or 'Bank'"/>
-                                <div>A/C: <span t-out="o.partner_bank_id.acc_number"/></div>
-                                <div t-if="o.partner_bank_id.acc_holder_name"
-                                     t-out="o.partner_bank_id.acc_holder_name"/>
-                            </div>
-                            <span t-if="not o.partner_bank_id and company.report_bank_details"
-                                  t-out="company.report_bank_details"/>
+                                 fallback for invoices that don't nominate one. Both are
+                                 suppressed when the dedicated bank band above prints them. -->
+                            <t t-if="not company.report_show_bank_block">
+                                <div t-if="o.partner_bank_id">
+                                    <div t-out="o.partner_bank_id.bank_id.name or 'Bank'"/>
+                                    <div>A/C: <span t-out="o.partner_bank_id.acc_number"/></div>
+                                    <div t-if="o.partner_bank_id.acc_holder_name"
+                                         t-out="o.partner_bank_id.acc_holder_name"/>
+                                </div>
+                                <span t-if="not o.partner_bank_id and company.report_bank_details"
+                                      t-out="company.report_bank_details"/>
+                            </t>
                             <div t-if="o.narration" style="margin-top: 4px;" t-out="o.narration"/>
                         </t>
                     </td>
@@ -71,7 +79,9 @@
 
             <!-- Signature + footer -->
             <t t-call="custom_report_templates.signature_block">
-                <t t-set="signer" t-value="o.invoice_user_id.name"/>
+                <!-- Companies that sign invoices as a department (e.g. "Finance")
+                     set the label; the rest keep printing the salesperson. -->
+                <t t-set="signer" t-value="company.report_invoice_signer_label or o.invoice_user_id.name"/>
                 <t t-set="doc_noun">invoice</t>
             </t>
         </div>

@@ -16,6 +16,10 @@ WHAT IT DOES
 3. Ticks ``res.company.report_show_product_name`` so every document line prints
    the product name above its description, even when a user overwrote that
    description with free text.
+4. Ticks ``res.company.report_show_bank_block`` (the invoice prints a dedicated
+   "BANK TRANSFER TO" band listing the company's own bank accounts) and sets
+   ``res.company.report_invoice_signer_label`` to "Finance" so the signature
+   line stops printing the salesperson who created the sales order.
 
 The account numbers are client data — fill ``BANKS`` before running. Step 3
 needs no input and is applied on its own if ``BANKS`` is left empty.
@@ -59,6 +63,13 @@ BANK_DETAILS = {
 }
 
 SHOW_PRODUCT_NAME = True  # step 3 — no client input needed
+
+# Step 4 — invoice layout. The bank band prints whatever bank accounts the
+# company owns, so it works even when the numbers are typed in the UI instead
+# of through BANKS above. SIGNER_LABEL replaces the salesperson under the
+# signature line; set to None to leave the field untouched.
+SHOW_BANK_BLOCK = True
+SIGNER_LABEL = "Finance"
 # -------------------------------------------------------------------------
 
 env = self.env  # noqa: F821  (provided by odoo shell)
@@ -150,6 +161,24 @@ if SHOW_PRODUCT_NAME:
         print("    %-30s %s -> True" % (company.name, company.report_show_product_name))
         if COMMIT:
             company.report_show_product_name = True
+
+# --- 4. invoice layout: bank band + signer label -------------------------
+print("\n[4] report_show_bank_block / report_invoice_signer_label")
+for company in env["res.company"].sudo().search([]):
+    print(
+        "    %-30s bank_block %s -> %s | signer %r -> %r"
+        % (
+            company.name,
+            company.report_show_bank_block,
+            SHOW_BANK_BLOCK,
+            company.report_invoice_signer_label,
+            SIGNER_LABEL if SIGNER_LABEL is not None else company.report_invoice_signer_label,
+        )
+    )
+    if COMMIT:
+        company.report_show_bank_block = SHOW_BANK_BLOCK
+        if SIGNER_LABEL is not None:
+            company.report_invoice_signer_label = SIGNER_LABEL
 
 if COMMIT:
     env.cr.commit()

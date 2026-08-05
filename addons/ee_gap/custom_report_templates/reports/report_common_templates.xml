@@ -153,6 +153,31 @@
         </table>
     </template>
 
+    <!-- ============ BANK TRANSFER TO band ============ -->
+    <!-- Where the customer pays. The invoice's own `partner_bank_id` wins when
+         it nominates one; otherwise every bank account the company owns is
+         listed, so Finance only has to fill Settings > Companies > Bank
+         Accounts and the band follows. `report_bank_details` (NPWP and other
+         free text) is appended underneath when set. Requires in scope: o,
+         company, accent. -->
+    <template id="bank_block">
+        <t t-set="_banks" t-value="o.partner_bank_id or company.partner_id.bank_ids.filtered(lambda b: not b.company_id or b.company_id == company)"/>
+        <div t-if="_banks or company.report_bank_details" style="margin-bottom: 12px;">
+            <div t-attf-style="font-weight: bold; padding: 4px 8px; margin-bottom: 4px; background-color: {{accent}}; color: #ffffff;">
+                BANK TRANSFER TO
+            </div>
+            <div style="padding: 0 8px; font-size: 11px; line-height: 1.3;">
+                <div t-foreach="_banks" t-as="_bank" style="margin-bottom: 4px;">
+                    <div style="font-weight: bold;" t-out="_bank.bank_id.name or 'Bank'"/>
+                    <div>A/C: <span t-out="_bank.acc_number"/></div>
+                    <div>a.n. <span t-out="_bank.acc_holder_name or company.name"/></div>
+                </div>
+                <div t-if="company.report_bank_details" style="white-space: pre-line;"
+                     t-out="company.report_bank_details"/>
+            </div>
+        </div>
+    </template>
+
     <!-- ============ OTHER COMMENTS box (body slot) ============ -->
     <template id="comments_box">
         <div style="border: 1px solid #b0b0b0; font-size: 11px;">
