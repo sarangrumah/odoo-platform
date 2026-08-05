@@ -94,8 +94,10 @@
 	handle_path /portal/* {
 		reverse_proxy hub-portal:8080
 	}
+	# Same `redir * ...` form as the tenant chooser below — without the `*` this
+	# block answered 404 instead of redirecting, which it did until 2026-08-05.
 	handle /portal {
-		redir /portal/ 308
+		redir * /portal/ 308
 	}
 
 	# VAS PMO headless UI. Next.js is built with basePath=/vaspmo, so it expects to see
@@ -122,8 +124,13 @@
 	#
 	# Next.js is built with basePath=/signin, so it expects to see the prefix
 	# itself — `handle`, not `handle_path`, same as /vaspmo and /files above.
+	# `redir * <to> <code>`, NOT `redir <to> <code>`: Caddy reads a leading-slash
+	# first argument as a PATH MATCHER, so `redir /signin/ 302` compiles to "when
+	# the path is /signin/, redirect to the literal URI `302`" — a route that
+	# never fires and, if it did, would send a Location header of "302". The `*`
+	# says "match anything inside this handle block", which is what is meant.
 	handle / {
-		redir /signin/ 302
+		redir * /signin/ 302
 	}
 	handle /signin* {
 		reverse_proxy login-gateway:8080
@@ -134,7 +141,7 @@
 	# yet", so point it at the chooser instead of at a 404. Session expiry and
 	# logout both land here, which is what makes the flow self-healing.
 	handle /web/database/selector* {
-		redir /signin/ 302
+		redir * /signin/ 302
 	}
 
 	# Everything else under /web/database/ is the database manager: create,
