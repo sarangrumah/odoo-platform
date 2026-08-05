@@ -14,6 +14,17 @@ Idempotent — matches on category.code, updates in place, safe to re-run.
     docker exec -i odoo19-platform-odoo odoo shell -d prd_levis \
         --no-http < scripts/tenants/levis/70_load_withholding.py
 
+Tenants that do not run the l10n_id chart of accounts keep their own codes for the
+four hutang-pajak accounts, and every rule would be SKIPped. Remap the CSV's COA
+code onto the local one with ``WHT_COA_ALIAS`` (``src=dst`` pairs, comma separated).
+``trn_arkaaim``, for one, uses an 8-digit house chart:
+
+    docker exec -i \
+        -e WHT_COA_ALIAS="2104100005=21210030,2104100001=21210050,\
+2104100008=21210060,2104100003=21210010" \
+        odoo19-platform-odoo odoo shell -d trn_arkaaim \
+        --no-http < scripts/tenants/levis/70_load_withholding.py
+
 Notes / decisions confirmed by Finance:
   * Tax Treaty rows (13x DGT PPh 26) + PPh 21 row have a FLEXIBLE rate -> rule.tarif=0,
     flagged in notes ("Tarif fleksibel — isi manual per transaksi (P3B/DGT)").
@@ -42,6 +53,19 @@ for cand in (CSV, "/tmp/withholding_codes.csv", "scripts/tenants/levis/withholdi
         break
 else:  # pragma: no cover
     raise SystemExit("withholding_codes.csv not found (copy it into the container)")
+
+# Tenants that do not run the l10n_id chart keep their own account codes for the
+# four hutang-pajak accounts. Map the CSV's COA code onto the local one with
+#   WHT_COA_ALIAS="2104100005=21210030,2104100001=21210050,..."
+COA_ALIAS = {}
+for pair in os.environ.get("WHT_COA_ALIAS", "").split(","):
+    pair = pair.strip()
+    if not pair:
+        continue
+    src, _, dst = pair.partition("=")
+    COA_ALIAS[src.strip()] = dst.strip()
+if COA_ALIAS:
+    log("COA alias in effect: %s" % COA_ALIAS)
 
 Category = env["tax.withholding.category"]
 Rule = env["tax.withholding.rule"]
@@ -97,13 +121,15 @@ for r in rows:
 
     # One rule per company (account_id domain is company-scoped).
     for comp in companies:
+        coa_code = r["coa_code"].strip()
+        coa_code = COA_ALIAS.get(coa_code, coa_code)
         acc = (
             env["account.account"]
             .with_company(comp)
-            .search([("code", "=", r["coa_code"].strip()), ("company_ids", "in", comp.id)], limit=1)
+            .search([("code", "=", coa_code), ("company_ids", "in", comp.id)], limit=1)
         )
         if not acc:
-            log("SKIP rule %s/%s: COA %s missing in %s" % (code, comp.name, r["coa_code"], comp.name))
+            log("SKIP rule %s/%s: COA %s missing in %s" % (code, comp.name, coa_code, comp.name))
             continue
         rule = Rule.search([("category_id", "=", cat.id), ("company_id", "=", comp.id)], limit=1)
         rvals = {
