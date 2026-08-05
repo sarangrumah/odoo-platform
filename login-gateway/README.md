@@ -38,13 +38,43 @@ in a request the browser never makes.
   an existing `session.db`. It is a server-to-server mechanism; a browser
   session cannot be built on it. See `odoo/http.py::_get_session_and_dbname`.
 
+## Public vs internal environments
+
+A target with `"visibility": "internal"` is **absent** from the chooser — not
+greyed out, not disabled: absent. A vertical whose targets are all internal
+disappears entirely, so the page does not even name the project. `resolveDb()`
+refuses internal pairs too, so a hand-crafted POST gets the same "not available"
+as a nonexistent one.
+
+Today that leaves clients seeing three entries: Levi's Production, ARKA-AIM
+Production, ARKA-AIM Training. Everything else — working copies (`prd_levis_AP`,
+`prd_detail_levis`, `prd_levis`), R&D, demo builds, the WMS and Gentle Woman
+builds that have no live users yet — is internal.
+
+To see them, open **`/signin?staff=<STAFF_KEY>`** once. The key is validated
+server-side, exchanged for a 12-hour cookie, and stripped from the URL
+immediately so it does not linger in history or a `Referer`. The header then
+reads "mode staf" and internal entries are marked `· internal`.
+
+`STAFF_KEY` unset = the unlock is off and internal entries are hidden from
+everyone, us included. It fails closed.
+
+This gate is a convenience on a *listing*, not an authorisation boundary — the
+real one is Odoo asking for a password on the next page. Its job is to keep our
+internal database inventory out of a client's view.
+
 ## Adding or removing an environment
 
 Edit `config/tenants.json`:
 
 ```json
 { "code": "training", "label": "Training", "db": "trn_arkaaim" }
+{ "code": "rnd", "label": "R&D", "db": "rnd_levis", "visibility": "internal" }
 ```
+
+`visibility` defaults to `"public"` when omitted. A typo in it is a hard error
+rather than a silent fallback — falling back to public would publish exactly
+what the line was meant to hide.
 
 `code` and `label` are what the browser sees; `db` never leaves the server. Keep
 it that way: **never make a `slug` or a `code` equal to a database name**, or the
@@ -69,6 +99,7 @@ want end users to read.
 | `ODOO_FRONT_URL` | `http://odoo-front:8069` | The multi-DB Odoo (`LIST_DB=False`, `DBFILTER=^.*$`) |
 | `TENANTS_CONFIG_PATH` | `/app/config/tenants.json` | Allow-list location |
 | `ODOO_TIMEOUT_MS` | `10000` | Bootstrap request timeout |
+| `STAFF_KEY` | *(unset)* | Unlocks internal entries at `/signin?staff=<key>`; unset = hidden from everyone |
 | `COOKIE_SECURE` | `true` | Set to `false` only for a plain-http dev run |
 
 ## Local run

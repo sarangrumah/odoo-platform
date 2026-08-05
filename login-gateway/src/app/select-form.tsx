@@ -6,7 +6,13 @@ import type { PublicVertical } from "@/lib/tenants";
 
 import { chooseTenant, type ChooseState } from "./actions";
 
-export default function SelectForm({ verticals }: { verticals: PublicVertical[] }) {
+export default function SelectForm({
+  verticals,
+  isStaff,
+}: {
+  verticals: PublicVertical[];
+  isStaff: boolean;
+}) {
   const [state, formAction, pending] = useActionState<ChooseState, FormData>(chooseTenant, {});
   const [slug, setSlug] = useState(verticals[0]?.slug ?? "");
 
@@ -18,7 +24,7 @@ export default function SelectForm({ verticals }: { verticals: PublicVertical[] 
         <header>
           <div>
             <h2>Erajaya Odoo</h2>
-            <span className="eyebrow">Pilih tujuan</span>
+            <span className="eyebrow">{isStaff ? "Pilih tujuan · mode staf" : "Pilih tujuan"}</span>
           </div>
         </header>
         <form action={formAction} className="body stackv">
@@ -46,7 +52,9 @@ export default function SelectForm({ verticals }: { verticals: PublicVertical[] 
             <select key={slug} id="environment" name="environment" required>
               {targets.map((t) => (
                 <option key={t.code} value={t.code}>
-                  {t.label}
+                  {/* The marker only ever renders in staff mode — a client's
+                      list contains no internal entries to mark. */}
+                  {t.internal ? `${t.label} · internal` : t.label}
                 </option>
               ))}
             </select>

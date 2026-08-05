@@ -2,14 +2,14 @@
   "verticals": [
     {
       "slug": "levis",
-      "name": "Levi's Indonesia",
+      "name": "PT ERA Busana Retailindo",
       "targets": [
         { "code": "prod", "label": "Production", "db": "prd_levis_begbal" },
-        { "code": "prod-ap", "label": "Production — Account Payable", "db": "prd_levis_AP" },
-        { "code": "prod-detail", "label": "Production — Detail", "db": "prd_detail_levis" },
-        { "code": "prod-legacy", "label": "Production (legacy)", "db": "prd_levis" },
-        { "code": "demo", "label": "Demo", "db": "demo_updated_levis" },
-        { "code": "rnd", "label": "R&D", "db": "rnd_levis" }
+        { "code": "ap", "label": "AP / Purchase testing", "db": "prd_levis_AP", "visibility": "internal" },
+        { "code": "detail", "label": "GL detail working copy", "db": "prd_detail_levis", "visibility": "internal" },
+        { "code": "pre-begbal", "label": "Pre-opening-balance copy", "db": "prd_levis", "visibility": "internal" },
+        { "code": "demo", "label": "Demo", "db": "demo_updated_levis", "visibility": "internal" },
+        { "code": "rnd", "label": "R&D", "db": "rnd_levis", "visibility": "internal" }
       ]
     },
     {
@@ -18,42 +18,44 @@
       "targets": [
         { "code": "prod", "label": "Production", "db": "prd_arkaaim" },
         { "code": "training", "label": "Training", "db": "trn_arkaaim" },
-        { "code": "training-begbal", "label": "Training — Opening Balance", "db": "trn_arkaaim_begbal" }
+        { "code": "training-begbal", "label": "Training — opening balance", "db": "trn_arkaaim_begbal", "visibility": "internal" }
       ]
     },
     {
       "slug": "wms",
       "name": "Warehouse Management",
       "targets": [
-        { "code": "prod", "label": "Production", "db": "prd_wms" },
-        { "code": "demo", "label": "Demo", "db": "demo_wms" },
-        { "code": "rnd", "label": "R&D", "db": "rnd_wms" }
+        { "code": "prod", "label": "Production", "db": "prd_wms", "visibility": "internal" },
+        { "code": "demo", "label": "Demo", "db": "demo_wms", "visibility": "internal" },
+        { "code": "rnd", "label": "R&D", "db": "rnd_wms", "visibility": "internal" }
+      ]
+    },
+    {
+      "slug": "gw",
+      "name": "Gentle Woman",
+      "targets": [
+        { "code": "prod", "label": "Production", "db": "gentlewoman", "visibility": "internal" }
       ]
     },
     {
       "slug": "ppob",
       "name": "PPOB",
-      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_ppob" }]
+      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_ppob", "visibility": "internal" }]
     },
     {
       "slug": "esb",
-      "name": "EFN — ESB Integration",
-      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_esb" }]
+      "name": "EFN — ESB integration",
+      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_esb", "visibility": "internal" }]
     },
     {
       "slug": "vaspmo",
       "name": "VAS PMO",
-      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_vas_pmo" }]
-    },
-    {
-      "slug": "gw",
-      "name": "Gentle Woman",
-      "targets": [{ "code": "prod", "label": "Production", "db": "gentlewoman" }]
+      "targets": [{ "code": "rnd", "label": "R&D", "db": "rnd_vas_pmo", "visibility": "internal" }]
     },
     {
       "slug": "sandbox",
       "name": "Sandbox",
-      "targets": [{ "code": "demo", "label": "Demo", "db": "demo" }]
+      "targets": [{ "code": "demo", "label": "Demo", "db": "demo", "visibility": "internal" }]
     }
   ]
 }

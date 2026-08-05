@@ -1,10 +1,12 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { bootstrapSession } from "@/lib/bootstrap";
+import { STAFF_COOKIE } from "@/lib/staff";
 import { resolveDb } from "@/lib/tenants";
+import { absolute } from "@/lib/url";
 
 export interface ChooseState {
   error?: string;
@@ -21,13 +23,19 @@ export async function chooseTenant(_prev: ChooseState, formData: FormData): Prom
     return { error: "Pilih vertical dan environment terlebih dahulu." };
   }
 
+  const store = await cookies();
+  const isStaff = store.get(STAFF_COOKIE)?.value === "1";
+
   // The browser only ever sends a (slug, code) pair; the database name is
-  // produced here, from the server-side allow-list, and stays here.
-  const db = await resolveDb(slug, code);
+  // produced here, from the server-side allow-list, and stays here. resolveDb
+  // re-checks visibility rather than trusting that the page only offered what
+  // this browser is allowed to pick.
+  const db = await resolveDb(slug, code, isStaff);
   if (!db) {
-    // Same message for "no such vertical" and "no such environment" — the form
-    // cannot produce either, so anything reaching this branch is someone
-    // probing the pair space, and it should not confirm which half was right.
+    // Same message for "no such vertical", "no such environment" and "internal,
+    // and you are not staff" — the form cannot produce any of them, so anything
+    // reaching this branch is someone probing the pair space, and it should not
+    // confirm which guess was close.
     return { error: "Pilihan tidak tersedia. Muat ulang halaman lalu coba lagi." };
   }
 
@@ -41,7 +49,6 @@ export async function chooseTenant(_prev: ChooseState, formData: FormData): Prom
     return { error: "Environment ini sedang tidak tersedia. Hubungi administrator." };
   }
 
-  const store = await cookies();
   store.set("session_id", result.cookie, {
     httpOnly: true,
     secure: COOKIE_SECURE,
@@ -56,8 +63,5 @@ export async function chooseTenant(_prev: ChooseState, formData: FormData): Prom
   // Absolute URL on purpose: `redirect("/web/login")` would be resolved against
   // this app's basePath and send the browser to /signin/web/login, which does
   // not exist. /web/login belongs to Odoo, one route table up in Caddy.
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const host = h.get("host") ?? "";
-  redirect(`${proto}://${host}/web/login`);
+  redirect(await absolute("/web/login"));
 }

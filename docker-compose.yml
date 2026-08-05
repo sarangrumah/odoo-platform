@@ -771,6 +771,10 @@ services:
       # the one — the public `odoo` runs ^%d$ and would refuse them all here.
       ODOO_FRONT_URL: ${LOGIN_GATEWAY_ODOO_URL:-http://odoo-front:8069}
       TENANTS_CONFIG_PATH: /app/config/tenants.json
+      # Unlocks the environments marked `"visibility": "internal"` in
+      # tenants.json, via /signin?staff=<key>. Leave EMPTY and they stay hidden
+      # from everyone — the gateway fails closed.
+      STAFF_KEY: ${LOGIN_GATEWAY_STAFF_KEY:-}
     ports:
       - "${LOGIN_GATEWAY_PORT:-18120}:8080"
     healthcheck:

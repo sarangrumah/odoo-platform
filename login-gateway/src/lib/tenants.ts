@@ -13,6 +13,14 @@ import { readFile } from "node:fs/promises";
  * must not become reachable just because it exists.
  */
 
+/**
+ * "public" is a client-facing environment. "internal" is ours — working copies,
+ * R&D, demo builds, anything a client should never see listed. Internal entries
+ * are omitted from the page entirely (not disabled, not greyed out: absent) and
+ * are refused by `resolveDb` unless the caller is holding the staff key.
+ */
+export type Visibility = "public" | "internal";
+
 export interface TenantTarget {
   /** Stable, opaque-to-the-client identifier, e.g. "prod", "rnd". */
   code: string;
@@ -20,6 +28,8 @@ export interface TenantTarget {
   label: string;
   /** Odoo database name. Server-side only. */
   db: string;
+  /** Defaults to "public" when the config omits it. */
+  visibility: Visibility;
 }
 
 export interface Vertical {
@@ -32,7 +42,7 @@ export interface Vertical {
 export interface PublicVertical {
   slug: string;
   name: string;
-  targets: { code: string; label: string }[];
+  targets: { code: string; label: string; internal: boolean }[];
 }
 
 const CONFIG_PATH = process.env.TENANTS_CONFIG_PATH ?? "/app/config/tenants.json";
@@ -71,7 +81,7 @@ function parse(raw: string): Vertical[] {
     const parsedTargets = targets.map((t, j) => {
       const tAt = `${at}.targets[${j}]`;
       if (!t || typeof t !== "object") throw new Error(`tenants.json: ${tAt} is not an object`);
-      const { code, label, db } = t as Record<string, unknown>;
+      const { code, label, db, visibility } = t as Record<string, unknown>;
 
       if (typeof code !== "string" || !CODE_RE.test(code)) {
         throw new Error(`tenants.json: ${tAt}.code must match ${CODE_RE}`);
@@ -84,7 +94,17 @@ function parse(raw: string): Vertical[] {
       if (typeof db !== "string" || !DB_NAME_RE.test(db)) {
         throw new Error(`tenants.json: ${tAt}.db must match ${DB_NAME_RE}`);
       }
-      return { code, label, db } satisfies TenantTarget;
+      // Omitted means public. A typo like "internl" must NOT silently fall back
+      // to public — that would publish exactly what it was meant to hide.
+      if (visibility !== undefined && visibility !== "public" && visibility !== "internal") {
+        throw new Error(`tenants.json: ${tAt}.visibility must be "public" or "internal"`);
+      }
+      return {
+        code,
+        label,
+        db,
+        visibility: (visibility as Visibility | undefined) ?? "public",
+      } satisfies TenantTarget;
     });
 
     return { slug, name, targets: parsedTargets } satisfies Vertical;
@@ -107,21 +127,46 @@ export async function loadVerticals(): Promise<Vertical[]> {
   return parse(await readFile(CONFIG_PATH, "utf8"));
 }
 
-/** Strips every `db` before the config can reach a React tree. */
-export function toPublic(verticals: Vertical[]): PublicVertical[] {
-  return verticals.map(({ slug, name, targets }) => ({
-    slug,
-    name,
-    targets: targets.map(({ code, label }) => ({ code, label })),
-  }));
+/**
+ * Strips every `db` before the config can reach a React tree, and drops the
+ * internal entries unless the caller is staff. A vertical whose targets are all
+ * internal disappears from the list entirely — otherwise the client-facing page
+ * would still name the project.
+ */
+export function toPublic(verticals: Vertical[], includeInternal: boolean): PublicVertical[] {
+  return verticals
+    .map(({ slug, name, targets }) => ({
+      slug,
+      name,
+      targets: targets
+        .filter((t) => includeInternal || t.visibility === "public")
+        .map(({ code, label, visibility }) => ({
+          code,
+          label,
+          internal: visibility === "internal",
+        })),
+    }))
+    .filter((v) => v.targets.length > 0);
 }
 
-export async function publicVerticals(): Promise<PublicVertical[]> {
-  return toPublic(await loadVerticals());
+export async function publicVerticals(includeInternal: boolean): Promise<PublicVertical[]> {
+  return toPublic(await loadVerticals(), includeInternal);
 }
 
-/** Returns the database for a (slug, code) pair, or null if it is not published. */
-export async function resolveDb(slug: string, code: string): Promise<string | null> {
+/**
+ * Returns the database for a (slug, code) pair, or null if it is not published
+ * to this caller. The `includeInternal` check is repeated here on purpose: the
+ * page filtering the list is cosmetic, this is the gate. A hand-crafted POST
+ * naming an internal pair must fail exactly like a nonexistent one.
+ */
+export async function resolveDb(
+  slug: string,
+  code: string,
+  includeInternal: boolean,
+): Promise<string | null> {
   const vertical = (await loadVerticals()).find((v) => v.slug === slug);
-  return vertical?.targets.find((t) => t.code === code)?.db ?? null;
+  const target = vertical?.targets.find((t) => t.code === code);
+  if (!target) return null;
+  if (target.visibility === "internal" && !includeInternal) return null;
+  return target.db;
 }
