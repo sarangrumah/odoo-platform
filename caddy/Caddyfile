@@ -111,19 +111,32 @@
 		reverse_proxy odoo19-platform-filebrowser:80
 	}
 
-	# Forward all remaining traffic to internal nginx, which still enforces
-	# rate-limit, blocks /web/database/manager, terminates HTTPS again for
-	# its full Odoo server-block (the port-80 block is a pure HTTP→HTTPS
-	# redirect and would loop forever behind Caddy). The inner hop is a
-	# self-signed cert on the docker network — verification is skipped.
-	reverse_proxy https://nginx:443 {
+	# All remaining traffic on the bare-IP host goes to the PRIVATE mgmt Odoo.
+	#
+	# Why not the public odoo: it runs dbfilter = ^%d$ (tenant isolation — a
+	# hostname may only reach the DB of the same name). DOMAIN here is a bare
+	# IP and no database is named after it, so the public instance answers
+	# EVERY path on this host with 303 -> /web/database/selector. Nothing can
+	# be logged into through it; routing this host to nginx/odoo served no one.
+	#
+	# odoo-mgmt runs dbfilter = ^.*$, so this host lists all databases in the
+	# manager AND can complete a login into the one you pick. Per-tenant
+	# routing is untouched: tenants reach the public odoo by their own
+	# hostname (dbfilter matches the DB name), never through this IP.
+	#
+	# NOTE: this bypasses the internal nginx hop, so the rate-limit and the
+	# extra security headers defined in nginx/conf.d/odoo.conf do not apply to
+	# this host. mgmt runs WORKERS=0 (threaded) — fine for admin/DB work, not
+	# sized for bulk end-user traffic.
+	reverse_proxy odoo-mgmt:8069 {
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
 		transport http {
 			read_timeout 720s
 			write_timeout 720s
 			dial_timeout 10s
-			tls_insecure_skip_verify
 		}
 	}
 
