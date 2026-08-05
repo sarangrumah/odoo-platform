@@ -5,12 +5,28 @@ import { STAFF_COOKIE } from "@/lib/staff";
 import { publicVerticals } from "@/lib/tenants";
 import { absolute, BASE_PATH } from "@/lib/url";
 
+import { BrandCompact, BrandPanel } from "./brand";
 import SelectForm from "./select-form";
 
 // The tenant list is read per request from a file that ops can edit, and what it
 // shows depends on a cookie; caching this page would serve a stale list and,
 // worse, risk a shared cache handing the staff view to a client.
 export const dynamic = "force-dynamic";
+
+/** The two-panel sheet both the normal and the empty state sit inside. */
+function Sheet({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="wrap">
+      <div className="sheet">
+        <BrandPanel />
+        <section className="form-panel">
+          <BrandCompact caption="EAL-Hub" />
+          {children}
+        </section>
+      </div>
+    </main>
+  );
+}
 
 export default async function Page({
   searchParams,
@@ -34,15 +50,17 @@ export default async function Page({
 
   if (!verticals.length) {
     return (
-      <main className="login-wrap">
-        <div className="card login-card">
-          <div className="body">
-            <p className="alert">Belum ada environment yang dipublikasikan.</p>
-          </div>
-        </div>
-      </main>
+      <Sheet>
+        <p className="alert" role="alert">
+          Belum ada environment yang dipublikasikan.
+        </p>
+      </Sheet>
     );
   }
 
-  return <SelectForm verticals={verticals} isStaff={isStaff} />;
+  return (
+    <Sheet>
+      <SelectForm verticals={verticals} isStaff={isStaff} />
+    </Sheet>
+  );
 }

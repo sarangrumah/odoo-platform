@@ -98,16 +98,101 @@ want end users to read.
 |---|---|---|
 | `ODOO_FRONT_URL` | `http://odoo-front:8069` | The multi-DB Odoo (`LIST_DB=False`, `DBFILTER=^.*$`) |
 | `TENANTS_CONFIG_PATH` | `/app/config/tenants.json` | Allow-list location |
+| `VERSIONS_CONFIG_PATH` | `/app/config/versions.json` | Data behind `/signin/versi` (see below) |
 | `ODOO_TIMEOUT_MS` | `10000` | Bootstrap request timeout |
 | `STAFF_KEY` | *(unset)* | Unlocks internal entries at `/signin?staff=<key>`; unset = hidden from everyone |
 | `COOKIE_SECURE` | `true` | Set to `false` only for a plain-http dev run |
+
+## Branding
+
+`public/brand/` holds the lockup used on the chooser and the version page.
+
+| File | What it is |
+|---|---|
+| `eal-logo.png` | The official Erajaya Active Lifestyle artwork, white field knocked out, trimmed, downscaled to 900px |
+| `eal-logo-dark.png` | Same artwork with the neutral inks lifted to near-white; the red/blue swoosh is untouched |
+| `favicon.svg` | The swoosh alone on a dark plate, drawn to stay legible at 16px |
+
+Two files rather than one because the official wordmark is **black** — it
+disappears on anything dark, and CSS cannot recolour a raster. Which one is used
+is decided per placement, not per theme: the brand panel is always dark so it
+always takes the dark variant, while the compact lockup swaps with
+`prefers-color-scheme` (in CSS, so there is no flash of the wrong logo).
+
+The Odoo wordmark is `src/app/odoo-mark.tsx`, drawn as an inline SVG rather than
+a file in `public/` so it can take its colour from `currentColor` and lighten in
+dark mode. An `<img src="…svg">` cannot.
+
+Source artwork:
+<https://www.erajaya.com/files/uploads/newseventattachment/uri/2022/Jan/18/61e6765517991/erajaya-active-lifestyle-fa-logo-latar-putih.png>
+
+Anything referenced out of `public/` must go through `asset()` in `src/lib/url.ts`.
+Next prepends `basePath` to routes and static *imports* but not to a plain string
+in `<img src>`, so a bare `/brand/eal-logo.png` 404s.
+
+**Changing a brand file needs an image rebuild** — only `config/` is
+bind-mounted; `public/` is baked in.
+
+## Version page (`/signin/versi`)
+
+Publicly linked from the chooser's footer. Shows the Odoo Community version
+(with the base-image digest pin), PostgreSQL, Python, and every custom addon
+with its manifest version and, for staff, the commits that touched it.
+
+The data is a generated file, not a live query — the gateway sits in front of
+the login and has no business opening a database connection:
+
+```bash
+python3 scripts/gen_module_versions.py        # writes login-gateway/config/versions.json
+docker compose restart login-gateway          # optional: the file is re-read per request
+```
+
+`config/` is bind-mounted read-only, so refreshing the page's data never needs
+an image rebuild — same mechanism as `tenants.json`. CI keeps the file honest:
+`.github/workflows/check-module-versions.yml` runs the generator with `--check`
+on any PR that touches a manifest, and fails if the committed file no longer
+matches. The check deliberately ignores the git-derived fields, which move on
+every commit and would make it unsatisfiable.
+
+### What the public view withholds
+
+Two things, and the second is the non-obvious one:
+
+1. modules in the `_tenants` bucket, whose names identify a client, and
+2. **every commit subject, on every module.**
+
+(2) is not paranoia. Commit messages on entirely generic modules read
+`feat(arkaaim): …`, `feat: Gentlewoman headless storefront`,
+`fix(lint): restore the warehouse-jds ruff ignore` — publishing the changelog
+would hand out exactly the client list that (1) and `tenants.json` go to some
+trouble to withhold. Redacting names from free text would mean maintaining a
+deny-list and being wrong the first time someone writes a new client's name, so
+the public view drops the subjects and shows the shape of the history instead:
+when the module last changed, and how many commits it has. The staff cookie
+(`/signin?staff=<key>`) reveals both.
+
+To publish the subjects anyway, return `m.changes` unconditionally in
+`publicVersions()` (`src/lib/versions.ts`).
 
 ## Local run
 
 ```bash
 npm install
 TENANTS_CONFIG_PATH=$PWD/config/tenants.json \
+VERSIONS_CONFIG_PATH=$PWD/config/versions.json \
 ODOO_FRONT_URL=http://127.0.0.1:18079 \
 COOKIE_SECURE=false \
 npm run dev            # http://localhost:8080/signin
+```
+
+Note that `next dev` streams source frames for server-side file reads, so the
+dev server's HTML contains the raw text of `tenants.json`, database names and
+all. That is a dev-mode artefact — the production build does not. Do the leak
+check against the built server:
+
+```bash
+npm run build
+cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static
+node .next/standalone/server.js
+curl -sL http://127.0.0.1:8080/signin/ | grep -E 'prd_|rnd_|demo_|trn_'   # must be empty
 ```
