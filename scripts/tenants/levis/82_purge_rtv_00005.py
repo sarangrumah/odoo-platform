@@ -58,8 +58,7 @@ if not rtv:
 others = env["custom.po.return"].search([("id", "!=", RTV_ID), ("state", "=", "done")])
 if others:
     raise SystemExit(
-        "other validated returns exist (%s) -- this script handles one record only"
-        % ", ".join(others.mapped("name"))
+        "other validated returns exist (%s) -- this script handles one record only" % ", ".join(others.mapped("name"))
     )
 
 if rtv.name != EXPECT_NAME:
@@ -86,15 +85,9 @@ return_move_ids = sorted(set(allocations.mapped("return_move_id").ids))
 pol_ids = sorted(set(allocations.mapped("purchase_line_id").ids))
 
 # The manual undo receipt is not referenced by the RTV -- find it through the chain.
-undo_move_ids = sorted(
-    env["stock.move"]
-    .search([("origin_returned_move_id", "in", return_move_ids)])
-    .ids
-)
+undo_move_ids = sorted(env["stock.move"].search([("origin_returned_move_id", "in", return_move_ids)]).ids)
 move_ids = sorted(set(return_move_ids + undo_move_ids))
-picking_ids = sorted(
-    set(env["stock.move"].browse(move_ids).mapped("picking_id").ids)
-)
+picking_ids = sorted(set(env["stock.move"].browse(move_ids).mapped("picking_id").ids))
 
 log("RTV %s id=%s state=%s date=%s by=%s" % (rtv.name, rtv.id, rtv.state, rtv.date, rtv.create_uid.login))
 log("source receipt moves: %s   POL: %s" % (source_move_ids, pol_ids))
@@ -248,7 +241,10 @@ cr.execute(
     "update stock_move set origin_returned_move_id = null where id in %s or origin_returned_move_id in %s",
     (tuple(move_ids), tuple(move_ids)),
 )
-cr.execute("update stock_picking set return_id = null where id in %s or return_id in %s", (tuple(picking_ids), tuple(picking_ids)))
+cr.execute(
+    "update stock_picking set return_id = null where id in %s or return_id in %s",
+    (tuple(picking_ids), tuple(picking_ids)),
+)
 cr.execute("delete from stock_move where id in %s", (tuple(move_ids),))
 log("deleted stock moves %s" % move_ids)
 cr.execute("delete from stock_picking where id in %s", (tuple(picking_ids),))
@@ -309,9 +305,7 @@ if cr.fetchone()[0]:
 cr.execute("select count(*) from account_move where id in %s", (tuple(je_ids),))
 if cr.fetchone()[0]:
     problems.append("journal entries survived")
-cr.execute(
-    "select count(*) from stock_move where origin_returned_move_id in %s", (tuple(source_move_ids),)
-)
+cr.execute("select count(*) from stock_move where origin_returned_move_id in %s", (tuple(source_move_ids),))
 n = cr.fetchone()[0]
 log("returns still hanging off source receipts %s: %s" % (source_move_ids, n))
 if n:
