@@ -7,4 +7,12 @@
               action="action_coretax_template_export"
               sequence="95"/>
 
+    <!-- Same FK/OF layout as the masa-pajak wizard above, but by date range
+         plus optional customer / journal filters. -->
+    <menuitem id="menu_coretax_fk_export"
+              name="Export e-Faktur Keluaran (FK)"
+              parent="account.menu_finance_reports"
+              action="action_coretax_fk_export"
+              sequence="96"/>
+
 </odoo>

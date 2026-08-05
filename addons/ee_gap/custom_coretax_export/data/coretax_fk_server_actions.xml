@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Multi-invoice export: appears in the invoice list's cog "Actions" menu.
+        `records` is the whole selection, and action_coretax_fk_export is
+        multi-record by design, so one workbook comes back holding every
+        selected invoice's FK row and its OF rows in date order.
+
+        List only — the form already has its own header button, and a duplicate
+        entry in the form's cog menu would just be noise.
+    -->
+
+    <record id="action_coretax_fk_export_moves" model="ir.actions.server">
+        <field name="name">Export e-Faktur Keluaran (FK/OF)</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_type">action</field>
+        <field name="binding_view_types">list</field>
+        <!-- Odoo 19 renamed ir.actions.server's groups_id to group_ids. -->
+        <field name="group_ids" eval="[(4, ref('account.group_account_invoice'))]"/>
+        <field name="state">code</field>
+        <field name="code">action = records.action_coretax_fk_export()</field>
+    </record>
+
+</odoo>

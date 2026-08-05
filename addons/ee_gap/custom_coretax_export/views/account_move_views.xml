@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_move_form_inherit_coretax_fk" model="ir.ui.view">
+        <field name="name">account.move.form.inherit.coretax.fk.export</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <!--
+                Single-invoice e-Faktur export. The `invisible` is convenience
+                only — the real enforcement is _coretax_fk_check_moves, which
+                the list-view Action needs anyway since it cannot hide itself
+                per record.
+            -->
+            <xpath expr="//header" position="inside">
+                <button name="action_coretax_fk_export" type="object"
+                        string="Export e-Faktur (FK)"
+                        groups="account.group_account_invoice"
+                        invisible="state != 'posted' or move_type != 'out_invoice'"
+                        help="Unduh berkas import Coretax e-Faktur Keluaran (FK/OF) untuk faktur ini."/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
