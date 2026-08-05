@@ -29,6 +29,12 @@ Features
 - **Branch dimension** — ``account.analytic.account`` extended with
   ``branch_code`` + ``is_branch_root`` for cost-centre reporting by
   legal branch / kantor cabang.
+- **Lock Dates** — Accounting → Configuration → Lock Dates puts the
+      four soft lock dates CE enforces but never exposes (global, tax,
+      sales, purchase) in front of ``account.group_account_manager``,
+      per company, with a warning about draft entries still sitting in
+      the period being locked. ``hard_lock_date`` is deliberately not
+      offered: core refuses to remove or decrease it.
 - **Unique vendor bill reference** — escalates Odoo CE's soft
   ``duplicated_ref_ids`` warning into a hard block: posting a vendor
   bill whose Bill Reference is already used by the same vendor
@@ -49,7 +55,7 @@ elimination journal entry is written to ``pdp.audit_log`` via the
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.4.0",
+    "version": "19.0.0.5.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -78,6 +84,7 @@ elimination journal entry is written to ``pdp.audit_log`` via the
         "views/fiscal_year_views.xml",
         "wizards/consolidation_report_wizard_views.xml",
         "wizards/fiscal_year_close_wizard_views.xml",
+        "wizards/lock_date_wizard_views.xml",
         "views/reconcile_rule_views.xml",
         "views/followup_views.xml",
         "views/credit_limit_views.xml",

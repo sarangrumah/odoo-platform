@@ -99,6 +99,16 @@
               sequence="80"
               groups="custom_accounting_full.group_match_admin"/>
 
+    <!-- CE ships the lock-date fields but no UI for them; EE hides the UI in
+         account_accountant. Period closing belongs to the accountant, so the
+         wizard lives under Accounting → Configuration rather than in Settings. -->
+    <menuitem id="menu_account_lock_date"
+              name="Lock Dates"
+              parent="account.menu_finance_configuration"
+              action="action_account_lock_date_wizard"
+              sequence="5"
+              groups="account.group_account_manager"/>
+
     <menuitem id="menu_match_result"
               name="3-Way Match Results"
               parent="account.menu_finance"

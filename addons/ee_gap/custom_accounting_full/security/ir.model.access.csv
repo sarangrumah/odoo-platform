@@ -33,3 +33,4 @@ access_match_result_admin,match result admin,model_custom_match_result,group_mat
 access_match_result_user,match result user,model_custom_match_result,account.group_account_user,1,0,0,0
 access_match_line_result_admin,match line result admin,model_custom_match_line_result,group_match_admin,1,1,1,1
 access_match_line_result_user,match line result user,model_custom_match_line_result,account.group_account_user,1,0,0,0
+access_lock_date_wiz,lock date wizard,model_custom_account_lock_date_wizard,account.group_account_manager,1,1,1,1
