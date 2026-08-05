@@ -66,62 +66,144 @@ Defaults to PREVIEW (nothing written). Set COMMIT = True to persist.
 # ----- knobs -------------------------------------------------------------
 COMMIT = False  # True to persist
 
-OU_PLAN_NAME = "Project"  # ARKA's only analytic plan; drives the OU field domain
-# Analytic plan whose accounts slice the shared advance account per person.
-# Named for its role, not its members: CodeQL's clear-text-logging rule reads a
-# constant called *_EMPLOYEE_* as personal data, and this is a config label.
-ADVANCE_SLICE_PLAN_NAME = "Employee"
-REALIZATION_DAYS = 14
-
 # Finance users to grant the approve/disburse/post/settle group to (logins).
 FINANCE_LOGINS = []
-
-TYPES = [
-    {
-        "code": "CA",
-        "name": "Cash Advance",
-        "kind": "cash_advance",
-        "account_code": "1109000002",
-        # Without this a CA request would number CA/... only by accident — the
-        # global fallback sequence is prefixed PC/.
-        "sequence_xmlid": "custom_petty_cash.seq_cash_advance_request",
-        "is_default": True,
-        "limit_enforcement": "warn",
-        "limit_per_request": 0.0,
-        "limit_outstanding": 0.0,
-        "max_open_requests": 0,
-        "block_when_overdue": True,
-    },
-    {
-        "code": "PC",
-        "name": "Petty Cash",
-        "kind": "petty_cash",
-        "account_code": "1115200001",
-        "sequence_xmlid": "custom_petty_cash.seq_petty_cash_request",
-        "is_default": False,
-        "limit_enforcement": "warn",
-        "limit_per_request": 5_000_000.0,
-        "limit_outstanding": 10_000_000.0,
-        "max_open_requests": 2,
-        "block_when_overdue": True,
-    },
-]
-
-# Bank-Out / Expense journal preference per company id, by CODE. First hit wins.
-BANK_OUT_PREF = {1: ["BCA1", "BNK1", "CSH"], 2: ["BNK1", "BNK2"]}
-EXPENSE_PREF = {1: ["MISC"], 2: ["JM"]}
 
 # Dedicated journal this script CREATES — never an existing shared bank journal.
 PAYMENT_JOURNAL_CODE = "PCPAY"
 PAYMENT_JOURNAL_NAME = "Petty Cash Payment"
 
-# Company 2 has no cash journal at all.
-CREATE_CASH_JOURNAL_FOR = [2]
-CASH_JOURNAL_CODE = "CSH"
-CASH_JOURNAL_NAME = "Kas"
+# ----- per-tenant profiles -----------------------------------------------
+# prd_arkaaim and trn_arkaaim do NOT share a chart of accounts: production runs
+# the bespoke 10-digit Erajaya chart, while the training DB was built on
+# l10n_id_psak_custom (8-digit PSAK). Their journal codes differ too (MISC/JM,
+# CSH/CSH1). One script, one profile per chart — selected by database name.
+#
+# ``create_missing_accounts`` is False everywhere except the training profile.
+# A setup script must never invent accounts in a production ledger; on trn the
+# PSAK chart genuinely has no employee-advance asset account (only liabilities
+# like "Employee Liabilities" and "Advance Sales"), so the two accounts below
+# are created to make the feature exercisable for training.
+PROFILES = {
+    "erajaya": {
+        "ou_plan_name": "Project",  # ARKA's only analytic plan
+        "realization_days": 14,
+        "create_missing_accounts": False,
+        "types": [
+            {
+                "code": "CA",
+                "name": "Cash Advance",
+                "kind": "cash_advance",
+                "account_code": "1109000002",
+                # Without this a CA request would number CA/... only by accident
+                # — the global fallback sequence is prefixed PC/.
+                "sequence_xmlid": "custom_petty_cash.seq_cash_advance_request",
+                "is_default": True,
+                "limit_enforcement": "warn",
+                "limit_per_request": 0.0,
+                "limit_outstanding": 0.0,
+                "max_open_requests": 0,
+                "block_when_overdue": True,
+            },
+            {
+                "code": "PC",
+                "name": "Petty Cash",
+                "kind": "petty_cash",
+                "account_code": "1115200001",
+                "sequence_xmlid": "custom_petty_cash.seq_petty_cash_request",
+                "is_default": False,
+                "limit_enforcement": "warn",
+                "limit_per_request": 5_000_000.0,
+                "limit_outstanding": 10_000_000.0,
+                "max_open_requests": 2,
+                "block_when_overdue": True,
+            },
+        ],
+        "bank_out_pref": {1: ["BCA1", "BNK1", "CSH"], 2: ["BNK1", "BNK2"]},
+        "expense_pref": {1: ["MISC"], 2: ["JM"]},
+        # Company 2 has no cash journal at all.
+        "create_cash_journal_for": [2],
+        "cash_journal_code": "CSH",
+        "cash_journal_name": "Kas",
+    },
+    "psak": {
+        "ou_plan_name": "Project",
+        "realization_days": 14,
+        "create_missing_accounts": True,
+        "types": [
+            {
+                "code": "CA",
+                "name": "Cash Advance",
+                "kind": "cash_advance",
+                "account_code": "11210020",
+                "account_name": "Employee Advance",
+                "account_type": "asset_receivable",
+                "sequence_xmlid": "custom_petty_cash.seq_cash_advance_request",
+                "is_default": True,
+                "limit_enforcement": "warn",
+                "limit_per_request": 0.0,
+                "limit_outstanding": 0.0,
+                "max_open_requests": 0,
+                "block_when_overdue": True,
+            },
+            {
+                "code": "PC",
+                "name": "Petty Cash",
+                "kind": "petty_cash",
+                "account_code": "11410040",
+                "account_name": "Advance for Operational Expenses",
+                "account_type": "asset_prepayments",
+                "sequence_xmlid": "custom_petty_cash.seq_petty_cash_request",
+                "is_default": False,
+                "limit_enforcement": "warn",
+                "limit_per_request": 5_000_000.0,
+                "limit_outstanding": 10_000_000.0,
+                "max_open_requests": 2,
+                "block_when_overdue": True,
+            },
+        ],
+        "bank_out_pref": {1: ["BNK1"], 2: ["BNK1"]},
+        "expense_pref": {1: ["MISC"], 2: ["MISC"]},
+        # Both companies already have CSH1.
+        "create_cash_journal_for": [],
+        "cash_journal_code": "CSH1",
+        "cash_journal_name": "Cash",
+    },
+}
+
+# Which profile each database uses. An unlisted DB stops the script rather than
+# guessing a chart.
+DB_PROFILE = {
+    "prd_arkaaim": "erajaya",
+    "trn_arkaaim": "psak",
+    "trn_arkaaim_begbal": "erajaya",
+}
 # -------------------------------------------------------------------------
 
 env = self.env  # noqa: F821  (provided by odoo shell)
+
+_dbname = env.cr.dbname
+if _dbname not in DB_PROFILE:
+    raise SystemExit(
+        "No profile for database %r. Add it to DB_PROFILE — guessing a chart of "
+        "accounts is exactly the mistake this map exists to prevent." % _dbname
+    )
+PROFILE_NAME = DB_PROFILE[_dbname]
+PROFILE = PROFILES[PROFILE_NAME]
+
+OU_PLAN_NAME = PROFILE["ou_plan_name"]
+# Analytic plan whose accounts slice the shared advance account per person.
+# Named for its role, not its members: CodeQL's clear-text-logging rule reads a
+# constant called *_EMPLOYEE_* as personal data, and this is a config label.
+ADVANCE_SLICE_PLAN_NAME = "Employee"
+REALIZATION_DAYS = PROFILE["realization_days"]
+TYPES = PROFILE["types"]
+BANK_OUT_PREF = PROFILE["bank_out_pref"]
+EXPENSE_PREF = PROFILE["expense_pref"]
+CREATE_CASH_JOURNAL_FOR = PROFILE["create_cash_journal_for"]
+CASH_JOURNAL_CODE = PROFILE["cash_journal_code"]
+CASH_JOURNAL_NAME = PROFILE["cash_journal_name"]
+CREATE_MISSING_ACCOUNTS = PROFILE["create_missing_accounts"]
 
 Account = env["account.account"].sudo()
 Journal = env["account.journal"].sudo()
@@ -131,6 +213,9 @@ Params = env["ir.config_parameter"].sudo()
 
 problems = []
 summary = []
+# PREVIEW cannot create, so the same account is asked for twice (company-level
+# fallback, then the type). Remember what we already announced.
+_announced_creates = set()
 
 
 def resolve_account(company, code):
@@ -139,6 +224,51 @@ def resolve_account(company, code):
     The company_ids clause is load-bearing — see the stale code_store note above.
     """
     return Account.with_company(company).search([("code", "=", code), ("company_ids", "in", company.id)], limit=1)
+
+
+def ensure_account(company, cfg):
+    """Resolve the type's advance account, creating it only where the profile
+    allows it (training charts that simply have no such account).
+
+    Returns an empty recordset when the account is missing and creation is not
+    permitted — the caller records that as a problem and the run aborts.
+    """
+    account = resolve_account(company, cfg["account_code"])
+    if account:
+        if not account.reconcile:
+            # Settlement reconciles the advance lines to zero; without this a
+            # request can never leave 'in_realization'.
+            print("  account %s not reconcilable -> SET reconcile=True" % cfg["account_code"])
+            if COMMIT:
+                account.reconcile = True
+        return account
+
+    if not CREATE_MISSING_ACCOUNTS:
+        problems.append("company %s: account %s not found" % (company.id, cfg["account_code"]))
+        return Account
+
+    if not cfg.get("account_name") or not cfg.get("account_type"):
+        problems.append(
+            "company %s: account %s missing and the profile gives no name/type to create it"
+            % (company.id, cfg["account_code"])
+        )
+        return Account
+
+    key = (company.id, cfg["account_code"])
+    if key not in _announced_creates:
+        _announced_creates.add(key)
+        print("  account %s CREATE  %-34s %s" % (cfg["account_code"], cfg["account_name"], cfg["account_type"]))
+    if not COMMIT:
+        return Account
+    return Account.with_company(company).create(
+        {
+            "code": cfg["account_code"],
+            "name": cfg["account_name"],
+            "account_type": cfg["account_type"],
+            "reconcile": True,
+            "company_ids": [(6, 0, [company.id])],
+        }
+    )
 
 
 def resolve_journal(company, codes, jtype_label):
@@ -151,7 +281,7 @@ def resolve_journal(company, codes, jtype_label):
 
 
 print("=" * 78)
-print("Cash advance setup — %s" % ("COMMIT" if COMMIT else "PREVIEW"))
+print("Cash advance setup — %s  [db=%s profile=%s]" % ("COMMIT" if COMMIT else "PREVIEW", _dbname, PROFILE_NAME))
 print("=" * 78)
 
 # --- global parameters ---------------------------------------------------
@@ -255,10 +385,12 @@ for company in env["res.company"].sudo().search([], order="id"):
     print("  bank-out  %-6s   expense %-6s" % (bank_out.code or "-", expense_journal.code or "-"))
 
     # Company-level fallback layer: an untyped request must still work.
-    default_account = resolve_account(company, TYPES[0]["account_code"])
-    if not default_account:
-        problems.append("company %s: account %s not found" % (company.id, TYPES[0]["account_code"]))
-    else:
+    # Goes through ensure_account so a profile that creates its accounts has
+    # them in place before this writes the company-level fallback.
+    # ensure_account already records a problem when the account is missing and
+    # the profile may not create it, so nothing to add here.
+    default_account = ensure_account(company, TYPES[0])
+    if default_account:
         print("  company default advance account -> %s (id %s)" % (TYPES[0]["account_code"], default_account.id))
         if COMMIT:
             company.write(
@@ -272,15 +404,13 @@ for company in env["res.company"].sudo().search([], order="id"):
 
     # Types.
     for cfg in TYPES:
-        account = resolve_account(company, cfg["account_code"])
+        account = ensure_account(company, cfg)
         if not account:
-            problems.append("company %s: account %s not found" % (company.id, cfg["account_code"]))
+            # A PREVIEW on a chart that needs the account created has already
+            # printed the CREATE; there is simply nothing to point at yet.
+            if CREATE_MISSING_ACCOUNTS and not COMMIT:
+                continue
             continue
-        if not account.reconcile:
-            problems.append(
-                "company %s: account %s is not reconcilable — settlement cannot clear"
-                % (company.id, cfg["account_code"])
-            )
 
         bank_for_type = bank_out
         if cfg["kind"] == "petty_cash":
