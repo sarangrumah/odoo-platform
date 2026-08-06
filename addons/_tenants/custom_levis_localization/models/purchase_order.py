@@ -19,9 +19,18 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 TRADE_SEQ = "purchase.order.levis.trade"
 NONTRADE_SEQ = "purchase.order.levis.nontrade"
+
+# Guard against the Quantity / Unit Price columns being swapped in a PO upload: a line
+# ordering this many pieces at a unit price this small is a pasted price, not an order.
+# Both thresholds are ir.config_parameter so a DB can retune them; either at 0 = guard off.
+SWAP_QTY_PARAM = "custom_levis_localization.po_swap_guard_qty"
+SWAP_PRICE_PARAM = "custom_levis_localization.po_swap_guard_price"
+SWAP_QTY_DEFAULT = 10000.0
+SWAP_PRICE_DEFAULT = 100.0
 
 
 class PurchaseOrder(models.Model):
@@ -132,6 +141,45 @@ class PurchaseOrder(models.Model):
 
 class PurchaseOrderLine(models.Model):
     _inherit = "purchase.order.line"
+
+    # ------------------------------------------------------------------
+    # Quantity / Unit Price column swap in uploads
+    # ------------------------------------------------------------------
+    @api.constrains("product_qty", "price_unit")
+    def _check_levis_qty_price_swap(self):
+        """Reject a line whose Quantity is obviously the Unit Price and vice versa.
+
+        PO sheets are uploaded through the native ``base_import``, where the column
+        mapping is entirely the user's to get right. Getting it wrong is silent and
+        expensive: 06-Aug-2026 saw 18 orders land with 124 million pieces "ordered"
+        at Rp 1 apiece, which validated a receipt, moved stock and wrecked the FIFO
+        cost of 200 products. An ``@api.onchange`` warning would not have helped —
+        ``base_import`` never runs onchanges — so this is a constraint.
+        """
+        param = self.env["ir.config_parameter"].sudo()
+        qty_max = float(param.get_param(SWAP_QTY_PARAM, SWAP_QTY_DEFAULT) or 0.0)
+        price_min = float(param.get_param(SWAP_PRICE_PARAM, SWAP_PRICE_DEFAULT) or 0.0)
+        if not qty_max or not price_min:
+            return  # guard disabled for this database
+        for line in self:
+            if line.display_type or not line.product_id:
+                continue
+            if line.product_qty < qty_max or not (0 < line.price_unit < price_min):
+                continue
+            raise ValidationError(
+                _(
+                    "Baris '%(product)s' memesan %(qty)s unit dengan harga satuan "
+                    "%(price)s — kolom Quantity dan Unit Price kemungkinan besar "
+                    "tertukar pada file upload.\n\n"
+                    "Periksa mapping kolom di file, lalu impor ulang. Bila jumlah ini "
+                    "memang benar, naikkan ambang batas pada parameter sistem "
+                    "%(param)s.",
+                    product=line.product_id.display_name,
+                    qty=line.product_qty,
+                    price=line.price_unit,
+                    param=SWAP_QTY_PARAM,
+                )
+            )
 
     # Preserve the base dependencies (product_id, order_id.partner_id) and add
     # the warehouse so the OU analytic re-stamps if the store changes. Re-declaring
