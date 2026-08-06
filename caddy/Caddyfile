@@ -269,6 +269,31 @@
 		respond `{"error":"RPC is not exposed on this host"}` 403
 	}
 
+	# --- Version disclosure -------------------------------------------------
+	# /web/webclient/version_info is auth="none" in Odoo (web/controllers/
+	# webclient.py) and answers any anonymous POST with the exact build:
+	# {"server_version": "19.0-20260528", "server_version_info": [...]}. That is
+	# the same disclosure the stripped `Server` header was removed for — it hands
+	# a scanner the precise CVE list to work through, and the build date narrows
+	# it to a single nightly.
+	#
+	# It is NOT closed with 403 like /xmlrpc, because the web client calls it:
+	# error_handlers.js pings it on a backoff to notice when a lost connection is
+	# back, and the `home` client action waits on it after a server restart. A
+	# refusal would leave "Connection lost. Trying to reconnect..." stuck on
+	# screen until the user reloads by hand. Both callers ignore the payload and
+	# only branch on resolve-vs-reject, so answering 200 with an empty result
+	# keeps reconnection working while telling an anonymous caller nothing.
+	#
+	# Authenticated clients still learn the version from session_info, which is
+	# where the web client reads it (start.js) — this closes the anonymous path
+	# only.
+	@version_info path /web/webclient/version_info
+	handle @version_info {
+		header Content-Type application/json
+		respond `{"jsonrpc":"2.0","id":null,"result":{}}` 200
+	}
+
 	# Erajaya Odoo Hub portal (landing + admin console) is mounted at /portal/*.
 	# The portal is a thin SPA + BFF; the BFF in turn signs HMAC calls to the
 	# tenant-orchestrator on the internal network.

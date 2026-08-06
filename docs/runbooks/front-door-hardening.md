@@ -48,6 +48,16 @@ Layer 1 — `caddy/Caddyfile` (commit "security headers, real client IP and scan
   CSRF-free credential surface; the whole access log held one hit and it was a
   scanner. Machine clients that need RPC get a tenant hostname instead.
 - **200 MB request body cap** (the same ceiling nginx allowed, so imports still work).
+- **`/web/webclient/version_info` answered by Caddy** with an empty result. The
+  route is `auth="none"` in Odoo, so before this any anonymous POST got
+  `19.0-20260528` back — the same disclosure the `Server` header was stripped for,
+  and it survived that stripping. It is answered rather than refused because the
+  web client polls it to detect that a lost connection is back
+  (`error_handlers.js`) and after a restart (`home` client action); both ignore the
+  payload and only branch on success, so a 403 would pin "Connection lost. Trying
+  to reconnect…" on screen. Authenticated clients still read the version from
+  `session_info`. Verify: `curl -sX POST -d '{}' -H 'Content-Type: application/json'
+  https://eal-hub.erajaya.com/web/webclient/version_info` → `"result":{}`.
 
 Layer 2 — `caddy/Dockerfile` + `caddy/coraza/*` (commit "OWASP CRS WAF and per-IP rate limits"):
 
