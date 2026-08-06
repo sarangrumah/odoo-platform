@@ -130,15 +130,30 @@ for xmlid, grp in targets.items():
         subset.write({"group_ids": [(3, grp.id)]})
         log("revoked %-24s from %d users" % (xmlid, len(subset)))
 
-# Verification. The failure mode that matters is a user left with no user-type
-# group at all: they would still log in, see an empty menu, and file a ticket
-# that looks like data loss rather than a rights change.
+# The failure mode that matters is a user left with no user-type group at all:
+# they would still log in, see an empty menu, and file a ticket that looks like
+# data loss rather than a rights change.
+#
+# It is not hypothetical. On prd_levis_AP (4 users) and prd_arkaaim (10) the
+# Internal User group was never materialised on the row -- those accounts were
+# internal users only *through* group_system implying it. Taking Settings away
+# would have taken their login with it. Grant the baseline explicitly instead:
+# it is what they already had in effect, so it is not an escalation, and the
+# alternative is to leave the tenant half-cleaned.
 stranded = losing.filtered(lambda u: group_user not in u.group_ids)
 if stranded:
+    log(
+        "granting base.group_user to %d users who held it only by implication: %s"
+        % (len(stranded), ", ".join(stranded.mapped("login")[:5]) + ("…" if len(stranded) > 5 else ""))
+    )
+    stranded.write({"group_ids": [(4, group_user.id)]})
+
+still_stranded = losing.filtered(lambda u: group_user not in u.group_ids)
+if still_stranded:
     env.cr.rollback()
     raise SystemExit(
-        "[adm] ABORTED: %d users would be left without base.group_user (%s). "
-        "Rolled back." % (len(stranded), ", ".join(stranded.mapped("login")[:5]))
+        "[adm] ABORTED: %d users still lack base.group_user after the grant (%s). "
+        "Rolled back." % (len(still_stranded), ", ".join(still_stranded.mapped("login")[:5]))
     )
 
 still = env["res.users"].search_count([("group_ids", "in", targets["base.group_system"].ids), ("active", "=", True)])
