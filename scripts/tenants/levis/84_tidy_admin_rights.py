@@ -98,16 +98,14 @@ missing = set(KEEP) - set(keep_users.mapped("login"))
 if missing:
     raise SystemExit(
         "[adm] these ADM_KEEP logins do not exist in %s: %s. Refusing to run "
-        "rather than silently keeping fewer admins than you intended."
-        % (DB, ", ".join(sorted(missing)))
+        "rather than silently keeping fewer admins than you intended." % (DB, ", ".join(sorted(missing)))
     )
 
-holders = env["res.users"].search(
-    [("group_ids", "in", targets["base.group_system"].ids), ("active", "=", True)]
-)
+holders = env["res.users"].search([("group_ids", "in", targets["base.group_system"].ids), ("active", "=", True)])
 losing = holders - keep_users
-log("db=%s  holders of group_system=%d  keeping=%d  revoking from=%d"
-    % (DB, len(holders), len(keep_users), len(losing)))
+log(
+    "db=%s  holders of group_system=%d  keeping=%d  revoking from=%d" % (DB, len(holders), len(keep_users), len(losing))
+)
 log("keeping: " + ", ".join(sorted(keep_users.mapped("login"))))
 
 # Backup first, and back up BOTH groups for everyone who has them, so a restore
@@ -143,12 +141,9 @@ if stranded:
         "Rolled back." % (len(stranded), ", ".join(stranded.mapped("login")[:5]))
     )
 
-still = env["res.users"].search_count(
-    [("group_ids", "in", targets["base.group_system"].ids), ("active", "=", True)]
-)
+still = env["res.users"].search_count([("group_ids", "in", targets["base.group_system"].ids), ("active", "=", True)])
 log("after: %d active users hold group_system (expected %d)" % (still, len(keep_users)))
-log("sample group counts after: " + ", ".join(
-    "%s=%d" % (u.login, len(u.group_ids)) for u in losing[:3]))
+log("sample group counts after: " + ", ".join("%s=%d" % (u.login, len(u.group_ids)) for u in losing[:3]))
 
 if APPLY:
     env.cr.commit()
