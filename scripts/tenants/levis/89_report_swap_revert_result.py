@@ -411,8 +411,10 @@ for g in gl_rows:
 # =========================================================================== tulis
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 wb.save(OUT)
+# 0644 + owned by the share user: File Browser (uid 1002) serves it, nobody else writes it
 try:
-    os.chmod(OUT, 0o664)
+    os.chmod(OUT, 0o644)
+    os.chown(OUT, 1002, 1002)
 except OSError:
     pass
 print(f"tersimpan: {OUT}")
