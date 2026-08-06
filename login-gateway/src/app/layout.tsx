@@ -6,7 +6,9 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "EAL-Hub — Masuk",
-  description: "Pintu masuk sistem ERP Erajaya Active Lifestyle — Odoo Community 19.0",
+  // No version number: this description is served to every anonymous visitor
+  // and to every crawler that indexes the login page.
+  description: "Pintu masuk sistem ERP Erajaya Active Lifestyle",
   // basePath does not apply to a bare string here, same trap as <img src>.
   icons: { icon: [{ url: asset("/brand/favicon.svg"), type: "image/svg+xml" }] },
 };
