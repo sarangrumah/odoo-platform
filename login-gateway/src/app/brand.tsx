@@ -40,7 +40,10 @@ export function BrandPanel() {
       <div className="brand-foot">
         <span>Dibangun di atas</span>
         <OdooMark className="odoo-mark" />
-        <span>Community 19.0</span>
+        {/* No version number: this panel renders for anonymous visitors, and
+            "19.0" is the string that tells a scanner which CVE list to work
+            through -- the same reason Caddy strips the Server header. */}
+        <span>Community</span>
       </div>
     </aside>
   );

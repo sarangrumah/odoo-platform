@@ -71,10 +71,15 @@ export default function SelectForm({
         </button>
         <p className="hint">Email dan password diisi di halaman login Odoo berikutnya.</p>
       </form>
-      <div className="panel-foot">
-        <span>Odoo Community 19.0</span>
-        <Link href="/versi">Versi &amp; riwayat rilis</Link>
-      </div>
+      {/* The release history, the module inventory and the exact version are a
+          staff view. A client at the login form gets neither the numbers nor a
+          link telling them the page exists -- and the page itself 404s for them. */}
+      {isStaff ? (
+        <div className="panel-foot">
+          <span>Odoo Community 19.0</span>
+          <Link href="/versi">Versi &amp; riwayat rilis</Link>
+        </div>
+      ) : null}
     </>
   );
 }

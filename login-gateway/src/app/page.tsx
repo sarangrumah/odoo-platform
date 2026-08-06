@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { STAFF_COOKIE } from "@/lib/staff";
+import { isStaffCookieValid, STAFF_COOKIE } from "@/lib/staff";
 import { publicVerticals } from "@/lib/tenants";
 import { absolute, BASE_PATH } from "@/lib/url";
 
@@ -41,7 +41,7 @@ export default async function Page({
     redirect(await absolute(`${BASE_PATH}/staff?key=${encodeURIComponent(raw)}`));
   }
 
-  const isStaff = (await cookies()).get(STAFF_COOKIE)?.value === "1";
+  const isStaff = isStaffCookieValid((await cookies()).get(STAFF_COOKIE)?.value);
 
   // publicVerticals() drops every `db`, and every internal entry unless this is
   // a staff browser, before the config reaches the client component below —

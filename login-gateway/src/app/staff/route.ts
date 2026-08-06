@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { isValidStaffKey, STAFF_COOKIE, STAFF_COOKIE_MAX_AGE } from "@/lib/staff";
+import { isValidStaffKey, mintStaffCookie, STAFF_COOKIE, STAFF_COOKIE_MAX_AGE } from "@/lib/staff";
 import { absolute, BASE_PATH } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +21,10 @@ export async function GET(request: NextRequest) {
   const key = request.nextUrl.searchParams.get("key");
   const target = await absolute(`${BASE_PATH}/`);
 
-  if (isValidStaffKey(key)) {
+  const minted = isValidStaffKey(key) ? mintStaffCookie() : null;
+  if (minted) {
     const store = await cookies();
-    store.set(STAFF_COOKIE, "1", {
+    store.set(STAFF_COOKIE, minted, {
       httpOnly: true,
       secure: COOKIE_SECURE,
       sameSite: "lax",

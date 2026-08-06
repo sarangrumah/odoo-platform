@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { bootstrapSession } from "@/lib/bootstrap";
-import { STAFF_COOKIE } from "@/lib/staff";
+import { isStaffCookieValid, STAFF_COOKIE } from "@/lib/staff";
 import { resolveDb } from "@/lib/tenants";
 import { absolute } from "@/lib/url";
 
@@ -24,7 +24,7 @@ export async function chooseTenant(_prev: ChooseState, formData: FormData): Prom
   }
 
   const store = await cookies();
-  const isStaff = store.get(STAFF_COOKIE)?.value === "1";
+  const isStaff = isStaffCookieValid(store.get(STAFF_COOKIE)?.value);
 
   // The browser only ever sends a (slug, code) pair; the database name is
   // produced here, from the server-side allow-list, and stays here. resolveDb

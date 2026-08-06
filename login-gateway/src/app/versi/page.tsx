@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 
-import { STAFF_COOKIE } from "@/lib/staff";
+import { isStaffCookieValid, STAFF_COOKIE } from "@/lib/staff";
 import { publicVersions } from "@/lib/versions";
 
 import { BrandCompact } from "../brand";
@@ -26,7 +27,14 @@ function fmt(iso: string): string {
 }
 
 export default async function VersiPage() {
-  const isStaff = (await cookies()).get(STAFF_COOKIE)?.value === "1";
+  const isStaff = isStaffCookieValid((await cookies()).get(STAFF_COOKIE)?.value);
+  // Staff only, and 404 rather than 403: an anonymous visitor should not learn
+  // that this page exists. Even its "public" rendering was an inventory -- the
+  // platform branch and commit, the base image digest, the runtime versions, and
+  // all 139 custom modules by technical name, version and date of last change.
+  // That is a target list, and it sat one click below the login form.
+  if (!isStaff) notFound();
+
   const { platform, buckets, modules, hidden, generated_at } = await publicVersions(isStaff);
 
   return (
