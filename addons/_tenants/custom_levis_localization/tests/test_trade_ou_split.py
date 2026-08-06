@@ -435,17 +435,13 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         self.assertEqual(small.order_line.price_unit, 1.0)
 
     def test_13c_guard_can_be_disabled(self):
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_levis_localization.po_swap_guard_qty", "0"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.po_swap_guard_qty", "0")
         try:
             po = self._make_po("trade", qty=413011.0)
             po.order_line.price_unit = 1.0
             self.assertEqual(po.order_line.product_qty, 413011.0)
         finally:
-            self.env["ir.config_parameter"].sudo().set_param(
-                "custom_levis_localization.po_swap_guard_qty", ""
-            )
+            self.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.po_swap_guard_qty", "")
 
     # ------------------------------------------------------------------
     # helpers

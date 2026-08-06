@@ -93,8 +93,7 @@ for order in orders:
     bad = lines.filtered(lambda l: l.product_qty >= SIG_QTY_MIN and l.price_unit <= SIG_PRICE_MAX)
     if len(bad) != len(lines):
         raise SystemExit(
-            "%s: %d/%d lines match the swap signature -- range is wrong, aborting"
-            % (order.name, len(bad), len(lines))
+            "%s: %d/%d lines match the swap signature -- range is wrong, aborting" % (order.name, len(bad), len(lines))
         )
 log("all %d orders carry the qty/price swap on every line" % len(orders))
 
@@ -146,6 +145,7 @@ if val_jes:
     )
 if company.restrictive_audit_trail:
     log("NOTE: restrictive_audit_trail is on -- the reversal adds entries, it cannot erase them")
+
 
 # --------------------------------------------------------------- snapshot ---
 def quants_by_usage():
@@ -204,15 +204,20 @@ for pid, entry in recv.items():
     product = env["product.product"].browse(pid).with_company(company)
     entry["price"] = entry["val"] / entry["qty"] if entry["qty"] else 0.0
     entry["cost_now"] = product.standard_price
-log("receipt touched %d products, %s pcs, value %s" % (len(recv), round(sum(e["qty"] for e in recv.values()), 2), round(sum(e["val"] for e in recv.values()), 2)))
+log(
+    "receipt touched %d products, %s pcs, value %s"
+    % (len(recv), round(sum(e["qty"] for e in recv.values()), 2), round(sum(e["val"] for e in recv.values()), 2))
+)
 
 returns = env["stock.picking"]
 suppress_before = Param.get_param(SUPPRESS_PARAM, "0")
 Param.set_param(SUPPRESS_PARAM, "1")  # private to this transaction, restored below
 try:
     for picking in done:
-        wizard = env["stock.return.picking"].with_context(active_id=picking.id, active_model="stock.picking").create(
-            {"picking_id": picking.id}
+        wizard = (
+            env["stock.return.picking"]
+            .with_context(active_id=picking.id, active_model="stock.picking")
+            .create({"picking_id": picking.id})
         )
         for line in wizard.product_return_moves:
             line.quantity = line.move_id.quantity
@@ -245,7 +250,10 @@ env.invalidate_all()
 # --------------------------------------- 3. reverse the receipt's GL entries ---
 if val_jes:
     reversals = val_jes._reverse_moves(
-        [{"date": fields.Date.context_today(env["account.move"]), "ref": _("Reversal of %s", je.ref)} for je in val_jes],
+        [
+            {"date": fields.Date.context_today(env["account.move"]), "ref": _("Reversal of %s", je.ref)}
+            for je in val_jes
+        ],
         cancel=True,
     )
     if len(reversals) != len(val_jes):
@@ -265,9 +273,7 @@ for pid, entry in sorted(recv.items()):
     else:
         # no stock before the receipt -> nothing to average back out of; fall back to the
         # unit price that the upload put in the Quantity column
-        pol = env["purchase.order.line"].search(
-            [("order_id", "in", orders.ids), ("product_id", "=", pid)], limit=1
-        )
+        pol = env["purchase.order.line"].search([("order_id", "in", orders.ids), ("product_id", "=", pid)], limit=1)
         cost = pol.product_qty if pol else entry["cost_now"]
         fallback.append((product.default_code, cost))
     product.standard_price = cost
@@ -287,9 +293,7 @@ problems = []
 # the receipt's own posting must be gone and nothing else may have moved, so every account
 # has to land exactly one receipt-worth lower than it was
 for acc in val_accounts:
-    booked = round(
-        sum(l.debit - l.credit for l in val_jes.line_ids.filtered(lambda l: l.account_id.id == acc.id)), 2
-    )
+    booked = round(sum(l.debit - l.credit for l in val_jes.line_ids.filtered(lambda l: l.account_id.id == acc.id)), 2)
     was, now = before["gl"].get(acc.id, 0.0), after["gl"].get(acc.id, 0.0)
     expected = round(was - booked, 2)
     log("GL %s: %s -> %s (expected %s, receipt had booked %s)" % (acc.code, was, now, expected, booked))
@@ -303,7 +307,9 @@ got_internal = after["quants"].get("internal", (0.0, 0.0))[0]
 if got_internal != expected_internal:
     problems.append("internal stock is %s, expected %s" % (got_internal, expected_internal))
 
-cr.execute("select count(*) from stock_quant where quantity < 0 and location_id in (select id from stock_location where usage='internal')")
+cr.execute(
+    "select count(*) from stock_quant where quantity < 0 and location_id in (select id from stock_location where usage='internal')"
+)
 n_neg = cr.fetchone()[0]
 if n_neg:
     problems.append("%s internal quants went negative" % n_neg)
@@ -332,9 +338,7 @@ log(
 if cost_off:
     log("cost differs >1%% from the PO unit price on %d products, first 10: %s" % (len(cost_off), cost_off[:10]))
 
-still_open = env["stock.picking"].search(
-    [("id", "in", pickings.ids), ("state", "not in", ("cancel", "done"))]
-)
+still_open = env["stock.picking"].search([("id", "in", pickings.ids), ("state", "not in", ("cancel", "done"))])
 if still_open:
     problems.append("receipts still open: %s" % still_open.mapped("name"))
 
