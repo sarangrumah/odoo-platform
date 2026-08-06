@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- The duplicate override lives next to the memo, where an operator
+         resolving the block is already looking. -->
+    <record id="view_account_payment_form_duplicate_checked" model="ir.ui.view">
+        <field name="name">account.payment.form.duplicate.checked</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_form"/>
+        <field name="arch" type="xml">
+            <field name="memo" position="after">
+                <field name="duplicate_checked"
+                       invisible="state not in ('draft',)"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_unapplied_payment_list" model="ir.ui.view">
+        <field name="name">account.payment.list.unapplied</field>
+        <field name="model">account.payment</field>
+        <field name="arch" type="xml">
+            <list string="Unapplied Payments" create="false" default_order="date desc">
+                <field name="date"/>
+                <field name="name" string="Payment"/>
+                <field name="partner_id"/>
+                <field name="payment_type"/>
+                <field name="memo" string="Description"/>
+                <field name="journal_id"/>
+                <field name="amount" sum="Total"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_unapplied_payment_search" model="ir.ui.view">
+        <field name="name">account.payment.search.unapplied</field>
+        <field name="model">account.payment</field>
+        <field name="arch" type="xml">
+            <search string="Unapplied Payments">
+                <field name="partner_id"/>
+                <field name="memo"/>
+                <field name="journal_id"/>
+                <filter name="outbound" string="Vendor Payments"
+                        domain="[('payment_type', '=', 'outbound')]"/>
+                <filter name="inbound" string="Customer Payments"
+                        domain="[('payment_type', '=', 'inbound')]"/>
+                <separator/>
+                <filter name="date" string="Payment Date" date="date"/>
+                <group>
+                    <filter name="by_partner" string="Partner" context="{'group_by': 'partner_id'}"/>
+                    <filter name="by_journal" string="Journal" context="{'group_by': 'journal_id'}"/>
+                    <filter name="by_date" string="Payment Date" context="{'group_by': 'date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_unapplied_payments" model="ir.actions.act_window">
+        <field name="name">Unapplied Payments</field>
+        <field name="res_model">account.payment</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_unapplied', '=', True)]</field>
+        <field name="context">{'search_default_outbound': 1}</field>
+        <field name="search_view_id" ref="view_unapplied_payment_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Every payment is applied to a document.
+            </p>
+            <p>
+                A payment listed here is posted but settles no invoice or bill. It
+                still moves cash and still sits on the receivable or payable
+                account, so it shows up in the aged reports as an open item that
+                nothing nets against — and the document it was meant to pay keeps
+                reading "Not Paid", which is what invites someone to pay it twice.
+            </p>
+        </field>
+    </record>
+
+    <!-- Next to the reconciliation screens this module already adds: an
+         unapplied payment is precisely a reconciliation that never happened. -->
+    <menuitem id="menu_unapplied_payments"
+              name="Unapplied Payments"
+              parent="menu_custom_reconciliation"
+              action="action_unapplied_payments"
+              sequence="5"/>
+
+</odoo>
