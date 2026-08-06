@@ -58,6 +58,29 @@ Layer 1 — `caddy/Caddyfile` (commit "security headers, real client IP and scan
   to reconnect…" on screen. Authenticated clients still read the version from
   `session_info`. Verify: `curl -sX POST -d '{}' -H 'Content-Type: application/json'
   https://eal-hub.erajaya.com/web/webclient/version_info` → `"result":{}`.
+- **The login gateway's version page is staff-only** (6-Aug-2026). `/signin/versi`
+  was linked from the signin footer and served an anonymous visitor the platform
+  branch and commit, the base image digest, the runtime versions and all 139
+  custom modules by technical name, version and date of last change. It now 404s
+  for anyone without a staff cookie, the footer link and the version string render
+  only in staff mode, and neither the brand panel nor the page `<meta
+  description>` prints "19.0" any more.
+
+  Hiding the link alone would have been theatre: the staff cookie held the literal
+  `1`, so `Cookie: lg_staff=1` — typed into devtools, no credential — returned the
+  354 KB staff view (every commit subject and hash) instead of the 132 KB public
+  one, and unlocked the internal environments in the chooser. The cookie is now
+  `<expiry>.<HMAC-SHA256(expiry, STAFF_KEY)>`, verified in constant time, with the
+  expiry inside the signed payload. **Rotating `LOGIN_GATEWAY_STAFF_KEY`
+  invalidates every outstanding unlock**, and this change already did — staff
+  re-open `/signin?staff=<key>` once per browser.
+
+  Verify: `curl -o /dev/null -w '%{http_code}\n' -H 'Cookie: lg_staff=1'
+  https://eal-hub.erajaya.com/signin/versi` → **404**.
+
+  Deploying it is a rebuild, not a restart — the gateway is a Next.js image:
+  `docker compose -f docker-compose.yml -f docker-compose.multitenant.yml build
+  login-gateway && ... up -d --no-deps login-gateway`.
 
 Layer 2 — `caddy/Dockerfile` + `caddy/coraza/*` (commit "OWASP CRS WAF and per-IP rate limits"):
 
