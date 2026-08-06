@@ -293,9 +293,16 @@ recorded with each. Nothing on this list can be closed from inside this repo alo
 
    Rollback CSVs for every tenant live in `/opt/odoo-platform/data/rights-backup/`.
 
+   Non-production followed the same day: `rnd_levis` 43 → 2 (keeping `admin` and
+   `am.ademaryadi@gmail.com`) and `trn_arkaaim` 14 → 3 (adding `odoo_admin`, as on
+   `prd_arkaaim`). Both were pre-checked for the empty-menu case and had none;
+   `trn_arkaaim` did have 11 users missing `base.group_user` on the row, which the
+   script granted. In both, the only accounts now lacking `group_user` are the
+   kept admins, which hold it by implication from `group_system`.
+
    Still open on this item: TOTP enrolment (nobody enrolled anywhere),
-   `prd_levis_AP`, and the non-production tenants — `rnd_levis` (43/43),
-   `trn_arkaaim` (14/17), `trn_arkaaim_begbal` (8/17), `gentlewoman` (3/5).
+   `prd_levis_AP`, and `trn_arkaaim_begbal` (8/17) plus `gentlewoman` (3/5). The
+   remaining tenants are single-user databases with nothing to clean.
 5. **File Browser (`/files`) is public.** **Decision: left as is, 6-Aug-2026** —
    login gate plus the WAF, the scanner refusal and the rate limit are accepted as
    sufficient for now. The upgrade path if that changes is Cloudflare Access (edge
