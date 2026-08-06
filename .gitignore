@@ -108,3 +108,10 @@ docs/*.docx
 # it explicitly: git cannot un-ignore files inside an ignored directory, so the
 # directory itself has to be named.
 !vas-pmo/src/app/(app)/logs/
+
+# ----- Graphify knowledge-graph output -----
+# `graphify extract` writes graph.json + graph.html + a cache/ dir (hundreds of KB
+# and up). It is a derived artifact: regenerate it with
+#   graphify extract <addon-path> --code-only --out /home/odoo-erp/odoo-platform
+# Unanchored on purpose — a graph can be built from any subdirectory.
+graphify-out/
