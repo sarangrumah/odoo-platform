@@ -141,39 +141,105 @@ files, and no rule can say anything useful about compressed bytes), and on
 stored XSS through an authenticated ORM write is not inspected — is stated there
 too. Deleting rule 1000111 restores full inspection at ~85 ms per RPC.
 
-## Still open — these need access this change did not have
+## Still open — measured and decided 6-Aug-2026
 
-1. **The origin is reachable directly, so Cloudflare can be bypassed.** Probes were
-   observed arriving from non-Cloudflare addresses. Until the origin only accepts
-   Cloudflare, every control that lives at the Cloudflare edge is optional from an
-   attacker's point of view. Two ways, best done together:
-   - Cloudflare **Authenticated Origin Pulls** (client-certificate on the CF→origin
-     hop) plus `tls client_auth` in the `eal-hub.erajaya.com` site block.
-   - Host firewall: allow 443/tcp only from the 22 Cloudflare ranges already listed
-     in `caddy/Caddyfile`. Note this box's `DOCKER-USER` chain is **empty** and 15
-     container ports are published to the LAN, so a firewall change here needs to
-     be planned against that inventory rather than dropped in.
-   The legacy bare-IP site block would have to go first, or be restricted to the
-   office range — it is the intended bypass today.
-2. **Cloudflare WAF is not configured** (dashboard access needed): enable Managed
-   Rules (OWASP + Cloudflare rulesets), a Rate Limiting rule on `/web/login`, Bot
-   Fight Mode, and turn on DNSSEC for `erajaya.com`. This is the cheap layer that
-   stops volumetric traffic before it costs origin CPU.
-3. **Phishing controls are DNS-side, not server-side** — nothing in this repo can
-   set them: SPF, DKIM and a `p=reject` DMARC policy on the sending domain, so a
-   forged "EAL Hub" mail cannot be delivered. The login page hardening here only
-   stops the *framing* half of a phishing flow.
-4. **MFA is not enforced in Odoo.** The rate limit makes credential stuffing slow;
-   only TOTP (`auth_totp`) plus a password policy makes a leaked password
-   insufficient. Worth pairing with a review of who holds Settings access, since
-   `ir.ui.view` write is equivalent to code execution in every user's browser.
-5. **File Browser (`/files`) is public.** It is login-gated, but it is the drop zone
-   for client spreadsheets and it is what the webshell scanners are aiming at. It
-   deserves either Cloudflare Access in front of it or an IP allowlist.
-6. **`/web/database/*` on the bare-IP host** reaches `odoo-mgmt` per an earlier
-   deliberate decision (see `caddy-recreate-overlay-drift` notes): the cross-tenant
-   database manager, held back by the master password alone. Unchanged here because
-   it was an explicit request, but it is the largest single item on this list.
+Each item below was re-measured on 6-Aug-2026 and put to the owner. Two turned out
+to be largely done already; four are decisions, not work, and the decision is
+recorded with each. Nothing on this list can be closed from inside this repo alone.
+
+1. **The origin is reachable directly, so Cloudflare can be bypassed.**
+   *Confirmed still true.* Caddy's own access log shows the socket source address
+   is preserved end to end (`remote_ip` is a real Cloudflare edge, e.g.
+   `172.69.89.166`, while `client_ip` is the visitor), so source-address filtering
+   on this host would work — the upstream NAT does not rewrite it.
+
+   **Decision: prepared, deliberately not enabled.** `scripts/security/origin_lockdown.sh`
+   builds the rules and prints them; nothing happens without `--apply`:
+   ```bash
+   ./scripts/security/origin_lockdown.sh --allow 192.168.3.0/24            # plan only
+   sudo ./scripts/security/origin_lockdown.sh --apply --allow 192.168.3.0/24 --trial 300
+   sudo ./scripts/security/origin_lockdown.sh --commit                     # within 300s, or it self-reverts
+   sudo ./scripts/security/origin_lockdown.sh --rollback
+   ```
+   It writes into `DOCKER-USER` (still empty on this box) because published ports
+   are DNAT'd before `INPUT` and an `INPUT` rule would never match. The allow list
+   is parsed out of the `trusted_proxies` block in `caddy/Caddyfile`, so the
+   firewall and the proxy cannot disagree about who Cloudflare is. `--apply`
+   accepts `RELATED,ESTABLISHED` first, arms an automatic rollback, and does not
+   persist across reboot — a reboot is a rollback.
+
+   **Order of operations matters, and getting it wrong is an outage.** Turn on
+   Cloudflare Authenticated Origin Pulls at the dashboard *first*, then add the
+   client-certificate check here:
+   ```caddy
+   # inside the eal-hub.erajaya.com site block, next to its tls directive
+   tls /path/fullchain.pem /path/privkey.pem {
+       client_auth {
+           mode require_and_verify
+           trust_pool file /etc/caddy/cloudflare-origin-pull-ca.pem
+       }
+   }
+   ```
+   (the CA is Cloudflare's public `origin-pull-ca.pem`). Enabling `client_auth`
+   before AOP is on at the edge locks out every visitor immediately.
+
+   Still true and still unaddressed: the bare-IP site block is the intended bypass,
+   Caddy also publishes **8443**, and 15 other container ports are published to the
+   LAN. The script prints that inventory rather than acting on it.
+2. **Cloudflare WAF is not configured** — needs dashboard access nobody in this
+   session had. Handover list, unchanged: Managed Rules (OWASP + Cloudflare
+   rulesets), a Rate Limiting rule on `/web/login`, Bot Fight Mode, and DNSSEC.
+   *Measured:* `dig DS erajaya.com` returns nothing, so **DNSSEC is confirmed off**.
+3. **Phishing controls — mostly already in place, one gap left.** Measured 6-Aug:
+   - SPF: present and ends in `-all` (hard fail) ✅
+   - DKIM: present for both senders — `google._domainkey` and `s1._domainkey`
+     (SendGrid) ✅
+   - DMARC: present but **`p=none`** ❌ — it reports and enforces nothing, so a
+     forged "EAL Hub" mail is still delivered. This is the whole remaining gap.
+
+   The change is one DNS record on `_dmarc.erajaya.com`, staged so legitimate mail
+   is not lost: run `p=quarantine` with `rua` reporting for two weeks, read the
+   aggregate reports, then move to `p=reject`:
+   ```
+   v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc-alert@erajaya.com; ruf=mailto:dmarc-alert@erajaya.com; fo=1
+   ```
+4. **MFA is available but nobody uses it, and almost everyone is an admin.**
+   Measured 6-Aug across the production databases:
+
+   | database | TOTP enrolled | holds Settings (`base.group_system`) |
+   |---|---|---|
+   | `prd_levis_begbal` | 0 of 73 | **73 of 73** |
+   | `prd_levis_AP` | 0 of 34 | 33 of 34 |
+   | `prd_detail_levis` | 0 of 27 | 27 of 27 |
+   | `prd_levis` | 0 of 65 | 28 of 65 |
+   | `prd_arkaaim` | 0 of 28 | 14 of 28 |
+
+   `auth_totp`, `auth_totp_mail` and `auth_totp_portal` are installed everywhere —
+   the capability is there, unused. Note Odoo 19 CE has **no** `totp_policy` column
+   on `res.company`, so enforcing 2FA is not a settings toggle; it needs a small
+   module that refuses a privileged login without it.
+
+   The admin figure is the sharper half: with `base.group_system` a user can write
+   `ir.ui.view`, which is code execution in every other user's browser, so on three
+   of these databases every account is effectively a superuser.
+
+   **Decision: deferred by the owner, 6-Aug-2026.** Recorded here rather than acted
+   on because both halves (enrolment rollout, revoking Settings per name) interrupt
+   people mid-work.
+5. **File Browser (`/files`) is public.** **Decision: left as is, 6-Aug-2026** —
+   login gate plus the WAF, the scanner refusal and the rate limit are accepted as
+   sufficient for now. The upgrade path if that changes is Cloudflare Access (edge
+   SSO, no IP list to maintain) or an allowlist in the Caddyfile.
+6. **`/web/database/*` on the bare-IP host** reaches `odoo-mgmt`: the cross-tenant
+   database manager, held back by the master password alone. *Measured:* it is
+   **actively used**, not a leftover — `odoo-mgmt` logged a `Database.backup` of
+   `prd_wms` on 5-Aug-2026, plus regular selector renders.
+
+   **Decision: left as is, 6-Aug-2026**, same as the original explicit request. It
+   remains the largest single item on this list: one master password stands between
+   any visitor to the bare IP and every tenant's data. If it is ever closed, the
+   replacement is already running — `pg_dump` of every database nightly at 02:30
+   with 14/8/6 rotation — and ad-hoc backups move to the CLI.
 
 ## Maintenance
 
