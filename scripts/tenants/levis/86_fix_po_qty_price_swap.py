@@ -93,11 +93,14 @@ before = {
     }
     for o in todo
 }
-log("before: %s pcs over %d lines, Rp %s" % (
-    round(sum(v["qty"] for v in before.values()), 2),
-    sum(v["lines"] for v in before.values()),
-    round(sum(v["untaxed"] for v in before.values()), 2),
-))
+log(
+    "before: %s pcs over %d lines, Rp %s"
+    % (
+        round(sum(v["qty"] for v in before.values()), 2),
+        sum(v["lines"] for v in before.values()),
+        round(sum(v["untaxed"] for v in before.values()), 2),
+    )
+)
 
 # --------------------------------------------------------------- 1. swap ---
 sample = []
