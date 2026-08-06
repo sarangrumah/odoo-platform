@@ -157,16 +157,32 @@ gantung = q(
     "and coalesce(am.ref, '') not like 'EBR-GL%' order by aml.debit desc"
 )
 
-# Kembar 016 vs 045.
+# Kembar 016 vs 045 -- seluruh baris jurnal, supaya terlihat keduanya identik.
 kembar = q(
-    "select am.name as mv, am.date, am.ref, rp.name as partner, aml.debit, "
-    "       aml.amount_residual as resid, aml.reconciled "
+    "select am.name as mv, am.date, am.ref, am.create_date, rp.name as partner, "
+    "       aa.code_store->>'1' as akun, aa.name->>'en_US' as akun_nama, "
+    "       aml.debit, aml.credit, aml.amount_residual as resid, aml.reconciled, aml.name as label "
     "from account_move_line aml "
     "join account_account aa on aa.id = aml.account_id "
     "join account_move am on am.id = aml.move_id "
     "left join res_partner rp on rp.id = aml.partner_id "
+    "where am.name in ('8282/2026/07/016', '8282/2026/07/045') "
+    "order by am.name, aa.code_store->>'1'"
+)
+
+# Tagihan yang benar-benar dilunasi oleh 045 -- inilah tagihan yang sama yang
+# disebut di keterangan baris 016.
+dilunasi = q(
+    "select am.name as bill, am.ref, am.invoice_date, aml.credit, "
+    "       am2.name as pelunas, p.amount, p.max_date "
+    "from account_move_line aml "
+    "join account_move am on am.id = aml.move_id "
+    "join account_account aa on aa.id = aml.account_id "
+    "join account_partial_reconcile p on p.credit_move_id = aml.id "
+    "join account_move_line aml2 on aml2.id = p.debit_move_id "
+    "join account_move am2 on am2.id = aml2.move_id "
     "where aa.account_type = 'liability_payable' "
-    "and am.name in ('8282/2026/07/016', '8282/2026/07/045') order by am.name"
+    "and am2.name = '8282/2026/07/045' order by am.name"
 )
 
 ebrgl = q(
@@ -318,29 +334,74 @@ note(
 
 # ---- Sheet 4: 016 vs 045
 ws4 = wb.create_sheet("016 vs 045")
-ws4["A1"] = "Dua jurnal bernominal sama untuk PT Metropolitan Land Tbk."
+ws4["A1"] = "8282/2026/07/016 adalah DOBEL-CATAT dari 8282/2026/07/045"
 ws4["A1"].font = Font(bold=True, size=12)
-head(ws4, 3, ["Jurnal", "Tanggal", "Keterangan", "Partner", "Debit", "Residual",
-              "Reconciled"], [22, 12, 46, 36, 18, 18, 12])
-r = 4
+ws4["A2"] = (
+    "Keduanya membayar tagihan yang sama: 00821/MTLA/MMB/INV-DRT/VII/26 (BILL/NT/EBR/2026/07/00005) "
+    "dan 00822/MTLA/MMB/INV-DSC/VII/26 (BILL/NT/EBR/2026/07/00006)."
+)
+ws4["A2"].font = NOTE_FONT
+
+ws4["A4"] = "Tagihan yang dilunasi oleh 8282/2026/07/045"
+ws4["A4"].font = SUB_FONT
+head(ws4, 5, ["Bill", "Reference vendor", "Tgl Tagihan", "Nilai Tagihan", "Dilunasi oleh",
+              "Nilai match", "Tgl match"], [28, 32, 12, 18, 22, 18, 12])
+r = 6
+t_dilunasi = Decimal(0)
+for x in dilunasi:
+    ws4.cell(row=r, column=1, value=x["bill"])
+    ws4.cell(row=r, column=2, value=x["ref"])
+    ws4.cell(row=r, column=3, value=x["invoice_date"])
+    ws4.cell(row=r, column=4, value=float(d(x["credit"]))).number_format = MONEY
+    ws4.cell(row=r, column=5, value=x["pelunas"])
+    ws4.cell(row=r, column=6, value=float(d(x["amount"]))).number_format = MONEY
+    ws4.cell(row=r, column=7, value=x["max_date"])
+    t_dilunasi += d(x["amount"])
+    r += 1
+ws4.cell(row=r, column=5, value="TOTAL").font = SUB_FONT
+c = ws4.cell(row=r, column=6, value=float(t_dilunasi))
+c.number_format, c.font, c.fill = MONEY, SUB_FONT, OK_FILL
+r += 2
+
+ws4.cell(row=r, column=1, value="Perbandingan baris demi baris").font = SUB_FONT
+r += 1
+head(ws4, r, ["Jurnal", "Tanggal", "Dibuat pada", "Keterangan jurnal", "Akun",
+              "Nama Akun", "Debit", "Credit", "Residual", "Keterangan baris"],
+     [22, 12, 20, 44, 14, 30, 18, 18, 18, 62])
+r += 1
 for x in kembar:
     ws4.cell(row=r, column=1, value=x["mv"])
     ws4.cell(row=r, column=2, value=x["date"])
-    ws4.cell(row=r, column=3, value=x["ref"])
-    ws4.cell(row=r, column=4, value=x["partner"])
-    ws4.cell(row=r, column=5, value=float(d(x["debit"]))).number_format = MONEY
-    c = ws4.cell(row=r, column=6, value=float(d(x["resid"])))
+    ws4.cell(row=r, column=3, value=(x["create_date"] or "")[:19])
+    ws4.cell(row=r, column=4, value=x["ref"])
+    ws4.cell(row=r, column=5, value=x["akun"])
+    ws4.cell(row=r, column=6, value=x["akun_nama"])
+    for col, key in ((7, "debit"), (8, "credit")):
+        ws4.cell(row=r, column=col, value=float(d(x[key]))).number_format = MONEY
+    c = ws4.cell(row=r, column=9, value=float(d(x["resid"])))
     c.number_format = MONEY
-    c.fill = WARN_FILL if d(x["resid"]) else OK_FILL
-    ws4.cell(row=r, column=7, value="ya" if x["reconciled"] == "t" else "tidak")
+    if d(x["resid"]):
+        c.fill = WARN_FILL
+    ws4.cell(row=r, column=10, value=x["label"])
     r += 1
 r += 1
+
 note(
     ws4, r,
-    "Nominal, tanggal dan partner keduanya sama persis; 045 sudah ter-match ke tagihannya "
-    "sedangkan 016 menggantung penuh. Kemungkinan dobel-catat, atau 016 memang deposit "
-    "yang belum ada tagihannya. Mohon dikonfirmasi ke Finance sebelum dijurnal balik atau "
-    "dipasangkan.", 7,
+    "Tanggal, jurnal (Bank BCA - 2687778282 Out), nominal (bank 142.957.500 / hutang "
+    "142.956.000 / admin fee 1.500) dan pembuatnya sama persis; hanya selisih satu hari "
+    "waktu input (016 dibuat 28 Juli, 045 dibuat 29 Juli). Keterangan baris 016 bahkan "
+    "menyebut nomor kedua tagihan itu secara eksplisit. 045 yang ter-match ke tagihannya, "
+    "016 menggantung penuh -- jadi 016 adalah entri ulang, bukan deposit terpisah.", 10,
+)
+r += 2
+note(
+    ws4, r,
+    "Dampak GL dari dobel-catat 016: kas bank BCA-IDR-2687778282-MB tercatat keluar dua "
+    "kali (kurang catat Rp 142.957.500), hutang usaha kurang catat Rp 142.956.000 (muncul "
+    "sebagai AP minus di aging), dan Bank Administrative lebih catat Rp 1.500. Membalik "
+    "8282/2026/07/016 membereskan ketiganya sekaligus. fiscalyear_lock_date = 30/06/2026, "
+    "jadi Juli masih terbuka dan jurnal balik boleh dibukukan di Juli.", 10,
 )
 
 # ---- Sheet 5: EBR-GL
@@ -386,6 +447,16 @@ note(
 
 wb.save(OUT)
 os.chmod(OUT, 0o644)
+# File Browser serves /srv/sftp-share/files as sftpshare:sftpusers; a root-owned
+# drop lands there readable but out of place. Best effort -- ignore if the ids
+# do not exist on this host.
+try:
+    import grp
+    import pwd
+
+    os.chown(OUT, pwd.getpwnam("sftpshare").pw_uid, grp.getgrnam("sftpusers").gr_gid)
+except (KeyError, PermissionError, OSError):
+    pass
 
 print(f"Database        : {DB}   cut-off {DATE_TO}")
 print(f"Trial Balance   : {t_tb:>20,.2f}")
