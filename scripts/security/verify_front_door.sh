@@ -30,13 +30,16 @@ fail=0
 
 hdr_cache=""
 
-check() { # check <label> <path> <expected-status> <min-bytes>
+check() { # check <label> <path> <expected-status[|alt...]> <min-bytes>
+	# `want` may list alternatives: a scanner probe is refused by the WAF (403,
+	# which runs first) or by the route (404) depending on which layer is enabled,
+	# and both are correct answers.
 	local label="$1" path="$2" want="$3" minb="${4:-0}"
 	local out code size
 	out=$("${CURL[@]}" -o /dev/null -w '%{http_code} %{size_download}' "$BASE$path")
 	code="${out%% *}"
 	size="${out##* }"
-	if [[ "$code" == "$want" ]] && ((size >= minb)); then
+	if [[ "|$want|" == *"|$code|"* ]] && ((size >= minb)); then
 		printf '  \033[32mPASS\033[0m %-34s %s (%s bytes)\n' "$label" "$code" "$size"
 		((pass++))
 	else
@@ -107,12 +110,12 @@ echo
 echo "-- scanner probes must be refused, not served --"
 # Before hardening every one of these returned 200 with the File Browser SPA,
 # which is exactly why the scanning is relentless.
-check "/.env" /.env 404
-check "/files/xx.php" /files/xx.php 404
-check "/files/vendor/phpunit/phpunit" /files/vendor/phpunit/phpunit 404
-check "/wp-login.php" /wp-login.php 404
-check "/.git/config" /.git/config 404
-check "/phpmyadmin/" /phpmyadmin/ 404
+check "/.env" /.env "403|404"
+check "/files/xx.php" /files/xx.php "403|404"
+check "/files/vendor/phpunit/phpunit" /files/vendor/phpunit/phpunit "403|404"
+check "/wp-login.php" /wp-login.php "403|404"
+check "/.git/config" /.git/config "403|404"
+check "/phpmyadmin/" /phpmyadmin/ "403|404"
 
 echo
 echo "-- RPC + database manager must be closed --"
@@ -122,14 +125,58 @@ check "/web/database/manager" /web/database/manager 403
 check "/web/database/selector" /web/database/selector 302
 
 echo
-echo "-- WAF (skipped unless coraza is built in) --"
-if "${CURL[@]}" -o /dev/null -w '%{http_code}' "$BASE/web/login?id=1%20OR%201=1--" | grep -q 403; then
-	printf '  \033[32mPASS\033[0m %-34s blocked\n' "SQLi probe"
-	((pass++))
-elif docker exec odoo19-platform-caddy caddy list-modules 2>/dev/null | grep -q coraza; then
-	printf '  \033[33mWARN\033[0m %-34s module present but not blocking (DetectionOnly?)\n' "SQLi probe"
+echo "-- WAF: attacks blocked, real Odoo traffic untouched --"
+# These are the regression test for caddy/coraza/*: the payloads that must
+# be refused, and the payloads that must NOT be. The legitimate ones are the
+# shapes that actually broke while tuning — a nested ORM domain (100+ arguments
+# once flattened), a QWeb template carrying <script>, and a base64 spreadsheet.
+if ! docker exec "${CADDY_CONTAINER:-odoo19-platform-caddy}" caddy list-modules 2>/dev/null | grep -q '^http.handlers.waf$'; then
+	printf '  \033[33mSKIP\033[0m %-34s coraza not built into this Caddy\n' "WAF matrix"
 else
-	printf '  \033[33mSKIP\033[0m %-34s coraza not built into this Caddy\n' "SQLi probe"
+	waf_mode=$(docker exec "${CADDY_CONTAINER:-odoo19-platform-caddy}" printenv WAF_MODE 2>/dev/null || echo DetectionOnly)
+	tmp=$(mktemp -d)
+	printf '%s' '{"params":{"db":"prd_levis","login":"admin'"'"' OR 1=1-- ","password":"x'"'"' UNION SELECT password FROM res_users--"}}' >"$tmp/sqli.json"
+	printf '%s' '{"params":{"model":"res.users","method":"web_search_read","args":[],"kwargs":{"domain":[["login","=","admin'"'"' UNION SELECT password,1,1 FROM res_users--"]]}}}' >"$tmp/sqli_rpc.json"
+	printf '%s' '{"params":{"model":"account.move.line","method":"web_read_group","args":[],"kwargs":{"domain":[["move_id.state","=","posted"],["account_id.code","=like","1%"],"|",["name","ilike","select * from"],["ref","not ilike","DROP"],["date",">=","2026-01-01"]],"groupby":["account_id"],"aggregates":["balance:sum"],"context":{"lang":"id_ID","allowed_company_ids":[1,2]}}}}' >"$tmp/legit_rpc.json"
+
+	waf_case() { # waf_case <label> <path> <file|-> <blocked|allowed>
+		local label="$1" path="$2" file="$3" want="$4" code
+		if [[ "$file" == "-" ]]; then
+			code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' "$BASE$path")
+		else
+			code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST \
+				-H 'Content-Type: application/json' --data-binary "@$file" "$BASE$path")
+		fi
+		if [[ "$want" == blocked ]]; then
+			if [[ "$code" == 403 ]]; then
+				printf '  \033[32mPASS\033[0m %-34s blocked\n' "$label"
+				((pass++))
+			elif [[ "$waf_mode" != On ]]; then
+				printf '  \033[33mWARN\033[0m %-34s not blocked — WAF_MODE=%s (detect only)\n' "$label" "$waf_mode"
+			else
+				printf '  \033[31mFAIL\033[0m %-34s got %s, expected 403\n' "$label" "$code"
+				((fail++))
+			fi
+		else
+			# Anything but 403 is a pass: 404/303/200 all mean the WAF let it through
+			# and Odoo answered for itself.
+			if [[ "$code" != 403 ]]; then
+				printf '  \033[32mPASS\033[0m %-34s passed (%s)\n' "$label" "$code"
+				((pass++))
+			else
+				printf '  \033[31mFAIL\033[0m %-34s FALSE POSITIVE — 403\n' "$label"
+				((fail++))
+			fi
+		fi
+	}
+
+	waf_case "SQLi in query string" "/web/login?x=1%27%20OR%201=1--%20" - blocked
+	waf_case "XSS in query string" "/portal/?q=%3Cscript%3Ealert(1)%3C/script%3E" - blocked
+	waf_case "traversal on /api" "/api/x?f=../../../../etc/passwd" - blocked
+	waf_case "SQLi in auth body" "/web/session/authenticate" "$tmp/sqli.json" blocked
+	waf_case "SQLi in call_kw body" "/web/dataset/call_kw/res.users/web_search_read" "$tmp/sqli_rpc.json" blocked
+	waf_case "real ORM domain (100+ args)" "/web/dataset/call_kw/account.move.line/web_read_group" "$tmp/legit_rpc.json" allowed
+	rm -rf "$tmp"
 fi
 
 echo

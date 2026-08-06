@@ -23,7 +23,18 @@
 services:
 
   caddy:
-    image: caddy:2-alpine
+    # Not caddy:2-alpine any more: the front-door Caddyfile uses `coraza_waf`
+    # (OWASP Core Rule Set) and `rate_limit`, which are Go modules that can only
+    # be compiled in. caddy/Dockerfile pins Caddy 2.11.3 and both module versions
+    # and checksum-verifies the rule set. Everything else about how Caddy runs is
+    # unchanged — same Caddyfile, same volumes, same ports.
+    #
+    # The stock image cannot parse the current Caddyfile, so pointing CADDY_IMAGE
+    # back at caddy:2-alpine is NOT a rollback path; reverting the Caddyfile is.
+    image: ${CADDY_IMAGE:-odoo19-platform-caddy-waf:2.11.3}
+    build:
+      context: ./caddy
+      dockerfile: Dockerfile
     container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-caddy
     restart: unless-stopped
     security_opt:
@@ -45,8 +56,24 @@ services:
       # only applies when the variable is UNSET, and `email` with no argument
       # is a fatal parse error.
       ACME_EMAIL: ${ACME_EMAIL:-admin@localhost}
+      # WAF engine mode, read by the Caddyfile's `coraza_waf` block:
+      #   DetectionOnly  evaluate + log, never block  (safe default)
+      #   On             block once the CRS anomaly score crosses the threshold
+      #   Off            engine loaded, idle
+      # Deploy a rules change in DetectionOnly, read
+      # data/caddy/coraza/audit.log for false positives, then flip to On.
+      WAF_MODE: ${WAF_MODE:-DetectionOnly}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Engine config, CRS tuning and the Odoo exclusions. Mounted (not baked in)
+      # so a rule can be corrected without rebuilding the image — the rule set
+      # itself lives at /etc/coraza/coreruleset INSIDE the image, which is why
+      # this mount cannot be at that path.
+      - ./caddy/coraza:/etc/caddy/coraza:ro
+      # Coraza audit log. Bind-mounted so it survives a container recreate and can
+      # be read from the host while tuning:
+      #   grep -E '\[id "[0-9]+"\]' data/caddy/coraza/audit.log | tail -20
+      - ./data/caddy/coraza:/var/log/coraza
       - ./data/caddy/data:/data
       - ./data/caddy/config:/config
     ports:

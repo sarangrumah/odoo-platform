@@ -54,6 +54,100 @@
 			2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
 		client_ip_headers CF-Connecting-IP X-Forwarded-For
 	}
+
+	# Both directives come from modules compiled into the image built by
+	# caddy/Dockerfile; the stock caddy:2-alpine has neither and would fail to
+	# parse this file. Caddy needs to be told where they sit in the handler chain
+	# because only the standard directives have a built-in position.
+	#
+	# rate_limit first: shedding a flood must not cost a WAF evaluation. Then the
+	# WAF, before any route decides where the request goes.
+	# `coraza_waf` must be positioned BEFORE it can be referenced as an anchor:
+	# `order rate_limit before coraza_waf` first fails with "directive
+	# 'coraza_waf' not found", which reads like a missing module rather than a
+	# statement ordering problem.
+	order coraza_waf first
+	order rate_limit before coraza_waf
+}
+
+# ============================================================
+# Rate limits — per real client IP (see trusted_proxies above; before that was
+# set, every Cloudflare visitor shared one bucket and this would have been a
+# global limit rather than a per-client one).
+#
+# Two zones, because the two failure modes are different: guessing passwords is
+# slow and needs a tight ceiling, while using the backoffice is bursty and needs
+# a loose one. caddy-ratelimit evaluates every zone whose matcher fits, so login
+# traffic is subject to both.
+# ============================================================
+(rate_limits) {
+	rate_limit {
+		# --- Credential stuffing ---
+		# 12 attempts/minute/IP across every path that accepts a credential:
+		# Odoo's login form, its session RPC, the password reset flow, and the
+		# login gateway's server action (a POST to /signin bootstraps an Odoo
+		# session, so it is a credential path even though it renders a page).
+		# A human logging in uses 1-3; a stuffing run wants thousands.
+		zone credentials {
+			match {
+				path /web/login /web/login/* /web/session/authenticate /web/reset_password /web/signup /signin /signin/
+				method POST
+			}
+			key {client_ip}
+			events 12
+			window 1m
+		}
+
+		# --- Everything else ---
+		# Deliberately loose. Odoo's web client fires dozens of requests to open
+		# one screen, and whole stores sit behind a single NAT address — Levi's
+		# outlet staff share one public IP, so a tight general limit would read as
+		# "Odoo is broken" for a shop rather than as a defence. 3000/min still
+		# cuts off any scraping or flood by three orders of magnitude.
+		zone general {
+			key {client_ip}
+			events 3000
+			window 1m
+		}
+
+		# Put the bucket key in the log line, so a 429 can be attributed to an IP
+		# without guessing.
+		log_key
+	}
+}
+
+# ============================================================
+# WAF — Coraza (ModSecurity-compatible) running the OWASP Core Rule Set.
+#
+# This is what answers the "SQL injection" part of the requirement: CRS inspects
+# the query string, headers, cookies AND the JSON request body (see
+# SecRequestBodyAccess in caddy/coraza/coraza.conf) against the 942xxx SQLi
+# family, plus XSS (941xxx), RCE (932xxx), traversal/LFI (930xxx), scanner
+# fingerprints (913xxx) and protocol abuse (920xxx).
+#
+# Note what it is NOT: Odoo's own ORM parameterises its SQL, and the raw
+# cr.execute() calls in this repo's addons interpolate table names, never request
+# data — so the WAF is defence in depth for the application, and first-line
+# defence for everything else on this host.
+#
+# {$WAF_MODE} controls the engine:
+#   DetectionOnly  evaluate + log, never block  (the safe default)
+#   On             block once the anomaly score crosses the threshold
+#   Off            engine loaded but idle
+# Set WAF_MODE=On in .env once the audit log is clean; deploy in DetectionOnly
+# first, always, because a false positive here is a user unable to work.
+# ============================================================
+(waf) {
+	coraza_waf {
+		directives `
+			Include /etc/caddy/coraza/coraza.conf
+			Include /etc/coraza/coreruleset/crs-setup.conf
+			Include /etc/caddy/coraza/crs-tuning.conf
+			Include /etc/coraza/coreruleset/rules/*.conf
+			Include /etc/caddy/coraza/exclusions.conf
+			SecRuleEngine {$WAF_MODE:DetectionOnly}
+		`
+	}
 }
 
 # ============================================================
@@ -107,6 +201,8 @@
 (front_door) {
 	encode zstd gzip
 	import security_headers
+	import rate_limits
+	import waf
 
 	# Cap on request bodies. Odoo's own import wizard is the largest legitimate
 	# upload (base_import/execute_import shows up in the access log daily), and
