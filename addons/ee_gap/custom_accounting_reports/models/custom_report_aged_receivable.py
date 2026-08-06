@@ -197,17 +197,55 @@ class CustomReportAgedReceivable(models.AbstractModel):
         return "d_over_365"
 
     def _open_lines(self, filters):
-        """Open (unreconciled) move lines for this report's account type."""
+        """Move lines on this report's account type, posted and dated on or
+        before the cut-off.
+
+        Deliberately *not* filtered on ``reconciled``: that flag and
+        ``amount_residual`` are both live values, so filtering on them would
+        drop a document that was still open on the cut-off date merely because
+        it was settled afterwards — the aging would then shrink every time it
+        is re-run and never tie back to the trial balance. Whether a line was
+        open *as of* ``date_to`` is decided by :meth:`_residual_as_of`.
+        """
         domain = [
             ("company_id", "in", filters["company_ids"]),
             ("account_id.account_type", "=", self._account_type()),
             ("parent_state", "=", "posted"),
-            ("reconciled", "=", False),
             ("date", "<=", filters["date_to"]),
         ]
         if filters.get("partner_ids"):
             domain.append(("partner_id", "in", filters["partner_ids"]))
         return self.env["account.move.line"].search(domain, order="partner_id, date_maturity, id")
+
+    # ------------------------------------------------------------------
+    # As-of-date residual
+    # ------------------------------------------------------------------
+    def _matched_as_of(self, lines, date_to):
+        """``{line_id: amount matched on or before date_to}``, signed the same
+        way as ``balance`` so the residual is a plain addition.
+
+        One read_group over ``account.partial.reconcile`` for the whole set
+        rather than walking ``matched_debit_ids`` per line.
+        """
+        matched = dict.fromkeys(lines.ids, 0.0)
+        if not matched:
+            return matched
+        Partial = self.env["account.partial.reconcile"]
+        # A partial credits the debit leg and debits the credit leg, so it
+        # always moves both balances towards zero.
+        for field, sign in (("debit_move_id", -1.0), ("credit_move_id", 1.0)):
+            groups = Partial._read_group(
+                [(field, "in", lines.ids), ("max_date", "<=", date_to)],
+                groupby=[field],
+                aggregates=["amount:sum"],
+            )
+            for line, amount in groups:
+                matched[line.id] = matched.get(line.id, 0.0) + sign * (amount or 0.0)
+        return matched
+
+    def _residual_as_of(self, line, matched):
+        """Open amount of ``line`` on the cut-off date."""
+        return line.company_currency_id.round(line.balance + matched.get(line.id, 0.0))
 
     # ------------------------------------------------------------------
     # Line builders
@@ -220,8 +258,10 @@ class CustomReportAgedReceivable(models.AbstractModel):
     def _build_summary_lines(self, filters):
         as_of = filters["date_to"]
         per_partner = {}
-        for line in self._open_lines(filters):
-            residual = line.amount_residual
+        lines = self._open_lines(filters)
+        matched = self._matched_as_of(lines, as_of)
+        for line in lines:
+            residual = self._residual_as_of(line, matched)
             if not residual:
                 continue
             pid = line.partner_id.id or 0
@@ -260,8 +300,10 @@ class CustomReportAgedReceivable(models.AbstractModel):
         as_of = filters["date_to"]
         bucket_codes = [c for c, _, _, _ in BUCKETS]
         groups = {}
-        for line in self._open_lines(filters):
-            residual = line.amount_residual
+        lines = self._open_lines(filters)
+        matched = self._matched_as_of(lines, as_of)
+        for line in lines:
+            residual = self._residual_as_of(line, matched)
             if not residual:
                 continue
             pid = line.partner_id.id or 0
