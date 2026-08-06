@@ -170,6 +170,16 @@ too. Deleting rule 1000111 restores full inspection at ~85 ms per RPC.
 - **Cloudflare ranges** drift. `scripts/security/refresh_cloudflare_ranges.sh`
   diffs them and exits 1 when the Caddyfile is stale (`--write` to apply). A stale
   list never blocks traffic — those requests just fall back to the edge IP.
+- **The Caddy binary is ours now, so its CVEs are ours.** The image is in CI's
+  `container-scan` matrix (trivy, HIGH/CRITICAL, `--ignore-unfixed`), because the
+  first build of it shipped 20 such findings: Caddy 2.11.3 itself (2, fixed in
+  2.11.4), `x/crypto` (9), `x/net` (3), `x/text`, `grpc`, `go-jose` and the Go
+  stdlib. That is why the build is a plain `go build` over `caddy/main.go` and an
+  explicit `go.mod` rather than `xcaddy build`: xcaddy resolves whatever the pinned
+  Caddy's `go.mod` asks for and gives no lever to raise a *transitive* module. The
+  third `go get` group in the Dockerfile is that lever — remove an entry only after
+  upstream has caught up, or the CVE comes back silently. `apk upgrade` in the
+  runtime stage covers the same problem for the base image's Alpine packages.
 - **CRS bumps**: change `CRS_VERSION` and `CRS_SHA256` in `caddy/Dockerfile`
   together, rebuild, run the verify script in DetectionOnly first. Our tuning lives
   in `crs-tuning.conf` and is included *after* the shipped `crs-setup.conf`, so a

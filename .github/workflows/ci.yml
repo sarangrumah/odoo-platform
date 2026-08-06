@@ -134,6 +134,13 @@ jobs:
           - {name: baileys, dir: services/baileys}
           - {name: finance-sap-bridge, dir: services/finance-sap-bridge}
           - {name: odoo-exporter, dir: observability/odoo-exporter}
+          # The front-door TLS terminator. It used to be the upstream caddy image
+          # and therefore nobody's to scan; since it carries our own Go build of
+          # Caddy plus the WAF and rate-limit plugins, a dependency CVE in it is
+          # ours. The first build of that image shipped 20 HIGH/CRITICAL findings
+          # (Caddy 2.11.3 itself, x/crypto, x/net, grpc, go-jose, Go stdlib), which
+          # is exactly what this entry is here to catch next time.
+          - {name: caddy, dir: caddy}
       fail-fast: false
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

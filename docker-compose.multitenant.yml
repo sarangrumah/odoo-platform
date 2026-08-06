@@ -31,7 +31,7 @@ services:
     #
     # The stock image cannot parse the current Caddyfile, so pointing CADDY_IMAGE
     # back at caddy:2-alpine is NOT a rollback path; reverting the Caddyfile is.
-    image: ${CADDY_IMAGE:-odoo19-platform-caddy-waf:2.11.3}
+    image: ${CADDY_IMAGE:-odoo19-platform-caddy-waf:2.11.4}
     build:
       context: ./caddy
       dockerfile: Dockerfile
