@@ -8,6 +8,7 @@ on the seeded EBR data.
 
 from odoo import Command, fields
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
+from odoo.exceptions import ValidationError
 from odoo.tests import tagged
 
 
@@ -398,6 +399,49 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
             self.assertNotEqual(prod_line.account_id, self.grir_trade)
         finally:
             self.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.suppress_gr_journal", "0")
+
+    # ------------------------------------------------------------------
+    # 13. Quantity / Unit Price column swap guard
+    # ------------------------------------------------------------------
+    def test_13_qty_price_swap_is_rejected(self):
+        # what the 06-Aug-2026 upload did: the price landed in Quantity and the
+        # quantity in Unit Price
+        with self.assertRaises(ValidationError):
+            self.env["purchase.order"].create(
+                {
+                    "partner_id": self.vendor.id,
+                    "l10n_purchase_type": "trade",
+                    "order_line": [
+                        Command.create(
+                            {
+                                "product_id": self.product.id,
+                                "name": self.product.name,
+                                "product_qty": 413011.0,
+                                "price_unit": 1.0,
+                            }
+                        )
+                    ],
+                }
+            )
+
+    def test_13b_genuine_bulk_order_passes(self):
+        # a real bulk order — large quantity, but a plausible unit price
+        po = self._make_po("trade", qty=50000)
+        self.assertEqual(po.order_line.product_qty, 50000)
+
+        # and a small order at a token price stays allowed too
+        small = self._make_po("trade", qty=5)
+        small.order_line.price_unit = 1.0
+        self.assertEqual(small.order_line.price_unit, 1.0)
+
+    def test_13c_guard_can_be_disabled(self):
+        self.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.po_swap_guard_qty", "0")
+        try:
+            po = self._make_po("trade", qty=413011.0)
+            po.order_line.price_unit = 1.0
+            self.assertEqual(po.order_line.product_qty, 413011.0)
+        finally:
+            self.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.po_swap_guard_qty", "")
 
     # ------------------------------------------------------------------
     # helpers

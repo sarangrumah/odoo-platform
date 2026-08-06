@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-05T22:36:22+00:00",
+  "generated_at": "2026-08-06T09:37:44+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "aa37f0b",
-    "branch": "main"
+    "commit": "ef5de84",
+    "branch": "fix/levis-po-qty-price-swap-guard"
   },
   "buckets": [
     {
@@ -311,14 +311,19 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.24.0",
+      "version": "19.0.1.25.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
-      "last_change": "2026-08-04",
-      "change_count": 37,
+      "last_change": "2026-08-06",
+      "change_count": 38,
       "changes": [
+        {
+          "sha": "ef5de84",
+          "date": "2026-08-06",
+          "subject": "fix(levis): guard PO uploads against swapped Quantity/Unit Price columns"
+        },
         {
           "sha": "f5d8d58",
           "date": "2026-08-04",
@@ -353,11 +358,6 @@
           "sha": "a28e844",
           "date": "2026-07-29",
           "subject": "feat(levis): show the PO's Operating Unit on the purchase form"
-        },
-        {
-          "sha": "c58eb46",
-          "date": "2026-07-24",
-          "subject": "feat(levis): allow flagged asset accounts as payment Destination Account"
         }
       ]
     },

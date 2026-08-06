@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T08:56:04Z
 generator: bootstrap-v1
 module: custom_levis_localization
-manifest_version: 19.0.1.24.0
+manifest_version: 19.0.1.25.0
 ---
 
 # Levi's Localization (`custom_levis_localization`)
@@ -211,6 +211,15 @@ were unindexed. `models/product_product.py` fixes both.
   `account.move.line._compute_account_id` has NO base `@api.depends` (precompute-at-
   create), so the override adds none either and relies on `l10n_purchase_type` being
   set on the move at create time (via `_prepare_invoice`).
+- **PO uploads go through the native `base_import`, which never runs onchanges.**
+  The Quantity/Unit Price swap guard on `purchase.order.line`
+  (`_check_levis_qty_price_swap`) is therefore an `@api.constrains`, not an
+  onchange warning — an onchange would have been skipped by the very path the bad
+  data came in on (06-Aug-2026, 18 orders at 413.011 pcs @ Rp 1). Thresholds live
+  in `ir.config_parameter`: `custom_levis_localization.po_swap_guard_qty`
+  (default 10000) and `.po_swap_guard_price` (default 100); either set to `0`
+  disables the guard for that database. A genuine bulk order is unaffected as long
+  as its unit price is above the price threshold.
 - Tenant scoping is a deployment convention only — the manifest documents the Levi's databases as intended targets, but there is no runtime check preventing installation elsewhere.
 - The `_cron_generate_drafts` cron is shipped with `active=False` (`data/inventory_reconciliation_data.xml:20`) and is monthly, so it does NOT run automatically unless a tenant enables it. When enabled it only creates DRAFT reconciliations/entries; it never posts.
 - The payment reports are direction-guarded: the Payment Voucher renders only for outbound payments and the Payment Receipt only for inbound payments.
