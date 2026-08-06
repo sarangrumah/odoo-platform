@@ -267,9 +267,35 @@ recorded with each. Nothing on this list can be closed from inside this repo alo
    `/opt/odoo-platform/data/rights-backup/group_system_backup_prd_levis_begbal.csv`
    fed back via `ADM_RESTORE=<csv> ADM_APPLY=1`.
 
-   Still open on this item: TOTP enrolment (nobody enrolled anywhere), and the same
-   sprawl on `prd_levis_AP` (33/34), `prd_detail_levis` (27/27), `prd_levis`
-   (28/65) and `prd_arkaaim` (14/28), which were not touched.
+   **Rolled out to the rest of production the same day:**
+
+   | database | holders before | after | note |
+   |---|---|---|---|
+   | `prd_levis_begbal` | 73 | 2 | |
+   | `prd_levis` | 28 | 1 | only `am.ademaryadi@gmail.com`; the local `admin` was not a holder and was not granted one |
+   | `prd_detail_levis` | 27 | 1 | same |
+   | `prd_arkaaim` | 14 | 3 | `admin`, `odoo_admin`, `am.ademaryadi@gmail.com` |
+   | `prd_levis_AP` | 33 | **skipped** | see below |
+
+   Two things the rollout turned up that the first tenant did not show:
+
+   - **`base.group_user` was missing from the row** on 4 users in `prd_levis_AP`
+     and 10 in `prd_arkaaim`: they were internal users only *through*
+     `group_system` implying it, so revoking Settings would have taken their login
+     with it. The script now grants the baseline explicitly instead of aborting —
+     not an escalation, it is what those accounts already had in effect.
+   - **`prd_levis_AP` is deliberately untouched.** Four of its users
+     (`aldi.sugieanto`, `lifintia.octania`, `mei.mey`, `veronika.osalia`) hold *no
+     functional groups at all* — Settings is their entire access, so revoking it
+     would leave them logged in with an empty menu. Owner's decision 6-Aug-2026:
+     leave the tenant alone until those four have real roles. Re-check with the
+     query in `84_tidy_admin_rights.py`'s header before trying again.
+
+   Rollback CSVs for every tenant live in `/opt/odoo-platform/data/rights-backup/`.
+
+   Still open on this item: TOTP enrolment (nobody enrolled anywhere),
+   `prd_levis_AP`, and the non-production tenants — `rnd_levis` (43/43),
+   `trn_arkaaim` (14/17), `trn_arkaaim_begbal` (8/17), `gentlewoman` (3/5).
 5. **File Browser (`/files`) is public.** **Decision: left as is, 6-Aug-2026** —
    login gate plus the WAF, the scanner refusal and the rate limit are accepted as
    sufficient for now. The upgrade path if that changes is Cloudflare Access (edge
