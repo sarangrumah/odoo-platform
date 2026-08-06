@@ -223,9 +223,30 @@ recorded with each. Nothing on this list can be closed from inside this repo alo
    `ir.ui.view`, which is code execution in every other user's browser, so on three
    of these databases every account is effectively a superuser.
 
-   **Decision: deferred by the owner, 6-Aug-2026.** Recorded here rather than acted
-   on because both halves (enrolment rollout, revoking Settings per name) interrupt
-   people mid-work.
+   **Decision, 6-Aug-2026: the admin half was done on `prd_levis_begbal`; TOTP
+   enrolment stays deferred.** `scripts/tenants/levis/84_tidy_admin_rights.py`
+   revoked `base.group_system` **and** `base.group_erp_manager` from 71 of 73
+   users, leaving `admin` and `am.ademaryadi@gmail.com`. Verified after: 2 holders,
+   `base.group_user` still on all 73, functional groups untouched (107 → 105 per
+   user, accounting groups intact). One *archived* user still holds it — cannot log
+   in, left alone.
+
+   Two things that script exists to get right, and that any repeat of this on
+   another tenant must also get right:
+   - `base.group_erp_manager` has to go with it. Odoo materialises implied groups
+     and never withdraws them retroactively, so removing only `group_system` leaves
+     "Access Rights" behind and the user can simply re-grant themselves everything.
+   - It must go through the ORM (`group_ids` 3-tuple), never SQL. Membership is a
+     computed closure over `implied_ids`; a `DELETE` on `res_groups_users_rel`
+     leaves the closure stale and the right survives through an implied path.
+
+   Rollback is one command, kept next to the data:
+   `/opt/odoo-platform/data/rights-backup/group_system_backup_prd_levis_begbal.csv`
+   fed back via `ADM_RESTORE=<csv> ADM_APPLY=1`.
+
+   Still open on this item: TOTP enrolment (nobody enrolled anywhere), and the same
+   sprawl on `prd_levis_AP` (33/34), `prd_detail_levis` (27/27), `prd_levis`
+   (28/65) and `prd_arkaaim` (14/28), which were not touched.
 5. **File Browser (`/files`) is public.** **Decision: left as is, 6-Aug-2026** —
    login gate plus the WAF, the scanner refusal and the rate limit are accepted as
    sufficient for now. The upgrade path if that changes is Cloudflare Access (edge
