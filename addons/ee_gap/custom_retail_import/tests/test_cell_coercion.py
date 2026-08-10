@@ -68,8 +68,7 @@ _NUMERIC_ROWS[1] = _NUMERIC_ROWS[1][:6] + ("ZT77A0001010.5",) + _NUMERIC_ROWS[1]
 
 #: The same two rows with every cell already text -- the golden reference.
 _TEXT_ROWS = [
-    row[:7] + (str(row[7]) if row[7] != 10.0 else "10",) + (row[8], str(row[9])) + row[10:]
-    for row in _NUMERIC_ROWS
+    row[:7] + (str(row[7]) if row[7] != 10.0 else "10",) + (row[8], str(row[9])) + row[10:] for row in _NUMERIC_ROWS
 ]
 
 
@@ -212,9 +211,7 @@ class TestX101NumericCells(TransactionCase):
         cls.namespace = cls.profile.namespace
 
     def _make_log(self):
-        return self.env["retail.import.log"].create(
-            {"profile_id": self.profile.id, "filename": "numeric.xlsx"}
-        )
+        return self.env["retail.import.log"].create({"profile_id": self.profile.id, "filename": "numeric.xlsx"})
 
     def _variant(self, sku):
         return self.env["product.product"].search([("default_code", "=", sku)])
@@ -252,13 +249,9 @@ class TestX101NumericCells(TransactionCase):
 
     def test_numeric_identifiers_do_not_leak_into_the_external_id(self):
         """A float product_code would seed the xid as TMPL_12345_0."""
-        rows = [
-            (12345, "NUMERIC CODE", "LEVIS", "MENS TOPS", "TEES", "SHORT SLEEVE", 678900, "M", "-", "", 199900, "")
-        ]
+        rows = [(12345, "NUMERIC CODE", "LEVIS", "MENS TOPS", "TEES", "SHORT SLEEVE", 678900, "M", "-", "", 199900, "")]
         self.Executor._x101_upsert_items(_as_records(rows), self.namespace)
-        tmpl_id = self.Executor._xid_get(
-            self.namespace, self.Executor._safe_xid("tmpl_", "12345"), "product.template"
-        )
+        tmpl_id = self.Executor._xid_get(self.namespace, self.Executor._safe_xid("tmpl_", "12345"), "product.template")
         self.assertTrue(tmpl_id, "the template xid must be seeded from the integer text")
         self.assertEqual(len(self._variant("678900")), 1)
 

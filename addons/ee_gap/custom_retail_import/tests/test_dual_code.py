@@ -40,16 +40,12 @@ class TestX101DualCode(TransactionCase):
 
     def test_name_search_resolves_a_dotted_supplier_code(self):
         # PROD SKU = PRODUCT CODE without the hyphen + "0" + SIZE.
-        product = self.env["product.product"].create(
-            {"name": "SNEAKER LOW 10.5", "default_code": "ZT79A0000010.5"}
-        )
+        product = self.env["product.product"].create({"name": "SNEAKER LOW 10.5", "default_code": "ZT79A0000010.5"})
         results = self.env["product.product"].name_search("ZT79A-000010.5", operator="=")
         self.assertEqual([res[0] for res in results], [product.id])
 
     def test_search_on_the_supplier_code_field(self):
-        product = self.env["product.product"].create(
-            {"name": "SNEAKER LOW 11.5", "default_code": "ZT79A0000011.5"}
-        )
+        product = self.env["product.product"].create({"name": "SNEAKER LOW 11.5", "default_code": "ZT79A0000011.5"})
         self.assertEqual(product.x101_product_code, "ZT79A-000011.5")
         found = self.env["product.product"].search([("x101_product_code", "=", "ZT79A-000011.5")])
         self.assertIn(product, found)
