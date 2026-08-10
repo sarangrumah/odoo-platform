@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-06T09:37:44+00:00",
+  "generated_at": "2026-08-10T06:35:59+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "ef5de84",
-    "branch": "fix/levis-po-qty-price-swap-guard"
+    "commit": "256a3fe",
+    "branch": "fix/levis-voucher-source-doc"
   },
   "buckets": [
     {
@@ -311,14 +311,29 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.25.0",
+      "version": "19.0.1.25.1",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
-      "last_change": "2026-08-06",
-      "change_count": 38,
+      "last_change": "2026-08-10",
+      "change_count": 41,
       "changes": [
+        {
+          "sha": "f34a2b7",
+          "date": "2026-08-10",
+          "subject": "fix(levis): print the bill number on the payment voucher, not the payment's own"
+        },
+        {
+          "sha": "5d735a4",
+          "date": "2026-08-06",
+          "subject": "style: ruff format the swap-revert script and localization tests"
+        },
+        {
+          "sha": "966a522",
+          "date": "2026-08-06",
+          "subject": "chore(levis): record the PO swap guard in MODULE_KNOWLEDGE + refresh versions.json"
+        },
         {
           "sha": "ef5de84",
           "date": "2026-08-06",
@@ -343,21 +358,6 @@
           "sha": "de96915",
           "date": "2026-08-04",
           "subject": "feat(levis): product category reclassification with its GL correction"
-        },
-        {
-          "sha": "4704e07",
-          "date": "2026-07-29",
-          "subject": "fix: convert every _sql_constraints to models.Constraint"
-        },
-        {
-          "sha": "24446ab",
-          "date": "2026-07-29",
-          "subject": "refactor: use env._ for translated field defaults repo-wide"
-        },
-        {
-          "sha": "a28e844",
-          "date": "2026-07-29",
-          "subject": "feat(levis): show the PO's Operating Unit on the purchase form"
         }
       ]
     },

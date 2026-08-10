@@ -223,6 +223,14 @@ were unindexed. `models/product_product.py` fixes both.
 - Tenant scoping is a deployment convention only — the manifest documents the Levi's databases as intended targets, but there is no runtime check preventing installation elsewhere.
 - The `_cron_generate_drafts` cron is shipped with `active=False` (`data/inventory_reconciliation_data.xml:20`) and is monthly, so it does NOT run automatically unless a tenant enables it. When enabled it only creates DRAFT reconciliations/entries; it never posts.
 - The payment reports are direction-guarded: the Payment Voucher renders only for outbound payments and the Payment Receipt only for inbound payments.
+- `_edo_line_source_doc` must read the FAR side of the reconciliation partials —
+  `matched_debit_ids.debit_move_id` and `matched_credit_ids.credit_move_id`, the way core
+  does in `_compute_reconciled_lines_ids`. `matched_debit_ids` holds the partials where the
+  line is the *credit* side, so reading `credit_move_id` returns the line you started from;
+  that line belongs to the payment, never to an invoice, so the `move_type` filter dropped
+  it and every voucher row silently fell back to the payment's own number. The NOMOR DOC AP
+  and REF Invoice Vendor columns showed no bill at all until 19.0.1.25.1. The failure is
+  invisible in the PDF — it looks like a filled-in column.
 
 ## Out of Scope
 - This module does not cover inventory adjustments, backorders, or handling of internal transfers and manufacturing receipts. These functionalities are left to the core Odoo stock management processes.

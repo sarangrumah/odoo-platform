@@ -43,9 +43,7 @@ class TestPaymentVoucherRows(AccountTestInvoicingCommon):
         self.assertIn("INV-VENDOR-9", [r["ref_vendor"] for r in rows])
 
     def test_source_doc_is_the_bill_not_the_payment(self):
-        payable = self.payment.move_id.line_ids.filtered(
-            lambda ln: ln.account_id.account_type == "liability_payable"
-        )
+        payable = self.payment.move_id.line_ids.filtered(lambda ln: ln.account_id.account_type == "liability_payable")
         self.assertEqual(self.payment._edo_line_source_doc(payable), self.bill)
 
     def test_unreconciled_line_falls_back_to_the_payment(self):
