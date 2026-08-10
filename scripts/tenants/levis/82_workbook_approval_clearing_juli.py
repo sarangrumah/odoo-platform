@@ -7,7 +7,7 @@ database is read through ``docker exec ... psql`` exactly like
     PGPASSWORD=... python3 scripts/tenants/levis/82_workbook_approval_clearing_juli.py \
         --json /srv/sftp-share/files/clearing-juli-2026/clearing_juli.json \
         --ebr  /srv/sftp-share/files/clearing-juli-2026/EBR_JULI_2026.xlsx \
-        --out  /srv/sftp-share/files/Persetujuan_Clearing_Juli2026.xlsx
+        --out  /srv/sftp-share/files/Laporan_Final_Clearing_Juli2026.xlsx
 
 The 63 drafts ``EBR-CLR-JULI-2026-*`` created on 4-Aug are still draft; this
 workbook is what Accounting signs before ``81_clearing_juli.py`` is re-run with
