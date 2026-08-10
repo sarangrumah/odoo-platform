@@ -7,7 +7,7 @@ Scope review: worksheet **EO** (15 item, live di `prd_arkaaim`) dan **FASHION**
 (13 item, live di `prd_levis_begbal`). Worksheet **OTOMOTIF** (EIVO/EDOO, 16 item)
 tidak masuk scope.
 
-Tanggal review & eksekusi: **2026-07-30**. Semua item di sheet ditandai klien
+Tanggal review & eksekusi: **2026-07-30**, diperbarui **2026-08-11** (ronde keempat, §1.0c). Semua item di sheet ditandai klien
 "Not Yet" — audit menunjukkan sebagian sudah live.
 
 > **STATUS POSTING: DITAHAN.** Backlog depresiasi Juni 2026 (Rp 565.523.083,57)
@@ -17,6 +17,59 @@ Tanggal review & eksekusi: **2026-07-30**. Semua item di sheet ditandai klien
 ---
 
 ## 1. Yang sudah diubah
+
+### 1.0c Ronde keempat (2026-08-11) — EO #4 dan blocker yang menutupinya
+
+Berangkat dari satu laporan user: *"No Outstanding account could be found to make
+the payment"* saat membayar bill di `prd_arkaaim`.
+
+**Asesmen 30-Jul atas EO #4 keliru, dan ini koreksinya.** Waktu itu disimpulkan
+"tidak reproduce" karena `payment_account_id` NULL di setiap
+`account_payment_method_line` diartikan sebagai "payment posting langsung ke
+`journal.default_account_id`". Yang benar: NULL berarti Odoo **mencari ke jalur
+berikutnya**, dan ada tiga jalur berurutan —
+
+1. `account_payment_method_line.payment_account_id`;
+2. XMLID chart-template `account.<company>_account_journal_payment_debit/credit_account_id`;
+3. `res_company.transfer_account_id`.
+
+Di `prd_arkaaim` ketiganya kosong untuk **company 1 (AIM)** → payment **tidak bisa
+dibuat sama sekali**. Company 2 (ARKA) bertahan lewat jalur 2, yang mengarah ke
+`1103000003 Outstanding Receipts` / `1103000004 Outstanding Payments` — **itulah
+"COA perantara" yang dikeluhkan klien**. Jadi keluhan EO #4 valid; yang salah
+adalah cara kami memverifikasinya. Satu-satunya payment yang diperiksa Juli lalu
+kebetulan milik company 2 dan sudah lewat akun perantara itu.
+
+Yang dikerjakan:
+
+- **Company 1 → direct-to-bank.** Semua payment method line journal bank/kas
+  diarahkan ke akun bank journal itu sendiri, mengikuti pola `prd_levis_begbal`.
+  Diuji ujung-ke-ujung: bill → Register Payment via BCA1 → `paid`, sisi liquidity
+  `1103019270`, tanpa akun perantara.
+- **Company 2 tidak diubah.** Sudah punya 5 payment terposting lewat Outstanding
+  Receipts/Payments; memindahkannya sekarang meninggalkan saldo di dua akun itu
+  dengan dua kebijakan berbeda sebelum/sesudah cutover. Butuh keputusan Finance —
+  masuk daftar §5.
+- **Jaring pengaman**: `transfer_account_id` diisi per company supaya journal bank
+  yang dibuat user lewat UI tidak mengulang crash yang sama.
+
+Sekalian ditutup di ronde ini, semuanya di `prd_arkaaim`/`trn_arkaaim`/`trn_arkaaim_begbal`:
+
+| Temuan | Tindakan |
+|---|---|
+| Akun deferred expense/revenue + journal kosong padahal `custom_account_deferred` terpasang — fiturnya ada di menu tapi tidak bisa memposting apa pun | Diisi di kedua company |
+| Metode payment **Giro** dan **Bank Transfer** belum ada di ARKA (hanya Manual + Cek) | Modul baru `custom_payment_methods_id`, tenant-neutral |
+| Printout **Payment Voucher / Payment Receipt** belum ada di ARKA | Modul baru `custom_payment_voucher` |
+| `trn_arkaaim_begbal` company 1 **nol akun bertipe payable** → vendor bill tidak bisa dibuat sama sekali | 2 akun trade payable dikoreksi tipenya; accrual gaji di akun non-trade sengaja tidak diseret ke Aged Payable |
+| `prd_arkaaim` company 1 idem — **7 dari 10 vendor** tidak punya property payable eksplisit sehingga jatuh ke `2103100001` yang bertipe `liability_current` → bill untuk ketujuhnya akan gagal | 2 akun trade payable dikoreksi; diuji: bill untuk HRD PAYROLL kini posted |
+| `trn_arkaaim_begbal` journal `BNK1` menunjuk akun **terarsip** `101401` — tampil normal di dropdown, gagal hanya saat posting | Journal diarsipkan (nol jurnal, nol payment, nol statement) |
+
+Bukti tidak ada dampak ke pembukuan: `ir_module_module` (jumlah, installed,
+`max(write_date)`) identik sebelum/sesudah di `prd_levis_begbal` dan
+`prd_arkaaim`; kedua akun yang dikoreksi tipenya **kosong** (0 baris, saldo 0),
+jadi tidak ada saldo terposting yang berpindah subledger.
+
+PR: `#117` `#120` `#121` `#122`.
 
 ### 1.0b Ronde ketiga (2026-07-30, malam)
 
@@ -206,7 +259,7 @@ ada akuntansi existing yang berubah.
 | 1 | Migrasi TB tanpa detail AR/AP per partner | Perlu dev + **data klien**. Seluruh DB hanya 9 baris AR (2 partner) / 19 AP (7 partner) |
 | 2 | Kurs valas belum di-set | **Menunggu klien** — `res_currency_rate` 0 baris untuk IDR/USD/CNY. Config saja, nol kode |
 | 3 | Kartu utang/piutang tidak terintegrasi | Report sudah ada (`payable_card`/`receivable_card`); kosong karena #1 |
-| 4 | Bank masuk/keluar lewat COA perantara | **TIDAK REPRODUCE — tidak diubah.** Lihat §3 |
+| 4 | Bank masuk/keluar lewat COA perantara | 🔄 **SEBAGIAN SELESAI (11-Aug)** — company 1 (AIM) kini **langsung ke COA bank**; company 2 (ARKA) **masih lewat COA perantara** dan menunggu keputusan Finance. Asesmen "tidak reproduce" 30-Jul **keliru** — lihat §1.0c |
 | 5 | Purchase report keluar Trial Balance | ✅ **SELESAI** (Batch A) |
 | 6 | Jurnal DP masuk COA penjualan | ✅ **SELESAI** (Batch B) |
 | 7 | Akses closing period | **Menunggu klien** — lock date NULL; perlu konfirmasi periode mana yang ditutup karena lock date memblokir posting |
@@ -373,7 +426,9 @@ commit — jangan dry-run dulu — supaya tidak ada gap nomor jurnal.
 | Item | Yang dibutuhkan |
 |---|---|
 | EO #2 | Daftar kurs yang dipakai (kurs tengah BI / kurs pajak) dan per tanggal apa |
-| EO #4 | Transaksi mana yang menunjukkan COA perantara (tidak reproduce di sistem) |
+| EO #4 (lanjutan) | **Company 2 (ARKA) masih lewat COA perantara** `1103000003`/`1103000004`. Sudah ada 5 payment terposting lewat sana, jadi memindahkannya ke direct-to-bank memecah saldo dua akun itu menjadi dua kebijakan. Perlu keputusan Finance: ikut dipindah, atau tetap? Company 1 sudah direct sejak 11-Aug |
+| EO #4 (lanjutan) | `prd_arkaaim` punya **dua journal bank aktif di satu rekening**: `BNK1` dan `BCA2` sama-sama memakai `1103019280`. Perlu tahu mana yang benar-benar dipakai sebelum salah satunya diarsipkan |
+| EO #1 / #3 (lanjutan) | **3 vendor** company 1 `prd_arkaaim` diarahkan ke akun payable **non-trade** (`2103300001`/`2103400001`) lewat property per-partner. Kalau vendor dagang seharusnya ke `2103100001`, kirim daftar per-vendor — ini master data, bukan tebakan sistem |
 | EO #7 | Periode mana yang mau ditutup (lock date memblokir posting) |
 | EO #12 | Aturan due date Erajaya yang eksak |
 | EO #13 | Alamat AIM persis sesuai NPWP |
@@ -389,10 +444,22 @@ commit — jangan dry-run dulu — supaya tidak ada gap nomor jurnal.
 
 ### Backlog development
 
-Tersisa **tiga**, semuanya di worksheet EO:
+Tersisa **empat**, semuanya di worksheet EO:
 
 | Item | Pekerjaan |
 |---|---|
 | EO #8 | Rekonsiliasi selisih asset — **dua** komponen: nilai perolehan 34.976.845 dan accum-dep ≈555.011.296 |
 | EO #10 | Report sales berbasis akun revenue GL untuk ARKA (perbaikan POS di FASHION #9 tidak menjangkau tenant tanpa POS) |
 | EO #3 | Verifikasi kartu utang/piutang — terhambat EO #1, jalan setelah listing outstanding datang |
+| EO #3 (baru, 11-Aug) | Akun `1106000001 "Trade Receivables - Third Parties"` di `prd_arkaaim` bertipe **`liability_payable`**. Namanya piutang, tipenya utang — ia muncul di sisi AP, bukan AR. Berbeda dari dua akun yang sudah dikoreksi, akun ini **berisi data**, jadi mengubah tipenya memindahkan saldo terposting antar subledger AR/AP. Perlu keputusan Finance + dump pengaman, dikerjakan sebagai pekerjaan tersendiri |
+
+### Catatan internal (bukan item sheet)
+
+Dua hal keluar dari sesi 11-Aug yang tidak ada hubungannya dengan keluhan klien,
+dicatat di sini supaya tidak hilang:
+
+- `custom_whatsapp` di `trn_arkaaim_begbal` tertinggal satu versi (19.0.0.3.0 vs
+  19.0.0.4.0 di prd). Di luar lingkup akuntansi.
+- Tag image `odoo19-platform-odoo:rollback-20260810` dan
+  `…-storefront:rollback-20260810` sengaja disimpan setelah pertukaran image
+  11-Aug. **Jangan `docker image prune`** sampai image baru dinyatakan stabil.
