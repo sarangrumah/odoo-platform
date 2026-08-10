@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Payment Receipt: customer / inbound payments. Reuses the shared
+         document body defined in payment_voucher_templates.xml.
+         Self-contained wrapper: no web.html_container → no external asset (report.url)
+         callback that stalls wkhtmltopdf. <main> required by _prepare_html, and
+         the style/charset must live inside it (see pv_page_style). -->
+    <template id="report_payment_receipt">
+        <html>
+            <body>
+                <main>
+                    <t t-call="custom_payment_voucher.pv_page_style"/>
+                    <t t-foreach="docs" t-as="o">
+                        <div t-if="not o_first" style="page-break-before: always;"></div>
+                        <t t-set="doc_title">PAYMENT RECEIPT</t>
+                        <t t-call="custom_payment_voucher.report_payment_document"/>
+                    </t>
+                </main>
+            </body>
+        </html>
+    </template>
+</odoo>

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-10T06:51:45+00:00",
+  "generated_at": "2026-08-10T06:57:17+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "5f7d89f",
+    "commit": "e4f0f21",
     "branch": "fix/levis-voucher-source-doc"
   },
   "buckets": [
@@ -3536,6 +3536,32 @@
       ]
     },
     {
+      "module": "custom_payment_methods_id",
+      "bucket": "ee_gap",
+      "name": "Indonesian Payment Methods (Giro / Bank Transfer)",
+      "version": "19.0.1.0.0",
+      "summary": "Adds GIRO and BANK TRANSFER as selectable payment methods on bank journals.",
+      "category": "Accounting/Accounting",
+      "depends": 1,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
+    },
+    {
+      "module": "custom_payment_voucher",
+      "bucket": "ee_gap",
+      "name": "Payment Voucher / Payment Receipt",
+      "version": "19.0.1.0.0",
+      "summary": "Printable payment voucher and receipt on account.payment, with terbilang.",
+      "category": "Accounting/Accounting",
+      "depends": 1,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
+    },
+    {
       "module": "custom_petty_cash",
       "bucket": "ee_gap",
       "name": "Custom Cash Advance & Petty Cash",
@@ -4177,9 +4203,14 @@
       "category": "Inventory/Retail",
       "depends": 6,
       "public": true,
-      "last_change": "2026-08-04",
-      "change_count": 55,
+      "last_change": "2026-08-10",
+      "change_count": 56,
       "changes": [
+        {
+          "sha": "5bb46bb",
+          "date": "2026-08-10",
+          "subject": "fix(retail-import): stop a half size from failing the whole X101 upload (#119)"
+        },
         {
           "sha": "f5d8d58",
           "date": "2026-08-04",
@@ -4214,11 +4245,6 @@
           "sha": "07bdd14",
           "date": "2026-07-27",
           "subject": "feat(retail_import): MDM product-master REST API + X24DN pending-SKU replay"
-        },
-        {
-          "sha": "7e9d66b",
-          "date": "2026-07-24",
-          "subject": "fix(ee_gap): green CI for accounting trio (lint, sast, knowledge)"
         }
       ]
     },
