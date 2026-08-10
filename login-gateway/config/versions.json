@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-10T06:19:32+00:00",
+  "generated_at": "2026-08-10T06:51:29+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "db7a224",
-    "branch": "HEAD"
+    "commit": "42a5b65",
+    "branch": "feat/arkaaim-payment-parity"
   },
   "buckets": [
     {
@@ -3536,6 +3536,49 @@
       ]
     },
     {
+      "module": "custom_payment_methods_id",
+      "bucket": "ee_gap",
+      "name": "Indonesian Payment Methods (Giro / Bank Transfer)",
+      "version": "19.0.1.0.0",
+      "summary": "Adds GIRO and BANK TRANSFER as selectable payment methods on bank journals.",
+      "category": "Accounting/Accounting",
+      "depends": 1,
+      "public": true,
+      "last_change": "2026-08-10",
+      "change_count": 2,
+      "changes": [
+        {
+          "sha": "42a5b65",
+          "date": "2026-08-10",
+          "subject": "chore(arkaaim): satisfy the formatter and refresh the module version manifest"
+        },
+        {
+          "sha": "724b8e5",
+          "date": "2026-08-10",
+          "subject": "fix(arkaaim): let AIM pay a bill again, and close the finance config gaps behind it"
+        }
+      ]
+    },
+    {
+      "module": "custom_payment_voucher",
+      "bucket": "ee_gap",
+      "name": "Payment Voucher / Payment Receipt",
+      "version": "19.0.1.0.0",
+      "summary": "Printable payment voucher and receipt on account.payment, with terbilang.",
+      "category": "Accounting/Accounting",
+      "depends": 1,
+      "public": true,
+      "last_change": "2026-08-10",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "724b8e5",
+          "date": "2026-08-10",
+          "subject": "fix(arkaaim): let AIM pay a bill again, and close the finance config gaps behind it"
+        }
+      ]
+    },
+    {
       "module": "custom_petty_cash",
       "bucket": "ee_gap",
       "name": "Custom Cash Advance & Petty Cash",
@@ -4177,14 +4220,9 @@
       "category": "Inventory/Retail",
       "depends": 6,
       "public": true,
-      "last_change": "2026-08-10",
-      "change_count": 56,
+      "last_change": "2026-08-04",
+      "change_count": 55,
       "changes": [
-        {
-          "sha": "db7a224",
-          "date": "2026-08-10",
-          "subject": "fix(retail-import): stop a half size from failing the whole X101 upload"
-        },
         {
           "sha": "f5d8d58",
           "date": "2026-08-04",
@@ -4219,6 +4257,11 @@
           "sha": "07bdd14",
           "date": "2026-07-27",
           "subject": "feat(retail_import): MDM product-master REST API + X24DN pending-SKU replay"
+        },
+        {
+          "sha": "7e9d66b",
+          "date": "2026-07-24",
+          "subject": "fix(ee_gap): green CI for accounting trio (lint, sast, knowledge)"
         }
       ]
     },
