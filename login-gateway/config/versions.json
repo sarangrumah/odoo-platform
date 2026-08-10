@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-10T06:35:59+00:00",
+  "generated_at": "2026-08-10T06:51:45+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "256a3fe",
+    "commit": "5f7d89f",
     "branch": "fix/levis-voucher-source-doc"
   },
   "buckets": [
@@ -317,8 +317,13 @@
       "depends": 9,
       "public": false,
       "last_change": "2026-08-10",
-      "change_count": 41,
+      "change_count": 42,
       "changes": [
+        {
+          "sha": "5f7d89f",
+          "date": "2026-08-10",
+          "subject": "chore(levis): record the voucher source-doc trap and refresh the generated files"
+        },
         {
           "sha": "f34a2b7",
           "date": "2026-08-10",
@@ -353,11 +358,6 @@
           "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
-        },
-        {
-          "sha": "de96915",
-          "date": "2026-08-04",
-          "subject": "feat(levis): product category reclassification with its GL correction"
         }
       ]
     },
@@ -4172,7 +4172,7 @@
       "module": "custom_retail_import",
       "bucket": "ee_gap",
       "name": "Custom Retail Import",
-      "version": "19.0.0.22.0",
+      "version": "19.0.0.23.0",
       "summary": "Excel/CSV + SFTP ingestion adapter for retail master & transaction data",
       "category": "Inventory/Retail",
       "depends": 6,
