@@ -194,7 +194,10 @@ for company in companies:
         )
         for line in wrong:
             was = account_code(line.payment_account_id, company) if line.payment_account_id else "NOT SET"
-            print("          %-24s %-8s  %s -> %s" % (line.name, line.payment_method_id.payment_type, was, account_code(account, company)))
+            print(
+                "          %-24s %-8s  %s -> %s"
+                % (line.name, line.payment_method_id.payment_type, was, account_code(account, company))
+            )
             if COMMIT:
                 line.payment_account_id = account.id
             touched_lines += 1
@@ -223,8 +226,7 @@ for company in env["res.company"].sudo().search([], order="id"):
 
 print("-" * 78)
 print(
-    "%d journal(s) / %d method line(s) %s"
-    % (touched_journals, touched_lines, "updated" if COMMIT else "would change")
+    "%d journal(s) / %d method line(s) %s" % (touched_journals, touched_lines, "updated" if COMMIT else "would change")
 )
 if skipped:
     print("skipped (needs a default account first): %s" % ", ".join(skipped))

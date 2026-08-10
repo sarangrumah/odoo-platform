@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-06T09:37:44+00:00",
+  "generated_at": "2026-08-10T06:35:44+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "ef5de84",
-    "branch": "fix/levis-po-qty-price-swap-guard"
+    "commit": "724b8e5",
+    "branch": "feat/arkaaim-payment-parity"
   },
   "buckets": [
     {
@@ -317,8 +317,18 @@
       "depends": 9,
       "public": false,
       "last_change": "2026-08-06",
-      "change_count": 38,
+      "change_count": 40,
       "changes": [
+        {
+          "sha": "5d735a4",
+          "date": "2026-08-06",
+          "subject": "style: ruff format the swap-revert script and localization tests"
+        },
+        {
+          "sha": "966a522",
+          "date": "2026-08-06",
+          "subject": "chore(levis): record the PO swap guard in MODULE_KNOWLEDGE + refresh versions.json"
+        },
         {
           "sha": "ef5de84",
           "date": "2026-08-06",
@@ -348,16 +358,6 @@
           "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
-        },
-        {
-          "sha": "24446ab",
-          "date": "2026-07-29",
-          "subject": "refactor: use env._ for translated field defaults repo-wide"
-        },
-        {
-          "sha": "a28e844",
-          "date": "2026-07-29",
-          "subject": "feat(levis): show the PO's Operating Unit on the purchase form"
         }
       ]
     },
@@ -3532,6 +3532,44 @@
           "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
+        }
+      ]
+    },
+    {
+      "module": "custom_payment_methods_id",
+      "bucket": "ee_gap",
+      "name": "Indonesian Payment Methods (Giro / Bank Transfer)",
+      "version": "19.0.1.0.0",
+      "summary": "Adds GIRO and BANK TRANSFER as selectable payment methods on bank journals.",
+      "category": "Accounting/Accounting",
+      "depends": 1,
+      "public": true,
+      "last_change": "2026-08-10",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "724b8e5",
+          "date": "2026-08-10",
+          "subject": "fix(arkaaim): let AIM pay a bill again, and close the finance config gaps behind it"
+        }
+      ]
+    },
+    {
+      "module": "custom_payment_voucher",
+      "bucket": "ee_gap",
+      "name": "Payment Voucher / Payment Receipt",
+      "version": "19.0.1.0.0",
+      "summary": "Printable payment voucher and receipt on account.payment, with terbilang.",
+      "category": "Accounting/Accounting",
+      "depends": 1,
+      "public": true,
+      "last_change": "2026-08-10",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "724b8e5",
+          "date": "2026-08-10",
+          "subject": "fix(arkaaim): let AIM pay a bill again, and close the finance config gaps behind it"
         }
       ]
     },

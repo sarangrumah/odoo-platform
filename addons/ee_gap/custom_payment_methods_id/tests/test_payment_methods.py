@@ -71,8 +71,6 @@ class TestIdPaymentMethods(AccountTestInvoicingCommon):
 
         self.assertEqual(payment.payment_method_line_id, line)
         self.assertEqual(payment.outstanding_account_id, self.bank_journal.default_account_id)
-        liquidity = payment.move_id.line_ids.filtered(
-            lambda ln: ln.account_id == self.bank_journal.default_account_id
-        )
+        liquidity = payment.move_id.line_ids.filtered(lambda ln: ln.account_id == self.bank_journal.default_account_id)
         self.assertEqual(liquidity.credit, 500000.0)
         self.assertEqual(self.bill.payment_state, "paid")
