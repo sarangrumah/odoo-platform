@@ -23,7 +23,9 @@
 #   DB_SERVICE       (default "postgres")
 #   PG_USER          (default $POSTGRES_USER or "odoo")
 #   PG_MAINTENANCE_DB (default "postgres" — used to list DBs)
-#   SKIP_DBS         (comma-separated, default "postgres,odoo_mgmt,template0,template1")
+#   SKIP_DBS         (comma-separated; see the default below — it holds the
+#                     system DBs plus the Levi's side copies that must not be
+#                     swept. Pass SKIP_DBS explicitly to override.)
 
 set -euo pipefail
 
@@ -32,7 +34,12 @@ ODOO_SERVICE="${ODOO_SERVICE:-odoo}"
 DB_SERVICE="${DB_SERVICE:-postgres}"
 PG_USER="${PG_USER:-${POSTGRES_USER:-odoo}}"
 PG_MAINTENANCE_DB="${PG_MAINTENANCE_DB:-postgres}"
-SKIP_DBS="${SKIP_DBS:-postgres,odoo_mgmt,template0,template1}"
+# Beyond the system DBs, four Levi's side copies are held back by request:
+# they carry posted journals but are not the live books, and an unattended
+# sweep upgrading them has no upside and can only surprise someone mid-review.
+# Only rnd_levis, prd_levis and prd_levis_begbal are meant to track the repo.
+# Remove a name here (or pass SKIP_DBS=) when a copy is deliberately refreshed.
+SKIP_DBS="${SKIP_DBS:-postgres,odoo_mgmt,template0,template1,prd_levis_AP,prd_detail_levis,demo_updated_levis,tst_agedpay}"
 
 # Source repo .env so PGPASSWORD / POSTGRES_PASSWORD reach docker exec.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
