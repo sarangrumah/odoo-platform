@@ -88,7 +88,7 @@ Agustus akan butuh putaran clearing sendiri.
 ## 4. Langkah eksekusi
 
 > **Prasyarat: approval Accounting atas workbook**
-> `/srv/sftp-share/files/Persetujuan_Clearing_Juli2026.xlsx` (12 sheet, ada kolom tanda tangan).
+> `/srv/sftp-share/files/Persetujuan_Clearing_Juli2026.xlsx` (13 sheet, ada kolom tanda tangan).
 > `fiscalyear_lock_date` = 2026-06-30, jadi Juli terbuka — tidak ada lock yang perlu digeser.
 
 ### ⚠️ Script 81 tidak bisa dipakai untuk mem-posting
@@ -160,7 +160,8 @@ jadi 5.198 baris POS receivable akan tetap ter-match padahal jurnalnya sudah dra
 `/srv/sftp-share/files/clearing-juli-2026/` — `clearing_juli.json` (persis yang membuat 63
 draft yang ada sekarang), `EBR_JULI_2026.xlsx`, `MUTASI_BCA_JULI.csv`.
 Workbook: `Draft_Clearing_Juli2026.xlsx` (validasi, 4-Agu) dan
-`Persetujuan_Clearing_Juli2026.xlsx` (approval; regenerate 11-Agu dengan dua sheet AEON).
+`Persetujuan_Clearing_Juli2026.xlsx` (approval; regenerate 11-Agu — dua sheet AEON, sheet
+`LANGKAH-EKSEKUSI`, indeks isi workbook, dan kolom SESUDAH ditandai terbukti lewat uji).
 Backup pra-clearing: `/opt/odoo-platform/backups/prd_levis_begbal_20260804_pre_clearing_juli.dump`.
 
 ## 5. Yang tetap terbuka sesudah clearing — butuh keputusan klien
@@ -257,7 +258,7 @@ sisa 490.494.449 seluruhnya berlabel 30-Jul (77.828.849 = 76.926.875 KOL + 901.9
 31-Jul (412.665.600), tanpa satu pun baris tersisa di 15-Jul.
 
 **Workbook untuk dikirim ke EBR.** Dua sheet baru sudah digabungkan ke workbook persetujuan
-`/srv/sftp-share/files/Persetujuan_Clearing_Juli2026.xlsx` (jadi 12 sheet), dibangkitkan oleh
+`/srv/sftp-share/files/Persetujuan_Clearing_Juli2026.xlsx` (jadi 13 sheet), dibangkitkan oleh
 `82_workbook_approval_clearing_juli.py` yang tetap read-only:
 
 - **`AEON-SELISIH`** — daftar selisih per transaksi (X70D vs COMPILE SALES, lengkap dengan

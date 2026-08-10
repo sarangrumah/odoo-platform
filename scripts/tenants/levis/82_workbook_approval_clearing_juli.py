@@ -461,6 +461,13 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
         ("Lingkup", f"63 jurnal draft dengan ref {REF_PREFIX}-*", ""),
         ("Periode", "01 s/d 31 Juli 2026 (fiscalyear lock 30-Jun-2026, Juli terbuka)", ""),
         ("Sifat", "Belum diposting. Workbook ini dasar persetujuan sebelum posting.", ""),
+        (
+            "Verifikasi",
+            "Angka kolom SESUDAH bukan proyeksi di atas kertas: 63 jurnal sudah di-posting "
+            "sungguhan di dalam transaksi lalu di-rollback (uji CLR_POST=1 CLR_DRY=1), dan "
+            "keempat saldo target keluar tepat sama. Rincian langkahnya di sheet LANGKAH-EKSEKUSI.",
+            "",
+        ),
         ("", "", ""),
         ("BLOK", "ISI", "NILAI"),
     ]
@@ -476,7 +483,7 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
         ("", "", ""),
         ("Blok S (statement bank) dan D (analytic OU) SUDAH permanen sejak 4-Agu.", "", ""),
         ("", "", ""),
-        ("AKUN", "SALDO SEBELUM (posted s/d 31-Jul)", "PROYEKSI SESUDAH POSTING"),
+        ("AKUN", "SALDO SEBELUM (posted s/d 31-Jul)", "SESUDAH POSTING (terbukti lewat uji)"),
     ]
     for code in KEY_ACCOUNTS:
         before = odoo["balance_before"].get(code, 0.0)
@@ -507,6 +514,30 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
             "di-match di widget bank reconciliation; kontrolnya murni saldo akun.",
             "",
         ),
+        (
+            "4",
+            "Rp 1.400.925 penjualan AEON BSD CITY tidak ikut ter-clearing karena trans date "
+            "trx 617/619/622 di workbook EBR bergeser sehari + trx 682 beda Rp 50 -- "
+            "lihat sheet AEON-SELISIH. Tidak menghalangi posting.",
+            "",
+        ),
+        (
+            "5",
+            "Data Agustus sudah mulai masuk dan TIDAK tersentuh paket ini; clearing Agustus "
+            "adalah pekerjaan terpisah.",
+            "",
+        ),
+        ("", "", ""),
+        ("ISI WORKBOOK", "", ""),
+        ("BLOK-A-SETTLEMENT / -PER-JURNAL / -PER-AKUN", "Rincian 30 jurnal settlement POS", ""),
+        ("BLOK-B-AR-JUNI", "2 jurnal collection AR Juni", ""),
+        ("BLOK-C-ATS-SWEEP", "31 jurnal sweep ATS BCA", ""),
+        ("KOL-76JT", "32 transaksi pemberian gratis ke KOL", ""),
+        ("SALES-JUN-DI-JULI", "Penjualan Juni yang masuk di file Juli", ""),
+        ("SISA-503JT", "Yang belum tersettle + jembatan ke proyeksi Odoo", ""),
+        ("AEON-SELISIH / AEON-TRX-DETAIL", "Selisih X70D vs COMPILE SALES di AEON BSD CITY", ""),
+        ("OPEN-ITEMS", "Yang tetap terbuka setelah clearing dan butuh keputusan", ""),
+        ("LANGKAH-EKSEKUSI", "Runbook posting, kriteria terima, dan cara rollback", ""),
         ("", "", ""),
         ("Disiapkan oleh", "", ""),
         ("Diperiksa oleh", "", ""),
@@ -543,7 +574,7 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
     for label, val in [
         ("Bruto rencana (tabel di atas)", rnd(a_gross)),
         ("Yang benar-benar dikredit oleh 30 jurnal draft blok A", rnd(a_credit)),
-        ("Selisih = AEON BSD CITY, klasifikasi tender EBR beda dengan X70D", rnd(a_gross - a_credit)),
+        ("Selisih = AEON BSD CITY, trans date EBR bergeser sehari + Rp 50 (sheet AEON-SELISIH)", rnd(a_gross - a_credit)),
     ]:
         ws.append([label, "", "", val])
         ws.cell(ws.max_row, 4).number_format = money
@@ -962,8 +993,95 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
         [6, 66, 20, 62, 22],
     )
 
+    # ------------------------------------------------------- langkah eksekusi
+    resid_after_x = rnd(sum(r[1] - r[3] for r in odoo["pos_receivable"]))
+    steps = [
+        ("LANGKAH EKSEKUSI SETELAH PERSETUJUAN TURUN", "", ""),
+        ("", "", ""),
+        (
+            "Catatan teknis",
+            "Jangan jalankan ulang 81_clearing_juli.py dengan CLR_POST=1. Setiap blok di sana "
+            "berhenti lebih awal begitu ref-nya sudah ada, jadi tidak ada entri yang di-posting "
+            "-- hasilnya no-op. Posting dilakukan oleh 90_post_clearing_juli.py, yang mencari "
+            "63 draft lewat ref lalu memvalidasi jumlah, balance per jurnal, tanggal harus di "
+            "Juli, dan lock date belum menutup Juli. Tanpa CLR_POST=1 script tidak menulis apa pun.",
+            "",
+        ),
+        ("", "", ""),
+        ("NO", "LANGKAH", "PERINTAH / KRITERIA"),
+        (
+            "1",
+            "Backup database -- tidak ada backup otomatis untuk DB tenant",
+            "pg_dump -Fc -d prd_levis_begbal -f prd_levis_begbal_pre_post_clearing_juli.dump",
+        ),
+        (
+            "2",
+            "Uji coba: posting sungguhan lalu rollback",
+            "CLR_POST=1 CLR_DRY=1 odoo shell -d prd_levis_begbal < 90_post_clearing_juli.py",
+        ),
+        (
+            "3",
+            "Periksa hasil uji -- harus keluar 'delta 0.00' empat kali",
+            "Kalau ada delta bukan nol: ADA MUTASI JULI BARU, hentikan dan regenerate JSON",
+        ),
+        (
+            "4",
+            "Eksekusi sungguhan",
+            "CLR_POST=1 odoo shell -d prd_levis_begbal < 90_post_clearing_juli.py",
+        ),
+        (
+            "5",
+            "Verifikasi akhir",
+            "Bandingkan dengan tabel KRITERIA TERIMA di bawah",
+        ),
+        ("", "", ""),
+        ("KRITERIA TERIMA", "NILAI YANG HARUS KELUAR", ""),
+        ("Jumlah jurnal ter-posting", 63.0, ""),
+        ("1103000002 Bank Suspense (s/d 31-Jul)", rnd(odoo["balance_before"].get("1103000002", 0.0) + delta["1103000002"]), ""),
+        ("7104000001 Beban MDR (s/d 31-Jul)", rnd(odoo["balance_before"].get("7104000001", 0.0) + delta["7104000001"]), ""),
+        ("1106000001 Piutang Usaha (s/d 31-Jul)", rnd(odoo["balance_before"].get("1106000001", 0.0) + delta["1106000001"]), ""),
+        ("POS Receivable Juli masih terbuka", resid_after_x, ""),
+        ("", "", ""),
+        ("ROLLBACK", "", ""),
+        (
+            "Sebelum commit",
+            "Tidak perlu tindakan -- script otomatis rollback pada mode CLR_DRY=1.",
+            "",
+        ),
+        (
+            "Sesudah commit",
+            "Restore dari dump langkah 1. JANGAN memakai Reset to Draft: di Odoo 19 reset to "
+            "draft tidak melepas rekonsiliasi, sehingga 5.198 baris POS receivable tetap "
+            "ter-match padahal jurnalnya sudah draft.",
+            "",
+        ),
+        ("", "", ""),
+        (
+            "Catatan periode",
+            "fiscalyear_lock_date = 30-Jun-2026, jadi Juli terbuka dan tidak ada lock yang "
+            "perlu digeser. Seluruh jurnal bertanggal dalam Juli; angka Juni tidak berubah.",
+            "",
+        ),
+    ]
+    ws = wb.create_sheet("LANGKAH-EKSEKUSI")
+    for r in steps:
+        ws.append(list(r))
+    ws["A1"].font = Font(bold=True, size=13)
+    for row in ws.iter_rows(min_row=2):
+        for c in row:
+            if isinstance(c.value, float):
+                c.number_format = money
+        if row[0].value in ("NO", "KRITERIA TERIMA", "ROLLBACK"):
+            for c in row:
+                c.font = bold
+    for c in ("A", "B", "C"):
+        ws.column_dimensions[c].width = {"A": 38, "B": 86, "C": 76}[c]
+    for row in ws.iter_rows():
+        for c in row:
+            c.alignment = Alignment(wrap_text=True, vertical="top")
+
     wb.save(path)
-    os.chmod(path, 0o644)
+    os.chmod(path, 0o664)
 
 
 def main():
