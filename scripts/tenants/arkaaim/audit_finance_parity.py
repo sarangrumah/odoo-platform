@@ -81,9 +81,13 @@ for company in companies:
     if not journals:
         print("    (no bank/cash journal)")
     for journal in journals:
+        account = journal.default_account_id
+        # An archived default account passes every config check here and then
+        # blows up at posting time — worth its own marker.
+        archived = "  <-- default account ARCHIVED, journal cannot post" if account and not account.active else ""
         print(
-            "    %-6s %-8s %-40s default=%s"
-            % (journal.code, journal.type, journal.name, code_of(journal.default_account_id, company))
+            "    %-6s %-8s %-40s default=%s%s"
+            % (journal.code, journal.type, journal.name, code_of(account, company), archived)
         )
         lines = journal.inbound_payment_method_line_ids | journal.outbound_payment_method_line_ids
         if not lines:
