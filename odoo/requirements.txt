@@ -22,7 +22,7 @@ lxml==6.1.1                   # Explicit pin (transitive via signxml); CVE-2026-
 phonenumbers==8.13.50         # E.164 normalization for PII fields
 qrcode==7.4.2                 # 2FA + receipt QR
 pyotp==2.9.0                  # TOTP for 2FA admin
-pypdf==6.14.2                 # PDF utilities for Documents/Sign; 15+ CVEs across 5.x → 6.x (-55197 onward); 6.14.2 clears CVE-2026-59935/59936/59937/59938 (over 6.13.3) + all prior
+pypdf==6.15.0                 # PDF utilities for Documents/Sign; 15+ CVEs across 5.x → 6.x (-55197 onward); 6.15.0 clears CVE-2026-71852/71870 (over 6.14.2) + all prior
 python-dateutil==2.9.0
 prometheus-client==0.21.0     # Optional: Odoo can expose /metrics later
 
