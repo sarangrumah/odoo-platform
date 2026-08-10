@@ -172,6 +172,20 @@ for company in companies:
             print("  SKIP  %-6s %-42s no default_account_id" % (journal.code, journal.name))
             continue
 
+        if not account.active:
+            # Configuring this journal would look like success and then fail at
+            # posting time: `_check_constrains_account_id_journal_id` refuses an
+            # archived account. The journal itself is the thing to fix — repoint
+            # it at a live bank account, or archive it.
+            skipped.append(
+                "%s/%s (default account %s is archived)" % (company.id, journal.code, account_code(account, company))
+            )
+            print(
+                "  SKIP  %-6s %-42s default account %s is ARCHIVED"
+                % (journal.code, journal.name, account_code(account, company))
+            )
+            continue
+
         added = ensure_method_lines(journal, company)
         # Re-read after create so newly added lines get their account below.
         journal.invalidate_recordset(["inbound_payment_method_line_ids", "outbound_payment_method_line_ids"])
