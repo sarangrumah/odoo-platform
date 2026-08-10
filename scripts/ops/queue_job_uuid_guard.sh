@@ -95,8 +95,11 @@ PGUSER="${PGUSER:-odoo}"
 [ -n "$PGPASSWORD" ] || die "POSTGRES_PASSWORD not found in $ENV_FILE"
 
 psql_db() {  # psql_db <db> <sql>
-  docker exec -i -e PGPASSWORD="$PGPASSWORD" "$PG_CONTAINER" \
-    psql -U "$PGUSER" -d "$1" -At -c "$2" 2>/dev/null
+  # NO -i, and stdin closed: this runs inside `while read < file` loops, and a
+  # `docker exec -i` there swallows the loop's input — the loop then processes
+  # the first item and silently exits. Cost one run of 24 collisions to notice.
+  docker exec -e PGPASSWORD="$PGPASSWORD" "$PG_CONTAINER" \
+    psql -U "$PGUSER" -d "$1" -At -c "$2" 2>/dev/null </dev/null
 }
 
 docker inspect "$PG_CONTAINER" >/dev/null 2>&1 || die "container $PG_CONTAINER not running"
