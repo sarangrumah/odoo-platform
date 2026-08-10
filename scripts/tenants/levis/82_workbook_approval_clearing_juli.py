@@ -138,6 +138,25 @@ def read_odoo(db):
         """,
     )
     out["ar_juni_adj"] = [(r[0], r[1], r[2], num(r[3])) for r in rows]
+
+    # 31-Jul POS receivable debits: the transactions that settle D+1 in August
+    # and therefore stay open no matter how the clearing is booked.
+    rows = psql(
+        db,
+        """
+        with acc as (select id, code_store->>'1' code from account_account),
+             an as (select id, name->>'en_US' nm from account_analytic_account)
+        select coalesce(an.nm, '(tanpa OU)'), acc.code, sum(l.debit)
+          from account_move_line l
+          join account_move m on m.id = l.move_id
+          join acc on acc.id = l.account_id
+          left join an on l.analytic_distribution ? an.id::text
+         where m.state = 'posted' and l.debit > 0 and l.date = '2026-07-31'
+           and acc.code between '1106000101' and '1106000110'
+      group by 1, 2 order by 1, 2
+        """,
+    )
+    out["timing_3107"] = [(r[0], r[1], num(r[2])) for r in rows]
     return out
 
 
@@ -534,7 +553,8 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
         ("BLOK-C-ATS-SWEEP", "31 jurnal sweep ATS BCA", ""),
         ("KOL-76JT", "32 transaksi pemberian gratis ke KOL", ""),
         ("SALES-JUN-DI-JULI", "Penjualan Juni yang masuk di file Juli", ""),
-        ("SISA-503JT", "Yang belum tersettle + jembatan ke proyeksi Odoo", ""),
+        ("SISA-503JT", "Yang belum tersettle per workbook EBR + jembatan ke Odoo", ""),
+        ("SISA-490JT", "Rincian POS Receivable Juli yang masih terbuka setelah clearing", ""),
         ("AEON-SELISIH / AEON-TRX-DETAIL", "Selisih X70D vs COMPILE SALES di AEON BSD CITY", ""),
         ("OPEN-ITEMS", "Yang tetap terbuka setelah clearing dan butuh keputusan", ""),
         ("LANGKAH-EKSEKUSI", "Runbook posting, kriteria terima, dan cara rollback", ""),
@@ -992,6 +1012,111 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
         ],
         [6, 66, 20, 62, 22],
     )
+
+    # ------------------------------------------------------------ sisa 490 jt
+    tim = collections.Counter()
+    tim_store = collections.Counter()
+    for store, code, val in odoo["timing_3107"]:
+        tim[(store, code)] += val
+        tim_store[store] += val
+    tot_timing = rnd(sum(tim.values()))
+    kol_total = rnd(sum(r["amount"] for r in kol))
+    macet_lain = rnd(sum(r["amount"] for r in unsettled if r["trans"] != "2026-07-31") - kol_total)
+
+    ws = sheet(
+        "SISA-490JT",
+        ["Komponen", "Sebab", "Nilai", "Tindak lanjut"],
+        [
+            (
+                "Timing 31-Jul",
+                "Transaksi 31-Jul yang settle D+1 di Agustus -- normal, bukan masalah",
+                tot_timing,
+                "Tertutup sendiri oleh clearing Agustus",
+            ),
+            (
+                "KOL 15-Jul",
+                "Pemberian gratis ke KOL tercatat sebagai penjualan CASH harga penuh "
+                "(GRAND INDONESIA, sheet KOL-76JT)",
+                kol_total,
+                "Reklas ke beban promosi ATAU batalkan dan import ulang sebagai free goods",
+            ),
+            (
+                "Macet lain",
+                "Bon manual / transaksi tanpa CASH RECEIVED DATE selain KOL (sheet SISA-503JT)",
+                macet_lain,
+                "Ditelusuri per toko oleh Finance",
+            ),
+            (
+                "AEON BSD CITY",
+                "Trans date trx 617/619/622 bergeser sehari di workbook EBR + trx 682 beda Rp 50 "
+                "(sheet AEON-SELISIH)",
+                1400925.0,
+                "EBR mengoreksi COMPILE SALES, lalu blok A dibangkitkan ulang",
+            ),
+            (
+                "Reclass SALESMANUAL Juni",
+                "Sudah dibukukan 7-Agu, jadi mengurangi sisa (sheet SALES-JUN-DI-JULI)",
+                -14608080.0,
+                "Selesai -- tidak perlu tindakan",
+            ),
+            (
+                "Pembulatan",
+                "Selisih pembulatan Odoo vs workbook EBR",
+                950.0,
+                "Diterima sebagai known-diff",
+            ),
+        ],
+        [26, 74, 18, 62],
+        total_cols=(2,),
+    )
+    ws.insert_rows(1, 3)
+    ws["A1"] = "RINCIAN POS RECEIVABLE JULI YANG MASIH TERBUKA SETELAH CLEARING"
+    ws["A1"].font = Font(bold=True, size=13)
+    ws["A2"] = (
+        "Total 490.494.449. Empat perlima di antaranya cuma soal waktu: transaksi 31-Jul yang "
+        "uangnya baru masuk 1-Agu. Yang benar-benar butuh keputusan hanya KOL dan macet lain."
+    )
+
+    ws.append([])
+    ws.append(["CARA MEMBACANYA DI BUKU BESAR"])
+    ws.cell(ws.max_row, 1).font = bold
+    ws.append(
+        [
+            "",
+            "Setelah 63 jurnal diposting, seluruh sisa ini muncul sebagai 85 baris bertanggal "
+            "30 dan 31 Juli saja -- BUKAN di tanggal aslinya. Penyebabnya rekonsiliasi dilakukan "
+            "per akun lintas toko, sehingga sisa mengapung ke baris terakhir yang belum termatch. "
+            "Karena itu sisa per toko dan per tanggal TIDAK bisa dibaca dari buku besar; "
+            "pakai sheet ini. Contoh: KOL terjadi 15-Jul tetapi akan tampak bertanggal 30-Jul.",
+            "",
+            "",
+        ]
+    )
+    ws.cell(ws.max_row, 2).alignment = Alignment(wrap_text=True, vertical="top")
+
+    ws.append([])
+    ws.append(["TIMING 31-JUL PER TOKO (settle D+1 di Agustus)"])
+    ws.cell(ws.max_row, 1).font = bold
+    ws.append(["Toko", "Nilai", "", ""])
+    for c in ws[ws.max_row]:
+        c.font, c.fill = bold, head_fill
+    for store, val in sorted(tim_store.items(), key=lambda kv: -kv[1]):
+        ws.append([store, rnd(val), "", ""])
+        ws.cell(ws.max_row, 2).number_format = money
+    ws.append(["TOTAL", tot_timing, "", ""])
+    ws.cell(ws.max_row, 1).font = bold
+    ws.cell(ws.max_row, 2).font = bold
+    ws.cell(ws.max_row, 2).number_format = money
+
+    ws.append([])
+    ws.append(["TIMING 31-JUL PER TOKO x TENDER"])
+    ws.cell(ws.max_row, 1).font = bold
+    ws.append(["Toko", "Akun POS Receivable", "Nilai", ""])
+    for c in ws[ws.max_row]:
+        c.font, c.fill = bold, head_fill
+    for (store, code), val in sorted(tim.items()):
+        ws.append([store, code, rnd(val), ""])
+        ws.cell(ws.max_row, 3).number_format = money
 
     # ------------------------------------------------------- langkah eksekusi
     resid_after_x = rnd(sum(r[1] - r[3] for r in odoo["pos_receivable"]))

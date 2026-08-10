@@ -73,6 +73,9 @@ log("all drafts balanced and inside July")
 
 
 def report(stage):
+    # the checks below read through raw SQL, so the ORM has to hit the database
+    # first -- without this the post-reconcile counts come back pre-reconcile
+    env.flush_all()
     for code in ("1103000002", "7104000001", "1106000001"):
         env.cr.execute(
             """select coalesce(sum(debit - credit), 0) from account_move_line

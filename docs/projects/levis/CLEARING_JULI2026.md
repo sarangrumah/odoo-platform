@@ -59,7 +59,7 @@ proyeksi di atas kertas — ini hasil **rehearsal posting sungguhan yang lalu di
 | `1103000002` Bank Suspense | 52.374.507,97 | **1.530.199.113,09** | lihat §5 |
 | `7104000001` Beban MDR | 26.448.556,73 | **94.186.098,68** | |
 | `1106000001` AR EBR | 368.378.122,00 | **2.949.900,00** | tinggal residu tipis |
-| POS Receivable Juli open | 16.925.825.341 (2.640 baris) | **490.494.449 (89 baris)** | lihat §5 |
+| POS Receivable Juli open | 16.925.825.341 (2.640 baris) | **490.494.449 (85 baris)** | lihat §5 |
 
 Rekonsiliasi otomatis akan menutup 5.198 baris POS receivable di 10 akun tender.
 
@@ -141,12 +141,19 @@ posted 63 entries: GLJV/2026/07/0034 .. GLJV/2026/07/0096
 after  balance 1103000002 = 1530199113.09  (expected 1530199113.09, delta 0.00)
 after  balance 7104000001 = 94186098.68    (expected 94186098.68, delta 0.00)
 after  balance 1106000001 = 2949900.00     (expected 2949900.00, delta 0.00)
-after  POS receivable July open: 490494449.00 on 89 lines  (delta 0.00)
+after  POS receivable July open: 490494449.00 on 85 lines  (delta 0.00)
 ```
 
 Kalau ada delta ≠ 0 → **jangan lanjut**, ada mutasi Juli baru yang masuk sesudah 11-Agu;
 regenerate JSON lewat `80_prep_clearing_juli.py` (draft lama harus dihapus dulu, guard-nya
 menolak double).
+
+### Catatan: hitungan baris butuh flush
+
+Verifikasi di `90_post_clearing_juli.py` membaca lewat SQL mentah, jadi ORM harus
+di-`flush_all()` dulu. Tanpa itu hitungan baris terbuka terbaca **sebelum** rekonsiliasi —
+89 baris, bukan 85 — padahal nilai rupiahnya tetap benar. `81_clearing_juli.py:425`
+punya pola yang sama dan angka barisnya ikut tidak bisa dipercaya.
 
 ### Rollback
 
@@ -190,7 +197,23 @@ oleh clearing Agustus.
 ### d. Selisih Rp 950
 Sales Juli Odoo 16.940.433.421 vs workbook 16.940.432.471. Immaterial, dicatat saja.
 
-Jembatan angka 490.494.449 = 412.665.600 (timing 31-Jul) + 76.926.875 (KOL) + 901.974 (lain-lain).
+### Rincian 490.494.449 (sheet `SISA-490JT`)
+
+| Komponen | Nilai | Tindak lanjut |
+|---|---:|---|
+| Timing 31-Jul — settle D+1 di Agustus | 412.665.600 | tertutup sendiri oleh clearing Agustus |
+| KOL 15-Jul Grand Indonesia | 76.926.875 | keputusan Accounting + Tax |
+| Macet lain (bon manual, 4 toko) | 14.108.179 | ditelusuri Finance |
+| AEON — trans date bergeser + Rp 50 | 1.400.925 | EBR mengoreksi COMPILE SALES |
+| Reclass SALESMANUAL Juni (sudah dibukukan 7-Agu) | −14.608.080 | selesai |
+| Pembulatan Odoo vs workbook | +950 | known-diff |
+| **Total** | **490.494.449** | |
+
+**Jangan baca sisa ini dari buku besar per toko atau per tanggal.** Setelah posting, ke-85
+baris seluruhnya bertanggal 30 dan 31 Juli — rekonsiliasi berjalan per akun lintas toko,
+jadi sisa mengapung ke baris terakhir yang belum ter-match. Baris 31-Jul (412.665.600)
+memang murni timing dan cocok per toko; seluruh sisanya menumpuk di label 30-Jul
+(77.828.849) walau KOL sebenarnya terjadi 15-Jul.
 
 ## 5A. Detail selisih AEON BSD CITY — tender EBR vs X70D
 
