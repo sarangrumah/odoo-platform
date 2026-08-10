@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-10T06:51:29+00:00",
+  "generated_at": "2026-08-10T06:57:17+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "42a5b65",
-    "branch": "feat/arkaaim-payment-parity"
+    "commit": "e4f0f21",
+    "branch": "fix/levis-voucher-source-doc"
   },
   "buckets": [
     {
@@ -311,14 +311,24 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.25.0",
+      "version": "19.0.1.25.1",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
-      "last_change": "2026-08-06",
-      "change_count": 40,
+      "last_change": "2026-08-10",
+      "change_count": 42,
       "changes": [
+        {
+          "sha": "5f7d89f",
+          "date": "2026-08-10",
+          "subject": "chore(levis): record the voucher source-doc trap and refresh the generated files"
+        },
+        {
+          "sha": "f34a2b7",
+          "date": "2026-08-10",
+          "subject": "fix(levis): print the bill number on the payment voucher, not the payment's own"
+        },
         {
           "sha": "5d735a4",
           "date": "2026-08-06",
@@ -348,16 +358,6 @@
           "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
-        },
-        {
-          "sha": "de96915",
-          "date": "2026-08-04",
-          "subject": "feat(levis): product category reclassification with its GL correction"
-        },
-        {
-          "sha": "4704e07",
-          "date": "2026-07-29",
-          "subject": "fix: convert every _sql_constraints to models.Constraint"
         }
       ]
     },
@@ -3544,20 +3544,9 @@
       "category": "Accounting/Accounting",
       "depends": 1,
       "public": true,
-      "last_change": "2026-08-10",
-      "change_count": 2,
-      "changes": [
-        {
-          "sha": "42a5b65",
-          "date": "2026-08-10",
-          "subject": "chore(arkaaim): satisfy the formatter and refresh the module version manifest"
-        },
-        {
-          "sha": "724b8e5",
-          "date": "2026-08-10",
-          "subject": "fix(arkaaim): let AIM pay a bill again, and close the finance config gaps behind it"
-        }
-      ]
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
     },
     {
       "module": "custom_payment_voucher",
@@ -3568,15 +3557,9 @@
       "category": "Accounting/Accounting",
       "depends": 1,
       "public": true,
-      "last_change": "2026-08-10",
-      "change_count": 1,
-      "changes": [
-        {
-          "sha": "724b8e5",
-          "date": "2026-08-10",
-          "subject": "fix(arkaaim): let AIM pay a bill again, and close the finance config gaps behind it"
-        }
-      ]
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
     },
     {
       "module": "custom_petty_cash",
@@ -4220,9 +4203,14 @@
       "category": "Inventory/Retail",
       "depends": 6,
       "public": true,
-      "last_change": "2026-08-04",
-      "change_count": 55,
+      "last_change": "2026-08-10",
+      "change_count": 56,
       "changes": [
+        {
+          "sha": "5bb46bb",
+          "date": "2026-08-10",
+          "subject": "fix(retail-import): stop a half size from failing the whole X101 upload (#119)"
+        },
         {
           "sha": "f5d8d58",
           "date": "2026-08-04",
@@ -4257,11 +4245,6 @@
           "sha": "07bdd14",
           "date": "2026-07-27",
           "subject": "feat(retail_import): MDM product-master REST API + X24DN pending-SKU replay"
-        },
-        {
-          "sha": "7e9d66b",
-          "date": "2026-07-24",
-          "subject": "fix(ee_gap): green CI for accounting trio (lint, sast, knowledge)"
         }
       ]
     },
