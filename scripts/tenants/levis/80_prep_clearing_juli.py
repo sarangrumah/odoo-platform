@@ -389,7 +389,12 @@ def build_workbook(path, plan, odoo, diag):
             1533030000.0,
         ),
         ("3", "AR 1106000001 menjadi minus karena entry SALESMANUAL Juni (Rp 14.608.080) belum dibukukan", ""),
-        ("4", "AEON BSD CITY 06/07-Jul: klasifikasi tender EBR beda dengan X70D, sisa tidak ter-clearing", 1400925.0),
+        (
+            "4",
+            "AEON BSD CITY: trx 617/619/622 ditulis EBR bertanggal 07-Jul (X70D: 06-Jul, register 1) "
+            "Rp 1.400.875 + trx 682 08-Jul beda Rp 50 -- tidak ter-clearing",
+            1400925.0,
+        ),
     ]
     for r in rows:
         ws.append(r)
