@@ -315,6 +315,9 @@ class RetailImportExecutorReplay(models.AbstractModel):
                 continue
             if not isinstance(row, dict):
                 continue
+            # Staged before the reader coerced numeric cells; see
+            # RetailImportExecutor._ri_normalize_row.
+            row = self.env["retail.import.executor"]._ri_normalize_row(row)
             row["_row"] = line.row_number
             records.append(row)
             row_to_line[line.row_number] = line
