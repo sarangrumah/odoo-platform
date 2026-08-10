@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-06T09:37:44+00:00",
+  "generated_at": "2026-08-10T06:19:32+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "ef5de84",
-    "branch": "fix/levis-po-qty-price-swap-guard"
+    "commit": "db7a224",
+    "branch": "HEAD"
   },
   "buckets": [
     {
@@ -317,8 +317,18 @@
       "depends": 9,
       "public": false,
       "last_change": "2026-08-06",
-      "change_count": 38,
+      "change_count": 40,
       "changes": [
+        {
+          "sha": "5d735a4",
+          "date": "2026-08-06",
+          "subject": "style: ruff format the swap-revert script and localization tests"
+        },
+        {
+          "sha": "966a522",
+          "date": "2026-08-06",
+          "subject": "chore(levis): record the PO swap guard in MODULE_KNOWLEDGE + refresh versions.json"
+        },
         {
           "sha": "ef5de84",
           "date": "2026-08-06",
@@ -348,16 +358,6 @@
           "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
-        },
-        {
-          "sha": "24446ab",
-          "date": "2026-07-29",
-          "subject": "refactor: use env._ for translated field defaults repo-wide"
-        },
-        {
-          "sha": "a28e844",
-          "date": "2026-07-29",
-          "subject": "feat(levis): show the PO's Operating Unit on the purchase form"
         }
       ]
     },
@@ -4172,14 +4172,19 @@
       "module": "custom_retail_import",
       "bucket": "ee_gap",
       "name": "Custom Retail Import",
-      "version": "19.0.0.22.0",
+      "version": "19.0.0.23.0",
       "summary": "Excel/CSV + SFTP ingestion adapter for retail master & transaction data",
       "category": "Inventory/Retail",
       "depends": 6,
       "public": true,
-      "last_change": "2026-08-04",
-      "change_count": 55,
+      "last_change": "2026-08-10",
+      "change_count": 56,
       "changes": [
+        {
+          "sha": "db7a224",
+          "date": "2026-08-10",
+          "subject": "fix(retail-import): stop a half size from failing the whole X101 upload"
+        },
         {
           "sha": "f5d8d58",
           "date": "2026-08-04",
@@ -4214,11 +4219,6 @@
           "sha": "07bdd14",
           "date": "2026-07-27",
           "subject": "feat(retail_import): MDM product-master REST API + X24DN pending-SKU replay"
-        },
-        {
-          "sha": "7e9d66b",
-          "date": "2026-07-24",
-          "subject": "fix(ee_gap): green CI for accounting trio (lint, sast, knowledge)"
         }
       ]
     },
