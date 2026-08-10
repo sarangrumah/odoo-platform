@@ -1,0 +1,14 @@
+# Keep the queue_job runner alive by breaking duplicate UUIDs across databases.
+# Install as /etc/cron.d/odoo-queue-job-guard (root:root, mode 0644).
+#
+# Hourly, not daily. The failure this prevents stops background jobs in EVERY
+# tenant and announces itself nowhere: the assert is logged at DEBUG, the UI is
+# unchanged, healthchecks stay green. A daily sweep would leave up to 24 hours
+# of silently dead jobs; the run itself takes ~15 seconds and writes nothing
+# when the platform is clean, which it normally is.
+#
+# :17 keeps it clear of the 02:30 dump and the 07:05 backup check.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+17 * * * * root /opt/odoo-platform/scripts/ops/queue_job_uuid_guard.sh >> /var/log/odoo-queue-job-guard.log 2>&1
