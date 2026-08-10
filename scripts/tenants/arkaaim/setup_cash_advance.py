@@ -120,7 +120,10 @@ PROFILES = {
             },
         ],
         "bank_out_pref": {1: ["BCA1", "BNK1", "CSH"], 2: ["BNK1", "BNK2"]},
-        "expense_pref": {1: ["MISC"], 2: ["JM"]},
+        # Company 2's general journal is JM on prd_arkaaim but MISC on
+        # trn_arkaaim_begbal — same chart, different journal seed. JM stays
+        # first so prd is unaffected; MISC is the fallback, not a preference.
+        "expense_pref": {1: ["MISC"], 2: ["JM", "MISC"]},
         # Company 2 has no cash journal at all.
         "create_cash_journal_for": [2],
         "cash_journal_code": "CSH",
