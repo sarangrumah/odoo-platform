@@ -209,6 +209,13 @@ Sales Juli Odoo 16.940.433.421 vs workbook 16.940.432.471. Immaterial, dicatat s
 | Pembulatan Odoo vs workbook | +950 | known-diff |
 | **Total** | **490.494.449** | |
 
+Rincian lengkapnya berdiri sendiri di
+`/srv/sftp-share/files/Rincian_Sisa_POS_Receivable_Juli2026.xlsx`, dibangkitkan oleh
+`scripts/tenants/levis/91_workbook_sisa_pos_receivable_juli.py` — 6 sheet: RINGKASAN (jembatan
+enam komponen berikut baris kontrol terhadap buku besar, selisih 0), TIMING-31JUL per toko,
+TIMING-PER-TENDER, KOL-76JT, MACET-LAIN, dan BARIS-BUKU-BESAR (85 baris). Script itu
+menjalankan uji posting di dalam transaksi lalu rollback, jadi database tidak berubah.
+
 **Jangan baca sisa ini dari buku besar per toko atau per tanggal.** Setelah posting, ke-85
 baris seluruhnya bertanggal 30 dan 31 Juli — rekonsiliasi berjalan per akun lintas toko,
 jadi sisa mengapung ke baris terakhir yang belum ter-match. Baris 31-Jul (412.665.600)
