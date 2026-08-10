@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-10T06:35:44+00:00",
+  "generated_at": "2026-08-10T06:51:29+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "724b8e5",
+    "commit": "42a5b65",
     "branch": "feat/arkaaim-payment-parity"
   },
   "buckets": [
@@ -3545,8 +3545,13 @@
       "depends": 1,
       "public": true,
       "last_change": "2026-08-10",
-      "change_count": 1,
+      "change_count": 2,
       "changes": [
+        {
+          "sha": "42a5b65",
+          "date": "2026-08-10",
+          "subject": "chore(arkaaim): satisfy the formatter and refresh the module version manifest"
+        },
         {
           "sha": "724b8e5",
           "date": "2026-08-10",
@@ -4210,7 +4215,7 @@
       "module": "custom_retail_import",
       "bucket": "ee_gap",
       "name": "Custom Retail Import",
-      "version": "19.0.0.22.0",
+      "version": "19.0.0.23.0",
       "summary": "Excel/CSV + SFTP ingestion adapter for retail master & transaction data",
       "category": "Inventory/Retail",
       "depends": 6,

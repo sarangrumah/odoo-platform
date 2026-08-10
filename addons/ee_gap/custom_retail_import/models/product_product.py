@@ -41,9 +41,14 @@ from odoo import api, fields, models
 from odoo.fields import Domain
 
 # style(5) "-" colour(4) then the optional size/inseam tail, e.g. 000A9-0005OS.
-_X101_HYPHEN_RE = re.compile(r"^([0-9A-Za-z]{5})-([0-9A-Za-z]{4})([0-9A-Za-z]*)$")
-# the same shape on the PROD SKU side, with X101's literal "0" separator.
-_X101_SKU_RE = re.compile(r"^([0-9A-Za-z]{5})([0-9A-Za-z]{4})0([0-9A-Za-z]*)$")
+# The tail admits one fractional part because Levi's footwear ships half sizes:
+# 008M8-000010.5 is a real supplier code, and 908 of them exist. Kept narrower than
+# a bare [0-9A-Za-z.]* so a malformed "ABCDE-1234.." still fails to translate.
+_X101_HYPHEN_RE = re.compile(r"^([0-9A-Za-z]{5})-([0-9A-Za-z]{4})([0-9A-Za-z]*(?:\.[0-9]+)?)$")
+# the same shape on the PROD SKU side, with X101's literal "0" separator. Both
+# patterns must keep the same tail class or the code<->SKU round trip stops being
+# an involution.
+_X101_SKU_RE = re.compile(r"^([0-9A-Za-z]{5})([0-9A-Za-z]{4})0([0-9A-Za-z]*(?:\.[0-9]+)?)$")
 
 
 def _x101_product_code_from_sku(value):
@@ -91,6 +96,19 @@ class ProductProduct(models.Model):
 
     def _search_x101_product_code(self, operator, value):
         """Search the hyphenated code by translating it back to the PROD SKU."""
+        # Odoo 19 normalises "=" / "!=" into "in" / "not in" before a search method is
+        # reached, so handling only the scalar operators meant nothing was ever
+        # translated -- the leaf fell through to the untranslated fallback and matched
+        # no row. A value that is not a supplier code is passed through unchanged so a
+        # mixed list still behaves.
+        if operator in ("in", "not in"):
+            # The collection is whatever Domain normalised to -- a list, a set or an
+            # OrderedSet -- so go by "iterable and not a string", not by concrete type.
+            if isinstance(value, str) or not hasattr(value, "__iter__"):
+                values = [value]
+            else:
+                values = list(value)
+            return Domain("default_code", operator, [_x101_sku_from_product_code(v) or v for v in values])
         if operator in ("=", "!=", "ilike", "not ilike", "like", "not like", "=like"):
             sku = _x101_sku_from_product_code(value)
             if sku:

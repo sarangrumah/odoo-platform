@@ -53,6 +53,102 @@ _ERROR_SENTINELS = frozenset(
     }
 )
 
+# Logical field names whose cells are IDENTIFIERS or LABELS, never arithmetic.
+# Excel types a whole column numerically as soon as one cell looks like a number
+# -- an ITEM SIZE column gets that treatment the moment Levi's ships a half size
+# (10.5) -- and openpyxl then hands back int/float. Those cells end up as dict
+# keys, external-ID seeds, ``default_code``, ``barcode`` and
+# ``product.attribute.value`` names, so they must first become their exact text.
+# Amount/date fields are deliberately absent: they keep their native
+# int/float/datetime and go through _parse_amount / _parse_date.
+# An unlisted field keeps the old behaviour, so the list fails safe.
+TEXT_FIELDS = frozenset(
+    {
+        # X101 material master
+        "product_code",
+        "description",
+        "brand",
+        "category",
+        "class",
+        "klass",
+        "subclass",
+        "sku",
+        "size",
+        "inseam",
+        "gtin",
+        # store / transaction identity
+        "store_code",
+        "sap_store_code",
+        "store_name",
+        "register",
+        "transnum",
+        "document_id",
+        "doc_id",
+        # item identity
+        "item_id",
+        "item_code",
+        "item_description",
+        "item_type",
+        "line_id",
+        "ean",
+        "waist",
+        # free text / party identity
+        "staff_id",
+        "staff_name",
+        "member_id",
+        "member_type",
+        "customer_phone",
+        "omni_order_id",
+        "line_comment",
+        "transaction_note",
+        # tender + discount labels
+        "tender_type",
+        "auth",
+        "voucher",
+        "discount_code",
+        # CoA and the company key/value sheet
+        "code",
+        "account_name",
+        "account_type",
+        "field",
+        "value",
+    }
+)
+# Slot-numbered X24 discount columns. The amount/percentage slots are money and
+# are deliberately excluded.
+_TEXT_FIELD_PREFIXES = ("discount_type_", "discount_code_", "discount_description_")
+
+
+def _is_text_field(name: str) -> bool:
+    return name in TEXT_FIELDS or name.startswith(_TEXT_FIELD_PREFIXES)
+
+
+def _number_to_text(value: Any) -> Any:
+    """Exact text of a numerically-typed cell; every other type passes through.
+
+    ITEM SIZE 10 arrives from openpyxl as ``10.0`` and EAN 4550703351542 as
+    ``4550703351542.0``. Those must become ``"10"`` and ``"4550703351542"`` --
+    never ``"10.0"``, never ``"4.550703351542e+12"``. A half size (``10.5``)
+    keeps its fraction: that is a real Levi's size, not a float artefact.
+    """
+    if value is None or isinstance(value, str):
+        return value  # the caller's existing handling applies
+    if isinstance(value, bool):
+        return value  # bool is an int; leave it to str() as today
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            return ""  # NaN/inf is not an identifier
+        if value.is_integer():
+            # int() is exact below 2**53, which covers every 13/14-digit GTIN.
+            return str(int(value))
+        return format(Decimal(str(value)), "f")  # 10.5 -> "10.5"; 1e-05 -> "0.00001"
+    if isinstance(value, Decimal):
+        return str(int(value)) if value == value.to_integral_value() else format(value, "f")
+    return value  # datetime/date/anything else
+
+
 FILE_TYPES = [
     ("x101", "X101 — Material Master (products)"),
     ("x20", "X20 — Current On-hand Inventory"),
@@ -166,6 +262,10 @@ class RetailImportProfile(models.Model):
             return ""
         return s
 
+    def _clean_cell(self, raw: Any) -> str:
+        """``_clean_str`` for identifier/label cells: numbers first become their exact text."""
+        return self._clean_str(_number_to_text(raw))
+
     def _parse_amount(self, raw: Any) -> Decimal:
         if raw is None or raw == "":
             return Decimal("0")
@@ -277,7 +377,13 @@ class RetailImportProfile(models.Model):
             rec = {}
             for field_name, idx in col_map.items():
                 cell = self._safe_cell(row, idx)
-                rec[field_name] = self._clean_str(cell) if isinstance(cell, str) else cell
+                if _is_text_field(field_name):
+                    # An identifier/label column: a numerically-typed cell must not
+                    # reach the executor as 10.0 / 4550703351542.0 -- those become
+                    # default_code, barcode and attribute-value names verbatim.
+                    rec[field_name] = self._clean_cell(cell)
+                else:
+                    rec[field_name] = self._clean_str(cell) if isinstance(cell, str) else cell
             rec["_row"] = total + self.data_start_row - 1
             records.append(rec)
             if limit and len(records) >= limit:

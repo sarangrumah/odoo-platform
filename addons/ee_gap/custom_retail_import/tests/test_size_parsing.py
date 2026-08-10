@@ -54,6 +54,26 @@ class TestMdmSplitSize(TransactionCase):
         self.assertEqual(self._split(34.0, "000YB0001034", "000YB-0001"), ("34", "", True))
         self.assertEqual(self._split("34.0", "000YB0001034", "000YB-0001"), ("34", "", True))
 
+    def test_half_size_survives_the_split(self):
+        """Levi's footwear has 10 and 10.5; the fraction is the size, not noise."""
+        self.assertEqual(self._split(10.5, "008M80000010.5", "008M8-0000"), ("10.5", "", True))
+        self.assertEqual(self._split("10.5", "008M80000010.5", "008M8-0000"), ("10.5", "", True))
+
+    def test_codepart_normalisation_table(self):
+        """_x24_codepart delegates its de-floating rule; pin the whole table."""
+        cases = [
+            (34.0, "34"),
+            (10.5, "10.5"),
+            (34, "34"),
+            (" 34 ", "34"),
+            ("-", ""),
+            ("", ""),
+            (None, ""),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                self.assertEqual(self.Executor._x24_codepart(raw), expected)
+
     def test_missing_separator_is_split_on_the_sku(self):
         """MDM omitted the space: "3228" against tail "3228" is a waist/inseam pair."""
         self.assertEqual(self._split("3228", "000LO000203228", "000LO-0002"), ("32", "28", True))
