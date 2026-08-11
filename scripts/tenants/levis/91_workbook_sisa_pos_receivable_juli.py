@@ -339,7 +339,17 @@ def build(path, ledger, timing, kol, unsettled):
     ws.freeze_panes = "A3"
 
     wb.save(path)
-    os.chmod(path, 0o644)
+    # 0644 + owned by the share user. This script runs on the HOST as root, and
+    # /srv/sftp-share/files belongs to sftpshare:sftpusers (uid/gid 1002) -- the
+    # account File Browser and SFTP serve it as. Without the chown the workbook
+    # lands root-owned: readable, but the people who work with it cannot replace
+    # it. Tolerant of a filesystem that refuses either, since the report is
+    # already written by this point and its mode is not worth losing it over.
+    try:
+        os.chmod(path, 0o644)
+        os.chown(path, 1002, 1002)
+    except OSError:
+        pass
 
 
 def main():
