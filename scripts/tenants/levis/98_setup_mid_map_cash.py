@@ -27,10 +27,20 @@ DIBACA untuk menyimpulkan tokonya; toko ditentukan oleh angka:
   terbuka pada hari transaksi +/- 2 hari. Kalau hanya satu toko punya angka itu,
   itu satu suara untuk toko tersebut.
 
-Kunci diterima hanya bila suaranya BULAT dan >= 3 baris setuju. Yang di bawah itu
-dibiarkan tak terpetakan supaya uangnya tetap terlihat di suspense: 33 kunci
-(Rp 110 jt) suaranya kurang atau terpecah, dan 43 baris (Rp 125 jt) tidak punya
-nama yang bisa dipakai sama sekali.
+Kunci diterima hanya bila suaranya BULAT dan >= 3 baris setuju. Yang tersisa
+dibiarkan tak terpetakan supaya uangnya tetap terlihat di suspense: 30 kunci
+suaranya kurang atau terpecah, dan 43 baris (Rp 125 jt) tidak punya nama yang bisa
+dipakai sama sekali.
+
+SUMBU YANG DIPERTAJAM (11-Aug-2026): nama akun tender menyebut tender-nya
+(`1106000101 = POS Receivable - CASH`), jadi setoran tunai dicocokkan HANYA ke akun
+kas -- bukan ke sepuluh akun tender seperti pengukuran pertama. Kolam menyempit dari
+2.641 debit ke 396, suara palsu dari piutang kartu hilang, dan tiga kunci tambahan
+jadi konklusif: RYMA NURGHAIDA FER, DIANA ANDRIYANI, ARYO ANGGA RUSMANA (Rp 11,2 jt,
+masing-masing 3 suara bulat). Yang menenangkan: NOL kunci lama hilang dan NOL kunci
+berubah toko, jadi sumbu yang lebih tajam ini murni lebih baik, bukan pertukaran.
+Sumbu ini datang dari sesi bank-reconcile, dan ia juga membongkar defect di
+`_allocate` yang dulu membiarkan setoran tunai melunasi piutang kartu.
 
 Jebakan yang harus dijaga: aturan keyword cocok secara SUBSTRING. "SOPIAN
 PERMANA" ada di dalam "SMB SOPIAN PERMANA" -- satu kasir, dua toko Bandung -- jadi
@@ -99,6 +109,7 @@ ROWS = [
     ("keyword", "RADEA CIPTA PRADAN", "OLS SES - AEON BSD CITY", "cash"),
     ("keyword", "SITI MASITOH", "OLS SES - CENTRAL PARK", "cash"),
     ("keyword", "LIDYA AYU OCTAVIAN", "OLS SES - GALAXY MALL 3", "cash"),
+    ("keyword", "RYMA NURGHAIDA FER", "OLS SES - GALAXY MALL 3", "cash"),
     ("keyword", "LINA KUMALA PUTRI", "OLS SES - GALAXY MALL 3", "cash"),
     ("keyword", "ADAM SURYONO", "OLS SES - GRAND INDONESIA", "cash"),
     ("keyword", "HELDA SELVY ANGGRA", "OLS SES - GRAND INDONESIA", "cash"),
@@ -106,9 +117,11 @@ ROWS = [
     ("keyword", "IIN PITURIA", "OLS SES - KELAPA GADING MALL", "cash"),
     ("keyword", "TAUFAN SAPUTRA", "OLS SES - KELAPA GADING MALL", "cash"),
     ("keyword", "DIAN ANGGRAINI", "OLS SES - LOTTE SHOPPING AVENUE", "cash"),
+    ("keyword", "DIANA ANDRIYANI", "OLS SES - LOTTE SHOPPING AVENUE", "cash"),
     ("keyword", "GRACE SALONIKA", "OLS SES - MALL OF INDONESIA", "cash"),
     ("keyword", "OCTAVIA EKA SARWAN", "OLS SES - MALL OF INDONESIA", "cash"),
     ("keyword", "ANISA NURUL NABILA", "OLS SES - METROPOLITAN MALL BEKASI", "cash"),
+    ("keyword", "ARYO ANGGA RUSMANA", "OLS SES - METROPOLITAN MALL BEKASI", "cash"),
     ("keyword", "ANIS NUR HOLIPAH", "OLS SES - PAKUWON MALL SURABAYA", "cash"),
     ("keyword", "KINANTI EKA PUSPA", "OLS SES - PAKUWON MALL SURABAYA", "cash"),
     ("keyword", "NOVITA DEVI PURWAN", "OLS SES - PAKUWON MALL SURABAYA", "cash"),
