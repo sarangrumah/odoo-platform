@@ -31,17 +31,36 @@
 # Yang TIDAK ada di daftar ini, karena buktinya tidak cukup, sengaja dibiarkan
 # tak terpetakan supaya uangnya tetap terlihat di suspense:
 #
-#   1999660761  Rp  19.603.427  "LEVIS PAK"     -- suara 1-1-1, tidak konklusif.
-#   1999660757  Rp  16.439.293  "LEVIS BANDUNG" -- ada empat toko Bandung.
-#   1999664887  Rp   2.563.123  "LEVIS GR"      -- Grand Indonesia atau Grand
-#                               Metropolitan; suaranya justru ke Plaza Senayan.
-#   1999632287  Rp   1.548.533  "LEVIS GRAND"   -- sama, tanpa suara sama sekali.
+#   1999632287  Rp   1.548.533  "LEVIS GRAND"   -- satu baris, 7 Juli, nol kecocokan
+#                               angka di toko mana pun. Nama dan posisi blok
+#                               mengarah ke Grand Indonesia, tapi GI justru nol
+#                               saldo di akun BRI. Nama saja bukan bukti.
 #
 # 1999632289 (Rp 556.975.475, "LEVIS PONDOK") tadinya ada di daftar itu: bukti
 # angkanya tidak menolong -- 53 settlement hanya menghasilkan 3 suara, dan
 # ketiganya ke toko lain. Ia sekarang dipetakan ke Pondok Indah Mall 2 atas
 # KONFIRMASI Finance (11-Aug-2026), bukan atas kesimpulan skrip ini. Yang
 # menguatkan: PIM 1 sudah dipegang 1999632288, dan kedua TID itu berurutan.
+#
+# DUA SUMBU BUKTI TAMBAHAN (11-Aug-2026) menutup tiga terminal yang tadinya di
+# daftar itu. Keduanya tidak menyentuh nama sama sekali:
+#
+#   AKUN TENDER MENYEBUT BANKNYA. `1106000108 = POS Receivable -
+#   OFFLINE_BRI_CREDIT_CARD`, jadi hanya toko dengan saldo di akun itu yang pernah
+#   menerima kartu BRI. Itu menyelesaikan 1999664887 secara telak: seluruh jejak
+#   BRI Grand Metropolitan Bekasi sepanjang Juli hanya SATU baris -- 14 Juli,
+#   Rp 2.581.600 -- dan ketiga settlement TID ini jatuh pada 14 Juli dengan jumlah
+#   persis Rp 2.581.600 (300.900 + 600.950 + 1.679.750).
+#
+#   NOMOR TERMINAL TERSUSUN PER WILAYAH. Blok 1999660757..763 seluruhnya Bandung
+#   dan Surabaya (758 Trans Studio Bandung, 759 Summarecon Bandung, 760 Paris Van
+#   Java, 761 Pakuwon Surabaya, 762 Tunjungan Plaza 3, 763 Galaxy Mall 3), dan
+#   1999660757 berada di kepalanya. Bandung Indah Plaza adalah satu-satunya toko
+#   Bandung tanpa terminal BRI. Ditambah 3 dari 13 baris yang punya kecocokan
+#   angka, dan BIP muncul di ketiganya -- sekali justru di akun 1106000108 itu
+#   sendiri (12 Juli, Rp 1.049.900).
+#
+# Pacific Place Mall tereliminasi dari seluruh kandidat: nol aktivitas POS Juli.
 #
 # Setoran tunai (475 baris, Rp 1,12 M) juga di luar cakupan skrip ini: kuncinya
 # teks bebas yang diketik kasir, 224 variasi, dan sebagiannya cuma nama orang.
@@ -110,6 +129,9 @@ ROWS = [
     ("tid", "1999632293", "OLS SES - CENTRAL PARK", "debit", "Central Park"),
     ("tid", "1999660759", "OLS SES - SUMMARECON MALL BANDUNG", "qris", "Summarecon Mall Bandung"),
     ("tid", "1999675383", "OLS SES - PASKAL BANDUNG", "debit", "Paskal Bandung"),
+    # Bukti akun tender + blok wilayah, 11-Aug-2026 -- lihat catatan di atas.
+    ("tid", "1999664887", "OLS SES - GRAND METROPOLITAN BEKASI", "debit", "Grand Metropolitan Bekasi"),
+    ("tid", "1999660757", "OLS SES - BANDUNG INDAH PLAZA", "debit", "Bandung Indah Plaza"),
 ]
 
 NOTE = "Diisi 11-Aug-2026 dari data Juli: nama pada narasi + kecocokan gross vs piutang tender harian per toko."
