@@ -403,6 +403,39 @@
 		respond "Not available" 403
 	}
 
+	# The bus lives on the EVENTED worker, not the HTTP one. A websocket
+	# handshake that lands on 8069 is refused by Odoo itself with "Couldn't bind
+	# the websocket. Is the connection opened on the evented port (8072)?", so
+	# without this route every realtime feature on the front door dies quietly:
+	# notifications, chat, activity updates, list auto-refresh. It fails as a 500
+	# per attempt and the browser retries, so the only visible symptom is a log
+	# flood — measured at 1,585/hour on 11-Aug-2026 before this was added.
+	#
+	# nginx has had the equivalent route since it was written
+	# (nginx/conf.d/odoo.conf, "Longpolling"), and the NOTE below is exactly how
+	# the gap opened: this host bypasses that hop, and the bypass note only
+	# mentioned the rate-limit and the security headers.
+	#
+	# /longpolling/ is the pre-16 spelling, kept so an old tab does not 500.
+	#
+	# A named matcher, not `handle /websocket* /longpolling/*`: `handle` takes
+	# exactly ONE matcher argument, and two of them is a fatal parse error that
+	# crash-loops the container and takes the whole front door down with it.
+	@bus path /websocket* /longpolling/*
+	handle @bus {
+		reverse_proxy odoo-front:8072 {
+			header_up Host {host}
+			header_up X-Real-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Forwarded-Proto {scheme}
+			transport http {
+				read_timeout 720s
+				write_timeout 720s
+				dial_timeout 10s
+			}
+		}
+	}
+
 	# All remaining traffic on the front-door hosts goes to odoo-front.
 	#
 	# Why not the public odoo: it runs dbfilter = ^%d$ (tenant isolation — a
