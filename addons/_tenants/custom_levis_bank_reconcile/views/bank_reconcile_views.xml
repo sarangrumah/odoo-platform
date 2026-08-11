@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Statement lines: which store, and what the narrative says -->
+    <record id="view_custom_bank_rec_st_line_list_levis" model="ir.ui.view">
+        <field name="name">account.bank.statement.line.custom.bankrec.list.levis</field>
+        <field name="model">account.bank.statement.line</field>
+        <field name="inherit_id" ref="custom_account_reconcile.view_custom_bank_rec_st_line_list"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="levis_ou_analytic_id" optional="show"/>
+                <field name="levis_narrative_kind" optional="show"/>
+                <field name="levis_channel" optional="hide"/>
+                <field name="levis_mid" optional="hide"/>
+            </field>
+            <field name="amount" position="after">
+                <field name="levis_gross" optional="show" sum="Gross"/>
+                <field name="levis_mdr" optional="show" sum="MDR"/>
+                <field name="levis_amount_matches_narrative" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_custom_bank_rec_st_line_search_levis" model="ir.ui.view">
+        <field name="name">account.bank.statement.line.custom.bankrec.search.levis</field>
+        <field name="model">account.bank.statement.line</field>
+        <field name="inherit_id" ref="custom_account_reconcile.view_custom_bank_rec_st_line_search"/>
+        <field name="arch" type="xml">
+            <field name="journal_id" position="after">
+                <field name="levis_ou_analytic_id"/>
+                <field name="levis_mid"/>
+            </field>
+            <filter name="reconciled" position="after">
+                <separator/>
+                <filter name="levis_settlement" string="Card / QRIS Settlement"
+                        domain="[('levis_narrative_kind', '=', 'settlement')]"/>
+                <filter name="levis_cash" string="Cash Deposit"
+                        domain="[('levis_narrative_kind', '=', 'cash_deposit')]"/>
+                <filter name="levis_unmapped" string="Store Not Identified"
+                        domain="[('levis_ou_analytic_id', '=', False),
+                                 ('levis_narrative_kind', 'in', ('settlement', 'cash_deposit'))]"/>
+                <filter name="levis_mismatch" string="Amount Disagrees With Narrative"
+                        domain="[('levis_amount_matches_narrative', '=', False)]"/>
+            </filter>
+            <filter name="group_journal" position="after">
+                <filter name="levis_group_ou" string="Operating Unit"
+                        context="{'group_by': 'levis_ou_analytic_id'}"/>
+                <filter name="levis_group_kind" string="Narrative Type"
+                        context="{'group_by': 'levis_narrative_kind'}"/>
+            </filter>
+        </field>
+    </record>
+
+    <!-- Re-read the narratives after a MID mapping is added -->
+    <record id="action_st_lines_levis_reread" model="ir.actions.server">
+        <field name="name">Re-read Bank Narrative</field>
+        <field name="model_id" ref="account.model_account_bank_statement_line"/>
+        <field name="binding_model_id" ref="account.model_account_bank_statement_line"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_levis_reread_narrative()</field>
+    </record>
+
+    <!-- Match wizard: store, gross vs MDR, cash suggestion -->
+    <record id="view_custom_bank_reconcile_wizard_form_levis" model="ir.ui.view">
+        <field name="name">custom.bank.reconcile.wizard.form.levis</field>
+        <field name="model">custom.bank.reconcile.wizard</field>
+        <field name="inherit_id" ref="custom_account_reconcile.view_custom_bank_reconcile_wizard_form"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="levis_is_tender" invisible="1"/>
+                <field name="levis_ou_analytic_id" invisible="not levis_is_tender"/>
+                <field name="levis_mid" invisible="not levis_is_tender"/>
+                <field name="levis_channel" invisible="not levis_is_tender"/>
+                <field name="levis_trans_date" invisible="not levis_trans_date"/>
+            </field>
+            <field name="remainder" position="before">
+                <field name="levis_gross" invisible="not levis_is_tender"/>
+                <field name="levis_mdr" invisible="not levis_is_tender"/>
+                <field name="levis_target" invisible="not levis_is_tender"/>
+                <field name="levis_gap" invisible="not levis_is_tender"/>
+            </field>
+            <xpath expr="//field[@name='candidate_ids']/list/field[@name='account_id']" position="after">
+                <field name="levis_ou_analytic_id" optional="show"/>
+                <field name="levis_ou_matches" column_invisible="1"/>
+            </xpath>
+            <xpath expr="//field[@name='candidate_ids']/list" position="attributes">
+                <attribute name="decoration-warning">levis_ou_matches == False</attribute>
+            </xpath>
+            <button name="action_search_more" position="before">
+                <button name="action_levis_suggest" type="object" string="Suggest"
+                        invisible="not levis_is_tender"
+                        help="Fill the selection up to the statement amount, largest open day first."/>
+            </button>
+        </field>
+    </record>
+
+</odoo>

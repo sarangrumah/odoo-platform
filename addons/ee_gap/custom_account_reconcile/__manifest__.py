@@ -37,7 +37,7 @@ It also keeps a reconciliation from being lost without anyone noticing:
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.3.0.0",
+    "version": "19.0.3.1.0",
     "license": "LGPL-3",
     "depends": ["account"],
     "data": [
