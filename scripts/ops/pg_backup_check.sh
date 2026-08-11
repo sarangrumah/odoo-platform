@@ -16,6 +16,9 @@
 #      blind spot, which is exactly how the old container failed
 #   5. globals.sql is non-empty (no roles = no usable restore)
 #   6. one dump passes `pg_restore -l` (catches truncation/corruption)
+#   7. every database with a filestore has a filestore archive -- a dump alone
+#      restores a database whose every attachment download 404s
+#   8. one filestore archive passes `tar tzf` (same truncation logic as 6)
 #
 # Alerting is deliberately noisy-on-failure and silent-on-success, with one
 # exception: on HEARTBEAT_DOM it sends an OK message too, so that silence
@@ -31,6 +34,12 @@ BAILEYS_URL="${BAILEYS_URL:-http://127.0.0.1:18088}"
 ALERT_FILE="$DEST/ALERT"
 HEARTBEAT_DOM="${HEARTBEAT_DOM:-01}"
 PROBE_DB="${PROBE_DB:-prd_levis_begbal}"
+# Note the two levels: the host directory is Odoo's data_dir, and the
+# per-database attachment trees live in its filestore/ subdirectory. Must match
+# FILESTORE_ROOT in pg_backup_all.sh, and if you set BACKUP_FILESTORE=0 there,
+# set CHECK_FILESTORE=0 here too or every night reads as broken.
+FILESTORE_ROOT="${FILESTORE_ROOT:-/opt/odoo-platform/data/odoo-filestore/filestore}"
+CHECK_FILESTORE="${CHECK_FILESTORE:-1}"
 
 log() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 
@@ -103,6 +112,48 @@ else
       problems+=("$PROBE_DB.dump gagal dibaca pg_restore — arsip rusak")
     fi
   fi
+
+  # Attachments. A dump restores the ir.attachment rows; without the filestore
+  # the bytes are gone and every download 404s, so these archives are as
+  # load-bearing as the dumps and deserve the same scrutiny.
+  #
+  # Compare against the filestore directories, not the database list: a tenant
+  # with no attachments yet has no directory and legitimately has no archive.
+  # Checking per database is what catches the case the dump-count cannot — a
+  # night where the tar step failed for one tenant while everything else looked
+  # healthy.
+  if [ "$CHECK_FILESTORE" = "1" ]; then
+    if [ ! -d "$FILESTORE_ROOT" ]; then
+      problems+=("filestore root $FILESTORE_ROOT tidak ada — arsip lampiran tidak mungkin benar")
+    else
+      fs_missing=()
+      fs_expected=0
+      while IFS= read -r fsdb; do
+        [ -n "$fsdb" ] || continue
+        fs_expected=$((fs_expected + 1))
+        [ -s "$day_dir/${fsdb}-filestore.tgz" ] || fs_missing+=("$fsdb")
+      done < <(find "$FILESTORE_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort)
+
+      if [ "$fs_expected" -eq 0 ]; then
+        # The platform always has attachments somewhere; an empty filestore root
+        # means the path moved or the mount is gone, not that nobody uploaded.
+        problems+=("tidak ada satu pun filestore di $FILESTORE_ROOT — path/mount berubah?")
+      elif [ "${#fs_missing[@]}" -gt 0 ]; then
+        problems+=("DB tanpa arsip filestore: ${fs_missing[*]}")
+      fi
+
+      # Integrity, same reasoning as the pg_restore probe: a truncated archive
+      # still passes `test -s`. tar tzf decompresses the whole stream, so a bad
+      # CRC or a cut-off tail fails here instead of during a restore. No
+      # container needed — tar and gzip are on the host.
+      probe_tgz="$day_dir/${PROBE_DB}-filestore.tgz"
+      if [ -s "$probe_tgz" ]; then
+        nfiles="$(tar tzf "$probe_tgz" 2>/dev/null | wc -l)"
+        [ "${nfiles:-0}" -ge 1 ] \
+          || problems+=("${PROBE_DB}-filestore.tgz gagal dibaca tar — arsip rusak")
+      fi
+    fi
+  fi
 fi
 
 # ---- alerting ---------------------------------------------------------------
@@ -138,11 +189,12 @@ host="$(hostname -s)"
 if [ "${#problems[@]}" -eq 0 ]; then
   size="$(du -sh "$day_dir" 2>/dev/null | cut -f1)"
   ndumps="$(find "$day_dir" -name '*.dump' | wc -l)"
-  log "OK — $ndumps dump, $size, $day_dir"
+  nfs="$(find "$day_dir" -name '*-filestore.tgz' | wc -l)"
+  log "OK — $ndumps dump, $nfs filestore, $size, $day_dir"
   rm -f "$ALERT_FILE"
   if [ "$(date +%d)" = "$HEARTBEAT_DOM" ]; then
     send_wa "✅ Backup Odoo ($host) sehat.
-$ndumps database, $size, $(date '+%d-%b-%Y').
+$ndumps database + $nfs filestore, $size, $(date '+%d-%b-%Y').
 Pesan bulanan — kalau tanggal 1 berikutnya tidak ada kabar, kanal alert-nya yang mati."
   fi
   exit 0
