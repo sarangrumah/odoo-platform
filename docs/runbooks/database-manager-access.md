@@ -44,7 +44,7 @@ scripts/ops/db-manager-tunnel.sh
 or, without the helper:
 
 ```bash
-ssh -N -L 127.0.0.1:18079:127.0.0.1:18079 odoo-erp@192.168.3.140
+ssh -N -p 2221 -L 127.0.0.1:18079:127.0.0.1:18079 odoo-erp@192.168.3.140
 ```
 
 Then open **<http://localhost:18079/web/database/manager>**.
@@ -52,8 +52,15 @@ Then open **<http://localhost:18079/web/database/manager>**.
 Master password:
 
 ```bash
-ssh odoo-erp@192.168.3.140 'grep ^ODOO_ADMIN_PASSWD= /opt/odoo-platform/.env'
+ssh -p 2221 odoo-erp@192.168.3.140 'grep ^ODOO_ADMIN_PASSWD= /opt/odoo-platform/.env'
 ```
+
+**`-p 2221` is not optional.** sshd on this host listens on 2221, not 22
+(`/etc/ssh/sshd_config`, `Port 2221`). Without it you get `ssh: connect to host
+192.168.3.140 port 22: Connection refused`, which reads like the host being down.
+
+192.168.3.140 is a LAN address and only 80/443 are NATed to this box, so the tunnel
+works from the office network or the VPN, not from the open internet.
 
 Check the tunnel is really up (expect `200`, and a list of every database):
 
@@ -63,6 +70,35 @@ curl -s http://localhost:18079/web/database/list \
   -X POST -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"call","params":{}}'
 ```
+
+## The host has to permit forwarding at all
+
+`sshd_config` carried a **global `DisableForwarding yes`** until 11-Aug-2026. That
+directive overrides every other forwarding option — `AllowTcpForwarding yes`
+included — so `-L` was refused for every account, and this whole procedure could
+not work. The symptom is a session that connects normally and then:
+
+```
+channel 1: open failed: administratively prohibited: open failed
+```
+
+It was there for the SFTP share accounts (`sftpshare` and anything else in group
+`sftpusers`, chrooted and forced to `internal-sftp`). The ban is now **scoped to
+that group** instead of applying to everyone: `DisableForwarding yes` moved into
+the `Match Group sftpusers` block, where it sits alongside the `AllowTcpForwarding
+no` / `PermitTunnel no` lines that were already there.
+
+Check either side without guessing — `sshd -T` resolves the Match blocks:
+
+```bash
+sshd -T -C user=odoo-erp,host=localhost,addr=127.0.0.1  | grep -i forwarding  # disableforwarding no
+sshd -T -C user=sftpshare,host=localhost,addr=127.0.0.1 | grep -i forwarding  # disableforwarding yes
+```
+
+If a forward is ever refused again, that scoping has been reverted — check there
+before debugging the client. Do **not** answer it by removing the restriction from
+the `sftpusers` block: those accounts are external file hand-off, and giving them
+TCP forwarding turns each one into a jump host into the platform network.
 
 ## Traps
 
