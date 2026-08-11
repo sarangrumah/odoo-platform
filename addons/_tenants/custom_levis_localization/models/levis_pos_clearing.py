@@ -74,6 +74,7 @@ _DIAG_KINDS = [
     ("unsettled", "POS receivable left open"),
     ("consumed", "Statement line already used by another run"),
     ("sweep_double", "Sweep destination is also a statement source"),
+    ("no_cash_account", "No CASH tender receivable configured"),
     ("overlap", "Another run covers part of this period"),
 ]
 
@@ -482,21 +483,29 @@ class LevisPosClearing(models.Model):
                     dates.append(candidate)
         return dates
 
-    def _allocate(self, pool, residual, analytic_id, dates, amount):
+    def _allocate(self, pool, residual, analytic_id, dates, amount, only_accounts=None):
         """Spend ``amount`` on open debits, largest residual first.
 
         Returns ``([(account_id, aml_id, date, amount)], shortfall)``. The greedy
         order is what discovers which tender account a settlement represents; the
         shortfall is reported, never absorbed.
+
+        ``only_accounts`` restricts which tender receivables may be consumed, and
+        is passed **only where the tender is certain** — see
+        ``_allowed_accounts_for``. Left empty, every configured tender account is
+        eligible, which is what a card settlement needs.
         """
         taken = []
         left = round(amount, 2)
+        allowed = set(only_accounts.ids) if only_accounts else None
         for date in dates:
             if left <= _EPS:
                 break
             for aml in pool.get((analytic_id, date), ()):
                 if left <= _EPS:
                     break
+                if allowed is not None and aml.account_id.id not in allowed:
+                    continue
                 remaining = residual.get(aml.id, 0.0)
                 if remaining <= _EPS:
                     continue
@@ -505,6 +514,50 @@ class LevisPosClearing(models.Model):
                 taken.append((aml.account_id.id, aml.id, date, take))
                 left = round(left - take, 2)
         return taken, round(left, 2)
+
+    def _cash_receivable_account(self):
+        """The per-tender receivable a cash deposit settles, or empty.
+
+        Resolved by code from ``ir.config_parameter`` (default ``1106000101``) and
+        required to be one of the configured tender accounts, so a typo cannot
+        point the restriction at some unrelated account. Deliberately not a new
+        field on ``levis.clearing.config``: that would be a column, and a column
+        means upgrading every database that shares this addon.
+        """
+        self.ensure_one()
+        code = (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param("custom_levis_localization.pos_cash_receivable_code", "1106000101")
+        )
+        company = self.company_id
+        return self.config_id.pos_receivable_account_ids.filtered(
+            lambda a: (a.with_company(company).code or "") == code
+        )[:1]
+
+    def _pool_accounts_for_channel(self, parsed, cash_account):
+        """Which tender receivables this settlement is allowed to consume.
+
+        Empty result means "no restriction". The rule is deliberately narrow:
+        restrict only where the narrative settles the question outright.
+
+        * **Cash deposit** — certain. The money arrived as a bank transfer of
+          takings, so it settles the CASH receivable and nothing else. Letting it
+          consume a card receivable clears the wrong account: measured on July
+          2026 before this guard, 76.6% of cash-deposit allocations landed on card
+          receivables, leaving the real cash receivable open and the card one
+          over-cleared.
+        * **Card** — genuinely undecidable, and that is the design, not a gap. One
+          MID covers Visa, Mastercard, JCB and Amex alike, so the split has to be
+          discovered from the open debits.
+        * **QRIS** — left unrestricted on purpose. It looks decidable, but there is
+          no evidence that QRIS always lands on one specific tender account here,
+          and guessing would reintroduce exactly the error this fixes.
+        """
+        self.ensure_one()
+        if parsed.get("kind") == "cash_deposit" and cash_account:
+            return cash_account
+        return self.env["account.account"]
 
     # ------------------------------------------------------------------
     # Stage 1 — summary. Creates nothing.
@@ -543,6 +596,24 @@ class LevisPosClearing(models.Model):
             promised,
         )
         ar_pool, ar_residual = self._open_ar_pool(promised)
+        cash_account = self._cash_receivable_account()
+        if not cash_account:
+            # Say so rather than quietly falling back to consuming any tender:
+            # that fallback is the bug this guard exists to prevent.
+            diag_config = [
+                {
+                    "kind": "no_cash_account",
+                    "severity": "warning",
+                    "count": 1,
+                    "message": _(
+                        "No CASH tender receivable is configured, so cash deposits may "
+                        "clear a card receivable instead. Set the account code in "
+                        "custom_levis_localization.pos_cash_receivable_code."
+                    ),
+                }
+            ]
+        else:
+            diag_config = []
 
         rules_cache = {}
         line_vals = []
@@ -562,16 +633,19 @@ class LevisPosClearing(models.Model):
                     ar_pool,
                     ar_residual,
                     diag_vals,
+                    cash_account,
                 )
             )
         self.line_ids = [(0, 0, vals) for vals in line_vals]
-        self.diag_ids = [(0, 0, vals) for vals in diag_vals]
+        self.diag_ids = [(0, 0, vals) for vals in diag_config + diag_vals]
         self._build_diagnostics(residual)
         self._simulate_balances()
         self.state = "computed"
         return True
 
-    def _line_from_parsed(self, statement_line, parsed, rules, pool, residual, ar_pool, ar_residual, diag_vals):
+    def _line_from_parsed(
+        self, statement_line, parsed, rules, pool, residual, ar_pool, ar_residual, diag_vals, cash_account=None
+    ):
         """One statement line -> one clearing line, allocations included.
 
         Every statement line in scope produces a row, whatever happened to it.
@@ -664,7 +738,10 @@ class LevisPosClearing(models.Model):
         vals["trans_date_is_derived"] = not exact
         dates = self._candidate_dates(primary)
 
-        taken, left = self._allocate(pool, residual, rule.analytic_account_id.id, dates, parsed["gross"])
+        only = self._pool_accounts_for_channel(parsed, cash_account)
+        taken, left = self._allocate(
+            pool, residual, rule.analytic_account_id.id, dates, parsed["gross"], only_accounts=only
+        )
         block = "a"
         if left > _EPS and ar_pool:
             ar_taken, left = self._allocate_flat(ar_pool, ar_residual, rule.analytic_account_id.id, left)

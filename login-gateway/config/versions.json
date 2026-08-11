@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-11T04:05:29+00:00",
+  "generated_at": "2026-08-11T04:57:19+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "edda9e6",
-    "branch": "feat/levis-mid-map-guard"
+    "commit": "8092ac5",
+    "branch": "feat/levis-cash-allocation"
   },
   "buckets": [
     {
@@ -335,7 +335,7 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.27.0",
+      "version": "19.0.1.28.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
@@ -344,9 +344,9 @@
       "change_count": 43,
       "changes": [
         {
-          "sha": "edda9e6",
+          "sha": "8092ac5",
           "date": "2026-08-11",
-          "subject": "fix(levis): stop two rules claiming one bank terminal, and pick the specific keyword"
+          "subject": "fix(levis): stop two rules claiming one bank terminal, and pick the specific keyword (#138)"
         },
         {
           "sha": "48ac177",

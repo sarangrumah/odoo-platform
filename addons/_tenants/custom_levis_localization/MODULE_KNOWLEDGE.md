@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T08:56:04Z
 generator: bootstrap-v1
 module: custom_levis_localization
-manifest_version: 19.0.1.27.0
+manifest_version: 19.0.1.28.0
 ---
 
 # Levi's Localization (`custom_levis_localization`)
@@ -358,6 +358,20 @@ gotcha below.
   `1103019320` directly, which is journal `OBCA`'s `default_account_id`. OBCA has no
   July statement lines today, so there is no double count — but the `sweep_double`
   diagnostic blocks generation if that ever changes.
+
+- **A cash deposit may only clear the CASH tender receivable.** `_allocate` spans every
+  configured tender account, which is right for a card settlement — one MID covers Visa,
+  Mastercard, JCB and Amex, so the split has to be discovered. For a cash deposit the tender is
+  certain, and letting it consume a card receivable clears the wrong account. Measured on the
+  July 2026 data before the guard: **93.1% of cash-deposit allocations (Rp 703,965,244) landed
+  on card receivables**, leaving the real cash receivable open and the card one over-cleared.
+  `_pool_accounts_for_channel` restricts the pool, resolved by code from
+  `ir.config_parameter custom_levis_localization.pos_cash_receivable_code` (default
+  `1106000101`) and required to be one of the configured tender accounts. QRIS is deliberately
+  NOT restricted: it spreads across seven accounts with no concentration, so a restriction
+  would break allocations that are currently right. Expect the reported shortfall to RISE after
+  this guard (July: Rp 35.3m/14 lines -> Rp 104.1m/49 lines) — that is the real gap becoming
+  visible, not a regression.
 
 ## Out of Scope
 - This module does not cover inventory adjustments, backorders, or handling of internal transfers and manufacturing receipts. These functionalities are left to the core Odoo stock management processes.

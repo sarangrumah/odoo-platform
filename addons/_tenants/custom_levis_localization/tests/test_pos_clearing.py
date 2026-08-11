@@ -623,6 +623,93 @@ class TestPosClearing(AccountTestInvoicingCommon):
             rule,
         )
 
+    def test_cash_deposit_only_clears_the_cash_receivable(self):
+        """A cash deposit must not clear a card receivable.
+
+        Both are open for the same store on the same day and the card one is
+        larger, so the old largest-residual-first rule would have taken it —
+        clearing Visa with cash takings and leaving the real cash receivable open.
+        """
+        day = date(2026, 7, 8)
+        self.env["ir.config_parameter"].sudo().set_param(
+            "custom_levis_localization.pos_cash_receivable_code", self.tender_c.code
+        )
+        card = self._posrec(self.tender_b, self.store_one, day, 900_000.0)
+        cash = self._posrec(self.tender_c, self.store_one, day, 400_000.0)
+        self.env["levis.bank.mid.map"].create(
+            {
+                "name": "Cash deposits store one",
+                "company_id": self.company.id,
+                "match_type": "keyword",
+                "key": "SETORAN SATU",
+                "channel": "cash",
+                "analytic_account_id": self.store_one.id,
+            }
+        )
+        self._statement(
+            date(2026, 7, 9),
+            400_000.0,
+            "TRSF E-BANKING CR 0107/FTSCY/WS95031 400000.00 SETORAN SATU",
+        )
+
+        run = self._run(ar_fallback=False)
+        run.action_compute()
+        line = run.line_ids.filtered(lambda line: line.kind == "cash_deposit")
+        self.assertEqual(len(line), 1)
+        self.assertEqual(line.alloc_ids.account_id, self.tender_c, "cash must settle the CASH receivable")
+        self.assertEqual(line.allocated, 400_000.0)
+        self.assertEqual(line.short_amount, 0.0)
+        self.assertFalse(card.reconciled)
+        self.assertEqual(card.amount_residual, 900_000.0, "the card receivable must be untouched")
+        self.assertEqual(cash.amount_residual, 400_000.0)
+
+    def test_cash_deposit_reports_a_shortfall_rather_than_taking_a_card_line(self):
+        """With no cash receivable open, the deposit is short — not reassigned."""
+        day = date(2026, 7, 8)
+        self.env["ir.config_parameter"].sudo().set_param(
+            "custom_levis_localization.pos_cash_receivable_code", self.tender_c.code
+        )
+        card = self._posrec(self.tender_b, self.store_one, day, 900_000.0)
+        self.env["levis.bank.mid.map"].create(
+            {
+                "name": "Cash deposits store one",
+                "company_id": self.company.id,
+                "match_type": "keyword",
+                "key": "SETORAN SATU",
+                "channel": "cash",
+                "analytic_account_id": self.store_one.id,
+            }
+        )
+        self._statement(
+            date(2026, 7, 9),
+            400_000.0,
+            "TRSF E-BANKING CR 0107/FTSCY/WS95031 400000.00 SETORAN SATU",
+        )
+
+        run = self._run(ar_fallback=False)
+        run.action_compute()
+        line = run.line_ids.filtered(lambda line: line.kind == "cash_deposit")
+        self.assertFalse(line.alloc_ids, "nothing eligible, so nothing allocated")
+        self.assertEqual(line.short_amount, 400_000.0)
+        self.assertEqual(line.state, "short")
+        self.assertEqual(card.amount_residual, 900_000.0, "the card receivable must be untouched")
+
+    def test_card_settlement_still_spans_every_tender(self):
+        """The restriction must not leak onto cards, where the split is discovered."""
+        day = date(2026, 7, 8)
+        self.env["ir.config_parameter"].sudo().set_param(
+            "custom_levis_localization.pos_cash_receivable_code", self.tender_c.code
+        )
+        self._posrec(self.tender_a, self.store_one, day, 500_000.0)
+        self._posrec(self.tender_b, self.store_one, day, 300_000.0)
+        self._statement(date(2026, 7, 9), 792_000.0, self._settlement_ref(MID_ONE, 800_000.0, 8_000.0, trans_day=day))
+
+        run = self._run(ar_fallback=False)
+        run.action_compute()
+        line = run.line_ids.filtered(lambda line: line.kind == "settlement")
+        self.assertEqual(set(line.alloc_ids.account_id.ids), {self.tender_a.id, self.tender_b.id})
+        self.assertEqual(line.allocated, 800_000.0)
+
     def test_incomplete_configuration_says_what_is_missing(self):
         self.config.mdr_account_id = False
         run = self._run()
