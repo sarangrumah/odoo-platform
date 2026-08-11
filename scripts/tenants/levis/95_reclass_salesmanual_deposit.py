@@ -74,7 +74,7 @@ TOPUP_REF = "EBR-ADJ-AR-JUNI-2026-TOPUP"
 ACC_AR = "1106000001"
 ACC_DEPOSIT = "2103100003"
 OU_NAME = "OLS SES - METROPOLITAN MALL BEKASI"
-EXPECTED_SWAP = 9052000.0   # penjualan manual Juni MM Bekasi menurut rekon FICO
+EXPECTED_SWAP = 9052000.0  # penjualan manual Juni MM Bekasi menurut rekon FICO
 EXPECTED_TOPUP = 4186925.0  # sisa deposit MM Bekasi yang dipakai TOPUP 0027
 
 CONFIRM = os.environ.get("DEP_CONFIRM") == "1"
@@ -177,9 +177,7 @@ if not src:
 if src.state != "posted":
     raise SystemExit("jurnal sumber %s state=%s, harus posted" % (src.name, src.state))
 src_ar = src.line_ids.filtered(
-    lambda l: l.account_id.id == _code2acc[ACC_AR].id
-    and l.debit > 0
-    and str(ou.id) in (l.analytic_distribution or {})
+    lambda l: l.account_id.id == _code2acc[ACC_AR].id and l.debit > 0 and str(ou.id) in (l.analytic_distribution or {})
 )
 if len(src_ar) != 1:
     raise SystemExit("baris AR %s di %s ada %d, harusnya tepat 1" % (OU_NAME, src.name, len(src_ar)))
@@ -198,9 +196,11 @@ if "UNTOPUP" in BLOCKS:
     if not topup or topup.state != "posted":
         raise SystemExit("jurnal %s tidak ada / belum posted, UNTOPUP tidak bisa dijalankan" % TOPUP_REF)
     tl = topup.line_ids.filtered(
-        lambda l: l.account_id.id == _code2acc[ACC_DEPOSIT].id
-        and l.debit > 0
-        and str(ou.id) in (l.analytic_distribution or {})
+        lambda l: (
+            l.account_id.id == _code2acc[ACC_DEPOSIT].id
+            and l.debit > 0
+            and str(ou.id) in (l.analytic_distribution or {})
+        )
     )
     if len(tl) != 1:
         raise SystemExit("baris deposit %s di %s ada %d, harusnya tepat 1" % (OU_NAME, topup.name, len(tl)))

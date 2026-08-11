@@ -43,9 +43,7 @@ class AccountMove(models.Model):
         cleanly, and any lock-date refusal surfaces before the state changes.
         """
         for move in self:
-            matched = move.line_ids.filtered(
-                lambda line: line.matched_debit_ids or line.matched_credit_ids
-            )
+            matched = move.line_ids.filtered(lambda line: line.matched_debit_ids or line.matched_credit_ids)
             if not matched:
                 continue
             counterparts = (
