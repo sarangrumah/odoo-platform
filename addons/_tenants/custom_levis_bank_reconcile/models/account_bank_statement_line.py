@@ -1,0 +1,179 @@
+# -*- coding: utf-8 -*-
+"""What a Levi's statement line should be offered to match against.
+
+The generic scorer in ``custom_account_reconcile`` looks for a journal item whose
+residual equals the statement amount. On this tenant that almost never happens,
+for two reasons that have nothing to do with data quality:
+
+* **A card settlement arrives net.** The acquirer bills the customer 4 722 112,
+  keeps 32 756 and transfers 4 689 356; the POS receivable is booked at the
+  gross. So the amount to look for is not ``amount`` but ``amount + MDR``, and
+  the MDR is printed on the very same narrative.
+* **A cash deposit is one transfer for several days.** Nothing in the ledger has
+  that total; it is a sum of daily cash receivables and must be assembled.
+
+Both need the store first, and the store is not in the amount — it comes from the
+merchant id via ``levis.bank.mid.map``, already resolved onto the line by
+``custom_levis_localization``. Once the Operating Unit is known the pool is
+small and honest: that store's open tender receivables, around that trading day.
+
+When the line is not a Levi's settlement — an unmapped merchant, a bank charge,
+a feed with no narrative grammar — this falls straight through to the generic
+scorer. A guess is never manufactured out of a narrative that was not understood.
+"""
+
+from datetime import timedelta
+
+from odoo import models
+
+# How far either side of the assumed trading day the receivable may sit. A
+# settlement early in the month pays for sales made in the previous one, and the
+# 1 484 July lines that carry no transaction date have to be placed by lag alone.
+_DAY_WINDOW_BEFORE = 12
+_DAY_WINDOW_AFTER = 3
+
+_LEVIS_KINDS = ("settlement", "cash_deposit")
+
+
+class AccountBankStatementLine(models.Model):
+    _inherit = "account.bank.statement.line"
+
+    # ------------------------------------------------------------------
+    # Levi's view of the line
+    # ------------------------------------------------------------------
+    def _levis_clearing_config(self):
+        """The tenant's clearing accounts, or empty when not configured."""
+        self.ensure_one()
+        Config = self.env.get("levis.clearing.config")
+        if Config is None:
+            return self.env["levis.clearing.config"].browse()
+        return Config.sudo().search([("company_id", "=", self.company_id.id)], limit=1)
+
+    def _levis_is_tender_line(self):
+        """True when this line is a POS settlement we know the store of."""
+        self.ensure_one()
+        return bool(self.levis_narrative_kind in _LEVIS_KINDS and self.levis_ou_analytic_id and self.amount > 0)
+
+    def _levis_match_target(self):
+        """The amount the selected journal items should add up to.
+
+        Gross for a card settlement (the fee is booked separately), the deposit
+        itself for cash. Falls back to the statement amount whenever the
+        narrative was not read — an unparsed MDR is never assumed to be zero.
+        """
+        self.ensure_one()
+        if self.levis_narrative_kind == "settlement" and self.levis_gross:
+            return self.levis_gross
+        return abs(self.amount)
+
+    def _levis_tender_accounts(self):
+        """Receivable accounts a POS session splits its tenders into."""
+        self.ensure_one()
+        config = self._levis_clearing_config()
+        accounts = config.pos_receivable_account_ids
+        # Block B of the monthly clearing: once a store's tender receivable for
+        # the day is exhausted, a settlement may be collecting a prior-month
+        # trade receivable instead. Offering it is fine; picking it is the
+        # operator's call.
+        if config.ar_account_id:
+            accounts |= config.ar_account_id
+        return accounts
+
+    def _levis_day_window(self):
+        """``(from, to)`` trading days this settlement may draw on."""
+        self.ensure_one()
+        config = self._levis_clearing_config()
+        primary = self.levis_trans_date or self.date
+        if not self.levis_trans_date and config:
+            primary -= timedelta(days=config.settlement_lag_days or 0)
+        return primary - timedelta(days=_DAY_WINDOW_BEFORE), primary + timedelta(days=_DAY_WINDOW_AFTER)
+
+    def _levis_candidate_domain(self, relax=False):
+        """Open tender receivables of this line's store, around its trading day."""
+        self.ensure_one()
+        accounts = self._levis_tender_accounts()
+        if not accounts:
+            return None
+        domain = self._get_default_amls_matching_domain() + [
+            ("account_id", "in", accounts.ids),
+            ("amount_residual", ">", 0),
+        ]
+        if not relax:
+            date_from, date_to = self._levis_day_window()
+            domain += [("date", ">=", date_from), ("date", "<=", date_to)]
+        return domain
+
+    def _levis_same_ou(self, aml):
+        """True when ``aml`` carries this line's Operating Unit.
+
+        The analytic distribution is the authority — that is what the POS close
+        and the monthly clearing write and what the P&L slices on. The explicit
+        ``l10n_ou_analytic_id`` pick is honoured too, for hand-made entries.
+        """
+        self.ensure_one()
+        wanted = self.levis_ou_analytic_id.id
+        if not wanted:
+            return False
+        if str(wanted) in (aml.analytic_distribution or {}):
+            return True
+        return "l10n_ou_analytic_id" in aml._fields and aml.l10n_ou_analytic_id.id == wanted
+
+    # ------------------------------------------------------------------
+    # Candidate search
+    # ------------------------------------------------------------------
+    def _get_match_candidates(self, limit=30, relax=False):
+        self.ensure_one()
+        if not self._levis_is_tender_line():
+            return super()._get_match_candidates(limit=limit, relax=relax)
+
+        domain = self._levis_candidate_domain(relax=relax)
+        if domain is None:
+            # Configured for nothing to match against: say so by falling back
+            # rather than returning an empty list that reads as "no candidates".
+            return super()._get_match_candidates(limit=limit, relax=relax)
+
+        amls = self.env["account.move.line"].search(domain, limit=limit * 20, order="date desc, id desc")
+        own_ou = amls.filtered(self._levis_same_ou)
+        # Another store's receivable is not a candidate. The whole point of the
+        # MID mapping is that money is attributed by merchant id, never by amount
+        # coincidence; an empty pool for this store is a finding to see, not a
+        # gap to fill from the outlet next door. "Search More" is the deliberate
+        # exception — an operator who asked for the wider net gets it.
+        pool = amls if (relax and not own_ou) else own_ou
+
+        target = self._levis_match_target()
+        currency = self.company_id.currency_id
+        primary_day = self.levis_trans_date
+        tender_accounts = self._levis_clearing_config().pos_receivable_account_ids
+
+        def score(aml):
+            s = 0.0
+            if not currency.compare_amounts(aml.amount_residual, target):
+                s += 100.0
+            if primary_day and aml.date == primary_day:
+                s += 40.0
+            elif primary_day:
+                s += max(0.0, 20.0 - abs((aml.date - primary_day).days) * 2.0)
+            if aml.account_id in tender_accounts:
+                s += 15.0  # a tender receivable before a trade one
+            if target:
+                s += max(0.0, 10.0 - abs(aml.amount_residual - target) / target * 10.0)
+            return s
+
+        return pool.sorted(key=score, reverse=True)[:limit]
+
+    def _get_auto_match_candidate(self):
+        """Auto-match must still see the gross, not the amount that landed."""
+        self.ensure_one()
+        if not self._levis_is_tender_line():
+            return super()._get_auto_match_candidate()
+        currency = self.company_id.currency_id
+        target = self._levis_match_target()
+        # A cash deposit is a sum of several days by nature; there is no single
+        # unambiguous item, so it is left to the wizard's suggestion.
+        if self.levis_narrative_kind != "settlement":
+            return self.env["account.move.line"].browse()
+        exact = self._get_match_candidates(limit=10).filtered(
+            lambda aml: not currency.compare_amounts(aml.amount_residual, target)
+        )
+        return exact if len(exact) == 1 else exact.browse()

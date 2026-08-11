@@ -71,7 +71,9 @@ class AccountBankStatementLine(models.Model):
 
         :param amls: account.move.line recordset to settle.
         :param writeoff_vals: optional dict(account_id, name) absorbing the
-            remainder instead of leaving it on suspense.
+            remainder instead of leaving it on suspense. ``analytic_distribution``
+            is honoured when present, so a fee written off here can still be
+            sliced by the dimension the rest of the entry carries.
         """
         self.ensure_one()
         if self.is_reconciled:
@@ -112,16 +114,15 @@ class AccountBankStatementLine(models.Model):
         comp_cur = self.company_id.currency_id
         if not comp_cur.is_zero(remainder):
             if writeoff_vals:
-                commands.append(
-                    Command.create(
-                        {
-                            "name": writeoff_vals.get("name") or _("Write-Off"),
-                            "account_id": writeoff_vals["account_id"],
-                            "partner_id": self.partner_id.id,
-                            "balance": remainder,
-                        }
-                    )
-                )
+                writeoff_line = {
+                    "name": writeoff_vals.get("name") or _("Write-Off"),
+                    "account_id": writeoff_vals["account_id"],
+                    "partner_id": self.partner_id.id,
+                    "balance": remainder,
+                }
+                if writeoff_vals.get("analytic_distribution"):
+                    writeoff_line["analytic_distribution"] = writeoff_vals["analytic_distribution"]
+                commands.append(Command.create(writeoff_line))
             else:
                 # Leave the open remainder on suspense (partial match).
                 commands.append(
