@@ -19,7 +19,10 @@ The work, in order:
 2. journal items with no distribution (tax and payment-term lines), from their
    move;
 3. moves themselves, from the majority unit of their lines;
-4. the small document tables, straight from the warehouse.
+4. the small document tables, straight from the warehouse — including the POS
+   chain (config from its warehouse, session from its config, order from its
+   session), which the module's own computes never fill on history because the
+   columns are created ready-made by the pre-init hook.
 
 Everything is plain SQL: going through the ORM would trigger the recompute this
 whole design exists to avoid, and ``operating_unit_id`` is ``readonly=False`` so
@@ -179,6 +182,32 @@ SIMPLE_PASSES = [
         """,
     ),
     (
+        "pos_config",
+        """
+        UPDATE pos_config c SET operating_unit_id = ou.id
+          FROM operating_unit ou
+         WHERE c.warehouse_id = ou.warehouse_id AND c.operating_unit_id IS NULL
+        """,
+    ),
+    (
+        "pos_session",
+        """
+        UPDATE pos_session s SET operating_unit_id = c.operating_unit_id
+          FROM pos_config c
+         WHERE s.config_id = c.id AND s.operating_unit_id IS NULL
+           AND c.operating_unit_id IS NOT NULL
+        """,
+    ),
+    (
+        "pos_order",
+        """
+        UPDATE pos_order o SET operating_unit_id = s.operating_unit_id
+          FROM pos_session s
+         WHERE o.session_id = s.id AND o.operating_unit_id IS NULL
+           AND s.operating_unit_id IS NOT NULL
+        """,
+    ),
+    (
         "account_payment",
         """
         UPDATE account_payment p SET operating_unit_id = m.operating_unit_id
@@ -233,6 +262,9 @@ def main():
         "stock_quant",
         "purchase_order",
         "sale_order",
+        "pos_config",
+        "pos_session",
+        "pos_order",
     ):
         remaining = _count_null(table)
         if remaining is not None:
