@@ -1,8 +1,13 @@
 # Clearing Juli 2026 — `prd_levis_begbal`
 
-Status per **11-Agu-2026**: **63 jurnal masih DRAFT**, menunggu persetujuan Accounting.
-Baseline sudah diverifikasi ulang hari ini — angkanya masih identik dengan review 7-Agu,
-tidak perlu regenerate apa pun.
+Status per **11-Agu-2026**: **SELESAI — 63 jurnal sudah DIPOSTING** setelah konfirmasi user.
+Dijalankan lewat `90_post_clearing_juli.py` (`CLR_POST=1`), didahului rehearsal
+`CLR_DRY=1` yang keluar delta 0,00 di keempat kriteria terima. Hasil akhir cocok persis:
+`1103000002` 1.530.199.113,09 · `7104000001` 94.186.098,68 · `1106000001` 2.949.900,00 ·
+POS receivable Juli terbuka 490.494.449,00 pada 85 baris. Backup pra-posting:
+`/opt/odoo-platform/backups/prd_levis_begbal_pre_post_clearing_juli.dump` (84 MB).
+Bagian di bawah dipertahankan sebagai catatan cara kerjanya; §5 (yang tetap terbuka)
+masih relevan.
 
 Dokumen ini menjelaskan (1) apa yang sebenarnya dibutuhkan, (2) angka posisi hari ini,
 (3) langkah eksekusi kalau clearing jadi dijalankan, (4) yang tersisa dan butuh keputusan.
