@@ -31,14 +31,17 @@
 # Yang TIDAK ada di daftar ini, karena buktinya tidak cukup, sengaja dibiarkan
 # tak terpetakan supaya uangnya tetap terlihat di suspense:
 #
-#   1999632289  Rp 556.975.475  "LEVIS PONDOK"  -- kemungkinan PIM 2 (PIM 1 sudah
-#                               dipegang 1999632288), tapi 53 settlement-nya cuma
-#                               menghasilkan 3 suara dan ketiganya ke toko lain.
 #   1999660761  Rp  19.603.427  "LEVIS PAK"     -- suara 1-1-1, tidak konklusif.
 #   1999660757  Rp  16.439.293  "LEVIS BANDUNG" -- ada empat toko Bandung.
 #   1999664887  Rp   2.563.123  "LEVIS GR"      -- Grand Indonesia atau Grand
 #                               Metropolitan; suaranya justru ke Plaza Senayan.
 #   1999632287  Rp   1.548.533  "LEVIS GRAND"   -- sama, tanpa suara sama sekali.
+#
+# 1999632289 (Rp 556.975.475, "LEVIS PONDOK") tadinya ada di daftar itu: bukti
+# angkanya tidak menolong -- 53 settlement hanya menghasilkan 3 suara, dan
+# ketiganya ke toko lain. Ia sekarang dipetakan ke Pondok Indah Mall 2 atas
+# KONFIRMASI Finance (11-Aug-2026), bukan atas kesimpulan skrip ini. Yang
+# menguatkan: PIM 1 sudah dipegang 1999632288, dan kedua TID itu berurutan.
 #
 # Setoran tunai (475 baris, Rp 1,12 M) juga di luar cakupan skrip ini: kuncinya
 # teks bebas yang diketik kasir, 224 variasi, dan sebagiannya cuma nama orang.
@@ -96,6 +99,8 @@ ROWS = [
     ("tid", "1999632290", "OLS SES - SENAYAN CITY", "debit", "Senayan City"),
     ("tid", "1999664883", "OLS SES - GANDARIA CITY", "debit", "Gandaria City"),
     ("tid", "1999632288", "OLS SES - PONDOK INDAH MALL 1", "debit", "Pondok Indah Mall 1"),
+    # Dikonfirmasi Finance 11-Aug-2026, bukan hasil pencocokan angka.
+    ("tid", "1999632289", "OLS SES - PONDOK INDAH MALL 2", "debit", "Pondok Indah Mall 2"),
     ("tid", "1999664888", "OLS SES - TRANS STUDIO CIBUBUR", "debit", "Trans Studio Cibubur"),
     ("tid", "1999660763", "OLS SES - GALAXY MALL 3", "qris", "Galaxy Mall 3"),
     ("tid", "1999660758", "OLS SES - TRANS STUDIO MALL BANDUNG", "debit", "Trans Studio Mall Bandung"),
@@ -121,9 +126,14 @@ def run():
         if not analytic:
             salah_ou.append((key, ou_name))
             continue
-        ada = MAP.search(
-            [("company_id", "=", company.id), ("match_type", "=", match_type), ("key", "=", key)],
-            limit=1,
+        # Dibandingkan dalam bentuk TERNORMALISASI, bukan string mentah. Bank
+        # mencetak terminal yang sama sebagai "001999632289" dan "1999632289";
+        # membandingkan apa adanya menghasilkan aturan kembar yang menunjuk toko
+        # yang sama -- persis yang terjadi 11-Aug-2026 di prd_levis_begbal, saat
+        # skrip ini dan sesi lain sama-sama memetakan TID 1999632289.
+        wanted = MAP._normalise_key(key)
+        ada = MAP.search([("company_id", "=", company.id), ("match_type", "=", match_type)]).filtered(
+            lambda r: MAP._normalise_key(r.key) == wanted
         )
         if ada:
             dilewati += 1
