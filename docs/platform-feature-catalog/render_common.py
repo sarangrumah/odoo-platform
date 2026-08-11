@@ -202,8 +202,14 @@ def block_gaps(cat):
     "Sedang" wraps to "Seda / ng". A per-gap block reads properly on paper; the
     filterable wide table lives in the XLSX, where filtering is the point.
     """
+    # Gap prose states counts too, so it gets the same placeholder treatment as
+    # the narrative. Hand-typed numbers here survived a rebase that moved every
+    # other figure in the document.
+    def sub(g, key):
+        return substitute(g.get(key, ""), cat)
+
     out = []
-    summary = [[g["id"], g["area"], g["title_id"],
+    summary = [[g["id"], g["area"], sub(g, "title_id"),
                 SEVERITY_LABEL.get(g["severity"], g["severity"]),
                 g.get("horizon", "")] for g in cat["gaps"]]
     out.append({"kind": "table",
@@ -213,17 +219,17 @@ def block_gaps(cat):
 
     for g in cat["gaps"]:
         out.append({"kind": "heading", "level": 3,
-                    "text": f"{g['id']} · {g['title_id']}"})
+                    "text": f"{g['id']} · {sub(g, 'title_id')}"})
         rows = [
             ["Area", g["area"]],
             ["Prioritas", SEVERITY_LABEL.get(g["severity"], g["severity"])
              + f" · upaya {EFFORT_LABEL.get(g.get('effort', ''), g.get('effort', '—'))}"
              + f" · horizon {g.get('horizon', '—')} bulan"],
-            ["Kondisi saat ini (NOW)", g["now_id"]],
-            ["Sasaran (TARGET)", g["target_id"]],
+            ["Kondisi saat ini (NOW)", sub(g, "now_id")],
+            ["Sasaran (TARGET)", sub(g, "target_id")],
         ]
         if g.get("impact_id"):
-            rows.append(["Dampak bisnis", g["impact_id"]])
+            rows.append(["Dampak bisnis", sub(g, "impact_id")])
         if g.get("evidence"):
             rows.append(["Rujukan", " · ".join(f"`{e}`" for e in g["evidence"])])
         out.append({"kind": "table", "head": ["", ""], "rows": rows,

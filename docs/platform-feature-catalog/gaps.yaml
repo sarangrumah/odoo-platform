@@ -148,11 +148,13 @@ gaps:
     area: Pengetahuan Modul
     title_id: "Dokumentasi modul sebagian besar masih berstatus draft"
     now_id: >-
-      Dari 158 modul, 129 memiliki dokumen pengetahuan — 115 berkas
-      MODULE_KNOWLEDGE.md di dalam addons dan 14 override yang ditulis untuk
-      katalog ini. Hanya 4 di antaranya berstatus `reviewed`; 111 masih `draft`
-      hasil generator. 29 modul belum terdokumentasi sama sekali dan diringkas
-      otomatis dari manifest.
+      Dari {{n.modules_total}} modul, {{n.knowledge_present}} memiliki dokumen
+      pengetahuan — sebagian berkas MODULE_KNOWLEDGE.md di dalam addons dan
+      {{n.knowledge_override}} override yang ditulis untuk katalog ini. Hanya
+      {{n.knowledge_reviewed}} di antaranya berstatus `reviewed`;
+      {{n.knowledge_draft}} masih `draft` hasil generator.
+      {{n.knowledge_missing}} modul belum terdokumentasi sama sekali dan
+      diringkas otomatis dari manifest.
     target_id: >-
       Semua modul yang menghadap klien berstatus reviewed, dengan pemeriksaan
       ulang saat versi manifest berubah.

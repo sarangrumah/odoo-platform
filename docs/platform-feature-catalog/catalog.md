@@ -4,7 +4,7 @@
 
 # Katalog Fitur Platform Odoo — Erajaya Group
 
-Dihasilkan 2026-08-11 dari commit `1884ada` (ada perubahan belum ter-commit) pada branch `docs/feature-catalog-main`. Odoo 19.0, 156 modul custom.
+Dihasilkan 2026-08-11 dari commit `2333f2a` (ada perubahan belum ter-commit) pada branch `docs/feature-catalog-main`. Odoo 19.0, 156 modul custom.
 
 # Ringkasan Eksekutif
 
@@ -1063,7 +1063,7 @@ Daftar lengkap kesenjangan yang tercatat: 10 butir, 3 di antaranya berprioritas 
 | --- | --- |
 | Area | Pengetahuan Modul |
 | Prioritas | Sedang · upaya L — lebih dari 1 bulan · horizon 3-6 bulan |
-| Kondisi saat ini (NOW) | Dari 158 modul, 129 memiliki dokumen pengetahuan — 115 berkas MODULE_KNOWLEDGE.md di dalam addons dan 14 override yang ditulis untuk katalog ini. Hanya 4 di antaranya berstatus `reviewed`; 111 masih `draft` hasil generator. 29 modul belum terdokumentasi sama sekali dan diringkas otomatis dari manifest. |
+| Kondisi saat ini (NOW) | Dari 156 modul, 129 memiliki dokumen pengetahuan — sebagian berkas MODULE_KNOWLEDGE.md di dalam addons dan 15 override yang ditulis untuk katalog ini. Hanya 4 di antaranya berstatus `reviewed`; 110 masih `draft` hasil generator. 27 modul belum terdokumentasi sama sekali dan diringkas otomatis dari manifest. |
 | Sasaran (TARGET) | Semua modul yang menghadap klien berstatus reviewed, dengan pemeriksaan ulang saat versi manifest berubah. |
 | Dampak bisnis | Klaim kapabilitas dari berkas draft tidak boleh dikutip tanpa pemeriksaan. Katalog ini menandainya lewat kolom Keyakinan Info, bukan menyembunyikannya. |
 | Rujukan | `docs/platform-feature-catalog/catalog-audit.md` · `scripts/generate_module_knowledge.py, scripts/check_knowledge_drift.py` |
