@@ -88,4 +88,3 @@ that decides which of them can be quoted to a client.
 
 - **phantom_model**: `engine.materialize`
 - **version_drift**: `19.0.0.1.0 → 19.0.0.3.0`
-
