@@ -175,6 +175,7 @@ DOMAIN_BY_MODULE = {
     "custom_levis_bank_reconcile": "keuangan-akuntansi",
     "custom_levis_categ_approval": "keuangan-akuntansi",
     "custom_levis_localization": "penjualan-retail-pos",
+    "custom_levis_operating_unit": "keuangan-akuntansi",
 
     # -- _vendor -------------------------------------------------------------
     "auth_jwt": "integrasi-platform",
@@ -204,6 +205,8 @@ DOMAIN_BY_MODULE = {
     "custom_ai_bridge": "produktivitas-ai",
     "custom_bast": "layanan-proyek",
     "custom_core": "integrasi-platform",
+    "custom_operating_unit": "integrasi-platform",
+    "custom_role_manager": "integrasi-platform",
     "custom_currency_nbsp": "integrasi-platform",
     "custom_hht_bridge": "gudang-inventori",
     "custom_home_console": "integrasi-platform",
@@ -218,6 +221,7 @@ DOMAIN_BY_MODULE = {
     "custom_accounting_full": "keuangan-akuntansi",
     "custom_accounting_recurring": "keuangan-akuntansi",
     "custom_accounting_reports": "keuangan-akuntansi",
+    "custom_operating_unit_reports": "keuangan-akuntansi",
     "custom_asset_from_receipt": "keuangan-akuntansi",
     "custom_bank_import": "keuangan-akuntansi",
     "custom_esg": "keuangan-akuntansi",
@@ -275,6 +279,7 @@ DOMAIN_BY_MODULE = {
     "custom_ecommerce": "penjualan-retail-pos",
     "custom_pos_id": "penjualan-retail-pos",
     "custom_retail_import": "penjualan-retail-pos",
+    "custom_operating_unit_pos": "penjualan-retail-pos",
     "custom_retail_import_api": "penjualan-retail-pos",
     "custom_retail_import_pos": "penjualan-retail-pos",
     "custom_retail_import_recon": "penjualan-retail-pos",
@@ -328,6 +333,7 @@ DOMAIN_BY_MODULE = {
     "custom_whatsapp": "pemasaran-komunikasi",
 
     # -- ee_gap: fondasi -----------------------------------------------------
+    "custom_operating_unit_docs": "integrasi-platform",
     "authenticate_keycloak": "integrasi-platform",
     "custom_approval_engine": "integrasi-platform",
     "custom_esb_connector": "integrasi-platform",
@@ -366,11 +372,17 @@ DOMAIN_SECONDARY = {
     "custom_esb_connector": ["vertikal-industri", "gudang-inventori"],
     "custom_finance_portal_sap": ["integrasi-platform"],
     "custom_finance_portal_sso": ["integrasi-platform"],
+    "custom_operating_unit": ["admin-saas"],
+    "custom_operating_unit_docs": ["keuangan-akuntansi", "gudang-inventori"],
+    "custom_operating_unit_pos": ["integrasi-platform"],
+    "custom_operating_unit_reports": ["integrasi-platform"],
+    "custom_role_manager": ["admin-saas", "kepatuhan-data-pdp"],
     "custom_hr_sso_keycloak": ["integrasi-platform"],
     "custom_hht_bridge": ["integrasi-platform"],
     "custom_intercompany_procurement": ["keuangan-akuntansi"],
     "custom_levis_categ_approval": ["penjualan-retail-pos"],
     "custom_levis_localization": ["keuangan-akuntansi", "gudang-inventori"],
+    "custom_levis_operating_unit": ["penjualan-retail-pos", "integrasi-platform"],
     "custom_livechat": ["layanan-proyek"],
     "custom_ops_reports": ["manufaktur-kualitas", "keuangan-akuntansi"],
     "custom_payment_id": ["penjualan-retail-pos"],
@@ -432,6 +444,7 @@ TENANTS_BY_MODULE = {
     "custom_levis_bank_reconcile": ["levis"],
     "custom_levis_categ_approval": ["levis"],
     "custom_levis_localization": ["levis"],
+    "custom_levis_operating_unit": ["levis"],
     "custom_retail_import": ["levis"],
     "custom_retail_import_api": ["levis"],
     "custom_retail_import_pos": ["levis"],
@@ -541,6 +554,9 @@ ID_LABELS = {
         "Mencocokkan settlement bank dengan piutang tender POS per toko, bersih dari MDR."),
     "custom_levis_categ_approval": ("Persetujuan Perubahan Kategori Produk",
         "Perubahan kategori produk tidak lagi diam-diam — harus lewat persetujuan Finance, dengan koreksi GL."),
+    "custom_levis_operating_unit": ("Migrasi Unit Operasional Levi's",
+        "Mengangkat dimensi Operating Unit Levi's yang sudah ada menjadi master unit "
+        "platform — tanpa mengubah kode gudang, nama akun analitik, jurnal, maupun POS."),
     "custom_levis_localization": ("Lokalisasi Levi's",
         "Kustomisasi tenant Levi's: HS Code, batas qty terima, jurnal billing, voucher pembayaran, kliring POS."),
 
@@ -591,6 +607,12 @@ ID_LABELS = {
         "Menghubungkan Odoo ke gateway AI platform (Claude / OpenAI / Ollama)."),
     "custom_bast": ("Berita Acara Serah Terima",
         "Dokumen serah terima generik dengan tanda tangan ganda dan jejak audit."),
+    "custom_operating_unit": ("Manajemen Unit Operasional",
+        "Master unit operasional berjenjang Kantor Pusat → Area → Toko, dan pemetaan "
+        "pengguna ke unit yang menjadi dasar pembatasan data."),
+    "custom_role_manager": ("Manajemen Peran Pengguna",
+        "Pilih peran jabatan alih-alih mencentang puluhan grup akses; 18 peran standar "
+        "Kantor Pusat dan retail, dengan pencabutan yang hanya menyentuh pemberian peran."),
     "custom_core": ("Fondasi Platform",
         "Utilitas bersama, mixin, helper kebijakan, dan endpoint ber-HMAC."),
     "custom_currency_nbsp": ("Perbaikan Format Mata Uang & CSV",
@@ -617,6 +639,9 @@ ID_LABELS = {
         "Otomasi antar-perusahaan, eliminasi, konsolidasi, batas kredit, tahun fiskal, dan follow-up."),
     "custom_accounting_recurring": ("Jurnal & Pembayaran Berulang",
         "Template jurnal dan pembayaran berulang dengan penjadwalan otomatis."),
+    "custom_operating_unit_reports": ("Laporan per Unit Operasional",
+        "Membatasi laporan keuangan pada unit yang boleh dibaca pengguna — laporan "
+        "menyusun SQL sendiri sehingga aturan akses Odoo tidak berlaku di sana."),
     "custom_accounting_reports": ("Mesin Laporan Keuangan",
         "P&L, Neraca, Buku Besar, Neraca Saldo, Arus Kas, Aging, Buku Kas/Bank, dan laporan pajak."),
     "custom_asset_from_receipt": ("Aset dari Penerimaan Barang",
@@ -723,6 +748,9 @@ ID_LABELS = {
         "Registry kurir (JNE, JNT, SiCepat, AnterAja, Pos) dan checkout Midtrans/Xendit."),
     "custom_pos_id": ("POS Indonesia",
         "QRIS, pembulatan rupiah, dan struk elektronik via WhatsApp/SMS."),
+    "custom_operating_unit_pos": ("Unit Operasional di Kasir",
+        "Membatasi POS, sesi, dan pesanan per toko, serta membubuhkan unit pada setiap "
+        "baris jurnal penutupan sesi."),
     "custom_retail_import": ("Impor Data Retail",
         "Ingest Excel/CSV dan SFTP untuk master serta transaksi retail dari XStore."),
     "custom_retail_import_api": ("API Master Produk (MDM)",
@@ -823,6 +851,9 @@ ID_LABELS = {
     # ---- ee_gap: fondasi ---------------------------------------------------
     "authenticate_keycloak": ("Autentikasi Keycloak",
         "Alur OAuth2 authorization code (confidential client) di atas auth_oauth Odoo."),
+    "custom_operating_unit_docs": ("Pembatasan Data per Unit Operasional",
+        "Menempelkan unit operasional pada dokumen akuntansi, gudang, pembelian dan "
+        "penjualan, lalu membatasi baca maupun tulisnya per unit."),
     "custom_approval_engine": ("Mesin Persetujuan",
         "Persetujuan berjenjang generik dengan delegasi, mode cuti, dan eskalasi SLA."),
     "custom_esb_connector": ("Konektor ESB Core",

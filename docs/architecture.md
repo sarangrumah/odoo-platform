@@ -94,16 +94,16 @@ they appear next to the Enterprise apps they replace.
 | Group | Count | Scope | Contents |
 | --- | --- | --- | --- |
 | `_vendor/` | 4 | third-party | Vendored OCA (`queue_job`, `auth_jwt`, …). Do not edit; `fetch_oca.sh`. |
-| `core/` | 9 | all tenants | `custom_core` (HMAC `secure_endpoint`), `custom_adapter_framework`, `custom_ai_bridge`, `custom_hht_bridge`, … |
+| `core/` | 11 | all tenants | `custom_core` (HMAC `secure_endpoint`), `custom_adapter_framework`, `custom_role_manager`, `custom_operating_unit`, … |
 | `control_plane/` | 4 | platform | `custom_hub_console`, `custom_super_admin`, `custom_tenant_infra`, `custom_onboarding_journey`. |
 | `compliance/` | 9 | all ID tenants | PDP (`custom_pdp_*`), Coretax, PPh withholding. |
-| `ee_gap/` | 103 | all tenants | The CE→EE delta: accounting, payroll, WMS, finance portal, retail, e-commerce. |
+| `ee_gap/` | 106 | all tenants | The CE→EE delta: accounting, payroll, WMS, finance portal, retail, e-commerce. |
 | `verticals/` | 14 | one industry | `custom_ppob_*` (12), `custom_fnb_stock_ops`, + `_template/`. |
-| `_tenants/` | 10 | one customer | `custom_levis_*` (4), `custom_arka_*` (6). |
+| `_tenants/` | 11 | one customer | `custom_levis_*` (5), `custom_arka_*` (6). |
 | `operations/` | 3 | internal | `custom_brd_analyzer`, `custom_dev_cycle`, `custom_ops_monitor`. |
 
-**Total: 156 manifests.** Counting gotcha: `verticals/_template/custom_vertical_example`
-sits at depth 4, so `find addons -maxdepth 3 -name __manifest__.py` returns 155, not 156.
+**Total: 162 manifests.** Counting gotcha: `verticals/_template/custom_vertical_example`
+sits at depth 4, so `find addons -maxdepth 3 -name __manifest__.py` returns 161, not 162.
 Do not hand-maintain these numbers — `docs/platform-feature-catalog/build_catalog_json.py`
 derives them and `verify.py` fails the build when this table disagrees with the repo.
 
