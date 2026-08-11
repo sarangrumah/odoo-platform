@@ -1,55 +1,55 @@
 {
   "meta": {
-    "generated_at": "2026-08-11T02:08:24+00:00",
-    "git_commit": "2333f2a",
-    "git_branch": "docs/feature-catalog-main",
+    "generated_at": "2026-08-11T11:51:21+00:00",
+    "git_commit": "941ec5d",
+    "git_branch": "HEAD",
     "git_dirty": true,
     "odoo_series": "19.0",
     "counts": {
-      "modules_total": 156,
+      "modules_total": 162,
       "by_group": {
-        "_tenants": 10,
+        "_tenants": 11,
         "_vendor": 4,
         "compliance": 9,
         "control_plane": 4,
-        "core": 9,
-        "ee_gap": 103,
+        "core": 11,
+        "ee_gap": 106,
         "operations": 3,
         "verticals": 14
       },
       "by_domain": {
         "admin-saas": 7,
         "gudang-inventori": 17,
-        "integrasi-platform": 13,
+        "integrasi-platform": 16,
         "kepatuhan-data-pdp": 6,
-        "keuangan-akuntansi": 28,
+        "keuangan-akuntansi": 30,
         "layanan-proyek": 15,
         "manufaktur-kualitas": 5,
         "pemasaran-komunikasi": 12,
-        "penjualan-retail-pos": 10,
+        "penjualan-retail-pos": 11,
         "perpajakan-indonesia": 6,
         "produktivitas-ai": 10,
         "sdm-payroll": 13,
         "vertikal-industri": 14
       },
       "by_scope": {
-        "general": 135,
+        "general": 140,
         "platform": 7,
-        "tenant": 10,
+        "tenant": 11,
         "vendor": 4
       },
       "by_confidence": {
-        "high": 19,
+        "high": 25,
         "low": 29,
         "medium": 108
       },
-      "knowledge_present": 129,
-      "knowledge_reviewed": 4,
+      "knowledge_present": 135,
+      "knowledge_reviewed": 10,
       "knowledge_override": 15,
       "knowledge_missing": 27,
       "audit_flags": {
-        "version_drift": 12,
-        "undocumented_model": 42,
+        "version_drift": 13,
+        "undocumented_model": 46,
         "phantom_model": 2,
         "phantom_field": 1
       }
@@ -62,7 +62,7 @@
       "title_id": "Keuangan & Akuntansi",
       "title_en": "Finance & Accounting",
       "blurb_id": "Buku besar, laporan keuangan, aset tetap, kas & bank, dan portal keuangan yang menutup selisih antara Odoo Community dan Enterprise.",
-      "module_count": 28,
+      "module_count": 30,
       "module_names": [
         "custom_account_batch_payment",
         "custom_account_deferred",
@@ -85,6 +85,8 @@
         "custom_levis_asset_accounts",
         "custom_levis_bank_reconcile",
         "custom_levis_categ_approval",
+        "custom_levis_operating_unit",
+        "custom_operating_unit_reports",
         "custom_payment_admin_fee",
         "custom_payment_id",
         "custom_payment_methods_id",
@@ -166,11 +168,12 @@
       "title_id": "Penjualan, Retail & POS",
       "title_en": "Sales, Retail & POS",
       "blurb_id": "CRM, POS Indonesia, eCommerce dan storefront headless, langganan, serta jalur impor data retail dari XStore.",
-      "module_count": 10,
+      "module_count": 11,
       "module_names": [
         "custom_crm",
         "custom_ecommerce",
         "custom_levis_localization",
+        "custom_operating_unit_pos",
         "custom_pos_id",
         "custom_retail_import",
         "custom_retail_import_api",
@@ -284,7 +287,7 @@
       "title_id": "Integrasi & Fondasi Platform",
       "title_en": "Integration & Platform Foundation",
       "blurb_id": "Fondasi bersama: HMAC endpoint, adapter framework, mesin persetujuan, SSO Keycloak, konektor ESB, dan komponen OCA.",
-      "module_count": 13,
+      "module_count": 16,
       "module_names": [
         "auth_jwt",
         "authenticate_keycloak",
@@ -296,7 +299,10 @@
         "custom_currency_nbsp",
         "custom_esb_connector",
         "custom_home_console",
+        "custom_operating_unit",
+        "custom_operating_unit_docs",
         "custom_report_templates",
+        "custom_role_manager",
         "partner_firstname",
         "queue_job"
       ]
@@ -1139,7 +1145,7 @@
         "summary": "Match bank settlements against POS tender receivables per store, net of MDR, with a cash suggestion capped at the statement amount.",
         "description_first_para": "Levi's Bank Reconciliation — POS Tender =======================================",
         "category": "Tenants/Levis",
-        "version": "19.0.1.0.0",
+        "version": "19.0.1.1.0",
         "license": "LGPL-3",
         "author": "Custom Platform",
         "depends": [
@@ -1232,7 +1238,7 @@
           "csv": 0
         },
         "test_files": 1,
-        "source_hash": "e162512fa3197a1ae72453484aea499f4bfb6d8d072e18c610ab24a71c608355",
+        "source_hash": "0301f4ae16a3774b6be6beaacee95feeb06efd06b96b918b04b0b45380b96e6c",
         "has_tests": true
       },
       "domain": "keuangan-akuntansi",
@@ -1364,7 +1370,7 @@
         "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
         "description_first_para": "Levi's Localization =================== Bundles four tenant-specific requirements for the Levi's databases (prd_levis / rnd_levis / demo_levis):",
         "category": "Tenants/Levis",
-        "version": "19.0.1.26.0",
+        "version": "19.0.1.29.0",
         "license": "LGPL-3",
         "author": "Custom Platform",
         "depends": [
@@ -1389,7 +1395,7 @@
         "status": "draft",
         "generated_at": "2026-07-02T08:56:04Z",
         "generator": "bootstrap-v1",
-        "manifest_version_at_gen": "19.0.1.26.0",
+        "manifest_version_at_gen": "19.0.1.29.0",
         "purpose": "This module implements five specific requirements for the Levi's tenant: HS Code management on the product master, ensuring receipt quantities do not exceed demand quantities, skipping the inventory journal entry at goods receipt confirmation, generating branded payment vouchers and receipts, and providing a periodic inventory reconciliation tool that realigns GL inventory-asset accounts with actual on-hand stock value.",
         "business_flow": [
           "**HS Code Management**:",
@@ -2006,13 +2012,13 @@
         ],
         "crons": 1,
         "file_counts": {
-          "py": 40,
+          "py": 41,
           "xml": 33,
           "js": 0,
           "csv": 2
         },
-        "test_files": 6,
-        "source_hash": "8284885efc487944ca767797444fe112a5e8221421b16cb1aa0c06d81e8b3f23",
+        "test_files": 7,
+        "source_hash": "871bb661b9f235bda1b8b0f97539bd355cfb0cc9ba908cd22fce8bbbf1f3bde5",
         "has_tests": true
       },
       "domain": "penjualan-retail-pos",
@@ -2055,6 +2061,99 @@
       "id": {
         "nama": "Lokalisasi Levi's",
         "ringkasan": "Kustomisasi tenant Levi's: HS Code, batas qty terima, jurnal billing, voucher pembayaran, kliring POS.",
+        "translated": true
+      }
+    },
+    {
+      "name": "custom_levis_operating_unit",
+      "group": "_tenants",
+      "relpath": "addons/_tenants/custom_levis_operating_unit",
+      "manifest": {
+        "name": "Custom Operating Unit — Levi's Migration",
+        "summary": "Turns the existing Levi's analytic Operating Units into operating.unit records — additively, without renaming a single warehouse, analytic or journal.",
+        "description_first_para": "Custom Operating Unit — Levi's Migration ========================================",
+        "category": "Custom Platform/Localization",
+        "version": "19.0.0.1.0",
+        "license": "LGPL-3",
+        "author": "Custom Platform",
+        "depends": [
+          "custom_operating_unit_docs",
+          "custom_levis_localization"
+        ],
+        "application": false,
+        "auto_install": true,
+        "installable": true,
+        "capability_tags": [
+          "operating-unit",
+          "levis",
+          "migration"
+        ],
+        "external_dependencies": {},
+        "countries": []
+      },
+      "knowledge": {
+        "status": "reviewed",
+        "generated_at": "2026-08-11",
+        "generator": "hand-written",
+        "manifest_version_at_gen": "19.0.0.1.0",
+        "purpose": "Lifts the Operating-Unit dimension Levi's already runs — one\n`account.analytic.account` per store, wired to a warehouse and a per-store\npurchase journal by `custom_levis_localization` — into the platform's\n`operating.unit` master. Auto-installs where that localization and\n`custom_operating_unit_docs` are both present.",
+        "business_flow": [],
+        "key_models": [],
+        "important_fields": [],
+        "present": true,
+        "origin": "module",
+        "version_drift": false
+      },
+      "source": {
+        "models_own": [],
+        "models_inherit": [
+          "account.move.line",
+          "operating.unit",
+          "purchase.order"
+        ],
+        "wizards": [],
+        "fields_by_model": {
+          "account.move.line": [
+            "l10n_ou_analytic_id"
+          ],
+          "operating.unit": [
+            "l10n_levis_store_code"
+          ],
+          "purchase.order": [
+            "l10n_ou_analytic_display"
+          ]
+        },
+        "models_xml": [
+          "ir.ui.view"
+        ],
+        "routes": [],
+        "security_groups": [],
+        "crons": 0,
+        "file_counts": {
+          "py": 7,
+          "xml": 1,
+          "js": 0,
+          "csv": 0
+        },
+        "test_files": 1,
+        "source_hash": "6e94f624ef48667bd67bc728b0444327bd6b13fbdfa798f843f43345585bbe6e",
+        "has_tests": true
+      },
+      "domain": "keuangan-akuntansi",
+      "domain_secondary": [
+        "penjualan-retail-pos",
+        "integrasi-platform"
+      ],
+      "scope": "tenant",
+      "tenants": [
+        "levis"
+      ],
+      "maturity": "production",
+      "confidence": "high",
+      "audit_flags": [],
+      "id": {
+        "nama": "Migrasi Unit Operasional Levi's",
+        "ringkasan": "Mengangkat dimensi Operating Unit Levi's yang sudah ada menjadi master unit platform — tanpa mengubah kode gudang, nama akun analitik, jurnal, maupun POS.",
         "translated": true
       }
     },
@@ -6853,6 +6952,133 @@
       }
     },
     {
+      "name": "custom_operating_unit",
+      "group": "core",
+      "relpath": "addons/core/custom_operating_unit",
+      "manifest": {
+        "name": "Custom Operating Unit",
+        "summary": "Operating Unit master data with a Head Office / Area / Store hierarchy, and the user-to-unit assignment that data isolation is built on.",
+        "description_first_para": "Custom Operating Unit — Unit Operasional ========================================",
+        "category": "Custom Platform/Security",
+        "version": "19.0.0.1.0",
+        "license": "LGPL-3",
+        "author": "Custom Platform",
+        "depends": [
+          "custom_core",
+          "analytic"
+        ],
+        "application": false,
+        "auto_install": false,
+        "installable": true,
+        "capability_tags": [
+          "operating-unit",
+          "multi-branch",
+          "data-isolation",
+          "organisation-hierarchy"
+        ],
+        "external_dependencies": {},
+        "countries": []
+      },
+      "knowledge": {
+        "status": "reviewed",
+        "generated_at": "2026-08-11",
+        "generator": "hand-written",
+        "manifest_version_at_gen": "19.0.0.1.0",
+        "purpose": "Master data for the branch dimension: Head Office → Area → Store, as a real\nmodel with a hierarchy, plus the user→unit assignment that the record rules in\nthe bridge modules read. Before this, \"Operating Unit\" was only an\n`account.analytic.account` in a plan of that name, owned by\n`custom_levis_localization`, with zero access-control effect.",
+        "business_flow": [],
+        "key_models": [],
+        "important_fields": [],
+        "present": true,
+        "origin": "module",
+        "version_drift": false
+      },
+      "source": {
+        "models_own": [
+          "operating.unit",
+          "operating.unit.mixin"
+        ],
+        "models_inherit": [
+          "res.users"
+        ],
+        "wizards": [],
+        "fields_by_model": {
+          "operating.unit": [
+            "active",
+            "analytic_account_id",
+            "child_ids",
+            "code",
+            "company_id",
+            "complete_name",
+            "manager_user_id",
+            "name",
+            "note",
+            "ou_type",
+            "parent_id",
+            "parent_path",
+            "partner_id",
+            "sequence",
+            "user_count",
+            "user_ids"
+          ],
+          "operating.unit.mixin": [
+            "operating_unit_id"
+          ],
+          "res.users": [
+            "default_operating_unit_id",
+            "operating_unit_ids",
+            "ou_all_access",
+            "ou_allowed_ids",
+            "ou_include_untagged",
+            "ou_is_scoped"
+          ]
+        },
+        "models_xml": [
+          "ir.actions.act_window",
+          "ir.rule",
+          "ir.ui.view",
+          "res.groups",
+          "res.groups.privilege"
+        ],
+        "routes": [],
+        "security_groups": [
+          "base.group_user",
+          "custom_operating_unit.group_operating_unit_manager"
+        ],
+        "crons": 0,
+        "file_counts": {
+          "py": 10,
+          "xml": 5,
+          "js": 0,
+          "csv": 1
+        },
+        "test_files": 2,
+        "source_hash": "4cf438e8c791c76466d9efecff1dc9bc44c83853ff8150ba541fc83cd1268611",
+        "has_tests": true
+      },
+      "domain": "integrasi-platform",
+      "domain_secondary": [
+        "admin-saas"
+      ],
+      "scope": "general",
+      "tenants": [],
+      "maturity": "production",
+      "confidence": "high",
+      "audit_flags": [
+        {
+          "kind": "undocumented_model",
+          "items": [
+            "operating.unit",
+            "operating.unit.mixin"
+          ]
+        }
+      ],
+      "id": {
+        "nama": "Manajemen Unit Operasional",
+        "ringkasan": "Master unit operasional berjenjang Kantor Pusat → Area → Toko, dan pemetaan pengguna ke unit yang menjadi dasar pembatasan data.",
+        "translated": true
+      }
+    },
+    {
       "name": "custom_product_barcode",
       "group": "core",
       "relpath": "addons/core/custom_product_barcode",
@@ -6943,6 +7169,137 @@
       "id": {
         "nama": "Barcode Produk Ganda",
         "ringkasan": "Beberapa barcode alternatif per varian produk — satu varian, satu stok, semua terpindai.",
+        "translated": true
+      }
+    },
+    {
+      "name": "custom_role_manager",
+      "group": "core",
+      "relpath": "addons/core/custom_role_manager",
+      "manifest": {
+        "name": "Custom Role Manager",
+        "summary": "Named security roles that bundle res.groups: pick 'Accounting Supervisor' instead of ticking thirty checkboxes, with safe revocation and shipped role templates for Head Office and retail positions.",
+        "description_first_para": "Custom Role Manager — Peran & Hak Akses =======================================",
+        "category": "Custom Platform/Security",
+        "version": "19.0.0.1.0",
+        "license": "LGPL-3",
+        "author": "Custom Platform",
+        "depends": [
+          "custom_core"
+        ],
+        "application": false,
+        "auto_install": false,
+        "installable": true,
+        "capability_tags": [
+          "rbac",
+          "role-bundles",
+          "user-provisioning",
+          "access-rights"
+        ],
+        "external_dependencies": {},
+        "countries": []
+      },
+      "knowledge": {
+        "status": "reviewed",
+        "generated_at": "2026-08-11",
+        "generator": "hand-written",
+        "manifest_version_at_gen": "19.0.0.1.0",
+        "purpose": "A **role** layer over native `res.groups`. Administrators pick a named position\n(\"Accounting Supervisor\", \"Store Manager\") and the module reconciles\n`res.users.group_ids` for them. Odoo ships nothing like this in Community or\nEnterprise; OCA's `base_user_role` is not ported to 19.0 and models a role as a\ngroup, which this platform cannot do (see Gotchas).",
+        "business_flow": [
+          "Assign `role_ids` on a user (form, wizard, or `res.users.create`).",
+          "`write`/`create` calls `_apply_security_roles()` unless the `role_apply` context flag is set (that flag is how the engine's own writes avoid recursing).",
+          "The engine computes `target = role_ids._all_group_ids()`, grants `target − group_ids`, revokes `role_granted_group_ids − target − role_baseline_group_ids`, then rewrites the ledger.",
+          "Editing a role's composition re-applies it to every holder, including holders of roles that *inherit* it (`_holder_roles()` walks upward)."
+        ],
+        "key_models": [],
+        "important_fields": [],
+        "present": true,
+        "origin": "module",
+        "version_drift": false
+      },
+      "source": {
+        "models_own": [
+          "custom.security.role",
+          "custom.security.role.assign"
+        ],
+        "models_inherit": [
+          "res.users"
+        ],
+        "wizards": [
+          "custom.security.role.assign"
+        ],
+        "fields_by_model": {
+          "custom.security.role": [
+            "active",
+            "code",
+            "company_ids",
+            "customized",
+            "description",
+            "group_ids",
+            "implied_role_ids",
+            "is_seed",
+            "level",
+            "name",
+            "role_domain",
+            "scope",
+            "sequence",
+            "user_count",
+            "user_ids"
+          ],
+          "custom.security.role.assign": [
+            "mode",
+            "role_ids",
+            "user_ids"
+          ],
+          "res.users": [
+            "role_baseline_group_ids",
+            "role_granted_group_ids",
+            "role_ids"
+          ]
+        },
+        "models_xml": [
+          "ir.actions.act_window",
+          "ir.ui.view",
+          "res.groups",
+          "res.groups.privilege"
+        ],
+        "routes": [],
+        "security_groups": [
+          "base.group_user",
+          "custom_role_manager.group_role_manager"
+        ],
+        "crons": 0,
+        "file_counts": {
+          "py": 13,
+          "xml": 6,
+          "js": 0,
+          "csv": 1
+        },
+        "test_files": 2,
+        "source_hash": "d4d0c75fc46869d37f1f745b517a07f050f6437309d1eceada176436ea0c0926",
+        "has_tests": true
+      },
+      "domain": "integrasi-platform",
+      "domain_secondary": [
+        "admin-saas",
+        "kepatuhan-data-pdp"
+      ],
+      "scope": "general",
+      "tenants": [],
+      "maturity": "production",
+      "confidence": "high",
+      "audit_flags": [
+        {
+          "kind": "undocumented_model",
+          "items": [
+            "custom.security.role",
+            "custom.security.role.assign"
+          ]
+        }
+      ],
+      "id": {
+        "nama": "Manajemen Peran Pengguna",
+        "ringkasan": "Pilih peran jabatan alih-alih mencentang puluhan grup akses; 18 peran standar Kantor Pusat dan retail, dengan pencabutan yang hanya menyentuh pemberian peran.",
         "translated": true
       }
     },
@@ -7427,7 +7784,7 @@
         "summary": "Enterprise-style manual reconciliation menu and wizard for Odoo CE (EE-gap closure).",
         "description_first_para": "Custom Account Reconciliation =============================",
         "category": "Accounting/Accounting",
-        "version": "19.0.2.1.0",
+        "version": "19.0.3.0.0",
         "license": "LGPL-3",
         "author": "Custom Platform",
         "depends": [
@@ -7444,7 +7801,7 @@
         "status": "draft",
         "generated_at": "2026-07-24T00:00:00Z",
         "generator": "claude-code-handwritten",
-        "manifest_version_at_gen": "19.0.2.1.0",
+        "manifest_version_at_gen": "19.0.3.0.0",
         "purpose": "Supplies the manual-reconciliation UI that Odoo Community lacks: an overview dashboard of reconcilable accounts with open items, a \"Reconcile\" wizard for selected journal items, and a bank-statement-line matching wizard. The reconciliation itself is delegated to core CE `account.move.line.reconcile()` / `account.bank.statement.line._reconcile_with_amls()` — this module is UI + candidate scoring, not a new engine.",
         "business_flow": [
           "**Overview**: `Accounting → Reconciliation → Reconcile` opens `action_custom_reconcile_overview` (list of `custom.reconcile.account`). Row button `action_open_lines` drills into that account's posted, unreconciled `account.move.line`s.",
@@ -7467,6 +7824,18 @@
           {
             "name": "account.bank.statement.line",
             "desc": "`account.bank.statement.line` (`_inherit`) — candidate search + reconcile mechanics."
+          },
+          {
+            "name": "account.move",
+            "desc": "`account.move` (`_inherit`) — `button_draft` unreconciles before resetting."
+          },
+          {
+            "name": "account.move.line",
+            "desc": "`account.move.line` (`_inherit`) — refuses structural edits on a matched line."
+          },
+          {
+            "name": "account.payment",
+            "desc": "`account.payment` (`_inherit`) — duplicate guard at posting + the Unapplied flag."
           }
         ],
         "important_fields": [
@@ -7489,6 +7858,11 @@
             "model": "custom.bank.reconcile.wizard",
             "field": "line",
             "desc": "`custom.bank.reconcile.wizard.line`: `selected` (Boolean), `aml_id` (M2o account.move.line), `amount_residual` (related), plus related move/date/account/partner."
+          },
+          {
+            "model": "account",
+            "field": "payment",
+            "desc": "`account.payment`: `duplicate_checked` (Boolean, `copy=False`) — the explicit override that lets a genuine second payment post; `is_unapplied` (Boolean, stored compute on `state`/`is_reconciled`) — posted (`in_process`/`paid`) but settling nothing."
           }
         ],
         "present": true,
@@ -7503,7 +7877,10 @@
           "custom.reconcile.account"
         ],
         "models_inherit": [
-          "account.bank.statement.line"
+          "account.bank.statement.line",
+          "account.move",
+          "account.move.line",
+          "account.payment"
         ],
         "wizards": [
           "custom.account.reconcile.wizard",
@@ -7512,6 +7889,12 @@
         ],
         "fields_by_model": {
           "account.bank.statement.line": [],
+          "account.move": [],
+          "account.move.line": [],
+          "account.payment": [
+            "duplicate_checked",
+            "is_unapplied"
+          ],
           "custom.account.reconcile.wizard": [
             "account_id",
             "company_id",
@@ -7577,13 +7960,13 @@
         ],
         "crons": 0,
         "file_counts": {
-          "py": 10,
-          "xml": 2,
+          "py": 14,
+          "xml": 3,
           "js": 0,
           "csv": 1
         },
-        "test_files": 1,
-        "source_hash": "b61202f6e1d9f7a123617e84b71e3c032953935f0da5635eb8d8606db18682ae",
+        "test_files": 2,
+        "source_hash": "084e68dd7617b8a6b0d46d0d26fa0aac44735656cf38af9aed2b681721653385",
         "has_tests": true
       },
       "domain": "keuangan-akuntansi",
@@ -8802,7 +9185,7 @@
         "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
         "description_first_para": "Custom Accounting Reports =========================",
         "category": "Accounting/Accounting",
-        "version": "19.0.0.18.0",
+        "version": "19.0.0.19.0",
         "license": "LGPL-3",
         "author": "Custom Platform",
         "depends": [
@@ -8982,7 +9365,7 @@
         ],
         "present": true,
         "origin": "module",
-        "version_drift": false
+        "version_drift": true
       },
       "source": {
         "models_own": [
@@ -9421,7 +9804,7 @@
           "csv": 1
         },
         "test_files": 1,
-        "source_hash": "e8fc33691eb9035248b806bfc5eb243219508d1e17aa21aec8097fba95f7c028",
+        "source_hash": "d54eb4a4402e8a2932394c4aaf5924d7596a03b92d27b0db60402ccee7982965",
         "has_tests": true
       },
       "domain": "keuangan-akuntansi",
@@ -9504,6 +9887,12 @@
             "custom.report.tax.wizard.mixin",
             "custom.report.trial.balance.wizard",
             "custom.report.wizard.mixin"
+          ]
+        },
+        {
+          "kind": "version_drift",
+          "items": [
+            "19.0.0.18.0 → 19.0.0.19.0"
           ]
         }
       ],
@@ -15230,7 +15619,7 @@
         "summary": "Keycloak SSO login + role→group mapping (employee vs vendor) for the Finance Portal",
         "description_first_para": "Custom Finance Portal — SSO (Keycloak) ======================================",
         "category": "Accounting/Finance",
-        "version": "19.0.0.1.0",
+        "version": "19.0.0.2.0",
         "license": "LGPL-3",
         "author": "Custom Platform",
         "depends": [
@@ -15279,14 +15668,14 @@
         "security_groups": [],
         "crons": 0,
         "file_counts": {
-          "py": 4,
+          "py": 6,
           "xml": 1,
           "js": 0,
           "csv": 0
         },
-        "test_files": 0,
-        "source_hash": "8f4cace950b84e807dee4d43a8e5398817132872c8cd5d1db4549d7258adaa51",
-        "has_tests": false
+        "test_files": 1,
+        "source_hash": "e747749fb304826d295b1ce37f9c5fc60da17182732b454533e50fc24324bf0c",
+        "has_tests": true
       },
       "domain": "keuangan-akuntansi",
       "domain_secondary": [
@@ -15296,7 +15685,7 @@
       "tenants": [
         "finportal"
       ],
-      "maturity": "beta",
+      "maturity": "production",
       "confidence": "medium",
       "audit_flags": [],
       "id": {
@@ -18850,6 +19239,339 @@
       "id": {
         "nama": "Manajemen Siklus Produk (PLM)",
         "ringkasan": "Alur ECO, versi BoM, dan perubahan yang dikunci persetujuan.",
+        "translated": true
+      }
+    },
+    {
+      "name": "custom_operating_unit_docs",
+      "group": "ee_gap",
+      "relpath": "addons/ee_gap/custom_operating_unit_docs",
+      "manifest": {
+        "name": "Custom Operating Unit — Documents",
+        "summary": "Stamps the Operating Unit on accounting, stock, purchase and sales documents and isolates them per unit: a store user sees and books only their own.",
+        "description_first_para": "Custom Operating Unit — Documents =================================",
+        "category": "Custom Platform/Security",
+        "version": "19.0.0.1.0",
+        "license": "LGPL-3",
+        "author": "Custom Platform",
+        "depends": [
+          "custom_operating_unit",
+          "account",
+          "stock",
+          "purchase",
+          "sale_stock"
+        ],
+        "application": false,
+        "auto_install": true,
+        "installable": true,
+        "capability_tags": [
+          "operating-unit",
+          "data-isolation",
+          "record-rules",
+          "multi-branch"
+        ],
+        "external_dependencies": {},
+        "countries": []
+      },
+      "knowledge": {
+        "status": "reviewed",
+        "generated_at": "2026-08-11",
+        "generator": "hand-written",
+        "manifest_version_at_gen": "19.0.0.1.0",
+        "purpose": "Turns the Operating Unit from master data into enforced data isolation on the\naccounting, stock, purchase and sales documents. Auto-installs wherever those\napps are present, so a tenant without them never sees it.",
+        "business_flow": [],
+        "key_models": [],
+        "important_fields": [],
+        "present": true,
+        "origin": "module",
+        "version_drift": false
+      },
+      "source": {
+        "models_own": [
+          "account.bank.statement.line",
+          "account.move",
+          "account.move.line",
+          "account.payment",
+          "purchase.order",
+          "sale.order",
+          "stock.move",
+          "stock.picking",
+          "stock.quant"
+        ],
+        "models_inherit": [
+          "operating.unit",
+          "operating.unit.mixin"
+        ],
+        "wizards": [],
+        "fields_by_model": {
+          "account.bank.statement.line": [
+            "operating_unit_id"
+          ],
+          "account.move": [
+            "operating_unit_id"
+          ],
+          "account.move.line": [
+            "operating_unit_id"
+          ],
+          "account.payment": [
+            "operating_unit_id"
+          ],
+          "operating.unit": [
+            "journal_id",
+            "purchase_journal_id",
+            "warehouse_id"
+          ],
+          "purchase.order": [
+            "operating_unit_id"
+          ],
+          "sale.order": [
+            "operating_unit_id"
+          ],
+          "stock.move": [
+            "operating_unit_id"
+          ],
+          "stock.picking": [
+            "operating_unit_id"
+          ],
+          "stock.quant": [
+            "operating_unit_id"
+          ]
+        },
+        "models_xml": [
+          "ir.rule",
+          "ir.ui.view"
+        ],
+        "routes": [],
+        "security_groups": [],
+        "crons": 0,
+        "file_counts": {
+          "py": 12,
+          "xml": 3,
+          "js": 0,
+          "csv": 0
+        },
+        "test_files": 2,
+        "source_hash": "a3a20e2de3f423a01db3d4e7cf332eec1f6a3e6910e4a4a474f6b216c897c296",
+        "has_tests": true
+      },
+      "domain": "integrasi-platform",
+      "domain_secondary": [
+        "keuangan-akuntansi",
+        "gudang-inventori"
+      ],
+      "scope": "general",
+      "tenants": [],
+      "maturity": "production",
+      "confidence": "high",
+      "audit_flags": [
+        {
+          "kind": "undocumented_model",
+          "items": [
+            "account.bank.statement.line",
+            "account.move",
+            "account.move.line",
+            "account.payment",
+            "purchase.order",
+            "sale.order",
+            "stock.move",
+            "stock.picking",
+            "stock.quant"
+          ]
+        }
+      ],
+      "id": {
+        "nama": "Pembatasan Data per Unit Operasional",
+        "ringkasan": "Menempelkan unit operasional pada dokumen akuntansi, gudang, pembelian dan penjualan, lalu membatasi baca maupun tulisnya per unit.",
+        "translated": true
+      }
+    },
+    {
+      "name": "custom_operating_unit_pos",
+      "group": "ee_gap",
+      "relpath": "addons/ee_gap/custom_operating_unit_pos",
+      "manifest": {
+        "name": "Custom Operating Unit — Point of Sale",
+        "summary": "Scopes points of sale, sessions and orders to their Operating Unit, and stamps the unit on every line of the session closing entry.",
+        "description_first_para": "Custom Operating Unit — Point of Sale =====================================",
+        "category": "Custom Platform/Point of Sale",
+        "version": "19.0.0.1.0",
+        "license": "LGPL-3",
+        "author": "Custom Platform",
+        "depends": [
+          "custom_operating_unit_docs",
+          "point_of_sale"
+        ],
+        "application": false,
+        "auto_install": true,
+        "installable": true,
+        "capability_tags": [
+          "operating-unit",
+          "data-isolation",
+          "point-of-sale"
+        ],
+        "external_dependencies": {},
+        "countries": []
+      },
+      "knowledge": {
+        "status": "reviewed",
+        "generated_at": "2026-08-11",
+        "generator": "hand-written",
+        "manifest_version_at_gen": "19.0.0.1.0",
+        "purpose": "Operating-Unit isolation for the point of sale, and the unit on the session\nclosing entry. Auto-installs where `point_of_sale` and\n`custom_operating_unit_docs` are both present.",
+        "business_flow": [],
+        "key_models": [],
+        "important_fields": [],
+        "present": true,
+        "origin": "module",
+        "version_drift": false
+      },
+      "source": {
+        "models_own": [
+          "pos.config",
+          "pos.order",
+          "pos.session"
+        ],
+        "models_inherit": [
+          "operating.unit",
+          "operating.unit.mixin"
+        ],
+        "wizards": [],
+        "fields_by_model": {
+          "operating.unit": [
+            "pos_config_ids"
+          ],
+          "pos.config": [
+            "operating_unit_id"
+          ],
+          "pos.order": [
+            "operating_unit_id"
+          ],
+          "pos.session": [
+            "operating_unit_id"
+          ]
+        },
+        "models_xml": [
+          "ir.rule",
+          "ir.ui.view"
+        ],
+        "routes": [],
+        "security_groups": [],
+        "crons": 0,
+        "file_counts": {
+          "py": 7,
+          "xml": 2,
+          "js": 0,
+          "csv": 0
+        },
+        "test_files": 1,
+        "source_hash": "8f56cf4644cc40aeda1efffa9381dec86c89e6792925ddb53328e8138e612407",
+        "has_tests": true
+      },
+      "domain": "penjualan-retail-pos",
+      "domain_secondary": [
+        "integrasi-platform"
+      ],
+      "scope": "general",
+      "tenants": [],
+      "maturity": "production",
+      "confidence": "high",
+      "audit_flags": [
+        {
+          "kind": "undocumented_model",
+          "items": [
+            "pos.config",
+            "pos.order",
+            "pos.session"
+          ]
+        }
+      ],
+      "id": {
+        "nama": "Unit Operasional di Kasir",
+        "ringkasan": "Membatasi POS, sesi, dan pesanan per toko, serta membubuhkan unit pada setiap baris jurnal penutupan sesi.",
+        "translated": true
+      }
+    },
+    {
+      "name": "custom_operating_unit_reports",
+      "group": "ee_gap",
+      "relpath": "addons/ee_gap/custom_operating_unit_reports",
+      "manifest": {
+        "name": "Custom Operating Unit — Reports",
+        "summary": "Makes the custom accounting reports respect the reader's Operating Units. Without it the list views are filtered but the Trial Balance is not.",
+        "description_first_para": "Custom Operating Unit — Reports ===============================",
+        "category": "Custom Platform/Accounting",
+        "version": "19.0.0.1.0",
+        "license": "LGPL-3",
+        "author": "Custom Platform",
+        "depends": [
+          "custom_operating_unit_docs",
+          "custom_accounting_reports"
+        ],
+        "application": false,
+        "auto_install": true,
+        "installable": true,
+        "capability_tags": [
+          "operating-unit",
+          "data-isolation",
+          "accounting-reports"
+        ],
+        "external_dependencies": {},
+        "countries": []
+      },
+      "knowledge": {
+        "status": "reviewed",
+        "generated_at": "2026-08-11",
+        "generator": "hand-written",
+        "manifest_version_at_gen": "19.0.0.1.0",
+        "purpose": "Makes the custom accounting reports respect the reader's Operating Units.\nAuto-installs where `custom_accounting_reports` and\n`custom_operating_unit_docs` are both present.",
+        "business_flow": [],
+        "key_models": [],
+        "important_fields": [],
+        "present": true,
+        "origin": "module",
+        "version_drift": false
+      },
+      "source": {
+        "models_own": [],
+        "models_inherit": [
+          "custom.report.engine",
+          "custom.report.journal.item.analysis",
+          "custom.report.profit.loss.branch"
+        ],
+        "wizards": [],
+        "fields_by_model": {
+          "custom.report.engine": [],
+          "custom.report.journal.item.analysis": [
+            "operating_unit_id"
+          ],
+          "custom.report.profit.loss.branch": []
+        },
+        "models_xml": [],
+        "routes": [],
+        "security_groups": [],
+        "crons": 0,
+        "file_counts": {
+          "py": 7,
+          "xml": 0,
+          "js": 0,
+          "csv": 0
+        },
+        "test_files": 1,
+        "source_hash": "ad09e7b3e07b10c0a62790449b79e7a2c74c29f44bb214fc6d2281b03f2fec45",
+        "has_tests": true
+      },
+      "domain": "keuangan-akuntansi",
+      "domain_secondary": [
+        "integrasi-platform"
+      ],
+      "scope": "general",
+      "tenants": [],
+      "maturity": "production",
+      "confidence": "high",
+      "audit_flags": [],
+      "id": {
+        "nama": "Laporan per Unit Operasional",
+        "ringkasan": "Membatasi laporan keuangan pada unit yang boleh dibaca pengguna — laporan menyusun SQL sendiri sehingga aturan akses Odoo tidak berlaku di sana.",
         "translated": true
       }
     },

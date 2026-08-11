@@ -548,6 +548,11 @@ MATURITY_OVERRIDE = {
     "custom_tax_id": "production",
     "custom_coretax_export": "production",
     "custom_petty_cash": "production",
+    # All of its code lives in inherited models — no own model, no route, no
+    # XML — so the source scan sees an empty module and calls it a scaffold. It
+    # has a test suite and does real work (the report SQL filter and the GL
+    # Analysis view wrapper); it is the heuristic that cannot see it.
+    "custom_operating_unit_reports": "production",
     # Reference template — never installed anywhere.
     "custom_vertical_example": "scaffold",
 }
