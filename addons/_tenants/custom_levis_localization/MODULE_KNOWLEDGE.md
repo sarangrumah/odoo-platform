@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T08:56:04Z
 generator: bootstrap-v1
 module: custom_levis_localization
-manifest_version: 19.0.1.26.0
+manifest_version: 19.0.1.27.0
 ---
 
 # Levi's Localization (`custom_levis_localization`)
@@ -222,6 +222,23 @@ compute depends on the narrative, the amount and the journal's format — **not*
 history; `action_levis_reread_narrative()` (via `add_to_compute`, so the ORM owns
 the write) re-reads the lines Finance chooses. `custom_levis_bank_reconcile`
 builds the interactive matching wizard on exactly these fields.
+
+**Two rules may never claim one terminal.** `_check_no_colliding_rule` refuses a
+mapping that would compete with an existing one, comparing through the resolver's own
+`_keys_match` — so it catches an identical key, a leading-zero variant
+(`1999632289` vs `001999632289`) *and* a suffix (`4608375` vs `885004608375`), which no
+unique index can express. It deliberately allows what the model was built for:
+non-overlapping `date_start`/`date_end` (a MID handed to another store), rules restricted
+to different bank feeds, and keyword substrings. Override with context
+`levis_skip_mid_map_guard=True`, which logs a warning. The SQL `_key_uniq` constraint
+exists but has never fired: `journal_id` is NULL on every real rule and Postgres treats
+NULLs as distinct.
+
+**The most specific keyword wins, not the first row.** `_resolve` picks by
+`(sequence, -len(key), key)`. Sequence stays the explicit override; length settles the tie
+— which is *always*, since every keyword rule on prd_levis_begbal carries sequence 20, so
+the tie used to be broken alphabetically. `SMB SOPIAN PERMANA` beat `SOPIAN PERMANA` only
+because M sorts before O, and the two name different stores.
 
 **Provisioning an existing database.** `post_init_hook` only runs on install;
 `scripts/tenants/levis/96_setup_pos_clearing.py` does the same for a database

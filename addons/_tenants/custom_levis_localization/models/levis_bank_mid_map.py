@@ -15,7 +15,12 @@ rule that Finance creates once per wording. A deposit matching no rule is left
 unattributed on suspense rather than guessed onto a store.
 """
 
+import logging
+
 from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 # Shorter than this and a "suffix match" would collide across merchants.
 _MIN_SUFFIX_LEN = 6
@@ -82,9 +87,133 @@ class LevisBankMidMap(models.Model):
     note = fields.Text()
 
     _key_uniq = models.Constraint(
+        # Present in Postgres, and it has never once fired: ``journal_id`` is NULL
+        # on every rule anyone has created, and Postgres treats NULLs as
+        # distinct, so the row simply never collides. It also compares the raw
+        # string, so ``1999632289`` and ``001999632289`` are two values to it and
+        # one terminal to us. Kept because it costs nothing and does catch the
+        # journal-scoped case; the real guard is ``_check_no_colliding_rule``.
         "unique(company_id, journal_id, match_type, key)",
         "This MID / terminal / keyword is already mapped for that bank journal.",
     )
+
+    # ------------------------------------------------------------------
+    # No two rules may claim the same terminal
+    # ------------------------------------------------------------------
+    @api.constrains("key", "match_type", "company_id", "journal_id", "date_start", "date_end", "active")
+    def _check_no_colliding_rule(self):
+        """Refuse a rule that competes with an existing one for the same feed.
+
+        The point is not tidiness. Two rules for one terminal pointing at
+        different stores means ``_resolve`` picks by sort order, so which shop
+        gets the money is an accident of ``sequence, match_type, key`` — and this
+        has already happened here: ``4608375`` and ``885004608375`` once sat side
+        by side in prd_levis_begbal, saved only by both naming the same store.
+
+        The comparison is ``_keys_match``, the resolver's own function, rather
+        than a re-implementation. A unique index cannot express this: the
+        resolver accepts a suffix from six digits up, so ``4608375`` and
+        ``885004608375`` are one terminal to it and two values to an index.
+
+        Three things deliberately do NOT collide:
+
+        * **Non-overlapping dates.** ``date_end`` exists so a MID can be handed
+          from one store to another; refusing that would break the feature the
+          field was added for.
+        * **Disjoint journals.** Two rules restricted to different bank feeds
+          never compete — ``_resolve`` only considers ``journal_id in (False,
+          this feed)``. A global rule does compete with everything.
+        * **Keyword substrings.** Cash narratives are matched by containment and
+          ordered by ``sequence``; "ols" inside "setoran ols pvj" is the design,
+          not a fault. Only an identical keyword is refused.
+        """
+        for rule in self:
+            for other in rule._colliding_rules():
+                raise ValidationError(rule._collision_message(other))
+
+    def _colliding_rules(self):
+        """Existing rules this one would compete with. Empty when it is safe."""
+        self.ensure_one()
+        if self.env.context.get("levis_skip_mid_map_guard"):
+            # Deliberate override, e.g. a data migration that knows it is moving
+            # a terminal. Logged, because a silent escape hatch becomes the
+            # normal way in about three months.
+            _logger.warning(
+                "levis.bank.mid.map: collision guard skipped for %s (key %s) by user %s",
+                self.display_name,
+                self.key,
+                self.env.user.login,
+            )
+            return self.browse()
+        if not self.active:
+            return self.browse()
+        candidates = self.search(
+            [
+                ("id", "!=", self.id),
+                ("company_id", "=", self.company_id.id),
+                ("match_type", "=", self.match_type),
+            ]
+        )
+        return candidates.filtered(lambda other: self._competes_with(other))
+
+    def _competes_with(self, other):
+        """True when ``other`` could answer for the same settlement as this rule."""
+        self.ensure_one()
+        if not self._journals_overlap(other) or not self._dates_overlap(other):
+            return False
+        if self.match_type == "keyword":
+            return (self.key or "").strip().lower() == (other.key or "").strip().lower()
+        return self._keys_match(self._normalise_key(other.key), self._normalise_key(self.key))
+
+    def _journals_overlap(self, other):
+        """A rule with no journal competes with every feed, hence with all rules."""
+        self.ensure_one()
+        return not self.journal_id or not other.journal_id or self.journal_id == other.journal_id
+
+    def _dates_overlap(self, other):
+        """Half-open on both ends: an empty bound means "forever" in that direction."""
+        self.ensure_one()
+        starts_after_other_ended = self.date_start and other.date_end and self.date_start > other.date_end
+        ends_before_other_started = self.date_end and other.date_start and self.date_end < other.date_start
+        return not (starts_after_other_ended or ends_before_other_started)
+
+    def _collision_shape(self, other):
+        """Which of the three collisions this is — they need different fixes."""
+        self.ensure_one()
+        if self.match_type == "keyword":
+            return _("the same keyword")
+        mine, theirs = self._normalise_key(self.key), self._normalise_key(other.key)
+        if mine == theirs:
+            if (self.key or "") == (other.key or ""):
+                return _("the same key")
+            return _("the same terminal written differently (%(mine)s vs %(theirs)s)", mine=self.key, theirs=other.key)
+        return _("a terminal whose digits end the same (%(mine)s vs %(theirs)s)", mine=self.key, theirs=other.key)
+
+    def _collision_message(self, other):
+        self.ensure_one()
+        same_store = self.analytic_account_id == other.analytic_account_id
+        return _(
+            "%(shape)s is already mapped by %(other)s → %(other_store)s.\n\n"
+            "This rule would send it to %(mine_store)s instead. The settlement "
+            "would be attributed by sort order, not by evidence — which store "
+            "gets the money would be an accident.\n\n"
+            "%(advice)s",
+            shape=self._collision_shape(other).capitalize(),
+            other=other.name or other.key,
+            other_store=other.analytic_account_id.display_name or _("no Operating Unit"),
+            mine_store=self.analytic_account_id.display_name or _("no Operating Unit"),
+            advice=(
+                _(
+                    "Both rules name the same store, so nothing is misdirected today — "
+                    "but keep only one, or a later edit will change one and leave the other."
+                )
+                if same_store
+                else _(
+                    "Correct whichever is wrong, or close the old one with an end date "
+                    "if the terminal really was handed over to another store."
+                )
+            ),
+        )
 
     @api.onchange("warehouse_id")
     def _onchange_warehouse_id(self):
@@ -157,8 +286,23 @@ class LevisBankMidMap(models.Model):
         haystack = (parsed.get("keyword") or parsed.get("raw") or "").lower()
         if not haystack:
             return self.browse()
-        hit = rules.filtered(lambda r: r.match_type == "keyword" and r.key and r.key.lower() in haystack)
-        return hit[0] if hit else self.browse()
+        hits = rules.filtered(lambda r: r.match_type == "keyword" and r.key and r.key.lower() in haystack)
+        if not hits:
+            return self.browse()
+        # The most specific keyword wins, not the first row off the recordset.
+        #
+        # ``_order`` is "sequence, match_type, key", and every keyword rule in
+        # prd_levis_begbal carries sequence 20 — so the tie was being broken
+        # ALPHABETICALLY. "SMB SOPIAN PERMANA" beat "SOPIAN PERMANA" only because
+        # M sorts before O; rename the store prefix to something late in the
+        # alphabet and the generic rule wins instead, sending one shop's cash to
+        # another. The two rules name different stores, and "SMB SOPIAN PERMANA"
+        # is sitting in the not-yet-mapped list waiting to be added.
+        #
+        # Sequence stays the primary discriminator so it keeps meaning what its
+        # help text says — an explicit override. Length only settles the tie,
+        # and the key itself only makes the outcome deterministic.
+        return min(hits, key=lambda r: (r.sequence, -len(r.key or ""), r.key or ""))
 
     def _ou_distribution(self):
         self.ensure_one()
