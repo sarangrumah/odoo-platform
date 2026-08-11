@@ -66,6 +66,11 @@ def header(cat) -> str:
     )
 
 
+def _tidy(text: str) -> str:
+    """Strip per-line trailing whitespace and end with exactly one newline."""
+    return "\n".join(line.rstrip() for line in text.split("\n")).rstrip("\n") + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--catalog", default=os.path.join(HERE, "catalog.json"))
@@ -76,8 +81,13 @@ def main() -> int:
         cat = json.load(fh)
 
     body = format_blocks(rc.build_document(cat))
+    # The repo's pre-commit hooks (trailing-whitespace, end-of-file-fixer) run
+    # over generated files too, so a renderer that leaves either behind makes
+    # every rebuild fail lint. Normalise here rather than fixing the output by
+    # hand, which the next build would undo.
+    document = _tidy(header(cat) + "\n" + body)
     with open(args.out, "w", encoding="utf-8") as fh:
-        fh.write(header(cat) + "\n" + body)
+        fh.write(document)
 
     lines = (header(cat) + body).count("\n")
     print(f"{lines} lines → {os.path.relpath(args.out, os.path.dirname(HERE))}")

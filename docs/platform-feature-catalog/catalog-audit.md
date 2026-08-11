@@ -23,10 +23,10 @@ that decides which of them can be quoted to a client.
 | --- | --- |
 | `phantom_field` | 1 |
 | `phantom_model` | 2 |
-| `undocumented_model` | 42 |
-| `version_drift` | 12 |
+| `undocumented_model` | 46 |
+| `version_drift` | 13 |
 
-46 of 156 modules carry at least one flag.
+50 of 162 modules carry at least one flag.
 
 ## `custom_arka_aim_opening_balance` (addons/_tenants/custom_arka_aim_opening_balance)
 
@@ -47,6 +47,10 @@ that decides which of them can be quoted to a client.
 ## `custom_accounting_full` (addons/ee_gap/custom_accounting_full)
 
 - **version_drift**: `19.0.0.3.0 → 19.0.0.5.0`
+
+## `custom_accounting_reports` (addons/ee_gap/custom_accounting_reports)
+
+- **version_drift**: `19.0.0.18.0 → 19.0.0.19.0`
 
 ## `custom_payment_id` (addons/ee_gap/custom_payment_id)
 

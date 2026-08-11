@@ -4,11 +4,11 @@
 
 # Katalog Fitur Platform Odoo — Erajaya Group
 
-Dihasilkan 2026-08-11 dari commit `2333f2a` (ada perubahan belum ter-commit) pada branch `docs/feature-catalog-main`. Odoo 19.0, 156 modul custom.
+Dihasilkan 2026-08-11 dari commit `4896fdf` (ada perubahan belum ter-commit) pada branch `docs/catalog-rebuild-162`. Odoo 19.0, 162 modul custom.
 
 # Ringkasan Eksekutif
 
-Dokumen ini adalah katalog lengkap fitur yang sudah dibangun di atas platform Odoo Erajaya Group: **156 modul custom**, dikelompokkan ke dalam 8 brand dan tiga belas domain fungsional. Dokumen ini menjawab tiga pertanyaan yang selama ini tersebar di banyak berkas dan tidak pernah dijawab di satu tempat:
+Dokumen ini adalah katalog lengkap fitur yang sudah dibangun di atas platform Odoo Erajaya Group: **162 modul custom**, dikelompokkan ke dalam 8 brand dan tiga belas domain fungsional. Dokumen ini menjawab tiga pertanyaan yang selama ini tersebar di banyak berkas dan tidak pernah dijawab di satu tempat:
 
 - Apa saja yang sudah tersedia?
 - Mana yang berlaku umum untuk tenant mana pun, dan mana yang khusus satu brand?
@@ -18,15 +18,15 @@ Dokumen ini adalah katalog lengkap fitur yang sudah dibangun di atas platform Od
 
 |  |  |
 | --- | --- |
-| Modul custom | **156** |
-| Berlaku umum untuk semua tenant | 135 |
-| Khusus satu brand (`addons/_tenants/`) | 10 |
+| Modul custom | **162** |
+| Berlaku umum untuk semua tenant | 140 |
+| Khusus satu brand (`addons/_tenants/`) | 11 |
 | Lapisan kendali platform | 7 |
 | Komponen pihak ketiga (OCA) | 4 |
 | Brand / tenant terdaftar | 8 |
 | Kesenjangan tercatat (prioritas tinggi) | 10 (3) |
 
-Sekitar **135 dari 156 modul berlaku umum**. Hanya 10 modul yang benar-benar terikat pada satu brand. Itulah angka yang menopang klaim reuse lintas vertikal: sebuah tenant baru mewarisi hampir seluruh kapabilitas platform tanpa pengembangan ulang, dan yang tersisa adalah konfigurasi serta data.
+Sekitar **140 dari 162 modul berlaku umum**. Hanya 11 modul yang benar-benar terikat pada satu brand. Itulah angka yang menopang klaim reuse lintas vertikal: sebuah tenant baru mewarisi hampir seluruh kapabilitas platform tanpa pengembangan ulang, dan yang tersisa adalah konfigurasi serta data.
 
 ## Apa yang membedakan dokumen ini
 
@@ -34,7 +34,7 @@ Setiap angka di sini **dipindai langsung dari repositori**, bukan diketik. Sebua
 
 Alasannya sederhana: sebelum dokumen ini dibuat, tabel jumlah modul di dokumen arsitektur internal salah pada lima dari delapan barisnya. Satu grup tertulis 78 modul padahal berisi 105. Angka yang dipelihara manual selalu tertinggal.
 
-Dokumen ini juga **menandai tingkat keyakinannya sendiri**. Dari 156 modul, 110 memiliki dokumen pengetahuan hasil generator yang belum diperiksa manusia, dan 27 belum memiliki dokumen sama sekali. Isinya tetap dipakai — tetapi setiap baris membawa kolom **Keyakinan Info**, dan sebuah gerbang otomatis membandingkan setiap klaim dengan kode sebelum dokumen ini terbit. Klaim yang menyebut model yang tidak ada di kode diturunkan keyakinannya dan daftar modelnya dibuang.
+Dokumen ini juga **menandai tingkat keyakinannya sendiri**. Dari 162 modul, 110 memiliki dokumen pengetahuan hasil generator yang belum diperiksa manusia, dan 27 belum memiliki dokumen sama sekali. Isinya tetap dipakai — tetapi setiap baris membawa kolom **Keyakinan Info**, dan sebuah gerbang otomatis membandingkan setiap klaim dengan kode sebelum dokumen ini terbit. Klaim yang menyebut model yang tidak ada di kode diturunkan keyakinannya dan daftar modelnya dibuang.
 
 ## Struktur dokumen
 
@@ -75,23 +75,23 @@ Tingkat sebuah modul ditentukan **semata-mata oleh direktori tempat ia berada** 
 
 | Grup | Modul |
 | --- | --- |
-| `addons/_tenants/` | 10 |
+| `addons/_tenants/` | 11 |
 | `addons/_vendor/` | 4 |
 | `addons/compliance/` | 9 |
 | `addons/control_plane/` | 4 |
-| `addons/core/` | 9 |
-| `addons/ee_gap/` | 103 |
+| `addons/core/` | 11 |
+| `addons/ee_gap/` | 106 |
 | `addons/operations/` | 3 |
 | `addons/verticals/` | 14 |
-| **Total** | **156** |
+| **Total** | **162** |
 
 Tiga aturan mengatur penempatan:
 
 - **Mesin integrasi bersama selalu masuk `ee_gap/` atau `core/`, tidak pernah `_tenants/`.** Data awalnya boleh milik satu pelanggan; mesinnya tidak. Contoh kanoniknya adalah `custom_retail_import`, yang generik, sementara profil `levis_*` di dalam datanya milik satu tenant.
 - **Promosi.** Sebuah pola yang muncul untuk pelanggan kedua naik dari `_tenants/` ke `ee_gap/`.
-- **Kedalaman direktori tetap** `addons/<grup>/<modul>/`. Satu pengecualian yang sudah ada — modul template di `verticals/_template/` — berada satu tingkat lebih dalam, dan itulah sebabnya perhitungan modul yang berbatas kedalaman menghasilkan satu modul lebih sedikit dari 156.
+- **Kedalaman direktori tetap** `addons/<grup>/<modul>/`. Satu pengecualian yang sudah ada — modul template di `verticals/_template/` — berada satu tingkat lebih dalam, dan itulah sebabnya perhitungan modul yang berbatas kedalaman menghasilkan satu modul lebih sedikit dari 162.
 
-Grup `ee_gap` adalah yang terbesar dengan 103 modul. Isinya adalah **selisih antara Odoo Community dan Odoo Enterprise**, ditambah lokalisasi Indonesia: akuntansi, payroll, gudang, portal keuangan, retail, dan e-commerce. Ini bagian dari platform yang paling bernilai secara komersial, karena menghilangkan ketergantungan lisensi Enterprise per pengguna untuk kapabilitas yang dibutuhkan Erajaya.
+Grup `ee_gap` adalah yang terbesar dengan 106 modul. Isinya adalah **selisih antara Odoo Community dan Odoo Enterprise**, ditambah lokalisasi Indonesia: akuntansi, payroll, gudang, portal keuangan, retail, dan e-commerce. Ini bagian dari platform yang paling bernilai secara komersial, karena menghilangkan ketergantungan lisensi Enterprise per pengguna untuk kapabilitas yang dibutuhkan Erajaya.
 
 ![Tingkatan modul: semakin ke atas, semakin sedikit tenant yang tersentuh](svg/D02-tingkatan-modul.svg)
 
@@ -101,7 +101,7 @@ Seluruh tumpukan berjalan sebagai kontainer Docker di satu host, di belakang sat
 
 - **Pintu depan** — Caddy dengan Web Application Firewall (OWASP CRS), TLS, dan pembatasan laju per alamat IP. Nama sub-domain tenant diterjemahkan menjadi nama basis data lewat header, sehingga satu instans Odoo melayani banyak tenant tanpa saling melihat.
 - **Gerbang login** — halaman `/signin` tersendiri menggantikan pemilih basis data bawaan Odoo, yang secara bawaan membocorkan daftar seluruh tenant.
-- **Aplikasi** — Odoo 19 Community dengan 156 modul custom di atasnya, ditambah beberapa aplikasi pendamping (konsol admin, storefront, aplikasi PMO) yang berbicara ke Odoo lewat API bertanda tangan.
+- **Aplikasi** — Odoo 19 Community dengan 162 modul custom di atasnya, ditambah beberapa aplikasi pendamping (konsol admin, storefront, aplikasi PMO) yang berbicara ke Odoo lewat API bertanda tangan.
 - **Data** — satu klaster PostgreSQL dengan satu basis data per tenant, Redis untuk pencegahan replay dan cache, MinIO untuk objek dan salinan cadangan.
 - **Integrasi** — satu kontrak HMAC dipakai untuk kedua arah: setiap panggilan masuk dan keluar ditandatangani dengan stempel waktu, dibatasi selisih waktu 300 detik, dan dijaga terhadap pengulangan lewat Redis.
 
@@ -111,24 +111,24 @@ Rincian operasional lapisan ini — siklus hidup tenant, hak akses, cadangan, da
 
 ## 1.4 Domain fungsional dalam dokumen ini
 
-Tiga belas domain di bawah ini adalah cara dokumen ini membaca 156 modul tersebut. Pengelompokan ini dibuat untuk pembaca bisnis dan tidak selalu sama dengan struktur direktori: sebuah modul akuntansi tetap masuk domain Keuangan meskipun ia berada di `addons/_tenants/`.
+Tiga belas domain di bawah ini adalah cara dokumen ini membaca 162 modul tersebut. Pengelompokan ini dibuat untuk pembaca bisnis dan tidak selalu sama dengan struktur direktori: sebuah modul akuntansi tetap masuk domain Keuangan meskipun ia berada di `addons/_tenants/`.
 
 | Domain | Modul | Cakupan isi |
 | --- | --- | --- |
-| Keuangan & Akuntansi | 28 | Buku besar, laporan keuangan, aset tetap, kas & bank, dan portal keuangan yang menutup selisih antara Odoo Community dan Enterprise. |
+| Keuangan & Akuntansi | 30 | Buku besar, laporan keuangan, aset tetap, kas & bank, dan portal keuangan yang menutup selisih antara Odoo Community dan Enterprise. |
 | Perpajakan Indonesia | 6 | Coretax DJP, e-Faktur, Bukti Potong Unifikasi, dan mesin pemotongan PPh — mengikuti PER-11/PJ/2025 dan PMK 131/2024. |
 | SDM & Payroll | 13 | Payroll PPh 21 TER dan BPJS, absensi geofence, cuti UU Cipta Kerja, rekrutmen, penilaian kinerja, dan reimbursement. |
 | Gudang & Inventori | 17 | Putaway, cycle count, QC inbound, transfer order, handheld terminal, barcode, dan retur pembelian. |
-| Penjualan, Retail & POS | 10 | CRM, POS Indonesia, eCommerce dan storefront headless, langganan, serta jalur impor data retail dari XStore. |
+| Penjualan, Retail & POS | 11 | CRM, POS Indonesia, eCommerce dan storefront headless, langganan, serta jalur impor data retail dari XStore. |
 | Layanan, Proyek & Sewa | 15 | Manajemen proyek dan change request, helpdesk ber-SLA, field service, timesheet, dan siklus penyewaan aset dengan BAST. |
 | Manufaktur, Kualitas & Pemeliharaan | 5 | Quality point dan CAPA, PLM/ECO, pemeliharaan prediktif dengan MTBF/MTTR, perbaikan aset, dan ingest sensor IoT. |
 | Produktivitas & AI | 10 | Jembatan AI ke Claude/OpenAI/Ollama, dokumen, knowledge base, spreadsheet, dashboard, tanda tangan elektronik, dan Studio Lite. |
 | Pemasaran & Komunikasi | 12 | WhatsApp Cloud API, SMS Indonesia, email marketing, marketing automation, event, survei, dan kanal komunikasi pelanggan. |
 | Kepatuhan Data (UU PDP) & Audit | 6 | Klasifikasi data pribadi, audit log berantai-hash, consent, DSAR, masking PII, dan kebijakan retensi — UU 27/2022. |
-| Integrasi & Fondasi Platform | 13 | Fondasi bersama: HMAC endpoint, adapter framework, mesin persetujuan, SSO Keycloak, konektor ESB, dan komponen OCA. |
+| Integrasi & Fondasi Platform | 16 | Fondasi bersama: HMAC endpoint, adapter framework, mesin persetujuan, SSO Keycloak, konektor ESB, dan komponen OCA. |
 | Vertikal Industri | 14 | Paket khusus industri: PPOB/VAS (dompet mitra, provider, switching H2H) dan operasi stok F&B di atas ESB Core. |
 | Administrasi Platform & Odoo-as-a-Service | 7 | Lapisan kendali multi-tenant: registry tenant, provisioning, deploy modul, monitoring kapasitas, onboarding journey, dan pelacakan siklus dev. |
-| **Total** | **156** |  |
+| **Total** | **162** |  |
 
 ![Modul per domain fungsional](svg/D04-peta-domain.svg)
 
@@ -138,20 +138,20 @@ Pertanyaan "fitur ini bisa dipakai brand lain atau tidak" tidak punya jawaban bi
 
 ## 2.1 Tiga tingkat cakupan
 
-**Umum** — 135 modul. Tersedia untuk tenant mana pun tanpa utang konfigurasi berarti. Pasang, aktifkan, pakai. Mayoritas kapabilitas akuntansi, SDM, gudang, dan produktivitas berada di tingkat ini.
+**Umum** — 140 modul. Tersedia untuk tenant mana pun tanpa utang konfigurasi berarti. Pasang, aktifkan, pakai. Mayoritas kapabilitas akuntansi, SDM, gudang, dan produktivitas berada di tingkat ini.
 
 **Umum, dikonfigurasi untuk brand tertentu** — mesin generik yang **sudah membawa profil, data, atau pemetaan satu brand**. Tenant kedua bisa memakainya, tetapi harus menyediakan profilnya sendiri. Dua contoh yang paling menjelaskan:
 
 - `custom_retail_import` adalah mesin ingest Excel/CSV/SFTP yang sepenuhnya generik. Yang khusus Levi's adalah profil format berkas XStore di dalam datanya. Retailer lain memerlukan profilnya sendiri, bukan modul baru.
 - `l10n_erajaya` menyediakan bagan akun 10 digit standar grup. Ia dipakai bersama oleh dua tenant live — ARKA-AIM dan Levi's — dan siap dipakai tenant Erajaya berikutnya tanpa perubahan kode.
 
-**Khusus brand** — 10 modul di `addons/_tenants/`. Terikat pada satu entitas dan **tidak dapat dipakai ulang apa adanya**. Isinya adalah aturan yang benar-benar hanya berlaku di sana: saldo awal per tanggal tertentu, format penomoran dokumen satu perusahaan, akun revaluasi aset satu entitas.
+**Khusus brand** — 11 modul di `addons/_tenants/`. Terikat pada satu entitas dan **tidak dapat dipakai ulang apa adanya**. Isinya adalah aturan yang benar-benar hanya berlaku di sana: saldo awal per tanggal tertentu, format penomoran dokumen satu perusahaan, akun revaluasi aset satu entitas.
 
 Dua tingkat sisanya melengkapi gambaran: **Platform** (7 modul) adalah lapisan kendali yang melayani operator, bukan tenant; **Pihak ketiga** (4 modul) adalah komponen OCA yang di-vendor dan tidak diubah.
 
 ## 2.2 Mengapa modul khusus brand sedikit
 
-Angka 10 dari 156 bukan kebetulan. Ada aturan tertulis yang mencegahnya membesar: **mesin bersama tidak boleh masuk `_tenants/`**, seberapa pun jelas ia diminta oleh satu pelanggan. Yang boleh masuk ke sana hanyalah data dan aturan yang secara definisi tidak berlaku di tempat lain.
+Angka 11 dari 162 bukan kebetulan. Ada aturan tertulis yang mencegahnya membesar: **mesin bersama tidak boleh masuk `_tenants/`**, seberapa pun jelas ia diminta oleh satu pelanggan. Yang boleh masuk ke sana hanyalah data dan aturan yang secara definisi tidak berlaku di tempat lain.
 
 Ketika sebuah pola muncul untuk pelanggan kedua, ia dipromosikan naik ke `ee_gap/`. Jadi tekanan sistemnya mengarah ke pengurangan modul khusus brand seiring waktu, bukan penambahan.
 
@@ -181,7 +181,7 @@ Membedakan keduanya penting. Sebuah modul bisa berstatus Produksi dengan Keyakin
 
 # 3. Keuangan & Akuntansi
 
-Domain terbesar di platform: **28 modul**. Isinya adalah kapabilitas akuntansi yang tidak ada di Odoo Community dan biasanya menjadi alasan utama membeli lisensi Enterprise — dibangun sendiri, sehingga tidak ada biaya lisensi per pengguna untuknya.
+Domain terbesar di platform: **30 modul**. Isinya adalah kapabilitas akuntansi yang tidak ada di Odoo Community dan biasanya menjadi alasan utama membeli lisensi Enterprise — dibangun sendiri, sehingga tidak ada biaya lisensi per pengguna untuknya.
 
 ## 3.1 Yang menutup selisih Community versus Enterprise
 
@@ -234,7 +234,8 @@ Keduanya muncul sebagai pilihan di Settings → Accounting → Chart Template, d
 | Anggaran Biaya Divisi | `custom_finance_budget` | Umum, dikonfigurasi | Finance Portal | Beta | Anggaran biaya per divisi/periode yang disinkronkan dari SAP. |
 | Finance Portal | `custom_finance_portal` | Umum, dikonfigurasi | Finance Portal | Produksi | Uang muka, reimbursement, tagihan vendor, dan perjalanan dinas di atas SAP — tanpa posting GL sendiri. |
 | Integrasi Finance Portal ↔ SAP | `custom_finance_portal_sap` | Umum, dikonfigurasi | Finance Portal | Beta | Adapter jembatan, push asinkron, sinkronisasi master data, webhook status, dan log sinkronisasi. |
-| SSO Finance Portal | `custom_finance_portal_sso` | Umum, dikonfigurasi | Finance Portal | Beta | Login Keycloak dan pemetaan peran ke grup, memisahkan karyawan dari vendor. |
+| SSO Finance Portal | `custom_finance_portal_sso` | Umum, dikonfigurasi | Finance Portal | Produksi | Login Keycloak dan pemetaan peran ke grup, memisahkan karyawan dari vendor. |
+| Laporan per Unit Operasional | `custom_operating_unit_reports` | Umum | — | Produksi | Membatasi laporan keuangan pada unit yang boleh dibaca pengguna — laporan menyusun SQL sendiri sehingga aturan akses Odoo tidak berlaku di sana. |
 | Biaya Admin Pembayaran | `custom_payment_admin_fee` | Umum, dikonfigurasi | Levi's | Produksi | Baris biaya admin/bank multi-COA pada wizard Register Payment. |
 | Payment Gateway Indonesia | `custom_payment_id` | Umum | — | Beta | Adapter Midtrans, Xendit, dan DOKU untuk payment.provider. |
 | Metode Pembayaran GIRO & Transfer | `custom_payment_methods_id` | Umum, dikonfigurasi | Levi's | Kerangka | Menambahkan GIRO dan BANK TRANSFER sebagai metode pembayaran pada jurnal bank. |
@@ -249,6 +250,7 @@ Keduanya muncul sebagai pilihan di Settings → Accounting → Chart Template, d
 | Akun Revaluasi Aset Levi's | `custom_levis_asset_accounts` | Khusus brand | Levi's | Beta | Enam kategori aset tetap EBR beserta akun revaluasi IAS 16, resolusi kode akun per perusahaan. |
 | Rekonsiliasi Bank POS Levi's | `custom_levis_bank_reconcile` | Khusus brand | Levi's | Produksi | Mencocokkan settlement bank dengan piutang tender POS per toko, bersih dari MDR. |
 | Persetujuan Perubahan Kategori Produk | `custom_levis_categ_approval` | Khusus brand | Levi's | Produksi | Perubahan kategori produk tidak lagi diam-diam — harus lewat persetujuan Finance, dengan koreksi GL. |
+| Migrasi Unit Operasional Levi's | `custom_levis_operating_unit` | Khusus brand | Levi's | Produksi | Mengangkat dimensi Operating Unit Levi's yang sudah ada menjadi master unit platform — tanpa mengubah kode gudang, nama akun analitik, jurnal, maupun POS. |
 
 ### Yang bersifat khusus per-brand
 
@@ -261,6 +263,7 @@ Modul berikut berada di `addons/_tenants/` dan **tidak dapat dipakai ulang apa a
 - **Akun Revaluasi Aset Levi's** (`custom_levis_asset_accounts`) — Levi's. Enam kategori aset tetap EBR beserta akun revaluasi IAS 16, resolusi kode akun per perusahaan.
 - **Rekonsiliasi Bank POS Levi's** (`custom_levis_bank_reconcile`) — Levi's. Mencocokkan settlement bank dengan piutang tender POS per toko, bersih dari MDR.
 - **Persetujuan Perubahan Kategori Produk** (`custom_levis_categ_approval`) — Levi's. Perubahan kategori produk tidak lagi diam-diam — harus lewat persetujuan Finance, dengan koreksi GL.
+- **Migrasi Unit Operasional Levi's** (`custom_levis_operating_unit`) — Levi's. Mengangkat dimensi Operating Unit Levi's yang sudah ada menjadi master unit platform — tanpa mengubah kode gudang, nama akun analitik, jurnal, maupun POS.
 
 Modul berikut adalah mesin umum yang **sudah dikonfigurasi** untuk satu brand atau lebih. Tenant baru dapat memakainya, tetapi perlu profil dan data sendiri:
 
@@ -461,7 +464,7 @@ Modul berikut adalah mesin umum yang **sudah dikonfigurasi** untuk satu brand at
 
 # 7. Penjualan, Retail & POS
 
-10 modul. Domain ini menopang tenant retail yang sudah **live** — Levi's / PT Era Busana Retailindo — dan karena itu berisi jalur data dengan volume terbesar di platform.
+11 modul. Domain ini menopang tenant retail yang sudah **live** — Levi's / PT Era Busana Retailindo — dan karena itu berisi jalur data dengan volume terbesar di platform.
 
 ## 7.1 Jalur impor data retail
 
@@ -497,6 +500,7 @@ Ia tidak dapat dipakai ulang apa adanya — dan memang tidak dimaksudkan demikia
 | --- | --- | --- | --- | --- | --- |
 | CRM & Prospek | `custom_crm` | Umum | — | Produksi | Penambangan prospek, skoring prediktif, pengayaan data, formulir web, dan otomasi. |
 | eCommerce Indonesia | `custom_ecommerce` | Umum, dikonfigurasi | GentleWoman | Beta | Registry kurir (JNE, JNT, SiCepat, AnterAja, Pos) dan checkout Midtrans/Xendit. |
+| Unit Operasional di Kasir | `custom_operating_unit_pos` | Umum | — | Produksi | Membatasi POS, sesi, dan pesanan per toko, serta membubuhkan unit pada setiap baris jurnal penutupan sesi. |
 | POS Indonesia | `custom_pos_id` | Umum | — | Beta | QRIS, pembulatan rupiah, dan struk elektronik via WhatsApp/SMS. |
 | Impor Data Retail | `custom_retail_import` | Umum, dikonfigurasi | Levi's | Produksi | Ingest Excel/CSV dan SFTP untuk master serta transaksi retail dari XStore. |
 | API Master Produk (MDM) | `custom_retail_import_api` | Umum, dikonfigurasi | Levi's | Produksi | REST masuk untuk feed master produk mendekati real-time dari MDM HUB. |
@@ -740,7 +744,7 @@ Empat lapisan dibangun berurutan, dan urutannya menentukan:
 
 ## 12.3 Jangkauan sesungguhnya
 
-Nilai domain ini tidak terletak pada enam modulnya, melainkan pada seberapa jauh ia menjangkau. Tag `audit-trail` muncul pada 78 manifest dan tag `pdp` pada 37 dari 156 modul. Artinya jejak audit dan kesadaran data pribadi bukan fitur yang dinyalakan di satu tempat, melainkan properti yang diwarisi sebagian besar platform.
+Nilai domain ini tidak terletak pada enam modulnya, melainkan pada seberapa jauh ia menjangkau. Tag `audit-trail` muncul pada 78 manifest dan tag `pdp` pada 37 dari 162 modul. Artinya jejak audit dan kesadaran data pribadi bukan fitur yang dinyalakan di satu tempat, melainkan properti yang diwarisi sebagian besar platform.
 
 > Catatan kematangan: lima dari enam modul PDP dinilai *Beta* karena tidak membawa suite pengujian sendiri. Perilaku append-only-nya ditegakkan di tingkat basis data lewat trigger, yang berlaku terlepas dari ada tidaknya pengujian di tingkat aplikasi.
 
@@ -761,7 +765,7 @@ Tidak ada. Seluruh modul di domain ini berlaku umum untuk tenant mana pun, tanpa
 
 # 13. Integrasi & Fondasi Platform
 
-13 modul. Domain ini jarang terlihat pengguna akhir, tetapi hampir setiap fitur di bab-bab sebelumnya berdiri di atasnya.
+16 modul. Domain ini jarang terlihat pengguna akhir, tetapi hampir setiap fitur di bab-bab sebelumnya berdiri di atasnya.
 
 ## 13.1 Fondasi
 
@@ -808,7 +812,10 @@ Empat modul OCA di-vendor apa adanya dan tidak diubah: **queue_job** (eksekusi p
 | Perbaikan Format Mata Uang & CSV | `custom_currency_nbsp` | Umum | — | Beta | Menghapus non-breaking space pada nominal dan menambahkan BOM UTF-8 pada ekspor CSV. |
 | Konektor ESB Core | `custom_esb_connector` | Umum, dikonfigurasi | EFN (Erajaya F&B) | Produksi | Adapter REST bersesi ke ESB Core/OMS, mirror master data, snapshot stok, dan outbox dokumen. |
 | Konsol Beranda | `custom_home_console` | Umum | — | Beta | Halaman depan bergaya spotlight: kartu aplikasi terkelompok, pencarian, branding. |
+| Manajemen Unit Operasional | `custom_operating_unit` | Umum | — | Produksi | Master unit operasional berjenjang Kantor Pusat → Area → Toko, dan pemetaan pengguna ke unit yang menjadi dasar pembatasan data. |
+| Pembatasan Data per Unit Operasional | `custom_operating_unit_docs` | Umum | — | Produksi | Menempelkan unit operasional pada dokumen akuntansi, gudang, pembelian dan penjualan, lalu membatasi baca maupun tulisnya per unit. |
 | Template Laporan Berbranding | `custom_report_templates` | Umum | — | Beta | Tata letak PDF faktur, penawaran, dan PO dengan branding per tenant. |
+| Manajemen Peran Pengguna | `custom_role_manager` | Umum | — | Produksi | Pilih peran jabatan alih-alih mencentang puluhan grup akses; 18 peran standar Kantor Pusat dan retail, dengan pencabutan yang hanya menyentuh pemberian peran. |
 | Autentikasi JWT (OCA) | `auth_jwt` | Pihak ketiga | — | Vendor | Autentikasi bearer token JWT untuk API keluar-masuk. |
 | Base REST (OCA) | `base_rest` | Pihak ketiga | — | Vendor | Kerangka membangun REST API tingkat tinggi di Odoo. Tidak dipasang. |
 | Penomoran Dokumen ARKA-AIM | `custom_arka_aim_numbering` | Khusus brand | ARKA-AIM | Produksi | Nomor SQ/SO/PO/INV/DO/BAST per perusahaan dengan reset bulanan. |
@@ -1063,7 +1070,7 @@ Daftar lengkap kesenjangan yang tercatat: 10 butir, 3 di antaranya berprioritas 
 | --- | --- |
 | Area | Pengetahuan Modul |
 | Prioritas | Sedang · upaya L — lebih dari 1 bulan · horizon 3-6 bulan |
-| Kondisi saat ini (NOW) | Dari 156 modul, 129 memiliki dokumen pengetahuan — sebagian berkas MODULE_KNOWLEDGE.md di dalam addons dan 15 override yang ditulis untuk katalog ini. Hanya 4 di antaranya berstatus `reviewed`; 110 masih `draft` hasil generator. 27 modul belum terdokumentasi sama sekali dan diringkas otomatis dari manifest. |
+| Kondisi saat ini (NOW) | Dari 162 modul, 135 memiliki dokumen pengetahuan — sebagian berkas MODULE_KNOWLEDGE.md di dalam addons dan 15 override yang ditulis untuk katalog ini. Hanya 10 di antaranya berstatus `reviewed`; 110 masih `draft` hasil generator. 27 modul belum terdokumentasi sama sekali dan diringkas otomatis dari manifest. |
 | Sasaran (TARGET) | Semua modul yang menghadap klien berstatus reviewed, dengan pemeriksaan ulang saat versi manifest berubah. |
 | Dampak bisnis | Klaim kapabilitas dari berkas draft tidak boleh dikutip tanpa pemeriksaan. Katalog ini menandainya lewat kolom Keyakinan Info, bukan menyembunyikannya. |
 | Rujukan | `docs/platform-feature-catalog/catalog-audit.md` · `scripts/generate_module_knowledge.py, scripts/check_knowledge_drift.py` |
@@ -1136,7 +1143,7 @@ Tidak ada. Seluruh modul di domain ini berlaku umum untuk tenant mana pun, tanpa
 
 # Lampiran — Rincian Teknis per Modul
 
-Bagian ini ditulis dalam **Bahasa Inggris**, ditujukan untuk tim pengembang dan arsitek. Isinya adalah satu entri untuk setiap dari 156 modul, diurutkan menurut domain fungsional yang sama dengan badan dokumen.
+Bagian ini ditulis dalam **Bahasa Inggris**, ditujukan untuk tim pengembang dan arsitek. Isinya adalah satu entri untuk setiap dari 162 modul, diurutkan menurut domain fungsional yang sama dengan badan dokumen.
 
 Cara membaca entri:
 
@@ -1227,11 +1234,11 @@ Closes the Enterprise deferred-revenue/expense gap for Community: users set a st
 |  |  |
 | --- | --- |
 | Path | `addons/ee_gap/custom_account_reconcile` |
-| Version | 19.0.2.1.0 |
+| Version | 19.0.3.0.0 |
 | Scope | Umum |
 | Maturity / confidence | Produksi / Sedang |
 | Depends | `account` |
-| Models / routes / tests | 4 / 0 / 1 |
+| Models / routes / tests | 4 / 0 / 2 |
 
 > Knowledge file is generator output, not human-reviewed.
 
@@ -1249,6 +1256,9 @@ Supplies the manual-reconciliation UI that Odoo Community lacks: an overview das
 - `custom.account.reconcile.wizard` (TransientModel) — manual reconcile of selected journal items.
 - `custom.bank.reconcile.wizard` + `custom.bank.reconcile.wizard.line` (TransientModel) — bank-statement-line matching + candidate rows.
 - `account.bank.statement.line` (`_inherit`) — candidate search + reconcile mechanics.
+- `account.move` (`_inherit`) — `button_draft` unreconciles before resetting.
+- `account.move.line` (`_inherit`) — refuses structural edits on a matched line.
+- `account.payment` (`_inherit`) — duplicate guard at posting + the Unapplied flag.
 
 **Important fields**
 
@@ -1256,6 +1266,7 @@ Supplies the manual-reconciliation UI that Odoo Community lacks: an overview das
 - `custom.account.reconcile.wizard`: `line_ids` (M2m account.move.line, readonly), `account_id`, `company_id`, `debit`/`credit`/`residual` (Monetary), `is_balanced` (Boolean), `mode` (`partial`/`writeoff`, default `partial`), `writeoff_account_id`/`writeoff_journal_id` (check_company, domain-restricted), `writeoff_date`, `writeoff_label` (default "Write-Off").
 - `custom.bank.reconcile.wizard`: `st_line_id` (required), `candidate_ids` (O2m wizard.line), `selected_total`/`remainder` (Monetary computed), `writeoff` (Boolean), `writeoff_account_id` (domain excludes receivable/payable), `writeoff_label`.
 - `custom.bank.reconcile.wizard.line`: `selected` (Boolean), `aml_id` (M2o account.move.line), `amount_residual` (related), plus related move/date/account/partner.
+- `account.payment`: `duplicate_checked` (Boolean, `copy=False`) — the explicit override that lets a genuine second payment post; `is_unapplied` (Boolean, stored compute on `state`/`is_reconciled`) — posted (`in_process`/`paid`) but settling nothing.
 
 ### custom_accounting_asset — Custom Accounting - Fixed Assets
 
@@ -1453,14 +1464,14 @@ Both engines share the same period machinery (`relativedelta` map), the same `en
 |  |  |
 | --- | --- |
 | Path | `addons/ee_gap/custom_accounting_reports` |
-| Version | 19.0.0.18.0 |
+| Version | 19.0.0.19.0 |
 | Scope | Umum, dikonfigurasi (ARKA-AIM, Levi's) |
 | Maturity / confidence | Produksi / Sedang |
 | Depends | `custom_core`, `custom_pdp_audit`, `custom_accounting_full`, `account` |
 | Models / routes / tests | 85 / 0 / 1 |
 | Tags | accounting, financial-reports, audit-trail |
 
-> Knowledge file is generator output, not human-reviewed.
+> Knowledge file is generator output, not human-reviewed. Written against version 19.0.0.18.0, module is now 19.0.0.19.0.
 
 This module closes the Enterprise gap on Odoo CE `account_reports`. It provides a comprehensive suite of financial reports for the Custom Platform — P&L, Balance Sheet, Cash Flow (indirect method), General Ledger, Trial Balance, Partner Ledger, Partner Cards, Aged Receivable/Payable, Tax (PPN/PPh), Day/Cash/Bank Book, Journal Audit, Down-Payment (Uang Muka) ledger, Sales, and a tree-driven custom Financial Report. All reports are built on a single shared `custom.report.engine` AbstractModel and render to QWeb PDF/HTML or XLSX.
 
@@ -1860,11 +1871,11 @@ integration exists.
 |  |  |
 | --- | --- |
 | Path | `addons/ee_gap/custom_finance_portal_sso` |
-| Version | 19.0.0.1.0 |
+| Version | 19.0.0.2.0 |
 | Scope | Umum, dikonfigurasi (Finance Portal) |
-| Maturity / confidence | Beta / Sedang |
+| Maturity / confidence | Produksi / Sedang |
 | Depends | `custom_core`, `custom_finance_portal`, `auth_oauth` |
-| Models / routes / tests | 0 / 0 / 0 |
+| Models / routes / tests | 0 / 0 / 1 |
 | Tags | finance-portal, sso, keycloak, oidc |
 
 > Knowledge file is generator output, not human-reviewed.
@@ -1889,7 +1900,7 @@ Seed the 6 EBR fixed-asset categories and wire IAS 16 revaluation account defaul
 |  |  |
 | --- | --- |
 | Path | `addons/_tenants/custom_levis_bank_reconcile` |
-| Version | 19.0.1.0.0 |
+| Version | 19.0.1.1.0 |
 | Scope | Khusus brand (Levi's) |
 | Maturity / confidence | Produksi / Tinggi |
 | Depends | `custom_levis_localization`, `custom_account_reconcile` |
@@ -1939,6 +1950,40 @@ Block silent product-category changes and route them through Finance approval Le
 **Key models**
 
 - levis.categ.reclass
+
+### custom_levis_operating_unit — Custom Operating Unit — Levi's Migration
+
+|  |  |
+| --- | --- |
+| Path | `addons/_tenants/custom_levis_operating_unit` |
+| Version | 19.0.0.1.0 |
+| Scope | Khusus brand (Levi's) |
+| Maturity / confidence | Produksi / Tinggi |
+| Depends | `custom_operating_unit_docs`, `custom_levis_localization` |
+| Models / routes / tests | 0 / 0 / 1 |
+| Tags | operating-unit, levis, migration |
+
+Lifts the Operating-Unit dimension Levi's already runs — one
+`account.analytic.account` per store, wired to a warehouse and a per-store
+purchase journal by `custom_levis_localization` — into the platform's
+`operating.unit` master. Auto-installs where that localization and
+`custom_operating_unit_docs` are both present.
+
+### custom_operating_unit_reports — Custom Operating Unit — Reports
+
+|  |  |
+| --- | --- |
+| Path | `addons/ee_gap/custom_operating_unit_reports` |
+| Version | 19.0.0.1.0 |
+| Scope | Umum |
+| Maturity / confidence | Produksi / Tinggi |
+| Depends | `custom_operating_unit_docs`, `custom_accounting_reports` |
+| Models / routes / tests | 0 / 0 / 1 |
+| Tags | operating-unit, data-isolation, accounting-reports |
+
+Makes the custom accounting reports respect the reader's Operating Units.
+Auto-installs where `custom_accounting_reports` and
+`custom_operating_unit_docs` are both present.
 
 ### custom_payment_admin_fee — Payment Admin Fees
 
@@ -3901,11 +3946,11 @@ It does **not** ship its own payment gateway; Midtrans/Xendit checkout entry is 
 |  |  |
 | --- | --- |
 | Path | `addons/_tenants/custom_levis_localization` |
-| Version | 19.0.1.26.0 |
+| Version | 19.0.1.29.0 |
 | Scope | Khusus brand (Levi's) |
 | Maturity / confidence | Produksi / Sedang |
 | Depends | `product`, `stock`, `stock_account`, `stock_delivery`, `purchase`, `purchase_stock`, `account`, `point_of_sale`, `custom_retail_import_pos` |
-| Models / routes / tests | 21 / 0 / 6 |
+| Models / routes / tests | 21 / 0 / 7 |
 
 > Knowledge file is generator output, not human-reviewed.
 
@@ -3959,6 +4004,24 @@ This module implements five specific requirements for the Levi's tenant: HS Code
 - `_levis_book_valuation_entry(ref, label, incoming)`: Shared idempotent poster — `incoming=True` → Dr Valuation/Cr Variation; `incoming=False` → the reverse. No-op if already posted for `ref`, non-real-time category, missing accounts/journal, or zero `move.value`.
 - **stock.picking**:
 - `button_validate()`: Validates the done quantity against demand quantities on incoming stock pickings (via `float_compare`). Raises an error if any line exceeds its demand.
+
+### custom_operating_unit_pos — Custom Operating Unit — Point of Sale
+
+|  |  |
+| --- | --- |
+| Path | `addons/ee_gap/custom_operating_unit_pos` |
+| Version | 19.0.0.1.0 |
+| Scope | Umum |
+| Maturity / confidence | Produksi / Tinggi |
+| Depends | `custom_operating_unit_docs`, `point_of_sale` |
+| Models / routes / tests | 3 / 0 / 1 |
+| Tags | operating-unit, data-isolation, point-of-sale |
+
+Operating-Unit isolation for the point of sale, and the unit on the session
+closing entry. Auto-installs where `point_of_sale` and
+`custom_operating_unit_docs` are both present.
+
+**Declared models**: `pos.config`, `pos.order`, `pos.session`
 
 ### custom_pos_id — Custom POS Indonesia
 
@@ -6629,6 +6692,44 @@ Raw captured spec: `docs/integrations/esb/esb-core.apidoc.json`.
 
 Spotlight-style home landing: grouped app cards, search, shortcuts, branding Custom Home Console ===================
 
+### custom_operating_unit — Custom Operating Unit
+
+|  |  |
+| --- | --- |
+| Path | `addons/core/custom_operating_unit` |
+| Version | 19.0.0.1.0 |
+| Scope | Umum |
+| Maturity / confidence | Produksi / Tinggi |
+| Depends | `custom_core`, `analytic` |
+| Models / routes / tests | 2 / 0 / 2 |
+| Tags | operating-unit, multi-branch, data-isolation, organisation-hierarchy |
+
+Master data for the branch dimension: Head Office → Area → Store, as a real
+model with a hierarchy, plus the user→unit assignment that the record rules in
+the bridge modules read. Before this, "Operating Unit" was only an
+`account.analytic.account` in a plan of that name, owned by
+`custom_levis_localization`, with zero access-control effect.
+
+**Declared models**: `operating.unit`, `operating.unit.mixin`
+
+### custom_operating_unit_docs — Custom Operating Unit — Documents
+
+|  |  |
+| --- | --- |
+| Path | `addons/ee_gap/custom_operating_unit_docs` |
+| Version | 19.0.0.1.0 |
+| Scope | Umum |
+| Maturity / confidence | Produksi / Tinggi |
+| Depends | `custom_operating_unit`, `account`, `stock`, `purchase`, `sale_stock` |
+| Models / routes / tests | 9 / 0 / 2 |
+| Tags | operating-unit, data-isolation, record-rules, multi-branch |
+
+Turns the Operating Unit from master data into enforced data isolation on the
+accounting, stock, purchase and sales documents. Auto-installs wherever those
+apps are present, so a tenant without them never sees it.
+
+**Declared models**: `account.bank.statement.line`, `account.move`, `account.move.line`, `account.payment`, `purchase.order`, `sale.order`, `stock.move`, `stock.picking`, `stock.quant`
+
 ### custom_report_templates — Custom Report Templates
 
 |  |  |
@@ -6652,6 +6753,33 @@ needs a code fork.
 **Key models**
 
 - `res.company` (inherited, `models/res_company.py`) — report configuration only; no behaviour, no overrides.
+
+### custom_role_manager — Custom Role Manager
+
+|  |  |
+| --- | --- |
+| Path | `addons/core/custom_role_manager` |
+| Version | 19.0.0.1.0 |
+| Scope | Umum |
+| Maturity / confidence | Produksi / Tinggi |
+| Depends | `custom_core` |
+| Models / routes / tests | 2 / 0 / 2 |
+| Tags | rbac, role-bundles, user-provisioning, access-rights |
+
+A **role** layer over native `res.groups`. Administrators pick a named position
+("Accounting Supervisor", "Store Manager") and the module reconciles
+`res.users.group_ids` for them. Odoo ships nothing like this in Community or
+Enterprise; OCA's `base_user_role` is not ported to 19.0 and models a role as a
+group, which this platform cannot do (see Gotchas).
+
+**How it works**
+
+- Assign `role_ids` on a user (form, wizard, or `res.users.create`).
+- `write`/`create` calls `_apply_security_roles()` unless the `role_apply` context flag is set (that flag is how the engine's own writes avoid recursing).
+- The engine computes `target = role_ids._all_group_ids()`, grants `target − group_ids`, revokes `role_granted_group_ids − target − role_baseline_group_ids`, then rewrites the ledger.
+- Editing a role's composition re-applies it to every holder, including holders of roles that *inherit* it (`_holder_roles()` walks upward).
+
+**Declared models**: `custom.security.role`, `custom.security.role.assign`
 
 ## Industry Verticals (Vertikal Industri)
 

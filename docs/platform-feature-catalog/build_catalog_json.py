@@ -350,8 +350,11 @@ def write_audit_report(modules: list[dict], path: str) -> dict:
             lines.append(f"- **{f['kind']}**: {', '.join('`%s`' % i for i in f['items'])}")
         lines.append("")
 
+    # Trailing blank lines and per-line whitespace would trip the repo's
+    # pre-commit hooks on every rebuild; strip them at the source.
+    body = "\n".join(line.rstrip() for line in lines).rstrip("\n")
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines) + "\n")
+        fh.write(body + "\n")
     return dict(tally)
 
 

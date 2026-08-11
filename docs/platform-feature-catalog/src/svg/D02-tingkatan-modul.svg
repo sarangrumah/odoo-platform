@@ -17,7 +17,7 @@
 <rect x="0" y="0" width="900" height="430" fill="#FFFFFF"/>
 <text class="cap" x="40" y="28">SEMAKIN KE ATAS, SEMAKIN SEDIKIT TENANT YANG TERSENTUH</text>
 <rect class="plum" x="250" y="44" width="400" height="52" rx="6"/>
-<text class="numw" x="278" y="80.0" text-anchor="middle">10</text>
+<text class="numw" x="278" y="80.0" text-anchor="middle">11</text>
 <text class="lblw" x="310" y="68.0">_tenants/ — satu pelanggan</text>
 <text class="smw" x="310" y="86.0">saldo awal · penomoran · aturan satu entitas</text>
 <rect class="lila" x="190" y="106" width="520" height="52" rx="6"/>
@@ -25,7 +25,7 @@
 <text class="lbl" x="250" y="130.0">verticals/ — satu industri</text>
 <text class="sm" x="250" y="148.0">PPOB / VAS · F&B ESB · template</text>
 <rect class="box" x="90" y="168" width="720" height="60" rx="6"/>
-<text class="num" x="118" y="208.0" text-anchor="middle">103</text>
+<text class="num" x="118" y="208.0" text-anchor="middle">106</text>
 <text class="lbl" x="150" y="196.0">ee_gap/ — semua tenant</text>
 <text class="sm" x="150" y="214.0">selisih Community → Enterprise: akuntansi · payroll · gudang · retail · portal keuangan</text>
 <rect class="box" x="90" y="238" width="350" height="52" rx="6"/>
@@ -37,7 +37,7 @@
 <text class="lbl" x="520" y="262.0">control_plane/ + operations/</text>
 <text class="sm" x="520" y="280.0">lapisan kendali — melayani operator</text>
 <rect class="box" x="90" y="300" width="350" height="52" rx="6"/>
-<text class="num" x="118" y="336.0" text-anchor="middle">9</text>
+<text class="num" x="118" y="336.0" text-anchor="middle">11</text>
 <text class="lbl" x="150" y="324.0">core/ — fondasi</text>
 <text class="sm" x="150" y="342.0">HMAC · adapter · BAST · HHT · barcode</text>
 <rect class="box" x="460" y="300" width="350" height="52" rx="6"/>
@@ -47,5 +47,5 @@
 <path class="arrow" d="M868 330 L868 80"/>
 <text class="sm" x="856" y="210" text-anchor="middle" transform="rotate(-90 856 210)">promosi bila muncul untuk pelanggan kedua</text>
 <text class="sm" x="40" y="392">Tingkat ditentukan semata-mata oleh direktori tempat modul berada. Kategori di dalam manifest bukan penentu tingkat.</text>
-<text class="sm" x="40" y="410">Total 156 modul. Mesin bersama tidak boleh masuk _tenants/, seberapa pun jelas ia diminta satu pelanggan.</text>
+<text class="sm" x="40" y="410">Total 162 modul. Mesin bersama tidak boleh masuk _tenants/, seberapa pun jelas ia diminta satu pelanggan.</text>
 </svg>
