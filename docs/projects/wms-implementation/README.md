@@ -27,17 +27,21 @@ dan rute apa adanya dari basis kode.
 
 ## Angka utama
 
+> **Effort PM sengaja dikosongkan** di seluruh paket — diisi oleh PM sesuai model tata kelola yang
+> dipakai. Semua total di bawah adalah **BA + DEV + QA saja**, dan harus dijumlahkan ulang setelah
+> alokasi PM masuk.
+
 | | Greenfield (bangun dari nol) | Brownfield (reuse modul) | JDS (pasca-POC) |
 |---|---:|---:|---:|
-| PM | 64 | 36 | 25 |
-| BA | 107 | 62 | 41 |
-| DEV | 263 | 90 | 62 |
-| QA | 121 | 52 | 37 |
-| **Total (termasuk kontingensi 15%)** | **≈ 555** | **≈ 240** | **≈ 165** |
-| Durasi | ≈ 28 minggu | ≈ 14 minggu | ≈ 11 minggu |
+| PM | *diisi PM* | *diisi PM* | *diisi PM* |
+| BA | 90 | 51 | 34 |
+| DEV | 252 | 84 | 59 |
+| QA | 106 | 44 | 32 |
+| **Total tanpa PM (termasuk kontingensi 15%)** | **≈ 448** | **≈ 179** | **≈ 125** |
+| Durasi | ≈ 25 minggu | ≈ 12 minggu | ≈ 10 minggu |
 
-Penghematan Brownfield vs Greenfield: **315 mandays (57%)**. Untuk JDS, karena POC sudah lulus:
-**390 mandays (70%)**.
+Penghematan Brownfield vs Greenfield: **269 mandays (60%)**. Untuk JDS, karena POC sudah lulus:
+**323 mandays (72%)**.
 
 Angka bersifat **indikatif berbasis asumsi tertulis**, bukan komitmen kontrak. Lingkup dasar:
 1 gudang, ≤3 zona, ≤200 bin, ≤5.000 SKU. Pengali untuk skala lain ada di dokumen 05 §9.
