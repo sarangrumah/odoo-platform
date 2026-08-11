@@ -186,31 +186,36 @@ lintas tenant.
 
 ## 8. Milestone & jadwal
 
-Baseline Brownfield, ±14 minggu. Rincian mingguan pada [`05-Estimasi-Mandays.md`](05-Estimasi-Mandays.md) §7.2.
+Baseline Brownfield, ±12 minggu. Rincian mingguan pada [`05-Estimasi-Mandays.md`](05-Estimasi-Mandays.md) §7.2.
+Jadwal ini belum memuat siklus tata kelola yang menjadi ranah PM.
 
 | # | Milestone | Minggu | Kriteria tercapai |
 |---|---|---|---|
-| M1 | Fit-gap selesai | W3 | Daftar gap disepakati; audit master data selesai; baseline KPI terukur |
-| M2 | Design beku | W4 | Denah bin & spesifikasi gap sign-off |
-| M3 | Sistem terkonfigurasi | W8 | Demo internal seluruh alur berjalan pada data klien |
-| M4 | Data termuat | W9 | Master + denah bin + saldo awal terekonsiliasi |
-| M5 | SIT lulus | W11 | E2E lulus; integrasi terverifikasi (bila di-scope) |
-| M6 | UAT sign-off | W12 | Seluruh skenario UAT lulus; operator terlatih |
-| M7 | Go-live | W13 | Sistem produktif; pergerakan manual dibekukan |
-| M8 | Serah terima | W14 | Runbook diserahkan; hypercare ditutup |
+| M1 | Fit-gap selesai | W2 | Daftar gap disepakati; audit master data selesai; baseline KPI terukur |
+| M2 | Design beku | W3 | Denah bin & spesifikasi gap sign-off |
+| M3 | Sistem terkonfigurasi | W7 | Demo internal seluruh alur berjalan pada data klien |
+| M4 | Data termuat | W8 | Master + denah bin + saldo awal terekonsiliasi |
+| M5 | SIT lulus | W10 | E2E lulus; integrasi terverifikasi (bila di-scope) |
+| M6 | UAT sign-off | W11 | Seluruh skenario UAT lulus; operator terlatih |
+| M7 | Go-live | W12 | Sistem produktif; pergerakan manual dibekukan |
+| M8 | Serah terima | W12 | Runbook diserahkan; hypercare ditutup |
 
 ## 9. Effort & sumber daya
 
 | | Brownfield (baseline) | Greenfield (pembanding) |
 |---|---:|---:|
-| PM | 36 | 64 |
-| BA | 62 | 107 |
-| DEV | 90 | 263 |
-| QA | 52 | 121 |
-| **Total (termasuk kontingensi 15%)** | **≈ 240 mandays** | **≈ 555 mandays** |
-| Durasi | ≈ 14 minggu | ≈ 28 minggu |
+| PM | *diisi PM* | *diisi PM* |
+| BA | 51 | 90 |
+| DEV | 84 | 252 |
+| QA | 44 | 106 |
+| **Total tanpa PM (termasuk kontingensi 15%)** | **≈ 179 mandays** | **≈ 448 mandays** |
+| Durasi | ≈ 12 minggu | ≈ 25 minggu |
 
-Komposisi tim Brownfield: 1 PM (±30%), 1 BA, 2 DEV, 1 QA. Rincian pembebanan pada
+> **Effort PM belum masuk angka ini.** Kolom PM sengaja dikosongkan dan diisi oleh PM sesuai model
+> tata kelola yang dipakai. Sebelum angka ini dipakai untuk penawaran komersial, alokasi PM harus
+> ditambahkan dan totalnya dijumlahkan ulang.
+
+Komposisi tim Brownfield: 1 BA, 2 DEV, 1 QA, ditambah PM. Rincian pembebanan pada
 [`05-Estimasi-Mandays.md`](05-Estimasi-Mandays.md) §8.
 
 **Sumber daya dari pihak klien** (di luar mandays di atas, tetapi wajib dialokasikan): Warehouse

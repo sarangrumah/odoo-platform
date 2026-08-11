@@ -4,7 +4,7 @@
 | | |
 |---|---|
 | **Dokumen** | Addendum klien — JDS |
-| **Versi** | 1.0 |
+| **Versi** | 1.1 |
 | **Tanggal** | 2026-08-11 |
 | **Status engagement** | **Pra-implementasi.** POC selesai dan lulus; kontrak implementasi belum |
 | **Induk** | [`00-Project-Initiation-Document.md`](00-Project-Initiation-Document.md) dan seluruh paket `wms-implementation/` |
@@ -128,7 +128,7 @@ Ini yang belum diketahui dan harus ditutup pada fase Requirement & fit-gap JDS:
 |---|---|---|
 | O1 | **Volume riil**: jumlah gudang, zona, bin, dan SKU aktif di Cikupa | Menentukan pengali estimasi (lihat estimasi generik §9). Demo memakai skala kecil; W07 ECOMMERCE di platform ini sudah pernah memuat 154 bin / 3.292 SKU |
 | O2 | **Perangkat handheld riil** dan simbologi yang aktif | Unit Denso BHT pada lingkup proyek ini hanya membaca EAN-13. Harus diuji, bukan diasumsikan |
-| O3 | **Integrasi SAP di-scope atau tidak** | Bila ya: kontrak payload + kesiapan sisi SAP menjadi gate SIT. Bila tidak: −18 mandays |
+| O3 | **Integrasi SAP di-scope atau tidak** | Bila ya: kontrak payload + kesiapan sisi SAP menjadi gate SIT. Bila tidak: −10 mandays |
 | O4 | **Kualitas master produk JDS** (barcode unik, dimensi, berat) | Slotting berbasis volume/dimensi tidak dapat dinyalakan tanpa data ini |
 | O5 | **Mode SAP slotting dipakai atau tidak** | Bila ya, perlu daftar tipe & seksi penyimpanan riil JDS untuk menggantikan CSV referensi |
 | O6 | **Denah bin riil** dan urutan jalan | Harus dibekukan di akhir fase Design |
@@ -137,7 +137,7 @@ Ini yang belum diketahui dan harus ditutup pada fase Requirement & fit-gap JDS:
 
 ## 6. Estimasi mandays JDS
 
-Basis: skenario Brownfield generik (240 mandays), **dikurangi** karena POC sudah menutup sebagian
+Basis: skenario Brownfield generik (179 mandays), **dikurangi** karena POC sudah menutup sebagian
 fase Requirement dan Design — kelayakan sudah dibuktikan, alur sudah diperagakan, dan konfigurasi
 referensi sudah ada dalam bentuk skrip.
 
@@ -145,48 +145,51 @@ Asumsi lingkup: **1 gudang (Cikupa), ≤3 zona, ≤200 bin, ≤5.000 SKU aktif, 
 di-scope.** Bila O1 mengungkap skala lebih besar, terapkan pengali pada
 [`05-Estimasi-Mandays.md`](05-Estimasi-Mandays.md) §9.
 
-| Fase | PM | BA | DEV | QA | Total |
-|---|---:|---:|---:|---:|---:|
-| 1. Requirement & fit-gap *(POC sudah menutup sebagian)* | 3 | 8 | 2 | 1 | **14** |
-| 2. Design delta | 1 | 3 | 3 | 1 | **8** |
-| 3. Konfigurasi + build gap | 6 | 8 | 26 | 10 | **50** |
-| 4. Data migration & master setup | 2 | 5 | 6 | 3 | **16** |
-| 5. SIT | 2 | 2 | 4 | 7 | **15** |
-| 6. UAT + training | 3 | 6 | 4 | 6 | **19** |
-| 7. Cutover & go-live | 3 | 2 | 5 | 2 | **12** |
-| 8. Hypercare | 2 | 2 | 4 | 2 | **10** |
-| **Subtotal** | **22** | **36** | **54** | **32** | **144** |
-| Kontingensi 15% | 3 | 5 | 8 | 5 | **21** |
-| **TOTAL** | **25** | **41** | **62** | **37** | **≈ 165** |
+> **Effort PM belum dihitung** — kolom PM dikosongkan dan diisi oleh PM. Total di bawah adalah
+> BA + DEV + QA saja.
 
-Perbandingan:
+| Fase | PM | BA | DEV | QA | Total |
+|---|:--:|---:|---:|---:|---:|
+| 1. Requirement & fit-gap *(POC sudah menutup sebagian)* | — | 5 | 1 | 1 | **7** |
+| 2. Design delta | — | 3 | 3 | 1 | **7** |
+| 3. Konfigurasi + build gap | — | 8 | 26 | 10 | **44** |
+| 4. Data migration & master setup | — | 5 | 6 | 3 | **14** |
+| 5. SIT | — | 1 | 3 | 5 | **9** |
+| 6. UAT + training | — | 4 | 3 | 4 | **11** |
+| 7. Cutover & go-live | — | 2 | 5 | 2 | **9** |
+| 8. Hypercare | — | 2 | 4 | 2 | **8** |
+| **Subtotal** | *diisi PM* | **30** | **51** | **28** | **109** |
+| Kontingensi 15% | *diisi PM* | 4 | 8 | 4 | **16** |
+| **TOTAL** | *diisi PM* | **34** | **59** | **32** | **≈ 125** |
+
+Perbandingan (seluruhnya tanpa PM):
 
 | | Greenfield | Brownfield generik | **JDS (pasca-POC)** |
 |---|---:|---:|---:|
-| Total mandays | 555 | 240 | **165** |
-| Durasi | ≈ 28 minggu | ≈ 14 minggu | **≈ 11 minggu** |
-| Penghematan vs Greenfield | — | 57% | **70%** |
+| Total mandays | 448 | 179 | **125** |
+| Durasi | ≈ 25 minggu | ≈ 12 minggu | **≈ 10 minggu** |
+| Penghematan vs Greenfield | — | 60% | **72%** |
 
-Selisih 75 mandays antara JDS dan Brownfield generik berasal dari: fase Requirement lebih pendek
+Selisih 54 mandays antara JDS dan Brownfield generik berasal dari: fase Requirement lebih pendek
 (kelayakan sudah terbukti, alur sudah diperagakan ke klien), Design delta lebih kecil (konfigurasi
 referensi sudah ada sebagai skrip), dan pengujian yang dapat memanfaatkan `70_scenario_test.py`
 serta `80_poc_scenario.py` sebagai basis regresi.
 
-**Penyesuaian bila asumsi berubah:**
+**Penyesuaian bila asumsi berubah** (seluruhnya tanpa PM):
 
 | Kondisi | Dampak |
 |---|---:|
-| Integrasi SAP **tidak** di-scope | −18 |
+| Integrasi SAP **tidak** di-scope | −10 |
 | Skala > 500 bin | +8 |
 | Skala > 10.000 SKU | +10 |
 | Mode SAP slotting tidak dipakai | −5 |
-| Gudang kedua dengan tata letak serupa | +12 |
+| Gudang kedua dengan tata letak serupa | +10 |
 | Mode offline handheld terbukti wajib | +12 |
 | Pembersihan master data massal | dinilai setelah audit (O4) |
 
 ## 7. Timeline JDS
 
-≈ 11 minggu.
+≈ 10 minggu.
 
 | Fase | Durasi | Minggu | Milestone |
 |---|---|---|---|
@@ -194,10 +197,10 @@ serta `80_poc_scenario.py` sebagai basis regresi.
 | 2. Design delta | 1 mgg | W2–W3 | Denah bin Cikupa dibekukan; spesifikasi gap sign-off |
 | 3. Konfigurasi + build gap | 3 mgg | W3–W6 | Sistem terkonfigurasi pada data JDS; demo internal |
 | 4. Data migration & master setup | 2 mgg | W5–W7 | Master + denah bin + saldo awal termuat |
-| 5. SIT | 2 mgg | W7–W9 | *Gate:* handheld & sisi SAP siap; E2E lulus |
-| 6. UAT + training | 2 mgg | W8–W10 | UAT sign-off; operator Cikupa terlatih |
-| 7. Cutover & go-live | 1 mgg | W10–W11 | Opname penuh → saldo awal → go-live |
-| 8. Hypercare | 1 mgg | W11 | Cycle count intensif; serah terima |
+| 5. SIT | 1 mgg | W7–W8 | *Gate:* handheld & sisi SAP siap; E2E lulus |
+| 6. UAT + training | 2 mgg | W7–W9 | UAT sign-off; operator Cikupa terlatih |
+| 7. Cutover & go-live | 1 mgg | W9–W10 | Opname penuh → saldo awal → go-live |
+| 8. Hypercare | 1 mgg | W10 | Cycle count intensif; serah terima |
 
 ## 8. Risiko khusus JDS
 
