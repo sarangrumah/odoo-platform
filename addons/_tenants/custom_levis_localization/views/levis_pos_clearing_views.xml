@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_levis_pos_clearing_form" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.form</field>
+        <field name="model">levis.pos.clearing</field>
+        <field name="arch" type="xml">
+            <form string="Monthly POS Clearing">
+                <header>
+                    <button name="action_compute" type="object" string="Compute Summary"
+                            class="btn-primary" invisible="state not in ('draft', 'computed')"
+                            help="Reads the statements and builds the summary below. Creates no journal entry and changes nothing."/>
+                    <button name="action_generate_moves" type="object"
+                            string="Generate Draft Entries" class="btn-primary"
+                            invisible="state != 'computed'"/>
+                    <button name="action_post" type="object"
+                            string="Post &amp; Reconcile" class="btn-primary"
+                            invisible="state != 'generated'"
+                            confirm="This posts the draft entries and reconciles the receivables they settle. In Odoo 19 a posted, reconciled entry cannot be undone by resetting it to draft. Continue?"/>
+                    <button name="action_open_mapping_wizard" type="object"
+                            string="Map Unmapped Settlements"
+                            invisible="unmapped_count == 0"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state not in ('computed', 'generated')"/>
+                    <button name="action_view_moves" type="object"
+                            string="Journal Entries" invisible="move_count == 0"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,computed,generated,posted"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                        <h3><field name="period_ref" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="date_from" readonly="state != 'draft'"/>
+                            <field name="date_to" readonly="state != 'draft'"/>
+                            <field name="config_id"/>
+                        </group>
+                        <group>
+                            <field name="journal_id" readonly="state != 'draft'"/>
+                            <field name="bank_journal_ids" widget="many2many_tags"
+                                   readonly="state != 'draft'"/>
+                            <field name="ar_fallback" readonly="state not in ('draft', 'computed')"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="move_count" invisible="1"/>
+                        </group>
+                    </group>
+
+                    <group string="Settlement Totals" invisible="state == 'draft'">
+                        <group>
+                            <field name="total_gross"/>
+                            <field name="total_mdr"/>
+                            <field name="total_cash_in"/>
+                        </group>
+                        <group>
+                            <field name="total_allocated"/>
+                            <field name="total_short"/>
+                            <field name="block_a_total" string="Block A — settlements"/>
+                            <field name="block_b_total" string="Block B — prior-month AR"/>
+                            <field name="block_c_total" string="Block C — sweep &amp; charges"/>
+                        </group>
+                    </group>
+
+                    <!-- Everything that could not be settled is stated up front. -->
+                    <div class="alert alert-danger" role="alert"
+                         invisible="unparsed_count == 0 and unmapped_count == 0 and mismatch_count == 0 and consumed_elsewhere_count == 0">
+                        <strong>These lines cannot be booked as they stand.</strong>
+                        <ul>
+                            <li invisible="unparsed_count == 0">
+                                <field name="unparsed_count" class="oe_inline" readonly="1"/>
+                                statement line(s) whose narrative could not be read
+                                (<field name="unparsed_amount" class="oe_inline" readonly="1"/>).
+                            </li>
+                            <li invisible="unmapped_count == 0">
+                                <field name="unmapped_count" class="oe_inline" readonly="1"/>
+                                settlement(s) whose MID, terminal or wording is not mapped to a store
+                                (<field name="unmapped_amount" class="oe_inline" readonly="1"/>).
+                            </li>
+                            <li invisible="mismatch_count == 0">
+                                <field name="mismatch_count" class="oe_inline" readonly="1"/>
+                                line(s) where the narrative disagrees with the money the bank moved.
+                            </li>
+                            <li invisible="consumed_elsewhere_count == 0">
+                                <field name="consumed_elsewhere_count" class="oe_inline" readonly="1"/>
+                                statement line(s) already used by another clearing run.
+                            </li>
+                        </ul>
+                        Their money stays on suspense. Map or fix them and press Compute
+                        again, or tick <em>Ignore warnings</em> to book the rest deliberately.
+                        <field name="ignore_warnings"/>
+                    </div>
+
+                    <div class="alert alert-warning" role="alert"
+                         invisible="short_count == 0 and missing_day_count == 0 and no_analytic_count == 0 and derived_date_count == 0">
+                        <ul>
+                            <li invisible="short_count == 0">
+                                <field name="short_count" class="oe_inline" readonly="1"/>
+                                settlement(s) found no open receivable to settle in full —
+                                the remainder stays on suspense (see Diagnostics).
+                            </li>
+                            <li invisible="missing_day_count == 0">
+                                <field name="missing_day_count" class="oe_inline" readonly="1"/>
+                                trading day(s) have no statement line although the days
+                                around them do — the bank import may have stopped halfway.
+                            </li>
+                            <li invisible="no_analytic_count == 0">
+                                <field name="no_analytic_count" class="oe_inline" readonly="1"/>
+                                posted POS receivable line(s) carry no Operating Unit
+                                (<field name="no_analytic_amount" class="oe_inline" readonly="1"/>),
+                                so no settlement can ever reach them.
+                            </li>
+                            <li invisible="derived_date_count == 0">
+                                <field name="derived_date_count" class="oe_inline" readonly="1"/>
+                                settlement(s) carried no transaction date, so their trading
+                                day was inferred. The store and the account are still exact.
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-warning" role="alert" invisible="not warning_text">
+                        <field name="warning_text" nolabel="1" readonly="1"/>
+                    </div>
+
+                    <notebook invisible="state == 'draft'">
+                        <page string="Settlements" name="block_a">
+                            <field name="line_ids" readonly="1" domain="[('block', '=', 'a')]"
+                                   context="{'default_block': 'a'}">
+                                <list create="false" delete="false" default_order="analytic_account_id, settlement_date">
+                                    <field name="analytic_account_id"/>
+                                    <field name="settlement_date"/>
+                                    <field name="trans_date"/>
+                                    <field name="trans_date_is_derived" optional="show"/>
+                                    <field name="bank_journal_id"/>
+                                    <field name="channel"/>
+                                    <field name="gross" sum="Gross"/>
+                                    <field name="mdr" sum="MDR"/>
+                                    <field name="cash_in" sum="Cash in"/>
+                                    <field name="allocated" sum="Allocated"/>
+                                    <field name="short_amount" sum="Short"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'ok'"
+                                           decoration-warning="state == 'short'"
+                                           decoration-danger="state in ('unmapped', 'unparsed', 'mismatch')"/>
+                                    <field name="payment_ref" optional="hide"/>
+                                    <field name="mid_key" optional="hide"/>
+                                    <field name="tid_key" optional="hide"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                                <form string="Settlement">
+                                    <group>
+                                        <group>
+                                            <field name="analytic_account_id"/>
+                                            <field name="map_id"/>
+                                            <field name="bank_journal_id"/>
+                                            <field name="settlement_date"/>
+                                            <field name="trans_date"/>
+                                            <field name="trans_date_is_derived"/>
+                                        </group>
+                                        <group>
+                                            <field name="statement_amount"/>
+                                            <field name="gross"/>
+                                            <field name="mdr"/>
+                                            <field name="mdr_booked"/>
+                                            <field name="allocated"/>
+                                            <field name="short_amount"/>
+                                            <field name="mismatch_amount"/>
+                                            <field name="currency_id" invisible="1"/>
+                                        </group>
+                                    </group>
+                                    <field name="payment_ref" readonly="1"/>
+                                    <field name="note" readonly="1"/>
+                                    <field name="alloc_ids" readonly="1">
+                                        <list create="false" delete="false">
+                                            <field name="account_id"/>
+                                            <field name="source_date"/>
+                                            <field name="source_aml_id"/>
+                                            <field name="amount" sum="Allocated"/>
+                                            <field name="move_line_id" optional="show"/>
+                                            <field name="currency_id" column_invisible="1"/>
+                                        </list>
+                                    </field>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Prior-Month AR" name="block_b">
+                            <field name="line_ids" readonly="1" domain="[('block', '=', 'b')]">
+                                <list create="false" delete="false">
+                                    <field name="analytic_account_id"/>
+                                    <field name="settlement_date"/>
+                                    <field name="bank_journal_id"/>
+                                    <field name="gross" sum="Gross"/>
+                                    <field name="mdr" sum="MDR"/>
+                                    <field name="allocated" sum="Allocated"/>
+                                    <field name="short_amount" sum="Short"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Sweep &amp; Charges" name="block_c">
+                            <field name="line_ids" readonly="1" domain="[('block', '=', 'c')]">
+                                <list create="false" delete="false">
+                                    <field name="settlement_date"/>
+                                    <field name="bank_journal_id"/>
+                                    <field name="kind"/>
+                                    <field name="statement_amount" sum="Amount"/>
+                                    <field name="payment_ref"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Not Booked" name="unbooked">
+                            <field name="line_ids" readonly="1"
+                                   domain="[('state', 'in', ('unmapped', 'unparsed', 'mismatch', 'skipped'))]">
+                                <list create="false" delete="false">
+                                    <field name="settlement_date"/>
+                                    <field name="bank_journal_id"/>
+                                    <field name="kind"/>
+                                    <field name="state" widget="badge" decoration-danger="1"/>
+                                    <field name="statement_amount" sum="Amount"/>
+                                    <field name="payment_ref"/>
+                                    <field name="note"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Diagnostics" name="diagnostics">
+                            <field name="diag_ids" readonly="1">
+                                <list create="false" delete="false" default_group_by="kind">
+                                    <field name="severity" widget="badge"
+                                           decoration-danger="severity == 'blocking'"
+                                           decoration-warning="severity == 'warning'"
+                                           decoration-info="severity == 'info'"/>
+                                    <field name="kind"/>
+                                    <field name="date"/>
+                                    <field name="bank_journal_id"/>
+                                    <field name="analytic_account_id"/>
+                                    <field name="amount" sum="Amount"/>
+                                    <field name="count" sum="Lines"/>
+                                    <field name="message"/>
+                                    <button name="action_open_record" type="object"
+                                            icon="fa-external-link" title="Open the record"
+                                            invisible="not res_id"/>
+                                    <field name="res_id" column_invisible="1"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Balance Check" name="balances">
+                            <p class="text-muted">
+                                <em>After (simulated)</em> is what posting these entries would
+                                produce; <em>After (actual)</em> is filled once they are posted.
+                                A difference between the two is reported above, not absorbed.
+                            </p>
+                            <group>
+                                <group string="Bank Suspense">
+                                    <field name="bal_suspense_before" string="Before"/>
+                                    <field name="bal_suspense_after_sim" string="After (simulated)"/>
+                                    <field name="bal_suspense_after_actual" string="After (actual)"/>
+                                </group>
+                                <group string="MDR Expense">
+                                    <field name="bal_mdr_before" string="Before"/>
+                                    <field name="bal_mdr_after_sim" string="After (simulated)"/>
+                                    <field name="bal_mdr_after_actual" string="After (actual)"/>
+                                </group>
+                                <group string="Trade Receivable">
+                                    <field name="bal_ar_before" string="Before"/>
+                                    <field name="bal_ar_after_sim" string="After (simulated)"/>
+                                    <field name="bal_ar_after_actual" string="After (actual)"/>
+                                </group>
+                                <group string="POS Receivable Still Open">
+                                    <field name="posrec_open_before" string="Before"/>
+                                    <field name="posrec_lines_before" string="Lines before"/>
+                                    <field name="posrec_open_after_sim" string="After (simulated)"/>
+                                    <field name="posrec_open_after_actual" string="After (actual)"/>
+                                    <field name="posrec_lines_after_actual" string="Lines after"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_list" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.list</field>
+        <field name="model">levis.pos.clearing</field>
+        <field name="arch" type="xml">
+            <list string="Monthly POS Clearing">
+                <field name="name"/>
+                <field name="period_ref"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="total_gross" sum="Gross"/>
+                <field name="total_allocated" sum="Allocated"/>
+                <field name="total_short" sum="Short"/>
+                <field name="unparsed_count" string="Unparsed"/>
+                <field name="unmapped_count" string="Unmapped"/>
+                <field name="move_count" string="Entries"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'posted'"
+                       decoration-info="state in ('computed', 'generated')"
+                       decoration-muted="state == 'cancel'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_search" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.search</field>
+        <field name="model">levis.pos.clearing</field>
+        <field name="arch" type="xml">
+            <search string="POS Clearing">
+                <field name="name"/>
+                <field name="period_ref"/>
+                <filter name="not_posted" string="Not Posted"
+                        domain="[('state', 'not in', ('posted', 'cancel'))]"/>
+                <filter name="has_short" string="Has Shortfall"
+                        domain="[('line_ids.short_amount', '>', 0)]"/>
+                <separator/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_pos_clearing" model="ir.actions.act_window">
+        <field name="name">POS Clearing</field>
+        <field name="res_model">levis.pos.clearing</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_not_posted': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Clear a month's POS receivables</p>
+            <p>Reads the bank statements already imported for the period, takes the
+               gross and the acquirer fee straight from each settlement's narrative,
+               and works out which per-tender receivable it pays by consuming that
+               store's open debits for the trading day.</p>
+            <p>Three steps, in order: <b>Compute</b> shows you the summary and changes
+               nothing; <b>Generate Draft Entries</b> writes entries you can read before
+               they count; <b>Post &amp; Reconcile</b> commits them. Anything that could
+               not be matched is listed rather than absorbed.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_levis_pos_clearing"
+              name="POS Clearing"
+              parent="account.menu_finance_entries"
+              action="action_levis_pos_clearing"
+              sequence="92"/>
+</odoo>

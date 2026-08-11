@@ -23,3 +23,16 @@ access_levis_categ_reclass_product_acct,levis.categ.reclass.product account,mode
 access_levis_categ_reclass_stock,levis.categ.reclass stock,model_levis_categ_reclass,stock.group_stock_manager,1,0,0,0
 access_levis_categ_reclass_line_stock,levis.categ.reclass.line stock,model_levis_categ_reclass_line,stock.group_stock_manager,1,0,0,0
 access_levis_categ_reclass_product_stock,levis.categ.reclass.product stock,model_levis_categ_reclass_product,stock.group_stock_manager,1,0,0,0
+access_levis_clearing_config_acct,levis.clearing.config account,model_levis_clearing_config,account.group_account_manager,1,1,1,1
+access_levis_bank_mid_map_acct,levis.bank.mid.map account,model_levis_bank_mid_map,account.group_account_manager,1,1,1,1
+access_levis_bank_mid_map_user,levis.bank.mid.map user,model_levis_bank_mid_map,account.group_account_invoice,1,0,0,0
+access_levis_pos_clearing_acct,levis.pos.clearing account,model_levis_pos_clearing,account.group_account_manager,1,1,1,1
+access_levis_pos_clearing_line_acct,levis.pos.clearing.line account,model_levis_pos_clearing_line,account.group_account_manager,1,1,1,1
+access_levis_pos_clearing_alloc_acct,levis.pos.clearing.alloc account,model_levis_pos_clearing_alloc,account.group_account_manager,1,1,1,1
+access_levis_pos_clearing_diag_acct,levis.pos.clearing.diag account,model_levis_pos_clearing_diag,account.group_account_manager,1,1,1,1
+access_levis_pos_clearing_user,levis.pos.clearing user,model_levis_pos_clearing,account.group_account_invoice,1,0,0,0
+access_levis_pos_clearing_line_user,levis.pos.clearing.line user,model_levis_pos_clearing_line,account.group_account_invoice,1,0,0,0
+access_levis_pos_clearing_alloc_user,levis.pos.clearing.alloc user,model_levis_pos_clearing_alloc,account.group_account_invoice,1,0,0,0
+access_levis_pos_clearing_diag_user,levis.pos.clearing.diag user,model_levis_pos_clearing_diag,account.group_account_invoice,1,0,0,0
+access_levis_mid_map_wizard_acct,levis.bank.mid.map.wizard account,model_levis_bank_mid_map_wizard,account.group_account_manager,1,1,1,1
+access_levis_mid_map_wizard_line_acct,levis.bank.mid.map.wizard.line account,model_levis_bank_mid_map_wizard_line,account.group_account_manager,1,1,1,1

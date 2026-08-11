@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      A standalone view rather than an extension: this Odoo build ships no core
+      list/search view for account.bank.statement.line, and the only module that
+      defines one (custom_account_reconcile) is an ee_gap module a tenant module
+      must not depend on.
+
+      What it is for: reading a settlement one line at a time. The clearing run
+      answers "did the month tie"; this answers "what did the bank say about this
+      Rp 4.722.112, and which shop was it".
+    -->
+    <record id="view_levis_settlement_line_list" model="ir.ui.view">
+        <field name="name">account.bank.statement.line.levis.settlement.list</field>
+        <field name="model">account.bank.statement.line</field>
+        <field name="arch" type="xml">
+            <list string="Bank Settlements" create="false" default_order="date desc, id desc">
+                <field name="date"/>
+                <field name="journal_id"/>
+                <field name="levis_narrative_kind"/>
+                <field name="levis_channel"/>
+                <field name="levis_mid"/>
+                <field name="levis_ou_analytic_id"/>
+                <field name="levis_trans_date" optional="show"/>
+                <field name="levis_gross" sum="Gross"/>
+                <field name="levis_mdr" sum="MDR"/>
+                <field name="amount" sum="Received"/>
+                <field name="levis_amount_matches_narrative" optional="show"
+                       widget="boolean_toggle" readonly="1"/>
+                <field name="levis_clearing_run_id" optional="show"/>
+                <field name="payment_ref" optional="hide"/>
+                <field name="levis_narrative_note" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_settlement_line_search" model="ir.ui.view">
+        <field name="name">account.bank.statement.line.levis.settlement.search</field>
+        <field name="model">account.bank.statement.line</field>
+        <field name="arch" type="xml">
+            <search string="Bank Settlements">
+                <field name="payment_ref"/>
+                <field name="levis_mid"/>
+                <field name="levis_ou_analytic_id"/>
+                <field name="journal_id"/>
+                <filter name="settlements" string="Settlements"
+                        domain="[('levis_narrative_kind', '=', 'settlement')]"/>
+                <filter name="cash_deposits" string="Cash Deposits"
+                        domain="[('levis_narrative_kind', '=', 'cash_deposit')]"/>
+                <separator/>
+                <filter name="unattributed" string="No Operating Unit"
+                        domain="[('levis_ou_analytic_id', '=', False),
+                                 ('levis_narrative_kind', 'in', ('settlement', 'cash_deposit'))]"
+                        help="Settlements whose merchant id or wording is not mapped to a store yet — their money is still sitting on suspense."/>
+                <filter name="unrecognised" string="Narrative Not Recognised"
+                        domain="[('levis_narrative_kind', '=', 'unknown')]"/>
+                <filter name="disagrees" string="Amount Disagrees"
+                        domain="[('levis_amount_matches_narrative', '=', False)]"
+                        help="Gross minus MDR does not equal the amount received."/>
+                <separator/>
+                <filter name="not_cleared" string="Not Yet Cleared"
+                        domain="[('levis_clearing_run_id', '=', False)]"/>
+                <separator/>
+                <filter name="group_ou" string="Operating Unit"
+                        context="{'group_by': 'levis_ou_analytic_id'}"/>
+                <filter name="group_kind" string="Narrative Type"
+                        context="{'group_by': 'levis_narrative_kind'}"/>
+                <filter name="group_channel" string="Channel" context="{'group_by': 'levis_channel'}"/>
+                <filter name="group_journal" string="Bank" context="{'group_by': 'journal_id'}"/>
+                <filter name="group_date" string="Settlement Date" context="{'group_by': 'date'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_settlement_lines" model="ir.actions.act_window">
+        <field name="name">Bank Settlements</field>
+        <field name="res_model">account.bank.statement.line</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_levis_settlement_line_list"/>
+        <field name="search_view_id" ref="view_levis_settlement_line_search"/>
+        <field name="context">{'search_default_settlements': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No settlements read yet</p>
+            <p>Every imported statement line is read through its bank's narrative
+               grammar, so the gross the acquirer billed, the fee it withheld and the
+               store it belongs to are visible per line — without opening a workbook.</p>
+            <p>Use <b>No Operating Unit</b> to find what still needs a Bank MID
+               Mapping, and <b>Amount Disagrees</b> to find lines where the narrative
+               and the money do not add up.</p>
+        </field>
+    </record>
+
+    <!--
+      Re-reading is explicit on purpose: adding one store's mapping must not
+      silently rewrite the whole statement history, so the compute does not depend
+      on the mapping table. This is the button that applies a new mapping.
+    -->
+    <record id="action_levis_reread_narrative" model="ir.actions.server">
+        <field name="name">Re-read Bank Narrative</field>
+        <field name="model_id" ref="account.model_account_bank_statement_line"/>
+        <field name="binding_model_id" ref="account.model_account_bank_statement_line"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="code">records.action_levis_reread_narrative()</field>
+    </record>
+
+    <menuitem id="menu_levis_settlement_lines"
+              name="Bank Settlements"
+              parent="account.menu_finance_entries"
+              action="action_levis_settlement_lines"
+              sequence="93"/>
+</odoo>

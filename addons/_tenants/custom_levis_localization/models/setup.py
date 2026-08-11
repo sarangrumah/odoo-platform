@@ -376,3 +376,110 @@ def seed_trade_ou(env):
         "mappings": made_map,
         "grir_normalised": made_grir,
     }
+
+
+# --- POS clearing (feature #15) ---------------------------------------------
+# Control accounts for levis.pos.clearing, resolved by company-dependent code.
+# A code that does not exist in the chart is left empty rather than substituted:
+# the clearing then names the missing field instead of booking to the wrong
+# account.
+CLEARING_CODES = {
+    "suspense_account_id": "1103000002",
+    "mdr_account_id": "7104000001",
+    "ar_account_id": "1106000001",
+    "sweep_account_id": "1103019320",
+    "bank_charge_account_id": "7299012000",
+}
+# Per-tender POS receivable accounts a POS session splits into.
+CLEARING_POSREC_CODES = tuple("11060001%02d" % n for n in range(1, 11))
+# Which narrative grammar each bank feed speaks. Matched on the journal's bank
+# name, because journal codes are a per-database naming convention.
+CLEARING_FORMATS = (
+    ("bca", ("bca",)),
+    ("bri", ("bri", "rakyat")),
+    ("bni", ("bni", "negara")),
+    ("mandiri", ("mandiri",)),
+)
+
+
+def _clearing_format_for(journal):
+    haystack = " ".join(
+        part.lower()
+        for part in (
+            journal.bank_id.name or "",
+            journal.name or "",
+            journal.code or "",
+        )
+    )
+    for fmt, needles in CLEARING_FORMATS:
+        if any(needle in haystack for needle in needles):
+            return fmt
+    return None
+
+
+def seed_clearing_config(env):
+    """Provision ``levis.clearing.config`` and the bank narrative formats.
+
+    Idempotent: an existing configuration is only topped up where a field is
+    still empty, so a deliberate manual override is never overwritten.
+    """
+    Config = env["levis.clearing.config"]
+    Journal = env["account.journal"]
+    companies = env["res.company"].search([])
+    made = filled = formats = 0
+    for company in companies:
+        warehouses = env["stock.warehouse"].search([("company_id", "=", company.id)])
+        if not warehouses:
+            continue
+        bank_journals = Journal.search([("company_id", "=", company.id), ("type", "=", "bank")])
+        for journal in bank_journals:
+            if journal.levis_clearing_format:
+                continue
+            fmt = _clearing_format_for(journal)
+            if fmt:
+                journal.levis_clearing_format = fmt
+                formats += 1
+
+        config = Config.search([("company_id", "=", company.id)], limit=1)
+        vals = {}
+        for field, code in CLEARING_CODES.items():
+            if config and config[field]:
+                continue
+            account = _find_account(env, company, code)
+            if account:
+                vals[field] = account.id
+        if not (config and config.pos_receivable_account_ids):
+            posrec = [
+                _find_account(env, company, code).id
+                for code in CLEARING_POSREC_CODES
+                if _find_account(env, company, code)
+            ]
+            if posrec:
+                vals["pos_receivable_account_ids"] = [(6, 0, posrec)]
+        if not (config and config.bank_journal_ids) and bank_journals:
+            parsable = bank_journals.filtered(lambda j: j.levis_clearing_format not in (False, "none"))
+            if parsable:
+                vals["bank_journal_ids"] = [(6, 0, parsable.ids)]
+        if not (config and config.journal_id):
+            journal = Journal.search(
+                [("company_id", "=", company.id), ("code", "=", "GLJV")], limit=1
+            ) or Journal.search([("company_id", "=", company.id), ("type", "=", "general")], limit=1)
+            if journal:
+                vals["journal_id"] = journal.id
+
+        if config:
+            if vals:
+                config.write(vals)
+                filled += 1
+        elif vals.get("journal_id"):
+            vals["company_id"] = company.id
+            Config.create(vals)
+            made += 1
+
+    _logger.info(
+        "Levi's POS clearing seeding: %d config created, %d topped up, %d journal formats set",
+        made,
+        filled,
+        formats,
+    )
+    return {"created": made, "updated": filled, "formats": formats}
