@@ -1,0 +1,6 @@
+# Built artefacts. Rebuildable with ./build.sh; the PDF alone is 4.3 MB.
+dist/
+src/catalog.html
+src/catalog-png.html
+src/catalog-docx.html
+src/png/

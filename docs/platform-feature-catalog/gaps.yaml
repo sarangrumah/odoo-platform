@@ -1,0 +1,226 @@
+# Register kesenjangan platform — dibaca oleh taxonomy.load_gaps() dan
+# dirender ke bab "Administrasi Platform & Odoo-as-a-Service".
+#
+# Aturan penulisan:
+#   - `now_id`   : apa yang benar-benar berjalan hari ini. Bukan rencana.
+#   - `target_id`: kondisi yang dituju. Bukan janji tanggal.
+#   - `evidence` : path yang bisa dibuka orang lain untuk memeriksa klaimnya.
+#                  Setiap baris di bawah ini sudah diverifikasi terhadap repo
+#                  pada 11 Agustus 2026 — jangan menyalin klaim dari dokumen
+#                  lain tanpa membuka berkasnya.
+#   - severity   : high | medium | low
+#   - effort     : S (< 1 minggu) | M (1-4 minggu) | L (> 1 bulan)
+#   - horizon    : 0-3 | 3-6 | 6-12  (bulan)
+
+gaps:
+  - id: GAP-BACKUP-01
+    area: Ketahanan Data
+    title_id: "RPO nyata 24 jam, bukan 1 jam"
+    now_id: >-
+      WAL archiving belum tersambung. Backup penuh berjalan harian pukul 02.30
+      lewat cron, sehingga kehilangan data maksimum yang mungkin terjadi adalah
+      satu hari kerja penuh. Runbook pemulihan bencana menuliskan RPO 1 jam di
+      kepala dokumen, dan baru mengoreksinya sendiri di catatan tengah dokumen.
+    target_id: >-
+      WAL archiving aktif ke object storage terpisah, RPO terukur maksimal
+      1 jam, dan angka di kepala runbook disamakan dengan kenyataan.
+    impact_id: >-
+      Kegagalan penyimpanan pada sore hari menghapus seluruh transaksi hari itu.
+      Untuk tenant retail yang live, itu berarti penjualan satu hari harus
+      dimasukkan ulang dari sumber POS.
+    severity: high
+    effort: M
+    horizon: "0-3"
+    evidence:
+      - "docs/runbooks/disaster-recovery.md:4 (klaim 1 jam)"
+      - "docs/runbooks/disaster-recovery.md:152-154 (koreksi ke 24 jam)"
+      - "scripts/ops/pg_backup_all.sh, scripts/ops/odoo-pg-backup.cron"
+      - "postgres/ — tidak ada archive_mode / archive_command"
+
+  - id: GAP-BACKUP-02
+    area: Ketahanan Data
+    title_id: "Backup off-site belum benar-benar off-site"
+    now_id: >-
+      Layanan pg-backup-s3 dikunci di balik profil Compose `s3-backup` dan mati
+      secara bawaan. MinIO berjalan di host yang sama dan menulis ke disk yang
+      sama dengan Postgres, sehingga salinan yang ada tidak selamat dari
+      kegagalan disk atau host.
+    target_id: >-
+      Salinan harian terkirim ke object storage di luar host, dengan uji restore
+      terjadwal yang hasilnya tercatat.
+    impact_id: >-
+      Kehilangan satu host berarti kehilangan basis data dan seluruh salinannya
+      sekaligus.
+    severity: high
+    effort: M
+    horizon: "0-3"
+    evidence:
+      - "docker-compose.prod.yml:125-130 (profiles: [s3-backup])"
+      - "docker-compose.yml — minio bind-mount pada disk yang sama"
+
+  - id: GAP-HA-01
+    area: Ketersediaan
+    title_id: "Seluruh platform berjalan di satu host"
+    now_id: >-
+      Sekitar 15 kontainer berbagi satu VPS dan satu Docker network; semua jalur
+      data adalah bind-mount di bawah ./data/. Host basis data, host pelaporan,
+      dan host redundan yang direncanakan belum dibangun. Nama host `postgres`
+      masih ditulis langsung di berkas Compose untuk layanan odoo, sehingga
+      memisahkan basis data ke host lain bukan sekadar mengubah environment.
+    target_id: >-
+      Pemisahan host basis data, replika baca untuk pelaporan, dan host redundan
+      untuk failover.
+    impact_id: >-
+      Tidak ada failover. Pemeliharaan yang memerlukan reboot menghentikan semua
+      tenant sekaligus, termasuk yang sudah live.
+    severity: high
+    effort: L
+    horizon: "6-12"
+    evidence:
+      - "docker-compose.yml:130 dan :606, docker-compose.multitenant.yml:137 (HOST: postgres)"
+      - "docs/architecture.md — tabel Deployment topology"
+      - ".env.example — HOST_CPU_CORES / HOST_RAM_GB / HOST_DISK_GB tunggal"
+
+  - id: GAP-SEC-01
+    area: Keamanan
+    title_id: "Orkestrator memegang soket Docker host"
+    now_id: >-
+      Overlay multitenant memasang /var/run/docker.sock ke tenant-orchestrator
+      dalam mode read-only dan mematikan read_only pada filesystem kontainernya.
+      Akses ke soket Docker setara akses root di host. Pilihan ini diambil sadar
+      dan alasannya tercatat sebagai komentar di berkas Compose, karena
+      provisioning menjalankan CLI Odoo di dalam kontainer odoo-mgmt.
+    target_id: >-
+      Provisioning lewat perantara berhak terbatas (socket proxy dengan daftar
+      perintah yang diizinkan), bukan soket penuh.
+    impact_id: >-
+      Satu kerentanan eksekusi kode pada orkestrator berubah menjadi penguasaan
+      host beserta seluruh basis data tenant.
+    severity: medium
+    effort: M
+    horizon: "3-6"
+    evidence:
+      - "docker-compose.multitenant.yml — blok tenant-orchestrator, mount docker.sock:ro"
+
+  - id: GAP-ADMIN-01
+    area: Konsol Admin
+    title_id: "Dua endpoint konsol masih mengembalikan data contoh"
+    now_id: >-
+      Pada BFF hub-portal, /api/costs dan /api/monitoring mengembalikan angka
+      tetap dengan penanda `demo: true`, yang di antarmuka muncul sebagai lencana
+      Demo. Endpoint lain sudah membaca data nyata lewat JSON-RPC ke Odoo.
+    target_id: >-
+      Biaya dibaca dari sumber penagihan yang sebenarnya; status layanan dibaca
+      dari Prometheus, bukan dari daftar tetap.
+    impact_id: >-
+      Halaman Cost dan Monitoring tidak boleh dipakai mengambil keputusan.
+      Penanda Demo memang tampil, tetapi mudah terlewat saat presentasi.
+    severity: medium
+    effort: S
+    horizon: "0-3"
+    evidence:
+      - "hub-portal/server/index.mjs:104 (/api/costs)"
+      - "hub-portal/server/index.mjs:116 (/api/monitoring)"
+
+  - id: GAP-ADMIN-02
+    area: Provisioning VPS
+    title_id: "Jalur provisioning VPS masih dapat berjalan dalam mode demo"
+    now_id: >-
+      Router /v1/vps/* sudah terdaftar di aplikasi (app/main.py:63) dan bukan
+      kode mati. Namun tiga handler yang bergantung SSH memeriksa
+      PLATFORM_DEMO_MODE dan mengembalikan jawaban stub ketika variabel itu
+      bernilai true, sehingga hasil "berhasil" belum tentu berarti ada perubahan
+      di VPS tujuan.
+    target_id: >-
+      Jalur SSH nyata diuji ujung ke ujung pada lingkungan produksi, dan
+      PLATFORM_DEMO_MODE dipastikan false di sana.
+    impact_id: >-
+      Operator bisa menyimpulkan sebuah VPS telah disiapkan padahal belum,
+      karena keluaran API terlihat sama.
+    severity: medium
+    effort: S
+    horizon: "0-3"
+    evidence:
+      - "tenant-orchestrator/app/main.py:63 (router terdaftar)"
+      - "tenant-orchestrator/app/routers/vps.py:30-33, :153 (stub demo mode)"
+
+  - id: GAP-KNOW-01
+    area: Pengetahuan Modul
+    title_id: "Dokumentasi modul sebagian besar masih berstatus draft"
+    now_id: >-
+      Dari 158 modul, 129 memiliki dokumen pengetahuan — 115 berkas
+      MODULE_KNOWLEDGE.md di dalam addons dan 14 override yang ditulis untuk
+      katalog ini. Hanya 4 di antaranya berstatus `reviewed`; 111 masih `draft`
+      hasil generator. 29 modul belum terdokumentasi sama sekali dan diringkas
+      otomatis dari manifest.
+    target_id: >-
+      Semua modul yang menghadap klien berstatus reviewed, dengan pemeriksaan
+      ulang saat versi manifest berubah.
+    impact_id: >-
+      Klaim kapabilitas dari berkas draft tidak boleh dikutip tanpa pemeriksaan.
+      Katalog ini menandainya lewat kolom Keyakinan Info, bukan menyembunyikannya.
+    severity: medium
+    effort: L
+    horizon: "3-6"
+    evidence:
+      - "docs/platform-feature-catalog/catalog-audit.md"
+      - "scripts/generate_module_knowledge.py, scripts/check_knowledge_drift.py"
+
+  - id: GAP-BI-01
+    area: Pelaporan & BI
+    title_id: "Belum ada permukaan Business Intelligence"
+    now_id: >-
+      Peran basis data odoo_readonly ada tetapi berstatus NOLOGIN dan hanya
+      diberi hak pada skema pdp. Tidak ada replika baca, tidak ada permukaan
+      ODBC, tidak ada gudang data, tidak ada ETL. Pelaporan seluruhnya berjalan
+      di dalam Odoo lewat custom_accounting_reports.
+    target_id: >-
+      Replika baca khusus pelaporan dengan peran read-only yang benar-benar bisa
+      login, sebagai target untuk perangkat BI.
+    impact_id: >-
+      Kueri analitik berat berjalan di basis data yang sama dengan transaksi.
+    severity: medium
+    effort: L
+    horizon: "6-12"
+    evidence:
+      - "postgres/init/03-roles.sql (odoo_readonly NOLOGIN, hanya skema pdp)"
+
+  - id: GAP-DOC-01
+    area: Dokumentasi
+    title_id: "Konsol admin tidak punya referensi endpoint"
+    now_id: >-
+      hub-portal/README.md hanya berisi 24 baris perintah pengembangan dan enam
+      variabel environment. Sekitar 20 endpoint BFF, perilaku stub demo, dan 12
+      halaman admin tidak terdokumentasi di mana pun selain kodenya.
+    target_id: >-
+      Referensi endpoint dan peta halaman admin, diperiksa CI agar tidak
+      tertinggal.
+    impact_id: >-
+      Serah terima operasional bergantung pada membaca kode.
+    severity: low
+    effort: S
+    horizon: "0-3"
+    evidence:
+      - "hub-portal/README.md (24 baris)"
+      - "hub-portal/server/index.mjs"
+
+  - id: GAP-DOC-02
+    area: Dokumentasi
+    title_id: "Angka modul di dokumen arsitektur pernah menyimpang jauh"
+    now_id: >-
+      Sebelum 11 Agustus 2026, lima dari delapan baris tabel Module tiers di
+      docs/architecture.md salah — ee_gap tertulis 78 padahal 105, _tenants
+      tertulis 5 padahal 10. Angka itu sudah dikoreksi, dan verify.py kini
+      membandingkan tabel tersebut dengan hasil pemindaian repo.
+    target_id: >-
+      Pemeriksaan tersebut berjalan di CI bersama check_knowledge_drift.py,
+      sehingga dua dokumen tidak bisa menyimpang lagi tanpa ketahuan.
+    impact_id: >-
+      Angka yang salah di dokumen rujukan internal menular ke setiap dokumen
+      turunan, termasuk yang dikirim ke klien.
+    severity: low
+    effort: S
+    horizon: "0-3"
+    evidence:
+      - "docs/architecture.md — tabel Module tiers"
+      - "docs/platform-feature-catalog/verify.py — pemeriksaan #12"
