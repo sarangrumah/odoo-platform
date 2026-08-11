@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Bank Reconciliation (POS Tender)",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "summary": "Match bank settlements against POS tender receivables per store, "
     "net of MDR, with a cash suggestion capped at the statement amount.",
     "description": """

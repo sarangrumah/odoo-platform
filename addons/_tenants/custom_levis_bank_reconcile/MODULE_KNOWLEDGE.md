@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-08-11T00:00:00Z
 generator: claude-code-handwritten
 module: custom_levis_bank_reconcile
-manifest_version: 19.0.1.0.0
+manifest_version: 19.0.1.1.0
 ---
 
 # custom_levis_bank_reconcile
@@ -20,7 +20,10 @@ same facts, same sources, one line at a time.
   narrative type, gross and MDR per statement line, with filters for
   settlements / cash deposits / *Store Not Identified* / *Amount Disagrees With
   Narrative*, and group-by Operating Unit.
-- **Match** on a card settlement opens the wizard preselecting candidates at the
+- **Match** opens a **full page** (`view_bank_reconcile_wizard_page`, `target=current`),
+  not the generic modal: the operator has to read store, gross, fee, trading day and a
+  dozen candidate rows at once, and a dialog collapses those columns. The statement
+  list stays in the breadcrumb. On a card settlement it preselects candidates at the
   **gross** (`amount + MDR`), with the fee pre-filled on the clearing config's MDR
   expense account and the store's analytic. Reconciling books
   Dr tender receivable-clearing / Dr MDR / Cr suspense; the receivable clears in full.
@@ -67,6 +70,13 @@ same facts, same sources, one line at a time.
 - **Adding a MID mapping does not rewrite history by itself.** The statement-line
   compute deliberately does not depend on `levis.bank.mid.map`; run *Re-read Bank
   Narrative* on the affected lines.
+- **Page buttons return `None` on purpose.** In a full-page form that reloads the
+  record; returning an action instead would push a new breadcrumb on every click.
+  (In a dialog, returning `None` would close it — which is why the generic wizard
+  in `custom_account_reconcile` returns an action and this one does not.)
+- `action_open_match_wizard` **creates** the wizard record before opening: a page
+  opens on a res_id, so without it the screen renders blank and `default_get`
+  never sees the statement line.
 - The day window is `settlement_lag_days` plus 12 days back / 3 forward. A
   settlement older than that needs *Search More*.
 

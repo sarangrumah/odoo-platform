@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-11T01:41:01+00:00",
+  "generated_at": "2026-08-11T03:03:20+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "8f985ed",
-    "branch": "feat/levis-bank-reconcile-tender"
+    "commit": "3692407",
+    "branch": "feat/levis-bank-reconcile-page"
   },
   "buckets": [
     {
@@ -287,14 +287,20 @@
       "module": "custom_levis_bank_reconcile",
       "bucket": "_tenants",
       "name": "Levi's Bank Reconciliation (POS Tender)",
-      "version": "19.0.1.0.0",
+      "version": "19.0.1.1.0",
       "summary": "Match bank settlements against POS tender receivables per store, net of MDR, with a cash suggestion capped at the statement amount.",
       "category": "Tenants/Levis",
       "depends": 2,
       "public": false,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-08-11",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "3692407",
+          "date": "2026-08-11",
+          "subject": "feat(levis): match a bank settlement to one store's POS tenders, net of MDR (#131)"
+        }
+      ]
     },
     {
       "module": "custom_levis_categ_approval",
@@ -333,9 +339,9 @@
       "change_count": 42,
       "changes": [
         {
-          "sha": "8f985ed",
+          "sha": "48ac177",
           "date": "2026-08-11",
-          "subject": "feat(levis): clear the month's POS receivables from the bank statement itself"
+          "subject": "feat(levis): clear the month's POS receivables from the bank statement itself (#130)"
         },
         {
           "sha": "611f04b",
@@ -1428,9 +1434,14 @@
       "category": "Accounting/Accounting",
       "depends": 1,
       "public": true,
-      "last_change": "2026-07-24",
-      "change_count": 2,
+      "last_change": "2026-08-11",
+      "change_count": 3,
       "changes": [
+        {
+          "sha": "3692407",
+          "date": "2026-08-11",
+          "subject": "feat(levis): match a bank settlement to one store's POS tenders, net of MDR (#131)"
+        },
         {
           "sha": "7e9d66b",
           "date": "2026-07-24",

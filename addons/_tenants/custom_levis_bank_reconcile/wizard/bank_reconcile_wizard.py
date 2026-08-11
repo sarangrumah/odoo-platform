@@ -150,13 +150,15 @@ class BankReconcileWizard(models.TransientModel):
             )
         self.candidate_ids.selected = False
         chosen.selected = True
-        return {
-            "type": "ir.actions.act_window",
-            "res_model": self._name,
-            "res_id": self.id,
-            "view_mode": "form",
-            "target": "new",
-        }
+        # Nothing to return: the page reloads the record in place. Re-opening it
+        # as an action would stack another breadcrumb for every click.
+        return None
+
+    def action_search_more(self):
+        """Refresh the candidates without leaving the page."""
+        self.ensure_one()
+        super().action_search_more()
+        return None
 
     # ------------------------------------------------------------------
     # Reconcile

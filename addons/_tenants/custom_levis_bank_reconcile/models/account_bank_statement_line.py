@@ -177,3 +177,31 @@ class AccountBankStatementLine(models.Model):
             lambda aml: not currency.compare_amounts(aml.amount_residual, target)
         )
         return exact if len(exact) == 1 else exact.browse()
+
+    # ------------------------------------------------------------------
+    # UI
+    # ------------------------------------------------------------------
+    def action_open_match_wizard(self):
+        """Open the matching screen as a page, not a modal.
+
+        The generic wizard was built for "one invoice, one payment", which fits
+        in a dialog. A Levi's settlement does not: the operator has to read the
+        store, the gross, the fee and the trading day, then compare a dozen
+        candidate rows that each carry their own store, day and residual. In a
+        modal those columns collapse into an unreadable smear, and the decision
+        being made is whose money this is.
+
+        So it gets the full width, with the statement list still in the
+        breadcrumb behind it.
+        """
+        self.ensure_one()
+        action = super().action_open_match_wizard()
+        action["target"] = "current"
+        action["views"] = [(self.env.ref("custom_levis_bank_reconcile.view_bank_reconcile_wizard_page").id, "form")]
+        context = dict(action.get("context") or {})
+        # The wizard is a transient: the action must carry a record, or the page
+        # opens on a blank one and default_get never sees the statement line.
+        wizard = self.env["custom.bank.reconcile.wizard"].with_context(**context).create({})
+        action["res_id"] = wizard.id
+        action["context"] = context
+        return action
