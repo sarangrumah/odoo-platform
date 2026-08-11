@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" width="900" height="520" font-family="Calibri, Carlito, sans-serif">
+  <style>
+    .lbl  { font-size: 13.5px; fill: #1A2332; font-weight: bold; }
+    .lblw { font-size: 13.5px; fill: #FFFFFF; font-weight: bold; }
+    .sm   { font-size: 11px; fill: #4A5568; }
+    .smw  { font-size: 11px; fill: #E8E0E7; }
+    .cap  { font-size: 11.5px; fill: #714B67; font-weight: bold; letter-spacing: .05em; }
+    .box  { fill: #FFFFFF; stroke: #C9B8C6; stroke-width: 1.4; }
+    .navy { fill: #1A2332; stroke: #1A2332; }
+    .plum { fill: #714B67; stroke: #714B67; }
+    .band { fill: #F5F2F4; stroke: #E0D6DE; stroke-width: 1; }
+    .hmac { stroke: #714B67; stroke-width: 1.8; fill: none; marker-end: url(#c); }
+    .plain{ stroke: #9AA5B1; stroke-width: 1.3; fill: none; marker-end: url(#d); }
+    .tag  { font-size: 10px; fill: #714B67; font-weight: bold; }
+  </style>
+  <defs>
+    <marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#714B67"/>
+    </marker>
+    <marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#9AA5B1"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="900" height="520" fill="#FFFFFF"/>
+
+  <text class="cap" x="40" y="26">LAPISAN KENDALI — SIAPA MEMANGGIL SIAPA</text>
+
+  <!-- operator -->
+  <rect class="box" x="40" y="44" width="160" height="46" rx="6"/>
+  <text class="lbl" x="120" y="66" text-anchor="middle">Operator platform</text>
+  <text class="sm"  x="120" y="82" text-anchor="middle">peramban · CLI · Makefile</text>
+
+  <!-- caddy -->
+  <rect class="navy" x="250" y="44" width="200" height="46" rx="6"/>
+  <text class="lblw" x="350" y="66" text-anchor="middle">Caddy + WAF</text>
+  <text class="smw"  x="350" y="82" text-anchor="middle">TLS · rate limit · slug → header</text>
+  <path class="plain" d="M200 67 L246 67"/>
+
+  <!-- hub portal -->
+  <rect class="plum" x="500" y="44" width="200" height="46" rx="6"/>
+  <text class="lblw" x="600" y="66" text-anchor="middle">Konsol admin (SPA)</text>
+  <text class="smw"  x="600" y="82" text-anchor="middle">12 halaman admin</text>
+  <path class="plain" d="M450 67 L496 67"/>
+
+  <!-- BFF -->
+  <rect class="box" x="500" y="122" width="200" height="46" rx="6"/>
+  <text class="lbl" x="600" y="144" text-anchor="middle">BFF (Express)</text>
+  <text class="sm"  x="600" y="160" text-anchor="middle">menandatangani permintaan</text>
+  <path class="plain" d="M600 90 L600 118"/>
+
+  <!-- orchestrator -->
+  <rect class="plum" x="500" y="212" width="200" height="58" rx="6"/>
+  <text class="lblw" x="600" y="234" text-anchor="middle">Orkestrator (FastAPI)</text>
+  <text class="smw"  x="600" y="250" text-anchor="middle">provision · suspend · backup</text>
+  <text class="smw"  x="600" y="264" text-anchor="middle">restore · bootstrap VPS</text>
+  <path class="hmac" d="M600 168 L600 208"/>
+  <text class="tag" x="610" y="192">HMAC · ±300 s · nonce</text>
+
+  <!-- odoo mgmt -->
+  <rect class="box" x="230" y="212" width="200" height="58" rx="6"/>
+  <text class="lbl" x="330" y="234" text-anchor="middle">Odoo manajemen</text>
+  <text class="sm"  x="330" y="250" text-anchor="middle">CLI pembuatan basis data</text>
+  <text class="sm"  x="330" y="264" text-anchor="middle">LIST_DB aktif · tidak publik</text>
+  <path class="hmac" d="M496 241 L434 241"/>
+  <text class="tag" x="440" y="232">docker exec</text>
+
+  <!-- odoo app -->
+  <rect class="navy" x="230" y="122" width="200" height="46" rx="6"/>
+  <text class="lblw" x="330" y="144" text-anchor="middle">Odoo aplikasi</text>
+  <text class="smw"  x="330" y="160" text-anchor="middle">modul control_plane</text>
+  <path class="plain" d="M330 90 L330 118"/>
+  <path class="hmac" d="M496 145 L434 145"/>
+  <text class="tag" x="436" y="136">JSON-RPC</text>
+
+  <!-- registry -->
+  <rect class="band" x="230" y="312" width="470" height="96" rx="8"/>
+  <text class="cap" x="248" y="332">REGISTRY — skema tenant_registry</text>
+  <rect class="box" x="248" y="342" width="100" height="48" rx="5"/>
+  <text class="lbl" x="298" y="364" text-anchor="middle">tenants</text>
+  <text class="sm"  x="298" y="380" text-anchor="middle">daftar induk</text>
+  <rect class="box" x="360" y="342" width="150" height="48" rx="5"/>
+  <text class="lbl" x="435" y="364" text-anchor="middle">action_log</text>
+  <text class="sm"  x="435" y="380" text-anchor="middle">append-only, berantai-hash</text>
+  <rect class="box" x="522" y="342" width="82" height="48" rx="5"/>
+  <text class="lbl" x="563" y="364" text-anchor="middle">backups</text>
+  <text class="sm"  x="563" y="380" text-anchor="middle">ledger</text>
+  <rect class="box" x="616" y="342" width="72" height="48" rx="5"/>
+  <text class="lbl" x="652" y="364" text-anchor="middle">coretax</text>
+  <text class="sm"  x="652" y="380" text-anchor="middle">usage</text>
+  <path class="hmac" d="M600 270 L600 308"/>
+
+  <!-- tenant dbs -->
+  <rect class="box" x="740" y="212" width="120" height="196" rx="6"/>
+  <text class="lbl" x="800" y="236" text-anchor="middle">Basis data</text>
+  <text class="lbl" x="800" y="252" text-anchor="middle">per tenant</text>
+  <text class="sm"  x="800" y="278" text-anchor="middle">prd_levis_begbal</text>
+  <text class="sm"  x="800" y="296" text-anchor="middle">prd_arkaaim</text>
+  <text class="sm"  x="800" y="314" text-anchor="middle">trn_arkaaim</text>
+  <text class="sm"  x="800" y="332" text-anchor="middle">rnd_ppob</text>
+  <text class="sm"  x="800" y="350" text-anchor="middle">rnd_esb</text>
+  <text class="sm"  x="800" y="368" text-anchor="middle">rnd_vas_pmo</text>
+  <text class="sm"  x="800" y="386" text-anchor="middle">…</text>
+  <path class="hmac" d="M700 241 L736 241"/>
+
+  <text class="sm" x="40" y="446">Garis ungu = panggilan bertanda tangan HMAC atau operasi istimewa. Garis abu = lalu lintas peramban biasa.</text>
+  <text class="sm" x="40" y="466">Basis data dibuat lewat CLI Odoo di dalam kontainer manajemen: endpoint pembuatan bawaan mengembalikan HTTP 200 meskipun gagal.</text>
+  <text class="sm" x="40" y="486">Orkestrator memegang soket Docker host dalam mode read-only — setara akses root. Lihat GAP-SEC-01.</text>
+</svg>

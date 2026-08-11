@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1036 580" width="1036" height="580" font-family="Calibri, Carlito, sans-serif">
+<style>
+ .lbl{font-size:13.5px;fill:#1A2332}
+ .hd{font-size:12px;fill:#1A2332;font-weight:bold}
+ .num{font-size:13px;fill:#714B67;font-weight:bold}
+ .sm{font-size:11px;fill:#4A5568}
+ .cap{font-size:11.5px;fill:#714B67;font-weight:bold;letter-spacing:.05em}
+ .bar{fill:#714B67}
+ .bar2{fill:#C9B8C6}
+ .cell{fill:#FFFFFF;stroke:#E0D6DE;stroke-width:1}
+ .alt{fill:#F5F2F4;stroke:#E0D6DE;stroke-width:1}
+ .own{font-size:14px;fill:#714B67;font-weight:bold}
+ .cfg{font-size:14px;fill:#9AA5B1}
+</style>
+<rect x="0" y="0" width="1036" height="580" fill="#FFFFFF"/>
+<text class="cap" x="30" y="26">DOMAIN × BRAND — DI MANA DATA ATAU KONFIGURASI BRAND SUDAH ADA</text>
+<text class="hd" x="381.0" y="118" text-anchor="start" transform="rotate(-55 381.0 118)">ARKA-AIM</text>
+<text class="hd" x="463.0" y="118" text-anchor="start" transform="rotate(-55 463.0 118)">Levi's</text>
+<text class="hd" x="545.0" y="118" text-anchor="start" transform="rotate(-55 545.0 118)">Eraspace / PPOB-VAS</text>
+<text class="hd" x="627.0" y="118" text-anchor="start" transform="rotate(-55 627.0 118)">EFN (Erajaya F&B)</text>
+<text class="hd" x="709.0" y="118" text-anchor="start" transform="rotate(-55 709.0 118)">Finance Portal</text>
+<text class="hd" x="791.0" y="118" text-anchor="start" transform="rotate(-55 791.0 118)">VAS PMO</text>
+<text class="hd" x="873.0" y="118" text-anchor="start" transform="rotate(-55 873.0 118)">GentleWoman</text>
+<text class="hd" x="955.0" y="118" text-anchor="start" transform="rotate(-55 955.0 118)">JDS Warehouse</text>
+<rect class="cell" x="30" y="126" width="310" height="30"/>
+<text class="lbl" x="40" y="146">Keuangan & Akuntansi</text>
+<rect class="cell" x="340" y="126" width="82" height="30"/>
+<text class="own" x="381.0" y="146" text-anchor="middle">●4 ○6</text>
+<rect class="cell" x="422" y="126" width="82" height="30"/>
+<text class="own" x="463.0" y="146" text-anchor="middle">●3 ○8</text>
+<rect class="cell" x="504" y="126" width="82" height="30"/>
+<rect class="cell" x="586" y="126" width="82" height="30"/>
+<rect class="cell" x="668" y="126" width="82" height="30"/>
+<text class="cfg" x="709.0" y="146" text-anchor="middle">○4</text>
+<rect class="cell" x="750" y="126" width="82" height="30"/>
+<rect class="cell" x="832" y="126" width="82" height="30"/>
+<rect class="cell" x="914" y="126" width="82" height="30"/>
+<rect class="alt" x="30" y="156" width="310" height="30"/>
+<text class="lbl" x="40" y="176">Perpajakan Indonesia</text>
+<rect class="alt" x="340" y="156" width="82" height="30"/>
+<text class="cfg" x="381.0" y="176" text-anchor="middle">○2</text>
+<rect class="alt" x="422" y="156" width="82" height="30"/>
+<text class="cfg" x="463.0" y="176" text-anchor="middle">○2</text>
+<rect class="alt" x="504" y="156" width="82" height="30"/>
+<rect class="alt" x="586" y="156" width="82" height="30"/>
+<rect class="alt" x="668" y="156" width="82" height="30"/>
+<rect class="alt" x="750" y="156" width="82" height="30"/>
+<rect class="alt" x="832" y="156" width="82" height="30"/>
+<rect class="alt" x="914" y="156" width="82" height="30"/>
+<rect class="cell" x="30" y="186" width="310" height="30"/>
+<text class="lbl" x="40" y="206">SDM & Payroll</text>
+<rect class="cell" x="340" y="186" width="82" height="30"/>
+<rect class="cell" x="422" y="186" width="82" height="30"/>
+<rect class="cell" x="504" y="186" width="82" height="30"/>
+<rect class="cell" x="586" y="186" width="82" height="30"/>
+<rect class="cell" x="668" y="186" width="82" height="30"/>
+<rect class="cell" x="750" y="186" width="82" height="30"/>
+<rect class="cell" x="832" y="186" width="82" height="30"/>
+<rect class="cell" x="914" y="186" width="82" height="30"/>
+<rect class="alt" x="30" y="216" width="310" height="30"/>
+<text class="lbl" x="40" y="236">Gudang & Inventori</text>
+<rect class="alt" x="340" y="216" width="82" height="30"/>
+<rect class="alt" x="422" y="216" width="82" height="30"/>
+<text class="cfg" x="463.0" y="236" text-anchor="middle">○2</text>
+<rect class="alt" x="504" y="216" width="82" height="30"/>
+<rect class="alt" x="586" y="216" width="82" height="30"/>
+<rect class="alt" x="668" y="216" width="82" height="30"/>
+<rect class="alt" x="750" y="216" width="82" height="30"/>
+<rect class="alt" x="832" y="216" width="82" height="30"/>
+<rect class="alt" x="914" y="216" width="82" height="30"/>
+<text class="cfg" x="955.0" y="236" text-anchor="middle">○9</text>
+<rect class="cell" x="30" y="246" width="310" height="30"/>
+<text class="lbl" x="40" y="266">Penjualan, Retail & POS</text>
+<rect class="cell" x="340" y="246" width="82" height="30"/>
+<rect class="cell" x="422" y="246" width="82" height="30"/>
+<text class="own" x="463.0" y="266" text-anchor="middle">●1 ○4</text>
+<rect class="cell" x="504" y="246" width="82" height="30"/>
+<rect class="cell" x="586" y="246" width="82" height="30"/>
+<rect class="cell" x="668" y="246" width="82" height="30"/>
+<rect class="cell" x="750" y="246" width="82" height="30"/>
+<rect class="cell" x="832" y="246" width="82" height="30"/>
+<text class="cfg" x="873.0" y="266" text-anchor="middle">○2</text>
+<rect class="cell" x="914" y="246" width="82" height="30"/>
+<rect class="alt" x="30" y="276" width="310" height="30"/>
+<text class="lbl" x="40" y="296">Layanan, Proyek & Sewa</text>
+<rect class="alt" x="340" y="276" width="82" height="30"/>
+<text class="own" x="381.0" y="296" text-anchor="middle">●1 ○5</text>
+<rect class="alt" x="422" y="276" width="82" height="30"/>
+<rect class="alt" x="504" y="276" width="82" height="30"/>
+<rect class="alt" x="586" y="276" width="82" height="30"/>
+<rect class="alt" x="668" y="276" width="82" height="30"/>
+<rect class="alt" x="750" y="276" width="82" height="30"/>
+<text class="cfg" x="791.0" y="296" text-anchor="middle">○4</text>
+<rect class="alt" x="832" y="276" width="82" height="30"/>
+<rect class="alt" x="914" y="276" width="82" height="30"/>
+<rect class="cell" x="30" y="306" width="310" height="30"/>
+<text class="lbl" x="40" y="326">Manufaktur, Kualitas & Pemeliharaan</text>
+<rect class="cell" x="340" y="306" width="82" height="30"/>
+<rect class="cell" x="422" y="306" width="82" height="30"/>
+<rect class="cell" x="504" y="306" width="82" height="30"/>
+<rect class="cell" x="586" y="306" width="82" height="30"/>
+<rect class="cell" x="668" y="306" width="82" height="30"/>
+<rect class="cell" x="750" y="306" width="82" height="30"/>
+<rect class="cell" x="832" y="306" width="82" height="30"/>
+<rect class="cell" x="914" y="306" width="82" height="30"/>
+<rect class="alt" x="30" y="336" width="310" height="30"/>
+<text class="lbl" x="40" y="356">Produktivitas & AI</text>
+<rect class="alt" x="340" y="336" width="82" height="30"/>
+<rect class="alt" x="422" y="336" width="82" height="30"/>
+<rect class="alt" x="504" y="336" width="82" height="30"/>
+<rect class="alt" x="586" y="336" width="82" height="30"/>
+<rect class="alt" x="668" y="336" width="82" height="30"/>
+<rect class="alt" x="750" y="336" width="82" height="30"/>
+<rect class="alt" x="832" y="336" width="82" height="30"/>
+<rect class="alt" x="914" y="336" width="82" height="30"/>
+<rect class="cell" x="30" y="366" width="310" height="30"/>
+<text class="lbl" x="40" y="386">Pemasaran & Komunikasi</text>
+<rect class="cell" x="340" y="366" width="82" height="30"/>
+<rect class="cell" x="422" y="366" width="82" height="30"/>
+<rect class="cell" x="504" y="366" width="82" height="30"/>
+<rect class="cell" x="586" y="366" width="82" height="30"/>
+<rect class="cell" x="668" y="366" width="82" height="30"/>
+<rect class="cell" x="750" y="366" width="82" height="30"/>
+<rect class="cell" x="832" y="366" width="82" height="30"/>
+<rect class="cell" x="914" y="366" width="82" height="30"/>
+<rect class="alt" x="30" y="396" width="310" height="30"/>
+<text class="lbl" x="40" y="416">Kepatuhan Data (UU PDP) & Audit</text>
+<rect class="alt" x="340" y="396" width="82" height="30"/>
+<rect class="alt" x="422" y="396" width="82" height="30"/>
+<rect class="alt" x="504" y="396" width="82" height="30"/>
+<rect class="alt" x="586" y="396" width="82" height="30"/>
+<rect class="alt" x="668" y="396" width="82" height="30"/>
+<rect class="alt" x="750" y="396" width="82" height="30"/>
+<rect class="alt" x="832" y="396" width="82" height="30"/>
+<rect class="alt" x="914" y="396" width="82" height="30"/>
+<rect class="cell" x="30" y="426" width="310" height="30"/>
+<text class="lbl" x="40" y="446">Integrasi & Fondasi Platform</text>
+<rect class="cell" x="340" y="426" width="82" height="30"/>
+<text class="own" x="381.0" y="446" text-anchor="middle">●1</text>
+<rect class="cell" x="422" y="426" width="82" height="30"/>
+<rect class="cell" x="504" y="426" width="82" height="30"/>
+<rect class="cell" x="586" y="426" width="82" height="30"/>
+<text class="cfg" x="627.0" y="446" text-anchor="middle">○1</text>
+<rect class="cell" x="668" y="426" width="82" height="30"/>
+<rect class="cell" x="750" y="426" width="82" height="30"/>
+<rect class="cell" x="832" y="426" width="82" height="30"/>
+<rect class="cell" x="914" y="426" width="82" height="30"/>
+<rect class="alt" x="30" y="456" width="310" height="30"/>
+<text class="lbl" x="40" y="476">Vertikal Industri</text>
+<rect class="alt" x="340" y="456" width="82" height="30"/>
+<rect class="alt" x="422" y="456" width="82" height="30"/>
+<rect class="alt" x="504" y="456" width="82" height="30"/>
+<text class="cfg" x="545.0" y="476" text-anchor="middle">○12</text>
+<rect class="alt" x="586" y="456" width="82" height="30"/>
+<text class="cfg" x="627.0" y="476" text-anchor="middle">○1</text>
+<rect class="alt" x="668" y="456" width="82" height="30"/>
+<rect class="alt" x="750" y="456" width="82" height="30"/>
+<rect class="alt" x="832" y="456" width="82" height="30"/>
+<rect class="alt" x="914" y="456" width="82" height="30"/>
+<rect class="cell" x="30" y="486" width="310" height="30"/>
+<text class="lbl" x="40" y="506">Administrasi Platform & Odoo-as-a-Service</text>
+<rect class="cell" x="340" y="486" width="82" height="30"/>
+<rect class="cell" x="422" y="486" width="82" height="30"/>
+<rect class="cell" x="504" y="486" width="82" height="30"/>
+<rect class="cell" x="586" y="486" width="82" height="30"/>
+<rect class="cell" x="668" y="486" width="82" height="30"/>
+<rect class="cell" x="750" y="486" width="82" height="30"/>
+<rect class="cell" x="832" y="486" width="82" height="30"/>
+<rect class="cell" x="914" y="486" width="82" height="30"/>
+<text class="sm" x="30" y="540">● modul khusus brand (addons/_tenants/)   ○ modul umum yang sudah membawa profil atau data brand tersebut</text>
+<text class="sm" x="30" y="558">Sel kosong berarti domain itu tersedia untuk brand tersebut tetapi belum membawa data khusus — bukan berarti tidak tersedia.</text>
+</svg>
