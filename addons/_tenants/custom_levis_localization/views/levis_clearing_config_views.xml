@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_levis_clearing_config_form" model="ir.ui.view">
+        <field name="name">levis.clearing.config.form</field>
+        <field name="model">levis.clearing.config</field>
+        <field name="arch" type="xml">
+            <form string="POS Clearing Accounts">
+                <sheet>
+                    <group>
+                        <group string="Scope">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="journal_id"/>
+                            <field name="bank_journal_ids" widget="many2many_tags"/>
+                        </group>
+                        <group string="Timing">
+                            <field name="settlement_lag_days"/>
+                            <field name="lookback_days"/>
+                        </group>
+                    </group>
+                    <group string="Control Accounts">
+                        <group>
+                            <field name="suspense_account_id"/>
+                            <field name="mdr_account_id"/>
+                            <field name="ar_account_id"/>
+                        </group>
+                        <group>
+                            <field name="sweep_account_id"/>
+                            <field name="bank_charge_account_id"/>
+                        </group>
+                    </group>
+                    <group string="POS Receivable per Tender">
+                        <p colspan="2" class="text-muted">
+                            The clearing does not trust the bank narrative to say which of
+                            these a settlement pays — one card MID covers every scheme. It
+                            finds out by consuming the open debits on these accounts,
+                            largest first, for the store and trading day in question.
+                        </p>
+                        <field name="pos_receivable_account_ids" nolabel="1" colspan="2"
+                               widget="many2many_tags"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_levis_clearing_config_list" model="ir.ui.view">
+        <field name="name">levis.clearing.config.list</field>
+        <field name="model">levis.clearing.config</field>
+        <field name="arch" type="xml">
+            <list string="POS Clearing Accounts">
+                <field name="company_id"/>
+                <field name="journal_id"/>
+                <field name="suspense_account_id"/>
+                <field name="mdr_account_id"/>
+                <field name="ar_account_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_levis_clearing_config" model="ir.actions.act_window">
+        <field name="name">POS Clearing Accounts</field>
+        <field name="res_model">levis.clearing.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Wire up the clearing accounts</p>
+            <p>Seeded by account code on install. Check the suspense account matches
+               what your bank journals actually park statement lines on — that is what
+               makes the clearing entry net out against them.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_levis_clearing_config"
+              name="POS Clearing Accounts"
+              parent="account.menu_finance_configuration"
+              action="action_levis_clearing_config"
+              sequence="95"/>
+
+    <record id="view_levis_bank_mid_map_form" model="ir.ui.view">
+        <field name="name">levis.bank.mid.map.form</field>
+        <field name="model">levis.bank.mid.map</field>
+        <field name="arch" type="xml">
+            <form string="Bank MID Mapping">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="journal_id"/>
+                            <field name="match_type"/>
+                            <field name="key"/>
+                        </group>
+                        <group>
+                            <field name="warehouse_id"/>
+                            <field name="analytic_account_id"/>
+                            <field name="channel"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                        </group>
+                    </group>
+                    <field name="note" placeholder="Why this rule exists…"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_levis_bank_mid_map_list" model="ir.ui.view">
+        <field name="name">levis.bank.mid.map.list</field>
+        <field name="model">levis.bank.mid.map</field>
+        <field name="arch" type="xml">
+            <list string="Bank MID Mapping" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="journal_id"/>
+                <field name="match_type"/>
+                <field name="key"/>
+                <field name="channel"/>
+                <field name="warehouse_id" optional="hide"/>
+                <field name="analytic_account_id"/>
+                <field name="date_start" optional="hide"/>
+                <field name="date_end" optional="hide"/>
+                <field name="name" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_bank_mid_map_search" model="ir.ui.view">
+        <field name="name">levis.bank.mid.map.search</field>
+        <field name="model">levis.bank.mid.map</field>
+        <field name="arch" type="xml">
+            <search string="Bank MID Mapping">
+                <field name="key"/>
+                <field name="analytic_account_id"/>
+                <field name="name"/>
+                <filter name="group_journal" string="Bank" context="{'group_by': 'journal_id'}"/>
+                <filter name="group_channel" string="Channel" context="{'group_by': 'channel'}"/>
+                <filter name="group_store" string="Operating Unit"
+                        context="{'group_by': 'analytic_account_id'}"/>
+                <filter name="inactive" string="Archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_bank_mid_map" model="ir.actions.act_window">
+        <field name="name">Bank MID Mapping</field>
+        <field name="res_model">levis.bank.mid.map</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Tell the clearing which store each terminal belongs to</p>
+            <p>Bank narratives truncate store names — <em>LEVIS PLAZA SENAYA</em> and
+               <em>LEVIS SENAYAN CITY</em> are different shops — so the merchant or
+               terminal number is the key, never the name. Cash deposits have no
+               number and are matched by an explicit keyword instead.</p>
+            <p>The fastest way to fill this in is the <b>Map Unmapped Settlements</b>
+               button on a clearing run: it scans the period and lists what is missing,
+               biggest amount first.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_levis_bank_mid_map"
+              name="Bank MID Mapping"
+              parent="account.menu_finance_configuration"
+              action="action_levis_bank_mid_map"
+              sequence="96"/>
+</odoo>
