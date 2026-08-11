@@ -50,6 +50,9 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 # Half a cent: below this, a difference is float noise, not money.
+# Channels whose money demonstrably did not arrive as cash.
+_CARD_CHANNELS = ("debit", "credit", "qris")
+
 _EPS = 0.005
 
 # Above this many identical findings, the diagnostic is aggregated into one row
@@ -550,13 +553,34 @@ class LevisPosClearing(models.Model):
         * **Card** — genuinely undecidable, and that is the design, not a gap. One
           MID covers Visa, Mastercard, JCB and Amex alike, so the split has to be
           discovered from the open debits.
-        * **QRIS** — left unrestricted on purpose. It looks decidable, but there is
-          no evidence that QRIS always lands on one specific tender account here,
-          and guessing would reintroduce exactly the error this fixes.
+        * **QRIS** — not narrowed to one account. It looks decidable, but there is
+          no evidence that QRIS always lands on one specific tender account here:
+          measured over July, QRIS settlements matched debits across SEVEN of the
+          ten accounts (102 46%, 106 23%, 105 17%, 108 12%, the rest ~1% each),
+          with no concentration at all. Guessing would reintroduce exactly the
+          error this fixes.
+        * **Card and QRIS still may not touch the CASH receivable**, which is a
+          different question from the one above and has a definite answer: the
+          account holds takings paid in cash, so card money settling it clears an
+          account the customer never used. Over July only 3 of 358 unambiguously
+          matched card/QRIS settlements landed there (0.8%, Rp 2.6 m) — small, but
+          wrong by construction rather than by measurement, and it hides a real
+          cash shortfall behind a card over-clear.
+
+        Note the asymmetry is deliberate: cash is restricted to ONE account
+        because its channel is certain, while card/QRIS is merely denied ONE
+        account, because which card account it belongs to remains undecidable.
         """
         self.ensure_one()
-        if parsed.get("kind") == "cash_deposit" and cash_account:
+        if not cash_account:
+            return self.env["account.account"]
+        if parsed.get("kind") == "cash_deposit":
             return cash_account
+        # Positive test on the channels we mean, never "not cash": a narrative
+        # that could not be read carries channel "other", and must keep the old
+        # unrestricted behaviour rather than being narrowed on a guess.
+        if parsed.get("kind") == "settlement" and parsed.get("channel") in _CARD_CHANNELS:
+            return self.config_id.pos_receivable_account_ids - cash_account
         return self.env["account.account"]
 
     # ------------------------------------------------------------------

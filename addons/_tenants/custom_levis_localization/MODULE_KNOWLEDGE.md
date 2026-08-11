@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T08:56:04Z
 generator: bootstrap-v1
 module: custom_levis_localization
-manifest_version: 19.0.1.28.0
+manifest_version: 19.0.1.29.0
 ---
 
 # Levi's Localization (`custom_levis_localization`)
@@ -372,6 +372,15 @@ gotcha below.
   would break allocations that are currently right. Expect the reported shortfall to RISE after
   this guard (July: Rp 35.3m/14 lines -> Rp 104.1m/49 lines) — that is the real gap becoming
   visible, not a regression.
+- **And the mirror: a card or QRIS settlement may not clear the CASH receivable.** Different
+  question, definite answer — that account holds takings paid in cash, so card money settling it
+  clears an account the customer never used, and hides a real cash shortfall behind a card
+  over-clear. Only 3 of 358 unambiguously matched card/QRIS settlements landed there in July
+  (0.8%, Rp 2.6m): small, and wrong by construction rather than by measurement. The asymmetry is
+  deliberate — cash is restricted to ONE account because its channel is certain, card/QRIS is
+  merely denied ONE account because which card account it belongs to stays undecidable. Both
+  branches test the channel POSITIVELY (`_CARD_CHANNELS`), never "not cash": an unread narrative
+  carries channel `other` and must keep the unrestricted pool.
 
 ## Out of Scope
 - This module does not cover inventory adjustments, backorders, or handling of internal transfers and manufacturing receipts. These functionalities are left to the core Odoo stock management processes.

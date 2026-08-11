@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-11T04:57:19+00:00",
+  "generated_at": "2026-08-11T05:12:15+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "8092ac5",
-    "branch": "feat/levis-cash-allocation"
+    "commit": "5ac3467",
+    "branch": "feat/levis-card-pool-excl-cash"
   },
   "buckets": [
     {
@@ -335,14 +335,19 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.28.0",
+      "version": "19.0.1.29.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
       "last_change": "2026-08-11",
-      "change_count": 43,
+      "change_count": 44,
       "changes": [
+        {
+          "sha": "5ac3467",
+          "date": "2026-08-11",
+          "subject": "fix(levis): the tender account names its tender — use that in allocation and mapping (#140)"
+        },
         {
           "sha": "8092ac5",
           "date": "2026-08-11",
@@ -377,11 +382,6 @@
           "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
-        },
-        {
-          "sha": "4e05e9c",
-          "date": "2026-08-04",
-          "subject": "feat(levis): allow admin fees when paying several bills at once (#85)"
         }
       ]
     },

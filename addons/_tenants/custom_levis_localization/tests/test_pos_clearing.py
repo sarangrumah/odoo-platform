@@ -710,6 +710,40 @@ class TestPosClearing(AccountTestInvoicingCommon):
         self.assertEqual(set(line.alloc_ids.account_id.ids), {self.tender_a.id, self.tender_b.id})
         self.assertEqual(line.allocated, 800_000.0)
 
+    def test_card_settlement_may_not_clear_the_cash_receivable(self):
+        """Card money settling the CASH account clears one the customer never used.
+
+        It also hides a real cash shortfall behind a card over-clear, which is the
+        mirror of the defect the cash restriction fixes.
+        """
+        day = date(2026, 7, 8)
+        self.env["ir.config_parameter"].sudo().set_param(
+            "custom_levis_localization.pos_cash_receivable_code", self.tender_c.code
+        )
+        card = self._posrec(self.tender_a, self.store_one, day, 300_000.0)
+        self._posrec(self.tender_c, self.store_one, day, 500_000.0)
+        self._statement(date(2026, 7, 9), 792_000.0, self._settlement_ref(MID_ONE, 800_000.0, 8_000.0, trans_day=day))
+
+        run = self._run(ar_fallback=False)
+        run.action_compute()
+        line = run.line_ids.filtered(lambda line: line.kind == "settlement")
+        self.assertEqual(set(line.alloc_ids.account_id.ids), {self.tender_a.id})
+        self.assertEqual(line.allocated, 300_000.0)
+        self.assertEqual(line.state, "short", "the rest is a finding, not the cash account's problem")
+        self.assertEqual(line.alloc_ids.source_aml_id, card)
+
+    def test_an_unreadable_narrative_is_not_narrowed_on_a_guess(self):
+        """Channel "other" means we do not know; the old unrestricted pool stands."""
+        day = date(2026, 7, 8)
+        self.env["ir.config_parameter"].sudo().set_param(
+            "custom_levis_localization.pos_cash_receivable_code", self.tender_c.code
+        )
+        run = self._run()
+        pool = run._pool_accounts_for_channel({"kind": "settlement", "channel": "other"}, self.tender_c)
+        self.assertFalse(pool, "an unread narrative must not be restricted")
+        pool = run._pool_accounts_for_channel({"kind": "settlement", "channel": "qris"}, self.tender_c)
+        self.assertEqual(set(pool.ids), set(self.tenders.ids) - {self.tender_c.id})
+
     def test_incomplete_configuration_says_what_is_missing(self):
         self.config.mdr_account_id = False
         run = self._run()
