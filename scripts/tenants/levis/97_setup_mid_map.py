@@ -31,14 +31,36 @@
 # Yang TIDAK ada di daftar ini, karena buktinya tidak cukup, sengaja dibiarkan
 # tak terpetakan supaya uangnya tetap terlihat di suspense:
 #
-#   1999632289  Rp 556.975.475  "LEVIS PONDOK"  -- kemungkinan PIM 2 (PIM 1 sudah
-#                               dipegang 1999632288), tapi 53 settlement-nya cuma
-#                               menghasilkan 3 suara dan ketiganya ke toko lain.
-#   1999660761  Rp  19.603.427  "LEVIS PAK"     -- suara 1-1-1, tidak konklusif.
-#   1999660757  Rp  16.439.293  "LEVIS BANDUNG" -- ada empat toko Bandung.
-#   1999664887  Rp   2.563.123  "LEVIS GR"      -- Grand Indonesia atau Grand
-#                               Metropolitan; suaranya justru ke Plaza Senayan.
-#   1999632287  Rp   1.548.533  "LEVIS GRAND"   -- sama, tanpa suara sama sekali.
+#   1999632287  Rp   1.548.533  "LEVIS GRAND"   -- satu baris, 7 Juli, nol kecocokan
+#                               angka di toko mana pun. Nama dan posisi blok
+#                               mengarah ke Grand Indonesia, tapi GI justru nol
+#                               saldo di akun BRI. Nama saja bukan bukti.
+#
+# 1999632289 (Rp 556.975.475, "LEVIS PONDOK") tadinya ada di daftar itu: bukti
+# angkanya tidak menolong -- 53 settlement hanya menghasilkan 3 suara, dan
+# ketiganya ke toko lain. Ia sekarang dipetakan ke Pondok Indah Mall 2 atas
+# KONFIRMASI Finance (11-Aug-2026), bukan atas kesimpulan skrip ini. Yang
+# menguatkan: PIM 1 sudah dipegang 1999632288, dan kedua TID itu berurutan.
+#
+# DUA SUMBU BUKTI TAMBAHAN (11-Aug-2026) menutup tiga terminal yang tadinya di
+# daftar itu. Keduanya tidak menyentuh nama sama sekali:
+#
+#   AKUN TENDER MENYEBUT BANKNYA. `1106000108 = POS Receivable -
+#   OFFLINE_BRI_CREDIT_CARD`, jadi hanya toko dengan saldo di akun itu yang pernah
+#   menerima kartu BRI. Itu menyelesaikan 1999664887 secara telak: seluruh jejak
+#   BRI Grand Metropolitan Bekasi sepanjang Juli hanya SATU baris -- 14 Juli,
+#   Rp 2.581.600 -- dan ketiga settlement TID ini jatuh pada 14 Juli dengan jumlah
+#   persis Rp 2.581.600 (300.900 + 600.950 + 1.679.750).
+#
+#   NOMOR TERMINAL TERSUSUN PER WILAYAH. Blok 1999660757..763 seluruhnya Bandung
+#   dan Surabaya (758 Trans Studio Bandung, 759 Summarecon Bandung, 760 Paris Van
+#   Java, 761 Pakuwon Surabaya, 762 Tunjungan Plaza 3, 763 Galaxy Mall 3), dan
+#   1999660757 berada di kepalanya. Bandung Indah Plaza adalah satu-satunya toko
+#   Bandung tanpa terminal BRI. Ditambah 3 dari 13 baris yang punya kecocokan
+#   angka, dan BIP muncul di ketiganya -- sekali justru di akun 1106000108 itu
+#   sendiri (12 Juli, Rp 1.049.900).
+#
+# Pacific Place Mall tereliminasi dari seluruh kandidat: nol aktivitas POS Juli.
 #
 # Setoran tunai (475 baris, Rp 1,12 M) juga di luar cakupan skrip ini: kuncinya
 # teks bebas yang diketik kasir, 224 variasi, dan sebagiannya cuma nama orang.
@@ -64,47 +86,52 @@ CONFIRM = os.environ.get("CONFIRM") == "1"
 MAP = env["levis.bank.mid.map"]
 company = env.company
 
-# (match_type, key, ou_id, channel, label)
+# (match_type, key, nama Operating Unit, channel, label)
 ROWS = [
     # --- BCA -------------------------------------------------------------
-    ("mid", "885004608375", 7, "debit", "Grand Indonesia"),
-    ("mid", "885004632717", 2, "debit", "Tunjungan Plaza 3"),
-    ("mid", "885004608391", 4, "debit", "Pondok Indah Mall 2"),
-    ("mid", "885004608387", 6, "debit", "Senayan City"),
-    ("mid", "885004608403", 20, "debit", "Plaza Senayan"),
-    ("mid", "885004632683", 13, "debit", "Paris Van Java"),
-    ("mid", "885004608383", 5, "debit", "Kelapa Gading Mall"),
-    ("mid", "885004608399", 9, "debit", "Central Park"),
-    ("mid", "885004632721", 14, "debit", "Pakuwon Mall Surabaya"),
-    ("mid", "885004632691", 8, "debit", "Trans Studio Mall Bandung"),
-    ("mid", "885004648635", 16, "debit", "Trans Studio Cibubur"),
-    ("mid", "885004648627", 12, "debit", "AEON BSD City"),
-    ("mid", "885004632687", 23, "debit", "Summarecon Mall Bandung"),
-    ("mid", "885004608395", 3, "debit", "Pondok Indah Mall 1"),
-    ("mid", "885004648615", 22, "debit", "Gandaria City"),
-    ("mid", "885004648619", 10, "debit", "Lotte Shopping Avenue"),
-    ("mid", "885004632695", 24, "debit", "Bandung Indah Plaza"),
-    ("mid", "885004632679", 17, "debit", "Galaxy Mall 3"),
-    ("mid", "885004704536", 21, "debit", "Paskal Bandung"),
-    ("mid", "885004648623", 18, "debit", "Metropolitan Mall Bekasi"),
-    ("mid", "885004648631", 11, "debit", "Grand Metropolitan Bekasi"),
-    ("mid", "885004618292", 19, "debit", "Mall of Indonesia"),
+    ("mid", "885004608375", "OLS SES - GRAND INDONESIA", "debit", "Grand Indonesia"),
+    ("mid", "885004632717", "OLS SES - TUNJUNGAN PLAZA 3", "debit", "Tunjungan Plaza 3"),
+    ("mid", "885004608391", "OLS SES - PONDOK INDAH MALL 2", "debit", "Pondok Indah Mall 2"),
+    ("mid", "885004608387", "OLS SES - SENAYAN CITY", "debit", "Senayan City"),
+    ("mid", "885004608403", "OLS SES - PLAZA SENAYAN", "debit", "Plaza Senayan"),
+    ("mid", "885004632683", "OLS SES - PARIS VAN JAVA", "debit", "Paris Van Java"),
+    ("mid", "885004608383", "OLS SES - KELAPA GADING MALL", "debit", "Kelapa Gading Mall"),
+    ("mid", "885004608399", "OLS SES - CENTRAL PARK", "debit", "Central Park"),
+    ("mid", "885004632721", "OLS SES - PAKUWON MALL SURABAYA", "debit", "Pakuwon Mall Surabaya"),
+    ("mid", "885004632691", "OLS SES - TRANS STUDIO MALL BANDUNG", "debit", "Trans Studio Mall Bandung"),
+    ("mid", "885004648635", "OLS SES - TRANS STUDIO CIBUBUR", "debit", "Trans Studio Cibubur"),
+    ("mid", "885004648627", "OLS SES - AEON BSD CITY", "debit", "AEON BSD City"),
+    ("mid", "885004632687", "OLS SES - SUMMARECON MALL BANDUNG", "debit", "Summarecon Mall Bandung"),
+    ("mid", "885004608395", "OLS SES - PONDOK INDAH MALL 1", "debit", "Pondok Indah Mall 1"),
+    ("mid", "885004648615", "OLS SES - GANDARIA CITY", "debit", "Gandaria City"),
+    ("mid", "885004648619", "OLS SES - LOTTE SHOPPING AVENUE", "debit", "Lotte Shopping Avenue"),
+    ("mid", "885004632695", "OLS SES - BANDUNG INDAH PLAZA", "debit", "Bandung Indah Plaza"),
+    ("mid", "885004632679", "OLS SES - GALAXY MALL 3", "debit", "Galaxy Mall 3"),
+    ("mid", "885004704536", "OLS SES - PASKAL BANDUNG", "debit", "Paskal Bandung"),
+    ("mid", "885004648623", "OLS SES - METROPOLITAN MALL BEKASI", "debit", "Metropolitan Mall Bekasi"),
+    ("mid", "885004648631", "OLS SES - GRAND METROPOLITAN BEKASI", "debit", "Grand Metropolitan Bekasi"),
+    ("mid", "885004618292", "OLS SES - MALL OF INDONESIA", "debit", "Mall of Indonesia"),
     # --- BRI -------------------------------------------------------------
-    ("tid", "1999639781", 19, "debit", "Mall of Indonesia"),
-    ("tid", "1999660760", 13, "qris", "Paris Van Java"),
-    ("tid", "1999632292", 5, "debit", "Kelapa Gading Mall"),
-    ("tid", "1999632290", 6, "debit", "Senayan City"),
-    ("tid", "1999664883", 22, "debit", "Gandaria City"),
-    ("tid", "1999632288", 3, "debit", "Pondok Indah Mall 1"),
-    ("tid", "1999664888", 16, "debit", "Trans Studio Cibubur"),
-    ("tid", "1999660763", 17, "qris", "Galaxy Mall 3"),
-    ("tid", "1999660758", 8, "debit", "Trans Studio Mall Bandung"),
-    ("tid", "1999664886", 12, "qris", "AEON BSD City"),
-    ("tid", "1999660762", 2, "debit", "Tunjungan Plaza 3"),
-    ("tid", "1999632291", 20, "qris", "Plaza Senayan"),
-    ("tid", "1999632293", 9, "debit", "Central Park"),
-    ("tid", "1999660759", 23, "qris", "Summarecon Mall Bandung"),
-    ("tid", "1999675383", 21, "debit", "Paskal Bandung"),
+    ("tid", "1999639781", "OLS SES - MALL OF INDONESIA", "debit", "Mall of Indonesia"),
+    ("tid", "1999660760", "OLS SES - PARIS VAN JAVA", "qris", "Paris Van Java"),
+    ("tid", "1999632292", "OLS SES - KELAPA GADING MALL", "debit", "Kelapa Gading Mall"),
+    ("tid", "1999632290", "OLS SES - SENAYAN CITY", "debit", "Senayan City"),
+    ("tid", "1999664883", "OLS SES - GANDARIA CITY", "debit", "Gandaria City"),
+    ("tid", "1999632288", "OLS SES - PONDOK INDAH MALL 1", "debit", "Pondok Indah Mall 1"),
+    # Dikonfirmasi Finance 11-Aug-2026, bukan hasil pencocokan angka.
+    ("tid", "1999632289", "OLS SES - PONDOK INDAH MALL 2", "debit", "Pondok Indah Mall 2"),
+    ("tid", "1999664888", "OLS SES - TRANS STUDIO CIBUBUR", "debit", "Trans Studio Cibubur"),
+    ("tid", "1999660763", "OLS SES - GALAXY MALL 3", "qris", "Galaxy Mall 3"),
+    ("tid", "1999660758", "OLS SES - TRANS STUDIO MALL BANDUNG", "debit", "Trans Studio Mall Bandung"),
+    ("tid", "1999664886", "OLS SES - AEON BSD CITY", "qris", "AEON BSD City"),
+    ("tid", "1999660762", "OLS SES - TUNJUNGAN PLAZA 3", "debit", "Tunjungan Plaza 3"),
+    ("tid", "1999632291", "OLS SES - PLAZA SENAYAN", "qris", "Plaza Senayan"),
+    ("tid", "1999632293", "OLS SES - CENTRAL PARK", "debit", "Central Park"),
+    ("tid", "1999660759", "OLS SES - SUMMARECON MALL BANDUNG", "qris", "Summarecon Mall Bandung"),
+    ("tid", "1999675383", "OLS SES - PASKAL BANDUNG", "debit", "Paskal Bandung"),
+    # Bukti akun tender + blok wilayah, 11-Aug-2026 -- lihat catatan di atas.
+    ("tid", "1999664887", "OLS SES - GRAND METROPOLITAN BEKASI", "debit", "Grand Metropolitan Bekasi"),
+    ("tid", "1999660757", "OLS SES - BANDUNG INDAH PLAZA", "debit", "Bandung Indah Plaza"),
 ]
 
 NOTE = "Diisi 11-Aug-2026 dari data Juli: nama pada narasi + kecocokan gross vs piutang tender harian per toko."
@@ -113,14 +140,22 @@ NOTE = "Diisi 11-Aug-2026 dari data Juli: nama pada narasi + kecocokan gross vs 
 def run():
     dibuat = dilewati = 0
     salah_ou = []
-    for match_type, key, ou_id, channel, label in ROWS:
-        analytic = env["account.analytic.account"].browse(ou_id).exists()
+    for match_type, key, ou_name, channel, label in ROWS:
+        # Dicari lewat NAMA, bukan id. Id analytic berbeda per database, dan id
+        # yang kebetulan ada bukan berarti toko yang benar -- memetakan ke toko
+        # yang salah adalah persis kesalahan yang tabel ini ada untuk mencegah.
+        analytic = env["account.analytic.account"].search([("name", "=", ou_name)], limit=1)
         if not analytic:
-            salah_ou.append((key, ou_id))
+            salah_ou.append((key, ou_name))
             continue
-        ada = MAP.search(
-            [("company_id", "=", company.id), ("match_type", "=", match_type), ("key", "=", key)],
-            limit=1,
+        # Dibandingkan dalam bentuk TERNORMALISASI, bukan string mentah. Bank
+        # mencetak terminal yang sama sebagai "001999632289" dan "1999632289";
+        # membandingkan apa adanya menghasilkan aturan kembar yang menunjuk toko
+        # yang sama -- persis yang terjadi 11-Aug-2026 di prd_levis_begbal, saat
+        # skrip ini dan sesi lain sama-sama memetakan TID 1999632289.
+        wanted = MAP._normalise_key(key)
+        ada = MAP.search([("company_id", "=", company.id), ("match_type", "=", match_type)]).filtered(
+            lambda r: MAP._normalise_key(r.key) == wanted
         )
         if ada:
             dilewati += 1

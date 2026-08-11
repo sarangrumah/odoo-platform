@@ -79,9 +79,18 @@ class AccountPayment(models.Model):
     # Source document (reconciled bill/invoice) behind a journal line
     # ------------------------------------------------------------------
     def _edo_line_source_doc(self, line):
-        """The invoice/bill this line is reconciled against, if any."""
-        counterparts = line.matched_debit_ids.mapped("credit_move_id.move_id")
-        counterparts |= line.matched_credit_ids.mapped("debit_move_id.move_id")
+        """The invoice/bill this line is reconciled against, if any.
+
+        ``matched_debit_ids`` holds the partials where ``line`` is the CREDIT
+        side, so the counterpart sits in ``debit_move_id`` — and the other way
+        round for ``matched_credit_ids``. Core reads them the same way in
+        ``_compute_reconciled_lines_ids``. Reading the near side instead just
+        returns ``line`` itself, which is never an invoice, so every voucher row
+        fell back to the payment's own number and the NOMOR DOC AP / REF Invoice
+        Vendor columns never showed the bill.
+        """
+        counterparts = line.matched_debit_ids.mapped("debit_move_id.move_id")
+        counterparts |= line.matched_credit_ids.mapped("credit_move_id.move_id")
         bills = counterparts.filtered(lambda m: m.move_type in _INVOICE_TYPES)
         return bills[:1]
 

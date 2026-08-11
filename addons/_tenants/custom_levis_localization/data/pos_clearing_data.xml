@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      No cron ships with this feature, deliberately and unlike
+      levis.inventory.reconciliation: a clearing moves money between control
+      accounts and reconciles receivables, so it is always started by a person
+      who has read the summary first.
+    -->
+    <record id="seq_levis_pos_clearing" model="ir.sequence">
+        <field name="name">Monthly POS Clearing</field>
+        <field name="code">levis.pos.clearing</field>
+        <field name="prefix">POSCLR/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>

@@ -24,6 +24,9 @@ DONE = "Selesai"
 HOLD = "Ditahan"
 CLIENT = "Menunggu Klien"
 NOREPRO = "Tidak Reproduce"
+# Added 11-Aug: EO #4 turned out to be half ours and half a decision the client
+# has to make, which neither DONE nor CLIENT says honestly on its own.
+PARTIAL = "Sebagian Selesai"
 
 # (no, item, status, keterangan, bukti/verifikasi, commit)
 EO = [
@@ -55,11 +58,16 @@ EO = [
     (
         "4",
         "Bank masuk/keluar masih lewat COA perantara",
-        NOREPRO,
-        "TIDAK diubah. Perlu klien menunjukkan transaksi mana yang dimaksud",
-        "payment_account_id NULL di semua payment method line; payment posted langsung "
-        "Dr BCA Main Bank / Cr Trade Receivables. Bank statement = 0",
-        "",
+        PARTIAL,
+        "Keluhan klien BENAR — vonis 'tidak reproduce' 30-Jul keliru. payment_account_id NULL "
+        "bukan berarti langsung ke akun bank; Odoo jatuh ke jalur berikutnya, dan jalur itu "
+        "mengarah ke Outstanding Receipts/Payments — COA perantara yang dimaksud. "
+        "Company 1 (AIM) kini LANGSUNG ke akun bank. Company 2 (ARKA) masih perantara, "
+        "menunggu keputusan Finance karena sudah ada 5 payment terposting lewat sana",
+        "Company 1: bill -> Register Payment via BCA1 -> paid, liquidity 1103019270, tanpa "
+        "perantara. Sebelumnya company 1 tidak bisa membuat payment sama sekali "
+        "(3 jalur pencarian akun outstanding kosong semua)",
+        "#117",
     ),
     (
         "5",
@@ -302,7 +310,22 @@ FASHION = [
 WAITING = [
     ("EO #1", "Listing outstanding AR/AP per pelanggan dan vendor"),
     ("EO #2", "Daftar kurs yang dipakai (kurs tengah BI / kurs pajak) dan per tanggal apa"),
-    ("EO #4", "Transaksi mana yang menunjukkan COA perantara — tidak reproduce di sistem"),
+    (
+        "EO #4",
+        "Company 2 (ARKA) masih lewat COA perantara 1103000003/1103000004. Ikut dipindah ke langsung-ke-bank seperti company 1, atau tetap? Sudah ada 5 payment terposting lewat akun itu",
+    ),
+    (
+        "EO #4 (b)",
+        "prd_arkaaim punya DUA journal bank aktif di satu rekening: BNK1 dan BCA2 sama-sama memakai 1103019280. Mana yang benar-benar dipakai?",
+    ),
+    (
+        "EO #1 / #3",
+        "3 vendor company 1 diarahkan ke akun payable NON-TRADE (2103300001/2103400001). Kalau vendor dagang seharusnya ke 2103100001 Trade Payables, kirim daftar per-vendor",
+    ),
+    (
+        "EO #3 (b)",
+        "Akun 1106000001 bernama Trade Receivables tetapi bertipe liability_payable — muncul di sisi AP, bukan AR. Akun ini BERISI DATA, jadi koreksi tipe memindahkan saldo terposting antar subledger AR/AP. Perlu persetujuan Finance",
+    ),
     ("EO #7", "Periode mana yang mau ditutup (lock date memblokir posting)"),
     ("EO #8", "Konfirmasi untuk melanjutkan rekonsiliasi selisih asset (DITAHAN)"),
     ("EO #9", "Persetujuan posting backlog depresiasi Juni 2026 Rp565.523.083,57 + aktifkan cron (DITAHAN)"),
@@ -328,6 +351,19 @@ DEPLOY = [
     ("custom_tax_id", "19.0.0.5.0", "14 DB", "Semua DB yang memasang modul"),
     ("custom_wms_reports + 2 dependensi", "19.0.0.2.0", "2 DB", "prd_levis_begbal, rnd_levis"),
     ("custom_accounting_asset", "19.0.0.5.0", "1 DB", "trn_arkaaim_begbal saja — produksi sengaja belum (lihat EO #9)"),
+    (
+        "custom_payment_methods_id",
+        "19.0.1.0.0",
+        "3 DB",
+        "Metode Giro + Bank Transfer — prd_arkaaim, trn_arkaaim, trn_arkaaim_begbal (11-Aug)",
+    ),
+    ("custom_payment_voucher", "19.0.1.0.0", "3 DB", "Printout Payment Voucher / Receipt — DB ARKA yang sama (11-Aug)"),
+    (
+        "custom_levis_localization",
+        "19.0.1.25.1",
+        "3 DB",
+        "Perbaikan voucher: kolom NOMOR DOC AP kini menyebut nomor bill — prd_levis_begbal, prd_levis, rnd_levis (11-Aug)",
+    ),
 ]
 
 wb = xlsxwriter.Workbook(OUT)
@@ -402,6 +438,18 @@ STATUS_FMT = {
             "valign": "vcenter",
         }
     ),
+    PARTIAL: wb.add_format(
+        {
+            "font_size": 10,
+            "bold": True,
+            "bg_color": "#EDE8F7",
+            "font_color": "#5B3E9B",
+            "border": 1,
+            "border_color": C_RULE,
+            "align": "center",
+            "valign": "vcenter",
+        }
+    ),
 }
 big = wb.add_format(
     {"bold": True, "font_size": 22, "align": "center", "valign": "vcenter", "border": 1, "border_color": C_RULE}
@@ -447,7 +495,7 @@ item_sheet(
 ws = wb.add_worksheet("Ringkasan")
 wb.worksheets_objs.insert(0, wb.worksheets_objs.pop())  # put it first
 ws.write(0, 0, "Status Delivery — List Kendala System ODOO", title)
-ws.write(1, 0, "Worksheet EO (ARKA-AIM) + FASHION (Levi's/EBR) · posisi 30 Juli 2026", sub)
+ws.write(1, 0, "Worksheet EO (ARKA-AIM) + FASHION (Levi's/EBR) · posisi 11 Agustus 2026", sub)
 ws.set_column(0, 0, 26)
 ws.set_column(1, 1, 14)
 ws.set_column(2, 2, 74)
@@ -471,9 +519,10 @@ meaning = {
     HOLD: "Ditahan menunggu keputusan / konfirmasi (EO #8 dan EO #9)",
     CLIENT: "Menunggu nilai, dokumen, atau template dari klien",
     NOREPRO: "Tidak dapat direproduksi di sistem — perlu klarifikasi klien",
+    PARTIAL: "Sebagian sudah aktif di produksi; sisanya menunggu keputusan klien",
 }
 r += 1
-for st in (DONE, HOLD, CLIENT, NOREPRO):
+for st in (DONE, PARTIAL, HOLD, CLIENT, NOREPRO):
     ws.write(r, 0, st, STATUS_FMT[st])
     ws.write(r, 1, counts.get(st, 0), big)
     ws.write(r, 2, meaning[st], cell)
@@ -488,8 +537,8 @@ r += 1
 notes = [
     (
         "Sisa development",
-        "NOL",
-        "Seluruh item yang belum tuntas kini menunggu keputusan atau data dari pihak lain, bukan menunggu pengerjaan.",
+        "1 item",
+        "Hampir semua yang belum tuntas menunggu keputusan atau data dari pihak lain. Satu pengecualian: akun 1106000001 (bernama Trade Receivables, bertipe liability_payable) perlu koreksi tipe — akun ini berisi data, jadi menunggu persetujuan Finance dulu karena saldo terposting akan berpindah antara AR dan AP.",
     ),
     (
         "Perlu disampaikan",
@@ -557,7 +606,7 @@ print("written:", OUT)
 # ======================================================================
 # HTML — same tables, standalone file (no CDN, opens straight from disk)
 # ======================================================================
-SLUG = {DONE: "ok", HOLD: "hold", CLIENT: "client", NOREPRO: "nr"}
+SLUG = {DONE: "ok", PARTIAL: "part", HOLD: "hold", CLIENT: "client", NOREPRO: "nr"}
 
 CSS = """
 :root{--ground:#f6f8fa;--surface:#fff;--alt:#eff3f7;--ink:#111820;--soft:#48555f;
@@ -606,6 +655,8 @@ text-transform:uppercase;font-weight:600;padding:.2rem .45rem;border-radius:2px;
 .c-hold{background:var(--hold-bg);color:var(--hold)}
 .c-client{background:var(--accent-bg);color:var(--accent)}
 .c-nr{background:var(--nr-bg);color:var(--nr)}
+.c-part{background:#EDE8F7;color:#5B3E9B}
+.t-part b{color:#5B3E9B}
 .note{background:var(--alt);border-radius:3px;padding:.85rem 1rem;font-size:.85rem;color:var(--soft)}
 .note b{color:var(--ink)}
 footer{border-top:1px solid var(--rule);padding-top:1rem;font-family:var(--mono);
@@ -653,6 +704,7 @@ def build_html():
         '<div class="tile t-%s"><b>%s</b><span>%s</span></div>' % (SLUG[st], counts.get(st, 0), html.escape(lbl))
         for st, lbl in (
             (DONE, "Selesai / sudah live"),
+            (PARTIAL, "Sebagian selesai"),
             (HOLD, "Ditahan menunggu keputusan"),
             (CLIENT, "Menunggu nilai / template klien"),
             (NOREPRO, "Tidak reproduce di sistem"),

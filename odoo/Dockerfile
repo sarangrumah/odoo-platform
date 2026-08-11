@@ -55,7 +55,14 @@ RUN pip3 install --no-cache-dir --break-system-packages --ignore-installed \
 # dep is stale, and its range (^8.4.21) accepts the fix. Drop the nested copy
 # and pin the patched postcss as a sibling in the global node_modules, which
 # rtlcss resolves upward to. Pinned, not @latest, so rebuilds are deterministic.
+# Deleting the nested postcss orphans the deps npm had installed FOR it —
+# nanoid and source-map-js stay behind in rtlcss/node_modules with nothing
+# resolving to them, and the stale nanoid 3.3.12 keeps failing the image scan
+# (CVE-2026-67213/67214). rtlcss itself depends on neither; the sibling postcss
+# brings its own patched copies. So the orphans go with it.
 RUN rm -rf /usr/local/lib/node_modules/rtlcss/node_modules/postcss \
+           /usr/local/lib/node_modules/rtlcss/node_modules/nanoid \
+           /usr/local/lib/node_modules/rtlcss/node_modules/source-map-js \
  && npm install -g --no-audit --no-fund postcss@8.5.25 \
  && npm cache clean --force
 

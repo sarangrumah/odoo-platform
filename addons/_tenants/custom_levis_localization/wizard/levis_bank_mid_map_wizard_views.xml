@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_levis_bank_mid_map_wizard_form" model="ir.ui.view">
+        <field name="name">levis.bank.mid.map.wizard.form</field>
+        <field name="model">levis.bank.mid.map.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Map Unmapped Settlements">
+                <group>
+                    <group>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                    </group>
+                    <group>
+                        <field name="journal_ids" widget="many2many_tags"/>
+                        <field name="run_id" readonly="1" invisible="not run_id"/>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="scanned" invisible="1"/>
+                    </group>
+                </group>
+                <div class="alert alert-info" role="alert" invisible="not scanned">
+                    <field name="unmapped_line_count" class="oe_inline" readonly="1"/>
+                    statement line(s) worth
+                    <field name="unmapped_total" class="oe_inline" readonly="1"/>
+                    have no store. Pick an Operating Unit for each group below —
+                    largest amount first, so a session cut short still covers the
+                    money that matters.
+                    <ul>
+                        <li>A suggestion is only offered when the narrative's store text
+                        overlaps an Operating Unit name. <strong>Check it</strong> — and
+                        note that many do not overlap at all, because the bank prints
+                        abbreviations (<em>LEVIS BIP</em> is Bandung Indah Plaza,
+                        <em>LEVIS GANCIT</em> is Gandaria City). Those are left empty
+                        rather than guessed from initials.</li>
+                        <li>Cash deposits often name only the person who made the
+                        deposit, not the store. That is a perfectly good key — a cashier
+                        deposits for one shop — so map the name. Shorten the
+                        <em>Key</em> to just the distinctive part so next month's
+                        deposits match the same rule.</li>
+                    </ul>
+                    Every rule you create here is permanent: this is a one-off setup,
+                    not monthly work.
+                </div>
+                <field name="line_ids" invisible="not scanned">
+                    <list create="false" delete="false" editable="bottom">
+                        <field name="journal_id" readonly="1"/>
+                        <field name="match_type" readonly="1"/>
+                        <field name="key" readonly="match_type != 'keyword'"/>
+                        <field name="channel" readonly="1"/>
+                        <field name="line_count" readonly="1" sum="Lines"/>
+                        <field name="total_amount" readonly="1" sum="Amount"/>
+                        <field name="sample_narrative" readonly="1"/>
+                        <field name="warehouse_id"/>
+                        <field name="analytic_account_id"/>
+                        <field name="skip"/>
+                        <field name="currency_id" column_invisible="1"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_scan" type="object" string="Scan Period"
+                            class="btn-primary" invisible="scanned"/>
+                    <button name="action_scan" type="object" string="Re-scan" invisible="not scanned"/>
+                    <button name="action_apply" type="object" string="Create Mappings"
+                            class="btn-primary" invisible="not scanned"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_levis_bank_mid_map_wizard" model="ir.actions.act_window">
+        <field name="name">Map Unmapped Settlements</field>
+        <field name="res_model">levis.bank.mid.map.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

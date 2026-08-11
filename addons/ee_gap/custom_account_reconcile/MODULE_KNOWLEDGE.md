@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-24T00:00:00Z
 generator: claude-code-handwritten
 module: custom_account_reconcile
-manifest_version: 19.0.2.0.0
+manifest_version: 19.0.2.1.0
 ---
 
 # custom_account_reconcile
@@ -43,7 +43,7 @@ Supplies the manual-reconciliation UI that Odoo Community lacks: an overview das
 
 ## Gotchas
 - `custom.reconcile.account` is a SQL view (`_auto=False`); aggregate columns span all companies sharing an account — on multi-company DBs treat sums as indicative and the drill-down as authoritative. `residual = SUM(ml.amount_residual)`.
-- `_reconcile_with_amls` guards: raises if the line is already reconciled, if it has no suspense leg, or if an AML is already reconciled; writes with `force_delete/skip_readonly_check/skip_account_move_synchronization` context; leftover remainder stays on suspense unless a write-off is supplied.
+- `_reconcile_with_amls` guards: raises if the line is already reconciled, if it has no suspense leg, or if an AML is already reconciled; writes with `force_delete/skip_readonly_check/skip_account_move_synchronization` context; leftover remainder stays on suspense unless a write-off is supplied. `writeoff_vals` may carry `analytic_distribution` (used by `custom_levis_bank_reconcile` to stamp the store's Operating Unit on an MDR fee leg); it is only applied when present.
 - Wizard `default_get` enforces ≥2 unreconciled lines, a single posted account with `reconcile=True`, and a single company.
 - Write-off in the journal-items wizard only supports company-currency lines (foreign currency raises → use partial mode).
 - Auto-match only fires on a unique exact-residual candidate (partner-agreement required when the statement line has a partner).

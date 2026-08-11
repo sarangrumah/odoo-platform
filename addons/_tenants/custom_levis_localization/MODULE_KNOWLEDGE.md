@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T08:56:04Z
 generator: bootstrap-v1
 module: custom_levis_localization
-manifest_version: 19.0.1.25.0
+manifest_version: 19.0.1.29.0
 ---
 
 # Levi's Localization (`custom_levis_localization`)
@@ -172,6 +172,79 @@ were unindexed. `models/product_product.py` fixes both.
   indexes are created from `product_product.init()` — see the gotcha below for
   why they are NOT declared on a `product.value` model.
 
+## Feature 15 — Monthly POS clearing (`levis.pos.clearing`)
+
+Settles the per-tender POS receivables (`1106000101`..`110`) against the bank
+settlements already imported, replacing `scripts/tenants/levis/80|81|90_*clearing_juli*`
+which were hardcoded to one month and driven by the client's EBR workbook.
+
+**Why no upload is needed.** The acquirer prints gross and fee on every settlement
+narrative, so `levis.bank.narrative` reads them straight off `payment_ref`:
+
+| Bank | Shape | Gross | Fee |
+|---|---|---|---|
+| BCA debit | `KR OTOMATIS MID : <mid> <STORE> TGH: n DDR: n` | `TGH` | `DDR` |
+| BCA credit | `KARTU KREDIT MID:<mid> <STORE> TGH:0000n ADM:0000n` | `TGH` | `ADM` |
+| BCA QRIS | `KR OTOMATIS TANGGAL :dd/mm MID : <mid> ... QR : n DDR: n` | `QR` | `DDR` |
+| BRI | `OnUs|OffUs|QRIS* 1 YYMMDD <tid> <STORE> AMT:n,00MDR:n,00` | `AMT` | `MDR` |
+
+Measured on prd_levis_begbal July 2026 (2 535 lines): 2 073 settlements,
+407 cash deposits, 34 sweeps, 6 charges, 3 interest, **12 unrecognised**, and
+`gross - mdr == amount` on **every** settlement (0 disagreements). This is a
+strict improvement on the scripts, which had to spread a monthly per-store MDR
+pro-rata because the workbook and the ledger were on different grains.
+
+**Why the tender split is discovered, not read.** One card MID covers Visa,
+Mastercard, JCB and Amex alike, and `levis.mdr.bin` is empty, so nothing states
+which of the ten receivable accounts a settlement pays. `_allocate` consumes that
+store's open debits for the trading day, largest residual first, and reports the
+remainder as a shortfall rather than forcing it somewhere.
+
+**Three stages, hard-separated.** `action_compute` builds the summary and creates
+*nothing* (verified on the clone: `account.move` count 38 822 before and after);
+`action_generate_moves` writes DRAFT entries; `action_post` posts and reconciles.
+No cron, no auto-post, and `action_compute` never generates.
+
+**Key models.** `levis.pos.clearing` (+ `.line` per statement line, `.alloc` per
+consumed receivable, `.diag` for findings), `levis.clearing.config` (accounts, one
+row per company, seeded by code from `models/setup.py:seed_clearing_config`),
+`levis.bank.mid.map` (MID/TID/keyword → Operating Unit), `levis.bank.narrative`
+(AbstractModel, one `_parse_<format>` per bank), plus stored narrative fields on
+`account.bank.statement.line` for per-line inspection.
+
+**The statement line carries its own reading.** `_compute_levis_narrative` stores
+`levis_narrative_kind`, `levis_channel`, `levis_mid`, `levis_gross`, `levis_mdr`,
+`levis_trans_date`, `levis_ou_analytic_id`, `levis_mid_map_id`,
+`levis_narrative_note` and `levis_amount_matches_narrative` on every line, so a
+statement can be filtered and grouped per store without running a clearing. The
+compute depends on the narrative, the amount and the journal's format — **not** on
+`levis.bank.mid.map`, so adding one mapping never silently rewrites months of
+history; `action_levis_reread_narrative()` (via `add_to_compute`, so the ORM owns
+the write) re-reads the lines Finance chooses. `custom_levis_bank_reconcile`
+builds the interactive matching wizard on exactly these fields.
+
+**Two rules may never claim one terminal.** `_check_no_colliding_rule` refuses a
+mapping that would compete with an existing one, comparing through the resolver's own
+`_keys_match` — so it catches an identical key, a leading-zero variant
+(`1999632289` vs `001999632289`) *and* a suffix (`4608375` vs `885004608375`), which no
+unique index can express. It deliberately allows what the model was built for:
+non-overlapping `date_start`/`date_end` (a MID handed to another store), rules restricted
+to different bank feeds, and keyword substrings. Override with context
+`levis_skip_mid_map_guard=True`, which logs a warning. The SQL `_key_uniq` constraint
+exists but has never fired: `journal_id` is NULL on every real rule and Postgres treats
+NULLs as distinct.
+
+**The most specific keyword wins, not the first row.** `_resolve` picks by
+`(sequence, -len(key), key)`. Sequence stays the explicit override; length settles the tie
+— which is *always*, since every keyword rule on prd_levis_begbal carries sequence 20, so
+the tie used to be broken alphabetically. `SMB SOPIAN PERMANA` beat `SOPIAN PERMANA` only
+because M sorts before O, and the two name different stores.
+
+**Provisioning an existing database.** `post_init_hook` only runs on install;
+`scripts/tenants/levis/96_setup_pos_clearing.py` does the same for a database
+that already has the module. The MID mapping is deliberately not seeded — see the
+gotcha below.
+
 ## Gotchas
 - **Never `_inherit "product.value"` from this module.** Doing so pulls
   `product.value` into the module's `init_models()` pass, and
@@ -223,6 +296,91 @@ were unindexed. `models/product_product.py` fixes both.
 - Tenant scoping is a deployment convention only — the manifest documents the Levi's databases as intended targets, but there is no runtime check preventing installation elsewhere.
 - The `_cron_generate_drafts` cron is shipped with `active=False` (`data/inventory_reconciliation_data.xml:20`) and is monthly, so it does NOT run automatically unless a tenant enables it. When enabled it only creates DRAFT reconciliations/entries; it never posts.
 - The payment reports are direction-guarded: the Payment Voucher renders only for outbound payments and the Payment Receipt only for inbound payments.
+- `_edo_line_source_doc` must read the FAR side of the reconciliation partials —
+  `matched_debit_ids.debit_move_id` and `matched_credit_ids.credit_move_id`, the way core
+  does in `_compute_reconciled_lines_ids`. `matched_debit_ids` holds the partials where the
+  line is the *credit* side, so reading `credit_move_id` returns the line you started from;
+  that line belongs to the payment, never to an invoice, so the `move_type` filter dropped
+  it and every voucher row silently fell back to the payment's own number. The NOMOR DOC AP
+  and REF Invoice Vendor columns showed no bill at all until 19.0.1.25.1. The failure is
+  invisible in the PDF — it looks like a filled-in column.
+
+- **`account.bank.statement.line` has no SQL `date` column.** It is delegated from
+  `account.move` via `_inherits`, so an ORM domain on `date` works but raw SQL must
+  join `move_id` — `select sl.date ...` fails with `column sl.date does not exist`.
+- **Bank narratives name stores by abbreviation, not truncation.** `LEVIS BIP` is
+  Bandung Indah Plaza and `LEVIS GANCIT` is Gandaria City: there is no word overlap
+  with the analytic name, so no fuzzy matcher can resolve them and guessing from
+  initials would misdirect money between shops. The MID/TID is the key, and the
+  wizard offers a suggestion only where the text genuinely overlaps an Operating
+  Unit name. Mapping the rest is a one-off human step (~24 terminals).
+- **Many cash deposits identify only the depositor, not the store.** Of 407 July
+  deposits, a large share read `TRSF E-BANKING CR ... ADAM SURYONO` with no store
+  word at all (Rp 61 M for that one name). The cashier's name is a legitimate and
+  stable key — one cashier deposits for one shop — so those get `match_type=keyword`
+  rules on the name. The wizard's `key` is editable for exactly this reason: shorten
+  it to the distinctive part so next month's deposits match the same rule.
+- **One merchant is printed two ways.** BCA shows `885004608375` on the debit feed
+  and `004608375` on the credit-card feed. `_keys_match` accepts a suffix match from
+  6 digits up, and the wizard folds suffix-equivalent ids into a single proposal —
+  without that they collide on the `levis.bank.mid.map` uniqueness constraint.
+  Channel is deliberately *not* part of that key: the same MID carries debit and
+  QRIS, and the rule answers "which store", not "which tender".
+- **The bank suspense account `1103000002` is `reconcile = False`,** and all six
+  bank journals use it as their `suspense_account_id`. So the clearing entry's
+  `Dr suspense` is the mirror of the statement line's credit and the two net out on
+  the *balance* — they are never matched, and statement lines stay
+  `is_reconciled = False` forever. Two consequences: the bank-rec widget will never
+  match them, and **Odoo core refuses to set `fiscalyear_lock_date` over any period
+  containing them** ("There are still unreconciled bank statement lines in the
+  period you want to lock"). That is why consumption is tracked by an explicit
+  marker (`levis_clearing_line_id`) rather than by reconciliation.
+- **The marker is written at generation, never at compute.** Previewing a period
+  must leave the database untouched, so a second run only becomes blind to July's
+  settlements once the first run has actually produced drafts.
+- **Allocations are paired to journal legs by position, not by lookup.** Two stores
+  can produce a credit on the same account with the same analytic inside one entry;
+  looking the leg up afterwards would hand both allocations the same line and then
+  over-reconcile it. `_attach_alloc_move_lines` zips the created lines (ascending
+  id) against the plan and refuses to pair at all if the counts differ.
+- **`short_amount` excludes unmapped lines.** "This store had nothing open" and "we
+  do not know the store" are different problems with different fixes; conflating
+  them inflated the shortfall figure by ~4.3 bn on the first real run.
+- **`levis_narrative_*` does not depend on `levis.bank.mid.map`.** Adding one
+  store's mapping must not silently rewrite the whole statement history, so the
+  fields are re-read explicitly via `action_levis_reread_narrative` (exposed as the
+  *Re-read Bank Narrative* action on the Bank Settlements list).
+- **`CAIR CEK UNTUK RTGS` (Rp 1.533.030.000) is classified `unknown` on purpose.**
+  Its destination is not in the narrative and Treasury never confirmed it; booking
+  it anywhere plausible would hide the question. Bank interest is likewise excluded
+  from clearing rather than absorbed.
+- **The sweep destination must not also be a statement source.** Block C debits
+  `1103019320` directly, which is journal `OBCA`'s `default_account_id`. OBCA has no
+  July statement lines today, so there is no double count — but the `sweep_double`
+  diagnostic blocks generation if that ever changes.
+
+- **A cash deposit may only clear the CASH tender receivable.** `_allocate` spans every
+  configured tender account, which is right for a card settlement — one MID covers Visa,
+  Mastercard, JCB and Amex, so the split has to be discovered. For a cash deposit the tender is
+  certain, and letting it consume a card receivable clears the wrong account. Measured on the
+  July 2026 data before the guard: **93.1% of cash-deposit allocations (Rp 703,965,244) landed
+  on card receivables**, leaving the real cash receivable open and the card one over-cleared.
+  `_pool_accounts_for_channel` restricts the pool, resolved by code from
+  `ir.config_parameter custom_levis_localization.pos_cash_receivable_code` (default
+  `1106000101`) and required to be one of the configured tender accounts. QRIS is deliberately
+  NOT restricted: it spreads across seven accounts with no concentration, so a restriction
+  would break allocations that are currently right. Expect the reported shortfall to RISE after
+  this guard (July: Rp 35.3m/14 lines -> Rp 104.1m/49 lines) — that is the real gap becoming
+  visible, not a regression.
+- **And the mirror: a card or QRIS settlement may not clear the CASH receivable.** Different
+  question, definite answer — that account holds takings paid in cash, so card money settling it
+  clears an account the customer never used, and hides a real cash shortfall behind a card
+  over-clear. Only 3 of 358 unambiguously matched card/QRIS settlements landed there in July
+  (0.8%, Rp 2.6m): small, and wrong by construction rather than by measurement. The asymmetry is
+  deliberate — cash is restricted to ONE account because its channel is certain, card/QRIS is
+  merely denied ONE account because which card account it belongs to stays undecidable. Both
+  branches test the channel POSITIVELY (`_CARD_CHANNELS`), never "not cash": an unread narrative
+  carries channel `other` and must keep the unrestricted pool.
 
 ## Out of Scope
 - This module does not cover inventory adjustments, backorders, or handling of internal transfers and manufacturing receipts. These functionalities are left to the core Odoo stock management processes.
