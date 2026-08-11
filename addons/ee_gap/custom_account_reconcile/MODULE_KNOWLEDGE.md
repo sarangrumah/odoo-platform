@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-24T00:00:00Z
 generator: claude-code-handwritten
 module: custom_account_reconcile
-manifest_version: 19.0.2.1.0
+manifest_version: 19.0.3.0.0
 ---
 
 # custom_account_reconcile
@@ -21,17 +21,24 @@ Supplies the manual-reconciliation UI that Odoo Community lacks: an overview das
 - `custom.account.reconcile.wizard` (TransientModel) — manual reconcile of selected journal items.
 - `custom.bank.reconcile.wizard` + `custom.bank.reconcile.wizard.line` (TransientModel) — bank-statement-line matching + candidate rows.
 - `account.bank.statement.line` (`_inherit`) — candidate search + reconcile mechanics.
+- `account.move` (`_inherit`) — `button_draft` unreconciles before resetting.
+- `account.move.line` (`_inherit`) — refuses structural edits on a matched line.
+- `account.payment` (`_inherit`) — duplicate guard at posting + the Unapplied flag.
 
 ## Important Fields
 - `custom.reconcile.account`: `account_id` (M2o account.account), `line_count` (Integer), `debit`/`credit`/`residual` (Monetary), `oldest_date` (Date), `currency_id` (computed from `env.company`, `@api.depends_context("company")`).
 - `custom.account.reconcile.wizard`: `line_ids` (M2m account.move.line, readonly), `account_id`, `company_id`, `debit`/`credit`/`residual` (Monetary), `is_balanced` (Boolean), `mode` (`partial`/`writeoff`, default `partial`), `writeoff_account_id`/`writeoff_journal_id` (check_company, domain-restricted), `writeoff_date`, `writeoff_label` (default "Write-Off").
 - `custom.bank.reconcile.wizard`: `st_line_id` (required), `candidate_ids` (O2m wizard.line), `selected_total`/`remainder` (Monetary computed), `writeoff` (Boolean), `writeoff_account_id` (domain excludes receivable/payable), `writeoff_label`.
 - `custom.bank.reconcile.wizard.line`: `selected` (Boolean), `aml_id` (M2o account.move.line), `amount_residual` (related), plus related move/date/account/partner.
+- `account.payment`: `duplicate_checked` (Boolean, `copy=False`) — the explicit override that lets a genuine second payment post; `is_unapplied` (Boolean, stored compute on `state`/`is_reconciled`) — posted (`in_process`/`paid`) but settling nothing.
 
 ## Public Methods
 - `custom.reconcile.account.init()` — (re)creates the SQL view (`WHERE aa.reconcile AND NOT ml.reconciled AND ml.parent_state='posted'`, grouped by account); `action_open_lines()` drill-down.
 - `custom.account.reconcile.wizard.action_reconcile()` / `_create_writeoff_line()`.
 - `custom.bank.reconcile.wizard.action_reconcile()`, `action_search_more()` (relaxed candidate refresh), `_candidate_commands()`, `_compute_amounts()`.
+- `account.move.button_draft()` — calls `remove_move_reconcile()` on every matched line *before* `super()`, so the partials are still consistent and a lock-date refusal surfaces before the state flips.
+- `account.move.line.write()` / `_assert_not_matched(vals)` — refuses to change `STRUCTURAL_FIELDS` (`account_id`, `partner_id`) on a line that still carries partials, in any state; compares against the stored value so a no-op rewrite passes.
+- `account.payment.action_post()` / `_find_duplicates()` — blocks a posted twin (same company/partner/payment_type/amount/date) unless `duplicate_checked`.
 - `account.bank.statement.line._get_match_candidates(limit=30, relax=False)` (scored candidate AMLs), `_get_auto_match_candidate()` (unique exact hit), `_reconcile_with_amls(amls, writeoff_vals=None)`, `action_open_match_wizard()`, `action_auto_match()` (bulk auto-reconcile with notification tally).
 
 ## Integration Points
@@ -47,6 +54,9 @@ Supplies the manual-reconciliation UI that Odoo Community lacks: an overview das
 - Wizard `default_get` enforces ≥2 unreconciled lines, a single posted account with `reconcile=True`, and a single company.
 - Write-off in the journal-items wizard only supports company-currency lines (foreign currency raises → use partial mode).
 - Auto-match only fires on a unique exact-residual candidate (partner-agreement required when the statement line has a partner).
+- Odoo 19's `button_draft` no longer unreconciles, which is why the override exists: without it a payment pulled back to draft keeps its matches, the bill still reads "Paid" against an entry that has left the trial balance, and the aged report silently drops it.
+- The structural-edit guard fires on `write()` regardless of move state, so data-fix scripts that legitimately need to repoint a matched line must pass `skip_reconciliation_guard=True` in the context — there is no other escape hatch.
+- `is_unapplied` is stored and depends only on `state`/`is_reconciled`; **Accounting → Entries → Unapplied Payments** filters on it, so a payment applied outside those triggers will not refresh until they change.
 
 ## Out of Scope
 - No new reconciliation engine (delegates to core `reconcile()`), no own exchange-difference logic, no automatic/cron reconciliation, no bank statement import (see [[bank-import-bca-corp-csv]] / `custom_bank_import`), and write-off does not handle multi-currency.

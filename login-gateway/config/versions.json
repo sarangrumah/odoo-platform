@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-11T05:12:15+00:00",
+  "generated_at": "2026-08-11T06:17:38+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "5ac3467",
-    "branch": "feat/levis-card-pool-excl-cash"
+    "commit": "f99d6ad",
+    "branch": "HEAD"
   },
   "buckets": [
     {
@@ -341,8 +341,13 @@
       "depends": 9,
       "public": false,
       "last_change": "2026-08-11",
-      "change_count": 44,
+      "change_count": 45,
       "changes": [
+        {
+          "sha": "e283281",
+          "date": "2026-08-11",
+          "subject": "fix(levis): a card settlement may not clear the cash receivable either (#141)"
+        },
         {
           "sha": "5ac3467",
           "date": "2026-08-11",
@@ -377,11 +382,6 @@
           "sha": "ef5de84",
           "date": "2026-08-06",
           "subject": "fix(levis): guard PO uploads against swapped Quantity/Unit Price columns"
-        },
-        {
-          "sha": "f5d8d58",
-          "date": "2026-08-04",
-          "subject": "style: satisfy pre-commit across the branch"
         }
       ]
     },
@@ -1434,18 +1434,23 @@
       "module": "custom_account_reconcile",
       "bucket": "ee_gap",
       "name": "Custom Account Reconciliation",
-      "version": "19.0.2.1.0",
+      "version": "19.0.3.0.0",
       "summary": "Enterprise-style manual reconciliation menu and wizard for Odoo CE (EE-gap closure).",
       "category": "Accounting/Accounting",
       "depends": 1,
       "public": true,
       "last_change": "2026-08-11",
-      "change_count": 3,
+      "change_count": 4,
       "changes": [
         {
           "sha": "3692407",
           "date": "2026-08-11",
           "subject": "feat(levis): match a bank settlement to one store's POS tenders, net of MDR (#131)"
+        },
+        {
+          "sha": "fe21ab7",
+          "date": "2026-08-07",
+          "subject": "fix(account): stop a reset-to-draft from orphaning a reconciliation"
         },
         {
           "sha": "7e9d66b",
