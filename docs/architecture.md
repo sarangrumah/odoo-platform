@@ -8,7 +8,7 @@ built). Nothing is described as existing until it does — the previous version 
 this document drew Kafka, a warm-standby Postgres and an `infra/` tree that were
 never built, and planning started from those assumptions.
 
-Last verified against the repo: 2026-07-16.
+Last verified against the repo: 2026-08-11.
 
 ## Contents
 
@@ -94,13 +94,18 @@ they appear next to the Enterprise apps they replace.
 | Group | Count | Scope | Contents |
 | --- | --- | --- | --- |
 | `_vendor/` | 4 | third-party | Vendored OCA (`queue_job`, `auth_jwt`, …). Do not edit; `fetch_oca.sh`. |
-| `core/` | 8 | all tenants | `custom_core` (HMAC `secure_endpoint`), `custom_adapter_framework`, `custom_ai_bridge`, `custom_hht_bridge`, … |
+| `core/` | 9 | all tenants | `custom_core` (HMAC `secure_endpoint`), `custom_adapter_framework`, `custom_ai_bridge`, `custom_hht_bridge`, … |
 | `control_plane/` | 4 | platform | `custom_hub_console`, `custom_super_admin`, `custom_tenant_infra`, `custom_onboarding_journey`. |
 | `compliance/` | 9 | all ID tenants | PDP (`custom_pdp_*`), Coretax, PPh withholding. |
-| `ee_gap/` | 78 | all tenants | The CE→EE delta: accounting, payroll, WMS, finance portal, retail, e-commerce. |
-| `verticals/` | 10 | one industry | `custom_ppob_*` + `_template/`. |
-| `_tenants/` | 5 | one customer | `custom_levis_*`, `custom_arka_*`. |
+| `ee_gap/` | 103 | all tenants | The CE→EE delta: accounting, payroll, WMS, finance portal, retail, e-commerce. |
+| `verticals/` | 14 | one industry | `custom_ppob_*` (12), `custom_fnb_stock_ops`, + `_template/`. |
+| `_tenants/` | 10 | one customer | `custom_levis_*` (4), `custom_arka_*` (6). |
 | `operations/` | 3 | internal | `custom_brd_analyzer`, `custom_dev_cycle`, `custom_ops_monitor`. |
+
+**Total: 156 manifests.** Counting gotcha: `verticals/_template/custom_vertical_example`
+sits at depth 4, so `find addons -maxdepth 3 -name __manifest__.py` returns 155, not 156.
+Do not hand-maintain these numbers — `docs/platform-feature-catalog/build_catalog_json.py`
+derives them and `verify.py` fails the build when this table disagrees with the repo.
 
 Rules:
 
@@ -209,6 +214,7 @@ Full mapping: `docs/pdp-compliance.md`.
 ## Reference
 
 - Adding a vertical: `docs/adding-vertical.md`
+- Per-module feature catalog: `docs/platform-feature-catalog/catalog.md`
 - Per-project docs: `docs/projects/`
 - Runbooks: `docs/runbooks/` · SOPs: `docs/sops/`
 - Compliance: `docs/pdp-compliance.md`, `docs/coretax.md`
