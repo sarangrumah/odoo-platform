@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-11T06:17:38+00:00",
+  "generated_at": "2026-08-11T10:54:28+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "f99d6ad",
-    "branch": "HEAD"
+    "commit": "01aabb4",
+    "branch": "feat/role-manager"
   },
   "buckets": [
     {
@@ -382,6 +382,25 @@
           "sha": "ef5de84",
           "date": "2026-08-06",
           "subject": "fix(levis): guard PO uploads against swapped Quantity/Unit Price columns"
+        }
+      ]
+    },
+    {
+      "module": "custom_levis_operating_unit",
+      "bucket": "_tenants",
+      "name": "Custom Operating Unit — Levi's Migration",
+      "version": "19.0.0.1.0",
+      "summary": "Turns the existing Levi's analytic Operating Units into operating.unit records — additively, without renaming a single warehouse, analytic or journal.",
+      "category": "Custom Platform/Localization",
+      "depends": 2,
+      "public": false,
+      "last_change": "2026-08-11",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "b08a5a3",
+          "date": "2026-08-11",
+          "subject": "feat(levis): lift the analytic Operating Units into the new master, additively"
         }
       ]
     },
@@ -1301,6 +1320,35 @@
       ]
     },
     {
+      "module": "custom_operating_unit",
+      "bucket": "core",
+      "name": "Custom Operating Unit",
+      "version": "19.0.0.1.0",
+      "summary": "Operating Unit master data with a Head Office / Area / Store hierarchy, and the user-to-unit assignment that data isolation is built on.",
+      "category": "Custom Platform/Security",
+      "depends": 2,
+      "public": true,
+      "last_change": "2026-08-11",
+      "change_count": 3,
+      "changes": [
+        {
+          "sha": "b08a5a3",
+          "date": "2026-08-11",
+          "subject": "feat(levis): lift the analytic Operating Units into the new master, additively"
+        },
+        {
+          "sha": "d2e1c8b",
+          "date": "2026-08-11",
+          "subject": "feat(security): isolate accounting, stock and trade documents per Operating Unit"
+        },
+        {
+          "sha": "6deb3b1",
+          "date": "2026-08-11",
+          "subject": "feat(security): give the branch dimension a master record and a hierarchy"
+        }
+      ]
+    },
+    {
       "module": "custom_product_barcode",
       "bucket": "core",
       "name": "Custom Product Barcode (Multi-barcode)",
@@ -1331,6 +1379,25 @@
           "sha": "e72f530",
           "date": "2026-06-12",
           "subject": "feat: multi-barcode per variant (alternate GTINs), one shared inventory"
+        }
+      ]
+    },
+    {
+      "module": "custom_role_manager",
+      "bucket": "core",
+      "name": "Custom Role Manager",
+      "version": "19.0.0.1.0",
+      "summary": "Named security roles that bundle res.groups: pick 'Accounting Supervisor' instead of ticking thirty checkboxes, with safe revocation and shipped role templates for Head Office and retail positions.",
+      "category": "Custom Platform/Security",
+      "depends": 1,
+      "public": true,
+      "last_change": "2026-08-11",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "d7b4902",
+          "date": "2026-08-11",
+          "subject": "feat(security): pick a role instead of ticking thirty group checkboxes"
         }
       ]
     },
@@ -1443,14 +1510,14 @@
       "change_count": 4,
       "changes": [
         {
+          "sha": "5ebc32f",
+          "date": "2026-08-11",
+          "subject": "docs(levis): July 2026 clearing — posting path, decision workbooks, reconciliation guards (#127)"
+        },
+        {
           "sha": "3692407",
           "date": "2026-08-11",
           "subject": "feat(levis): match a bank settlement to one store's POS tenders, net of MDR (#131)"
-        },
-        {
-          "sha": "fe21ab7",
-          "date": "2026-08-07",
-          "subject": "fix(account): stop a reset-to-draft from orphaning a reconciliation"
         },
         {
           "sha": "7e9d66b",
@@ -1630,14 +1697,19 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.18.0",
+      "version": "19.0.0.19.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 4,
       "public": true,
-      "last_change": "2026-08-05",
-      "change_count": 49,
+      "last_change": "2026-08-11",
+      "change_count": 50,
       "changes": [
+        {
+          "sha": "7bd6adf",
+          "date": "2026-08-11",
+          "subject": "feat(reports): stop the accounting reports leaking other branches' numbers"
+        },
         {
           "sha": "53afaa5",
           "date": "2026-08-05",
@@ -1672,11 +1744,6 @@
           "sha": "11aeafa",
           "date": "2026-08-04",
           "subject": "fix(reports): render grouped reports on screen, not just in Excel"
-        },
-        {
-          "sha": "5cb822f",
-          "date": "2026-08-03",
-          "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         }
       ]
     },
@@ -2714,14 +2781,19 @@
       "module": "custom_finance_portal_sso",
       "bucket": "ee_gap",
       "name": "Custom Finance Portal — SSO (Keycloak)",
-      "version": "19.0.0.1.0",
+      "version": "19.0.0.2.0",
       "summary": "Keycloak SSO login + role→group mapping (employee vs vendor) for the Finance Portal",
       "category": "Accounting/Finance",
       "depends": 3,
       "public": true,
-      "last_change": "2026-07-03",
-      "change_count": 1,
+      "last_change": "2026-08-11",
+      "change_count": 2,
       "changes": [
+        {
+          "sha": "01aabb4",
+          "date": "2026-08-11",
+          "subject": "feat(sso): let Keycloak role names mean the platform's own roles"
+        },
         {
           "sha": "062d173",
           "date": "2026-07-03",
@@ -3469,6 +3541,68 @@
           "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
+        }
+      ]
+    },
+    {
+      "module": "custom_operating_unit_docs",
+      "bucket": "ee_gap",
+      "name": "Custom Operating Unit — Documents",
+      "version": "19.0.0.1.0",
+      "summary": "Stamps the Operating Unit on accounting, stock, purchase and sales documents and isolates them per unit: a store user sees and books only their own.",
+      "category": "Custom Platform/Security",
+      "depends": 5,
+      "public": true,
+      "last_change": "2026-08-11",
+      "change_count": 2,
+      "changes": [
+        {
+          "sha": "b08a5a3",
+          "date": "2026-08-11",
+          "subject": "feat(levis): lift the analytic Operating Units into the new master, additively"
+        },
+        {
+          "sha": "d2e1c8b",
+          "date": "2026-08-11",
+          "subject": "feat(security): isolate accounting, stock and trade documents per Operating Unit"
+        }
+      ]
+    },
+    {
+      "module": "custom_operating_unit_pos",
+      "bucket": "ee_gap",
+      "name": "Custom Operating Unit — Point of Sale",
+      "version": "19.0.0.1.0",
+      "summary": "Scopes points of sale, sessions and orders to their Operating Unit, and stamps the unit on every line of the session closing entry.",
+      "category": "Custom Platform/Point of Sale",
+      "depends": 2,
+      "public": true,
+      "last_change": "2026-08-11",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "233f9e6",
+          "date": "2026-08-11",
+          "subject": "feat(pos): scope the point of sale per Operating Unit, closing entry included"
+        }
+      ]
+    },
+    {
+      "module": "custom_operating_unit_reports",
+      "bucket": "ee_gap",
+      "name": "Custom Operating Unit — Reports",
+      "version": "19.0.0.1.0",
+      "summary": "Makes the custom accounting reports respect the reader's Operating Units. Without it the list views are filtered but the Trial Balance is not.",
+      "category": "Custom Platform/Accounting",
+      "depends": 2,
+      "public": true,
+      "last_change": "2026-08-11",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "7bd6adf",
+          "date": "2026-08-11",
+          "subject": "feat(reports): stop the accounting reports leaking other branches' numbers"
         }
       ]
     },

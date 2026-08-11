@@ -28,6 +28,23 @@ Keycloak's OIDC endpoints, plus role→group mapping.
 The role mapping runs in `res.users._auth_oauth_signin` and is additive (grants
 groups; does not revoke). Vendor role implies `base.group_portal`.
 
+## Role resolution order (since 19.0.0.2.0)
+
+An incoming role name is matched against **`custom.security.role.code`** first,
+so the identity provider and Odoo share one vocabulary and the group composition
+of a job title lives in one place. Names that match no role fall through to the
+`role_group_map` above unchanged — a tenant migrates one role at a time, and a
+database without `custom_role_manager` behaves exactly as before (the model is
+soft-detected, there is no dependency).
+
+Still additive by default. `ir.config_parameter`
+**`custom_finance_portal_sso.roles_authoritative` = `"1"`** makes the provider
+own the role list instead: a role removed in Keycloak is removed here on the next
+sign-in. That is only safe because the role engine revokes strictly what it
+granted itself — a hand-granted group survives either way, and a test asserts it.
+Off by default: on a tenant whose Keycloak groups are incomplete it would quietly
+demote everybody.
+
 ## Hardening: strict OIDC via auth_oidc
 
 `auth_oauth` validates via the userinfo endpoint. For id_token signature + JWKS
