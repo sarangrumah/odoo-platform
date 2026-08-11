@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-11T01:24:58+00:00",
+  "generated_at": "2026-08-11T01:29:54+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "6453f8f",
+    "commit": "7311d54",
     "branch": "HEAD"
   },
   "buckets": [
@@ -3565,6 +3565,32 @@
       ]
     },
     {
+      "module": "custom_payment_methods_id",
+      "bucket": "ee_gap",
+      "name": "Indonesian Payment Methods (Giro / Bank Transfer)",
+      "version": "19.0.1.0.0",
+      "summary": "Adds GIRO and BANK TRANSFER as selectable payment methods on bank journals.",
+      "category": "Accounting/Accounting",
+      "depends": 1,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
+    },
+    {
+      "module": "custom_payment_voucher",
+      "bucket": "ee_gap",
+      "name": "Payment Voucher / Payment Receipt",
+      "version": "19.0.1.0.0",
+      "summary": "Printable payment voucher and receipt on account.payment, with terbilang.",
+      "category": "Accounting/Accounting",
+      "depends": 1,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
+    },
+    {
       "module": "custom_petty_cash",
       "bucket": "ee_gap",
       "name": "Custom Cash Advance & Petty Cash",
@@ -4201,7 +4227,7 @@
       "module": "custom_retail_import",
       "bucket": "ee_gap",
       "name": "Custom Retail Import",
-      "version": "19.0.0.22.0",
+      "version": "19.0.0.23.0",
       "summary": "Excel/CSV + SFTP ingestion adapter for retail master & transaction data",
       "category": "Inventory/Retail",
       "depends": 6,

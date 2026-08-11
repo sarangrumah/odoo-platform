@@ -32,6 +32,8 @@ from odoo import _, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import config, float_compare
 
+from .retail_import_profile import _is_text_field, _number_to_text
+
 _logger = logging.getLogger(__name__)
 
 BATCH = 200
@@ -111,6 +113,27 @@ class RetailImportExecutor(models.AbstractModel):
     @staticmethod
     def _safe_xid(prefix, value):
         return prefix + "".join(c if c.isalnum() else "_" for c in str(value)).upper()
+
+    @staticmethod
+    def _ri_text(value):
+        """Trimmed exact text of an identifier cell.
+
+        The defensive twin of the reader's ``_clean_cell``, for callers that never
+        go through ``read_records`` -- the MDM API enters the X101 seam directly --
+        and for rows replayed out of ``retail.import.line.raw_data_json``.
+        """
+        value = _number_to_text(value)
+        return "" if value is None else str(value).strip()
+
+    @classmethod
+    def _ri_normalize_row(cls, row):
+        """Apply the reader's text-field coercion to a row rebuilt from stored JSON.
+
+        Lines staged before that coercion existed still carry ``register``/
+        ``transnum``/``ean`` as JSON floats; without this the ``"1"`` key a fresh
+        import produces would stop matching the ``"1.0"`` an older log staged.
+        """
+        return {k: (_number_to_text(v) if _is_text_field(k) else v) for k, v in row.items()}
 
     # ------------------------------------------------------------------
     # Source-file footer rows
@@ -322,17 +345,21 @@ class RetailImportExecutor(models.AbstractModel):
         tmpl_mdm = {}  # pc  -> extended attrs from the MDM payload (API path only)
         sku_mdm = {}  # sku -> extended attrs from the MDM payload (API path only)
         for r in records:
-            pc = r.get("product_code")
-            sku = r.get("sku")
+            # Coerced defensively: this seam is also entered by the MDM API, which
+            # does not go through the reader. A numeric cell landing here would put
+            # "10.0" / "4550703351542.0" into default_code, barcode and the Size
+            # attribute values -- and ``(cell or "").strip()`` would simply crash.
+            pc = self._ri_text(r.get("product_code"))
+            sku = self._ri_text(r.get("sku"))
             row_num = r.get("_row")
             if not pc or not sku:
                 if row_num is not None:
                     skipped_row_nums.append(row_num)
                 continue
-            size = (r.get("size") or "").strip()
-            inseam_raw = r.get("inseam")
+            size = self._ri_text(r.get("size"))
+            inseam_raw = _number_to_text(r.get("inseam"))
             inseam = str(inseam_raw).strip() if inseam_raw not in (None, "-", "") else ""
-            gtin = str(r.get("gtin") or "").strip()
+            gtin = self._ri_text(r.get("gtin"))
             if gtin:
                 sku_gtins[sku].add(gtin)  # keep EVERY GTIN so all scanned codes resolve
             retail = _amt(r.get("retail_price"))
@@ -350,10 +377,10 @@ class RetailImportExecutor(models.AbstractModel):
             if m is None or (eff and (m.get("eff") is None or eff > m["eff"])):
                 tmpl_meta[pc] = {
                     "code": pc,
-                    "name": (r.get("description") or pc),
-                    "cat": (r.get("category") or "").strip(),
-                    "cls": (r.get("klass") or "").strip(),
-                    "subcls": (r.get("subclass") or "").strip(),
+                    "name": (self._ri_text(r.get("description")) or pc),
+                    "cat": self._ri_text(r.get("category")),
+                    "cls": self._ri_text(r.get("klass")),
+                    "subcls": self._ri_text(r.get("subclass")),
                     "retail": retail,
                     "eff": eff,
                 }
@@ -1207,14 +1234,15 @@ class RetailImportExecutor(models.AbstractModel):
         """Normalise a WAIST/INSEAM cell for composing the sized variant code.
 
         Numeric cells come back as ``34.0``/``10.0`` floats from the xlsx reader;
-        the default_code is built from the integer text (``34``/``10``). A ``-`` or
-        blank inseam contributes nothing.
+        the default_code is built from the integer text (``34``/``10``). A half size
+        (``10.5``) keeps its fraction. A ``-`` or blank inseam contributes nothing.
+
+        The de-floating rule itself lives in ``_number_to_text`` so the XLSX, X24 and
+        MDM paths cannot drift apart -- two copies of the same rule is exactly how
+        they would.
         """
-        if v is None:
-            return ""
-        if isinstance(v, float) and v.is_integer():
-            v = int(v)
-        s = str(v).strip()
+        v = _number_to_text(v)
+        s = "" if v is None else str(v).strip()
         return "" if s in ("", "-") else s
 
     @classmethod
@@ -1640,6 +1668,9 @@ class RetailImportExecutor(models.AbstractModel):
                 r = json.loads(ln.raw_data_json or "{}")
             except Exception:
                 continue
+            # Staged before the reader coerced numeric cells: register/transnum may
+            # still be JSON floats, whose keys would no longer match a fresh import.
+            r = self._ri_normalize_row(r)
             tt = str(r.get("tender_type") or "").strip()
             if not tt:
                 continue
@@ -2307,6 +2338,7 @@ class RetailImportExecutor(models.AbstractModel):
                 r = json.loads(ln.raw_data_json or "{}")
             except Exception:
                 continue
+            r = self._ri_normalize_row(r)  # see _x24_tender_index
             sc = str(r.get("store_code") or "").strip()
             if not sc or not sc.isdigit():
                 continue
@@ -3128,6 +3160,7 @@ class RetailImportExecutor(models.AbstractModel):
                 r = json.loads(ln.raw_data_json or "{}")
             except Exception:
                 continue
+            r = self._ri_normalize_row(r)  # see _x24_tender_index
             code = str(r.get("product_code") or "").strip()
             if not code:
                 continue
