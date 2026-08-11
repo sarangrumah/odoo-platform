@@ -22,15 +22,11 @@ class TestComputeOperatingUnit(OperatingUnitDocsCommon):
         )
         self.assertEqual(move.operating_unit_id, self.ou_ho)
         move.write({"journal_id": self.journal_b.id})
-        self.assertEqual(
-            move.operating_unit_id, self.ou_ho, "an explicit unit survives a journal change"
-        )
+        self.assertEqual(move.operating_unit_id, self.ou_ho, "an explicit unit survives a journal change")
 
     def test_03_line_inherits_the_move(self):
         move = self._make_move(self.ou_b, journal=self.journal_b)
-        account = self.env["account.account"].search(
-            [("company_ids", "in", self.company.id)], limit=1
-        )
+        account = self.env["account.account"].search([("company_ids", "in", self.company.id)], limit=1)
         move.write(
             {
                 "line_ids": [
@@ -53,9 +49,7 @@ class TestComputeOperatingUnit(OperatingUnitDocsCommon):
         line_model = self.env["account.move.line"]
         index = self.OU._analytic_index()
         # Odoo joins several plans' ids into one comma-separated key.
-        self.assertEqual(
-            line_model._ou_from_distribution({"%s,999" % analytic.id: 100}, index), self.ou_b.id
-        )
+        self.assertEqual(line_model._ou_from_distribution({"%s,999" % analytic.id: 100}, index), self.ou_b.id)
         self.assertFalse(line_model._ou_from_distribution({"999": 100}, index))
 
     def test_05_picking_from_warehouse(self):
@@ -76,17 +70,13 @@ class TestComputeOperatingUnit(OperatingUnitDocsCommon):
             [("warehouse_id", "=", self.wh_a.id), ("code", "=", "incoming")], limit=1
         )
         partner = self.env["res.partner"].create({"name": "OU Vendor"})
-        order = self.env["purchase.order"].create(
-            {"partner_id": partner.id, "picking_type_id": picking_type.id}
-        )
+        order = self.env["purchase.order"].create({"partner_id": partner.id, "picking_type_id": picking_type.id})
         self.assertEqual(order.operating_unit_id, self.ou_a)
         self.assertEqual(order._prepare_invoice().get("operating_unit_id"), self.ou_a.id)
 
     def test_07_sale_order_from_warehouse(self):
         partner = self.env["res.partner"].create({"name": "OU Customer"})
-        order = self.env["sale.order"].create(
-            {"partner_id": partner.id, "warehouse_id": self.wh_b.id}
-        )
+        order = self.env["sale.order"].create({"partner_id": partner.id, "warehouse_id": self.wh_b.id})
         self.assertEqual(order.operating_unit_id, self.ou_b)
         self.assertEqual(order._prepare_invoice().get("operating_unit_id"), self.ou_b.id)
 

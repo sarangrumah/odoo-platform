@@ -73,15 +73,11 @@ class AccountPayment(models.Model):
     _name = "account.payment"
     _inherit = ["account.payment", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        related="move_id.operating_unit_id", store=True, readonly=False, index=True
-    )
+    operating_unit_id = fields.Many2one(related="move_id.operating_unit_id", store=True, readonly=False, index=True)
 
 
 class AccountBankStatementLine(models.Model):
     _name = "account.bank.statement.line"
     _inherit = ["account.bank.statement.line", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        related="move_id.operating_unit_id", store=True, readonly=False, index=True
-    )
+    operating_unit_id = fields.Many2one(related="move_id.operating_unit_id", store=True, readonly=False, index=True)

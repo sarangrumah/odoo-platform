@@ -12,14 +12,13 @@ changes.
 """
 
 from odoo import fields, models
+from odoo.tools import SQL
 
 
 class CustomReportJournalItemAnalysis(models.Model):
     _inherit = "custom.report.journal.item.analysis"
 
-    operating_unit_id = fields.Many2one(
-        "operating.unit", string="Operating Unit", readonly=True, index=True
-    )
+    operating_unit_id = fields.Many2one("operating.unit", string="Operating Unit", readonly=True, index=True)
 
     def init(self):
         super().init()
@@ -29,12 +28,18 @@ class CustomReportJournalItemAnalysis(models.Model):
         if not row:
             return
         base_definition = row[0].rstrip().rstrip(";")
-        cr.execute("DROP VIEW IF EXISTS %s CASCADE" % self._table)
+        view = SQL.identifier(self._table)
+        cr.execute(SQL("DROP VIEW IF EXISTS %s CASCADE", view))
+        # `base_definition` is the view body Postgres just handed back, not
+        # input — there is no identifier to quote and nothing to bind, so it is
+        # spliced in as-is. Everything an attacker could reach is already a
+        # bound parameter or a quoted identifier.
+        # nosemgrep: semgrep.odoo-sql-injection-fstring - server-side view definition, no user input
         cr.execute(
-            """
-            CREATE VIEW {table} AS
-            SELECT base.*, aml.operating_unit_id AS operating_unit_id
-              FROM ({base}) base
-              LEFT JOIN account_move_line aml ON aml.id = base.id
-            """.format(table=self._table, base=base_definition)
+            SQL(
+                "CREATE VIEW %s AS SELECT base.*, aml.operating_unit_id AS operating_unit_id "
+                "FROM (" + base_definition + ") base "
+                "LEFT JOIN account_move_line aml ON aml.id = base.id",
+                view,
+            )
         )

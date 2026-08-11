@@ -62,8 +62,7 @@ class OperatingUnitMixin(models.AbstractModel):
             if unit and unit.id not in allowed:
                 raise AccessError(
                     _(
-                        "You are not allowed to book %(document)s on Operating Unit "
-                        "%(unit)s.",
+                        "You are not allowed to book %(document)s on Operating Unit %(unit)s.",
                         document=record.display_name or record._description,
                         unit=unit.display_name,
                     )

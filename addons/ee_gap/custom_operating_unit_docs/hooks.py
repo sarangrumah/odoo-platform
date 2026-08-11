@@ -17,6 +17,8 @@ queues nothing. The columns stay NULL; history is filled out of band by
 
 import logging
 
+from odoo.tools import SQL
+
 _logger = logging.getLogger(__name__)
 
 # Tables that get an operating_unit_id column. Each one exists only if its app
@@ -41,12 +43,22 @@ def create_operating_unit_columns(cr):
         cr.execute("SELECT to_regclass(%s)", (table,))
         if not cr.fetchone()[0]:
             continue
+        # DDL cannot take a bound parameter for an identifier, so the table
+        # name goes through SQL.identifier() (which quotes it) rather than a
+        # bare format. The names come from OU_TABLES above, never from input.
+        table_sql = SQL.identifier(table)
         cr.execute(
-            """
-            ALTER TABLE {table} ADD COLUMN IF NOT EXISTS operating_unit_id integer;
-            CREATE INDEX IF NOT EXISTS {table}_operating_unit_id_index
-                ON {table} (operating_unit_id) WHERE operating_unit_id IS NOT NULL;
-            """.format(table=table)
+            SQL(
+                "ALTER TABLE %s ADD COLUMN IF NOT EXISTS operating_unit_id integer",
+                table_sql,
+            )
+        )
+        cr.execute(
+            SQL(
+                "CREATE INDEX IF NOT EXISTS %s ON %s (operating_unit_id) WHERE operating_unit_id IS NOT NULL",
+                SQL.identifier("%s_operating_unit_id_index" % table),
+                table_sql,
+            )
         )
         created.append(table)
     # Partial index: the column is entirely NULL until the backfill runs, so the

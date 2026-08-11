@@ -21,9 +21,7 @@ class PosConfig(models.Model):
     _name = "pos.config"
     _inherit = ["pos.config", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        compute="_compute_operating_unit_id", store=True, readonly=False
-    )
+    operating_unit_id = fields.Many2one(compute="_compute_operating_unit_id", store=True, readonly=False)
 
     @api.depends("warehouse_id")
     def _compute_operating_unit_id(self):
@@ -38,18 +36,14 @@ class PosSession(models.Model):
     _name = "pos.session"
     _inherit = ["pos.session", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        related="config_id.operating_unit_id", store=True, readonly=True, index=True
-    )
+    operating_unit_id = fields.Many2one(related="config_id.operating_unit_id", store=True, readonly=True, index=True)
 
     def _create_account_move(self, *args, **kwargs):
         move = super()._create_account_move(*args, **kwargs)
         # The move is created on the POS journal, which carries no unit of its
         # own; give it the session's so the entry is addressable as a whole.
         if self.operating_unit_id and self.move_id and not self.move_id.operating_unit_id:
-            self.move_id.with_context(ou_skip_check=True).operating_unit_id = (
-                self.operating_unit_id.id
-            )
+            self.move_id.with_context(ou_skip_check=True).operating_unit_id = self.operating_unit_id.id
         return move
 
     def _ou_stamp(self, vals):
@@ -81,9 +75,7 @@ class PosOrder(models.Model):
     _name = "pos.order"
     _inherit = ["pos.order", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        compute="_compute_operating_unit_id", store=True, readonly=False, index=True
-    )
+    operating_unit_id = fields.Many2one(compute="_compute_operating_unit_id", store=True, readonly=False, index=True)
 
     @api.depends("session_id.operating_unit_id", "config_id.operating_unit_id")
     def _compute_operating_unit_id(self):

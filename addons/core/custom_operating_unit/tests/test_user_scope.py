@@ -31,9 +31,7 @@ class TestUserScope(OperatingUnitTestCommon):
         self.assertNotIn(self.ou_ho, allowed, "an area manager does not get Head Office")
 
     def test_04_all_units_group_overrides_assignment(self):
-        user = self._scoped_user(
-            "ou.hq@test", [self.ou_store_a], ["custom_operating_unit.group_operating_unit_all"]
-        )
+        user = self._scoped_user("ou.hq@test", [self.ou_store_a], ["custom_operating_unit.group_operating_unit_all"])
         self.assertFalse(user.ou_is_scoped)
         self.assertIn(self.ou_store_c, user.ou_allowed_ids)
 
@@ -41,9 +39,7 @@ class TestUserScope(OperatingUnitTestCommon):
         user = self._scoped_user("ou.helper@test", [self.ou_store_a])
         self.assertFalse(user.ou_all_access)
         user.ou_all_access = True
-        self.assertIn(
-            self.env.ref("custom_operating_unit.group_operating_unit_all"), user.all_group_ids
-        )
+        self.assertIn(self.env.ref("custom_operating_unit.group_operating_unit_all"), user.all_group_ids)
         self.assertFalse(user.ou_is_scoped)
         user.ou_all_access = False
         self.assertTrue(user.ou_is_scoped)
@@ -55,9 +51,7 @@ class TestUserScope(OperatingUnitTestCommon):
         self.assertIn(self.ou_store_c, user.ou_allowed_ids)
 
     def test_07_record_rule_filters_the_unit_list_itself(self):
-        user = self._scoped_user(
-            "ou.rule@test", [self.ou_store_a], ["custom_operating_unit.group_operating_unit_user"]
-        )
+        user = self._scoped_user("ou.rule@test", [self.ou_store_a], ["custom_operating_unit.group_operating_unit_user"])
         visible = self.OU.with_user(user).search([])
         self.assertEqual(visible, self.ou_store_a)
 
@@ -77,9 +71,7 @@ class TestUserScope(OperatingUnitTestCommon):
     def test_11_include_untagged_parameter_is_exposed(self):
         user = self._scoped_user("ou.untagged@test", [self.ou_store_a])
         self.assertTrue(user.ou_include_untagged, "default posture keeps legacy documents visible")
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_operating_unit.include_untagged", "0"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_operating_unit.include_untagged", "0")
         user.invalidate_recordset(["ou_include_untagged"])
         self.assertFalse(user.ou_include_untagged)
 
@@ -88,6 +80,4 @@ class TestUserScope(OperatingUnitTestCommon):
             "ou.nocreate@test", [self.ou_store_a], ["custom_operating_unit.group_operating_unit_user"]
         )
         with self.assertRaises(AccessError):
-            self.OU.with_user(user).create(
-                {"code": "ZZ-X", "name": "Sneaky", "company_id": self.company.id}
-            )
+            self.OU.with_user(user).create({"code": "ZZ-X", "name": "Sneaky", "company_id": self.company.id})

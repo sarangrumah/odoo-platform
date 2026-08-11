@@ -124,9 +124,7 @@ class CustomSecurityRole(models.Model):
     def _check_implied_recursion(self):
         for role in self:
             if role._has_cycle("implied_role_ids"):
-                raise ValidationError(
-                    _("A role cannot inherit itself, directly or through another role.")
-                )
+                raise ValidationError(_("A role cannot inherit itself, directly or through another role."))
 
     # ------------------------------------------------------------------
     # Public API
@@ -156,9 +154,7 @@ class CustomSecurityRole(models.Model):
     def write(self, vals):
         # An administrator editing a shipped role opts that role out of future
         # platform refreshes — better a stale template than lost local intent.
-        if not self.env.context.get("role_seed_sync") and (
-            "group_ids" in vals or "implied_role_ids" in vals
-        ):
+        if not self.env.context.get("role_seed_sync") and ("group_ids" in vals or "implied_role_ids" in vals):
             seeds = self.filtered(lambda r: r.is_seed and not r.customized)
             if seeds:
                 super(CustomSecurityRole, seeds).write({"customized": True})

@@ -88,15 +88,11 @@ def migrate_levis_operating_units(env):
                 unit.active = False
 
     if "pos.config" in env and "operating_unit_id" in env["pos.config"]._fields:
-        configs = env["pos.config"].with_context(active_test=False).search(
-            [("warehouse_id", "!=", False)]
-        )
+        configs = env["pos.config"].with_context(active_test=False).search([("warehouse_id", "!=", False)])
         for config in configs:
             if config.operating_unit_id:
                 continue
-            unit = OU.with_context(active_test=False).search(
-                [("warehouse_id", "=", config.warehouse_id.id)], limit=1
-            )
+            unit = OU.with_context(active_test=False).search([("warehouse_id", "=", config.warehouse_id.id)], limit=1)
             if unit:
                 config.operating_unit_id = unit.id
 

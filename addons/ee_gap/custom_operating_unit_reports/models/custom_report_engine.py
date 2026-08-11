@@ -39,8 +39,7 @@ class CustomReportEngine(models.AbstractModel):
             # Same posture as the record rules: documents that carry no unit
             # yet (everything, before the backfill) stay visible.
             return (
-                " AND (%s.operating_unit_id IS NULL OR %s.operating_unit_id IN %%s)"
-                % (alias, alias),
+                " AND (%s.operating_unit_id IS NULL OR %s.operating_unit_id IN %%s)" % (alias, alias),
                 [tuple(unit_ids)],
             )
         return " AND %s.operating_unit_id IN %%s" % alias, [tuple(unit_ids)]
@@ -62,8 +61,4 @@ class CustomReportProfitLossBranch(models.AbstractModel):
         if not user.ou_is_scoped:
             return columns
         visible_analytic_ids = set(user.ou_allowed_ids.analytic_account_id.ids)
-        return [
-            column
-            for column in columns
-            if column[2] is not None and column[2] in visible_analytic_ids
-        ]
+        return [column for column in columns if column[2] is not None and column[2] in visible_analytic_ids]

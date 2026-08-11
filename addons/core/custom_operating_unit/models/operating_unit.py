@@ -46,14 +46,10 @@ class OperatingUnit(models.Model):
         required=True,
         index=True,
     )
-    parent_id = fields.Many2one(
-        "operating.unit", string="Parent", ondelete="restrict", index=True
-    )
+    parent_id = fields.Many2one("operating.unit", string="Parent", ondelete="restrict", index=True)
     parent_path = fields.Char(index=True)
     child_ids = fields.One2many("operating.unit", "parent_id", string="Children")
-    company_id = fields.Many2one(
-        "res.company", required=True, index=True, default=lambda self: self.env.company
-    )
+    company_id = fields.Many2one("res.company", required=True, index=True, default=lambda self: self.env.company)
     active = fields.Boolean(default=True)
     sequence = fields.Integer(default=10)
     manager_user_id = fields.Many2one("res.users", string="Manager")
@@ -91,9 +87,7 @@ class OperatingUnit(models.Model):
     @api.depends("name", "parent_id.complete_name")
     def _compute_complete_name(self):
         for ou in self:
-            ou.complete_name = (
-                "%s / %s" % (ou.parent_id.complete_name, ou.name) if ou.parent_id else ou.name
-            )
+            ou.complete_name = "%s / %s" % (ou.parent_id.complete_name, ou.name) if ou.parent_id else ou.name
 
     @api.depends("user_ids")
     def _compute_user_count(self):
@@ -106,9 +100,7 @@ class OperatingUnit(models.Model):
             if ou._has_cycle():
                 raise ValidationError(_("An Operating Unit cannot be its own ancestor."))
             if ou.parent_id and ou.parent_id.company_id != ou.company_id:
-                raise ValidationError(
-                    _("An Operating Unit must belong to the same company as its parent.")
-                )
+                raise ValidationError(_("An Operating Unit must belong to the same company as its parent."))
 
     @api.constrains("ou_type", "parent_id", "company_id")
     def _check_head_office(self):
@@ -127,8 +119,11 @@ class OperatingUnit(models.Model):
             )
             if other:
                 raise ValidationError(
-                    _("%(company)s already has a Head Office unit (%(existing)s).",
-                      company=ou.company_id.display_name, existing=other.display_name)
+                    _(
+                        "%(company)s already has a Head Office unit (%(existing)s).",
+                        company=ou.company_id.display_name,
+                        existing=other.display_name,
+                    )
                 )
 
     # ------------------------------------------------------------------
@@ -147,11 +142,7 @@ class OperatingUnit(models.Model):
         )
         links = {k: v for k, v in links.items() if v}
         if existing:
-            fill = {
-                field: value
-                for field, value in links.items()
-                if field in self._fields and not existing[field]
-            }
+            fill = {field: value for field, value in links.items() if field in self._fields and not existing[field]}
             if parent and not existing.parent_id and parent != existing:
                 fill["parent_id"] = parent.id
             if fill:
@@ -176,8 +167,10 @@ class OperatingUnit(models.Model):
         whole journals, and a per-line search would turn a 500-line bill into
         500 queries.
         """
-        rows = self.with_context(active_test=False).sudo().search_read(
-            [("analytic_account_id", "!=", False)], ["analytic_account_id"]
+        rows = (
+            self.with_context(active_test=False)
+            .sudo()
+            .search_read([("analytic_account_id", "!=", False)], ["analytic_account_id"])
         )
         return {row["analytic_account_id"][0]: row["id"] for row in rows}
 

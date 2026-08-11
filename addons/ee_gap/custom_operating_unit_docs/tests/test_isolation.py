@@ -27,17 +27,13 @@ class TestOperatingUnitIsolation(OperatingUnitDocsCommon):
     def test_03_untagged_can_be_locked_down_per_tenant(self):
         legacy = self._make_move(None)
         legacy.operating_unit_id = False
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_operating_unit.include_untagged", "0"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_operating_unit.include_untagged", "0")
         self.user_store_a.invalidate_recordset(["ou_include_untagged"])
 
         visible = self.Move.with_user(self.user_store_a).search([("id", "=", legacy.id)])
 
         self.assertFalse(visible)
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_operating_unit.include_untagged", "1"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_operating_unit.include_untagged", "1")
 
     def test_04_unscoped_user_sees_everything(self):
         mine = self._make_move(self.ou_a)
@@ -58,21 +54,23 @@ class TestOperatingUnitIsolation(OperatingUnitDocsCommon):
 
     def test_06_write_guard_refuses_moving_a_document_afterwards(self):
         """A create-time check alone would miss this."""
-        move = self.Move.with_user(self.user_store_a).create(
-            {"move_type": "entry", "journal_id": self.journal_a.id}
-        )
+        move = self.Move.with_user(self.user_store_a).create({"move_type": "entry", "journal_id": self.journal_a.id})
         self.assertEqual(move.operating_unit_id, self.ou_a)
         with self.assertRaises(AccessError):
             move.write({"operating_unit_id": self.ou_b.id})
 
     def test_07_sudo_paths_are_unaffected(self):
         """Crons, the retail import and queue_job all run elevated."""
-        move = self.Move.with_user(self.user_store_a).sudo().create(
-            {
-                "move_type": "entry",
-                "journal_id": self.journal_b.id,
-                "operating_unit_id": self.ou_b.id,
-            }
+        move = (
+            self.Move.with_user(self.user_store_a)
+            .sudo()
+            .create(
+                {
+                    "move_type": "entry",
+                    "journal_id": self.journal_b.id,
+                    "operating_unit_id": self.ou_b.id,
+                }
+            )
         )
         self.assertEqual(move.operating_unit_id, self.ou_b)
 

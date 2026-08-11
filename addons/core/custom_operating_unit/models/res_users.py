@@ -55,15 +55,11 @@ class ResUsers(models.Model):
         OU = self.env["operating.unit"].sudo()
         every_unit = OU.search([])
         group_all = self.env.ref(ALL_UNITS_GROUP, raise_if_not_found=False)
-        include_untagged = (
-            self.env["ir.config_parameter"].sudo().get_param(INCLUDE_UNTAGGED_PARAM, "1") != "0"
-        )
+        include_untagged = self.env["ir.config_parameter"].sudo().get_param(INCLUDE_UNTAGGED_PARAM, "1") != "0"
         root_id = self.env.ref("base.user_root").id
         for user in self:
             unrestricted = (
-                not user.operating_unit_ids
-                or user.id == root_id
-                or (group_all and group_all in user.all_group_ids)
+                not user.operating_unit_ids or user.id == root_id or (group_all and group_all in user.all_group_ids)
             )
             user.ou_is_scoped = not unrestricted
             user.ou_allowed_ids = (

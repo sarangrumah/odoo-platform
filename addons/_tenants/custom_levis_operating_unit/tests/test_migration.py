@@ -9,23 +9,19 @@ from ..models.setup import migrate_levis_operating_units
 @tagged("post_install", "-at_install")
 class TestLevisOperatingUnitMigration(TransactionCase):
     def test_01_every_wired_warehouse_has_a_unit(self):
-        warehouses = self.env["stock.warehouse"].with_context(active_test=False).search(
-            [("l10n_ou_analytic_id", "!=", False)]
+        warehouses = (
+            self.env["stock.warehouse"].with_context(active_test=False).search([("l10n_ou_analytic_id", "!=", False)])
         )
         units = self.env["operating.unit"].with_context(active_test=False)
         for warehouse in warehouses:
             unit = units.search([("warehouse_id", "=", warehouse.id)], limit=1)
-            head_office = units.search(
-                [("analytic_account_id", "=", warehouse.l10n_ou_analytic_id.id)], limit=1
-            )
+            head_office = units.search([("analytic_account_id", "=", warehouse.l10n_ou_analytic_id.id)], limit=1)
             self.assertTrue(
                 unit or head_office,
                 "warehouse %s has an OU analytic but no operating.unit" % warehouse.code,
             )
             if unit:
-                self.assertEqual(
-                    unit.code, warehouse.code, "the unit code is the warehouse code, copied"
-                )
+                self.assertEqual(unit.code, warehouse.code, "the unit code is the warehouse code, copied")
 
     def test_02_rerunning_creates_nothing(self):
         units = self.env["operating.unit"].with_context(active_test=False)

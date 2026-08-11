@@ -8,9 +8,7 @@ class PurchaseOrder(models.Model):
     _name = "purchase.order"
     _inherit = ["purchase.order", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        compute="_compute_operating_unit_id", store=True, readonly=False
-    )
+    operating_unit_id = fields.Many2one(compute="_compute_operating_unit_id", store=True, readonly=False)
 
     @api.depends("picking_type_id.warehouse_id")
     def _compute_operating_unit_id(self):
@@ -19,9 +17,7 @@ class PurchaseOrder(models.Model):
         for order in self:
             if order.operating_unit_id:
                 continue
-            order.operating_unit_id = (
-                index.get(order.picking_type_id.warehouse_id.id) or default_unit.id or False
-            )
+            order.operating_unit_id = index.get(order.picking_type_id.warehouse_id.id) or default_unit.id or False
 
     def _prepare_invoice(self):
         vals = super()._prepare_invoice()
@@ -34,9 +30,7 @@ class SaleOrder(models.Model):
     _name = "sale.order"
     _inherit = ["sale.order", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        compute="_compute_operating_unit_id", store=True, readonly=False
-    )
+    operating_unit_id = fields.Many2one(compute="_compute_operating_unit_id", store=True, readonly=False)
 
     @api.depends("warehouse_id")
     def _compute_operating_unit_id(self):
@@ -45,9 +39,7 @@ class SaleOrder(models.Model):
         for order in self:
             if order.operating_unit_id:
                 continue
-            order.operating_unit_id = (
-                index.get(order.warehouse_id.id) or default_unit.id or False
-            )
+            order.operating_unit_id = index.get(order.warehouse_id.id) or default_unit.id or False
 
     def _prepare_invoice(self):
         vals = super()._prepare_invoice()

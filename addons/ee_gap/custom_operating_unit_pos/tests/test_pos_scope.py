@@ -14,10 +14,7 @@ class TestPosOperatingUnit(TransactionCase):
         OU = cls.env["operating.unit"]
         cls.ho = OU.with_context(active_test=False).search(
             [("ou_type", "=", "company"), ("company_id", "=", cls.company.id)], limit=1
-        ) or OU.create(
-            {"code": "ZZP-HO", "name": "Head Office", "ou_type": "company",
-             "company_id": cls.company.id}
-        )
+        ) or OU.create({"code": "ZZP-HO", "name": "Head Office", "ou_type": "company", "company_id": cls.company.id})
         cls.wh_a = cls.env["stock.warehouse"].create(
             {"name": "POS Test WH A", "code": "ZPA", "company_id": cls.company.id}
         )
@@ -25,12 +22,22 @@ class TestPosOperatingUnit(TransactionCase):
             {"name": "POS Test WH B", "code": "ZPB", "company_id": cls.company.id}
         )
         cls.unit_a = OU.create(
-            {"code": "ZZP-A", "name": "POS Store A", "parent_id": cls.ho.id,
-             "company_id": cls.company.id, "warehouse_id": cls.wh_a.id}
+            {
+                "code": "ZZP-A",
+                "name": "POS Store A",
+                "parent_id": cls.ho.id,
+                "company_id": cls.company.id,
+                "warehouse_id": cls.wh_a.id,
+            }
         )
         cls.unit_b = OU.create(
-            {"code": "ZZP-B", "name": "POS Store B", "parent_id": cls.ho.id,
-             "company_id": cls.company.id, "warehouse_id": cls.wh_b.id}
+            {
+                "code": "ZZP-B",
+                "name": "POS Store B",
+                "parent_id": cls.ho.id,
+                "company_id": cls.company.id,
+                "warehouse_id": cls.wh_b.id,
+            }
         )
         cls.config_a = cls._make_config("POS Test A", cls.wh_a)
         cls.config_b = cls._make_config("POS Test B", cls.wh_b)
@@ -84,15 +91,13 @@ class TestPosOperatingUnit(TransactionCase):
         session_a = self.env["pos.session"].create({"config_id": self.config_a.id})
         session_b = self.env["pos.session"].create({"config_id": self.config_b.id})
 
-        visible = self.env["pos.session"].with_user(self.cashier).search(
-            [("id", "in", (session_a | session_b).ids)]
-        )
+        visible = self.env["pos.session"].with_user(self.cashier).search([("id", "in", (session_a | session_b).ids)])
 
         self.assertEqual(visible, session_a)
 
     def test_05_cashier_sees_only_their_own_point_of_sale(self):
-        visible = self.env["pos.config"].with_user(self.cashier).search(
-            [("id", "in", (self.config_a | self.config_b).ids)]
+        visible = (
+            self.env["pos.config"].with_user(self.cashier).search([("id", "in", (self.config_a | self.config_b).ids)])
         )
         self.assertEqual(visible, self.config_a)
 
@@ -108,9 +113,10 @@ class TestPosOperatingUnit(TransactionCase):
         self.assertEqual(stamped["operating_unit_id"], self.unit_a.id)
 
     def test_07_stamping_is_a_no_op_without_a_unit(self):
-        config = self._make_config("POS Test No Unit", self.env["stock.warehouse"].create(
-            {"name": "POS Test WH C", "code": "ZPC", "company_id": self.company.id}
-        ))
+        config = self._make_config(
+            "POS Test No Unit",
+            self.env["stock.warehouse"].create({"name": "POS Test WH C", "code": "ZPC", "company_id": self.company.id}),
+        )
         session = self.env["pos.session"].create({"config_id": config.id})
         self.assertFalse(session.operating_unit_id)
         self.assertNotIn("operating_unit_id", session._ou_stamp({"balance": 1.0}))

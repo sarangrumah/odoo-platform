@@ -99,9 +99,7 @@ class ResUsers(models.Model):
         if not matched:
             return set()
 
-        authoritative = (
-            self.env["ir.config_parameter"].sudo().get_param(AUTHORITATIVE_PARAM, "0") == "1"
-        )
+        authoritative = self.env["ir.config_parameter"].sudo().get_param(AUTHORITATIVE_PARAM, "0") == "1"
         if authoritative:
             # The identity provider owns the role list: a role removed there is
             # removed here on the next sign-in. Safe only because the role engine

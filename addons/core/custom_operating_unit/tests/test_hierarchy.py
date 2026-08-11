@@ -43,9 +43,7 @@ class TestOperatingUnitHierarchy(OperatingUnitTestCommon):
     def test_07_ensure_is_idempotent_and_never_renames(self):
         again = self.OU._ensure("ZZ-A", "A COMPLETELY DIFFERENT NAME", self.company)
         self.assertEqual(again, self.ou_store_a)
-        self.assertEqual(
-            again.name, "Store A", "_ensure must never rename an existing unit"
-        )
+        self.assertEqual(again.name, "Store A", "_ensure must never rename an existing unit")
 
     def test_08_ensure_fills_only_empty_links(self):
         analytic_plan = self.env["account.analytic.plan"].create({"name": "OU Test Plan"})
@@ -59,9 +57,7 @@ class TestOperatingUnitHierarchy(OperatingUnitTestCommon):
         self.assertEqual(self.ou_store_b.analytic_account_id, first)
 
         self.OU._ensure("ZZ-B", "Store B", self.company, analytic_account_id=second.id)
-        self.assertEqual(
-            self.ou_store_b.analytic_account_id, first, "an existing link must not be overwritten"
-        )
+        self.assertEqual(self.ou_store_b.analytic_account_id, first, "an existing link must not be overwritten")
 
     def test_09_ensure_creates_with_parent(self):
         created = self.OU._ensure("ZZ-D", "Store D", self.company, parent=self.ou_area)

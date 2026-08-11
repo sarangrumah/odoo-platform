@@ -13,9 +13,7 @@ class TestSsoRoleDelegation(TransactionCase):
         cls.has_roles = "custom.security.role" in cls.env
         cls.privilege = cls.env["res.groups.privilege"].create({"name": "SSO Test"})
         cls.group_x, cls.group_y = [
-            cls.env["res.groups"].create(
-                {"name": "SSO Test / %s" % letter, "privilege_id": cls.privilege.id}
-            )
+            cls.env["res.groups"].create({"name": "SSO Test / %s" % letter, "privilege_id": cls.privilege.id})
             for letter in ("X", "Y")
         ]
         cls.user = cls.env["res.users"].create(
@@ -33,8 +31,7 @@ class TestSsoRoleDelegation(TransactionCase):
         if not self.has_roles:
             self.skipTest("custom_role_manager not installed")
         role = self.env["custom.security.role"].create(
-            {"code": "sso_test_role", "name": "SSO Test Role",
-             "group_ids": [Command.set([self.group_x.id])]}
+            {"code": "sso_test_role", "name": "SSO Test Role", "group_ids": [Command.set([self.group_x.id])]}
         )
 
         self.user._finance_sso_apply_roles(self._claims("sso_test_role"))
@@ -57,12 +54,10 @@ class TestSsoRoleDelegation(TransactionCase):
         if not self.has_roles:
             self.skipTest("custom_role_manager not installed")
         role_a = self.env["custom.security.role"].create(
-            {"code": "sso_role_a", "name": "SSO Role A",
-             "group_ids": [Command.set([self.group_x.id])]}
+            {"code": "sso_role_a", "name": "SSO Role A", "group_ids": [Command.set([self.group_x.id])]}
         )
         role_b = self.env["custom.security.role"].create(
-            {"code": "sso_role_b", "name": "SSO Role B",
-             "group_ids": [Command.set([self.group_y.id])]}
+            {"code": "sso_role_b", "name": "SSO Role B", "group_ids": [Command.set([self.group_y.id])]}
         )
 
         self.user._finance_sso_apply_roles(self._claims("sso_role_a"))
@@ -74,16 +69,12 @@ class TestSsoRoleDelegation(TransactionCase):
     def test_04_authoritative_mode_mirrors_the_provider(self):
         if not self.has_roles:
             self.skipTest("custom_role_manager not installed")
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_finance_portal_sso.roles_authoritative", "1"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_finance_portal_sso.roles_authoritative", "1")
         role_a = self.env["custom.security.role"].create(
-            {"code": "sso_auth_a", "name": "SSO Auth A",
-             "group_ids": [Command.set([self.group_x.id])]}
+            {"code": "sso_auth_a", "name": "SSO Auth A", "group_ids": [Command.set([self.group_x.id])]}
         )
         role_b = self.env["custom.security.role"].create(
-            {"code": "sso_auth_b", "name": "SSO Auth B",
-             "group_ids": [Command.set([self.group_y.id])]}
+            {"code": "sso_auth_b", "name": "SSO Auth B", "group_ids": [Command.set([self.group_y.id])]}
         )
 
         self.user._finance_sso_apply_roles(self._claims("sso_auth_a"))
@@ -93,29 +84,22 @@ class TestSsoRoleDelegation(TransactionCase):
         self.assertIn(role_b, self.user.role_ids)
         self.assertNotIn(self.group_x, self.user.group_ids)
         self.assertIn(self.group_y, self.user.group_ids)
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_finance_portal_sso.roles_authoritative", "0"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_finance_portal_sso.roles_authoritative", "0")
 
     def test_05_hand_granted_group_survives_authoritative_mode(self):
         """The engine only ever revokes what it granted itself."""
         if not self.has_roles:
             self.skipTest("custom_role_manager not installed")
         self.user.sudo().write({"group_ids": [Command.link(self.group_x.id)]})
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_finance_portal_sso.roles_authoritative", "1"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_finance_portal_sso.roles_authoritative", "1")
         self.env["custom.security.role"].create(
-            {"code": "sso_keep", "name": "SSO Keep",
-             "group_ids": [Command.set([self.group_y.id])]}
+            {"code": "sso_keep", "name": "SSO Keep", "group_ids": [Command.set([self.group_y.id])]}
         )
 
         self.user._finance_sso_apply_roles(self._claims("sso_keep"))
 
         self.assertIn(self.group_x, self.user.group_ids)
-        self.env["ir.config_parameter"].sudo().set_param(
-            "custom_finance_portal_sso.roles_authoritative", "0"
-        )
+        self.env["ir.config_parameter"].sudo().set_param("custom_finance_portal_sso.roles_authoritative", "0")
 
     def test_06_no_claims_is_harmless(self):
         before = self.user.group_ids

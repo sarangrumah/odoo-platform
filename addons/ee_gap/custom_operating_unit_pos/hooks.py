@@ -9,6 +9,8 @@ Levi's tenant accumulates hundreds of thousands of rows.
 
 import logging
 
+from odoo.tools import SQL
+
 _logger = logging.getLogger(__name__)
 
 OU_TABLES = ("pos_config", "pos_session", "pos_order")
@@ -19,10 +21,21 @@ def create_operating_unit_columns(cr):
         cr.execute("SELECT to_regclass(%s)", (table,))
         if not cr.fetchone()[0]:
             continue
+        # Identifiers cannot be bound parameters; SQL.identifier() quotes
+        # them. The names come from OU_TABLES above, never from input.
+        table_sql = SQL.identifier(table)
         cr.execute(
-            "ALTER TABLE {t} ADD COLUMN IF NOT EXISTS operating_unit_id integer;"
-            "CREATE INDEX IF NOT EXISTS {t}_operating_unit_id_index "
-            "  ON {t} (operating_unit_id) WHERE operating_unit_id IS NOT NULL;".format(t=table)
+            SQL(
+                "ALTER TABLE %s ADD COLUMN IF NOT EXISTS operating_unit_id integer",
+                table_sql,
+            )
+        )
+        cr.execute(
+            SQL(
+                "CREATE INDEX IF NOT EXISTS %s ON %s (operating_unit_id) WHERE operating_unit_id IS NOT NULL",
+                SQL.identifier("%s_operating_unit_id_index" % table),
+                table_sql,
+            )
         )
     _logger.info("Operating Unit columns ensured on the POS tables")
 

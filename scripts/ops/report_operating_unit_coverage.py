@@ -35,9 +35,8 @@ TABLES = (
 cr.execute("SELECT count(*) FROM operating_unit WHERE active")
 _logger.info("Active operating units: %s", cr.fetchone()[0])
 
-param = env["ir.config_parameter"].sudo().get_param(  # noqa: F821
-    "custom_operating_unit.include_untagged", "1"
-)
+ConfigParameter = env["ir.config_parameter"].sudo()  # noqa: F821 — odoo shell global
+param = ConfigParameter.get_param("custom_operating_unit.include_untagged", "1")
 _logger.info("include_untagged = %r (%s)", param, "untagged visible" if param != "0" else "hidden")
 
 _logger.info("%-34s %10s %10s %7s", "table", "rows", "no unit", "cover")
@@ -46,9 +45,7 @@ for table in TABLES:
     cr.execute("SELECT to_regclass(%s)", (table,))
     if not cr.fetchone()[0]:
         continue
-    cr.execute(
-        "SELECT count(*), count(*) FILTER (WHERE operating_unit_id IS NULL) FROM %s" % table
-    )
+    cr.execute("SELECT count(*), count(*) FILTER (WHERE operating_unit_id IS NULL) FROM %s" % table)
     rows, missing = cr.fetchone()
     total_missing += missing
     coverage = 100.0 if not rows else 100.0 * (rows - missing) / rows

@@ -44,8 +44,8 @@ class OperatingUnit(models.Model):
         The document computes run over whole journals and pickings; resolving
         the unit per record would be a query per row.
         """
-        rows = self.with_context(active_test=False).sudo().search_read(
-            [("warehouse_id", "!=", False)], ["warehouse_id"]
+        rows = (
+            self.with_context(active_test=False).sudo().search_read([("warehouse_id", "!=", False)], ["warehouse_id"])
         )
         return {row["warehouse_id"][0]: row["id"] for row in rows}
 
@@ -54,9 +54,13 @@ class OperatingUnit(models.Model):
     def _journal_index(self):
         """``{journal_id: operating_unit_id}`` for both journal links."""
         index = {}
-        rows = self.with_context(active_test=False).sudo().search_read(
-            ["|", ("journal_id", "!=", False), ("purchase_journal_id", "!=", False)],
-            ["journal_id", "purchase_journal_id"],
+        rows = (
+            self.with_context(active_test=False)
+            .sudo()
+            .search_read(
+                ["|", ("journal_id", "!=", False), ("purchase_journal_id", "!=", False)],
+                ["journal_id", "purchase_journal_id"],
+            )
         )
         for row in rows:
             for key in ("journal_id", "purchase_journal_id"):

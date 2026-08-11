@@ -26,8 +26,7 @@ class ResUsers(models.Model):
         "user_id",
         "role_id",
         string="Roles",
-        help="Named position(s) held by this user. The groups below are kept in "
-        "sync with the roles automatically.",
+        help="Named position(s) held by this user. The groups below are kept in sync with the roles automatically.",
     )
     role_granted_group_ids = fields.Many2many(
         "res.groups",
@@ -37,8 +36,7 @@ class ResUsers(models.Model):
         string="Groups Granted by Roles",
         readonly=True,
         copy=False,
-        help="Ledger of what the role engine granted last time. Only these may "
-        "ever be revoked by it.",
+        help="Ledger of what the role engine granted last time. Only these may ever be revoked by it.",
     )
     role_baseline_group_ids = fields.Many2many(
         "res.groups",
@@ -100,9 +98,7 @@ class ResUsers(models.Model):
             commands += [Command.unlink(g.id) for g in to_revoke]
             if commands:
                 sudo_user.with_context(role_apply=True).write({"group_ids": commands})
-            sudo_user.with_context(role_apply=True).write(
-                {"role_granted_group_ids": [Command.set(target.ids)]}
-            )
+            sudo_user.with_context(role_apply=True).write({"role_granted_group_ids": [Command.set(target.ids)]})
             if to_grant or to_revoke:
                 _logger.info(
                     "Roles applied to %s: granted %s, revoked %s",
@@ -122,13 +118,18 @@ class ResUsers(models.Model):
             return
         if self == self.env.user:
             raise UserError(
-                _("Applying this role would remove your own Settings access. "
-                  "Ask another administrator to change your roles.")
+                _(
+                    "Applying this role would remove your own Settings access. "
+                    "Ask another administrator to change your roles."
+                )
             )
         if admin and self == admin and not self.env.su:
             raise UserError(
-                _("The %s user must keep Settings access. Change its roles as a "
-                  "superuser if this is really intended.", admin.name)
+                _(
+                    "The %s user must keep Settings access. Change its roles as a "
+                    "superuser if this is really intended.",
+                    admin.name,
+                )
             )
 
     def action_reapply_security_roles(self):

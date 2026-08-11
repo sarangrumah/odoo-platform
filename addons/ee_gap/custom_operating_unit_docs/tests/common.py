@@ -32,10 +32,7 @@ class OperatingUnitDocsCommon(TransactionCase):
         # run against a real clone, where a company-type unit already exists.
         cls.ou_ho = cls.OU.with_context(active_test=False).search(
             [("ou_type", "=", "company"), ("company_id", "=", cls.company.id)], limit=1
-        ) or cls.OU.create(
-            {"code": "ZZ-HO", "name": "Head Office", "ou_type": "company",
-             "company_id": cls.company.id}
-        )
+        ) or cls.OU.create({"code": "ZZ-HO", "name": "Head Office", "ou_type": "company", "company_id": cls.company.id})
         cls.ou_a = cls.OU.create(
             {
                 "code": "ZZ-A",
@@ -67,9 +64,7 @@ class OperatingUnitDocsCommon(TransactionCase):
             | cls.env.ref("account.group_account_user")
             | cls.env.ref("custom_operating_unit.group_operating_unit_user")
         )
-        user = cls.env["res.users"].create(
-            {"login": login, "name": login, "group_ids": [Command.set(groups.ids)]}
-        )
+        user = cls.env["res.users"].create({"login": login, "name": login, "group_ids": [Command.set(groups.ids)]})
         if units:
             user.operating_unit_ids = [Command.set([u.id for u in units])]
         return user

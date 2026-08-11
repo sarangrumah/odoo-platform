@@ -14,17 +14,12 @@ class TestReportOperatingUnitScope(TransactionCase):
         OU = cls.env["operating.unit"]
         cls.ho = OU.with_context(active_test=False).search(
             [("ou_type", "=", "company"), ("company_id", "=", cls.company.id)], limit=1
-        ) or OU.create(
-            {"code": "ZZR-HO", "name": "Head Office", "ou_type": "company",
-             "company_id": cls.company.id}
-        )
+        ) or OU.create({"code": "ZZR-HO", "name": "Head Office", "ou_type": "company", "company_id": cls.company.id})
         cls.unit_a = OU.create(
-            {"code": "ZZR-A", "name": "Report Store A", "parent_id": cls.ho.id,
-             "company_id": cls.company.id}
+            {"code": "ZZR-A", "name": "Report Store A", "parent_id": cls.ho.id, "company_id": cls.company.id}
         )
         cls.unit_b = OU.create(
-            {"code": "ZZR-B", "name": "Report Store B", "parent_id": cls.ho.id,
-             "company_id": cls.company.id}
+            {"code": "ZZR-B", "name": "Report Store B", "parent_id": cls.ho.id, "company_id": cls.company.id}
         )
 
         groups = (
@@ -44,9 +39,7 @@ class TestReportOperatingUnitScope(TransactionCase):
         cls.journal = cls.env["account.journal"].search(
             [("type", "=", "general"), ("company_id", "=", cls.company.id)], limit=1
         )
-        cls.account = cls.env["account.account"].search(
-            [("company_ids", "in", cls.company.id)], limit=1
-        )
+        cls.account = cls.env["account.account"].search([("company_ids", "in", cls.company.id)], limit=1)
         cls.move_a = cls._post_move(cls.unit_a, 100.0)
         cls.move_b = cls._post_move(cls.unit_b, 250.0)
 
@@ -102,9 +95,7 @@ class TestReportOperatingUnitScope(TransactionCase):
     def test_04_wizard_filter_cannot_widen_the_scope(self):
         """An explicit unit filter narrows; it never becomes a way around isolation."""
         engine = self.env["custom.report.engine"].with_user(self.store_user)
-        sql, params = engine.with_context(
-            report_operating_unit_ids=[self.unit_b.id]
-        )._ou_sql_filter("aml")
+        sql, params = engine.with_context(report_operating_unit_ids=[self.unit_b.id])._ou_sql_filter("aml")
         self.assertEqual(sql, " AND FALSE")
         self.assertEqual(params, [])
 

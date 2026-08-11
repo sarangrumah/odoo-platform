@@ -8,9 +8,7 @@ class StockPicking(models.Model):
     _name = "stock.picking"
     _inherit = ["stock.picking", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        compute="_compute_operating_unit_id", store=True, readonly=False
-    )
+    operating_unit_id = fields.Many2one(compute="_compute_operating_unit_id", store=True, readonly=False)
 
     @api.depends("picking_type_id.warehouse_id")
     def _compute_operating_unit_id(self):
@@ -25,9 +23,7 @@ class StockMove(models.Model):
     _name = "stock.move"
     _inherit = ["stock.move", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        compute="_compute_operating_unit_id", store=True, readonly=False
-    )
+    operating_unit_id = fields.Many2one(compute="_compute_operating_unit_id", store=True, readonly=False)
 
     @api.depends("picking_id.operating_unit_id", "picking_type_id.warehouse_id")
     def _compute_operating_unit_id(self):
@@ -36,9 +32,7 @@ class StockMove(models.Model):
             if move.operating_unit_id:
                 continue
             move.operating_unit_id = (
-                move.picking_id.operating_unit_id.id
-                or index.get(move.picking_type_id.warehouse_id.id)
-                or False
+                move.picking_id.operating_unit_id.id or index.get(move.picking_type_id.warehouse_id.id) or False
             )
 
 
@@ -46,9 +40,7 @@ class StockQuant(models.Model):
     _name = "stock.quant"
     _inherit = ["stock.quant", "operating.unit.mixin"]
 
-    operating_unit_id = fields.Many2one(
-        compute="_compute_operating_unit_id", store=True, readonly=False
-    )
+    operating_unit_id = fields.Many2one(compute="_compute_operating_unit_id", store=True, readonly=False)
 
     @api.depends("location_id.warehouse_id")
     def _compute_operating_unit_id(self):

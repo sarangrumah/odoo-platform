@@ -85,8 +85,7 @@ SEED_ROLES = [
         "role_domain": "accounting",
         "level": "supervisor",
         "scope": "head_office",
-        "description": "Reviews and posts what the staff prepared; runs the "
-        "standard accounting reports.",
+        "description": "Reviews and posts what the staff prepared; runs the standard accounting reports.",
         "groups": [
             "account.group_account_user",
             "custom_accounting_reports.group_report_user",
@@ -195,8 +194,7 @@ SEED_ROLES = [
         "role_domain": "pos",
         "level": "operator",
         "scope": "retail",
-        "description": "Operates the point of sale. No accounting, no stock "
-        "configuration.",
+        "description": "Operates the point of sale. No accounting, no stock configuration.",
         "groups": ["custom_core.group_custom_user", "point_of_sale.group_pos_user"],
     },
     {
@@ -224,8 +222,7 @@ SEED_ROLES = [
         "role_domain": "pos",
         "level": "manager",
         "scope": "retail",
-        "description": "Runs one store: POS configuration, stock, store reports "
-        "and first-level approvals.",
+        "description": "Runs one store: POS configuration, stock, store reports and first-level approvals.",
         "groups": [
             "point_of_sale.group_pos_manager",
             "custom_accounting_reports.group_report_user",
@@ -303,6 +300,5 @@ def sync_seed_roles(env):
     holders = env["res.users"].search([("role_ids", "in", [r.id for r in by_code.values()])])
     if holders:
         holders._apply_security_roles()
-    _logger.info("Seed roles synced: %d role(s), %d holder(s) re-applied.",
-                 len(by_code), len(holders))
+    _logger.info("Seed roles synced: %d role(s), %d holder(s) re-applied.", len(by_code), len(holders))
     return by_code

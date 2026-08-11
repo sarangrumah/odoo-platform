@@ -29,8 +29,10 @@ class OperatingUnitTestCommon(TransactionCase):
 
     @classmethod
     def _head_office(cls):
-        existing = cls.env["operating.unit"].with_context(active_test=False).search(
-            [("ou_type", "=", "company"), ("company_id", "=", cls.env.company.id)], limit=1
+        existing = (
+            cls.env["operating.unit"]
+            .with_context(active_test=False)
+            .search([("ou_type", "=", "company"), ("company_id", "=", cls.env.company.id)], limit=1)
         )
         return existing or cls._make_ou("ZZ-HO", "Head Office", ou_type="company")
 
@@ -54,9 +56,7 @@ class OperatingUnitTestCommon(TransactionCase):
         groups = cls.env.ref("base.group_user")
         for xmlid in group_xmlids:
             groups |= cls.env.ref(xmlid)
-        return cls.Users.create(
-            {"login": login, "name": name or login, "group_ids": [Command.set(groups.ids)]}
-        )
+        return cls.Users.create({"login": login, "name": name or login, "group_ids": [Command.set(groups.ids)]})
 
     @classmethod
     def _scoped_user(cls, login, units, group_xmlids=()):
