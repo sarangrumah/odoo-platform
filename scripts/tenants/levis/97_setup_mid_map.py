@@ -1,0 +1,173 @@
+# Mengisi levis.bank.mid.map -- prd_levis_begbal.
+#
+# Dijalankan lewat odoo shell (butuh ORM):
+#   docker exec -i odoo19-platform-odoo odoo shell -d prd_levis_begbal --no-http \
+#       --shell-interface=python < scripts/tenants/levis/97_setup_mid_map.py
+#
+# Env:  CONFIRM=1  -> benar-benar menulis + commit. Tanpa ini: DRY RUN
+#                     (semua di-rollback di akhir, tapi ringkasannya tetap dicetak).
+#
+# --------------------------------------------------------------------------
+# Kenapa daftar ini boleh dipercaya
+# --------------------------------------------------------------------------
+# Modul sengaja tidak menyemai tabel ini: nama toko pada narasi bank adalah
+# SINGKATAN, bukan potongan -- "LEVIS BIP" itu Bandung Indah Plaza, "LEVIS
+# GANCIT" itu Gandaria City -- dan menebak dari inisial akan menyalurkan uang ke
+# toko yang salah. Jadi tiap baris di bawah berdiri di atas DUA bukti yang
+# dikumpulkan dari data Juli 2026 (2.857 baris, Rp 19,14 M):
+#
+#   1. Nama pada narasi, dicocokkan ke daftar Operating Unit yang ada.
+#   2. Kecocokan angka: gross tiap settlement dibandingkan dengan debit piutang
+#      tender (levis.clearing.config.pos_receivable_account_ids) pada hari yang
+#      sama +/- 2 hari. Kalau hanya satu toko yang punya angka itu, toko tersebut
+#      dapat satu suara.
+#
+# Bukti kedua inilah yang menjawab jebakan yang paling berbahaya: BRI memotong
+# nama di 13 karakter, sehingga "LEVIS SENAYA" bisa berarti Plaza Senayan ATAU
+# Senayan City. TID 1999632290 mendapat 14 suara Senayan City dan nol suara Plaza
+# Senayan, jadi ia Senayan City -- dan Plaza Senayan ternyata punya TID sendiri
+# (1999632291, "LEVIS PL").
+#
+# Yang TIDAK ada di daftar ini, karena buktinya tidak cukup, sengaja dibiarkan
+# tak terpetakan supaya uangnya tetap terlihat di suspense:
+#
+#   1999632289  Rp 556.975.475  "LEVIS PONDOK"  -- kemungkinan PIM 2 (PIM 1 sudah
+#                               dipegang 1999632288), tapi 53 settlement-nya cuma
+#                               menghasilkan 3 suara dan ketiganya ke toko lain.
+#   1999660761  Rp  19.603.427  "LEVIS PAK"     -- suara 1-1-1, tidak konklusif.
+#   1999660757  Rp  16.439.293  "LEVIS BANDUNG" -- ada empat toko Bandung.
+#   1999664887  Rp   2.563.123  "LEVIS GR"      -- Grand Indonesia atau Grand
+#                               Metropolitan; suaranya justru ke Plaza Senayan.
+#   1999632287  Rp   1.548.533  "LEVIS GRAND"   -- sama, tanpa suara sama sekali.
+#
+# Setoran tunai (475 baris, Rp 1,12 M) juga di luar cakupan skrip ini: kuncinya
+# teks bebas yang diketik kasir, 224 variasi, dan sebagiannya cuma nama orang.
+#
+# --------------------------------------------------------------------------
+# Catatan teknis
+# --------------------------------------------------------------------------
+# * BCA memakai MID, BRI memakai TID -- match_type-nya berbeda dan tidak boleh
+#   tertukar, karena parser mengisi field yang berbeda.
+# * Kunci BCA ditulis dalam bentuk panjang (885004608375). Feed kartu kredit
+#   mencetak merchant yang sama tanpa prefix acquirer (4608375); _keys_match
+#   menerima kecocokan sufiks >= 6 digit, jadi satu aturan menutup keduanya.
+# * journal_id dibiarkan kosong supaya aturan berlaku untuk semua feed bank
+#   (satu merchant id hanya milik satu toko, apa pun jurnalnya).
+# * channel hanya untuk pelaporan; akun piutangnya ditemukan dari baris POS yang
+#   terbuka, bukan dari field ini.
+
+import os
+import sys
+
+CONFIRM = os.environ.get("CONFIRM") == "1"
+
+MAP = env["levis.bank.mid.map"]
+company = env.company
+
+# (match_type, key, ou_id, channel, label)
+ROWS = [
+    # --- BCA -------------------------------------------------------------
+    ("mid", "885004608375", 7, "debit", "Grand Indonesia"),
+    ("mid", "885004632717", 2, "debit", "Tunjungan Plaza 3"),
+    ("mid", "885004608391", 4, "debit", "Pondok Indah Mall 2"),
+    ("mid", "885004608387", 6, "debit", "Senayan City"),
+    ("mid", "885004608403", 20, "debit", "Plaza Senayan"),
+    ("mid", "885004632683", 13, "debit", "Paris Van Java"),
+    ("mid", "885004608383", 5, "debit", "Kelapa Gading Mall"),
+    ("mid", "885004608399", 9, "debit", "Central Park"),
+    ("mid", "885004632721", 14, "debit", "Pakuwon Mall Surabaya"),
+    ("mid", "885004632691", 8, "debit", "Trans Studio Mall Bandung"),
+    ("mid", "885004648635", 16, "debit", "Trans Studio Cibubur"),
+    ("mid", "885004648627", 12, "debit", "AEON BSD City"),
+    ("mid", "885004632687", 23, "debit", "Summarecon Mall Bandung"),
+    ("mid", "885004608395", 3, "debit", "Pondok Indah Mall 1"),
+    ("mid", "885004648615", 22, "debit", "Gandaria City"),
+    ("mid", "885004648619", 10, "debit", "Lotte Shopping Avenue"),
+    ("mid", "885004632695", 24, "debit", "Bandung Indah Plaza"),
+    ("mid", "885004632679", 17, "debit", "Galaxy Mall 3"),
+    ("mid", "885004704536", 21, "debit", "Paskal Bandung"),
+    ("mid", "885004648623", 18, "debit", "Metropolitan Mall Bekasi"),
+    ("mid", "885004648631", 11, "debit", "Grand Metropolitan Bekasi"),
+    ("mid", "885004618292", 19, "debit", "Mall of Indonesia"),
+    # --- BRI -------------------------------------------------------------
+    ("tid", "1999639781", 19, "debit", "Mall of Indonesia"),
+    ("tid", "1999660760", 13, "qris", "Paris Van Java"),
+    ("tid", "1999632292", 5, "debit", "Kelapa Gading Mall"),
+    ("tid", "1999632290", 6, "debit", "Senayan City"),
+    ("tid", "1999664883", 22, "debit", "Gandaria City"),
+    ("tid", "1999632288", 3, "debit", "Pondok Indah Mall 1"),
+    ("tid", "1999664888", 16, "debit", "Trans Studio Cibubur"),
+    ("tid", "1999660763", 17, "qris", "Galaxy Mall 3"),
+    ("tid", "1999660758", 8, "debit", "Trans Studio Mall Bandung"),
+    ("tid", "1999664886", 12, "qris", "AEON BSD City"),
+    ("tid", "1999660762", 2, "debit", "Tunjungan Plaza 3"),
+    ("tid", "1999632291", 20, "qris", "Plaza Senayan"),
+    ("tid", "1999632293", 9, "debit", "Central Park"),
+    ("tid", "1999660759", 23, "qris", "Summarecon Mall Bandung"),
+    ("tid", "1999675383", 21, "debit", "Paskal Bandung"),
+]
+
+NOTE = "Diisi 11-Aug-2026 dari data Juli: nama pada narasi + kecocokan gross vs piutang tender harian per toko."
+
+
+def run():
+    dibuat = dilewati = 0
+    salah_ou = []
+    for match_type, key, ou_id, channel, label in ROWS:
+        analytic = env["account.analytic.account"].browse(ou_id).exists()
+        if not analytic:
+            salah_ou.append((key, ou_id))
+            continue
+        ada = MAP.search(
+            [("company_id", "=", company.id), ("match_type", "=", match_type), ("key", "=", key)],
+            limit=1,
+        )
+        if ada:
+            dilewati += 1
+            continue
+        MAP.create(
+            {
+                "name": "%s (%s)" % (label, "BCA" if match_type == "mid" else "BRI"),
+                "company_id": company.id,
+                "match_type": match_type,
+                "key": key,
+                "channel": channel,
+                "analytic_account_id": analytic.id,
+                "note": NOTE,
+            }
+        )
+        dibuat += 1
+
+    if salah_ou:
+        # Id analytic berbeda per database. Berhenti daripada memetakan ke toko
+        # yang salah -- itu persis kesalahan yang tabel ini ada untuk mencegah.
+        print("BATAL: Operating Unit tidak ditemukan: %s" % salah_ou, file=sys.stderr)
+        env.cr.rollback()
+        return
+
+    total = MAP.search_count([("company_id", "=", company.id)])
+    print(
+        "dibuat=%d dilewati(sudah ada)=%d total aturan=%d" % (dibuat, dilewati, total),
+        file=sys.stderr,
+    )
+
+    # Baca ulang narasi supaya baris statement yang sudah ada ikut mendapat OU:
+    # compute-nya sengaja tidak bergantung pada tabel ini.
+    lines = env["account.bank.statement.line"].search([("levis_narrative_kind", "in", ("settlement", "cash_deposit"))])
+    lines.action_levis_reread_narrative()
+    ber_ou = len(lines.filtered("levis_ou_analytic_id"))
+    nilai = sum(lines.filtered("levis_ou_analytic_id").mapped("amount"))
+    print(
+        "baris settlement/cash=%d, ber-OU=%d (Rp %s)" % (len(lines), ber_ou, "{:,.0f}".format(nilai)),
+        file=sys.stderr,
+    )
+
+    if CONFIRM:
+        env.cr.commit()
+        print("COMMIT", file=sys.stderr)
+    else:
+        env.cr.rollback()
+        print("DRY RUN -- di-rollback. Jalankan ulang dengan CONFIRM=1 untuk menyimpan.", file=sys.stderr)
+
+
+run()
