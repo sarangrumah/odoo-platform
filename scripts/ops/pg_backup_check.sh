@@ -134,12 +134,24 @@ send_wa() {
   return 1
 }
 
+# WhatsApp is one channel, and it has already failed silently: the session was
+# logged out on 4-Aug-2026, so the 11-Aug alert reached nobody and sat unread in
+# $ALERT_FILE. Every verdict now also goes to syslog, and a failing verdict leaves
+# the ALERT file that /etc/update-motd.d/99-odoo-backup-alert prints on each SSH
+# login. Delivery stays best-effort; the record does not.
+notify() {
+  local level="$1" text="$2"
+  logger -t odoo-backup -p "daemon.$level" -- "$(printf '%s' "$text" | tr '\n' ' ')" 2>/dev/null || true
+  send_wa "$text"
+}
+
 host="$(hostname -s)"
 if [ "${#problems[@]}" -eq 0 ]; then
   size="$(du -sh "$day_dir" 2>/dev/null | cut -f1)"
   ndumps="$(find "$day_dir" -name '*.dump' | wc -l)"
   log "OK — $ndumps dump, $size, $day_dir"
   rm -f "$ALERT_FILE"
+  logger -t odoo-backup -p daemon.info -- "OK $ndumps dump, $size, $day_dir" 2>/dev/null || true
   if [ "$(date +%d)" = "$HEARTBEAT_DOM" ]; then
     send_wa "✅ Backup Odoo ($host) sehat.
 $ndumps database, $size, $(date '+%d-%b-%Y').
@@ -159,10 +171,12 @@ log "MASALAH:"
 printf '  - %s\n' "${problems[@]}"
 printf '%s\n' "$msg" > "$ALERT_FILE"
 
-if ! send_wa "$msg"; then
-  # The channel is down too. Say so loudly in the log; the ALERT file is the
-  # only surviving signal, so make sure it records that nobody was told.
-  log "PERINGATAN: alert TIDAK terkirim — hanya tertulis di $ALERT_FILE"
-  printf '\n[alert WhatsApp GAGAL terkirim %s]\n' "$(date -Is)" >> "$ALERT_FILE"
+if ! notify err "$msg"; then
+  # WhatsApp is down too. syslog and the ALERT file already carry the verdict, and
+  # the login banner reads that file -- so record that nobody was messaged, and
+  # say where the alert did land.
+  log "PERINGATAN: WhatsApp GAGAL — alert ada di syslog (odoo-backup), $ALERT_FILE, dan banner login"
+  printf '\n[alert WhatsApp GAGAL terkirim %s — dibaca lewat banner login / journalctl -t odoo-backup]\n' \
+    "$(date -Is)" >> "$ALERT_FILE"
 fi
 exit 1
