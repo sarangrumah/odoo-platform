@@ -307,16 +307,18 @@ recorded with each. Nothing on this list can be closed from inside this repo alo
    login gate plus the WAF, the scanner refusal and the rate limit are accepted as
    sufficient for now. The upgrade path if that changes is Cloudflare Access (edge
    SSO, no IP list to maintain) or an allowlist in the Caddyfile.
-6. **`/web/database/*` on the bare-IP host** reaches `odoo-mgmt`: the cross-tenant
-   database manager, held back by the master password alone. *Measured:* it is
+6. **`/web/database/*` on the bare-IP host** used to reach `odoo-mgmt`: the
+   cross-tenant database manager, held back by the master password alone. It was
    **actively used**, not a leftover — `odoo-mgmt` logged a `Database.backup` of
    `prd_wms` on 5-Aug-2026, plus regular selector renders.
 
-   **Decision: left as is, 6-Aug-2026**, same as the original explicit request. It
-   remains the largest single item on this list: one master password stands between
-   any visitor to the bare IP and every tenant's data. If it is ever closed, the
-   replacement is already running — `pg_dump` of every database nightly at 02:30
-   with 14/8/6 rotation — and ad-hoc backups move to the CLI.
+   **CLOSED.** The `handle /web/database/*` block in `caddy/Caddyfile` now answers
+   403 on both front-door hosts, and the instance behind them (`odoo-front`) runs
+   `LIST_DB=False`. *Verified 11-Aug-2026:* `curl --resolve 103.130.240.24:443:…
+   https://103.130.240.24/web/database/manager` → 403. Admin access moved to an SSH
+   tunnel to `odoo-mgmt` on `127.0.0.1:18079` — procedure in
+   `docs/runbooks/database-manager-access.md`. Nightly `pg_dump` of every database
+   at 02:30 with 14/8/6 rotation covers the backups that used to be taken here.
 
 ## Maintenance
 

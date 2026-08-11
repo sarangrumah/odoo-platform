@@ -398,7 +398,8 @@
 	# drop, backup, restore, duplicate. It has no business on a public host.
 	# odoo-front runs LIST_DB=False so Odoo refuses these itself; this block is
 	# the belt to that pair of braces. Admins reach the real manager through
-	# odoo-mgmt on 127.0.0.1:18079 over an SSH tunnel.
+	# odoo-mgmt on 127.0.0.1:18079 over an SSH tunnel — the procedure is in
+	# docs/runbooks/database-manager-access.md.
 	handle /web/database/* {
 		respond "Not available" 403
 	}
