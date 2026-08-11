@@ -78,18 +78,46 @@ else
   PGPASSWORD="$(grep -E '^POSTGRES_PASSWORD=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-)"
   PGUSER="$(grep -E '^POSTGRES_USER=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-)"
   PGUSER="${PGUSER:-odoo}"
+  # A database created after the run began cannot have a dump, and saying so every
+  # morning is how an alert stops being read: scratch databases are routine here
+  # (`scratch_clearing` on 11-Aug, `tst_rolemgr` the same afternoon, both gone
+  # within hours). The age comes from base/<oid>/PG_VERSION, which is written once
+  # at CREATE DATABASE and never touched again -- so this needs no naming
+  # convention and cannot be fooled by a tenant that happens to be called scratch.
+  #
+  # Run start = the oldest dump in today's set. Anything newer than that is
+  # excluded; anything older is a real miss.
   if [ -n "$PGPASSWORD" ]; then
     live="$(docker exec -i -e PGPASSWORD="$PGPASSWORD" "$PG_CONTAINER" \
-      psql -U "$PGUSER" -d postgres -At -c \
-      "select datname from pg_database where not datistemplate and datallowconn order by 1;" 2>/dev/null)"
+      psql -U "$PGUSER" -d postgres -At -F'|' -c \
+      "select datname, extract(epoch from (pg_stat_file('base/'||oid||'/PG_VERSION')).modification)::bigint
+         from pg_database where not datistemplate and datallowconn order by 1;" 2>/dev/null)"
+    if [ -z "$live" ]; then
+      # pg_stat_file needs superuser; fall back to the plain list rather than
+      # skipping the check, and accept that new databases will be reported.
+      live="$(docker exec -i -e PGPASSWORD="$PGPASSWORD" "$PG_CONTAINER" \
+        psql -U "$PGUSER" -d postgres -At -c \
+        "select datname||'|0' from pg_database where not datistemplate and datallowconn order by 1;" 2>/dev/null)"
+    fi
     if [ -z "$live" ]; then
       problems+=("tidak bisa membaca daftar database dari $PG_CONTAINER")
     else
+      run_start="$(find "$day_dir" -name '*.dump' -printf '%T@\n' 2>/dev/null \
+                   | sort -n | head -1 | cut -d. -f1)"
+      run_start="${run_start:-0}"
       missing=()
-      while IFS= read -r db; do
+      skipped=()
+      while IFS='|' read -r db born; do
         [ -n "$db" ] || continue
-        [ -s "$day_dir/$db.dump" ] || missing+=("$db")
+        [ -s "$day_dir/$db.dump" ] && continue
+        if [ "${born:-0}" -gt "$run_start" ] && [ "$run_start" -gt 0 ]; then
+          skipped+=("$db")
+        else
+          missing+=("$db")
+        fi
       done <<< "$live"
+      # Never silent: an exclusion nobody can see is how a real gap hides.
+      [ "${#skipped[@]}" -eq 0 ] || log "abaikan (dibuat setelah backup jalan): ${skipped[*]}"
       [ "${#missing[@]}" -eq 0 ] || problems+=("DB tanpa dump: ${missing[*]}")
     fi
   else
