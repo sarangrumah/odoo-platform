@@ -5,3 +5,4 @@ from . import test_categ_reclass
 from . import test_payment_voucher_rows
 from . import test_bank_narrative
 from . import test_pos_clearing
+from . import test_mid_map_guard
