@@ -19,9 +19,16 @@ DFROM, DTO = "2026-07-01", "2026-07-31"
 POST = os.environ.get("CLR_POST") == "1"
 DRY = os.environ.get("CLR_DRY") == "1"
 
-# expected end state, from the 7-Aug baseline review (July window only)
+# Expected end state, from the 7-Aug baseline review (July window only).
+#
+# Bank suspense was 1530199113.09 when the 63 entries went in on 11-Aug. Finance
+# then deleted eight ATS sweep lines worth 720440.97 from blocks C 29-Jul and
+# 31-Jul (GLJV/2026/07/0092 and 0096) -- deliberate, and the entries stayed
+# balanced because they removed whole debit/credit pairs. Less credit to
+# suspense means a higher balance, hence the figure below. The other three are
+# untouched: that edit never reached blocks A or B.
 EXPECT = {
-    "1103000002": 1530199113.09,  # bank suspense
+    "1103000002": 1530919554.06,  # bank suspense
     "7104000001": 94186098.68,  # MDR
     "1106000001": 2949900.00,  # AR EBR
 }
