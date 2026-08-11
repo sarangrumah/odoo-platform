@@ -18,15 +18,30 @@
 # Full procedure and the traps around backup/restore:
 #   docs/runbooks/database-manager-access.md
 #
+# TWO host details that are not the defaults, and cost a round trip when this
+# script was first written against them:
+#
+#   * sshd listens on 2221, not 22. `ssh odoo-erp@192.168.3.140` with no -p
+#     answers "Connection refused", which reads like the host being down.
+#   * sshd used to carry a GLOBAL `DisableForwarding yes`, which overrides every
+#     other forwarding option and refuses `-L` for everyone. It is now scoped to
+#     the `sftpusers` group (the SFTP share accounts it was meant for), so
+#     ordinary accounts can forward. If a forward is ever refused with
+#     "administratively prohibited", that scoping has been reverted -- check
+#     `sshd -T -C user=<you>,host=localhost,addr=127.0.0.1 | grep -i forwarding`
+#     on the host.
+#
 # Usage:
 #   scripts/ops/db-manager-tunnel.sh
-#   ODOO_HOST=odoo-erp@192.168.3.140 ODOO_MGMT_PORT=18079 scripts/ops/db-manager-tunnel.sh
+#   ODOO_HOST=odoo-erp@192.168.3.140 ODOO_SSH_PORT=2221 ODOO_MGMT_PORT=18079 \
+#     scripts/ops/db-manager-tunnel.sh
 #
 # Ctrl-C closes the tunnel.
 
 set -euo pipefail
 
 HOST="${ODOO_HOST:-odoo-erp@192.168.3.140}"
+SSH_PORT="${ODOO_SSH_PORT:-2221}"
 PORT="${ODOO_MGMT_PORT:-18079}"
 URL="http://localhost:${PORT}/web/database/manager"
 
@@ -44,7 +59,7 @@ banner() {
   cat <<EOF
 
   Database manager : ${URL}
-  Master password  : ssh ${HOST} 'grep ^ODOO_ADMIN_PASSWD= /opt/odoo-platform/.env'
+  Master password  : ssh -p ${SSH_PORT} ${HOST} 'grep ^ODOO_ADMIN_PASSWD= /opt/odoo-platform/.env'
 
   Before you drop, restore or duplicate anything on a production database, take
   a dump first -- docs/runbooks/backup-restore.md.
@@ -63,7 +78,7 @@ fi
 # would never fire.
 trap 'echo; echo "Tunnel closed."' EXIT
 
-echo "Opening tunnel to ${HOST} (local ${PORT} -> 127.0.0.1:${PORT}) ..."
+echo "Opening tunnel to ${HOST}:${SSH_PORT} (local ${PORT} -> 127.0.0.1:${PORT}) ..."
 banner
 echo "  Ctrl-C to close."
 echo
@@ -72,6 +87,7 @@ echo
 # ExitOnForwardFailure: fail loudly if the forward cannot be set up, rather than
 # sitting there looking connected while the browser gets connection refused.
 ssh -N \
+  -p "${SSH_PORT}" \
   -o ExitOnForwardFailure=yes \
   -o ServerAliveInterval=30 \
   -L "127.0.0.1:${PORT}:127.0.0.1:${PORT}" \
