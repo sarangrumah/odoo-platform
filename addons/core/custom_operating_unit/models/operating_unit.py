@@ -49,7 +49,7 @@ class OperatingUnit(models.Model):
     parent_id = fields.Many2one(
         "operating.unit", string="Parent", ondelete="restrict", index=True
     )
-    parent_path = fields.Char(index=True, unaccent=False)
+    parent_path = fields.Char(index=True)
     child_ids = fields.One2many("operating.unit", "parent_id", string="Children")
     company_id = fields.Many2one(
         "res.company", required=True, index=True, default=lambda self: self.env.company

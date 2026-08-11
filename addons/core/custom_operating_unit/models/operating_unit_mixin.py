@@ -27,6 +27,28 @@ class OperatingUnitMixin(models.AbstractModel):
         copy=True,
     )
 
+    # ------------------------------------------------------------------
+    # Enforcement
+    # ------------------------------------------------------------------
+    # The check runs from create/write, not only from @api.constrains, because
+    # a constraint is validated at *flush* time and flushing may happen through
+    # a different environment than the one that made the change — an elevated
+    # one, in which the guard would short-circuit and let a foreign unit
+    # through. Checking in create/write pins the check to the environment that
+    # actually performed the write. The constraint stays as a second line of
+    # defence for values that reach the field by other routes.
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records._check_operating_unit_allowed()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if "operating_unit_id" in vals:
+            self._check_operating_unit_allowed()
+        return res
+
     @api.constrains("operating_unit_id")
     def _check_operating_unit_allowed(self):
         if self.env.su or self.env.context.get("ou_skip_check"):
