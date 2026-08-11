@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_users_form_role" model="ir.ui.view">
+            <field name="name">res.users.form.role</field>
+            <field name="model">res.users</field>
+            <field name="inherit_id" ref="base.view_users_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//notebook" position="inside">
+                    <page string="Roles" name="security_roles" groups="custom_role_manager.group_role_manager">
+                        <div class="alert alert-info" role="alert">
+                            Roles keep the Access Rights below in sync. Removing a role only
+                            revokes the groups that role granted — groups given by hand, or by
+                            another module, are left alone.
+                        </div>
+                        <group>
+                            <field name="role_ids" widget="many2many_tags" nolabel="1" colspan="2"
+                                   options="{'no_quick_create': True}"/>
+                        </group>
+                        <button name="action_reapply_security_roles" type="object"
+                                string="Re-apply Roles" class="btn-secondary"
+                                help="Reconcile this user's groups with their roles again."/>
+                        <separator string="Granted by roles"/>
+                        <field name="role_granted_group_ids" widget="many2many_tags" readonly="1"/>
+                        <separator string="Held before roles were applied"/>
+                        <field name="role_baseline_group_ids" widget="many2many_tags" readonly="1"/>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

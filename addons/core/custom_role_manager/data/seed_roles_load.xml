@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Deliberately NOT noupdate: the sync must run on install *and* on every
+         module update. That is what picks up a group whose app was installed
+         after the roles were first loaded (a tenant that adds Point of Sale
+         later, for example) — the catalogue skips xml-ids that do not exist
+         yet, so without this the role would stay permanently incomplete.
+         The sync itself never overwrites a role an administrator has edited. -->
+    <function model="custom.security.role" name="_sync_seed_roles"/>
+</odoo>

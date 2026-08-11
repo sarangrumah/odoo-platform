@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_operating_unit_form_links" model="ir.ui.view">
+            <field name="name">operating.unit.form.links</field>
+            <field name="model">operating.unit</field>
+            <field name="inherit_id" ref="custom_operating_unit.view_operating_unit_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//page[@name='links']/group[@name='links']" position="inside">
+                    <field name="warehouse_id"/>
+                    <field name="purchase_journal_id"/>
+                    <field name="journal_id"/>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_operating_unit_list_links" model="ir.ui.view">
+            <field name="name">operating.unit.list.links</field>
+            <field name="model">operating.unit</field>
+            <field name="inherit_id" ref="custom_operating_unit.view_operating_unit_list"/>
+            <field name="arch" type="xml">
+                <field name="analytic_account_id" position="after">
+                    <field name="warehouse_id" optional="show"/>
+                </field>
+            </field>
+        </record>
+    </data>
+</odoo>

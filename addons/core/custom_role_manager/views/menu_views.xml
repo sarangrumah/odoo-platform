@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Lives next to Users & Companies in Settings, which is where an
+             administrator looks for it. -->
+        <menuitem id="menu_custom_security_role"
+                  name="Security Roles"
+                  parent="base.menu_users"
+                  action="action_custom_security_role"
+                  sequence="25"
+                  groups="custom_role_manager.group_role_manager"/>
+    </data>
+</odoo>

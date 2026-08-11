@@ -423,6 +423,11 @@ class CustomReportGeneralLedger(models.AbstractModel):
         if filters.get("partner_ids"):
             query += " AND aml.partner_id IN %s"
             params.append(tuple(filters["partner_ids"]))
+
+        ou_sql, ou_params = self._ou_sql_filter("aml")
+        if ou_sql:
+            query += ou_sql
+            params.extend(ou_params)
         query += " ORDER BY aml.account_id, aml.date, aml.id"
         return query, tuple(params)
 

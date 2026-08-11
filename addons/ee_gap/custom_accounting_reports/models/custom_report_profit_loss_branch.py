@@ -121,6 +121,11 @@ class CustomReportProfitLossBranch(models.AbstractModel):
         if filters.get("journal_ids"):
             sql += " AND aml.journal_id IN %s"
             params.append(tuple(filters["journal_ids"]))
+        ou_sql, ou_params = self._ou_sql_filter("aml")
+        if ou_sql:
+            sql += ou_sql
+            params.extend(ou_params)
+
         sql += " AND part.analytic_id::int IN %s GROUP BY 1, 2"
         params.append(tuple(analytic_ids))
 

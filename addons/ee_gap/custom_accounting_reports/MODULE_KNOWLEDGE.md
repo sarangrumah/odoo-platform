@@ -90,6 +90,13 @@ Report models are AbstractModels and generally have no stored fields; user input
 - **Wizards**: live under `wizard/` (singular). There is no `controllers/` directory.
 
 ## Gotchas
+- **The reports build raw SQL, so `ir.rule` does not apply to them.** Every query
+  that touches `account_move_line` must splice in `_ou_sql_filter(alias)` — a
+  no-op here, implemented by `custom_operating_unit_reports`. Miss it on a new
+  query and a store-scoped user reads other branches' numbers while their list
+  views look correctly filtered: a leak with no symptoms. Call sites today:
+  `_get_move_lines_query`, `_sum_by_account`,
+  `custom_report_general_ledger`, `custom_report_profit_loss_branch._sum_by_account_and_branch`.
 - All computation runs through the single `custom.report.engine` base; overriding `_build_lines` is the extension point, not adding fields.
 - **Never bucket a P&L by `account_type` alone.** Indonesian charts type every cost-of-sales account plain `expense` (not `expense_direct_cost`), so a type-based split reports COGS as zero, files `income_other` under Revenue, and drops `expense_other` entirely. Section membership comes from the account-code prefix via `account.group`.
 - `account.account.group_id` is **computed, not stored** in Odoo 19 (resolved from the code prefix). It cannot appear in a SQL join or an ORM domain — read it off a browsed recordset, as `_account_groups` does.
