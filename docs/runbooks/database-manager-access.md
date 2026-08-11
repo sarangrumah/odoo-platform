@@ -146,12 +146,24 @@ It also refuses to run at all if the database list cannot be read or comes back
 with fewer than five entries, because an unreachable postgres looks exactly like
 "every database is gone". Details in `scripts/ops/nightly_disk_cleanup.sh`.
 
-Worked example, 11-Aug-2026: seven databases were dropped deliberately
-(`tst_agedpay`, `prd_levis_AP`, `prd_detail_levis`, `trn_arkaaim_begbal`, `demo`,
-`tst_recur_gapA`, `tst_appr_clean`). Dumps and one combined filestore archive
-went to `/opt/odoo-platform/backups/dropped-20260811/` first, so all seven can
-come back whole. Five had a filestore at all — 621, 554, 525, 467 and 1 files
-respectively; the two `tst_*` had none.
+Worked example, 11-Aug-2026: seven databases were dropped deliberately. Dumps and
+one combined filestore archive went to
+`/opt/odoo-platform/backups/dropped-20260811/` first, so all seven can come back
+whole — attachments included, for the five that had any:
+
+| Database | Files in filestore |
+|---|---:|
+| `prd_levis_AP` | 621 |
+| `trn_arkaaim_begbal` | 554 |
+| `prd_detail_levis` | 525 |
+| `demo` | 467 |
+| `tst_agedpay` | 1 |
+| `tst_recur_gapA` | none |
+| `tst_appr_clean` | none |
+
+Counts are actual files, not directory entries — Odoo's filestore nests one
+directory per hash prefix, so a `tar tzf | wc -l` roughly doubles them. If you
+verify a restore by counting attachments, count files.
 
 ## Traps
 
