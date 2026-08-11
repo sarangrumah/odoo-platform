@@ -10,7 +10,7 @@ from .common import OperatingUnitTestCommon
 @tagged("post_install", "-at_install")
 class TestOperatingUnitHierarchy(OperatingUnitTestCommon):
     def test_01_complete_name(self):
-        self.assertEqual(self.ou_store_a.complete_name, "Head Office / Area Jakarta / Store A")
+        self.assertEqual(self.ou_store_a.complete_name, self.ou_ho.name + " / Area Jakarta / Store A")
 
     def test_02_descendants(self):
         ids = self.ou_area._descendant_ids()
@@ -26,22 +26,22 @@ class TestOperatingUnitHierarchy(OperatingUnitTestCommon):
 
     def test_04_one_head_office_per_company(self):
         with self.assertRaises(ValidationError):
-            self._make_ou("HO2", "Second Head Office", ou_type="company")
+            self._make_ou("ZZ-HO2", "Second Head Office", ou_type="company")
 
     def test_05_head_office_has_no_parent(self):
         # A unit outside the HO subtree, so this is the Head-Office constraint
         # talking and not the recursion guard.
-        outside = self._make_ou("OTH", "Outside", ou_type="other")
+        outside = self._make_ou("ZZ-OTH", "Outside", ou_type="other")
         with self.assertRaises(ValidationError):
             self.ou_ho.write({"parent_id": outside.id})
 
     def test_06_code_unique_per_company(self):
         with self.assertRaises(Exception):
             with self.env.cr.savepoint():
-                self._make_ou("ST-A", "Duplicate code")
+                self._make_ou("ZZ-A", "Duplicate code")
 
     def test_07_ensure_is_idempotent_and_never_renames(self):
-        again = self.OU._ensure("ST-A", "A COMPLETELY DIFFERENT NAME", self.company)
+        again = self.OU._ensure("ZZ-A", "A COMPLETELY DIFFERENT NAME", self.company)
         self.assertEqual(again, self.ou_store_a)
         self.assertEqual(
             again.name, "Store A", "_ensure must never rename an existing unit"
@@ -55,16 +55,16 @@ class TestOperatingUnitHierarchy(OperatingUnitTestCommon):
             )
             for name in ("Analytic One", "Analytic Two")
         ]
-        self.OU._ensure("ST-B", "Store B", self.company, analytic_account_id=first.id)
+        self.OU._ensure("ZZ-B", "Store B", self.company, analytic_account_id=first.id)
         self.assertEqual(self.ou_store_b.analytic_account_id, first)
 
-        self.OU._ensure("ST-B", "Store B", self.company, analytic_account_id=second.id)
+        self.OU._ensure("ZZ-B", "Store B", self.company, analytic_account_id=second.id)
         self.assertEqual(
             self.ou_store_b.analytic_account_id, first, "an existing link must not be overwritten"
         )
 
     def test_09_ensure_creates_with_parent(self):
-        created = self.OU._ensure("ST-D", "Store D", self.company, parent=self.ou_area)
+        created = self.OU._ensure("ZZ-D", "Store D", self.company, parent=self.ou_area)
         self.assertEqual(created.parent_id, self.ou_area)
         self.assertEqual(created.ou_type, "store")
 

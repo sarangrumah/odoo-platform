@@ -79,7 +79,7 @@ class TestOperatingUnitIsolation(OperatingUnitDocsCommon):
     def test_08_area_user_sees_both_stores(self):
         area = self.OU.create(
             {
-                "code": "AREA",
+                "code": "ZZ-AREA",
                 "name": "Area",
                 "ou_type": "area",
                 "parent_id": self.ou_ho.id,

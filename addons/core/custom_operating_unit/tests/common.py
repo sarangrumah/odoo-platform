@@ -17,11 +17,22 @@ class OperatingUnitTestCommon(TransactionCase):
 
         # HO ── Area Jakarta ── Store A / Store B
         #    └─ Store C (directly under HO)
-        cls.ou_ho = cls._make_ou("HO", "Head Office", ou_type="company")
-        cls.ou_area = cls._make_ou("AREA-JKT", "Area Jakarta", ou_type="area", parent=cls.ou_ho)
-        cls.ou_store_a = cls._make_ou("ST-A", "Store A", parent=cls.ou_area)
-        cls.ou_store_b = cls._make_ou("ST-B", "Store B", parent=cls.ou_area)
-        cls.ou_store_c = cls._make_ou("ST-C", "Store C", parent=cls.ou_ho)
+        #
+        # Codes are prefixed and the head office is reused when the database
+        # already has one: these tests also run on a tenant clone, where real
+        # units exist and "HO" is taken.
+        cls.ou_ho = cls._head_office()
+        cls.ou_area = cls._make_ou("ZZ-AREA", "Area Jakarta", ou_type="area", parent=cls.ou_ho)
+        cls.ou_store_a = cls._make_ou("ZZ-A", "Store A", parent=cls.ou_area)
+        cls.ou_store_b = cls._make_ou("ZZ-B", "Store B", parent=cls.ou_area)
+        cls.ou_store_c = cls._make_ou("ZZ-C", "Store C", parent=cls.ou_ho)
+
+    @classmethod
+    def _head_office(cls):
+        existing = cls.env["operating.unit"].with_context(active_test=False).search(
+            [("ou_type", "=", "company"), ("company_id", "=", cls.env.company.id)], limit=1
+        )
+        return existing or cls._make_ou("ZZ-HO", "Head Office", ou_type="company")
 
     @classmethod
     def _make_ou(cls, code, name, ou_type="store", parent=None, **vals):

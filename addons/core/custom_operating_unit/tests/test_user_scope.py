@@ -89,5 +89,5 @@ class TestUserScope(OperatingUnitTestCommon):
         )
         with self.assertRaises(AccessError):
             self.OU.with_user(user).create(
-                {"code": "ST-X", "name": "Sneaky", "company_id": self.company.id}
+                {"code": "ZZ-X", "name": "Sneaky", "company_id": self.company.id}
             )

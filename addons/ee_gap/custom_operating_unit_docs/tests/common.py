@@ -16,24 +16,29 @@ class OperatingUnitDocsCommon(TransactionCase):
         cls.company = cls.env.company
 
         cls.wh_a = cls.env["stock.warehouse"].create(
-            {"name": "Store A WH", "code": "STA", "company_id": cls.company.id}
+            {"name": "OU Test WH A", "code": "ZZA", "company_id": cls.company.id}
         )
         cls.wh_b = cls.env["stock.warehouse"].create(
-            {"name": "Store B WH", "code": "STB", "company_id": cls.company.id}
+            {"name": "OU Test WH B", "code": "ZZB", "company_id": cls.company.id}
         )
         cls.journal_a = cls.env["account.journal"].create(
-            {"name": "Purchase A", "type": "purchase", "code": "PURA", "company_id": cls.company.id}
+            {"name": "Purchase A", "type": "purchase", "code": "ZZPA", "company_id": cls.company.id}
         )
         cls.journal_b = cls.env["account.journal"].create(
-            {"name": "Purchase B", "type": "purchase", "code": "PURB", "company_id": cls.company.id}
+            {"name": "Purchase B", "type": "purchase", "code": "ZZPB", "company_id": cls.company.id}
         )
 
-        cls.ou_ho = cls.OU.create(
-            {"code": "HO", "name": "Head Office", "ou_type": "company", "company_id": cls.company.id}
+        # Reuse the tenant's head office when there is one: these tests also
+        # run against a real clone, where a company-type unit already exists.
+        cls.ou_ho = cls.OU.with_context(active_test=False).search(
+            [("ou_type", "=", "company"), ("company_id", "=", cls.company.id)], limit=1
+        ) or cls.OU.create(
+            {"code": "ZZ-HO", "name": "Head Office", "ou_type": "company",
+             "company_id": cls.company.id}
         )
         cls.ou_a = cls.OU.create(
             {
-                "code": "STA",
+                "code": "ZZ-A",
                 "name": "Store A",
                 "parent_id": cls.ou_ho.id,
                 "company_id": cls.company.id,
@@ -43,7 +48,7 @@ class OperatingUnitDocsCommon(TransactionCase):
         )
         cls.ou_b = cls.OU.create(
             {
-                "code": "STB",
+                "code": "ZZ-B",
                 "name": "Store B",
                 "parent_id": cls.ou_ho.id,
                 "company_id": cls.company.id,
