@@ -50,11 +50,16 @@ Untuk terminal besar yang tidak mendapat suara. Setelah semua yang lain
 dialokasikan, hitung (piutang terbuka - yang terkonsumsi) per toko; toko yang
 menyisakan sebesar terminal itu adalah pemiliknya.
 
-  TID 001999632289 "LEVIS PONDOK"  Rp 557,0 jt
-      -> PIM 2 menyisakan Rp 551,8 jt; toko berikutnya hanya Rp 157 jt.
-         PIM 1 sudah dipegang 1999632288, dan narasinya memang "PONDOK".
   TID 001999660761 "LEVIS PAK"     Rp 19,6 jt
       -> Pakuwon menyisakan Rp 18,9 jt.
+
+Terminal kedua yang dulu ada di sini, 1999632289 "LEVIS PONDOK" (Rp 557,0 jt),
+sekarang dipetakan oleh skrip 97 atas KONFIRMASI Finance, dan barisnya di sini
+sudah dicabut supaya satu terminal tidak dipetakan oleh dua skrip. Yang
+menenangkan: eliminasi di sini sampai pada toko yang SAMA lebih dulu, murni dari
+buku besar -- PIM 2 menyisakan Rp 551,8 jt sementara toko berikutnya hanya
+Rp 157 jt, dan PIM 1 sudah dipegang 1999632288. Jadi bukti angka dan konfirmasi
+Finance saling menguatkan, bukan bertabrakan.
 
 Divalidasi lewat PREDIKSI, bukan kecocokan saja: setelah dipetakan, sisa PIM 2
 runtuh dari 551.823.858 ke -1.000 dan Pakuwon dari 18.932.897 ke 0. Kalau sisa
@@ -89,7 +94,6 @@ company = env.company
 # (match_type, key, nama Operating Unit, channel)
 ROWS = [
     ("tid", "001999660761", "OLS SES - PAKUWON MALL SURABAYA", "debit"),
-    ("tid", "001999632289", "OLS SES - PONDOK INDAH MALL 2", "debit"),
     # --- setoran tunai: kunci = nama kasir --------------------------------
     ("keyword", "PARADILA ANDINI", "OLS SES - AEON BSD CITY", "cash"),
     ("keyword", "RADEA CIPTA PRADAN", "OLS SES - AEON BSD CITY", "cash"),
@@ -155,7 +159,24 @@ def run():
         if not analytic:
             tidak_ketemu.append((key, ou_name))
             continue
-        if MAP.search_count([("company_id", "=", company.id), ("match_type", "=", match_type), ("key", "=", key)]):
+        # Dibandingkan TERNORMALISASI, bukan string mentah. Bank mencetak terminal
+        # yang sama sebagai "001999632289" dan "1999632289"; membandingkan apa
+        # adanya melahirkan aturan kembar yang menunjuk toko yang sama -- itu
+        # terjadi 11-Aug-2026 di prd_levis_begbal, saat skrip ini dan skrip 97
+        # sama-sama memetakan TID yang sama dengan leading zero berbeda.
+        # Kunci keyword tetap dibandingkan apa adanya: ia teks, bukan nomor.
+        if match_type == "keyword":
+            sudah_ada = MAP.search_count(
+                [("company_id", "=", company.id), ("match_type", "=", "keyword"), ("key", "=", key)]
+            )
+        else:
+            wanted = MAP._normalise_key(key)
+            sudah_ada = bool(
+                MAP.search([("company_id", "=", company.id), ("match_type", "=", match_type)]).filtered(
+                    lambda r: MAP._normalise_key(r.key) == wanted
+                )
+            )
+        if sudah_ada:
             dilewati += 1
             continue
         MAP.create(
