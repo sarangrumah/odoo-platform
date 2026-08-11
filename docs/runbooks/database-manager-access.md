@@ -100,6 +100,71 @@ before debugging the client. Do **not** answer it by removing the restriction fr
 the `sftpusers` block: those accounts are external file hand-off, and giving them
 TCP forwarding turns each one into a jump host into the platform network.
 
+## Dropping a database: the filestore does not travel with pg_dump
+
+Attachments do not live in Postgres. They sit in
+`/opt/odoo-platform/data/odoo-filestore/filestore/<db>/`, and **`pg_dump` never
+touches them** — which means the nightly job in `/opt/db-backups/auto/daily`
+restores the data and loses every attachment: stored PDFs, product images,
+e-Faktur evidence. Dropping through the database manager deletes the filestore
+along with the database, and `dropdb` plus an orphan sweep ends up in the same
+place.
+
+So archive the filestore **at the moment you drop**, alongside the dump:
+
+```bash
+db=prd_something
+dest=/opt/odoo-platform/backups/dropped-$(date +%Y%m%d)
+mkdir -p "$dest"
+
+export PGPASSWORD=$(grep -m1 '^POSTGRES_PASSWORD=' /opt/odoo-platform/.env | cut -d= -f2-)
+docker exec -e PGPASSWORD="$PGPASSWORD" odoo19-platform-postgres \
+  pg_dump -U odoo -Fc -d "$db" -f "/tmp/$db.dump"
+docker cp "odoo19-platform-postgres:/tmp/$db.dump" "$dest/"
+
+tar czf "$dest/$db-filestore.tgz" \
+  -C /opt/odoo-platform/data/odoo-filestore/filestore "$db"
+```
+
+The database manager's own Backup (zip = SQL + filestore) does both in one step
+and is the better choice when the tunnel is already up.
+
+**Verify the dump, and verify it in the right place.** `pg_restore` is not
+installed on the host, so `pg_restore -l` there fails with `command not found` —
+which reads exactly like a corrupt dump. Check inside the container:
+
+```bash
+docker cp "$dest/$db.dump" odoo19-platform-postgres:/tmp/v.dump
+docker exec odoo19-platform-postgres pg_restore -l /tmp/v.dump | grep -c '^[0-9]'
+```
+
+**"Later" is not an option: the window is seven days.** Since 11-Aug-2026
+`/etc/cron.d/odoo-platform-disk-cleanup` sweeps orphan filestores nightly at
+03:30 — any directory with no matching database. It skips anything younger than
+seven days, so a filestore left behind by a drop survives a week and then goes.
+It also refuses to run at all if the database list cannot be read or comes back
+with fewer than five entries, because an unreachable postgres looks exactly like
+"every database is gone". Details in `scripts/ops/nightly_disk_cleanup.sh`.
+
+Worked example, 11-Aug-2026: seven databases were dropped deliberately. Dumps and
+one combined filestore archive went to
+`/opt/odoo-platform/backups/dropped-20260811/` first, so all seven can come back
+whole — attachments included, for the five that had any:
+
+| Database | Files in filestore |
+|---|---:|
+| `prd_levis_AP` | 621 |
+| `trn_arkaaim_begbal` | 554 |
+| `prd_detail_levis` | 525 |
+| `demo` | 467 |
+| `tst_agedpay` | 1 |
+| `tst_recur_gapA` | none |
+| `tst_appr_clean` | none |
+
+Counts are actual files, not directory entries — Odoo's filestore nests one
+directory per hash prefix, so a `tar tzf | wc -l` roughly doubles them. If you
+verify a restore by counting attachments, count files.
+
 ## Traps
 
 - **This is not the nightly backup.** The manager's Backup/Restore uses Odoo's own
@@ -108,7 +173,8 @@ TCP forwarding turns each one into a jump host into the platform network.
   filestore. They are not interchangeable — during a recovery, know which one you
   are holding. See `docs/runbooks/backup-restore.md`.
 - **Take a dump before you drop, restore or duplicate a production database.** The
-  manager gives no confirmation worth the name and no undo.
+  manager gives no confirmation worth the name and no undo. A dump alone is not a
+  full restore point — see the filestore section above.
 - **`odoo-mgmt` runs `WORKERS=0`** (threaded, single process). Fine for admin work;
   a large restore will be slow and will block other requests *on that instance*.
   Tenant traffic goes through `odoo` / `odoo-front` and is unaffected.
