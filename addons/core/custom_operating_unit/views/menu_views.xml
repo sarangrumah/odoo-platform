@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <menuitem id="menu_operating_unit"
+                  name="Operating Units"
+                  parent="base.menu_users"
+                  action="action_operating_unit"
+                  sequence="30"
+                  groups="custom_operating_unit.group_operating_unit_user"/>
+    </data>
+</odoo>

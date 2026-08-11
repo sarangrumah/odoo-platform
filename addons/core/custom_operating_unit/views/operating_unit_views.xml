@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_operating_unit_list" model="ir.ui.view">
+            <field name="name">operating.unit.list</field>
+            <field name="model">operating.unit</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="sequence" widget="handle"/>
+                    <field name="code"/>
+                    <field name="complete_name" string="Operating Unit"/>
+                    <field name="ou_type"/>
+                    <field name="parent_id" optional="hide"/>
+                    <field name="analytic_account_id" optional="show"/>
+                    <field name="manager_user_id" optional="hide"/>
+                    <field name="user_count" string="Users"/>
+                    <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_operating_unit_form" model="ir.ui.view">
+            <field name="name">operating.unit.form</field>
+            <field name="model">operating.unit</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                                invisible="active"/>
+                        <div class="oe_title">
+                            <label for="name"/>
+                            <h1><field name="name" placeholder="OLS SES - PACIFIC PLACE"/></h1>
+                            <field name="active" invisible="1"/>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="code" placeholder="27648"/>
+                                <field name="ou_type"/>
+                                <field name="parent_id"
+                                       domain="[('id', '!=', id), ('company_id', '=', company_id)]"
+                                       invisible="ou_type == 'company'"/>
+                                <field name="manager_user_id"/>
+                            </group>
+                            <group>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                                <field name="sequence"/>
+                                <field name="partner_id"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <!-- Bridge modules xpath their link fields into this page. -->
+                            <page string="Links" name="links">
+                                <group name="links">
+                                    <field name="analytic_account_id"/>
+                                </group>
+                                <div class="text-muted">
+                                    These point at records the tenant already has. Clearing a link
+                                    never deletes the linked record.
+                                </div>
+                            </page>
+                            <page string="Users" name="users">
+                                <field name="user_ids" widget="many2many_tags"
+                                       options="{'no_quick_create': True}"/>
+                                <div class="text-muted">
+                                    A user assigned here sees this unit <b>and every unit below it</b>.
+                                </div>
+                            </page>
+                            <page string="Notes" name="notes">
+                                <field name="note" placeholder="Anything worth knowing about this unit."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_operating_unit_search" model="ir.ui.view">
+            <field name="name">operating.unit.search</field>
+            <field name="model">operating.unit</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="code"/>
+                    <field name="parent_id"/>
+                    <field name="analytic_account_id"/>
+                    <filter name="filter_head_office" string="Head Office"
+                            domain="[('ou_type','=','company')]"/>
+                    <filter name="filter_area" string="Areas" domain="[('ou_type','=','area')]"/>
+                    <filter name="filter_store" string="Stores" domain="[('ou_type','=','store')]"/>
+                    <separator/>
+                    <filter name="filter_unlinked" string="No analytic account"
+                            domain="[('analytic_account_id','=',False)]"/>
+                    <filter name="filter_inactive" string="Archived" domain="[('active','=',False)]"/>
+                    <group>
+                        <filter name="group_by_type" string="Type" context="{'group_by': 'ou_type'}"/>
+                        <filter name="group_by_parent" string="Parent" context="{'group_by': 'parent_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_operating_unit" model="ir.actions.act_window">
+            <field name="name">Operating Units</field>
+            <field name="res_model">operating.unit</field>
+            <field name="view_mode">list,form</field>
+            <field name="view_id" ref="view_operating_unit_list"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">Define an Operating Unit</p>
+                <p>Head Office, areas and stores. Users assigned to a unit see that unit
+                   and everything below it.</p>
+            </field>
+        </record>
+    </data>
+</odoo>
