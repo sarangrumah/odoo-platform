@@ -417,13 +417,11 @@
 	# the gap opened: this host bypasses that hop, and the bypass note only
 	# mentioned the rate-limit and the security headers.
 	#
-	# /longpolling/ is the pre-16 spelling, kept so an old tab does not 500.
-	#
 	# A named matcher, not `handle /websocket* /longpolling/*`: `handle` takes
 	# exactly ONE matcher argument, and two of them is a fatal parse error that
 	# crash-loops the container and takes the whole front door down with it.
-	@bus path /websocket* /longpolling/*
-	handle @bus {
+	@ws path /websocket*
+	handle @ws {
 		reverse_proxy odoo-front:8072 {
 			header_up Host {host}
 			header_up X-Real-IP {client_ip}
@@ -434,6 +432,30 @@
 				write_timeout 720s
 				dial_timeout 10s
 			}
+		}
+	}
+
+	# /longpolling/ is the pre-16 spelling. Odoo 19 has no endpoint under it, so
+	# only a tab left open across the upgrade still asks — and it must NOT go to
+	# 8072 with the bus above.
+	#
+	# On 8072 such a request does not 404, it 500s: routing fails, the fallback
+	# reaches the website module, and `_serve_redirect` reads
+	# environ['REQUEST_URI'] (addons/website/models/ir_http.py:326), which
+	# gevent's WSGI never sets -> KeyError. werkzeug on 8069 does set it, so the
+	# same request answers a clean 404 there. It only bites once a database is
+	# resolved, i.e. a logged-in user's stale tab; an anonymous probe stops at
+	# 404 before the fallback and makes the wrong route look healthy.
+	#
+	# nginx/conf.d/odoo.conf points its /longpolling/ prefix at 8069 for exactly
+	# this reason; keep the two hops in agreement.
+	@lp path /longpolling/*
+	handle @lp {
+		reverse_proxy odoo-front:8069 {
+			header_up Host {host}
+			header_up X-Real-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Forwarded-Proto {scheme}
 		}
 	}
 
