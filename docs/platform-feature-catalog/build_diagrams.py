@@ -35,21 +35,20 @@ STYLE = """<style>
 
 # Layer order for the tier diagram: fewest tenants touched at the top.
 TIER_ROWS = [
-    ("_tenants",      "_tenants/ — satu pelanggan",
-     "saldo awal · penomoran · aturan satu entitas",       250, 400, "plum"),
-    ("verticals",     "verticals/ — satu industri",
-     "PPOB / VAS · F&B ESB · template",                    190, 520, "lila"),
-    ("ee_gap",        "ee_gap/ — semua tenant",
-     "selisih Community → Enterprise: akuntansi · payroll · gudang · retail · portal keuangan",
-     90, 720, "box"),
-    ("compliance",    "compliance/ — semua tenant ID",
-     "UU PDP 27/2022 · Coretax · PPh",                      90, 350, "box"),
-    ("control_plane", "control_plane/ + operations/",
-     "lapisan kendali — melayani operator",                460, 350, "box"),
-    ("core",          "core/ — fondasi",
-     "HMAC · adapter · BAST · HHT · barcode",               90, 350, "box"),
-    ("_vendor",       "_vendor/ — pihak ketiga",
-     "OCA: queue_job · auth_jwt · lainnya",                460, 350, "box"),
+    ("_tenants", "_tenants/ — satu pelanggan", "saldo awal · penomoran · aturan satu entitas", 250, 400, "plum"),
+    ("verticals", "verticals/ — satu industri", "PPOB / VAS · F&B ESB · template", 190, 520, "lila"),
+    (
+        "ee_gap",
+        "ee_gap/ — semua tenant",
+        "selisih Community → Enterprise: akuntansi · payroll · gudang · retail · portal keuangan",
+        90,
+        720,
+        "box",
+    ),
+    ("compliance", "compliance/ — semua tenant ID", "UU PDP 27/2022 · Coretax · PPh", 90, 350, "box"),
+    ("control_plane", "control_plane/ + operations/", "lapisan kendali — melayani operator", 460, 350, "box"),
+    ("core", "core/ — fondasi", "HMAC · adapter · BAST · HHT · barcode", 90, 350, "box"),
+    ("_vendor", "_vendor/ — pihak ketiga", "OCA: queue_job · auth_jwt · lainnya", 460, 350, "box"),
 ]
 
 
@@ -65,9 +64,10 @@ def tier_chart(cat) -> str:
     # control_plane and operations share one row.
     counts["control_plane"] = counts.get("control_plane", 0) + counts.pop("operations", 0)
     width, height = 900, 430
-    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
-         f'width="{width}" height="{height}" font-family="Calibri, Carlito, sans-serif">',
-         """<style>
+    p = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        f'width="{width}" height="{height}" font-family="Calibri, Carlito, sans-serif">',
+        """<style>
  .lbl{font-size:14px;fill:#1A2332;font-weight:bold}
  .sm{font-size:11.5px;fill:#4A5568}
  .num{font-size:22px;fill:#714B67;font-weight:bold}
@@ -82,9 +82,9 @@ def tier_chart(cat) -> str:
 </style>
 <defs><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
  orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#714B67"/></marker></defs>""",
-         f'<rect x="0" y="0" width="{width}" height="{height}" fill="#FFFFFF"/>',
-         '<text class="cap" x="40" y="28">SEMAKIN KE ATAS, SEMAKIN SEDIKIT TENANT '
-         'YANG TERSENTUH</text>']
+        f'<rect x="0" y="0" width="{width}" height="{height}" fill="#FFFFFF"/>',
+        '<text class="cap" x="40" y="28">SEMAKIN KE ATAS, SEMAKIN SEDIKIT TENANT YANG TERSENTUH</text>',
+    ]
 
     y = 44
     prev_style = None
@@ -97,21 +97,29 @@ def tier_chart(cat) -> str:
         num_cls = "numw" if style == "plum" else "num"
         lbl_cls = "lblw" if style == "plum" else "lbl"
         sub_cls = "smw" if style == "plum" else "sm"
-        p.append(f'<text class="{num_cls}" x="{x + 28}" y="{y + h / 2 + 10}" '
-                 f'text-anchor="middle">{counts.get(group, 0)}</text>')
+        p.append(
+            f'<text class="{num_cls}" x="{x + 28}" y="{y + h / 2 + 10}" '
+            f'text-anchor="middle">{counts.get(group, 0)}</text>'
+        )
         p.append(f'<text class="{lbl_cls}" x="{x + 60}" y="{y + h / 2 - 2}">{title}</text>')
         p.append(f'<text class="{sub_cls}" x="{x + 60}" y="{y + h / 2 + 16}">{sub}</text>')
         prev_style = "pair" if (x == 90 and group in ("compliance", "core")) else None
         y += h + 10
 
     p.append('<path class="arrow" d="M868 330 L868 80"/>')
-    p.append('<text class="sm" x="856" y="210" text-anchor="middle" '
-             'transform="rotate(-90 856 210)">promosi bila muncul untuk pelanggan kedua</text>')
-    p.append('<text class="sm" x="40" y="392">Tingkat ditentukan semata-mata oleh direktori '
-             'tempat modul berada. Kategori di dalam manifest bukan penentu tingkat.</text>')
-    p.append(f'<text class="sm" x="40" y="410">Total {cat["meta"]["counts"]["modules_total"]} '
-             'modul. Mesin bersama tidak boleh masuk _tenants/, seberapa pun jelas ia diminta '
-             'satu pelanggan.</text>')
+    p.append(
+        '<text class="sm" x="856" y="210" text-anchor="middle" '
+        'transform="rotate(-90 856 210)">promosi bila muncul untuk pelanggan kedua</text>'
+    )
+    p.append(
+        '<text class="sm" x="40" y="392">Tingkat ditentukan semata-mata oleh direktori '
+        "tempat modul berada. Kategori di dalam manifest bukan penentu tingkat.</text>"
+    )
+    p.append(
+        f'<text class="sm" x="40" y="410">Total {cat["meta"]["counts"]["modules_total"]} '
+        "modul. Mesin bersama tidak boleh masuk _tenants/, seberapa pun jelas ia diminta "
+        "satu pelanggan.</text>"
+    )
     p.append("</svg>")
     return "\n".join(p)
 
@@ -124,13 +132,15 @@ def domain_chart(cat) -> str:
     height = 90 + rowh * len(doms) + 30
     mx = max(d["module_count"] for d in doms)
 
-    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
-         f'width="{width}" height="{height}" font-family="Calibri, Carlito, sans-serif">',
-         STYLE,
-         f'<rect x="0" y="0" width="{width}" height="{height}" fill="#FFFFFF"/>',
-         '<text class="cap" x="40" y="30">MODUL PER DOMAIN FUNGSIONAL</text>',
-         '<text class="sm" x="40" y="52">Batang penuh = modul berlaku umum. '
-         'Batang muda = khusus brand, platform, atau pihak ketiga.</text>']
+    p = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        f'width="{width}" height="{height}" font-family="Calibri, Carlito, sans-serif">',
+        STYLE,
+        f'<rect x="0" y="0" width="{width}" height="{height}" fill="#FFFFFF"/>',
+        '<text class="cap" x="40" y="30">MODUL PER DOMAIN FUNGSIONAL</text>',
+        '<text class="sm" x="40" y="52">Batang penuh = modul berlaku umum. '
+        "Batang muda = khusus brand, platform, atau pihak ketiga.</text>",
+    ]
     y = 78
     for d in doms:
         mods = [m for m in cat["modules"] if m["domain"] == d["id"]]
@@ -144,9 +154,11 @@ def domain_chart(cat) -> str:
         label = str(d["module_count"]) + (f"  ({gen} umum · {oth} lainnya)" if oth else "")
         p.append(f'<text class="num" x="{330 + wg + wo + 10}" y="{y + 16}">{label}</text>')
         y += rowh
-    p.append(f'<text class="sm" x="40" y="{y + 18}">Total {cat["meta"]["counts"]["modules_total"]} '
-             'modul. Dihasilkan otomatis dari repositori — angka pada diagram ini tidak '
-             'dipelihara manual.</text>')
+    p.append(
+        f'<text class="sm" x="40" y="{y + 18}">Total {cat["meta"]["counts"]["modules_total"]} '
+        "modul. Dihasilkan otomatis dari repositori — angka pada diagram ini tidak "
+        "dipelihara manual.</text>"
+    )
     p.append("</svg>")
     return "\n".join(p)
 
@@ -159,16 +171,18 @@ def brand_matrix(cat) -> str:
     width = left + colw * len(tenants) + 40
     height = 130 + rowh * len(doms) + 60
 
-    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
-         f'width="{width}" height="{height}" font-family="Calibri, Carlito, sans-serif">',
-         STYLE,
-         f'<rect x="0" y="0" width="{width}" height="{height}" fill="#FFFFFF"/>',
-         '<text class="cap" x="30" y="26">DOMAIN × BRAND — DI MANA DATA ATAU KONFIGURASI '
-         'BRAND SUDAH ADA</text>']
+    p = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        f'width="{width}" height="{height}" font-family="Calibri, Carlito, sans-serif">',
+        STYLE,
+        f'<rect x="0" y="0" width="{width}" height="{height}" fill="#FFFFFF"/>',
+        '<text class="cap" x="30" y="26">DOMAIN × BRAND — DI MANA DATA ATAU KONFIGURASI BRAND SUDAH ADA</text>',
+    ]
     for i, t in enumerate(tenants):
         x = left + i * colw + colw / 2
-        p.append(f'<text class="hd" x="{x}" y="118" text-anchor="start" '
-                 f'transform="rotate(-55 {x} 118)">{t["brand"]}</text>')
+        p.append(
+            f'<text class="hd" x="{x}" y="118" text-anchor="start" transform="rotate(-55 {x} 118)">{t["brand"]}</text>'
+        )
     y = 126
     for r, d in enumerate(doms):
         mods = [m for m in cat["modules"] if m["domain"] == d["id"]]
@@ -182,14 +196,20 @@ def brand_matrix(cat) -> str:
             cfg = sum(1 for m in mods if t["id"] in m["tenants"] and m["scope"] != "tenant")
             txt = (f"●{own} " if own else "") + (f"○{cfg}" if cfg else "")
             if txt.strip():
-                p.append(f'<text class="{"own" if own else "cfg"}" x="{x + colw / 2}" '
-                         f'y="{y + 20}" text-anchor="middle">{txt.strip()}</text>')
+                p.append(
+                    f'<text class="{"own" if own else "cfg"}" x="{x + colw / 2}" '
+                    f'y="{y + 20}" text-anchor="middle">{txt.strip()}</text>'
+                )
         y += rowh
-    p.append(f'<text class="sm" x="30" y="{y + 24}">● modul khusus brand (addons/_tenants/)   '
-             '○ modul umum yang sudah membawa profil atau data brand tersebut</text>')
-    p.append(f'<text class="sm" x="30" y="{y + 42}">Sel kosong berarti domain itu tersedia untuk '
-             'brand tersebut tetapi belum membawa data khusus — bukan berarti tidak '
-             'tersedia.</text>')
+    p.append(
+        f'<text class="sm" x="30" y="{y + 24}">● modul khusus brand (addons/_tenants/)   '
+        "○ modul umum yang sudah membawa profil atau data brand tersebut</text>"
+    )
+    p.append(
+        f'<text class="sm" x="30" y="{y + 42}">Sel kosong berarti domain itu tersedia untuk '
+        "brand tersebut tetapi belum membawa data khusus — bukan berarti tidak "
+        "tersedia.</text>"
+    )
     p.append("</svg>")
     return "\n".join(p)
 
@@ -198,9 +218,11 @@ def main() -> int:
     with open(os.path.join(HERE, "catalog.json"), "r", encoding="utf-8") as fh:
         cat = json.load(fh)
     os.makedirs(SVG, exist_ok=True)
-    for name, svg in (("D02-tingkatan-modul.svg", tier_chart(cat)),
-                      ("D04-peta-domain.svg", domain_chart(cat)),
-                      ("D05-peta-brand.svg", brand_matrix(cat))):
+    for name, svg in (
+        ("D02-tingkatan-modul.svg", tier_chart(cat)),
+        ("D04-peta-domain.svg", domain_chart(cat)),
+        ("D05-peta-brand.svg", brand_matrix(cat)),
+    ):
         with open(os.path.join(SVG, name), "w", encoding="utf-8") as fh:
             fh.write(svg + "\n")
         print(f"  {name}")

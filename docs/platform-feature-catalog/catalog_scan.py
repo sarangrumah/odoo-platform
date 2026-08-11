@@ -176,11 +176,7 @@ def test_files(path: str) -> int:
     tests_dir = os.path.join(path, "tests")
     if not os.path.isdir(tests_dir):
         return 0
-    return sum(
-        1
-        for fn in os.listdir(tests_dir)
-        if fn.startswith("test_") and fn.endswith(".py")
-    )
+    return sum(1 for fn in os.listdir(tests_dir) if fn.startswith("test_") and fn.endswith(".py"))
 
 
 def compute_source_hash(path: str) -> str:
@@ -232,7 +228,7 @@ def _split_frontmatter(raw: str) -> tuple[dict, str]:
         return {}, raw
     fm_raw = stripped[3:end]
     rest_start = stripped.find("\n", end + 4)
-    body = stripped[rest_start + 1:] if rest_start != -1 else ""
+    body = stripped[rest_start + 1 :] if rest_start != -1 else ""
     fm = {}
     for line in fm_raw.splitlines():
         if ":" not in line or line.strip().startswith("#"):
@@ -284,18 +280,22 @@ def parse_knowledge(raw: str) -> dict:
     key_models = []
     for item in _bullets(sections.get("key_models", "")):
         tok = _MODEL_TOKEN.search(item)
-        key_models.append({
-            "name": tok.group(1) if tok else "",
-            "desc": item,
-        })
+        key_models.append(
+            {
+                "name": tok.group(1) if tok else "",
+                "desc": item,
+            }
+        )
     important_fields = []
     for item in _bullets(sections.get("important_fields", "")):
         tok = _FIELD_TOKEN.search(item)
-        important_fields.append({
-            "model": tok.group(1) if tok else "",
-            "field": tok.group(2) if tok else "",
-            "desc": item,
-        })
+        important_fields.append(
+            {
+                "model": tok.group(1) if tok else "",
+                "field": tok.group(2) if tok else "",
+                "desc": item,
+            }
+        )
 
     status = (fm.get("status") or "draft").lower()
     if status not in ("draft", "reviewed", "override"):

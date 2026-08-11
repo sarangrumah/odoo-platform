@@ -85,8 +85,7 @@ def _resolve_number(cat, key: str):
     if key.startswith("confidence."):
         return counts["by_confidence"].get(key.split(".", 1)[1], 0)
     if key == "knowledge_draft":
-        return (counts["knowledge_present"] - counts["knowledge_reviewed"]
-                - counts["knowledge_override"])
+        return counts["knowledge_present"] - counts["knowledge_reviewed"] - counts["knowledge_override"]
     if key in counts:
         return counts[key]
     raise KeyError(f"unknown placeholder {{{{n.{key}}}}}")
@@ -109,14 +108,16 @@ def _mods_in_domain(cat, domain_id):
 def table_modules(cat, domain_id, brand_by_id):
     rows = []
     for m in _mods_in_domain(cat, domain_id):
-        rows.append([
-            m["id"]["nama"],
-            f"`{m['name']}`",
-            scope_label(m),
-            ", ".join(brand_by_id[t] for t in m["tenants"]) or "—",
-            MATURITY_LABEL.get(m["maturity"], m["maturity"]),
-            m["id"]["ringkasan"],
-        ])
+        rows.append(
+            [
+                m["id"]["nama"],
+                f"`{m['name']}`",
+                scope_label(m),
+                ", ".join(brand_by_id[t] for t in m["tenants"]) or "—",
+                MATURITY_LABEL.get(m["maturity"], m["maturity"]),
+                m["id"]["ringkasan"],
+            ]
+        )
     return {
         "kind": "table",
         "head": ["Fitur", "Modul", "Cakupan", "Brand", "Kematangan", "Ringkasan"],
@@ -133,29 +134,46 @@ def block_tenant_specific(cat, domain_id, brand_by_id):
     modules" chapter that would split Finance in two.
     """
     tenant_mods = [m for m in _mods_in_domain(cat, domain_id) if m["scope"] == "tenant"]
-    configured = [m for m in _mods_in_domain(cat, domain_id)
-                  if m["scope"] == "general" and m["tenants"]]
+    configured = [m for m in _mods_in_domain(cat, domain_id) if m["scope"] == "general" and m["tenants"]]
     out = [{"kind": "heading", "level": 3, "text": "Yang bersifat khusus per-brand"}]
     if not tenant_mods and not configured:
-        out.append({"kind": "para", "text":
-                    "Tidak ada. Seluruh modul di domain ini berlaku umum untuk "
-                    "tenant mana pun, tanpa data atau konfigurasi khusus brand."})
+        out.append(
+            {
+                "kind": "para",
+                "text": "Tidak ada. Seluruh modul di domain ini berlaku umum untuk "
+                "tenant mana pun, tanpa data atau konfigurasi khusus brand.",
+            }
+        )
         return out
     if tenant_mods:
-        items = [f"**{m['id']['nama']}** (`{m['name']}`) — "
-                 f"{', '.join(brand_by_id[t] for t in m['tenants']) or 'tanpa brand terdaftar'}. "
-                 f"{m['id']['ringkasan']}" for m in tenant_mods]
-        out.append({"kind": "para", "text":
-                    "Modul berikut berada di `addons/_tenants/` dan **tidak dapat dipakai "
-                    "ulang apa adanya** oleh tenant lain:"})
+        items = [
+            f"**{m['id']['nama']}** (`{m['name']}`) — "
+            f"{', '.join(brand_by_id[t] for t in m['tenants']) or 'tanpa brand terdaftar'}. "
+            f"{m['id']['ringkasan']}"
+            for m in tenant_mods
+        ]
+        out.append(
+            {
+                "kind": "para",
+                "text": "Modul berikut berada di `addons/_tenants/` dan **tidak dapat dipakai "
+                "ulang apa adanya** oleh tenant lain:",
+            }
+        )
         out.append({"kind": "list", "items": items})
     if configured:
-        items = [f"**{m['id']['nama']}** (`{m['name']}`) — sudah membawa data atau profil untuk "
-                 f"{', '.join(brand_by_id[t] for t in m['tenants'])}." for m in configured]
-        out.append({"kind": "para", "text":
-                    "Modul berikut adalah mesin umum yang **sudah dikonfigurasi** untuk satu "
-                    "brand atau lebih. Tenant baru dapat memakainya, tetapi perlu profil dan "
-                    "data sendiri:"})
+        items = [
+            f"**{m['id']['nama']}** (`{m['name']}`) — sudah membawa data atau profil untuk "
+            f"{', '.join(brand_by_id[t] for t in m['tenants'])}."
+            for m in configured
+        ]
+        out.append(
+            {
+                "kind": "para",
+                "text": "Modul berikut adalah mesin umum yang **sudah dikonfigurasi** untuk satu "
+                "brand atau lebih. Tenant baru dapat memakainya, tetapi perlu profil dan "
+                "data sendiri:",
+            }
+        )
         out.append({"kind": "list", "items": items})
     return out
 
@@ -163,36 +181,37 @@ def block_tenant_specific(cat, domain_id, brand_by_id):
 def table_groups(cat):
     rows = [[f"`addons/{g}/`", str(n)] for g, n in sorted(cat["meta"]["counts"]["by_group"].items())]
     rows.append(["**Total**", f"**{cat['meta']['counts']['modules_total']}**"])
-    return {"kind": "table", "head": ["Grup", "Modul"], "rows": rows,
-            "widths": ["70%", "30%"]}
+    return {"kind": "table", "head": ["Grup", "Modul"], "rows": rows, "widths": ["70%", "30%"]}
 
 
 def table_domains(cat):
     rows = [[d["title_id"], str(d["module_count"]), d["blurb_id"]] for d in cat["domains"]]
     rows.append(["**Total**", f"**{cat['meta']['counts']['modules_total']}**", ""])
-    return {"kind": "table", "head": ["Domain", "Modul", "Cakupan isi"], "rows": rows,
-            "widths": ["24%", "8%", "68%"]}
+    return {"kind": "table", "head": ["Domain", "Modul", "Cakupan isi"], "rows": rows, "widths": ["24%", "8%", "68%"]}
 
 
 def table_tenants(cat):
     rows = []
     for t in cat["tenants"]:
-        rows.append([
-            t["brand"],
-            t.get("legal", ""),
-            "Erajaya Group" if t["erajaya"] else "Di luar grup",
-            t.get("industry", ""),
-            ", ".join(f"`{d}`" for d in t.get("dbs", [])) or "—",
-            t.get("status", ""),
-        ])
-    return {"kind": "table",
-            "head": ["Brand", "Entitas", "Afiliasi", "Industri", "Basis data", "Status"],
-            "rows": rows,
-            "widths": ["14%", "20%", "12%", "18%", "24%", "12%"]}
+        rows.append(
+            [
+                t["brand"],
+                t.get("legal", ""),
+                "Erajaya Group" if t["erajaya"] else "Di luar grup",
+                t.get("industry", ""),
+                ", ".join(f"`{d}`" for d in t.get("dbs", [])) or "—",
+                t.get("status", ""),
+            ]
+        )
+    return {
+        "kind": "table",
+        "head": ["Brand", "Entitas", "Afiliasi", "Industri", "Basis data", "Status"],
+        "rows": rows,
+        "widths": ["14%", "20%", "12%", "18%", "24%", "12%"],
+    }
 
 
-EFFORT_LABEL = {"S": "S — di bawah 1 minggu", "M": "M — 1 sampai 4 minggu",
-                "L": "L — lebih dari 1 bulan"}
+EFFORT_LABEL = {"S": "S — di bawah 1 minggu", "M": "M — 1 sampai 4 minggu", "L": "L — lebih dari 1 bulan"}
 
 
 def block_gaps(cat):
@@ -202,6 +221,7 @@ def block_gaps(cat):
     "Sedang" wraps to "Seda / ng". A per-gap block reads properly on paper; the
     filterable wide table lives in the XLSX, where filtering is the point.
     """
+
     # Gap prose states counts too, so it gets the same placeholder treatment as
     # the narrative. Hand-typed numbers here survived a rebase that moved every
     # other figure in the document.
@@ -209,22 +229,29 @@ def block_gaps(cat):
         return substitute(g.get(key, ""), cat)
 
     out = []
-    summary = [[g["id"], g["area"], sub(g, "title_id"),
-                SEVERITY_LABEL.get(g["severity"], g["severity"]),
-                g.get("horizon", "")] for g in cat["gaps"]]
-    out.append({"kind": "table",
-                "head": ["ID", "Area", "Kesenjangan", "Prioritas", "Horizon (bulan)"],
-                "rows": summary,
-                "widths": ["12%", "18%", "45%", "13%", "12%"]})
+    summary = [
+        [g["id"], g["area"], sub(g, "title_id"), SEVERITY_LABEL.get(g["severity"], g["severity"]), g.get("horizon", "")]
+        for g in cat["gaps"]
+    ]
+    out.append(
+        {
+            "kind": "table",
+            "head": ["ID", "Area", "Kesenjangan", "Prioritas", "Horizon (bulan)"],
+            "rows": summary,
+            "widths": ["12%", "18%", "45%", "13%", "12%"],
+        }
+    )
 
     for g in cat["gaps"]:
-        out.append({"kind": "heading", "level": 3,
-                    "text": f"{g['id']} · {sub(g, 'title_id')}"})
+        out.append({"kind": "heading", "level": 3, "text": f"{g['id']} · {sub(g, 'title_id')}"})
         rows = [
             ["Area", g["area"]],
-            ["Prioritas", SEVERITY_LABEL.get(g["severity"], g["severity"])
-             + f" · upaya {EFFORT_LABEL.get(g.get('effort', ''), g.get('effort', '—'))}"
-             + f" · horizon {g.get('horizon', '—')} bulan"],
+            [
+                "Prioritas",
+                SEVERITY_LABEL.get(g["severity"], g["severity"])
+                + f" · upaya {EFFORT_LABEL.get(g.get('effort', ''), g.get('effort', '—'))}"
+                + f" · horizon {g.get('horizon', '—')} bulan",
+            ],
             ["Kondisi saat ini (NOW)", sub(g, "now_id")],
             ["Sasaran (TARGET)", sub(g, "target_id")],
         ]
@@ -232,8 +259,7 @@ def block_gaps(cat):
             rows.append(["Dampak bisnis", sub(g, "impact_id")])
         if g.get("evidence"):
             rows.append(["Rujukan", " · ".join(f"`{e}`" for e in g["evidence"])])
-        out.append({"kind": "table", "head": ["", ""], "rows": rows,
-                    "widths": ["22%", "78%"], "headless": True})
+        out.append({"kind": "table", "head": ["", ""], "rows": rows, "widths": ["22%", "78%"], "headless": True})
     return out
 
 
@@ -247,23 +273,31 @@ def block_appendix(cat, domain_title, brand_by_id):
         mods = [m for m in cat["modules"] if m["domain"] == d["id"]]
         if not mods:
             continue
-        out.append({"kind": "heading", "level": 2,
-                    "text": f"{d['title_en']} ({d['title_id']})"})
+        out.append({"kind": "heading", "level": 2, "text": f"{d['title_en']} ({d['title_id']})"})
         for m in sorted(mods, key=lambda x: x["name"]):
             if m["group"] == "_vendor" or m["name"] == "custom_vertical_example":
                 vendor_like.append(m)
                 continue
             out.extend(_appendix_entry(m, brand_by_id))
     if vendor_like:
-        out.append({"kind": "heading", "level": 2,
-                    "text": "Third-party components (OCA) and templates"})
-        out.append({"kind": "para", "text":
-                    "Vendored or reference-only. Counted in the total so the figures "
-                    "reconcile, but not described in depth — they are not features "
-                    "delivered to a tenant."})
-        out.append({"kind": "list", "items": [
-            f"`{m['name']}` {m['manifest']['version']} — {m['manifest']['summary'] or m['manifest']['name']}"
-            for m in sorted(vendor_like, key=lambda x: x["name"])]})
+        out.append({"kind": "heading", "level": 2, "text": "Third-party components (OCA) and templates"})
+        out.append(
+            {
+                "kind": "para",
+                "text": "Vendored or reference-only. Counted in the total so the figures "
+                "reconcile, but not described in depth — they are not features "
+                "delivered to a tenant.",
+            }
+        )
+        out.append(
+            {
+                "kind": "list",
+                "items": [
+                    f"`{m['name']}` {m['manifest']['version']} — {m['manifest']['summary'] or m['manifest']['name']}"
+                    for m in sorted(vendor_like, key=lambda x: x["name"])
+                ],
+            }
+        )
     return out
 
 
@@ -274,28 +308,40 @@ def _appendix_entry(m, brand_by_id):
     facts = [
         ["Path", f"`{m['relpath']}`"],
         ["Version", man["version"] or "—"],
-        ["Scope", scope_label(m) + (
-            f" ({', '.join(brand_by_id[t] for t in m['tenants'])})" if m["tenants"] else "")],
-        ["Maturity / confidence",
-         f"{MATURITY_LABEL.get(m['maturity'], m['maturity'])} / {CONFIDENCE_LABEL[m['confidence']]}"],
+        ["Scope", scope_label(m) + (f" ({', '.join(brand_by_id[t] for t in m['tenants'])})" if m["tenants"] else "")],
+        [
+            "Maturity / confidence",
+            f"{MATURITY_LABEL.get(m['maturity'], m['maturity'])} / {CONFIDENCE_LABEL[m['confidence']]}",
+        ],
         ["Depends", ", ".join(f"`{d}`" for d in man["depends"]) or "—"],
-        ["Models / routes / tests",
-         f"{len(src['models_own'])} / {len(src['routes'])} / {src['test_files']}"],
+        ["Models / routes / tests", f"{len(src['models_own'])} / {len(src['routes'])} / {src['test_files']}"],
     ]
     if man["capability_tags"]:
         facts.append(["Tags", ", ".join(man["capability_tags"])])
-    out.append({"kind": "table", "head": ["", ""], "rows": facts,
-                "widths": ["24%", "76%"], "compact": True, "headless": True})
+    out.append(
+        {"kind": "table", "head": ["", ""], "rows": facts, "widths": ["24%", "76%"], "compact": True, "headless": True}
+    )
 
     if not k["present"]:
-        out.append({"kind": "note", "text":
-                    "No module knowledge file exists. The summary below is derived from the "
-                    "manifest; treat it as an index entry, not a specification."})
+        out.append(
+            {
+                "kind": "note",
+                "text": "No module knowledge file exists. The summary below is derived from the "
+                "manifest; treat it as an index entry, not a specification.",
+            }
+        )
     elif k["status"] == "draft":
-        out.append({"kind": "note", "text":
-                    "Knowledge file is generator output, not human-reviewed."
-                    + (f" Written against version {k['manifest_version_at_gen']}, "
-                       f"module is now {man['version']}." if k["version_drift"] else "")})
+        out.append(
+            {
+                "kind": "note",
+                "text": "Knowledge file is generator output, not human-reviewed."
+                + (
+                    f" Written against version {k['manifest_version_at_gen']}, module is now {man['version']}."
+                    if k["version_drift"]
+                    else ""
+                ),
+            }
+        )
 
     if k["purpose"]:
         out.append({"kind": "para", "text": k["purpose"]})
@@ -306,14 +352,12 @@ def _appendix_entry(m, brand_by_id):
         out.append({"kind": "para", "text": "**Key models**"})
         out.append({"kind": "list", "items": [km["desc"] for km in k["key_models"]]})
     elif src["models_own"]:
-        out.append({"kind": "para", "text": "**Declared models**: "
-                    + ", ".join(f"`{x}`" for x in src["models_own"])})
+        out.append({"kind": "para", "text": "**Declared models**: " + ", ".join(f"`{x}`" for x in src["models_own"])})
     if k["important_fields"]:
         out.append({"kind": "para", "text": "**Important fields**"})
         out.append({"kind": "list", "items": [f["desc"] for f in k["important_fields"]]})
     if src["routes"]:
-        out.append({"kind": "para", "text": "**Endpoints**: "
-                    + ", ".join(f"`{r}`" for r in src["routes"])})
+        out.append({"kind": "para", "text": "**Endpoints**: " + ", ".join(f"`{r}`" for r in src["routes"])})
     return out
 
 
@@ -332,7 +376,7 @@ def _parse_front(raw: str) -> tuple[dict, str]:
             key, _, val = line.partition(":")
             meta[key.strip()] = val.strip()
     rest = raw.find("\n", end + 4)
-    return meta, raw[rest + 1:] if rest != -1 else ""
+    return meta, raw[rest + 1 :] if rest != -1 else ""
 
 
 def _markdown_to_blocks(text: str) -> list[dict]:
@@ -376,8 +420,10 @@ def _markdown_to_blocks(text: str) -> list[dict]:
             continue
         if re.match(r"^\s*(?:[-*]|\d+\.)\s+", line):
             items: list[str] = []
-            while i < len(lines) and (re.match(r"^\s*(?:[-*]|\d+\.)\s+", lines[i])
-                                      or (items and lines[i].startswith((" ", "\t")) and lines[i].strip())):
+            while i < len(lines) and (
+                re.match(r"^\s*(?:[-*]|\d+\.)\s+", lines[i])
+                or (items and lines[i].startswith((" ", "\t")) and lines[i].strip())
+            ):
                 if re.match(r"^\s*(?:[-*]|\d+\.)\s+", lines[i]):
                     items.append(re.sub(r"^\s*(?:[-*]|\d+\.)\s+", "", lines[i]).strip())
                 else:
@@ -386,8 +432,12 @@ def _markdown_to_blocks(text: str) -> list[dict]:
             blocks.append({"kind": "list", "items": items})
             continue
         buf = []
-        while i < len(lines) and lines[i].strip() and not lines[i].startswith(("#", "|", ">")) \
-                and not re.match(r"^\s*(?:[-*]|\d+\.)\s+", lines[i]):
+        while (
+            i < len(lines)
+            and lines[i].strip()
+            and not lines[i].startswith(("#", "|", ">"))
+            and not re.match(r"^\s*(?:[-*]|\d+\.)\s+", lines[i])
+        ):
             buf.append(lines[i].strip())
             i += 1
         blocks.append({"kind": "para", "text": " ".join(buf)})

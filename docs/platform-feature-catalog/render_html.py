@@ -56,7 +56,7 @@ def slug(text: str, seen: dict) -> str:
 
 def render_figure(b, mode: str) -> str:
     name = os.path.basename(b["src"])
-    caption = f'<figcaption>{inline(b["alt"])}</figcaption>' if b["alt"] else ""
+    caption = f"<figcaption>{inline(b['alt'])}</figcaption>" if b["alt"] else ""
     if mode == "svg":
         path = os.path.join(SRC, "svg", name)
         with open(path, "r", encoding="utf-8") as fh:
@@ -110,15 +110,13 @@ def render_blocks(blocks, mode: str) -> str:
 
 
 def render_table(b) -> str:
-    classes = " ".join(c for c in ("compact" if b.get("compact") else "",
-                                   "headless" if b.get("headless") else "") if c)
+    classes = " ".join(c for c in ("compact" if b.get("compact") else "", "headless" if b.get("headless") else "") if c)
     cls = f' class="{classes}"' if classes else ""
     cols = ""
     if b.get("widths"):
         cols = "<colgroup>" + "".join(f'<col style="width:{w}">' for w in b["widths"]) + "</colgroup>"
     head = "".join(f"<th>{inline(h)}</th>" for h in b["head"])
-    body = "".join("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in row) + "</tr>"
-                   for row in b["rows"])
+    body = "".join("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in row) + "</tr>" for row in b["rows"])
     return f"<table{cls}>{cols}<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
 
 
@@ -132,7 +130,7 @@ def render_toc(blocks) -> str:
             if open_sub:
                 out.append("</ol></li>")
                 open_sub = False
-            out.append(f'<li>{html.escape(b["text"])}<ol>')
+            out.append(f"<li>{html.escape(b['text'])}<ol>")
             open_sub = True
         else:
             if not open_sub:
@@ -155,12 +153,12 @@ def render_cover(cat) -> str:
     dengan pemisahan antara yang berlaku umum dan yang khusus satu brand —
     ditambah analisis kesenjangan administrasi platform.</div>
   <dl>
-    <dt>Modul custom</dt><dd>{counts['modules_total']}</dd>
-    <dt>Domain fungsional</dt><dd>{len(cat['domains'])}</dd>
-    <dt>Brand terdaftar</dt><dd>{len(cat['tenants'])}</dd>
-    <dt>Versi</dt><dd>v{meta['generated_at'][:10]}</dd>
-    <dt>Sumber</dt><dd>commit <code>{meta['git_commit']}</code>{dirty}</dd>
-    <dt>Platform</dt><dd>Odoo {meta['odoo_series']} Community</dd>
+    <dt>Modul custom</dt><dd>{counts["modules_total"]}</dd>
+    <dt>Domain fungsional</dt><dd>{len(cat["domains"])}</dd>
+    <dt>Brand terdaftar</dt><dd>{len(cat["tenants"])}</dd>
+    <dt>Versi</dt><dd>v{meta["generated_at"][:10]}</dd>
+    <dt>Sumber</dt><dd>commit <code>{meta["git_commit"]}</code>{dirty}</dd>
+    <dt>Platform</dt><dd>Odoo {meta["odoo_series"]} Community</dd>
   </dl>
 </section>"""
 

@@ -7370,11 +7370,11 @@ Manages the per-tenant **VPS fleet** end-to-end from Odoo. Lets ops register a V
 
 Vendored or reference-only. Counted in the total so the figures reconcile, but not described in depth — they are not features delivered to a tenant.
 
-- `auth_jwt` 19.0.1.0.2 — 
+- `auth_jwt` 19.0.1.0.2 —
         JWT bearer token authentication.
-- `base_rest` 18.0.1.1.1 — 
+- `base_rest` 18.0.1.1.1 —
         Develop your own high level REST APIs for Odoo thanks to this addon.
-        
+
 - `custom_vertical_example` 19.0.0.1.0 — Reference vertical template used as a starting point
 - `partner_firstname` 19.0.1.0.0 — Split first name and last name for non company partners
 - `queue_job` 19.0.2.0.1 — Job Queue

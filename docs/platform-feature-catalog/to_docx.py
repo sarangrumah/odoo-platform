@@ -40,9 +40,7 @@ def convert_cover(match: re.Match) -> str:
     pairs = re.findall(r"<dt>(.*?)</dt>\s*<dd>(.*?)</dd>", body, re.S)
     rows = "".join(f"<tr><td><strong>{k}</strong></td><td>{v}</td></tr>" for k, v in pairs)
     return (
-        f"<h1>{' '.join(title.split())}</h1>"
-        f"<p><em>{' '.join(sub.split())}</em></p>"
-        f"<table><tbody>{rows}</tbody></table>"
+        f"<h1>{' '.join(title.split())}</h1><p><em>{' '.join(sub.split())}</em></p><table><tbody>{rows}</tbody></table>"
     )
 
 

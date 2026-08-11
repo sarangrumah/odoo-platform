@@ -66,7 +66,9 @@ def _git(*args: str) -> str:
     try:
         return subprocess.run(
             ["git", "-C", REPO, *args],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
     except (subprocess.CalledProcessError, OSError):
         return ""
@@ -246,45 +248,52 @@ def audit(modules: list[dict]) -> None:
         declared = set(mod["source"]["models_own"])
         flags = []
 
-        phantom_models = sorted({
-            km["name"] for km in k["key_models"]
-            if _is_model_token(km["name"])
-            and km["name"] not in known_models
-            and not km["name"].startswith(_AUDIT_IGNORE_PREFIXES)
-        })
+        phantom_models = sorted(
+            {
+                km["name"]
+                for km in k["key_models"]
+                if _is_model_token(km["name"])
+                and km["name"] not in known_models
+                and not km["name"].startswith(_AUDIT_IGNORE_PREFIXES)
+            }
+        )
         if phantom_models:
             flags.append({"kind": "phantom_model", "items": phantom_models})
 
-        phantom_fields = sorted({
-            f"{f['model']}.{f['field']}" for f in k["important_fields"]
-            # A leading underscore is a class constant or an SQL constraint
-            # name, not a field. A dotted token that is itself a known model is
-            # the parser mis-splitting `custom.foo.wizard.line` into model+field.
-            if f["model"] and f["field"]
-            and not f["field"].startswith("_")
-            and f"{f['model']}.{f['field']}" not in known_fields
-            and f"{f['model']}.{f['field']}" not in known_models
-            and f["model"] in known_models
-            # A field declared on a mixin and surfaced on the inheriting model
-            # is never attributed to that model by a static scan. Accepting any
-            # field name that exists somewhere in the codebase clears those
-            # without also clearing an invented name, which will not collide.
-            and f["field"] not in known_field_names
-        })
+        phantom_fields = sorted(
+            {
+                f"{f['model']}.{f['field']}"
+                for f in k["important_fields"]
+                # A leading underscore is a class constant or an SQL constraint
+                # name, not a field. A dotted token that is itself a known model is
+                # the parser mis-splitting `custom.foo.wizard.line` into model+field.
+                if f["model"]
+                and f["field"]
+                and not f["field"].startswith("_")
+                and f"{f['model']}.{f['field']}" not in known_fields
+                and f"{f['model']}.{f['field']}" not in known_models
+                and f["model"] in known_models
+                # A field declared on a mixin and surfaced on the inheriting model
+                # is never attributed to that model by a static scan. Accepting any
+                # field name that exists somewhere in the codebase clears those
+                # without also clearing an invented name, which will not collide.
+                and f["field"] not in known_field_names
+            }
+        )
         if phantom_fields:
             flags.append({"kind": "phantom_field", "items": phantom_fields})
 
-        undocumented = sorted(
-            declared - {km["name"] for km in k["key_models"]}
-        )
+        undocumented = sorted(declared - {km["name"] for km in k["key_models"]})
         if undocumented:
             flags.append({"kind": "undocumented_model", "items": undocumented})
 
         if k["version_drift"]:
-            flags.append({
-                "kind": "version_drift",
-                "items": [f"{k['manifest_version_at_gen']} → {mod['manifest']['version']}"],
-            })
+            flags.append(
+                {
+                    "kind": "version_drift",
+                    "items": [f"{k['manifest_version_at_gen']} → {mod['manifest']['version']}"],
+                }
+            )
 
         mod["audit_flags"] = flags
         # A phantom model means the prose describes something that is not there.
@@ -358,12 +367,17 @@ def bootstrap(found) -> None:
     for name, group, relpath in found:
         raw = scan.read_manifest(os.path.join(REPO, relpath)) or {}
         tags = ",".join(raw.get("capability_tags") or []) or "-"
-        print("\t".join([
-            group, name,
-            str(raw.get("category") or "-"),
-            tags,
-            (raw.get("summary") or "-")[:90],
-        ]))
+        print(
+            "\t".join(
+                [
+                    group,
+                    name,
+                    str(raw.get("category") or "-"),
+                    tags,
+                    (raw.get("summary") or "-")[:90],
+                ]
+            )
+        )
 
 
 # --- main -------------------------------------------------------------------

@@ -45,7 +45,9 @@ def check(name):
                 results.append(("FAIL", name, str(exc)))
             except Exception as exc:  # noqa: BLE001 - report, never abort the run
                 results.append(("ERROR", name, f"{type(exc).__name__}: {exc}"))
+
         return run
+
     return wrap
 
 
@@ -69,6 +71,7 @@ def scan_disk() -> dict[str, int]:
 
 # --- checks -----------------------------------------------------------------
 
+
 @check("1. module total matches a fresh filesystem scan")
 def c_total(cat):
     disk = sum(scan_disk().values())
@@ -80,8 +83,7 @@ def c_total(cat):
 @check("2. per-group counts match a fresh scan")
 def c_groups(cat):
     disk, claimed = scan_disk(), cat["meta"]["counts"]["by_group"]
-    diff = {g: (disk.get(g), claimed.get(g)) for g in set(disk) | set(claimed)
-            if disk.get(g) != claimed.get(g)}
+    diff = {g: (disk.get(g), claimed.get(g)) for g in set(disk) | set(claimed) if disk.get(g) != claimed.get(g)}
     assert not diff, f"mismatch {diff}"
     return f"{len(claimed)} groups"
 
@@ -90,6 +92,7 @@ def c_groups(cat):
 def c_taxonomy(cat):
     sys.path.insert(0, HERE)
     import taxonomy
+
     on_disk = set()
     addons = os.path.join(REPO, "addons")
     for root, dirs, files in os.walk(addons):
@@ -106,14 +109,16 @@ def c_taxonomy(cat):
 @check("4. domain counts reconcile to the total")
 def c_domains(cat):
     total = sum(d["module_count"] for d in cat["domains"])
-    assert total == cat["meta"]["counts"]["modules_total"], \
+    assert total == cat["meta"]["counts"]["modules_total"], (
         f"domains sum {total} != {cat['meta']['counts']['modules_total']}"
+    )
     return f"{len(cat['domains'])} domains"
 
 
 @check("5. XLSX matrix has one row per module")
 def c_xlsx_rows(cat):
     from openpyxl import load_workbook
+
     wb = load_workbook(XLSX, read_only=True)
     expected = cat["meta"]["counts"]["modules_total"] + 1
     got = wb["Matriks Fitur"].max_row
@@ -124,11 +129,11 @@ def c_xlsx_rows(cat):
 @check("6. XLSX pivot grand total equals the module total")
 def c_xlsx_pivot(cat):
     from openpyxl import load_workbook
+
     wb = load_workbook(XLSX, read_only=True)
     ws = wb["Domain x Grup"]
     grand = ws.cell(row=ws.max_row, column=ws.max_column).value
-    assert grand == cat["meta"]["counts"]["modules_total"], \
-        f"pivot total {grand}"
+    assert grand == cat["meta"]["counts"]["modules_total"], f"pivot total {grand}"
     return f"{grand}"
 
 
@@ -136,14 +141,12 @@ def c_xlsx_pivot(cat):
 def c_pdf_pages(cat):
     out = subprocess.run(["pdfinfo", PDF], capture_output=True, text=True, check=True).stdout
     pages = int(next(l for l in out.splitlines() if l.startswith("Pages:")).split()[1])
-    assert PDF_PAGES_MIN <= pages <= PDF_PAGES_MAX, \
-        f"{pages} pages outside {PDF_PAGES_MIN}-{PDF_PAGES_MAX}"
+    assert PDF_PAGES_MIN <= pages <= PDF_PAGES_MAX, f"{pages} pages outside {PDF_PAGES_MIN}-{PDF_PAGES_MAX}"
     return f"{pages} pages"
 
 
 def pdf_text() -> str:
-    return subprocess.run(["pdftotext", "-layout", PDF, "-"],
-                          capture_output=True, text=True, check=True).stdout
+    return subprocess.run(["pdftotext", "-layout", PDF, "-"], capture_output=True, text=True, check=True).stdout
 
 
 @check("8. every module name reached the PDF")
@@ -165,6 +168,7 @@ def c_pdf_mojibake(cat):
 @check("10. DOCX opens and carries a table of contents")
 def c_docx(cat):
     from docx import Document
+
     doc = Document(DOCX)
     paras = len(doc.paragraphs)
     assert paras > 500, f"only {paras} paragraphs — conversion probably truncated"
@@ -182,19 +186,16 @@ def c_secrets(cat):
     secret *values* are not, so scan for anything that looks like one."""
     text = pdf_text()
     patterns = [
-        r"\b[0-9a-f]{64}\b",                       # hex key / raw digest
+        r"\b[0-9a-f]{64}\b",  # hex key / raw digest
         r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
     ]
-    hits = [m if isinstance(m, str) else " ".join(m)
-            for pat in patterns for m in re.findall(pat, text)]
+    hits = [m if isinstance(m, str) else " ".join(m) for pat in patterns for m in re.findall(pat, text)]
 
     # `<name> = <value>` where the name reads like a credential. Documentation
     # legitimately shows how a credential is *produced*
     # ("token = secrets.token_urlsafe(24)") or where one goes
     # ("Token: <api_token>"); a literal value is the thing to catch.
-    for assign in re.findall(
-        r"(?i)(?:secret|password|api[_-]?key|token)\s*[:=]\s*(\S{8,})", text
-    ):
+    for assign in re.findall(r"(?i)(?:secret|password|api[_-]?key|token)\s*[:=]\s*(\S{8,})", text):
         looks_like_code = "(" in assign or assign.startswith(("<", "{", "$", "%"))
         if not looks_like_code:
             hits.append(assign[:60])
@@ -204,10 +205,12 @@ def c_secrets(cat):
     # ("draft/confirmed/exported/…", "BCA/Mandiri/BNI/…"), which buries any real
     # finding. Require mixed case, a digit, and at most one slash.
     for tok in re.findall(r"\b[A-Za-z0-9+/]{40,}={0,2}\b", text):
-        if (tok.count("/") <= 1
-                and any(c.isdigit() for c in tok)
-                and any(c.islower() for c in tok)
-                and any(c.isupper() for c in tok)):
+        if (
+            tok.count("/") <= 1
+            and any(c.isdigit() for c in tok)
+            and any(c.islower() for c in tok)
+            and any(c.isupper() for c in tok)
+        ):
             hits.append(tok[:60])
 
     assert not hits, f"possible secret-shaped strings: {hits[:5]}"

@@ -89,8 +89,11 @@ MATURITY_LABEL = {
     "disabled": "Nonaktif",
 }
 MATURITY_BG = {
-    "production": GREEN, "beta": AMBER, "scaffold": GREY,
-    "vendor": GREY, "disabled": RED,
+    "production": GREEN,
+    "beta": AMBER,
+    "scaffold": GREY,
+    "vendor": GREY,
+    "disabled": RED,
 }
 CONFIDENCE_LABEL = {"high": "Tinggi", "medium": "Sedang", "low": "Rendah"}
 CONFIDENCE_BG = {"high": GREEN, "medium": AMBER, "low": RED}
@@ -180,15 +183,20 @@ def sheet_ringkasan(wb, cat, brand_by_id):
 
     w(ws, r, 1, "Dokumen pengetahuan modul", bg=PURPLE, bold=True, color=WHITE)
     w(ws, r, 2, "Jumlah", bg=PURPLE, bold=True, color=WHITE, h="center")
-    for i, (label, key) in enumerate([
-        ("Override ditulis tangan", "knowledge_override"),
-        ("MODULE_KNOWLEDGE.md — reviewed", "knowledge_reviewed"),
-        ("MODULE_KNOWLEDGE.md — draft", None),
-        ("Belum ada (diringkas dari manifest)", "knowledge_missing"),
-    ]):
+    for i, (label, key) in enumerate(
+        [
+            ("Override ditulis tangan", "knowledge_override"),
+            ("MODULE_KNOWLEDGE.md — reviewed", "knowledge_reviewed"),
+            ("MODULE_KNOWLEDGE.md — draft", None),
+            ("Belum ada (diringkas dari manifest)", "knowledge_missing"),
+        ]
+    ):
         rr = r + 1 + i
-        val = (counts["knowledge_present"] - counts["knowledge_reviewed"] - counts["knowledge_override"]
-               if key is None else counts[key])
+        val = (
+            counts["knowledge_present"] - counts["knowledge_reviewed"] - counts["knowledge_override"]
+            if key is None
+            else counts[key]
+        )
         w(ws, rr, 1, label, bg=ALT if i % 2 else WHITE)
         w(ws, rr, 2, val, bg=ALT if i % 2 else WHITE, h="center")
     r += 6
@@ -202,11 +210,24 @@ def sheet_ringkasan(wb, cat, brand_by_id):
 
 
 MATRIX_COLS = [
-    ("No", 5), ("Modul (teknis)", 34), ("Nama Fitur", 34), ("Domain", 26),
-    ("Domain Sekunder", 24), ("Grup Teknis", 14), ("Cakupan", 18),
-    ("Brand Terkait", 22), ("Ringkasan", 62), ("Kematangan", 12),
-    ("Keyakinan Info", 13), ("Dok. Modul", 22), ("Model", 7), ("Endpoint", 9),
-    ("Test", 7), ("Versi", 14), ("Dependensi", 40), ("Tag Kapabilitas", 34),
+    ("No", 5),
+    ("Modul (teknis)", 34),
+    ("Nama Fitur", 34),
+    ("Domain", 26),
+    ("Domain Sekunder", 24),
+    ("Grup Teknis", 14),
+    ("Cakupan", 18),
+    ("Brand Terkait", 22),
+    ("Ringkasan", 62),
+    ("Kematangan", 12),
+    ("Keyakinan Info", 13),
+    ("Dok. Modul", 22),
+    ("Model", 7),
+    ("Endpoint", 9),
+    ("Test", 7),
+    ("Versi", 14),
+    ("Dependensi", 40),
+    ("Tag Kapabilitas", 34),
     ("Path", 46),
 ]
 
@@ -279,8 +300,14 @@ def sheet_brand_map(wb, cat):
             w(ws, r, j + 3, mark, bg=bg, h="center")
 
     r = len(cat["modules"]) + 3
-    w(ws, r, 1, "● khusus brand (addons/_tenants/)   ○ modul umum yang sudah "
-                "membawa data atau konfigurasi brand tersebut", bg=LILA, italic=True)
+    w(
+        ws,
+        r,
+        1,
+        "● khusus brand (addons/_tenants/)   ○ modul umum yang sudah membawa data atau konfigurasi brand tersebut",
+        bg=LILA,
+        italic=True,
+    )
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=len(tenants) + 2)
     ws.freeze_panes = "C2"
     return ws
@@ -323,9 +350,16 @@ def sheet_pivot(wb, cat):
 
 
 GAP_COLS = [
-    ("ID", 15), ("Area", 20), ("Kesenjangan", 40), ("Kondisi Saat Ini (NOW)", 62),
-    ("Sasaran (TARGET)", 52), ("Dampak Bisnis", 52), ("Prioritas", 11),
-    ("Upaya", 8), ("Horizon (bln)", 12), ("Rujukan", 52),
+    ("ID", 15),
+    ("Area", 20),
+    ("Kesenjangan", 40),
+    ("Kondisi Saat Ini (NOW)", 62),
+    ("Sasaran (TARGET)", 52),
+    ("Dampak Bisnis", 52),
+    ("Prioritas", 11),
+    ("Upaya", 8),
+    ("Horizon (bln)", 12),
+    ("Rujukan", 52),
 ]
 
 
@@ -340,9 +374,16 @@ def sheet_gaps(wb, cat):
         r = i + 3
         bg = ALT if i % 2 else WHITE
         row = [
-            g["id"], g["area"], g["title_id"], g["now_id"], g["target_id"],
-            g.get("impact_id", ""), SEVERITY_LABEL.get(g["severity"], g["severity"]),
-            g.get("effort", ""), g.get("horizon", ""), "\n".join(g.get("evidence", [])),
+            g["id"],
+            g["area"],
+            g["title_id"],
+            g["now_id"],
+            g["target_id"],
+            g.get("impact_id", ""),
+            SEVERITY_LABEL.get(g["severity"], g["severity"]),
+            g.get("effort", ""),
+            g.get("horizon", ""),
+            "\n".join(g.get("evidence", [])),
         ]
         for c, val in enumerate(row, start=1):
             w(ws, r, c, val, bg=bg, h="center" if c in (7, 8, 9) else "left")
@@ -360,51 +401,88 @@ def sheet_method(wb, cat):
     title(ws, 1, 1, 2, "Sumber data dan cara kolom ini dihasilkan", sz=13)
 
     rows = [
-        ("Cara dihasilkan",
-         "Seluruh angka di workbook ini dipindai langsung dari repositori oleh "
-         "docs/platform-feature-catalog/build_catalog_json.py, bukan diketik. "
-         "Menambah modul ke addons/ membuat proses build gagal sampai modul itu "
-         "diklasifikasikan — tidak ada kategori penampung."),
+        (
+            "Cara dihasilkan",
+            "Seluruh angka di workbook ini dipindai langsung dari repositori oleh "
+            "docs/platform-feature-catalog/build_catalog_json.py, bukan diketik. "
+            "Menambah modul ke addons/ membuat proses build gagal sampai modul itu "
+            "diklasifikasikan — tidak ada kategori penampung.",
+        ),
         ("Waktu pemindaian", meta["generated_at"]),
-        ("Commit", f"{meta['git_commit']} (branch {meta['git_branch']})"
-                   + (" — ada perubahan belum ter-commit" if meta["git_dirty"] else "")),
+        (
+            "Commit",
+            f"{meta['git_commit']} (branch {meta['git_branch']})"
+            + (" — ada perubahan belum ter-commit" if meta["git_dirty"] else ""),
+        ),
         ("Seri Odoo", meta["odoo_series"]),
-        ("Modul (teknis)", "Nama direktori di addons/. Penelusuran tanpa batas kedalaman: "
-                           "verticals/_template/custom_vertical_example berada satu tingkat "
-                           "lebih dalam, dan pencarian berbatas kedalaman menghasilkan 157, "
-                           "bukan 158."),
-        ("Nama Fitur & Ringkasan", "Ditulis tangan dalam Bahasa Indonesia. Entri yang belum "
-                                   "diterjemahkan tampil dengan awalan [EN] agar terlihat, "
-                                   "bukan tercampur diam-diam."),
-        ("Domain", "Klasifikasi fungsional buatan manusia di taxonomy.py, satu domain primer "
-                   "per modul. Domain sekunder hanya rujukan silang dan tidak dihitung."),
-        ("Cakupan", "Umum = tersedia untuk tenant mana pun. Umum, dikonfigurasi = mesin generik "
-                    "yang sudah membawa data satu brand. Khusus Brand = ada di addons/_tenants/ "
-                    "dan tidak bisa dipakai ulang apa adanya. Platform = lapisan kendali. "
-                    "Pihak Ketiga = komponen OCA."),
-        ("Kematangan", "Diturunkan: ada suite test → Produksi; ada model/route/XML tapi tanpa "
-                       "test → Beta; kosong → Kerangka. Sebelas modul dikoreksi manual karena "
-                       "berjalan di produksi tanpa test."),
-        ("Keyakinan Info", "Tinggi = override ditulis tangan atau berkas berstatus reviewed. "
-                           "Sedang = MODULE_KNOWLEDGE.md berstatus draft hasil generator. "
-                           "Rendah = tidak ada dokumen, atau audit menemukan model yang "
-                           "disebut tetapi tidak ada di kode."),
-        ("Arti status draft", f"{counts['knowledge_present'] - counts['knowledge_reviewed'] - counts['knowledge_override']} "
-                              "berkas pengetahuan modul dihasilkan generator dan belum diperiksa "
-                              "manusia. Isinya dipakai di katalog ini, tetapi selalu disertai "
-                              "kolom Keyakinan Info — bukan disembunyikan dan bukan pula "
-                              "diperlakukan setara dengan yang sudah diperiksa."),
-        ("Gerbang akurasi", "build_catalog_json.py --audit membandingkan setiap klaim di berkas "
-                            "pengetahuan dengan kode. Model yang disebut tetapi tidak ada di "
-                            "mana pun menurunkan modul ke Keyakinan Rendah dan daftar modelnya "
-                            "dibuang dari lampiran. Hasil lengkap: catalog-audit.md."),
-        ("Temuan audit", ", ".join(f"{k}: {v}" for k, v in sorted(counts.get("audit_flags", {}).items()))
-                         or "tidak ada"),
-        ("Model / Endpoint / Test", "Dihitung dengan analisis statis atas models/, controllers/ "
-                                    "dan tests/. Modul yang seluruhnya berupa controller (mis. "
-                                    "custom_wms_hht) sah bernilai 0 model."),
-        ("Kesenjangan", "Ditulis tangan di gaps.yaml. Setiap baris menyertakan rujukan berkas "
-                        "yang bisa dibuka untuk memeriksa klaimnya."),
+        (
+            "Modul (teknis)",
+            "Nama direktori di addons/. Penelusuran tanpa batas kedalaman: "
+            "verticals/_template/custom_vertical_example berada satu tingkat "
+            "lebih dalam, dan pencarian berbatas kedalaman menghasilkan 157, "
+            "bukan 158.",
+        ),
+        (
+            "Nama Fitur & Ringkasan",
+            "Ditulis tangan dalam Bahasa Indonesia. Entri yang belum "
+            "diterjemahkan tampil dengan awalan [EN] agar terlihat, "
+            "bukan tercampur diam-diam.",
+        ),
+        (
+            "Domain",
+            "Klasifikasi fungsional buatan manusia di taxonomy.py, satu domain primer "
+            "per modul. Domain sekunder hanya rujukan silang dan tidak dihitung.",
+        ),
+        (
+            "Cakupan",
+            "Umum = tersedia untuk tenant mana pun. Umum, dikonfigurasi = mesin generik "
+            "yang sudah membawa data satu brand. Khusus Brand = ada di addons/_tenants/ "
+            "dan tidak bisa dipakai ulang apa adanya. Platform = lapisan kendali. "
+            "Pihak Ketiga = komponen OCA.",
+        ),
+        (
+            "Kematangan",
+            "Diturunkan: ada suite test → Produksi; ada model/route/XML tapi tanpa "
+            "test → Beta; kosong → Kerangka. Sebelas modul dikoreksi manual karena "
+            "berjalan di produksi tanpa test.",
+        ),
+        (
+            "Keyakinan Info",
+            "Tinggi = override ditulis tangan atau berkas berstatus reviewed. "
+            "Sedang = MODULE_KNOWLEDGE.md berstatus draft hasil generator. "
+            "Rendah = tidak ada dokumen, atau audit menemukan model yang "
+            "disebut tetapi tidak ada di kode.",
+        ),
+        (
+            "Arti status draft",
+            f"{counts['knowledge_present'] - counts['knowledge_reviewed'] - counts['knowledge_override']} "
+            "berkas pengetahuan modul dihasilkan generator dan belum diperiksa "
+            "manusia. Isinya dipakai di katalog ini, tetapi selalu disertai "
+            "kolom Keyakinan Info — bukan disembunyikan dan bukan pula "
+            "diperlakukan setara dengan yang sudah diperiksa.",
+        ),
+        (
+            "Gerbang akurasi",
+            "build_catalog_json.py --audit membandingkan setiap klaim di berkas "
+            "pengetahuan dengan kode. Model yang disebut tetapi tidak ada di "
+            "mana pun menurunkan modul ke Keyakinan Rendah dan daftar modelnya "
+            "dibuang dari lampiran. Hasil lengkap: catalog-audit.md.",
+        ),
+        (
+            "Temuan audit",
+            ", ".join(f"{k}: {v}" for k, v in sorted(counts.get("audit_flags", {}).items())) or "tidak ada",
+        ),
+        (
+            "Model / Endpoint / Test",
+            "Dihitung dengan analisis statis atas models/, controllers/ "
+            "dan tests/. Modul yang seluruhnya berupa controller (mis. "
+            "custom_wms_hht) sah bernilai 0 model.",
+        ),
+        (
+            "Kesenjangan",
+            "Ditulis tangan di gaps.yaml. Setiap baris menyertakan rujukan berkas "
+            "yang bisa dibuka untuk memeriksa klaimnya.",
+        ),
     ]
     for i, (label, text) in enumerate(rows):
         r = i + 3
