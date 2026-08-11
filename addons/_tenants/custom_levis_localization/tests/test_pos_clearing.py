@@ -32,9 +32,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
         Account = cls.env["account.account"]
 
         def account(name, code, kind, reconcile=False):
-            return Account.create(
-                {"name": name, "code": code, "account_type": kind, "reconcile": reconcile}
-            )
+            return Account.create({"name": name, "code": code, "account_type": kind, "reconcile": reconcile})
 
         # The suspense account is deliberately NOT reconcilable, as in production:
         # it can only be balanced, never matched.
@@ -49,16 +47,10 @@ class TestPosClearing(AccountTestInvoicingCommon):
         cls.tenders = cls.tender_a + cls.tender_b + cls.tender_c
 
         plan = cls.env["account.analytic.plan"].create({"name": "Clearing OU"})
-        cls.store_one = cls.env["account.analytic.account"].create(
-            {"name": "STORE ONE", "plan_id": plan.id}
-        )
-        cls.store_two = cls.env["account.analytic.account"].create(
-            {"name": "STORE TWO", "plan_id": plan.id}
-        )
+        cls.store_one = cls.env["account.analytic.account"].create({"name": "STORE ONE", "plan_id": plan.id})
+        cls.store_two = cls.env["account.analytic.account"].create({"name": "STORE TWO", "plan_id": plan.id})
 
-        cls.gljv = cls.env["account.journal"].create(
-            {"name": "Clearing Journal", "code": "TGLJ", "type": "general"}
-        )
+        cls.gljv = cls.env["account.journal"].create({"name": "Clearing Journal", "code": "TGLJ", "type": "general"})
         cls.bank = cls.env["account.journal"].create(
             {
                 "name": "BCA test",
@@ -180,9 +172,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
     # ------------------------------------------------------------------
     def test_compute_creates_no_accounting(self):
         self._posrec(self.tender_a, self.store_one, date(2026, 7, 8), 1_000_000.0)
-        statement = self._statement(
-            date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0)
-        )
+        statement = self._statement(date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0))
         before = self.env["account.move"].search_count([("company_id", "=", self.company.id)])
 
         run = self._run()
@@ -212,9 +202,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
         self._posrec(self.tender_a, self.store_one, day, 500_000.0)
         self._posrec(self.tender_b, self.store_one, day, 300_000.0)
         self._posrec(self.tender_c, self.store_one, day, 200_000.0)
-        self._statement(
-            date(2026, 7, 9), 891_000.0, self._settlement_ref(MID_ONE, 900_000.0, 9_000.0, trans_day=day)
-        )
+        self._statement(date(2026, 7, 9), 891_000.0, self._settlement_ref(MID_ONE, 900_000.0, 9_000.0, trans_day=day))
 
         run = self._run()
         run.action_compute()
@@ -246,9 +234,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
 
     def test_unmapped_mid_blocks_generation(self):
         self._posrec(self.tender_a, self.store_one, date(2026, 7, 8), 1_000_000.0)
-        self._statement(
-            date(2026, 7, 9), 990_000.0, self._settlement_ref("885004609999", 1_000_000.0, 10_000.0)
-        )
+        self._statement(date(2026, 7, 9), 990_000.0, self._settlement_ref("885004609999", 1_000_000.0, 10_000.0))
 
         run = self._run()
         run.action_compute()
@@ -261,9 +247,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
 
     def test_unparsed_line_is_visible_and_books_nothing(self):
         self._posrec(self.tender_a, self.store_one, date(2026, 7, 8), 1_000_000.0)
-        self._statement(
-            date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0)
-        )
+        self._statement(date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0))
         self._statement(date(2026, 7, 9), 12_345.0, "SOMETHING NOBODY TAUGHT US")
 
         run = self._run()
@@ -281,9 +265,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
     def test_amount_mismatch_is_a_finding(self):
         self._posrec(self.tender_a, self.store_one, date(2026, 7, 8), 1_000_000.0)
         # Narrative says 990 000 net; the bank moved 900 000.
-        self._statement(
-            date(2026, 7, 9), 900_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0)
-        )
+        self._statement(date(2026, 7, 9), 900_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0))
 
         run = self._run()
         run.action_compute()
@@ -311,9 +293,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
         self.assertEqual(set(run.move_ids.mapped("state")), {"draft"})
         self.assertEqual(len(run.move_ids), 2, "one entry per block and date")
         for move in run.move_ids:
-            self.assertAlmostEqual(
-                sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2
-            )
+            self.assertAlmostEqual(sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2)
             self.assertTrue(move.ref.startswith(run.period_ref))
 
         settlement_move = run.move_ids.filtered(lambda m: "-A-" in m.ref)
@@ -389,9 +369,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
         with self.assertRaises(UserError):
             run.action_generate_moves()
         self.assertFalse(run.move_ids)
-        self.assertEqual(
-            self.company.fiscalyear_lock_date, date(2026, 7, 31), "the lock must not be touched"
-        )
+        self.assertEqual(self.company.fiscalyear_lock_date, date(2026, 7, 31), "the lock must not be touched")
 
     # ------------------------------------------------------------------
     # Stage 3
@@ -409,9 +387,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
         self._statement(
             date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, trans_day=day)
         )
-        self._statement(
-            date(2026, 7, 9), 495_000.0, self._settlement_ref(MID_TWO, 500_000.0, 5_000.0, trans_day=day)
-        )
+        self._statement(date(2026, 7, 9), 495_000.0, self._settlement_ref(MID_TWO, 500_000.0, 5_000.0, trans_day=day))
 
         run = self._run(ar_fallback=False)
         run.action_compute()
@@ -505,9 +481,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
     def test_prior_month_ar_absorbs_what_pos_cannot(self):
         """A settlement with no open POS receivable collects an older invoice."""
         self._posrec(self.ar, self.store_one, date(2026, 5, 20), 800_000.0)
-        self._statement(
-            date(2026, 7, 9), 792_000.0, self._settlement_ref(MID_ONE, 800_000.0, 8_000.0)
-        )
+        self._statement(date(2026, 7, 9), 792_000.0, self._settlement_ref(MID_ONE, 800_000.0, 8_000.0))
         run = self._run(ar_fallback=True)
         run.action_compute()
         line = run.line_ids
@@ -589,15 +563,13 @@ class TestPosClearing(AccountTestInvoicingCommon):
         self.assertEqual(partial.period_ref, "POSCLR-20260705-20260720")
 
     def test_unmapped_is_not_counted_as_a_shortfall(self):
-        """"We don't know the store" and "the store had nothing open" differ."""
+        """ "We don't know the store" and "the store had nothing open" differ."""
         day = date(2026, 7, 8)
         self._posrec(self.tender_a, self.store_one, day, 1_000_000.0)
         self._statement(
             date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, trans_day=day)
         )
-        self._statement(
-            date(2026, 7, 9), 495_000.0, self._settlement_ref("885004609999", 500_000.0, 5_000.0)
-        )
+        self._statement(date(2026, 7, 9), 495_000.0, self._settlement_ref("885004609999", 500_000.0, 5_000.0))
         run = self._run(ar_fallback=False)
         run.action_compute()
         self.assertEqual(run.unmapped_count, 1)
@@ -613,9 +585,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
         proposal — otherwise the rules collide on their uniqueness constraint.
         """
         day = date(2026, 7, 8)
-        self._statement(
-            date(2026, 7, 9), 99_000.0, self._settlement_ref("885004600003", 100_000.0, 1_000.0)
-        )
+        self._statement(date(2026, 7, 9), 99_000.0, self._settlement_ref("885004600003", 100_000.0, 1_000.0))
         self._statement(
             date(2026, 7, 9),
             50_000.0,

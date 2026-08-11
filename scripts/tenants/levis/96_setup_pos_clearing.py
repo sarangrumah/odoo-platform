@@ -32,9 +32,7 @@ from odoo.addons.custom_levis_localization.models.setup import (  # noqa: E402
 )
 
 result = seed_clearing_config(env)
-log(
-    "config created=%(created)s topped_up=%(updated)s journal_formats=%(formats)s" % result
-)
+log("config created=%(created)s topped_up=%(updated)s journal_formats=%(formats)s" % result)
 
 for journal in env["account.journal"].search([("type", "=", "bank")], order="code"):
     log(
@@ -62,16 +60,14 @@ for config in env["levis.clearing.config"].search([]):
         log("  MISSING tender accounts:   %s" % ", ".join(absent))
         missing.append("%s: tender accounts %s" % (company.name, ", ".join(absent)))
     log("  bank_journals             %s" % ", ".join(config.bank_journal_ids.mapped("code")) or "(none)")
-    unparsed = config.bank_journal_ids.filtered(
-        lambda j: j.levis_clearing_format in (False, "none")
-    )
+    unparsed = config.bank_journal_ids.filtered(lambda j: j.levis_clearing_format in (False, "none"))
     if unparsed:
         log("  WARNING no narrative format: %s" % ", ".join(unparsed.mapped("code")))
 
     mapped = env["levis.bank.mid.map"].search_count([("company_id", "=", company.id)])
     log("  mid_mapping_rules         %d" % mapped)
     if not mapped:
-        log("  -> run the \"Map Unmapped Settlements\" wizard before the first clearing")
+        log('  -> run the "Map Unmapped Settlements" wizard before the first clearing')
 
 if missing:
     log("INCOMPLETE — the clearing will refuse to run until these are set:")

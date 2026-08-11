@@ -206,7 +206,12 @@ class LevisBankMidMapWizard(models.TransientModel):
                     "key": line.key,
                     "channel": line.channel,
                     "analytic_account_id": line.analytic_account_id.id,
-                    "note": _("Created from statement scan %(start)s..%(end)s. Sample: %(sample)s", start=self.date_from, end=self.date_to, sample=line.sample_narrative),
+                    "note": _(
+                        "Created from statement scan %(start)s..%(end)s. Sample: %(sample)s",
+                        start=self.date_from,
+                        end=self.date_to,
+                        sample=line.sample_narrative,
+                    ),
                 }
                 for line in todo
             ]
@@ -246,7 +251,7 @@ class LevisBankMidMapWizardLine(models.TransientModel):
     )
     key = fields.Char(
         help="Editable for keyword rules: shorten it to the part that actually names "
-        "the store (e.g. just \"pvj\") so next month's deposits match the same rule "
+        'the store (e.g. just "pvj") so next month\'s deposits match the same rule '
         "instead of needing a new one. MID and terminal keys should be left alone.",
     )
     channel = fields.Selection(

@@ -23,9 +23,7 @@ class TestReconciliationGuards(TransactionCase):
             [("type", "=", "bank"), ("company_id", "=", cls.company.id)], limit=1
         )
         cls.partner = cls.env["res.partner"].create({"name": "Guard Vendor"})
-        cls.product = cls.env["product.product"].create(
-            {"name": "Guard Service", "type": "service"}
-        )
+        cls.product = cls.env["product.product"].create({"name": "Guard Service", "type": "service"})
 
     def _bill(self, amount, bill_date=None):
         bill = self.env["account.move"].create(
@@ -58,9 +56,7 @@ class TestReconciliationGuards(TransactionCase):
             .create({"journal_id": self.bank_journal.id})
         )
         wizard.action_create_payments()
-        return self.env["account.payment"].search(
-            [("partner_id", "=", self.partner.id)], order="id desc", limit=1
-        )
+        return self.env["account.payment"].search([("partner_id", "=", self.partner.id)], order="id desc", limit=1)
 
     # ------------------------------------------------------------------
     # Reset to draft
@@ -83,9 +79,9 @@ class TestReconciliationGuards(TransactionCase):
         self.assertNotEqual(bill.payment_state, "paid")
         self.assertAlmostEqual(
             sum(
-                bill.line_ids.filtered(
-                    lambda l: l.account_id.account_type == "liability_payable"
-                ).mapped("amount_residual")
+                bill.line_ids.filtered(lambda l: l.account_id.account_type == "liability_payable").mapped(
+                    "amount_residual"
+                )
             ),
             -1000.0,
             places=2,
@@ -120,9 +116,7 @@ class TestReconciliationGuards(TransactionCase):
         swapped by hand while the entry sat in draft."""
         bill = self._bill(700.0)
         payment = self._register(bill)
-        line = payment.move_id.line_ids.filtered(
-            lambda l: l.account_id.account_type == "liability_payable"
-        )
+        line = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type == "liability_payable")
         other = self.env["account.account"].search(
             [
                 ("account_type", "=", "liability_payable"),
@@ -148,9 +142,7 @@ class TestReconciliationGuards(TransactionCase):
         that does not actually change the account would block ordinary edits."""
         bill = self._bill(700.0)
         payment = self._register(bill)
-        line = payment.move_id.line_ids.filtered(
-            lambda l: l.account_id.account_type == "liability_payable"
-        )
+        line = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type == "liability_payable")
         line.write({"account_id": line.account_id.id, "name": "relabelled"})
         self.assertEqual(line.name, "relabelled")
 

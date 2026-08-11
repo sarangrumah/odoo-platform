@@ -299,8 +299,7 @@ def read_aeon(db, ebr_path, plan):
     for r in xs:  # pass 1 -- exact agreement, drop silently
         if not take(
             left_e,
-            lambda e, r=r: (e["date"], e["acc"], round(e["amount"], 2))
-            == (r["date"], r["acc"], round(r["amount"], 2)),
+            lambda e, r=r: (e["date"], e["acc"], round(e["amount"], 2)) == (r["date"], r["acc"], round(r["amount"], 2)),
         ):
             left_x.append(r)
 
@@ -312,6 +311,7 @@ def read_aeon(db, ebr_path, plan):
         for r in recs:
             g[(r["date"], r["acc"])].append(r)
         return g
+
     gx, ge = group(left_x), group(left_e)
     for key in set(gx) | set(ge):
         sx = round(sum(r["amount"] for r in gx.get(key, [])), 2)
@@ -542,8 +542,7 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
         ),
         (
             "5",
-            "Data Agustus sudah mulai masuk dan TIDAK tersentuh paket ini; clearing Agustus "
-            "adalah pekerjaan terpisah.",
+            "Data Agustus sudah mulai masuk dan TIDAK tersentuh paket ini; clearing Agustus adalah pekerjaan terpisah.",
             "",
         ),
         ("", "", ""),
@@ -594,7 +593,10 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
     for label, val in [
         ("Bruto rencana (tabel di atas)", rnd(a_gross)),
         ("Yang benar-benar dikredit oleh 30 jurnal draft blok A", rnd(a_credit)),
-        ("Selisih = AEON BSD CITY, trans date EBR bergeser sehari + Rp 50 (sheet AEON-SELISIH)", rnd(a_gross - a_credit)),
+        (
+            "Selisih = AEON BSD CITY, trans date EBR bergeser sehari + Rp 50 (sheet AEON-SELISIH)",
+            rnd(a_gross - a_credit),
+        ),
     ]:
         ws.append([label, "", "", val])
         ws.cell(ws.max_row, 4).number_format = money
@@ -857,9 +859,7 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
     ws.append([])
     ws.append(["DAMPAK KE BLOK A (per tanggal transaksi)"])
     ws.cell(ws.max_row, 1).font = bold
-    ws.append(
-        ["Trans date", "Jurnal blok A", "Diminta EBR", "Tersedia di Odoo", "Dikreditkan", "Tidak ter-clearing"]
-    )
+    ws.append(["Trans date", "Jurnal blok A", "Diminta EBR", "Tersedia di Odoo", "Dikreditkan", "Tidak ter-clearing"])
     for c in ws[ws.max_row]:
         c.font, c.fill = bold, head_fill
     for d in sorted(aeon["asked"]):
@@ -995,8 +995,7 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
             ),
             (
                 "5",
-                "Jurnal draft OBCA 8282/2026/07/042 'SEWA 7 LEVIS MOI' 21-Jul, "
-                "DI LUAR paket clearing ini",
+                "Jurnal draft OBCA 8282/2026/07/042 'SEWA 7 LEVIS MOI' 21-Jul, DI LUAR paket clearing ini",
                 75407050.0,
                 "Ditindaklanjuti terpisah agar Juli tidak tertinggal",
                 "Accounting",
@@ -1035,8 +1034,7 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
             ),
             (
                 "KOL 15-Jul",
-                "Pemberian gratis ke KOL tercatat sebagai penjualan CASH harga penuh "
-                "(GRAND INDONESIA, sheet KOL-76JT)",
+                "Pemberian gratis ke KOL tercatat sebagai penjualan CASH harga penuh (GRAND INDONESIA, sheet KOL-76JT)",
                 kol_total,
                 "Reklas ke beban promosi ATAU batalkan dan import ulang sebagai free goods",
             ),
@@ -1048,8 +1046,7 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
             ),
             (
                 "AEON BSD CITY",
-                "Trans date trx 617/619/622 bergeser sehari di workbook EBR + trx 682 beda Rp 50 "
-                "(sheet AEON-SELISIH)",
+                "Trans date trx 617/619/622 bergeser sehari di workbook EBR + trx 682 beda Rp 50 (sheet AEON-SELISIH)",
                 1400925.0,
                 "EBR mengoreksi COMPILE SALES, lalu blok A dibangkitkan ulang",
             ),
@@ -1162,9 +1159,21 @@ def build(path, plan, odoo, kol, sales_jun, unsettled, aeon):
         ("", "", ""),
         ("KRITERIA TERIMA", "NILAI YANG HARUS KELUAR", ""),
         ("Jumlah jurnal ter-posting", 63.0, ""),
-        ("1103000002 Bank Suspense (s/d 31-Jul)", rnd(odoo["balance_before"].get("1103000002", 0.0) + delta["1103000002"]), ""),
-        ("7104000001 Beban MDR (s/d 31-Jul)", rnd(odoo["balance_before"].get("7104000001", 0.0) + delta["7104000001"]), ""),
-        ("1106000001 Piutang Usaha (s/d 31-Jul)", rnd(odoo["balance_before"].get("1106000001", 0.0) + delta["1106000001"]), ""),
+        (
+            "1103000002 Bank Suspense (s/d 31-Jul)",
+            rnd(odoo["balance_before"].get("1103000002", 0.0) + delta["1103000002"]),
+            "",
+        ),
+        (
+            "7104000001 Beban MDR (s/d 31-Jul)",
+            rnd(odoo["balance_before"].get("7104000001", 0.0) + delta["7104000001"]),
+            "",
+        ),
+        (
+            "1106000001 Piutang Usaha (s/d 31-Jul)",
+            rnd(odoo["balance_before"].get("1106000001", 0.0) + delta["1106000001"]),
+            "",
+        ),
         ("POS Receivable Juli masih terbuka", resid_after_x, ""),
         ("", "", ""),
         ("ROLLBACK", "", ""),

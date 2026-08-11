@@ -89,9 +89,7 @@ class LevisPosClearing(models.Model):
     _order = "date_to desc, id desc"
 
     name = fields.Char(default="/", copy=False, readonly=True)
-    company_id = fields.Many2one(
-        "res.company", required=True, default=lambda self: self.env.company, readonly=True
-    )
+    company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company, readonly=True)
     config_id = fields.Many2one(
         "levis.clearing.config",
         string="Accounts",
@@ -478,7 +476,7 @@ class LevisPosClearing(models.Model):
         earliest = self.date_from - timedelta(days=config.lookback_days or 0)
         dates = []
         for offset in range(0, (config.lookback_days or 0) + 2):
-            for step in ((0,) if offset == 0 else (-offset, offset)):
+            for step in (0,) if offset == 0 else (-offset, offset):
                 candidate = primary + timedelta(days=step)
                 if earliest <= candidate <= self.date_to and candidate not in dates:
                     dates.append(candidate)
@@ -573,9 +571,7 @@ class LevisPosClearing(models.Model):
         self.state = "computed"
         return True
 
-    def _line_from_parsed(
-        self, statement_line, parsed, rules, pool, residual, ar_pool, ar_residual, diag_vals
-    ):
+    def _line_from_parsed(self, statement_line, parsed, rules, pool, residual, ar_pool, ar_residual, diag_vals):
         """One statement line -> one clearing line, allocations included.
 
         Every statement line in scope produces a row, whatever happened to it.
@@ -661,8 +657,8 @@ class LevisPosClearing(models.Model):
         vals["map_id"] = rule.id
         vals["analytic_account_id"] = rule.analytic_account_id.id
         exact = parsed["confidence"] == "exact" and parsed["trans_date"]
-        primary = parsed["trans_date"] if exact else statement_line.date - timedelta(
-            days=config.settlement_lag_days or 0
+        primary = (
+            parsed["trans_date"] if exact else statement_line.date - timedelta(days=config.settlement_lag_days or 0)
         )
         vals["trans_date"] = primary
         vals["trans_date_is_derived"] = not exact
@@ -745,7 +741,11 @@ class LevisPosClearing(models.Model):
                     "count": 1,
                     "res_model": "account.bank.statement.line",
                     "res_id": line.statement_line_id.id,
-                    "message": _("Narrative says %(net)s, the bank moved %(amount)s.", net=line.cash_in, amount=line.statement_amount),
+                    "message": _(
+                        "Narrative says %(net)s, the bank moved %(amount)s.",
+                        net=line.cash_in,
+                        amount=line.statement_amount,
+                    ),
                 }
             )
         return out
@@ -877,9 +877,7 @@ class LevisPosClearing(models.Model):
         config = self.config_id
         if not config.sweep_account_id:
             return []
-        clashing = self._bank_journals().filtered(
-            lambda j: j.default_account_id == config.sweep_account_id
-        )
+        clashing = self._bank_journals().filtered(lambda j: j.default_account_id == config.sweep_account_id)
         out = []
         for journal in clashing:
             if any(line.bank_journal_id == journal for line in self.line_ids):
@@ -918,7 +916,9 @@ class LevisPosClearing(models.Model):
                 "count": 1,
                 "res_model": "levis.pos.clearing",
                 "res_id": other.id,
-                "message": _("%(name)s covers %(start)s..%(end)s.", name=other.name, start=other.date_from, end=other.date_to),
+                "message": _(
+                    "%(name)s covers %(start)s..%(end)s.", name=other.name, start=other.date_from, end=other.date_to
+                ),
             }
             for other in others
         ]
@@ -1059,7 +1059,7 @@ class LevisPosClearing(models.Model):
                     _(
                         "Not booking yet: %(problems)s. Money behind those lines would "
                         "stay on suspense with no record of why. Map or fix them, or "
-                        "tick \"Ignore warnings\" to book the rest deliberately.",
+                        'tick "Ignore warnings" to book the rest deliberately.',
                         problems="; ".join(problems),
                     )
                 )
@@ -1170,14 +1170,10 @@ class LevisPosClearing(models.Model):
             raise UserError(_("No draft entries left — they were posted or deleted elsewhere."))
         for move in drafts:
             if not (self.date_from <= move.date <= self.date_to):
-                raise UserError(
-                    _("Entry %(ref)s is dated %(date)s, outside the period.", ref=move.ref, date=move.date)
-                )
+                raise UserError(_("Entry %(ref)s is dated %(date)s, outside the period.", ref=move.ref, date=move.date))
             imbalance = sum(move.line_ids.mapped("debit")) - sum(move.line_ids.mapped("credit"))
             if abs(imbalance) > _EPS:
-                raise UserError(
-                    _("Entry %(ref)s is out of balance by %(amount)s.", ref=move.ref, amount=imbalance)
-                )
+                raise UserError(_("Entry %(ref)s is out of balance by %(amount)s.", ref=move.ref, amount=imbalance))
         # The drafts may have waited days. Anything they promised must still be there.
         stale = []
         for alloc in self.line_ids.alloc_ids:
@@ -1247,10 +1243,10 @@ class LevisPosClearing(models.Model):
             (config.ar_account_id.display_name, self.bal_ar_after_sim, self.bal_ar_after_actual),
         ):
             if abs(round(actual - simulated, 2)) > _EPS:
-                deltas.append(_("%(label)s: expected %(sim)s, got %(actual)s", label=label, sim=simulated, actual=actual))
-        self.warning_text = (
-            _("Posted balances differ from the simulation:\n%s", "\n".join(deltas)) if deltas else False
-        )
+                deltas.append(
+                    _("%(label)s: expected %(sim)s, got %(actual)s", label=label, sim=simulated, actual=actual)
+                )
+        self.warning_text = _("Posted balances differ from the simulation:\n%s", "\n".join(deltas)) if deltas else False
         if deltas:
             _logger.warning("POS clearing %s: post-balance drift %s", self.name, deltas)
         return True
@@ -1329,9 +1325,7 @@ class LevisPosClearingLine(models.Model):
     run_id = fields.Many2one("levis.pos.clearing", required=True, ondelete="cascade", index=True)
     company_id = fields.Many2one(related="run_id.company_id", store=True)
     currency_id = fields.Many2one(related="run_id.currency_id")
-    statement_line_id = fields.Many2one(
-        "account.bank.statement.line", required=True, ondelete="cascade", index=True
-    )
+    statement_line_id = fields.Many2one("account.bank.statement.line", required=True, ondelete="cascade", index=True)
     bank_journal_id = fields.Many2one(related="statement_line_id.journal_id", store=True, string="Bank")
     payment_ref = fields.Char(related="statement_line_id.payment_ref", string="Narrative")
     settlement_date = fields.Date(required=True)

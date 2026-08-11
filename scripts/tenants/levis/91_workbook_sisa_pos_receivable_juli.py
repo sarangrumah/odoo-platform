@@ -196,11 +196,9 @@ def build(path, ledger, timing, kol, unsettled):
         ),
         (
             "KOL 15-Jul",
-            "Pemberian gratis ke KOL tercatat sebagai penjualan CASH harga penuh "
-            "di GRAND INDONESIA",
+            "Pemberian gratis ke KOL tercatat sebagai penjualan CASH harga penuh di GRAND INDONESIA",
             kol_total,
-            "Reklas ke beban promosi ATAU batalkan dan import ulang sebagai free goods "
-            "(ada implikasi PPN cuma-cuma)",
+            "Reklas ke beban promosi ATAU batalkan dan import ulang sebagai free goods (ada implikasi PPN cuma-cuma)",
         ),
         (
             "Macet lain",
@@ -244,8 +242,7 @@ def build(path, ledger, timing, kol, unsettled):
         ),
         (
             "",
-            "Pengecualian: baris bertanggal 31-Jul memang murni timing dan cocok per toko, "
-            "lihat sheet TIMING-31JUL.",
+            "Pengecualian: baris bertanggal 31-Jul memang murni timing dan cocok per toko, lihat sheet TIMING-31JUL.",
             "",
             "",
         ),

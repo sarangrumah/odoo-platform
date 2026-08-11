@@ -43,9 +43,7 @@ class AccountPayment(models.Model):
     @api.depends("state", "is_reconciled")
     def _compute_is_unapplied(self):
         for payment in self:
-            payment.is_unapplied = (
-                payment.state in ("in_process", "paid") and not payment.is_reconciled
-            )
+            payment.is_unapplied = payment.state in ("in_process", "paid") and not payment.is_reconciled
 
     def _find_duplicates(self):
         """Posted payments that look like the same transaction as ``self``."""
@@ -75,19 +73,15 @@ class AccountPayment(models.Model):
                         "%(partner)s already has a posted payment of %(amount)s dated "
                         "%(date)s: %(twins)s.\n\n"
                         "If this is a second, genuinely separate payment, tick "
-                        "\"Duplicate Checked\" and post again. If it is the same "
+                        '"Duplicate Checked" and post again. If it is the same '
                         "transaction being entered twice, cancel this one — note that "
                         "a payment which settles no bill still leaves the bill "
-                        "reading \"Not Paid\", which is exactly what invites a "
+                        'reading "Not Paid", which is exactly what invites a '
                         "duplicate.",
                         partner=payment.partner_id.display_name,
-                        amount=formatLang(
-                            self.env, payment.amount, currency_obj=payment.currency_id
-                        ),
+                        amount=formatLang(self.env, payment.amount, currency_obj=payment.currency_id),
                         date=payment.date,
-                        twins=", ".join(
-                            t.move_id.name or str(t.id) for t in twins
-                        ),
+                        twins=", ".join(t.move_id.name or str(t.id) for t in twins),
                     )
                 )
         return super().action_post()

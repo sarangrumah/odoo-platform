@@ -44,12 +44,9 @@ from openpyxl.utils import get_column_letter
 
 PG = "odoo19-platform-postgres"
 DB = os.environ.get("DB", "prd_levis_begbal")
-OUT = os.environ.get(
-    "OUT", "/srv/sftp-share/files/Skenario_Insiden_Pembayaran_Juli_2026.xlsx"
-)
+OUT = os.environ.get("OUT", "/srv/sftp-share/files/Skenario_Insiden_Pembayaran_Juli_2026.xlsx")
 
-MOVES = ("8282/2026/07/009", "8282/2026/07/016", "8282/2026/07/017",
-         "8282/2026/07/042", "8282/2026/07/045")
+MOVES = ("8282/2026/07/009", "8282/2026/07/016", "8282/2026/07/017", "8282/2026/07/042", "8282/2026/07/045")
 
 MONEY = "#,##0.00"
 HDR_FILL = PatternFill("solid", fgColor="1F4E78")
@@ -65,11 +62,15 @@ WRAP = Alignment(wrap_text=True, vertical="top")
 def q(sql):
     out = subprocess.run(
         [
-            "docker", "exec", PG, "sh", "-c",
-            'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" '
-            f"-d {DB} --csv -v ON_ERROR_STOP=1 -c \"{sql}\"",
+            "docker",
+            "exec",
+            PG,
+            "sh",
+            "-c",
+            f'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d {DB} --csv -v ON_ERROR_STOP=1 -c "{sql}"',
         ],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if out.returncode:
         sys.exit(f"query failed:\n{out.stderr}")
@@ -189,10 +190,7 @@ KASUS = [
             "'SEWA 2 SC PL JUL 26 LEVIS PVJ BDG', lalu satu siklus reset to draft dan "
             "posting ulang. Satu siklus saja sudah cukup menghapus matching-nya."
         ),
-        "akibat": (
-            "Sama seperti 009: tagihan kembali terbuka, pembayaran menggantung sebagai "
-            "AP minus di aging."
-        ),
+        "akibat": ("Sama seperti 009: tagihan kembali terbuka, pembayaran menggantung sebagai AP minus di aging."),
         "status": "SUDAH DIPERBAIKI oleh skrip 90 (direkonsiliasi ke tagihan aslinya)",
         "keputusan": "-",
     },
@@ -250,8 +248,7 @@ PENCEGAHAN = [
         "custom_account_reconcile / account_move.py -> button_draft()",
         "Sebelum jurnal turun ke draft, rekonsiliasinya dibatalkan lebih dulu (perilaku "
         "Odoo versi lama), dan dokumen yang dilepas dicatat di chatter.",
-        "042 (tagihan tidak lagi bisa terbaca lunas melawan jurnal draft), dan mencegah "
-        "pengulangan 009/017.",
+        "042 (tagihan tidak lagi bisa terbaca lunas melawan jurnal draft), dan mencegah pengulangan 009/017.",
     ),
     (
         "Akun / partner baris ter-reconcile tidak bisa diganti",
@@ -307,8 +304,12 @@ c.alignment, c.fill = WRAP, INFO_FILL
 ws.merge_cells(start_row=5, start_column=1, end_row=5, end_column=7)
 ws.row_dimensions[5].height = 100
 
-head(ws, 7, ["Jurnal", "Tanggal", "Partner", "Nilai", "Dibuat oleh", "Tagihan terkait",
-             "Status"], [20, 12, 34, 18, 30, 42, 46])
+head(
+    ws,
+    7,
+    ["Jurnal", "Tanggal", "Partner", "Nilai", "Dibuat oleh", "Tagihan terkait", "Status"],
+    [20, 12, 34, 18, 30, 42, 46],
+)
 r = 8
 for k in KASUS:
     h = kepala_map.get(k["mv"], {})
@@ -324,8 +325,7 @@ for k in KASUS:
     r += 1
 
 r += 1
-head(ws, r, ["Jurnal", "Apa yang terjadi", "Akibatnya", "Keputusan yang ditunggu"],
-     [20, 78, 60, 60])
+head(ws, r, ["Jurnal", "Apa yang terjadi", "Akibatnya", "Keputusan yang ditunggu"], [20, 78, 60, 60])
 r += 1
 for k in KASUS:
     ws.cell(row=r, column=1, value=k["mv"])
@@ -341,8 +341,7 @@ for k in KASUS:
 ws2 = wb.create_sheet("Kronologi")
 ws2["A1"] = "Jejak audit Odoo — apa adanya, urut waktu"
 ws2["A1"].font = Font(bold=True, size=12)
-head(ws2, 3, ["Waktu", "User", "Jurnal", "Model", "Field", "Dari", "Jadi"],
-     [21, 30, 20, 18, 17, 46, 46])
+head(ws2, 3, ["Waktu", "User", "Jurnal", "Model", "Field", "Dari", "Jadi"], [21, 30, 20, 18, 17, 46, 46])
 r = 4
 warna = {}
 for x in jejak:
@@ -363,20 +362,26 @@ for x in jejak:
     r += 1
 r += 1
 note(
-    ws2, r,
+    ws2,
+    r,
     "Baris oranye = reset to draft (di Odoo 19 rekonsiliasinya tetap hidup). Baris biru = "
     "pergantian akun pada baris jurnal (saat draft tidak ada penjagaan sama sekali). "
     "Odoo melacak perubahan state, ref, dan account_id, tetapi TIDAK melacak rekonsiliasi — "
     "aksi unreconcile manual tidak meninggalkan jejak apa pun, itulah kenapa 016 tidak "
-    "menunjukkan penyebab yang eksplisit.", 7,
+    "menunjukkan penyebab yang eksplisit.",
+    7,
 )
 
 # ---- Sheet 3: Dampak GL
 ws3 = wb.create_sheet("Dampak GL")
 ws3["A1"] = "Isi jurnal keempat kasus (plus 045 sebagai pembanding)"
 ws3["A1"].font = Font(bold=True, size=12)
-head(ws3, 3, ["Jurnal", "State", "Akun", "Nama Akun", "Debit", "Credit", "Residual",
-              "Reconciled"], [20, 10, 14, 34, 18, 18, 18, 12])
+head(
+    ws3,
+    3,
+    ["Jurnal", "State", "Akun", "Nama Akun", "Debit", "Credit", "Residual", "Reconciled"],
+    [20, 10, 14, 34, 18, 18, 18, 12],
+)
 r = 4
 for x in dampak:
     h = kepala_map.get(x["mv"], {})
@@ -396,8 +401,7 @@ for x in dampak:
 r += 2
 ws3.cell(row=r, column=1, value="Tagihan yang terkait").font = SUB_FONT
 r += 1
-head(ws3, r, ["Bill", "Reference vendor", "Partner", "Nilai", "Residual", "Reconciled"],
-     [30, 34, 34, 18, 18, 12])
+head(ws3, r, ["Bill", "Reference vendor", "Partner", "Nilai", "Residual", "Reconciled"], [30, 34, 34, 18, 18, 12])
 r += 1
 for x in tagihan:
     ws3.cell(row=r, column=1, value=x["bill"])
@@ -416,8 +420,7 @@ ws4["A1"] = "Pencegahan yang dibangun — modul custom_account_reconcile 19.0.3.
 ws4["A1"].font = Font(bold=True, size=12)
 ws4["A2"] = "Kode sudah selesai dan lulus tes. BELUM di-deploy; menunggu review."
 ws4["A2"].font = NOTE_FONT
-head(ws4, 4, ["Pencegahan", "Letak", "Cara kerja", "Menutup kasus"],
-     [46, 56, 74, 62])
+head(ws4, 4, ["Pencegahan", "Letak", "Cara kerja", "Menutup kasus"], [46, 56, 74, 62])
 r = 5
 for nama, letak, cara, menutup in PENCEGAHAN:
     ws4.cell(row=r, column=1, value=nama).alignment = WRAP
@@ -428,12 +431,14 @@ for nama, letak, cara, menutup in PENCEGAHAN:
     r += 1
 r += 1
 note(
-    ws4, r,
+    ws4,
+    r,
     "Catatan: penjagaan 'tagihan yang sudah lunas tidak bisa dipilih lagi' sudah ada di "
     "Odoo sejak awal — wizard Register Payment melewati baris dengan residual nol dan "
     "menolak kalau tidak ada sisa (account/wizard/account_payment_register.py:969-975). "
     "Penjagaan itu tidak akan menolong di sini, karena keempat pembayaran memang sudah "
-    "memilih tagihan yang benar; matching-nya yang hilang sesudahnya.", 4,
+    "memilih tagihan yang benar; matching-nya yang hilang sesudahnya.",
+    4,
 )
 
 wb.save(OUT)

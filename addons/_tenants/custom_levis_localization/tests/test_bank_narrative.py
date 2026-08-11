@@ -18,12 +18,8 @@ class TestBankNarrative(TransactionCase):
         super().setUpClass()
         cls.parser = cls.env["levis.bank.narrative"]
         Journal = cls.env["account.journal"]
-        cls.bca = Journal.create(
-            {"name": "BCA test", "code": "TBCA", "type": "bank", "levis_clearing_format": "bca"}
-        )
-        cls.bri = Journal.create(
-            {"name": "BRI test", "code": "TBRI", "type": "bank", "levis_clearing_format": "bri"}
-        )
+        cls.bca = Journal.create({"name": "BCA test", "code": "TBCA", "type": "bank", "levis_clearing_format": "bca"})
+        cls.bri = Journal.create({"name": "BRI test", "code": "TBRI", "type": "bank", "levis_clearing_format": "bri"})
         cls.mute = Journal.create({"name": "Quiet", "code": "TQUI", "type": "bank"})
         cls.day = date(2026, 7, 10)
 
@@ -93,9 +89,7 @@ class TestBankNarrative(TransactionCase):
 
     def test_bca_charge_and_sweep(self):
         self.assertEqual(self.parse(self.bca, "BIAYA ADM", -30000.0)["kind"], "charge")
-        swept = self.parse(
-            self.bca, "TRSF E-BANKING DB 0107/SWBCA/WS95431 15000000000.00 ERA BUSANA RETAILI", -15e9
-        )
+        swept = self.parse(self.bca, "TRSF E-BANKING DB 0107/SWBCA/WS95431 15000000000.00 ERA BUSANA RETAILI", -15e9)
         self.assertEqual(swept["kind"], "sweep")
         self.assertEqual(swept["gross"], 15e9)
 
@@ -124,23 +118,17 @@ class TestBankNarrative(TransactionCase):
 
     def test_bri_misplaced_thousands_separator(self):
         """``MDR:1.3473,00`` means 13 473, not 1,3 or zero."""
-        parsed = self.parse(
-            self.bri, "OnUs 1 260707 001999632288 LEVIS X AMT:1.100.900,00MDR:1.3473,00", 1087427.0
-        )
+        parsed = self.parse(self.bri, "OnUs 1 260707 001999632288 LEVIS X AMT:1.100.900,00MDR:1.3473,00", 1087427.0)
         self.assertEqual(parsed["mdr"], 13473.00)
 
     def test_bri_qris_channel(self):
-        parsed = self.parse(
-            self.bri, "QRISOffUs_3_260707_001999632292_LEVIS KE AMT:1.176.925,00MDR:0,00", 1176925.0
-        )
+        parsed = self.parse(self.bri, "QRISOffUs_3_260707_001999632292_LEVIS KE AMT:1.176.925,00MDR:0,00", 1176925.0)
         self.assertEqual(parsed["channel"], "qris")
         self.assertEqual(parsed["gross"], 1176925.00)
 
     def test_bri_prior_month_trading_day(self):
         """A June trading day settling in July, which really occurs in the data."""
-        parsed = self.parse(
-            self.bri, "OnUs 1 260630 001999632288 LEVIS PONDOK AMT:1.000.900,00MDR:1.501,00", 999399.0
-        )
+        parsed = self.parse(self.bri, "OnUs 1 260630 001999632288 LEVIS PONDOK AMT:1.000.900,00MDR:1.501,00", 999399.0)
         self.assertEqual(parsed["trans_date"], date(2026, 6, 30))
 
     def test_bri_cheque_clearing_stays_unknown(self):

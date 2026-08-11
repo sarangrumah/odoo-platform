@@ -26,7 +26,7 @@ class LevisBankMidMap(models.Model):
     _description = "Bank MID / Terminal to Store Mapping"
     _order = "sequence, match_type, key"
 
-    name = fields.Char(required=True, help="Free label, e.g. \"BCA debit — Senayan City\".")
+    name = fields.Char(required=True, help='Free label, e.g. "BCA debit — Senayan City".')
     company_id = fields.Many2one(
         "res.company",
         required=True,
@@ -73,8 +73,7 @@ class LevisBankMidMap(models.Model):
             ("transfer", "Transfer"),
             ("other", "Other"),
         ],
-        help="Reporting only — the receivable account is discovered from the open "
-        "POS lines, never from this field.",
+        help="Reporting only — the receivable account is discovered from the open POS lines, never from this field.",
     )
     sequence = fields.Integer(default=10, help="Precedence between competing keyword rules.")
     active = fields.Boolean(default=True)
@@ -136,8 +135,10 @@ class LevisBankMidMap(models.Model):
         """
         rules = candidates if candidates is not None else self._candidates(company, journal)
         rules = rules.filtered(
-            lambda r: (not r.date_start or not date or r.date_start <= date)
-            and (not r.date_end or not date or date <= r.date_end)
+            lambda r: (
+                (not r.date_start or not date or r.date_start <= date)
+                and (not r.date_end or not date or date <= r.date_end)
+            )
         )
         for match_type, value in (("mid", parsed.get("mid")), ("tid", parsed.get("tid"))):
             if not value:
