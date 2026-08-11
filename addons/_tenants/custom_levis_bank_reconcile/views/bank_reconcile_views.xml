@@ -61,37 +61,85 @@
         <field name="code">records.action_levis_reread_narrative()</field>
     </record>
 
-    <!-- Match wizard: store, gross vs MDR, cash suggestion -->
-    <record id="view_custom_bank_reconcile_wizard_form_levis" model="ir.ui.view">
-        <field name="name">custom.bank.reconcile.wizard.form.levis</field>
+    <!-- Matching as a full page.
+
+         Deliberately a standalone view rather than an inheritance of the generic
+         dialog form: the two layouts have nothing in common beyond the fields.
+         The dialog puts everything in two cramped columns because it assumes one
+         invoice against one payment; here the operator is deciding whose money a
+         settlement is, and needs the store, the gross, the fee, the trading day
+         and a dozen candidate rows legible at the same time. -->
+    <record id="view_bank_reconcile_wizard_page" model="ir.ui.view">
+        <field name="name">custom.bank.reconcile.wizard.page.levis</field>
         <field name="model">custom.bank.reconcile.wizard</field>
-        <field name="inherit_id" ref="custom_account_reconcile.view_custom_bank_reconcile_wizard_form"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
-            <field name="partner_id" position="after">
-                <field name="levis_is_tender" invisible="1"/>
-                <field name="levis_ou_analytic_id" invisible="not levis_is_tender"/>
-                <field name="levis_mid" invisible="not levis_is_tender"/>
-                <field name="levis_channel" invisible="not levis_is_tender"/>
-                <field name="levis_trans_date" invisible="not levis_trans_date"/>
-            </field>
-            <field name="remainder" position="before">
-                <field name="levis_gross" invisible="not levis_is_tender"/>
-                <field name="levis_mdr" invisible="not levis_is_tender"/>
-                <field name="levis_target" invisible="not levis_is_tender"/>
-                <field name="levis_gap" invisible="not levis_is_tender"/>
-            </field>
-            <xpath expr="//field[@name='candidate_ids']/list/field[@name='account_id']" position="after">
-                <field name="levis_ou_analytic_id" optional="show"/>
-                <field name="levis_ou_matches" column_invisible="1"/>
-            </xpath>
-            <xpath expr="//field[@name='candidate_ids']/list" position="attributes">
-                <attribute name="decoration-warning">levis_ou_matches == False</attribute>
-            </xpath>
-            <button name="action_search_more" position="before">
-                <button name="action_levis_suggest" type="object" string="Suggest"
-                        invisible="not levis_is_tender"
-                        help="Fill the selection up to the statement amount, largest open day first."/>
-            </button>
+            <form string="Match Statement Line" create="false" duplicate="false">
+                <header>
+                    <button name="action_reconcile" type="object" string="Reconcile"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button name="action_levis_suggest" type="object" string="Suggest"
+                            invisible="not levis_is_tender"
+                            help="Fill the selection up to the statement amount, largest open day first."/>
+                    <button name="action_search_more" type="object" string="Search More"
+                            help="Widen the net: drop the trading-day window, and fall back to other stores when this one has nothing open."/>
+                </header>
+                <sheet>
+                    <field name="st_line_id" invisible="1"/>
+                    <field name="levis_is_tender" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <div class="oe_title">
+                        <h2><field name="payment_ref" readonly="1" nolabel="1"/></h2>
+                        <h3 class="text-muted" invisible="not levis_ou_analytic_id">
+                            <field name="levis_ou_analytic_id" readonly="1" nolabel="1"/>
+                        </h3>
+                    </div>
+                    <group>
+                        <group string="Bank statement">
+                            <field name="journal_id" readonly="1"/>
+                            <field name="date" readonly="1"/>
+                            <field name="levis_trans_date" readonly="1" invisible="not levis_trans_date"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="levis_narrative_kind" readonly="1" invisible="not levis_is_tender"/>
+                            <field name="levis_channel" readonly="1" invisible="not levis_is_tender"/>
+                            <field name="levis_mid" readonly="1" invisible="not levis_is_tender"/>
+                        </group>
+                        <group string="Amounts">
+                            <field name="amount" readonly="1"/>
+                            <field name="levis_gross" readonly="1" invisible="not levis_is_tender"/>
+                            <field name="levis_mdr" readonly="1" invisible="not levis_is_tender"/>
+                            <field name="levis_target" invisible="not levis_is_tender"/>
+                            <field name="selected_total"/>
+                            <field name="levis_gap" invisible="not levis_is_tender"/>
+                            <field name="remainder"/>
+                        </group>
+                    </group>
+                    <separator string="Open journal items of this store"/>
+                    <field name="candidate_ids" nolabel="1">
+                        <list editable="bottom" create="false" delete="false"
+                              decoration-warning="levis_ou_matches == False">
+                            <field name="selected" widget="boolean_toggle"/>
+                            <field name="date"/>
+                            <field name="move_name"/>
+                            <field name="account_id"/>
+                            <field name="levis_ou_analytic_id"/>
+                            <field name="partner_id" optional="hide"/>
+                            <field name="name" string="Label"/>
+                            <field name="amount_residual" sum="Selected"/>
+                            <field name="levis_ou_matches" column_invisible="1"/>
+                            <field name="company_currency_id" column_invisible="1"/>
+                            <field name="aml_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                    <group>
+                        <group string="Remainder">
+                            <field name="writeoff"/>
+                            <field name="writeoff_account_id" invisible="not writeoff" required="writeoff"/>
+                            <field name="writeoff_label" invisible="not writeoff"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
         </field>
     </record>
 

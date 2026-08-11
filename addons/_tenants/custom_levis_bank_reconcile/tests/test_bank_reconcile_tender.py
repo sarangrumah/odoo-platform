@@ -159,6 +159,37 @@ class TestBankReconcileTender(AccountTestInvoicingCommon):
         return self.env["custom.bank.reconcile.wizard"].with_context(default_st_line_id=st_line.id).create({})
 
     # ------------------------------------------------------------------
+    # The matching screen is a page, not a modal
+    # ------------------------------------------------------------------
+    def test_match_opens_a_page_on_a_real_wizard(self):
+        day = date(2026, 7, 8)
+        self._posrec(self.tender_card, self.store_one, day, 1_000_000.0)
+        line = self._statement(day, 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, day))
+
+        action = line.action_open_match_wizard()
+
+        self.assertEqual(action["target"], "current", "a modal cannot show a dozen candidate columns")
+        self.assertEqual(
+            action["views"],
+            [(self.env.ref("custom_levis_bank_reconcile.view_bank_reconcile_wizard_page").id, "form")],
+        )
+        # A page opens on a record, so the wizard must already exist and have
+        # been through default_get — otherwise the screen renders blank.
+        wizard = self.env["custom.bank.reconcile.wizard"].browse(action["res_id"])
+        self.assertEqual(wizard.st_line_id, line)
+        self.assertTrue(wizard.candidate_ids)
+        self.assertTrue(wizard.writeoff, "the MDR default must survive the page route")
+
+    def test_page_buttons_reload_instead_of_stacking_dialogs(self):
+        day = date(2026, 7, 8)
+        self._posrec(self.tender_cash, self.store_one, day, 400_000.0)
+        line = self._statement(day, 400_000.0, "TRSF E-BANKING CR 0807/FTSCY/WS95031 cash sales store one")
+        wizard = self._wizard(line)
+        self.assertIsNone(wizard.action_levis_suggest())
+        self.assertIsNone(wizard.action_search_more())
+        self.assertTrue(wizard.candidate_ids.filtered("selected"))
+
+    # ------------------------------------------------------------------
     # 4. The statement line knows its store
     # ------------------------------------------------------------------
     def test_statement_line_carries_store_gross_and_fee(self):
