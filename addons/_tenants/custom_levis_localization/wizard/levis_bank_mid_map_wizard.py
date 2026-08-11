@@ -1,0 +1,293 @@
+# -*- coding: utf-8 -*-
+"""Turn a period's unmapped settlements into mapping rules, biggest money first.
+
+Mapping 44 merchant ids by hand from a bank statement is the kind of task that
+gets abandoned halfway, and a half-mapped table means money silently parked on
+suspense. So the wizard does the reading: it parses the period, keeps only what
+no rule matches, groups it, and asks for the one thing it cannot know — which
+store each id belongs to.
+
+The truncated store name from the narrative is offered as a *suggestion* for the
+Operating Unit. It is never applied on its own: ``LEVIS PLAZA SENAYA`` and
+``LEVIS SENAYAN CITY`` are different shops whose names collide under truncation,
+which is the whole reason this table exists.
+"""
+
+from collections import defaultdict
+
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
+
+
+class LevisBankMidMapWizard(models.TransientModel):
+    _name = "levis.bank.mid.map.wizard"
+    _description = "Map Unmapped Bank Settlements"
+
+    company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company)
+    run_id = fields.Many2one("levis.pos.clearing", string="Clearing Run")
+    date_from = fields.Date(required=True)
+    date_to = fields.Date(required=True)
+    journal_ids = fields.Many2many(
+        "account.journal",
+        string="Bank Journals",
+        domain="[('type', '=', 'bank'), ('company_id', '=', company_id)]",
+    )
+    line_ids = fields.One2many("levis.bank.mid.map.wizard.line", "wizard_id")
+    unmapped_line_count = fields.Integer(compute="_compute_unmapped")
+    unmapped_total = fields.Monetary(compute="_compute_unmapped", currency_field="currency_id")
+    currency_id = fields.Many2one(related="company_id.currency_id")
+    scanned = fields.Boolean(default=False)
+
+    @api.depends("line_ids.line_count", "line_ids.total_amount")
+    def _compute_unmapped(self):
+        for wizard in self:
+            wizard.unmapped_line_count = sum(wizard.line_ids.mapped("line_count"))
+            wizard.unmapped_total = sum(wizard.line_ids.mapped("total_amount"))
+
+    # ------------------------------------------------------------------
+    def action_scan(self):
+        self.ensure_one()
+        if self.date_to < self.date_from:
+            raise UserError(_("The end date precedes the start date."))
+        self.line_ids.unlink()
+        Narrative = self.env["levis.bank.narrative"]
+        MidMap = self.env["levis.bank.mid.map"]
+        journals = self.journal_ids or self.env["account.journal"].search(
+            [("type", "=", "bank"), ("company_id", "=", self.company_id.id)]
+        )
+        statement_lines = self.env["account.bank.statement.line"].search(
+            [
+                ("journal_id", "in", journals.ids),
+                ("company_id", "=", self.company_id.id),
+                ("date", ">=", self.date_from),
+                ("date", "<=", self.date_to),
+                ("move_id.state", "=", "posted"),
+            ]
+        )
+        rules_cache = {}
+        buckets = defaultdict(lambda: {"count": 0, "amount": 0.0, "sample": "", "narrative": ""})
+        for statement_line in statement_lines:
+            journal = statement_line.journal_id
+            if journal.id not in rules_cache:
+                rules_cache[journal.id] = MidMap._candidates(self.company_id, journal)
+            parsed = Narrative.parse(journal, statement_line.payment_ref, statement_line.amount, statement_line.date)
+            if parsed["kind"] not in ("settlement", "cash_deposit"):
+                continue
+            if MidMap._resolve(
+                self.company_id, journal, parsed, statement_line.date, candidates=rules_cache[journal.id]
+            ):
+                continue
+            # Channel is deliberately NOT part of the key. One merchant id serves
+            # the debit, credit-card and QRIS feeds of the same shop, and the rule
+            # answers "which store", not "which tender" — the tender is discovered
+            # from the open receivables.
+            if parsed["mid"]:
+                key = (journal.id, "mid", MidMap._normalise_key(parsed["mid"]))
+            elif parsed["tid"]:
+                key = (journal.id, "tid", MidMap._normalise_key(parsed["tid"]))
+            else:
+                key = (journal.id, "keyword", (parsed["keyword"] or "")[:80])
+            bucket = buckets[key]
+            bucket["count"] += 1
+            bucket["amount"] += statement_line.amount
+            bucket.setdefault("channels", set()).add(parsed["channel"])
+            if not bucket["sample"]:
+                bucket["sample"] = statement_line.payment_ref or ""
+                bucket["narrative"] = self._store_hint(statement_line.payment_ref or "")
+
+        buckets = self._merge_equivalent_keys(buckets)
+        # Biggest money first: if the mapping session is cut short, the part that
+        # got done is the part that matters.
+        ordered = sorted(buckets.items(), key=lambda item: -abs(item[1]["amount"]))
+        analytics = self.env["account.analytic.account"].search([])
+        self.line_ids = [
+            (
+                0,
+                0,
+                {
+                    "journal_id": journal_id,
+                    "match_type": match_type,
+                    "key": key,
+                    "channel": self._dominant_channel(bucket.get("channels")),
+                    "line_count": bucket["count"],
+                    "total_amount": bucket["amount"],
+                    "sample_narrative": bucket["sample"],
+                    "analytic_account_id": self._suggest_analytic(bucket["narrative"], analytics).id or False,
+                },
+            )
+            for (journal_id, match_type, key), bucket in ordered
+        ]
+        self.scanned = True
+        return self._reopen()
+
+    @api.model
+    def _merge_equivalent_keys(self, buckets):
+        """Fold merchant ids that denote the same terminal into one proposal.
+
+        BCA prints one merchant two ways — ``885004608375`` on the debit feed and
+        ``004608375`` on the credit-card feed. They are the same shop, and
+        ``_keys_match`` resolves both against the longer form, so proposing two
+        rules would just be two chances to disagree with yourself (and they would
+        collide on the uniqueness constraint if the shorter one were kept too).
+        """
+        MidMap = self.env["levis.bank.mid.map"]
+        merged = {}
+        for key, bucket in sorted(buckets.items(), key=lambda item: -len(item[0][2] or "")):
+            journal_id, match_type, value = key
+            if match_type == "keyword":
+                merged[key] = bucket
+                continue
+            target = None
+            for existing in merged:
+                if existing[0] != journal_id or existing[1] != match_type:
+                    continue
+                if MidMap._keys_match(existing[2], value):
+                    target = existing
+                    break
+            if target is None:
+                merged[key] = dict(bucket)
+                continue
+            into = merged[target]
+            into["count"] += bucket["count"]
+            into["amount"] += bucket["amount"]
+            into.setdefault("channels", set()).update(bucket.get("channels") or ())
+            if not into.get("sample"):
+                into["sample"] = bucket.get("sample")
+                into["narrative"] = bucket.get("narrative")
+        return merged
+
+    @api.model
+    def _dominant_channel(self, channels):
+        """One label for a rule that may cover several tenders."""
+        channels = set(channels or ())
+        if not channels:
+            return False
+        for preferred in ("cash", "credit", "debit", "qris", "transfer"):
+            if preferred in channels:
+                return preferred if len(channels) == 1 else "other"
+        return "other"
+
+    @api.model
+    def _store_hint(self, payment_ref):
+        """The part of a narrative that looks like a store name."""
+        text = " ".join((payment_ref or "").split())
+        for marker in ("TGH", "QR ", "QR:", "AMT", "ADM", "DDR", "MDR"):
+            index = text.upper().find(marker)
+            if index > 0:
+                text = text[:index]
+        return " ".join(word for word in text.split() if not word.isdigit())
+
+    @api.model
+    def _suggest_analytic(self, hint, analytics):
+        """Longest word-overlap with an Operating Unit name — a suggestion only."""
+        words = {word for word in (hint or "").upper().split() if len(word) > 2 and word != "LEVIS"}
+        if not words:
+            return self.env["account.analytic.account"]
+        best, best_score = self.env["account.analytic.account"], 0
+        for analytic in analytics:
+            name = (analytic.display_name or "").upper()
+            score = sum(len(word) for word in words if word in name)
+            if score > best_score:
+                best, best_score = analytic, score
+        return best
+
+    def action_apply(self):
+        self.ensure_one()
+        todo = self.line_ids.filtered(lambda line: line.analytic_account_id and not line.skip)
+        if not todo:
+            raise UserError(_("Nothing to apply — no Operating Unit was picked."))
+        self.env["levis.bank.mid.map"].create(
+            [
+                {
+                    "name": line.suggested_name(),
+                    "company_id": self.company_id.id,
+                    "journal_id": line.journal_id.id,
+                    "match_type": line.match_type,
+                    "key": line.key,
+                    "channel": line.channel,
+                    "analytic_account_id": line.analytic_account_id.id,
+                    "note": _(
+                        "Created from statement scan %(start)s..%(end)s. Sample: %(sample)s",
+                        start=self.date_from,
+                        end=self.date_to,
+                        sample=line.sample_narrative,
+                    ),
+                }
+                for line in todo
+            ]
+        )
+        if self.run_id and self.run_id.state in ("draft", "computed"):
+            self.run_id.action_compute()
+            return {
+                "type": "ir.actions.act_window",
+                "res_model": "levis.pos.clearing",
+                "res_id": self.run_id.id,
+                "view_mode": "form",
+            }
+        return {"type": "ir.actions.act_window_close"}
+
+    def _reopen(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": self._name,
+            "res_id": self.id,
+            "view_mode": "form",
+            "target": "new",
+        }
+
+
+class LevisBankMidMapWizardLine(models.TransientModel):
+    _name = "levis.bank.mid.map.wizard.line"
+    _description = "Unmapped Bank Settlement Group"
+    _order = "total_amount desc"
+
+    wizard_id = fields.Many2one("levis.bank.mid.map.wizard", required=True, ondelete="cascade")
+    currency_id = fields.Many2one(related="wizard_id.currency_id")
+    journal_id = fields.Many2one("account.journal", string="Bank", readonly=True)
+    match_type = fields.Selection(
+        [("mid", "Bank MID"), ("tid", "Terminal / TID"), ("keyword", "Narrative Keyword")],
+        readonly=True,
+    )
+    key = fields.Char(
+        help="Editable for keyword rules: shorten it to the part that actually names "
+        'the store (e.g. just "pvj") so next month\'s deposits match the same rule '
+        "instead of needing a new one. MID and terminal keys should be left alone.",
+    )
+    channel = fields.Selection(
+        [
+            ("debit", "Debit Card"),
+            ("credit", "Credit Card"),
+            ("qris", "QRIS"),
+            ("cash", "Cash Deposit"),
+            ("transfer", "Transfer"),
+            ("other", "Other"),
+        ],
+        readonly=True,
+    )
+    line_count = fields.Integer(string="Statement Lines", readonly=True)
+    total_amount = fields.Monetary(currency_field="currency_id", readonly=True)
+    sample_narrative = fields.Char(readonly=True)
+    analytic_account_id = fields.Many2one(
+        "account.analytic.account",
+        string="Operating Unit",
+        help="Pre-filled from the store name in the narrative when one could be "
+        "guessed. Check it — truncated names collide between stores.",
+    )
+    warehouse_id = fields.Many2one("stock.warehouse")
+    skip = fields.Boolean(help="Leave unmapped for now; the money stays on suspense.")
+
+    @api.onchange("warehouse_id")
+    def _onchange_warehouse_id(self):
+        for line in self:
+            if line.warehouse_id.l10n_ou_analytic_id:
+                line.analytic_account_id = line.warehouse_id.l10n_ou_analytic_id
+
+    def suggested_name(self):
+        self.ensure_one()
+        labels = dict(self._fields["channel"]._description_selection(self.env))
+        return "%s %s — %s" % (
+            self.journal_id.code or "",
+            labels.get(self.channel, self.channel or ""),
+            self.analytic_account_id.display_name or "",
+        )

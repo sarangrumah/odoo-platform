@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-10T06:57:17+00:00",
+  "generated_at": "2026-08-11T01:35:06+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "e4f0f21",
-    "branch": "fix/levis-voucher-source-doc"
+    "commit": "c31df84",
+    "branch": "feat/levis-pos-clearing-main"
   },
   "buckets": [
     {
@@ -311,23 +311,23 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.25.1",
+      "version": "19.0.1.26.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
-      "last_change": "2026-08-10",
+      "last_change": "2026-08-11",
       "change_count": 42,
       "changes": [
         {
-          "sha": "5f7d89f",
-          "date": "2026-08-10",
-          "subject": "chore(levis): record the voucher source-doc trap and refresh the generated files"
+          "sha": "c31df84",
+          "date": "2026-08-11",
+          "subject": "feat(levis): clear the month's POS receivables from the bank statement itself"
         },
         {
-          "sha": "f34a2b7",
+          "sha": "611f04b",
           "date": "2026-08-10",
-          "subject": "fix(levis): print the bill number on the payment voucher, not the payment's own"
+          "subject": "fix(levis): payment voucher mencetak nomor bill, bukan nomor payment sendiri (#118)"
         },
         {
           "sha": "5d735a4",
@@ -3544,9 +3544,15 @@
       "category": "Accounting/Accounting",
       "depends": 1,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-08-10",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "0443e8c",
+          "date": "2026-08-10",
+          "subject": "fix(arkaaim): unblock AIM payments and close the finance config gaps behind it (#117)"
+        }
+      ]
     },
     {
       "module": "custom_payment_voucher",
@@ -3557,9 +3563,15 @@
       "category": "Accounting/Accounting",
       "depends": 1,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-08-10",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "0443e8c",
+          "date": "2026-08-10",
+          "subject": "fix(arkaaim): unblock AIM payments and close the finance config gaps behind it (#117)"
+        }
+      ]
     },
     {
       "module": "custom_petty_cash",

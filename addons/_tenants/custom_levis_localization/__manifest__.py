@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.25.1",
+    "version": "19.0.1.26.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -123,6 +123,37 @@ Bundles four tenant-specific requirements for the Levi's databases
     unique key: BIC cannot be, since every BI branch office shares ``INDOIDJA``.
     Feeds the *Acquiring Bank* on the Card BIN / MDR mapping above.
 
+15. **Monthly POS Clearing.** ``levis.pos.clearing`` (Accounting > Accounting >
+    POS Clearing) settles the per-tender POS receivables (``1106000101``..``110``)
+    against the bank settlements already imported, replacing three host scripts
+    that were hardcoded to one month and driven by a client workbook.
+
+    It needs no upload: the acquirer already prints the gross and its fee on every
+    settlement narrative (``TGH``/``DDR``, ``TGH``/``ADM``, ``QR``/``DDR``,
+    ``AMT``/``MDR``), so the fee is exact per settlement instead of a monthly
+    figure spread pro-rata. Which tender account a settlement pays cannot be read
+    anywhere — one card MID covers Visa, Mastercard, JCB and Amex alike — so it is
+    discovered by consuming that store's open receivable debits for the trading
+    day, largest residual first, and whatever is left over is reported as a
+    shortfall rather than forced somewhere.
+
+    Three stages, deliberately separate: **Compute** builds the summary and
+    creates nothing at all; **Generate Draft Entries** writes DRAFT entries
+    carrying the store's Operating-Unit analytic on every leg; **Post &
+    Reconcile** posts them and reconciles each credit leg with exactly the
+    receivable lines its allocation names (not a blanket per-account sweep, so
+    per-store residuals stay readable afterwards). There is no cron and no
+    auto-post.
+
+    Supporting records: ``levis.clearing.config`` (Configuration > POS Clearing
+    Accounts, seeded by account code) and ``levis.bank.mid.map`` (Configuration >
+    Bank MID Mapping), because bank narratives truncate store names inconsistently
+    and only the merchant/terminal number is a safe key. A wizard scans a period
+    and lists what is still unmapped, biggest amount first. Unparsed narratives,
+    unmapped terminals, amount mismatches, statement days missing from the import
+    and posted receivables lacking an Operating Unit are all surfaced as
+    diagnostics with click-through, and block generation until acknowledged.
+
 TENANT-SCOPED: install only on the Levi's tenant databases.
 """,
     "author": "Custom Platform",
@@ -151,12 +182,17 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "data/inventory_reconciliation_data.xml",
         "data/cogs_run_data.xml",
         "data/categ_reclass_sequence.xml",
+        "data/pos_clearing_data.xml",
         "views/res_bank_views.xml",
         "views/product_template_views.xml",
         "views/product_product_views.xml",
         "views/inventory_reconciliation_views.xml",
         "views/cogs_run_views.xml",
         "views/categ_reclass_views.xml",
+        "views/levis_clearing_config_views.xml",
+        "wizard/levis_bank_mid_map_wizard_views.xml",
+        "views/levis_pos_clearing_views.xml",
+        "views/account_bank_statement_line_views.xml",
         "views/scrap_batch_views.xml",
         "views/levis_mdr_bin_views.xml",
         "views/account_account_views.xml",
