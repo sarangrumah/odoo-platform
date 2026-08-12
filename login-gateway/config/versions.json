@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-12T03:02:15+00:00",
+  "generated_at": "2026-08-12T10:17:39+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "b4cfbb7",
-    "branch": "fix/levis-ou-cash-journal"
+    "commit": "6dc7bb8",
+    "branch": "fix/lock-date-redirect-views"
   },
   "buckets": [
     {
@@ -394,9 +394,14 @@
       "category": "Custom Platform/Localization",
       "depends": 2,
       "public": false,
-      "last_change": "2026-08-11",
-      "change_count": 1,
+      "last_change": "2026-08-12",
+      "change_count": 2,
       "changes": [
+        {
+          "sha": "e0b4ddf",
+          "date": "2026-08-12",
+          "subject": "fix(levis): link the store cash journal, not just the purchase one (#160)"
+        },
         {
           "sha": "c854c71",
           "date": "2026-08-11",
@@ -1579,14 +1584,19 @@
       "module": "custom_accounting_full",
       "bucket": "ee_gap",
       "name": "Custom Accounting Full",
-      "version": "19.0.0.5.0",
+      "version": "19.0.0.6.0",
       "summary": "Indonesian COA + intercompany automation + consolidation reports (CE multi-company gap)",
       "category": "Accounting/Accounting",
       "depends": 9,
       "public": true,
-      "last_change": "2026-08-05",
-      "change_count": 16,
+      "last_change": "2026-08-12",
+      "change_count": 17,
       "changes": [
+        {
+          "sha": "6dc7bb8",
+          "date": "2026-08-12",
+          "subject": "fix(accounting): give the lock-date warning a button that actually opens"
+        },
         {
           "sha": "d63a903",
           "date": "2026-08-05",
@@ -1621,11 +1631,6 @@
           "sha": "10a06c9",
           "date": "2026-05-24",
           "subject": "refactor(addons): extract PSAK template to l10n_id_psak_custom for discoverability (#27)"
-        },
-        {
-          "sha": "2f567f2",
-          "date": "2026-05-23",
-          "subject": "fix(addons): wire up dead model files + complete PSAK COA template (#25)"
         }
       ]
     },
