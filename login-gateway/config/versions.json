@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-12T10:19:36+00:00",
+  "generated_at": "2026-08-12T10:27:29+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "7250032",
+    "commit": "2ea2e8c",
     "branch": "feat/clearing-onto-statement-lines"
   },
   "buckets": [
@@ -341,8 +341,13 @@
       "depends": 9,
       "public": false,
       "last_change": "2026-08-12",
-      "change_count": 46,
+      "change_count": 47,
       "changes": [
+        {
+          "sha": "2ea2e8c",
+          "date": "2026-08-12",
+          "subject": "style(levis): let black join the currency-refusal message"
+        },
         {
           "sha": "7250032",
           "date": "2026-08-12",
@@ -377,11 +382,6 @@
           "sha": "5d735a4",
           "date": "2026-08-06",
           "subject": "style: ruff format the swap-revert script and localization tests"
-        },
-        {
-          "sha": "966a522",
-          "date": "2026-08-06",
-          "subject": "chore(levis): record the PO swap guard in MODULE_KNOWLEDGE + refresh versions.json"
         }
       ]
     },
@@ -1584,7 +1584,7 @@
       "module": "custom_accounting_full",
       "bucket": "ee_gap",
       "name": "Custom Accounting Full",
-      "version": "19.0.0.5.0",
+      "version": "19.0.0.6.0",
       "summary": "Indonesian COA + intercompany automation + consolidation reports (CE multi-company gap)",
       "category": "Accounting/Accounting",
       "depends": 9,

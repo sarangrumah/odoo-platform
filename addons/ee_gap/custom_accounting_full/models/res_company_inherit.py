@@ -16,6 +16,27 @@ class ResCompany(models.Model):
         "company. Useful as a kill-switch during migration.",
     )
 
+    def _get_unreconciled_statement_lines_redirect_action(self, unreconciled_statement_lines):
+        """Add the missing ``views`` key to core's lock-date redirect action.
+
+        Core builds this action as a plain dict and hands it straight to
+        ``RedirectWarning``. The web client receives it as an object, so
+        ``_loadAction`` returns it untouched and never derives ``views`` from
+        ``view_mode`` the way ``/web/action/load`` would for a stored
+        ``ir.actions.act_window``. ``_preprocessAction`` then does
+        ``action.views.map(...)`` on ``undefined`` and the whole click dies with
+        an uncaught ``TypeError`` — the user sees the warning but can never open
+        the offending statement lines.
+
+        Core's own hard-lock-date redirect a few lines up in the same method
+        spells ``views`` out explicitly; this one just forgot.
+        """
+        action = super()._get_unreconciled_statement_lines_redirect_action(unreconciled_statement_lines)
+        if action.get("type") == "ir.actions.act_window" and not action.get("views"):
+            view_mode = action.get("view_mode") or "list,form"
+            action["views"] = [(False, mode) for mode in view_mode.split(",")]
+        return action
+
     @api.model
     def _sister_companies(self):
         """Return companies in the same intercompany perimeter as ``self.env.company``."""
