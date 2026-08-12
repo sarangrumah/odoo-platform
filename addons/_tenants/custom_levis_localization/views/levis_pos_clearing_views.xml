@@ -10,12 +10,13 @@
                             class="btn-primary" invisible="state not in ('draft', 'computed')"
                             help="Reads the statements and builds the summary below. Creates no journal entry and changes nothing."/>
                     <button name="action_generate_moves" type="object"
-                            string="Generate Draft Entries" class="btn-primary"
-                            invisible="state != 'computed'"/>
+                            string="Prepare Entries" class="btn-primary"
+                            invisible="state != 'computed'"
+                            help="Writes down every journal item this clearing intends to book, on the Planned Entries tab. Still changes no accounting."/>
                     <button name="action_post" type="object"
                             string="Post &amp; Reconcile" class="btn-primary"
                             invisible="state != 'generated'"
-                            confirm="This posts the draft entries and reconciles the receivables they settle. In Odoo 19 a posted, reconciled entry cannot be undone by resetting it to draft. Continue?"/>
+                            confirm="This writes the planned items onto the bank statement lines and reconciles the receivables they settle. Undoing it afterwards means Undo Reconciliation on each statement line. Continue?"/>
                     <button name="action_open_mapping_wizard" type="object"
                             string="Map Unmapped Settlements"
                             invisible="unmapped_count == 0"/>
@@ -39,12 +40,14 @@
                             <field name="config_id"/>
                         </group>
                         <group>
-                            <field name="journal_id" readonly="state != 'draft'"/>
+                            <field name="journal_id" readonly="state != 'draft'"
+                                   groups="base.group_no_one"/>
                             <field name="bank_journal_ids" widget="many2many_tags"
                                    readonly="state != 'draft'"/>
                             <field name="ar_fallback" readonly="state not in ('draft', 'computed')"/>
                             <field name="currency_id" invisible="1"/>
                             <field name="move_count" invisible="1"/>
+                            <field name="leg_count" invisible="1"/>
                         </group>
                     </group>
 
@@ -222,6 +225,30 @@
                                     <field name="statement_amount" sum="Amount"/>
                                     <field name="payment_ref"/>
                                     <field name="note"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Planned Entries" name="legs"
+                              invisible="leg_count == 0">
+                            <div class="alert alert-info" role="alert">
+                                These are the journal items that will be written onto the
+                                bank statement lines themselves, replacing their suspense
+                                leg. A settlement that is fully explained leaves no
+                                suspense leg at all and Odoo marks the line reconciled;
+                                anything still on suspense here is the part nobody could
+                                account for, and that line stays open by that amount.
+                            </div>
+                            <field name="leg_ids" readonly="1">
+                                <list create="false" delete="false" default_group_by="role">
+                                    <field name="settlement_date"/>
+                                    <field name="bank_journal_id"/>
+                                    <field name="role" widget="badge"
+                                           decoration-warning="role == 'short'"/>
+                                    <field name="account_id"/>
+                                    <field name="name"/>
+                                    <field name="balance" sum="Balance"/>
+                                    <field name="move_line_id" optional="hide"/>
                                     <field name="currency_id" column_invisible="1"/>
                                 </list>
                             </field>

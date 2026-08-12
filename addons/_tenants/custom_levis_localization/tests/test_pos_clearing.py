@@ -259,8 +259,12 @@ class TestPosClearing(AccountTestInvoicingCommon):
 
         run.ignore_warnings = True
         run.action_generate_moves()
-        booked = run.move_ids.line_ids.filtered(lambda aml: aml.account_id == self.suspense)
-        self.assertEqual(sum(booked.mapped("debit")), 990_000.0, "the unparsed amount must not be booked")
+        planned = run.leg_ids.filtered(lambda leg: leg.account_id == self.tender_a)
+        self.assertEqual(sum(planned.mapped("balance")), -1_000_000.0, "the unparsed amount must not be booked")
+        self.assertFalse(
+            run.leg_ids.statement_line_id.filtered(lambda st: st.payment_ref == "SOMETHING NOBODY TAUGHT US"),
+            "the unparsed line gets no legs at all",
+        )
 
     def test_amount_mismatch_is_a_finding(self):
         self._posrec(self.tender_a, self.store_one, date(2026, 7, 8), 1_000_000.0)
@@ -277,40 +281,47 @@ class TestPosClearing(AccountTestInvoicingCommon):
     # ------------------------------------------------------------------
     # Stage 2
     # ------------------------------------------------------------------
-    def test_generate_creates_balanced_drafts_with_the_store_analytic(self):
+    def test_generate_plans_balanced_legs_with_the_store_analytic(self):
         day = date(2026, 7, 8)
         self._posrec(self.tender_a, self.store_one, day, 1_000_000.0)
-        self._statement(
+        settlement = self._statement(
             date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, trans_day=day)
         )
-        self._statement(date(2026, 7, 15), -30_000.0, "BIAYA ADM")
+        charge = self._statement(date(2026, 7, 15), -30_000.0, "BIAYA ADM")
+        before = self.env["account.move"].search_count([("company_id", "=", self.company.id)])
 
         run = self._run()
         run.action_compute()
         run.action_generate_moves()
 
         self.assertEqual(run.state, "generated")
-        self.assertEqual(set(run.move_ids.mapped("state")), {"draft"})
-        self.assertEqual(len(run.move_ids), 2, "one entry per block and date")
-        for move in run.move_ids:
-            self.assertAlmostEqual(sum(move.line_ids.mapped("debit")), sum(move.line_ids.mapped("credit")), places=2)
-            self.assertTrue(move.ref.startswith(run.period_ref))
+        self.assertFalse(run.move_ids, "preparing must not create an entry of its own")
+        self.assertEqual(
+            self.env["account.move"].search_count([("company_id", "=", self.company.id)]),
+            before,
+            "preparing must not create a journal entry at all",
+        )
+        for st_line in (settlement, charge):
+            _liq, suspense, other = st_line._seek_for_lines()
+            self.assertTrue(suspense, "the statement line is untouched until posting")
+            self.assertFalse(other)
 
-        settlement_move = run.move_ids.filtered(lambda m: "-A-" in m.ref)
+        # Block A: the legs replace a 990 000 credit on suspense, so they total
+        # -990 000 — the gross receivable plus the fee the acquirer kept.
+        settlement_legs = run.leg_ids.filtered(lambda leg: leg.statement_line_id == settlement)
+        self.assertAlmostEqual(sum(settlement_legs.mapped("balance")), -990_000.0, places=2)
         expected = {str(self.store_one.id): 100.0}
-        for aml in settlement_move.line_ids:
-            self.assertEqual(aml.analytic_distribution, expected, "every leg carries the OU")
-        legs = {aml.account_id: aml.balance for aml in settlement_move.line_ids}
-        self.assertEqual(legs[self.suspense], 990_000.0)
-        self.assertEqual(legs[self.mdr], 10_000.0)
-        self.assertEqual(legs[self.tender_a], -1_000_000.0)
+        for leg in settlement_legs:
+            self.assertEqual(leg.analytic_distribution, expected, "every leg carries the OU")
+        by_account = {leg.account_id: leg.balance for leg in settlement_legs}
+        self.assertEqual(by_account[self.mdr], 10_000.0)
+        self.assertEqual(by_account[self.tender_a], -1_000_000.0)
+        self.assertNotIn(self.suspense, by_account, "nothing is left unexplained, so no suspense leg")
 
-        charge_move = run.move_ids.filtered(lambda m: "-C-" in m.ref)
-        charge_legs = {aml.account_id: aml.balance for aml in charge_move.line_ids}
-        # The statement debited suspense by 30 000, so clearing credits it back.
-        self.assertEqual(charge_legs[self.suspense], -30_000.0)
-        self.assertEqual(charge_legs[self.charge], 30_000.0)
-        self.assertFalse(charge_move.line_ids.mapped("analytic_distribution")[0])
+        charge_legs = run.leg_ids.filtered(lambda leg: leg.statement_line_id == charge)
+        self.assertEqual(charge_legs.account_id, self.charge)
+        self.assertEqual(charge_legs.balance, 30_000.0)
+        self.assertFalse(charge_legs.analytic_distribution)
 
     def test_statement_lines_are_claimed_only_at_generation(self):
         day = date(2026, 7, 8)
@@ -396,15 +407,95 @@ class TestPosClearing(AccountTestInvoicingCommon):
 
         self.assertEqual(run.state, "posted")
         self.assertEqual(set(run.move_ids.mapped("state")), {"posted"})
-        # The counters drive the header buttons, so they must follow the state.
-        self.assertEqual(run.posted_move_count, run.move_count)
-        self.assertEqual(run.draft_move_count, 0)
         # Every allocation must know the leg that pays it, or stage 3 could only
         # fall back to a blanket per-account reconcile.
         self.assertTrue(all(run.line_ids.alloc_ids.mapped("move_line_id")))
         self.assertTrue(one.reconciled, "store one was settled in full")
         self.assertFalse(two.reconciled)
         self.assertEqual(two.amount_residual, 500_000.0, "store two keeps its own residual")
+
+    def test_posting_leaves_the_statement_line_reconciled(self):
+        """The whole point of writing onto the statement line.
+
+        July 2026 booked the counterpart in its own entry, which left every
+        statement line sitting on suspense with ``is_reconciled = False`` — and
+        Odoo then refuses a lock date over the period. A fully explained
+        settlement must come out the other side with no suspense leg at all.
+        """
+        day = date(2026, 7, 8)
+        self._posrec(self.tender_a, self.store_one, day, 1_000_000.0)
+        settlement = self._statement(
+            date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, trans_day=day)
+        )
+        charge = self._statement(date(2026, 7, 15), -30_000.0, "BIAYA ADM")
+
+        run = self._run()
+        run.action_compute()
+        run.action_generate_moves()
+        run.action_post()
+
+        for st_line in (settlement, charge):
+            _liq, suspense, _other = st_line._seek_for_lines()
+            self.assertFalse(suspense, "the suspense leg must be gone, not matched")
+            self.assertTrue(st_line.is_reconciled, "%s stayed open" % st_line.payment_ref)
+            self.assertEqual(st_line.move_id.state, "posted", "the bank entry stays posted throughout")
+            self.assertAlmostEqual(
+                sum(st_line.move_id.line_ids.mapped("debit")),
+                sum(st_line.move_id.line_ids.mapped("credit")),
+                places=2,
+            )
+        # The bank leg itself is untouched: clearing explains the money, it does
+        # not restate what the bank did.
+        liquidity, _s, _o = settlement._seek_for_lines()
+        self.assertEqual(liquidity.balance, 990_000.0)
+        self.assertEqual(
+            {aml.account_id for aml in settlement.move_id.line_ids},
+            {self.bank.default_account_id, self.mdr, self.tender_a},
+        )
+
+    def test_a_short_settlement_keeps_the_gap_on_suspense_and_stays_open(self):
+        """Being short is not a reason to pretend the line is done."""
+        day = date(2026, 7, 8)
+        self._posrec(self.tender_a, self.store_one, day, 400_000.0)
+        settlement = self._statement(
+            date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, trans_day=day)
+        )
+
+        run = self._run(ar_fallback=False)
+        run.action_compute()
+        run.action_generate_moves()
+        # 600 000 of gross receivable went unmatched...
+        self.assertEqual(run.line_ids.short_amount, 600_000.0)
+        run.action_post()
+
+        _liq, suspense, _other = settlement._seek_for_lines()
+        self.assertTrue(suspense, "the unexplained part must stay visible on suspense")
+        # ...but the bank only ever paid net, and the fee is prorated to what was
+        # matched (4 000 of 10 000). So the money left unexplained is 594 000, not
+        # the 600 000 gross: the missing 6 000 is a fee on a settlement that,
+        # as far as the open receivables go, did not happen.
+        self.assertAlmostEqual(sum(suspense.mapped("balance")), -594_000.0, places=2)
+        self.assertEqual(run.line_ids.mdr_booked, 4_000.0)
+        self.assertFalse(settlement.is_reconciled, "a short line is not a cleared line")
+
+    def test_post_refuses_a_statement_line_someone_else_reconciled(self):
+        day = date(2026, 7, 8)
+        self._posrec(self.tender_a, self.store_one, day, 1_000_000.0)
+        settlement = self._statement(
+            date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, trans_day=day)
+        )
+
+        run = self._run()
+        run.action_compute()
+        run.action_generate_moves()
+
+        # Somebody reconciles it by hand in the meantime.
+        _liq, suspense, _other = settlement._seek_for_lines()
+        settlement.with_context(force_delete=True, skip_readonly_check=True).write(
+            {"line_ids": [(1, suspense.id, {"account_id": self.charge.id})]}
+        )
+        with self.assertRaises(UserError):
+            run.action_post()
 
     def test_post_refuses_if_a_promised_receivable_moved(self):
         day = date(2026, 7, 8)
@@ -433,7 +524,8 @@ class TestPosClearing(AccountTestInvoicingCommon):
 
         with self.assertRaises(UserError):
             run.action_post()
-        self.assertEqual(set(run.move_ids.mapped("state")), {"draft"})
+        self.assertFalse(run.move_ids, "a refused post books nothing")
+        self.assertTrue(run.leg_ids, "the reviewed plan survives so it can be recomputed")
 
     def test_balances_before_after_simulated_and_actual_agree(self):
         day = date(2026, 7, 8)
@@ -457,7 +549,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
     # ------------------------------------------------------------------
     # Cancel, diagnostics, prior-month AR
     # ------------------------------------------------------------------
-    def test_cancel_releases_drafts_and_markers_but_not_posted(self):
+    def test_cancel_releases_the_plan_and_markers_but_not_a_posted_run(self):
         day = date(2026, 7, 8)
         self._posrec(self.tender_a, self.store_one, day, 1_000_000.0)
         statement = self._statement(
@@ -469,7 +561,10 @@ class TestPosClearing(AccountTestInvoicingCommon):
         run.action_cancel()
         self.assertEqual(run.state, "cancel")
         self.assertFalse(run.move_ids)
+        self.assertFalse(run.leg_ids)
         self.assertFalse(statement.levis_clearing_run_id)
+        _liq, suspense, _other = statement._seek_for_lines()
+        self.assertTrue(suspense, "cancelling before posting leaves the bank entry alone")
 
         again = self._run(ar_fallback=False)
         again.action_compute()

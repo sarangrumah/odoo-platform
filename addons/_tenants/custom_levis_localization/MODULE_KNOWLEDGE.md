@@ -200,12 +200,49 @@ which of the ten receivable accounts a settlement pays. `_allocate` consumes tha
 store's open debits for the trading day, largest residual first, and reports the
 remainder as a shortfall rather than forcing it somewhere.
 
+**The clearing is written onto the bank statement line itself** (since
+19.0.1.30.0). Odoo books a statement line as `Dr Bank / Cr Suspense` and expects
+reconciliation to *replace* the suspense leg — that is why the suspense account
+ships with `reconcile = False` and can never be matched. Booking the counterpart
+in a separate entry leaves the suspense leg standing forever: the ledger comes
+out right, but every statement line stays `is_reconciled = False` and Odoo then
+refuses a lock date over the period. July 2026 is the proof — 2 526 lines, GL
+flat (suspense nets to zero against 757 `EBR-CLR-JULI-2026-*` legs), lock date
+blocked. So `_counterpart_plan` produces the legs that *replace* the suspense
+leg:
+
+    Dr Bank                 (untouched, what the bank paid)
+    Dr MDR Expense          (prorated to what was actually matched)
+        Cr POS Receivable   (per tender, gross)
+
+and a suspense leg survives only when the settlement is short, carrying exactly
+the amount nobody could explain. Fully explained lines end up with no suspense
+leg and Odoo's own `_compute_is_reconciled` marks them reconciled — no
+reconciliation call, no flag flipped on the chart of accounts.
+
+Watch the arithmetic on a short line: the residual is the *balancing* figure, not
+`short_amount`. A settlement of gross 1 000 000 / fee 10 000 / bank 990 000 that
+only finds 400 000 of open receivable is short 600 000 **gross**, but books
+400 000 receivable and 4 000 prorated fee, so 594 000 stays on suspense. The
+6 000 difference is fee on a settlement that, as far as the open receivables go,
+never happened.
+
 **Three stages, hard-separated.** `action_compute` builds the summary and creates
 *nothing* (verified on the clone: `account.move` count 38 822 before and after);
-`action_generate_moves` writes DRAFT entries; `action_post` posts and reconciles.
-No cron, no auto-post, and `action_compute` never generates.
+`action_generate_moves` writes the intended journal items to
+`levis.pos.clearing.leg` and still touches no accounting; `action_post` applies
+exactly those legs to the statement lines and reconciles. Stage 2 persists the
+plan rather than letting stage 3 recompute it, so the accountant approves a
+specific set of numbers and posting books that set — and if the underlying
+receivables moved in between, `_preflight` refuses instead of quietly booking
+something else. No cron, no auto-post, and `action_compute` never generates.
 
-**Key models.** `levis.pos.clearing` (+ `.line` per statement line, `.alloc` per
+**Undo is per statement line.** Once posted, the legs live on the bank entries,
+so `action_cancel` refuses; reversing means Odoo's own "Undo Reconciliation" on
+the lines concerned.
+
+**Key models.** `levis.pos.clearing` (+ `.line` per statement line, `.leg` per
+planned journal item, `.alloc` per
 consumed receivable, `.diag` for findings), `levis.clearing.config` (accounts, one
 row per company, seeded by code from `models/setup.py:seed_clearing_config`),
 `levis.bank.mid.map` (MID/TID/keyword → Operating Unit), `levis.bank.narrative`
@@ -327,22 +364,38 @@ gotcha below.
   Channel is deliberately *not* part of that key: the same MID carries debit and
   QRIS, and the rule answers "which store", not "which tender".
 - **The bank suspense account `1103000002` is `reconcile = False`,** and all six
-  bank journals use it as their `suspense_account_id`. So the clearing entry's
-  `Dr suspense` is the mirror of the statement line's credit and the two net out on
-  the *balance* — they are never matched, and statement lines stay
-  `is_reconciled = False` forever. Two consequences: the bank-rec widget will never
-  match them, and **Odoo core refuses to set `fiscalyear_lock_date` over any period
-  containing them** ("There are still unreconciled bank statement lines in the
-  period you want to lock"). That is why consumption is tracked by an explicit
-  marker (`levis_clearing_line_id`) rather than by reconciliation.
+  bank journals use it as their `suspense_account_id`. That is not a Levi's
+  misconfiguration — it is what `chart_template.py` ships, on every tenant here,
+  because Odoo never matches a suspense leg, it *replaces* it. Booking the
+  counterpart in its own entry therefore nets the balance to zero while leaving
+  every statement line `is_reconciled = False` forever, and **Odoo core then
+  refuses to set `fiscalyear_lock_date` over the period** ("There are still
+  unreconciled bank statement lines in the period you want to lock"). That is the
+  July 2026 situation and the reason the design changed in 19.0.1.30.0. Do not
+  "fix" it by flipping the flag: that makes the six bank journals behave unlike
+  every other Odoo database and still needs a bulk match to mean anything.
+  Consumption is *additionally* tracked by an explicit marker
+  (`levis_clearing_line_id`), which is what a second run reads.
 - **The marker is written at generation, never at compute.** Previewing a period
   must leave the database untouched, so a second run only becomes blind to July's
   settlements once the first run has actually produced drafts.
 - **Allocations are paired to journal legs by position, not by lookup.** Two stores
   can produce a credit on the same account with the same analytic inside one entry;
   looking the leg up afterwards would hand both allocations the same line and then
-  over-reconcile it. `_attach_alloc_move_lines` zips the created lines (ascending
-  id) against the plan and refuses to pair at all if the counts differ.
+  over-reconcile it. `_apply_to_statement_lines` zips the newly created items
+  (ascending id) against the planned legs and refuses to pair at all if the counts
+  differ.
+- **Writing to a posted statement-line entry is normal, not a hack.** Odoo posts
+  the entry the moment the line is imported, and core's own
+  `action_undo_reconciliation` rewrites `line_ids` on it with
+  `force_delete=True, skip_readonly_check=True`. `_apply_to_statement_lines` uses
+  the same context but only *deletes the suspense leg* instead of clearing
+  everything, so nothing recomputes the bank amount or its currency behind our
+  back. It refuses outright when the line no longer sits on suspense — somebody
+  reconciled it by hand after the plan was approved.
+- **Legs are booked in company currency only.** `_preflight` refuses a statement
+  line with a `foreign_currency_id`, rather than inventing a per-leg rate. All six
+  Levi's bank journals are IDR.
 - **`short_amount` excludes unmapped lines.** "This store had nothing open" and "we
   do not know the store" are different problems with different fixes; conflating
   them inflated the shortfall figure by ~4.3 bn on the first real run.

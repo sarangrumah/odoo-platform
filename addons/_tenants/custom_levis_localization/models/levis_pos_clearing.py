@@ -23,13 +23,37 @@ client's EBR workbook. Two things make it a feature instead:
   the source of truth, which is also why anything left over is reported as a
   shortfall rather than forced somewhere.
 
+The clearing is written **onto the bank statement line itself**, not into a
+separate entry. Odoo posts a statement line as ``Dr Bank / Cr Suspense`` and
+expects reconciliation to *replace* that suspense leg with what the money
+actually was — which is why the suspense account ships with ``reconcile =
+False`` and can never be matched. Booking the counterpart in its own journal
+entry leaves the suspense leg standing forever: the general ledger comes out
+right, but every statement line stays ``is_reconciled = False`` and Odoo then
+refuses to set a lock date over the period. That is what happened to July 2026
+(2.526 lines). So the legs below go on the statement line's own move:
+
+    Dr Bank                 (unchanged, what the bank paid)
+    Dr MDR Expense          (what the acquirer kept)
+        Cr POS Receivable   (per tender, gross)
+
+and the suspense leg only survives when the settlement is short, by exactly the
+amount nobody could explain.
+
 Three stages, deliberately hard-separated because money moves:
 
 1. ``action_compute`` — builds a summary and **creates nothing**. No journal
    entry, no write to a statement line or a receivable.
-2. ``action_generate_moves`` — creates DRAFT entries for the accountant to read.
-3. ``action_post`` — posts them and reconciles each credit leg with exactly the
-   receivable lines its allocation names.
+2. ``action_generate_moves`` — writes the intended legs to
+   ``levis.pos.clearing.leg`` for the accountant to read. Still **no**
+   accounting: not a draft entry, not a write to a statement line's ledger.
+3. ``action_post`` — applies exactly those legs to the statement lines and
+   reconciles each credit leg with exactly the receivable lines its allocation
+   names.
+
+Stage 2 persists the legs rather than recomputing them at stage 3 on purpose:
+the accountant approves a specific set of numbers, and posting must book that
+set, not whatever a fresh computation would produce days later.
 
 That last point matters. The scripts reconciled per account across all stores,
 which let one store's excess absorb another's shortfall and made per-store
@@ -103,12 +127,19 @@ class LevisPosClearing(models.Model):
     )
     date_from = fields.Date(required=True, default=lambda self: self._default_date_from())
     date_to = fields.Date(required=True, default=lambda self: self._default_date_to())
+    # Nothing is booked here any more — the legs go onto the bank statement
+    # lines. Kept because the column is NOT NULL on installed databases and
+    # ``levis.clearing.config`` still keys configuration creation off a general
+    # journal; dropping it needs a migration, not a field edit.
     journal_id = fields.Many2one(
         "account.journal",
-        string="Clearing Journal",
+        string="General Journal (unused)",
         required=True,
         domain="[('type', '=', 'general'), ('company_id', '=', company_id)]",
         default=lambda self: self._default_journal(),
+        help="Left over from when the clearing booked its own entries. It books "
+        "nothing now: the journal items are written onto the bank statement "
+        "lines themselves.",
     )
     bank_journal_ids = fields.Many2many(
         "account.journal",
@@ -135,11 +166,13 @@ class LevisPosClearing(models.Model):
     )
 
     line_ids = fields.One2many("levis.pos.clearing.line", "run_id", copy=False)
+    leg_ids = fields.One2many("levis.pos.clearing.leg", "run_id", copy=False)
     diag_ids = fields.One2many("levis.pos.clearing.diag", "run_id", copy=False)
+    # The bank statement lines' own entries, tagged as this run touched them.
+    # Only filled at posting: there is nothing of ours to look at before that.
     move_ids = fields.One2many("account.move", "levis_pos_clearing_id", readonly=True, copy=False)
     move_count = fields.Integer(compute="_compute_move_count")
-    draft_move_count = fields.Integer(compute="_compute_move_count")
-    posted_move_count = fields.Integer(compute="_compute_move_count")
+    leg_count = fields.Integer(compute="_compute_move_count")
 
     state = fields.Selection(
         [
@@ -247,13 +280,12 @@ class LevisPosClearing(models.Model):
                 )
 
     # Without the depends these stay at whatever they were first read as — posting
-    # the entries would leave "posted: 0" on screen and the header buttons stale.
-    @api.depends("move_ids", "move_ids.state")
+    # would leave "0 entries" on screen and the header buttons stale.
+    @api.depends("move_ids", "leg_ids")
     def _compute_move_count(self):
         for run in self:
             run.move_count = len(run.move_ids)
-            run.draft_move_count = len(run.move_ids.filtered(lambda m: m.state == "draft"))
-            run.posted_move_count = len(run.move_ids.filtered(lambda m: m.state == "posted"))
+            run.leg_count = len(run.leg_ids)
 
     @api.depends(
         "line_ids.gross",
@@ -1120,18 +1152,20 @@ class LevisPosClearing(models.Model):
         if self.state != "computed":
             raise UserError(_("Compute the summary first — there is nothing reviewed to book."))
         self._assert_period_open()
-        clash = self.env["account.move"].search_count(
+        # The clearing no longer has entries of its own to look for, so the claim
+        # on a statement line is the marker it carries.
+        clash = self.env["account.bank.statement.line"].search_count(
             [
-                ("company_id", "=", self.company_id.id),
-                ("ref", "=like", "%s-%%" % self.period_ref),
-                ("levis_pos_clearing_id", "!=", self.id),
+                ("id", "in", self.line_ids.statement_line_id.ids),
+                ("levis_clearing_line_id", "!=", False),
+                ("levis_clearing_line_id.run_id", "!=", self.id),
             ]
         )
         if clash:
             raise UserError(
                 _(
-                    "%(count)s entries already exist for %(period)s. Cancel or delete "
-                    "them before generating a second set.",
+                    "%(count)s statement line(s) in %(period)s are already claimed by "
+                    "another clearing run. Cancel it before generating a second set.",
                     count=clash,
                     period=self.period_ref,
                 )
@@ -1166,10 +1200,6 @@ class LevisPosClearing(models.Model):
                 )
         return True
 
-    def _move_ref(self, block, date):
-        self.ensure_one()
-        return "%s-%s-%s" % (self.period_ref, block.upper(), date)
-
     def _line_vals(self, account_id, label, balance, analytic):
         return {
             "account_id": account_id,
@@ -1180,39 +1210,42 @@ class LevisPosClearing(models.Model):
         }
 
     def action_generate_moves(self):
+        """Stage 2: write down what stage 3 will book, and book nothing."""
         self.ensure_one()
         self._assert_generatable()
-        config = self.config_id
-        moves = self.env["account.move"]
-        per_key = defaultdict(lambda: self.env["levis.pos.clearing.line"])
+        self.leg_ids.unlink()
+        # Built as one batch: a month of settlements is a few thousand legs, and
+        # creating them one at a time is a few thousand round trips.
+        to_create = []
+        owners = []
         for line in self.line_ids:
-            if line.block in ("a", "b") and line.allocated > _EPS:
-                per_key[(line.block, line.settlement_date)] |= line
-            elif line.block == "c" and abs(line.statement_amount) > _EPS:
-                per_key[("c", line.settlement_date)] |= line
-
-        for (block, date), lines in sorted(per_key.items(), key=lambda item: (item[0][1], item[0][0])):
-            plan = []
-            for line in lines:
-                plan += line._move_line_plan()
-            if not plan:
+            if line.block not in ("a", "b", "c"):
                 continue
-            move = self.env["account.move"].create(
-                {
-                    "move_type": "entry",
-                    "journal_id": self.journal_id.id,
-                    "company_id": self.company_id.id,
-                    "date": date,
-                    "ref": self._move_ref(block, date),
-                    "levis_pos_clearing_id": self.id,
-                    "line_ids": [(0, 0, vals) for _allocs, vals in plan],
-                }
-            )
-            moves |= move
-            lines.write({"move_id": move.id})
-            self._attach_alloc_move_lines(plan, move)
+            if line.block in ("a", "b") and line.allocated <= _EPS:
+                continue
+            if line.block == "c" and abs(line.statement_amount) <= _EPS:
+                continue
+            for sequence, (allocs, role, vals) in enumerate(line._counterpart_plan()):
+                to_create.append(
+                    {
+                        "run_id": self.id,
+                        "line_id": line.id,
+                        "sequence": sequence,
+                        "role": role,
+                        "account_id": vals["account_id"],
+                        "name": vals["name"],
+                        "balance": vals["debit"] - vals["credit"],
+                        "analytic_distribution": vals["analytic_distribution"],
+                    }
+                )
+                owners.append(allocs)
+        legs = self.env["levis.pos.clearing.leg"].create(to_create) if to_create else False
+        # create() returns the records in the order it was given them.
+        for leg, allocs in zip(legs or [], owners):
+            if allocs:
+                allocs.write({"leg_id": leg.id})
 
-        if not moves:
+        if not legs:
             raise UserError(
                 _(
                     "Nothing to book. Either no settlement could be matched to an open "
@@ -1222,33 +1255,6 @@ class LevisPosClearing(models.Model):
             )
         self._mark_statement_lines()
         self.state = "generated"
-        return True
-
-    def _attach_alloc_move_lines(self, plan, move):
-        """Link each allocation to the credit leg that carries it.
-
-        Paired by position, not by looking the leg up afterwards: two stores can
-        legitimately produce a credit on the same account with the same analytic
-        in one entry, and a lookup would hand both allocations the same leg and
-        then over-reconcile it. The move's lines are created in the order of the
-        command list, so walking both in ascending id keeps the pairing exact.
-        """
-        self.ensure_one()
-        created = move.line_ids.sorted(key=lambda aml: aml.id)
-        if len(created) != len(plan):
-            # Something added or merged a line; fall back to no pairing rather than
-            # a wrong one. Stage 3 then reports the allocations as unreconcilable.
-            _logger.warning(
-                "POS clearing %s: entry %s has %s lines for %s planned — allocations left unpaired.",
-                self.name,
-                move.ref,
-                len(created),
-                len(plan),
-            )
-            return False
-        for move_line, (allocs, _vals) in zip(created, plan):
-            if allocs:
-                allocs.write({"move_line_id": move_line.id})
         return True
 
     def _mark_statement_lines(self):
@@ -1264,18 +1270,59 @@ class LevisPosClearing(models.Model):
     def _preflight(self):
         self.ensure_one()
         if self.state != "generated":
-            raise UserError(_("There are no generated draft entries to post."))
+            raise UserError(_("There is no reviewed plan to post — generate it first."))
         self._assert_period_open()
-        drafts = self.move_ids.filtered(lambda m: m.state == "draft")
-        if not drafts:
-            raise UserError(_("No draft entries left — they were posted or deleted elsewhere."))
-        for move in drafts:
-            if not (self.date_from <= move.date <= self.date_to):
-                raise UserError(_("Entry %(ref)s is dated %(date)s, outside the period.", ref=move.ref, date=move.date))
-            imbalance = sum(move.line_ids.mapped("debit")) - sum(move.line_ids.mapped("credit"))
+        if not self.leg_ids:
+            raise UserError(_("The planned legs are gone. Cancel and generate them again."))
+
+        company_currency = self.company_id.currency_id
+        for line in self.leg_ids.line_id:
+            st_line = line.statement_line_id
+            if not (self.date_from <= st_line.date <= self.date_to):
+                raise UserError(
+                    _(
+                        "Statement line %(ref)s is dated %(date)s, outside the period.",
+                        ref=st_line.payment_ref or st_line.id,
+                        date=st_line.date,
+                    )
+                )
+            # Every leg is written in company currency, so a statement line in
+            # anything else would need a rate applied per leg. Refuse rather than
+            # invent one — all six Levi's bank journals are IDR.
+            if st_line.foreign_currency_id or (st_line.currency_id and st_line.currency_id != company_currency):
+                raise UserError(
+                    _(
+                        "Statement line %(ref)s is in %(currency)s. This clearing only "
+                        "books in %(company)s.",
+                        ref=st_line.payment_ref or st_line.id,
+                        currency=(st_line.foreign_currency_id or st_line.currency_id).name,
+                        company=company_currency.name,
+                    )
+                )
+            _liquidity, suspense, other = st_line._seek_for_lines()
+            if not suspense or other:
+                raise UserError(
+                    _(
+                        "Statement line %(ref)s is no longer sitting on suspense — "
+                        "someone reconciled or edited it after this plan was made. "
+                        "Cancel and recompute.",
+                        ref=st_line.payment_ref or st_line.id,
+                    )
+                )
+            planned = sum(self.leg_ids.filtered(lambda leg: leg.line_id == line).mapped("balance"))
+            imbalance = round(planned + st_line.amount, 2)
             if abs(imbalance) > _EPS:
-                raise UserError(_("Entry %(ref)s is out of balance by %(amount)s.", ref=move.ref, amount=imbalance))
-        # The drafts may have waited days. Anything they promised must still be there.
+                raise UserError(
+                    _(
+                        "The legs planned for statement line %(ref)s total %(planned)s "
+                        "against a bank amount of %(amount)s — off by %(diff)s.",
+                        ref=st_line.payment_ref or st_line.id,
+                        planned=planned,
+                        amount=st_line.amount,
+                        diff=imbalance,
+                    )
+                )
+        # The plan may have waited days. Anything it promised must still be there.
         stale = []
         for alloc in self.line_ids.alloc_ids:
             aml = alloc.source_aml_id
@@ -1293,15 +1340,72 @@ class LevisPosClearing(models.Model):
                     entry=stale[0].source_aml_id.move_id.name or stale[0].source_aml_id.id,
                 )
             )
-        return drafts
+        return True
 
     def action_post(self):
         self.ensure_one()
-        drafts = self._preflight()
-        drafts.action_post()
+        self._preflight()
+        self._apply_to_statement_lines()
         self._reconcile_allocations()
         self._snapshot_after()
         self.state = "posted"
+        return True
+
+    def _apply_to_statement_lines(self):
+        """Swap each statement line's suspense leg for the legs planned in stage 2.
+
+        The statement line's entry is already posted — that is normal, Odoo posts
+        it the moment the line is imported, and its own reconciliation does
+        exactly this write (see ``action_undo_reconciliation`` in core). Only the
+        suspense leg is deleted; the liquidity leg is left alone rather than
+        cleared and rebuilt, so nothing recomputes the bank amount or its
+        currency behind our back.
+        """
+        self.ensure_one()
+        company_currency = self.company_id.currency_id
+        for line in self.leg_ids.line_id:
+            st_line = line.statement_line_id
+            legs = self.leg_ids.filtered(lambda leg: leg.line_id == line).sorted(key=lambda leg: leg.sequence)
+            _liquidity, suspense, _other = st_line._seek_for_lines()
+            commands = [(2, suspense.id, 0)] if suspense else []
+            for leg in legs:
+                commands.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "name": leg.name,
+                            "account_id": leg.account_id.id,
+                            "partner_id": st_line.partner_id.id,
+                            "currency_id": company_currency.id,
+                            "amount_currency": leg.balance,
+                            "debit": leg.balance if leg.balance > 0 else 0.0,
+                            "credit": -leg.balance if leg.balance < 0 else 0.0,
+                            "analytic_distribution": leg.analytic_distribution or False,
+                        },
+                    )
+                )
+            st_line.with_context(force_delete=True, skip_readonly_check=True).write({"line_ids": commands})
+            st_line.move_id.levis_pos_clearing_id = self.id
+
+            # Pair each planned leg with the journal item it became, by position:
+            # two stores can legitimately produce the same account, amount and
+            # analytic on one statement line, and looking the leg up afterwards
+            # would hand both allocations the same item and over-reconcile it.
+            created = (st_line.move_id.line_ids - _liquidity).sorted(key=lambda aml: aml.id)
+            if len(created) != len(legs):
+                _logger.warning(
+                    "POS clearing %s: statement line %s has %s new items for %s legs — left unpaired.",
+                    self.name,
+                    st_line.id,
+                    len(created),
+                    len(legs),
+                )
+                continue
+            for aml, leg in zip(created, legs):
+                leg.move_line_id = aml.id
+                if leg.alloc_ids:
+                    leg.alloc_ids.write({"move_line_id": aml.id})
         return True
 
     def _reconcile_allocations(self):
@@ -1357,24 +1461,24 @@ class LevisPosClearing(models.Model):
     # ------------------------------------------------------------------
     def action_cancel(self):
         self.ensure_one()
-        if self.move_ids.filtered(lambda m: m.state != "draft"):
+        if self.state == "posted":
             raise UserError(
                 _(
-                    "Entries of %s are already posted. In Odoo 19 resetting them to draft "
-                    "does not release their reconciliation, so this record cannot undo "
-                    "them — reverse the entries themselves.",
+                    "%s is posted. Its legs live on the bank statement lines now, so "
+                    'undoing it means "Undo Reconciliation" on those lines — this record '
+                    "cannot take the money back on their behalf.",
                     self.name,
                 )
             )
         self.line_ids.mapped("statement_line_id").write({"levis_clearing_line_id": False})
-        self.move_ids.unlink()
+        self.leg_ids.unlink()
         self.state = "cancel"
         return True
 
     def action_reset_to_draft(self):
         self.ensure_one()
-        if self.move_ids:
-            raise UserError(_("Cancel the generated entries first."))
+        if self.leg_ids:
+            raise UserError(_("Cancel the generated plan first."))
         self.state = "draft"
         return True
 
@@ -1383,7 +1487,7 @@ class LevisPosClearing(models.Model):
         action = {
             "type": "ir.actions.act_window",
             "res_model": "account.move",
-            "name": _("Clearing Entries"),
+            "name": _("Statement Entries Cleared"),
             "domain": [("id", "in", self.move_ids.ids)],
             "view_mode": "list,form",
         }
@@ -1489,7 +1593,9 @@ class LevisPosClearingLine(models.Model):
     )
     note = fields.Text()
     alloc_ids = fields.One2many("levis.pos.clearing.alloc", "line_id", copy=False)
-    move_id = fields.Many2one("account.move", readonly=True, copy=False)
+    leg_ids = fields.One2many("levis.pos.clearing.leg", "line_id", copy=False)
+    # The statement line's own entry — where this clearing's legs are written.
+    move_id = fields.Many2one(related="statement_line_id.move_id", string="Journal Entry")
 
     _stmt_uniq = models.Constraint(
         "unique(run_id, statement_line_id)",
@@ -1514,16 +1620,24 @@ class LevisPosClearingLine(models.Model):
             shortable = line.kind in _SETTLING_KINDS and line.state in ("ok", "short", "mismatch")
             line.short_amount = max(round(line.gross - line.allocated, 2), 0.0) if shortable else 0.0
 
-    def _move_line_plan(self):
-        """The journal legs for this statement line, each with the allocations it pays.
+    def _counterpart_plan(self):
+        """The legs that replace this statement line's suspense leg.
 
-        Sign convention: a statement line of amount ``A`` moves the suspense
-        account by ``-A``, so the clearing leg on suspense is always ``+A``. That
-        holds for a settlement coming in and for a sweep going out, which is why
-        blocks A/B and C can share one rule.
+        Odoo books a statement line of amount ``A`` as ``Dr Bank A / Cr Suspense
+        A``. Clearing it means swapping that ``Cr Suspense A`` for what the money
+        actually was, so the legs here must total ``-A``: the receivables the
+        settlement pays (credit, gross), the fee the acquirer kept (debit), and —
+        only when the settlement is short — whatever is left with no explanation,
+        which stays on suspense.
 
-        Returns ``[(alloc_recordset, line_vals)]``; the recordset is empty for the
-        suspense and MDR legs, which settle nothing.
+        That last leg is the whole point of the sign arithmetic. Fully explained
+        settlements end up with no suspense leg at all, and Odoo's own
+        ``_compute_is_reconciled`` then marks the line reconciled without anyone
+        reconciling anything. A short one keeps a suspense leg for exactly the
+        shortfall and stays open, which is the truth about it.
+
+        Returns ``[(alloc_recordset, role, line_vals)]``; the recordset is empty
+        for the MDR, bank and shortfall legs, which settle nothing.
         """
         self.ensure_one()
         run = self.run_id
@@ -1543,8 +1657,7 @@ class LevisPosClearingLine(models.Model):
                     )
                 )
             label = (self.payment_ref or "")[:120] or _("Bank movement %s", self.settlement_date)
-            plan.append((Alloc, run._line_vals(config.suspense_account_id.id, label, self.statement_amount, False)))
-            plan.append((Alloc, run._line_vals(target.id, label, -self.statement_amount, False)))
+            plan.append((Alloc, "bank", run._line_vals(target.id, label, -self.statement_amount, False)))
             return plan
 
         store = self.analytic_account_id.display_name or ""
@@ -1557,6 +1670,7 @@ class LevisPosClearingLine(models.Model):
             plan.append(
                 (
                     allocs,
+                    "receivable",
                     run._line_vals(
                         account_id,
                         _("Settlement %(bank)s %(date)s (%(store)s)", bank=bank, date=source_date, store=store),
@@ -1565,27 +1679,38 @@ class LevisPosClearingLine(models.Model):
                     ),
                 )
             )
-        cash_in = round(self.allocated - self.mdr_booked, 2)
-        if abs(cash_in) > _EPS:
-            plan.append(
-                (
-                    Alloc,
-                    run._line_vals(
-                        config.suspense_account_id.id,
-                        _("Cash in %(bank)s %(date)s (%(store)s)", bank=bank, date=self.settlement_date, store=store),
-                        cash_in,
-                        analytic,
-                    ),
-                )
-            )
         if abs(self.mdr_booked) > _EPS:
             plan.append(
                 (
                     Alloc,
+                    "mdr",
                     run._line_vals(
                         config.mdr_account_id.id,
                         _("MDR %(bank)s %(date)s (%(store)s)", bank=bank, date=self.settlement_date, store=store),
                         round(self.mdr_booked, 2),
+                        analytic,
+                    ),
+                )
+            )
+        # Whatever the legs above do not account for. Computed as the balancing
+        # figure rather than from `short_amount` so that the entry is balanced by
+        # construction: a rounding crumb anywhere above lands here instead of
+        # making the move unpostable.
+        residual = round(-self.statement_amount - sum(vals["debit"] - vals["credit"] for _a, _r, vals in plan), 2)
+        if abs(residual) > _EPS:
+            plan.append(
+                (
+                    Alloc,
+                    "short",
+                    run._line_vals(
+                        config.suspense_account_id.id,
+                        _(
+                            "Unsettled %(bank)s %(date)s (%(store)s)",
+                            bank=bank,
+                            date=self.settlement_date,
+                            store=store,
+                        ),
+                        residual,
                         analytic,
                     ),
                 )
@@ -1622,13 +1747,66 @@ class LevisPosClearingAlloc(models.Model):
     )
     source_date = fields.Date(string="Trading Day Used")
     amount = fields.Monetary(currency_field="currency_id")
+    leg_id = fields.Many2one(
+        "levis.pos.clearing.leg",
+        readonly=True,
+        copy=False,
+        ondelete="set null",
+        string="Planned Leg",
+        help="The planned credit leg that pays this receivable. Filled at stage 2.",
+    )
     move_line_id = fields.Many2one(
         "account.move.line",
         readonly=True,
         copy=False,
         string="Clearing Leg",
-        help="The credit leg of the generated entry that pays this receivable. "
-        "Filled at generation and used to reconcile the exact pair.",
+        help="The credit leg written onto the statement line that pays this "
+        "receivable. Filled at posting and used to reconcile the exact pair.",
+    )
+
+
+class LevisPosClearingLeg(models.Model):
+    """One journal item the clearing intends to write onto a statement line.
+
+    Stage 2 fills these in and stage 3 books exactly them. Keeping the plan as
+    records rather than recomputing it at posting time is what makes the
+    accountant's review mean something: what was approved is what gets booked,
+    even if the underlying receivables have shifted in the meantime — and if
+    they have, the preflight refuses rather than quietly booking something else.
+    """
+
+    _name = "levis.pos.clearing.leg"
+    _description = "POS Clearing Planned Leg"
+    _order = "line_id, sequence, id"
+
+    run_id = fields.Many2one("levis.pos.clearing", required=True, ondelete="cascade", index=True)
+    line_id = fields.Many2one("levis.pos.clearing.line", required=True, ondelete="cascade", index=True)
+    company_id = fields.Many2one(related="run_id.company_id", store=True)
+    currency_id = fields.Many2one(related="run_id.currency_id")
+    statement_line_id = fields.Many2one(related="line_id.statement_line_id", store=True, string="Statement Line")
+    bank_journal_id = fields.Many2one(related="line_id.bank_journal_id", store=True, string="Bank")
+    settlement_date = fields.Date(related="line_id.settlement_date", store=True)
+    sequence = fields.Integer(default=0)
+    role = fields.Selection(
+        [
+            ("receivable", "POS Receivable"),
+            ("mdr", "MDR Expense"),
+            ("bank", "Sweep / Charge"),
+            ("short", "Left on Suspense"),
+        ],
+        required=True,
+    )
+    account_id = fields.Many2one("account.account", required=True)
+    name = fields.Char()
+    balance = fields.Monetary(currency_field="currency_id", help="Debit when positive, credit when negative.")
+    analytic_distribution = fields.Json()
+    alloc_ids = fields.One2many("levis.pos.clearing.alloc", "leg_id", copy=False)
+    move_line_id = fields.Many2one(
+        "account.move.line",
+        readonly=True,
+        copy=False,
+        string="Journal Item",
+        help="What this leg became once posted onto the statement line.",
     )
 
 
