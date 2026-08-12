@@ -79,6 +79,10 @@ class AccountLockDateWizard(models.TransientModel):
         string="Draft Entries in Locked Period",
         compute="_compute_draft_move_count",
     )
+    unreconciled_stmt_count = fields.Integer(
+        string="Unreconciled Statement Lines",
+        compute="_compute_unreconciled_stmt_count",
+    )
     company_summary = fields.Html(
         string="Current Lock Dates",
         compute="_compute_company_summary",
@@ -106,6 +110,35 @@ class AccountLockDateWizard(models.TransientModel):
                     ("date", "<=", wiz.fiscalyear_lock_date),
                 ]
             )
+
+    @api.depends("company_id", "fiscalyear_lock_date")
+    def _compute_unreconciled_stmt_count(self):
+        """Pre-flight the check core runs inside ``res.company.write``.
+
+        Core raises a RedirectWarning for these, which is a dead end: the user
+        has already filled the form in and gets bounced out of it. Counting them
+        up front lets the wizard say so before Apply is pressed.
+        """
+        Line = self.env["account.bank.statement.line"]
+        for wiz in self:
+            if not wiz.company_id or not wiz.fiscalyear_lock_date:
+                wiz.unreconciled_stmt_count = 0
+                continue
+            domain = wiz.company_id._get_unreconciled_statement_lines_domain(wiz.fiscalyear_lock_date)
+            wiz.unreconciled_stmt_count = Line.search_count(domain)
+
+    def action_show_unreconciled_statement_lines(self):
+        self.ensure_one()
+        domain = self.company_id._get_unreconciled_statement_lines_domain(self.fiscalyear_lock_date)
+        return {
+            "name": _("Unreconciled Transactions"),
+            "type": "ir.actions.act_window",
+            "res_model": "account.bank.statement.line",
+            "view_mode": "list,form",
+            "views": [(False, "list"), (False, "form")],
+            "domain": domain,
+            "context": {"create": False},
+        }
 
     @api.depends("company_id")
     def _compute_company_summary(self):

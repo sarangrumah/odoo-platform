@@ -87,6 +87,21 @@ class TestLockDateWizard(TransactionCase):
         wiz = self._wizard(fiscalyear_lock_date=date(2026, 6, 30))
         self.assertGreaterEqual(wiz.draft_move_count, 1)
 
+    def test_unreconciled_redirect_action_carries_views(self):
+        # Core hands this dict straight to RedirectWarning, so the web client
+        # gets an action object and never derives `views` from `view_mode` the
+        # way /web/action/load would. Without `views`, _preprocessAction blows
+        # up on `action.views.map(...)` and the warning's button is dead.
+        Line = self.env["account.bank.statement.line"]
+        for lines in (Line, Line.browse([1]), Line.browse([1, 2])):
+            action = self.company._get_unreconciled_statement_lines_redirect_action(lines)
+            self.assertTrue(action.get("views"), "no views for %s line(s)" % len(lines))
+            self.assertEqual(
+                [v[1] for v in action["views"]],
+                action["view_mode"].split(","),
+                "views must match view_mode",
+            )
+
     def test_non_manager_cannot_apply(self):
         user = self.env["res.users"].create(
             {
