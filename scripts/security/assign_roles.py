@@ -39,10 +39,13 @@ if "custom.security.role" not in env:
     raise SystemExit("custom_role_manager is not installed on this database")
 
 Role = env["custom.security.role"]
-OU = env["operating.unit"] if "operating.unit" in env else None
+has_ou = "operating.unit" in env
 
 roles_by_code = {r.code: r for r in Role.search([])}
-units_by_code = {u.code: u for u in OU.with_context(active_test=False).search([])} if OU else {}
+# `if OU` on an empty recordset is False, so testing the model that way silently
+# left this dict empty and rejected every valid unit code as "unknown". Ask the
+# registry whether the model exists, not the recordset whether it has rows.
+units_by_code = {u.code: u for u in env["operating.unit"].with_context(active_test=False).search([])} if has_ou else {}
 
 applied = skipped = 0
 problems = []
