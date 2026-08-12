@@ -6,9 +6,16 @@
 Read-only. This is the go/no-go for flipping
 ``custom_operating_unit.include_untagged`` to ``"0"``: while it is ``"1"`` (the
 shipped default) a scoped user still sees documents that carry no unit, which is
-what keeps history visible on day one. Turning it off before coverage is
-complete makes legacy documents disappear for store users — technically correct,
-operationally alarming.
+what keeps history visible on day one.
+
+**The question is not whether coverage reached 100%** — on a tenant with a
+central bank journal it never will, and waiting for it is waiting forever. It is
+whether every row that is still untagged is one that *genuinely* has no
+Operating Unit. So the report also breaks the untagged entries down by journal:
+central bank and head-office payments are fine to hide, a store's own entries in
+a journal nobody linked to a unit are not. That second kind is what the
+cash-journal gap looked like on rnd_levis — 378 entries that read as acceptable
+residue and were a missing link.
 """
 
 import logging
@@ -51,10 +58,29 @@ for table in TABLES:
     coverage = 100.0 if not rows else 100.0 * (rows - missing) / rows
     _logger.info("%-34s %10d %10d %6.1f%%", table, rows, missing, coverage)
 
-_logger.info(
-    "%s",
-    "Coverage complete — safe to set include_untagged = 0."
-    if not total_missing
-    else "%d row(s) still have no unit. Run backfill_operating_unit.py, and keep "
-    "include_untagged = 1 until this is zero." % total_missing,
-)
+if total_missing:
+    _logger.info("")
+    _logger.info("--- untagged journal entries, by journal ---")
+    cr.execute(
+        """
+        SELECT j.type, coalesce(j.name ->> 'en_US', '?'), count(*)
+          FROM account_move m
+          JOIN account_journal j ON j.id = m.journal_id
+         WHERE m.operating_unit_id IS NULL
+         GROUP BY 1, 2
+         ORDER BY 3 DESC
+         LIMIT 15
+        """
+    )
+    for jtype, jname, count in cr.fetchall():
+        _logger.info("%-10s %-44s %8d", jtype, jname[:44], count)
+    _logger.info("")
+    _logger.info(
+        "%d row(s) have no unit. Before setting include_untagged = 0, check the list "
+        "above: a central bank or head-office journal belongs there, a store's own "
+        "journal does not — that one needs its Operating Unit link fixed and the "
+        "backfill re-run first.",
+        total_missing,
+    )
+else:
+    _logger.info("Nothing is untagged — include_untagged = 0 changes nothing.")

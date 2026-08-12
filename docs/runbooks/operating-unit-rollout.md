@@ -102,9 +102,14 @@ Batched and idempotent — an interrupted run is resumed by running it again.
     docker exec -i odoo19-platform-odoo-mgmt odoo shell \
         -d <db> --no-http < scripts/ops/report_operating_unit_coverage.py
 
-Read-only. Rows that legitimately have no unit (head-office payments, bank
-statement lines) will stay at zero coverage — that is expected, and it is why
-`include_untagged` stays `"1"`.
+Read-only. It prints coverage per table and, for the rows that are still
+untagged, **which journals they sit in** — which is the evidence you need in
+step 8.
+
+Do not wait for 100%. Some rows legitimately have no unit and never will: on
+Levi's the central Bank journal alone is 1,102 payments and 1,111 entries, made
+centrally and belonging to no store. What matters is *which* rows are left, not
+how many.
 
 ### 6. Assign roles
 
@@ -138,15 +143,38 @@ As head office: everything unchanged.
 Machine paths — crons, the retail import, queue_job workers, POS closing — run
 elevated and are unaffected. Run the daily import once and confirm.
 
-## Tightening later (optional)
-
-Once coverage reports zero:
+## 8. Tightening: `include_untagged = 0`
 
     # Settings → Technical → System Parameters
     custom_operating_unit.include_untagged = 0
 
-Documents with no unit then disappear for scoped users. Technically correct,
-operationally alarming if coverage is not actually complete — hence the report.
+Documents with no unit then disappear for scoped users.
+
+**The criterion is not "coverage reached zero"** — an earlier version of this
+runbook said that, and on Levi's it is a condition that can never arrive. The
+question to answer from the coverage report is narrower:
+
+> Is every remaining untagged row one that *genuinely* has no Operating Unit —
+> or is some of it data the backfill simply could not reach yet?
+
+Central bank movements and head-office payments are the first kind: leave them
+untagged and hide them. A store's own entries sitting in a journal nobody linked
+to a unit are the second kind — fix the link and re-run the backfill first, or
+flipping this hides a store's own data from that store. The cash-journal gap
+found during the `rnd_levis` rollout was exactly that: 378 entries that looked
+like acceptable residue and were not.
+
+What the flip actually does, measured on `rnd_levis`:
+
+| Reader | `= 1` | `= 0` |
+|---|---|---|
+| Accounting, scoped to one store | TB 59.5 bn | **TB 394 m, 48 of 1,802 entries** |
+| Head office / All Units | TB 67.36 bn | unchanged |
+
+99.3% of the scoped reader's total was untagged head-office rows. After the
+flip they see their store. They also stop seeing central bank movements
+entirely — if someone at a store needs those, the answer is *All Operating
+Units* or a unit that covers head office, not turning this back on.
 
 ## Rolling back
 
