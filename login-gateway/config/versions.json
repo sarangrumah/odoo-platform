@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-12T10:27:29+00:00",
+  "generated_at": "2026-08-12T22:15:04+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "2ea2e8c",
-    "branch": "feat/clearing-onto-statement-lines"
+    "commit": "d45b75b",
+    "branch": "feat/bca-nfc-narrative"
   },
   "buckets": [
     {
@@ -335,23 +335,18 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.30.0",
+      "version": "19.0.1.31.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
       "last_change": "2026-08-12",
-      "change_count": 47,
+      "change_count": 46,
       "changes": [
         {
-          "sha": "2ea2e8c",
+          "sha": "d45b75b",
           "date": "2026-08-12",
-          "subject": "style(levis): let black join the currency-refusal message"
-        },
-        {
-          "sha": "7250032",
-          "date": "2026-08-12",
-          "subject": "feat(levis): clear the POS receivable on the statement line, not beside it"
+          "subject": "feat(levis): clear the POS receivable on the statement line, not beside it (#167)"
         },
         {
           "sha": "e283281",
@@ -382,6 +377,11 @@
           "sha": "5d735a4",
           "date": "2026-08-06",
           "subject": "style: ruff format the swap-revert script and localization tests"
+        },
+        {
+          "sha": "966a522",
+          "date": "2026-08-06",
+          "subject": "chore(levis): record the PO swap guard in MODULE_KNOWLEDGE + refresh versions.json"
         }
       ]
     },
@@ -1589,9 +1589,14 @@
       "category": "Accounting/Accounting",
       "depends": 9,
       "public": true,
-      "last_change": "2026-08-05",
-      "change_count": 16,
+      "last_change": "2026-08-12",
+      "change_count": 17,
       "changes": [
+        {
+          "sha": "926e2c7",
+          "date": "2026-08-12",
+          "subject": "fix(accounting): give the lock-date warning a button that actually opens (#166)"
+        },
         {
           "sha": "d63a903",
           "date": "2026-08-05",
@@ -1626,11 +1631,6 @@
           "sha": "10a06c9",
           "date": "2026-05-24",
           "subject": "refactor(addons): extract PSAK template to l10n_id_psak_custom for discoverability (#27)"
-        },
-        {
-          "sha": "2f567f2",
-          "date": "2026-05-23",
-          "subject": "fix(addons): wire up dead model files + complete PSAK COA template (#25)"
         }
       ]
     },

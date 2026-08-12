@@ -186,6 +186,7 @@ narrative, so `levis.bank.narrative` reads them straight off `payment_ref`:
 | BCA debit | `KR OTOMATIS MID : <mid> <STORE> TGH: n DDR: n` | `TGH` | `DDR` |
 | BCA credit | `KARTU KREDIT MID:<mid> <STORE> TGH:0000n ADM:0000n` | `TGH` | `ADM` |
 | BCA QRIS | `KR OTOMATIS TANGGAL :dd/mm MID : <mid> ... QR : n DDR: n` | `QR` | `DDR` |
+| BCA NFC | `KR OTOMATIS TANGGAL :dd/mm MID : <mid> <STORE> NFC: n DDR: n` | `NFC` | `DDR` |
 | BRI | `OnUs|OffUs|QRIS* 1 YYMMDD <tid> <STORE> AMT:n,00MDR:n,00` | `AMT` | `MDR` |
 
 Measured on prd_levis_begbal July 2026 (2 535 lines): 2 073 settlements,
@@ -193,6 +194,15 @@ Measured on prd_levis_begbal July 2026 (2 535 lines): 2 073 settlements,
 `gross - mdr == amount` on **every** settlement (0 disagreements). This is a
 strict improvement on the scripts, which had to spread a monthly per-store MDR
 pro-rata because the workbook and the ledger were on different grains.
+
+`NFC` was added to that table in 19.0.1.31.0, from two of those 12 unrecognised
+lines. Contactless says how the card was presented, not whether it was debit or
+credit, and the narrative does not say — so it parses as `debit`, which is the
+feed it arrives on. That choice carries no accounting weight, because clearing
+pools debit, credit and QRIS over the same card receivables; what matters is
+that it resolves to a *card* channel at all, since an unrecognised one keeps the
+unrestricted pool and may settle the CASH receivable. Both observed rows carry
+`DDR: 0.00`, so contactless is fee-free here or billed elsewhere.
 
 **Why the tender split is discovered, not read.** One card MID covers Visa,
 Mastercard, JCB and Amex alike, and `levis.mdr.bin` is empty, so nothing states
