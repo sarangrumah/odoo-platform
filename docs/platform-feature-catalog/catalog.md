@@ -4,7 +4,7 @@
 
 # Katalog Fitur Platform Odoo — Erajaya Group
 
-Dihasilkan 2026-08-11 dari commit `4896fdf` (ada perubahan belum ter-commit) pada branch `docs/catalog-rebuild-162`. Odoo 19.0, 162 modul custom.
+Dihasilkan 2026-08-12 dari commit `1fcf781` pada branch `main`. Odoo 19.0, 162 modul custom.
 
 # Ringkasan Eksekutif
 
@@ -1956,7 +1956,7 @@ Block silent product-category changes and route them through Finance approval Le
 |  |  |
 | --- | --- |
 | Path | `addons/_tenants/custom_levis_operating_unit` |
-| Version | 19.0.0.1.0 |
+| Version | 19.0.0.2.0 |
 | Scope | Khusus brand (Levi's) |
 | Maturity / confidence | Produksi / Tinggi |
 | Depends | `custom_operating_unit_docs`, `custom_levis_localization` |
