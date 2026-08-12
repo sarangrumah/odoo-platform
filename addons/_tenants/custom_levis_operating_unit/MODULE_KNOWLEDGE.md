@@ -3,7 +3,7 @@ status: reviewed
 generated_at: 2026-08-11
 generator: hand-written
 module: custom_levis_operating_unit
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_levis_operating_unit — Module Knowledge
@@ -23,6 +23,7 @@ purchase journal by `custom_levis_localization` — into the platform's
 | `res.company.l10n_ho_analytic_id` | the head-office unit, keyed on the **EBR warehouse's code** |
 | `stock.warehouse.l10n_ou_analytic_id` | one store unit per warehouse, `code = warehouse.code` |
 | `stock.warehouse.l10n_purchase_journal_id` | `operating.unit.purchase_journal_id` |
+| `pos.config → payment_method_ids(is_cash_count) → journal_id` | `operating.unit.journal_id` (the store's cash journal) |
 | `pos.config.warehouse_id` | `pos.config.operating_unit_id` (when the POS bridge is installed) |
 
 An archived store gets an archived unit, fully wired, so reactivating it stays
@@ -38,6 +39,17 @@ being written. The arrow never points the other way: this module never touches
 It also relabels `l10n_ou_analytic_id` / `l10n_ou_analytic_display` to
 "Operating Unit (Analytic)" — Odoo warns when two fields of a model share a
 label, and the two dimensions must be told apart on screen.
+
+## The cash journal (19.0.0.2.0)
+`_link_cash_journals` resolves it through the POS config's **cash payment
+method**, not by matching `"Cash - " + unit.name`. The names agree on every
+Levi's database today, which is exactly what makes name-matching dangerous: a
+rename would stop linking and nobody would notice.
+
+The first release linked only the purchase journal, so on an already-installed
+tenant every POS cash entry is still without a unit — 378 journal entries and
+756 items on `rnd_levis`. `migrations/19.0.0.2.0/post-migration.py` re-runs the
+migration to pick them up; re-running is safe, it never overwrites a link.
 
 ## Non-negotiables
 - **`stock.warehouse.code` is never modified.** It is the key X24/X101 join on,

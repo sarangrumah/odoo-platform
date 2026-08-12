@@ -15,6 +15,22 @@ names and picking sequences. It is **copied** into `operating.unit.code`, never
 modified — including for the head office, whose unit takes the EBR warehouse's
 code so every unit is addressable the same way.
 
+## The two journals
+
+A store owns two journals, and they are reached differently:
+
+* the **purchase** journal hangs off the warehouse
+  (`stock.warehouse.l10n_purchase_journal_id`) — linked since the first release;
+* the **cash** journal hangs off the point of sale, as the journal of the
+  config's cash payment method. Resolved structurally
+  (`pos.config → payment_method_ids(is_cash_count) → journal_id`), never by
+  matching the journal name against the unit name: the names agree today, and a
+  rename would silently stop linking anything.
+
+Missing the second one is not cosmetic. On `rnd_levis` it left 378 journal
+entries and 756 items without a unit — the difference between a store reader
+seeing their own cash movements and seeing none of them.
+
 ## After the migration
 
 The Operating Unit is the master; the analytic account is one of its links.
