@@ -96,13 +96,46 @@ def migrate_levis_operating_units(env):
             if unit:
                 config.operating_unit_id = unit.id
 
+    linked_cash = _link_cash_journals(env, OU)
+
     _logger.info(
-        "Levi's Operating Units: %d head office(s), %d store(s) created, %d already present.",
+        "Levi's Operating Units: %d head office(s), %d store(s) created, %d already present, "
+        "%d cash journal(s) linked.",
         len(head_offices),
         created,
         existing,
+        linked_cash,
     )
     return created, existing
+
+
+def _link_cash_journals(env, OU):
+    """Point each store unit at its POS cash journal.
+
+    The store's *purchase* journal comes from the localization and is linked
+    above. Its **cash** journal is not: it hangs off the point of sale, as the
+    journal of the config's cash payment method. Without this link every POS
+    cash entry stays without an Operating Unit — on rnd_levis that was 378
+    journal entries and 756 items, which is the difference between a store
+    reader seeing their own cash movements and seeing none of them.
+
+    Resolved structurally (config → cash payment method → journal), never by
+    matching the journal name against the unit name: the names happen to agree
+    today, and a rename would silently stop linking anything.
+    """
+    if "pos.config" not in env or "journal_id" not in OU._fields:
+        return 0
+    Config = env["pos.config"].with_context(active_test=False)
+    linked = 0
+    for unit in OU.with_context(active_test=False).search([("warehouse_id", "!=", False)]):
+        if unit.journal_id:
+            continue
+        configs = Config.search([("warehouse_id", "=", unit.warehouse_id.id)])
+        cash_journal = configs.payment_method_ids.filtered(lambda m: m.is_cash_count and m.journal_id)[:1].journal_id
+        if cash_journal:
+            unit.journal_id = cash_journal.id
+            linked += 1
+    return linked
 
 
 def post_init_hook(env):

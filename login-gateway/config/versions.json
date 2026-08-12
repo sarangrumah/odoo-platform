@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-11T10:54:28+00:00",
+  "generated_at": "2026-08-12T03:02:15+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "01aabb4",
-    "branch": "feat/role-manager"
+    "commit": "b4cfbb7",
+    "branch": "fix/levis-ou-cash-journal"
   },
   "buckets": [
     {
@@ -389,7 +389,7 @@
       "module": "custom_levis_operating_unit",
       "bucket": "_tenants",
       "name": "Custom Operating Unit — Levi's Migration",
-      "version": "19.0.0.1.0",
+      "version": "19.0.0.2.0",
       "summary": "Turns the existing Levi's analytic Operating Units into operating.unit records — additively, without renaming a single warehouse, analytic or journal.",
       "category": "Custom Platform/Localization",
       "depends": 2,
@@ -398,9 +398,9 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "b08a5a3",
+          "sha": "c854c71",
           "date": "2026-08-11",
-          "subject": "feat(levis): lift the analytic Operating Units into the new master, additively"
+          "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
       ]
     },
@@ -1329,22 +1329,12 @@
       "depends": 2,
       "public": true,
       "last_change": "2026-08-11",
-      "change_count": 3,
+      "change_count": 1,
       "changes": [
         {
-          "sha": "b08a5a3",
+          "sha": "c854c71",
           "date": "2026-08-11",
-          "subject": "feat(levis): lift the analytic Operating Units into the new master, additively"
-        },
-        {
-          "sha": "d2e1c8b",
-          "date": "2026-08-11",
-          "subject": "feat(security): isolate accounting, stock and trade documents per Operating Unit"
-        },
-        {
-          "sha": "6deb3b1",
-          "date": "2026-08-11",
-          "subject": "feat(security): give the branch dimension a master record and a hierarchy"
+          "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
       ]
     },
@@ -1395,9 +1385,9 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "d7b4902",
+          "sha": "c854c71",
           "date": "2026-08-11",
-          "subject": "feat(security): pick a role instead of ticking thirty group checkboxes"
+          "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
       ]
     },
@@ -1706,9 +1696,9 @@
       "change_count": 50,
       "changes": [
         {
-          "sha": "7bd6adf",
+          "sha": "c854c71",
           "date": "2026-08-11",
-          "subject": "feat(reports): stop the accounting reports leaking other branches' numbers"
+          "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         },
         {
           "sha": "53afaa5",
@@ -2790,9 +2780,9 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "01aabb4",
+          "sha": "c854c71",
           "date": "2026-08-11",
-          "subject": "feat(sso): let Keycloak role names mean the platform's own roles"
+          "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         },
         {
           "sha": "062d173",
@@ -3554,17 +3544,12 @@
       "depends": 5,
       "public": true,
       "last_change": "2026-08-11",
-      "change_count": 2,
+      "change_count": 1,
       "changes": [
         {
-          "sha": "b08a5a3",
+          "sha": "c854c71",
           "date": "2026-08-11",
-          "subject": "feat(levis): lift the analytic Operating Units into the new master, additively"
-        },
-        {
-          "sha": "d2e1c8b",
-          "date": "2026-08-11",
-          "subject": "feat(security): isolate accounting, stock and trade documents per Operating Unit"
+          "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
       ]
     },
@@ -3581,9 +3566,9 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "233f9e6",
+          "sha": "c854c71",
           "date": "2026-08-11",
-          "subject": "feat(pos): scope the point of sale per Operating Unit, closing entry included"
+          "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
       ]
     },
@@ -3600,9 +3585,9 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "7bd6adf",
+          "sha": "c854c71",
           "date": "2026-08-11",
-          "subject": "feat(reports): stop the accounting reports leaking other branches' numbers"
+          "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
       ]
     },

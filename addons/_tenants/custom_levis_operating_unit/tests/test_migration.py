@@ -70,3 +70,35 @@ class TestLevisOperatingUnitMigration(TransactionCase):
             }
         )
         self.assertEqual(line.l10n_ou_analytic_id, unit.analytic_account_id)
+
+    def test_05_store_cash_journals_are_linked(self):
+        """Every store whose POS has a cash payment method gets that journal.
+
+        Without it the POS cash entries carry no unit, which is most of a
+        store's ledger.
+        """
+        if "pos.config" not in self.env:
+            self.skipTest("point_of_sale not installed on this database")
+        Config = self.env["pos.config"].with_context(active_test=False)
+        units = self.env["operating.unit"].with_context(active_test=False).search([("warehouse_id", "!=", False)])
+        checked = 0
+        for unit in units:
+            configs = Config.search([("warehouse_id", "=", unit.warehouse_id.id)])
+            cash = configs.payment_method_ids.filtered(lambda m: m.is_cash_count and m.journal_id)[:1].journal_id
+            if not cash:
+                continue
+            checked += 1
+            self.assertTrue(
+                unit.journal_id,
+                "%s has a POS cash journal but no journal linked" % unit.code,
+            )
+        if not checked:
+            self.skipTest("no POS cash payment method on this database")
+
+    def test_06_an_existing_journal_link_is_not_overwritten(self):
+        unit = self.env["operating.unit"].search([("journal_id", "!=", False)], limit=1)
+        if not unit:
+            self.skipTest("no unit carries a journal on this database")
+        before = unit.journal_id
+        migrate_levis_operating_units(self.env)
+        self.assertEqual(unit.journal_id, before)
