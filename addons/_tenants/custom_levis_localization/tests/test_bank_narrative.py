@@ -72,8 +72,7 @@ class TestBankNarrative(TransactionCase):
         for ref, gross in (
             ("KR OTOMATIS TANGGAL :11/07 MID : 885004648615 LEVIS GANCIT NFC: 875925.00 DDR: 0.00", 875925.00),
             (
-                "KR OTOMATIS TANGGAL :28/07 MID : 885004608391  LEVIS PIM 2 "
-                "NFC:     649900.00  DDR:          0.00",
+                "KR OTOMATIS TANGGAL :28/07 MID : 885004608391  LEVIS PIM 2 NFC:     649900.00  DDR:          0.00",
                 649900.00,
             ),
         ):
