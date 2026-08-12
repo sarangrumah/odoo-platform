@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-12T10:17:39+00:00",
+  "generated_at": "2026-08-12T10:27:29+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "6dc7bb8",
-    "branch": "fix/lock-date-redirect-views"
+    "commit": "2ea2e8c",
+    "branch": "feat/clearing-onto-statement-lines"
   },
   "buckets": [
     {
@@ -335,14 +335,24 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.29.0",
+      "version": "19.0.1.30.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
-      "last_change": "2026-08-11",
-      "change_count": 45,
+      "last_change": "2026-08-12",
+      "change_count": 47,
       "changes": [
+        {
+          "sha": "2ea2e8c",
+          "date": "2026-08-12",
+          "subject": "style(levis): let black join the currency-refusal message"
+        },
+        {
+          "sha": "7250032",
+          "date": "2026-08-12",
+          "subject": "feat(levis): clear the POS receivable on the statement line, not beside it"
+        },
         {
           "sha": "e283281",
           "date": "2026-08-11",
@@ -372,16 +382,6 @@
           "sha": "5d735a4",
           "date": "2026-08-06",
           "subject": "style: ruff format the swap-revert script and localization tests"
-        },
-        {
-          "sha": "966a522",
-          "date": "2026-08-06",
-          "subject": "chore(levis): record the PO swap guard in MODULE_KNOWLEDGE + refresh versions.json"
-        },
-        {
-          "sha": "ef5de84",
-          "date": "2026-08-06",
-          "subject": "fix(levis): guard PO uploads against swapped Quantity/Unit Price columns"
         }
       ]
     },
@@ -1589,14 +1589,9 @@
       "category": "Accounting/Accounting",
       "depends": 9,
       "public": true,
-      "last_change": "2026-08-12",
-      "change_count": 17,
+      "last_change": "2026-08-05",
+      "change_count": 16,
       "changes": [
-        {
-          "sha": "6dc7bb8",
-          "date": "2026-08-12",
-          "subject": "fix(accounting): give the lock-date warning a button that actually opens"
-        },
         {
           "sha": "d63a903",
           "date": "2026-08-05",
@@ -1631,6 +1626,11 @@
           "sha": "10a06c9",
           "date": "2026-05-24",
           "subject": "refactor(addons): extract PSAK template to l10n_id_psak_custom for discoverability (#27)"
+        },
+        {
+          "sha": "2f567f2",
+          "date": "2026-05-23",
+          "subject": "fix(addons): wire up dead model files + complete PSAK COA template (#25)"
         }
       ]
     },
