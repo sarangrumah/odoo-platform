@@ -1292,8 +1292,7 @@ class LevisPosClearing(models.Model):
             if st_line.foreign_currency_id or (st_line.currency_id and st_line.currency_id != company_currency):
                 raise UserError(
                     _(
-                        "Statement line %(ref)s is in %(currency)s. This clearing only "
-                        "books in %(company)s.",
+                        "Statement line %(ref)s is in %(currency)s. This clearing only books in %(company)s.",
                         ref=st_line.payment_ref or st_line.id,
                         currency=(st_line.foreign_currency_id or st_line.currency_id).name,
                         company=company_currency.name,
