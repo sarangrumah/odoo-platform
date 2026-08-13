@@ -34,6 +34,16 @@
                 </div>
                 <separator string="Current Lock Dates"/>
                 <field name="company_summary" nolabel="1" readonly="1"/>
+                <field name="exception_count" invisible="1"/>
+                <div class="alert alert-warning" role="alert" invisible="exception_count == 0">
+                    <field name="exception_count" nolabel="1" class="oe_inline"/>
+                    lock date exception(s) are active on this company. Odoo enforces the
+                    user's own date, so the people below can still post into the period
+                    these dates close. Setting a new lock date does not remove them —
+                    core re-creates them against the new date.
+                </div>
+                <field name="exception_summary" nolabel="1" readonly="1"
+                       invisible="exception_count == 0"/>
                 <footer>
                     <button name="action_apply" type="object" string="Apply"
                             class="btn-primary" data-hotkey="q"/>

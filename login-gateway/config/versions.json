@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-12T22:15:04+00:00",
+  "generated_at": "2026-08-12T23:53:59+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "d45b75b",
-    "branch": "feat/bca-nfc-narrative"
+    "commit": "5021153",
+    "branch": "feat/lock-date-show-exceptions"
   },
   "buckets": [
     {
@@ -340,9 +340,14 @@
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
-      "last_change": "2026-08-12",
-      "change_count": 46,
+      "last_change": "2026-08-13",
+      "change_count": 47,
       "changes": [
+        {
+          "sha": "5021153",
+          "date": "2026-08-13",
+          "subject": "feat(levis): read NFC settlements off the BCA narrative (#168)"
+        },
         {
           "sha": "d45b75b",
           "date": "2026-08-12",
@@ -377,11 +382,6 @@
           "sha": "5d735a4",
           "date": "2026-08-06",
           "subject": "style: ruff format the swap-revert script and localization tests"
-        },
-        {
-          "sha": "966a522",
-          "date": "2026-08-06",
-          "subject": "chore(levis): record the PO swap guard in MODULE_KNOWLEDGE + refresh versions.json"
         }
       ]
     },
@@ -1584,7 +1584,7 @@
       "module": "custom_accounting_full",
       "bucket": "ee_gap",
       "name": "Custom Accounting Full",
-      "version": "19.0.0.6.0",
+      "version": "19.0.0.7.0",
       "summary": "Indonesian COA + intercompany automation + consolidation reports (CE multi-company gap)",
       "category": "Accounting/Accounting",
       "depends": 9,
