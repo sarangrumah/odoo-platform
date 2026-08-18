@@ -13,8 +13,22 @@ RUN groupadd -r app --gid 10101 \
 WORKDIR /app
 
 # System deps minimal (curl for healthcheck dev convenience, build-essential for some wheels)
+# The `--only-upgrade` call patches the util-linux family to the distro's fixed
+# build (CVE-2026-53615, integer overflow in libblkid's DOS partition parser).
+# python:3.12-slim ships trixie's 2.41-5 and the fix lives in trixie-security as
+# 2.41.5-0+deb13u1, so it only arrives when upstream rebuilds the base image --
+# patching here keeps the scan green without waiting on that. `--only-upgrade`
+# skips any name that is not installed, so the list survives a base change.
+# Same idiom as odoo/Dockerfile.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \
+ && apt-get install -y --no-install-recommends --only-upgrade \
+      util-linux \
+      bsdutils \
+      libblkid1 \
+      libmount1 \
+      libsmartcols1 \
+      libuuid1 \
  && rm -rf /var/lib/apt/lists/* \
  && update-ca-certificates
 

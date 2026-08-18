@@ -55,7 +55,7 @@ elimination journal entry is written to ``pdp.audit_log`` via the
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.6.0",
+    "version": "19.0.0.7.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
