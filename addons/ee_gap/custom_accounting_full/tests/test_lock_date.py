@@ -87,6 +87,58 @@ class TestLockDateWizard(TransactionCase):
         wiz = self._wizard(fiscalyear_lock_date=date(2026, 6, 30))
         self.assertGreaterEqual(wiz.draft_move_count, 1)
 
+    def _exception(self, **vals):
+        return self.env["account.lock_exception"].create(
+            {
+                "company_id": self.company.id,
+                "lock_date_field": "fiscalyear_lock_date",
+                "lock_date": date(2026, 5, 31),
+                **vals,
+            }
+        )
+
+    def test_active_exceptions_are_shown_because_they_outrank_the_dates(self):
+        """A lock date reads as closed while an exception quietly reopens it.
+
+        Core enforces `_get_user_lock_date()`, not the company field, so an
+        exception lets a named user keep posting into a period the wizard says
+        is locked. On prd_levis_begbal six users sat at 31-May while the company
+        said 31-Jul, and nothing in the UI said so.
+        """
+        wiz = self._wizard()
+        self.assertEqual(wiz.exception_count, 0)
+        self.assertFalse(wiz.exception_summary)
+
+        user = self.env["res.users"].create(
+            {"name": "Late Poster", "login": "late_poster", "company_ids": [(6, 0, [self.company.id])]}
+        )
+        self._exception(user_id=user.id, reason="June input")
+        wiz = self._wizard()
+        self.assertEqual(wiz.exception_count, 1)
+        self.assertIn("Late Poster", wiz.exception_summary)
+        self.assertIn("June input", wiz.exception_summary)
+        # No end date means it never lapses — the wizard must say so rather than
+        # leaving the column blank.
+        self.assertIn("never", wiz.exception_summary)
+
+    def test_an_exception_for_everyone_is_named_as_such(self):
+        self._exception(user_id=False, reason="platform migration")
+        wiz = self._wizard()
+        self.assertEqual(wiz.exception_count, 1)
+        self.assertIn("EVERYONE", wiz.exception_summary)
+
+    def test_a_revoked_exception_is_not_listed(self):
+        exc = self._exception(user_id=False, reason="done with this")
+        exc.active = False
+        self.assertEqual(self._wizard().exception_count, 0, "revoked exceptions are history, not warnings")
+
+    def test_the_reason_is_escaped_into_the_summary(self):
+        """`reason` is free text and the field renders with sanitize=False."""
+        self._exception(user_id=False, reason="<script>alert(1)</script>")
+        summary = self._wizard().exception_summary
+        self.assertNotIn("<script>", summary)
+        self.assertIn("&lt;script&gt;", summary)
+
     def test_unreconciled_redirect_action_carries_views(self):
         # Core hands this dict straight to RedirectWarning, so the web client
         # gets an action object and never derives `views` from `view_mode` the

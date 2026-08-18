@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-18T10:52:52+00:00",
+  "generated_at": "2026-08-18T10:55:45+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "401126d",
+    "commit": "91bdbd9",
     "branch": "feat/levis-quickwins-aug18-main"
   },
   "buckets": [
@@ -264,8 +264,13 @@
       "depends": 1,
       "public": false,
       "last_change": "2026-08-18",
-      "change_count": 4,
+      "change_count": 5,
       "changes": [
+        {
+          "sha": "91bdbd9",
+          "date": "2026-08-18",
+          "subject": "docs(levis): knowledge file for custom_levis_asset_accounts, and refresh versions.json"
+        },
         {
           "sha": "08ab253",
           "date": "2026-08-18",
@@ -1589,7 +1594,7 @@
       "module": "custom_accounting_full",
       "bucket": "ee_gap",
       "name": "Custom Accounting Full",
-      "version": "19.0.0.6.0",
+      "version": "19.0.0.7.0",
       "summary": "Indonesian COA + intercompany automation + consolidation reports (CE multi-company gap)",
       "category": "Accounting/Accounting",
       "depends": 9,
@@ -4373,7 +4378,7 @@
       "module": "custom_retail_import",
       "bucket": "ee_gap",
       "name": "Custom Retail Import",
-      "version": "19.0.0.23.0",
+      "version": "19.0.0.24.0",
       "summary": "Excel/CSV + SFTP ingestion adapter for retail master & transaction data",
       "category": "Inventory/Retail",
       "depends": 6,
