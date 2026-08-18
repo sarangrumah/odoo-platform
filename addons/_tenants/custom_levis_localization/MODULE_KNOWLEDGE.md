@@ -293,6 +293,13 @@ that already has the module. The MID mapping is deliberately not seeded — see 
 gotcha below.
 
 ## Gotchas
+- **`l10n_id_kode_transaksi` is not a faktur number.** It is the two-digit DJP
+  *transaction code* ("04" = DPP nilai lain). It used to sit at the end of
+  `_edo_tax_number`'s fallback chain, so every bill entered without a faktur
+  pajak printed "04" in the Tax Number row of the Journal Billing voucher — 80
+  posted bills in `prd_levis_begbal` on 18-Aug-2026. A bill with no faktur must
+  print an empty Tax Number; guarded by
+  `tests/test_journal_billing_tax_number.py`.
 - **Never `_inherit "product.value"` from this module.** Doing so pulls
   `product.value` into the module's `init_models()` pass, and
   `registry.check_foreign_keys()` then re-creates any *missing* core foreign key
