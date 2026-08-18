@@ -1610,3 +1610,95 @@ class TestCustomReports(TransactionCase):
         table = self.env["custom.report.aged.payable"].get_report_table(options, {"aging_detail": True})
         self.assertTrue(table["columns"])
         self.assertEqual(table["lines"][-1]["type"], "grand_total")
+
+    # ------------------------------------------------------------------
+    # Report VAT — the PPN ledger (go-live sheet item 2).
+    # ------------------------------------------------------------------
+    def test_report_vat_ledger(self):
+        """VAT accounts are discovered from tax repartition, PPh is excluded,
+        and the running balance walks the lines it is printed against.
+        """
+        today = date.today()
+        acc_vat_out = self._mk_account("21251", "VAT Out Ledger", "liability_current")
+        acc_pph = self._mk_account("21261", "PPh 23 Ledger", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Ledger 11%", "sale", acc_vat_out)
+        self._mk_ppn_tax("PPh 23 Ledger 2%", "purchase", acc_pph, amount=2.0)
+
+        for price in (1000.0, 2000.0):
+            self.Move.create(
+                {
+                    "move_type": "out_invoice",
+                    "journal_id": self.j_sale.id,
+                    "partner_id": self.partner_a.id,
+                    "invoice_date": today,
+                    "date": today,
+                    "company_id": self.company.id,
+                    "invoice_line_ids": [
+                        Command.create(
+                            {
+                                "name": "Jasa Drone",
+                                "quantity": 1.0,
+                                "price_unit": price,
+                                "account_id": self.acc_revenue.id,
+                                "tax_ids": [Command.set([ppn.id])],
+                            }
+                        )
+                    ],
+                }
+            ).action_post()
+
+        report = self.env["custom.report.vat"]
+
+        vat_ids = report._vat_account_ids([self.company.id], "both")
+        self.assertIn(acc_vat_out.id, vat_ids, "A PPN account must be discovered.")
+        self.assertNotIn(
+            acc_pph.id,
+            vat_ids,
+            "A tax named 'PPh ...' is withholding — its account is not a VAT account.",
+        )
+
+        lines = report._build_lines(self._filters())
+        body = [ln for ln in lines if ln.get("type") != "grand_total"]
+        self.assertTrue(body, "The ledger must return the posted PPN lines.")
+        self.assertTrue(
+            all(ln["account_id"] in vat_ids for ln in body),
+            "Only VAT accounts may appear.",
+        )
+        self.assertTrue(
+            any(ln["tipe"] == "Faktur Penjualan" for ln in body),
+            "move_type must be mapped to the Indonesian transaction label.",
+        )
+
+        # Running balance must equal the cumulative movement, per account.
+        running = {}
+        for ln in body:
+            running[ln["account_id"]] = running.get(ln["account_id"], 0.0) + ln["debit"] - ln["credit"]
+            self.assertAlmostEqual(
+                ln["balance"],
+                running[ln["account_id"]],
+                2,
+                "Saldo Akhir must walk the lines it is printed beside.",
+            )
+
+        grand = next((ln for ln in lines if ln.get("type") == "grand_total"), None)
+        self.assertIsNotNone(grand, "Report VAT must emit a grand_total.")
+        self.assertAlmostEqual(grand["credit"], sum(ln["credit"] for ln in body), 2)
+
+        # A narrower side must not widen the account set.
+        keluaran = report._vat_account_ids([self.company.id], "keluaran")
+        self.assertIn(acc_vat_out.id, keluaran)
+        masukan = report._vat_account_ids([self.company.id], "masukan")
+        self.assertNotIn(acc_vat_out.id, masukan)
+
+    def test_report_vat_screen_table(self):
+        """The report must be reachable through the shared screen contract."""
+        options = {
+            "date_from": "1970-01-01",
+            "date_to": date.today().isoformat(),
+            "company_ids": [self.company.id],
+            "posted_only": True,
+        }
+        table = self.env["custom.report.vat"].get_report_table(options)
+        headers = [c["header"] for c in table["columns"]]
+        self.assertEqual(headers[0], "Kode Perkiraan")
+        self.assertIn("No Faktur Pajak", headers)

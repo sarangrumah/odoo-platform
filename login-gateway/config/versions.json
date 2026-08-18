@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-18T10:34:50+00:00",
+  "generated_at": "2026-08-18T10:54:29+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "4959371",
-    "branch": "fix/x24-import-session-guard"
+    "commit": "a56f5b1",
+    "branch": "feat/arkaaim-report-vat"
   },
   "buckets": [
     {
@@ -1692,14 +1692,24 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.19.0",
+      "version": "19.0.0.20.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 4,
       "public": true,
-      "last_change": "2026-08-11",
-      "change_count": 50,
+      "last_change": "2026-08-18",
+      "change_count": 52,
       "changes": [
+        {
+          "sha": "a56f5b1",
+          "date": "2026-08-18",
+          "subject": "docs(reports): record the PPN ledger in the module's knowledge file"
+        },
+        {
+          "sha": "879f1ce",
+          "date": "2026-08-18",
+          "subject": "feat(reports): the PPN ledger Tax asked for, in the layout they sent"
+        },
         {
           "sha": "c854c71",
           "date": "2026-08-11",
@@ -1729,16 +1739,6 @@
           "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
-        },
-        {
-          "sha": "7d2c250",
-          "date": "2026-08-04",
-          "subject": "docs(reports): record the on-screen table contract and the grouped flattener"
-        },
-        {
-          "sha": "11aeafa",
-          "date": "2026-08-04",
-          "subject": "fix(reports): render grouped reports on screen, not just in Excel"
         }
       ]
     },
@@ -4377,9 +4377,9 @@
       "change_count": 57,
       "changes": [
         {
-          "sha": "778961b",
+          "sha": "ceaae47",
           "date": "2026-08-18",
-          "subject": "fix(retail): one open POS session must not silence a whole night of sales"
+          "subject": "fix(retail): one open POS session must not silence a whole night of sales (#170)"
         },
         {
           "sha": "5bb46bb",

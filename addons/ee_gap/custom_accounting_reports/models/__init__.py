@@ -39,4 +39,5 @@ from . import custom_report_pph25
 from . import custom_report_tax_audit
 from . import custom_report_books
 from . import custom_report_analysis
+from . import custom_report_vat
 from . import custom_report_dispatch

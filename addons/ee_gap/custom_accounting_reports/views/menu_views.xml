@@ -108,6 +108,12 @@
               action="action_faktur_pajak_wizard"
               sequence="20"/>
 
+    <menuitem id="menu_custom_reports_vat"
+              name="Report VAT (Invoice PPN)"
+              parent="menu_custom_reports_tax_root"
+              action="action_vat_wizard"
+              sequence="22"/>
+
     <menuitem id="menu_custom_reports_ppn_masukan_import"
               name="Import PPN Masukan"
               parent="menu_custom_reports_tax_root"

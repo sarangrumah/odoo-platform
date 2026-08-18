@@ -42,6 +42,7 @@ REPORT_MODEL_MAP = {
     "bill_payment": "custom.report.bill.payment",
     "tax": "custom.report.tax",
     "faktur_pajak": "custom.report.faktur.pajak",
+    "report_vat": "custom.report.vat",
     "bupot": "custom.report.bupot",
     "spt_ppn": "custom.report.spt.ppn",
     "pph_withholding": "custom.report.pph.withholding",
