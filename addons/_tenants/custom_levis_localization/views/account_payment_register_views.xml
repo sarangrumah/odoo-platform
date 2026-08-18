@@ -7,6 +7,26 @@
         <field name="inherit_id" ref="account.view_account_payment_register_form"/>
         <field name="arch" type="xml">
             <xpath expr="//footer" position="before">
+                <!--
+                  Feature #20: show WHAT is being paid. The wizard already holds
+                  the AP lines it pulled in, but never listed them, so an
+                  operator settling a batch had to leave the dialog to check the
+                  bills. Read-only: the selection is made by picking the bills
+                  before opening the wizard.
+                -->
+                <group string="Bills Being Paid" invisible="not l10n_bill_ids">
+                    <field name="l10n_bill_ids" nolabel="1" colspan="2" readonly="1">
+                        <list create="false" delete="false">
+                            <field name="name" string="Bill No"/>
+                            <field name="invoice_date" string="Bill Date"/>
+                            <field name="invoice_date_due" string="Due Date"/>
+                            <field name="ref" string="Vendor Ref"/>
+                            <field name="currency_id" column_invisible="1"/>
+                            <field name="amount_total" string="Total"/>
+                            <field name="amount_residual" string="Amount Due"/>
+                        </list>
+                    </field>
+                </group>
                 <group string="Card MDR"
                        invisible="not can_edit_wizard or payment_type != 'inbound' or (can_group_payments and not group_payment)">
                     <field name="x_card_bin" placeholder="e.g. 400000"/>
