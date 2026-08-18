@@ -78,6 +78,9 @@
                         <t t-elif="report_code == 'faktur_pajak'">
                             <t t-call="custom_accounting_reports.report_faktur_pajak"/>
                         </t>
+                        <t t-elif="report_code == 'report_vat'">
+                            <t t-call="custom_accounting_reports.report_vat"/>
+                        </t>
                         <t t-elif="report_code == 'ppn_masukan_import'">
                             <t t-call="custom_accounting_reports.report_ppn_masukan_import"/>
                         </t>
