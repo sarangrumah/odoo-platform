@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-12T23:53:59+00:00",
+  "generated_at": "2026-08-18T10:34:50+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "5021153",
-    "branch": "feat/lock-date-show-exceptions"
+    "commit": "4959371",
+    "branch": "fix/x24-import-session-guard"
   },
   "buckets": [
     {
@@ -1589,9 +1589,14 @@
       "category": "Accounting/Accounting",
       "depends": 9,
       "public": true,
-      "last_change": "2026-08-12",
-      "change_count": 17,
+      "last_change": "2026-08-13",
+      "change_count": 18,
       "changes": [
+        {
+          "sha": "3871ab4",
+          "date": "2026-08-13",
+          "subject": "feat(accounting): show the lock exceptions that outrank the lock dates (#169)"
+        },
         {
           "sha": "926e2c7",
           "date": "2026-08-12",
@@ -1626,11 +1631,6 @@
           "sha": "2c0ca58",
           "date": "2026-05-28",
           "subject": "feat(custom_accounting_full): PSAK template data + new accounting addons"
-        },
-        {
-          "sha": "10a06c9",
-          "date": "2026-05-24",
-          "subject": "refactor(addons): extract PSAK template to l10n_id_psak_custom for discoverability (#27)"
         }
       ]
     },
@@ -4368,14 +4368,19 @@
       "module": "custom_retail_import",
       "bucket": "ee_gap",
       "name": "Custom Retail Import",
-      "version": "19.0.0.23.0",
+      "version": "19.0.0.24.0",
       "summary": "Excel/CSV + SFTP ingestion adapter for retail master & transaction data",
       "category": "Inventory/Retail",
       "depends": 6,
       "public": true,
-      "last_change": "2026-08-10",
-      "change_count": 56,
+      "last_change": "2026-08-18",
+      "change_count": 57,
       "changes": [
+        {
+          "sha": "778961b",
+          "date": "2026-08-18",
+          "subject": "fix(retail): one open POS session must not silence a whole night of sales"
+        },
         {
           "sha": "5bb46bb",
           "date": "2026-08-10",
@@ -4410,11 +4415,6 @@
           "sha": "4429d6a",
           "date": "2026-07-27",
           "subject": "fix(mdm_api): make the endpoint survive having no user, and stop leaking a lock"
-        },
-        {
-          "sha": "07bdd14",
-          "date": "2026-07-27",
-          "subject": "feat(retail_import): MDM product-master REST API + X24DN pending-SKU replay"
         }
       ]
     },
