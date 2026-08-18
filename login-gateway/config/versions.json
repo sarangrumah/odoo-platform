@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-18T10:55:45+00:00",
+  "generated_at": "2026-08-18T11:01:22+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "91bdbd9",
-    "branch": "feat/levis-quickwins-aug18-main"
+    "commit": "0e16ae6",
+    "branch": "feat/levis-quickwins-aug18-batch2"
   },
   "buckets": [
     {
@@ -264,17 +264,12 @@
       "depends": 1,
       "public": false,
       "last_change": "2026-08-18",
-      "change_count": 5,
+      "change_count": 4,
       "changes": [
         {
-          "sha": "91bdbd9",
+          "sha": "62b4b5d",
           "date": "2026-08-18",
-          "subject": "docs(levis): knowledge file for custom_levis_asset_accounts, and refresh versions.json"
-        },
-        {
-          "sha": "08ab253",
-          "date": "2026-08-18",
-          "subject": "feat(levis): seed the six Right-of-Use asset categories (PSAK 73)"
+          "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
         },
         {
           "sha": "3b2f15d",
@@ -345,14 +340,24 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.32.0",
+      "version": "19.0.1.33.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
       "last_change": "2026-08-18",
-      "change_count": 48,
+      "change_count": 50,
       "changes": [
+        {
+          "sha": "9496655",
+          "date": "2026-08-18",
+          "subject": "feat(levis): show which bills a payment covers, on the wizard and the payment"
+        },
+        {
+          "sha": "c72238f",
+          "date": "2026-08-18",
+          "subject": "feat(levis): let the bill list be filtered by payment status and grouped by store"
+        },
         {
           "sha": "4147631",
           "date": "2026-08-18",
@@ -382,16 +387,6 @@
           "sha": "8092ac5",
           "date": "2026-08-11",
           "subject": "fix(levis): stop two rules claiming one bank terminal, and pick the specific keyword (#138)"
-        },
-        {
-          "sha": "48ac177",
-          "date": "2026-08-11",
-          "subject": "feat(levis): clear the month's POS receivables from the bank statement itself (#130)"
-        },
-        {
-          "sha": "611f04b",
-          "date": "2026-08-10",
-          "subject": "fix(levis): payment voucher mencetak nomor bill, bukan nomor payment sendiri (#118)"
         }
       ]
     },
@@ -1599,9 +1594,14 @@
       "category": "Accounting/Accounting",
       "depends": 9,
       "public": true,
-      "last_change": "2026-08-12",
-      "change_count": 17,
+      "last_change": "2026-08-13",
+      "change_count": 18,
       "changes": [
+        {
+          "sha": "3871ab4",
+          "date": "2026-08-13",
+          "subject": "feat(accounting): show the lock exceptions that outrank the lock dates (#169)"
+        },
         {
           "sha": "926e2c7",
           "date": "2026-08-12",
@@ -1636,11 +1636,6 @@
           "sha": "2c0ca58",
           "date": "2026-05-28",
           "subject": "feat(custom_accounting_full): PSAK template data + new accounting addons"
-        },
-        {
-          "sha": "10a06c9",
-          "date": "2026-05-24",
-          "subject": "refactor(addons): extract PSAK template to l10n_id_psak_custom for discoverability (#27)"
         }
       ]
     },
@@ -4383,9 +4378,14 @@
       "category": "Inventory/Retail",
       "depends": 6,
       "public": true,
-      "last_change": "2026-08-10",
-      "change_count": 56,
+      "last_change": "2026-08-18",
+      "change_count": 57,
       "changes": [
+        {
+          "sha": "ceaae47",
+          "date": "2026-08-18",
+          "subject": "fix(retail): one open POS session must not silence a whole night of sales (#170)"
+        },
         {
           "sha": "5bb46bb",
           "date": "2026-08-10",
@@ -4420,11 +4420,6 @@
           "sha": "4429d6a",
           "date": "2026-07-27",
           "subject": "fix(mdm_api): make the endpoint survive having no user, and stop leaking a lock"
-        },
-        {
-          "sha": "07bdd14",
-          "date": "2026-07-27",
-          "subject": "feat(retail_import): MDM product-master REST API + X24DN pending-SKU replay"
         }
       ]
     },
@@ -4466,14 +4461,19 @@
       "module": "custom_retail_import_pos",
       "bucket": "ee_gap",
       "name": "Custom Retail Import — POS bridge",
-      "version": "19.0.0.5.0",
+      "version": "19.0.0.6.0",
       "summary": "Book imported POS sales/returns with the source file's own tax, discount and return accounts",
       "category": "Inventory/Retail",
       "depends": 2,
       "public": true,
-      "last_change": "2026-08-05",
-      "change_count": 4,
+      "last_change": "2026-08-18",
+      "change_count": 5,
       "changes": [
+        {
+          "sha": "7e7c414",
+          "date": "2026-08-18",
+          "subject": "fix(levis): a returned item grosses up Sales Return, never Gross Sales"
+        },
         {
           "sha": "3fd30e8",
           "date": "2026-08-05",
