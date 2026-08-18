@@ -36,3 +36,26 @@ default ignore = false
 ignore {
 	input.PkgName == "linux-libc-dev"
 }
+
+# Go stdlib v1.26.5, as compiled into the static docker CLI that
+# tenant-orchestrator ships (`usr/local/bin/docker`, gobinary target). Eight
+# HIGH findings as of 18-Aug-2026, led by CVE-2026-33818 (encoding/asn1 DoS).
+#
+# Why it cannot be fixed by bumping, which is what the Dockerfile comment tells
+# you to do first: 29.7.2 is the newest static release Docker publishes and it
+# is *also* built with go1.26.5 (verified by reading the build stamp out of the
+# tarball). The fix needs go1.26.6, and no Docker release carries it yet.
+#
+# Why the exposure is negligible here: the binary is only ever invoked as
+# `docker exec` against /var/run/docker.sock, mounted read-only, on the local
+# host. It parses no ASN.1 from a remote peer — there is no TLS transport and no
+# registry pull in that path.
+#
+# The rule is pinned to the exact vulnerable version ON PURPOSE, so it expires
+# by itself: the moment the CLI is rebuilt on any other Go build, this stops
+# matching and every finding reports again. Do NOT relax it to `PkgName ==
+# "stdlib"` alone — that would hide every future Go CVE in every binary.
+ignore {
+	input.PkgName == "stdlib"
+	input.InstalledVersion == "v1.26.5"
+}
