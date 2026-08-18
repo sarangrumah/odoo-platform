@@ -180,12 +180,8 @@ class CustomReportVat(models.AbstractModel):
         rows = self.env.cr.dictfetchall()
 
         # Batched reads — one browse per model, not one per row.
-        accounts = {
-            a.id: a for a in self.env["account.account"].browse(sorted({r["account_id"] for r in rows}))
-        }
-        moves = {
-            m.id: m for m in self.env["account.move"].browse(sorted({r["move_id"] for r in rows if r["move_id"]}))
-        }
+        accounts = {a.id: a for a in self.env["account.account"].browse(sorted({r["account_id"] for r in rows}))}
+        moves = {m.id: m for m in self.env["account.move"].browse(sorted({r["move_id"] for r in rows if r["move_id"]}))}
         partners = {
             p.id: p for p in self.env["res.partner"].browse(sorted({r["partner_id"] for r in rows if r["partner_id"]}))
         }

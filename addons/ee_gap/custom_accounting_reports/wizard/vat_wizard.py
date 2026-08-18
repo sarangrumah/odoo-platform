@@ -33,14 +33,12 @@ class VatReportWizard(models.TransientModel):
         string="Sisi PPN",
         default="both",
         required=True,
-        help="The reference pull carries both sides in one sheet; narrow it here "
-        "when only one account is wanted.",
+        help="The reference pull carries both sides in one sheet; narrow it here when only one account is wanted.",
     )
     account_ids = fields.Many2many(
         "account.account",
         string="Akun (opsional)",
-        help="Leave empty for every VAT account. A selection here narrows that "
-        "set, it never adds a non-VAT account.",
+        help="Leave empty for every VAT account. A selection here narrows that set, it never adds a non-VAT account.",
     )
     partner_ids = fields.Many2many("res.partner", string="Lawan Transaksi")
     posted_only = fields.Boolean(default=True)
