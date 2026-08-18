@@ -29,4 +29,32 @@
             </field>
         </field>
     </record>
+
+    <!--
+      Feature #20 on the payment itself. Core computes ``reconciled_bill_ids``
+      but only surfaces it as a smart-button count, so checking which bills a
+      payment settled meant clicking through. 40 of the 145 reconciled payments
+      in prd_levis_begbal settle more than one bill.
+    -->
+    <record id="view_account_payment_form_levis_bills" model="ir.ui.view">
+        <field name="name">account.payment.form.levis.settled.bills</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Bills Settled" invisible="not reconciled_bill_ids">
+                    <field name="reconciled_bill_ids" nolabel="1" colspan="2" readonly="1">
+                        <list create="false" delete="false">
+                            <field name="name" string="Bill No"/>
+                            <field name="invoice_date" string="Bill Date"/>
+                            <field name="ref" string="Vendor Ref"/>
+                            <field name="currency_id" column_invisible="1"/>
+                            <field name="amount_total" string="Total"/>
+                            <field name="amount_residual" string="Amount Due"/>
+                        </list>
+                    </field>
+                </group>
+            </xpath>
+        </field>
+    </record>
 </odoo>

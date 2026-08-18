@@ -293,6 +293,20 @@ that already has the module. The MID mapping is deliberately not seeded — see 
 gotcha below.
 
 ## Gotchas
+- **The vendor-bill list has no bare `partner_id` to anchor a view on.** Core's
+  `account.view_invoice_tree` carries `invoice_partner_display_name` **twice**,
+  one variant per move type, each `column_invisible` on the other. Inheriting
+  `<field name="partner_id" position="after">` raises *"cannot be located in
+  parent view"* and the whole module fails to load. Anchor on `ref` instead.
+- **Bill status lives in two fields.** Core's Draft / Posted / Cancelled filters
+  read `state`; Paid / Partially Paid / Reversed read `payment_state`. A bill is
+  routinely Posted **and** Paid, so the two filter groups must stay separate
+  rather than being merged into one status list.
+- **`payment_reference` is deliberately not auto-filled** from the bills a
+  payment settles. It feeds the Payment Voucher print-out and the bank export,
+  so populating it is an accounting decision, not a display convenience. The
+  bill list on the payment form (`reconciled_bill_ids`) and on the register
+  wizard (`l10n_bill_ids`) is read-only for the same reason.
 - **`l10n_id_kode_transaksi` is not a faktur number.** It is the two-digit DJP
   *transaction code* ("04" = DPP nilai lain). It used to sit at the end of
   `_edo_tax_number`'s fallback chain, so every bill entered without a faktur

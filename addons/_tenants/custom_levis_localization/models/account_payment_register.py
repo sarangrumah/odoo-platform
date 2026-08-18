@@ -51,6 +51,19 @@ class LevisPaymentRegisterFee(models.TransientModel):
 class AccountPaymentRegister(models.TransientModel):
     _inherit = "account.payment.register"
 
+    # --- Feature #20: the bills this payment is about to settle --------------
+    # The wizard already knows them (``line_ids`` are the AP lines pulled in),
+    # but it never showed them, so an operator paying a batch had no way to
+    # check WHAT is being paid without leaving the dialog. 40 of the 145
+    # reconciled payments in prd_levis_begbal settle more than one bill.
+    # Read-only mirror of ``line_ids.move_id`` -- selecting is done by picking
+    # the bills before opening the wizard, not here.
+    l10n_bill_ids = fields.Many2many(
+        "account.move",
+        string="Bills Being Paid",
+        compute="_compute_l10n_bill_ids",
+    )
+
     admin_fee_line_ids = fields.One2many("levis.payment.register.fee", "wizard_id", string="Admin Fees")
     admin_fee_total = fields.Monetary(
         string="Total Admin Fees",
@@ -101,6 +114,14 @@ class AccountPaymentRegister(models.TransientModel):
         if self.l10n_remark:
             vals["l10n_remark"] = self.l10n_remark
         return vals
+
+    @api.depends("line_ids")
+    def _compute_l10n_bill_ids(self):
+        for wizard in self:
+            moves = wizard.line_ids.move_id
+            wizard.l10n_bill_ids = moves.filtered(
+                lambda m: m.move_type in ("in_invoice", "in_refund", "out_invoice", "out_refund")
+            )
 
     @api.depends("admin_fee_line_ids.amount")
     def _compute_admin_fee_total(self):
