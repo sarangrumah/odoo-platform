@@ -134,11 +134,7 @@ class PosSession(models.Model):
             if not amount:
                 continue
             suffix = " — %s" % " ".join(filter(None, (code, description)))
-            debit_account, credit_account, amount = self._ri_reclass_legs(
-                counter_id, discount_id, is_return, amount
-            )
-            if not amount:
-                continue
+            debit_account, credit_account, amount = self._ri_reclass_legs(counter_id, discount_id, is_return, amount)
             # A fresh vals dict per line: ``analytic_distribution`` is a mutable Json
             # value and must never be shared between two create commands.
             vals.append(
@@ -158,9 +154,7 @@ class PosSession(models.Model):
                     account_id=credit_account,
                     debit=0.0,
                     credit=amount,
-                    name=(
-                        "POS %s%s" % ("return gross-up" if is_return else "discount gross-up", suffix)
-                    )[:200],
+                    name=("POS %s%s" % ("return gross-up" if is_return else "discount gross-up", suffix))[:200],
                 )
             )
         return vals
