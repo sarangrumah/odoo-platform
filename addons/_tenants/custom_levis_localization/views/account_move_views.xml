@@ -34,4 +34,60 @@
             </xpath>
         </field>
     </record>
+
+    <!--
+      Feature #10 + #12 on the vendor bill LIST and SEARCH panel.
+
+      #10: core ships Draft / Posted / Cancelled as the only status filters
+      (`state`), so a bill that is Paid or Reversed cannot be filtered at all:
+      305 paid and 3 reversed bills in prd_levis_begbal were unreachable. The
+      missing dimension is `payment_state`, added here as three filters plus a
+      group-by, kept separate from the existing `state` filters because a bill
+      is both Posted AND Paid.
+
+      #12: the Operating Unit (store) already lives on account.move but only on
+      the form, so Accounting could not filter or group the bill list per store.
+    -->
+    <record id="view_account_invoice_filter_levis" model="ir.ui.view">
+        <field name="name">account.move.search.levis.status.ou</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_account_invoice_filter"/>
+        <field name="arch" type="xml">
+            <field name="journal_id" position="after">
+                <field name="l10n_ou_analytic_id"/>
+            </field>
+            <filter name="cancel" position="after">
+                <separator/>
+                <filter name="l10n_paid" string="Paid"
+                        domain="[('payment_state', '=', 'paid')]"/>
+                <filter name="l10n_partial" string="Partially Paid"
+                        domain="[('payment_state', '=', 'partial')]"/>
+                <filter name="l10n_reversed" string="Reversed"
+                        domain="[('payment_state', '=', 'reversed')]"/>
+            </filter>
+            <filter name="status" position="after">
+                <filter name="l10n_group_payment_state" string="Payment Status"
+                        context="{'group_by': 'payment_state'}"/>
+                <filter name="l10n_group_ou" string="Operating Unit"
+                        context="{'group_by': 'l10n_ou_analytic_id'}"/>
+            </filter>
+        </field>
+    </record>
+
+    <record id="view_invoice_tree_levis_ou" model="ir.ui.view">
+        <field name="name">account.move.list.levis.ou</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="arch" type="xml">
+            <!--
+              Anchored on ``ref``: the list carries
+              ``invoice_partner_display_name`` TWICE (one variant per move type,
+              each column_invisible on the other), so a partner anchor is
+              ambiguous, and there is no bare ``partner_id`` to attach to.
+            -->
+            <field name="ref" position="after">
+                <field name="l10n_ou_analytic_id" optional="hide"/>
+            </field>
+        </field>
+    </record>
 </odoo>
