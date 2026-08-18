@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Fixed Asset Revaluation Accounts",
-    "version": "19.0.2.0.0",
+    "version": "19.0.2.1.0",
     "summary": "Seed the 6 EBR fixed-asset categories and wire IAS 16 revaluation "
     "account defaults onto fixed-asset groups by resolving Erajaya chart codes per "
     "company.",

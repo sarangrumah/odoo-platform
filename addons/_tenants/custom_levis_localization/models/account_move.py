@@ -244,10 +244,16 @@ class AccountMove(models.Model):
         """Faktur Pajak / tax invoice number.
 
         Levi's carries this in ``x_custom_nsfp`` (No. Faktur Pajak / NSFP, from
-        ``custom_coretax``); the l10n_id names are kept as fallbacks so the
+        ``custom_coretax``); ``l10n_id_tax_number`` is kept as a fallback so the
         report still works on a DB without Coretax.
+
+        ``l10n_id_kode_transaksi`` is deliberately NOT a fallback: it is the
+        two-digit *transaction code* ("04" for DPP nilai lain), not a faktur
+        number. A bill entered without a faktur pajak must print an empty Tax
+        Number -- printing "04" there reads as a real faktur to anyone reviewing
+        the voucher.
         """
-        return self._edo_first_field("x_custom_nsfp", "l10n_id_tax_number", "l10n_id_kode_transaksi", default="")
+        return self._edo_first_field("x_custom_nsfp", "l10n_id_tax_number", default="")
 
     def _edo_tax_date(self):
         """Tax point date — Coretax "Tanggal Faktur Pajak" (``x_custom_tanggal_

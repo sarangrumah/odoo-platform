@@ -74,6 +74,13 @@ This is the canonical Indonesian withholding + DPP module. Any BRD with "potong 
 - **Cross-vertical:** Indonesia-locked — DJP-specific rules.
 
 ## Gotchas
+- **`tax.withholding.category` is picked by code, not by name.** The field is
+  labelled "Kode Objek PPh" on the vendor bill, and there are 108 rows whose
+  `name` is a 60-character "jenis penghasilan" sentence. `_rec_names_search`
+  covers `bupot_object_code` (the DJP code the tax team quotes, e.g. 24-104-01)
+  and `code` (our internal handle, e.g. Z5-AF); `display_name` leads with the
+  object code. Reports read `category.name` directly, so they are unaffected by
+  the display change.
 - **`_post` ordering**: `_custom_apply_withholding` runs BEFORE `super()._post`. The withholding lines are created but the JOURNAL ITEMS for the hutang pajak are NOT created (`account_id` on the rule is captured but no `account.move.line` is debited/credited). The bupot draft is the only persistence. Module description says "balancing journal items" but code currently only materialises bupot.
 - **Idempotency via line presence** — if `x_custom_withholding_line_ids` exist, the engine skips. Re-posting a move that lost its lines (e.g. through `unlink`) will NOT re-apply.
 - **`_resolve_for_line` ignores `pph_22`/`pph_21` filters** — there's no special-casing; PPh 21 should be handled by a payroll module, not vendor bills.
