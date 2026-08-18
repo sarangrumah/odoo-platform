@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-12T22:15:04+00:00",
+  "generated_at": "2026-08-18T10:52:52+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "d45b75b",
-    "branch": "feat/bca-nfc-narrative"
+    "commit": "401126d",
+    "branch": "feat/levis-quickwins-aug18-main"
   },
   "buckets": [
     {
@@ -258,14 +258,19 @@
       "module": "custom_levis_asset_accounts",
       "bucket": "_tenants",
       "name": "Levi's Fixed Asset Revaluation Accounts",
-      "version": "19.0.2.0.0",
+      "version": "19.0.2.1.0",
       "summary": "Seed the 6 EBR fixed-asset categories and wire IAS 16 revaluation account defaults onto fixed-asset groups by resolving Erajaya chart codes per company.",
       "category": "Tenants/Levis",
       "depends": 1,
       "public": false,
-      "last_change": "2026-07-09",
-      "change_count": 3,
+      "last_change": "2026-08-18",
+      "change_count": 4,
       "changes": [
+        {
+          "sha": "08ab253",
+          "date": "2026-08-18",
+          "subject": "feat(levis): seed the six Right-of-Use asset categories (PSAK 73)"
+        },
         {
           "sha": "3b2f15d",
           "date": "2026-07-09",
@@ -335,14 +340,24 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.31.0",
+      "version": "19.0.1.32.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
-      "last_change": "2026-08-12",
-      "change_count": 46,
+      "last_change": "2026-08-18",
+      "change_count": 48,
       "changes": [
+        {
+          "sha": "4147631",
+          "date": "2026-08-18",
+          "subject": "fix(levis): a bill with no faktur pajak must print an empty Tax Number"
+        },
+        {
+          "sha": "5021153",
+          "date": "2026-08-13",
+          "subject": "feat(levis): read NFC settlements off the BCA narrative (#168)"
+        },
         {
           "sha": "d45b75b",
           "date": "2026-08-12",
@@ -372,16 +387,6 @@
           "sha": "611f04b",
           "date": "2026-08-10",
           "subject": "fix(levis): payment voucher mencetak nomor bill, bukan nomor payment sendiri (#118)"
-        },
-        {
-          "sha": "5d735a4",
-          "date": "2026-08-06",
-          "subject": "style: ruff format the swap-revert script and localization tests"
-        },
-        {
-          "sha": "966a522",
-          "date": "2026-08-06",
-          "subject": "chore(levis): record the PO swap guard in MODULE_KNOWLEDGE + refresh versions.json"
         }
       ]
     },
@@ -4890,14 +4895,19 @@
       "module": "custom_tax_id",
       "bucket": "ee_gap",
       "name": "Custom Tax Indonesia (PPh + DPP Nilai Lain)",
-      "version": "19.0.0.5.0",
+      "version": "19.0.0.6.0",
       "summary": "PPh 23 / 4(2) / 26 withholding engine, PPN DPP Nilai Lain (PMK 131/2024), Faktur Pengganti workflow",
       "category": "Accounting/Localizations",
       "depends": 9,
       "public": true,
-      "last_change": "2026-08-04",
-      "change_count": 19,
+      "last_change": "2026-08-18",
+      "change_count": 20,
       "changes": [
+        {
+          "sha": "f2bb7ad",
+          "date": "2026-08-18",
+          "subject": "feat(tax): find a Kode Objek PPh by its code, not by its 60-character name"
+        },
         {
           "sha": "635bde3",
           "date": "2026-08-04",
@@ -4932,11 +4942,6 @@
           "sha": "45201a5",
           "date": "2026-07-17",
           "subject": "fix(tax_id): stop withholding every bill line at 15% \"Deviden\"; let the operator pick the code"
-        },
-        {
-          "sha": "3b2f15d",
-          "date": "2026-07-09",
-          "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         }
       ]
     },
