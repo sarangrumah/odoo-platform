@@ -1,5 +1,5 @@
 Waiting for Confirmation	Begbal sudah di upload. Menunggu pengecekan & confirm nominal dari pak Brando & pak Darwin. Bukan blocker IT.
-Open	Engine e-Faktur/Coretax sudah terpasang. Template Excel "Invoice PPN" belum dibuat. [IT 18-Aug-2026]
+Waiting for Confirmation	Report VAT (Invoice PPN) sudah live di menu Laporan Pajak, format mengikuti contoh tarikan (13 kolom, saldo berjalan per akun, No Faktur Pajak & Nama Pemasok). Export Excel + PDF tersedia. Mohon dicek apakah kolom No. Trans # sudah sesuai. [IT 18-Aug-2026]
 Closed	Untuk menu report sudah ada boleh di check jika masih blm sesuai boleh diinfo
 Waiting for Confirmation	ARKA sudah tercetak di invoice (BCA 2682626268). AIM belum ada norek sama sekali - mohon kirim nomor + nama rekening PT Aero Inovasi Media. [IT 18-Aug-2026]
 Waiting for Confirmation	Sudah aktif: nama produk + Event/Lokasi/Tanggal tercetak di invoice, kedua company. Mohon dicek. [IT 18-Aug-2026]
@@ -20,6 +20,6 @@ Waiting for Confirmation	Modul Cash Advance sudah terpasang & terkonfigurasi (ak
 Open	GAP: saldo awal AR/AP naik agregat (AR 8 baris, AP 18 baris), sebagian besar tanpa partner - tidak bisa dipecah per pelanggan/vendor. Butuh detail begbal per partner dari Accounting. [IT 18-Aug-2026]
 Open	Teks akan ditambahkan di bawah nomor rekening. Untuk AIM belum bisa - norek belum tersedia. [IT 18-Aug-2026]
 Open	Yang tercetak di bawah Balance Due adalah blok "If you have any questions about this invoice..." + tanda tangan. Mohon konfirmasi bagian mana yang dihapus. [IT 18-Aug-2026]
-Open	GAP: user syafiqo.zhafran@erajaya.com belum ada di sistem. Mohon konfirmasi company & hak akses yang diperlukan. [IT 18-Aug-2026]
+Waiting for Confirmation	User syafiqo.zhafran@erajaya.com sudah dibuat (18-Aug-2026), hak akses sama dengan Mei, akses ke kedua company. Login case-sensitive - ketik huruf kecil semua. Password sementara dikirim terpisah, wajib diganti saat login pertama. [IT 18-Aug-2026]
 Open	Sudah tersedia: payment method Giro (in/out) dan vendor KAS NEGARA. Belum: trade/non-trade, kode billing di receipt bank untuk Giro, penamaan journal. [IT 18-Aug-2026]
-Open	Terkonfirmasi: pembayaran ARKA masih lewat COA perantara 1103000004 Outstanding Payments (contoh PBNK2/2026/00004). AIM sudah langsung ke bank. Perbaikan di journal BNK1/BNK2 ARKA. [IT 18-Aug-2026]
+Waiting for Confirmation	Sudah diperbaiki 18-Aug-2026: payment ARKA kini langsung ke akun bank, tidak lagi lewat 1103000004. CATATAN: 6 payment yang sudah terlanjur diposting meninggalkan Rp 320.052.945 di akun perantara (7 baris belum rekon) - perlu reclass oleh Accounting, tidak ikut terkoreksi otomatis. [IT 18-Aug-2026]

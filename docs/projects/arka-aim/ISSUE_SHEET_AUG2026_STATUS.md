@@ -28,7 +28,10 @@ merusak struktur — lewati sel `J3` kalau format aslinya mau dipertahankan.
 
 ## 1. GAP yang terkonfirmasi dengan bukti
 
-### 1.1 Item 25 / EO #4 — payment ARKA masih lewat COA perantara
+> Item 25, 23 dan 2 sudah **selesai** per 18-Aug-2026 — lihat masing-masing bagian
+> di bawah. Sisanya masih terbuka.
+
+### 1.1 Item 25 / EO #4 — payment ARKA masih lewat COA perantara — **SELESAI 18-Aug-2026**
 
 Pembayaran di company 2 masih membentur akun perantara, bukan langsung ke bank:
 
@@ -45,8 +48,11 @@ sehingga jurnalnya langsung Dr/Cr bank:
 PBCA2/2026/00001 | 1103019280 BCA - IDR-268.150.7878 | cr 11.875
 ```
 
-Perbaikan: isi `payment_account_id` pada seluruh method line journal `BNK1`/`BNK2`
-company 2 dengan akun bank masing-masing. `payment_account_id` yang NULL jatuh ke
+**Selesai 18-Aug-2026** (PR #173): 18 method line di `BNK1`/`BNK2`/`CSH`/`PCPAY`
+company 2 kini menunjuk akun likuiditas journal-nya sendiri; diuji dengan payment
+yang diposting lalu di-rollback. **Sisa Rp 320.052.945 di `1103000004` tidak ikut
+pindah** — 7 baris belum rekon dari 6 payment sebelum cutover, perlu reclass oleh
+Accounting. `payment_account_id` yang NULL jatuh ke
 default outstanding company — itulah sumber COA perantara.
 
 ### 1.2 Item 8 / EO #9 — depresiasi Jul-2026 dst belum menghasilkan jurnal
@@ -85,9 +91,11 @@ Baris opening s/d 30-Jun-2026:
 Saldo naik agregat, jadi Kartu Piutang/Utang dan aging tidak bisa dipecah per
 pelanggan/vendor. Butuh detail begbal per partner dari Accounting.
 
-### 1.4 Item 23 — user Fiqo belum ada
+### 1.4 Item 23 — user Fiqo belum ada — **SELESAI 18-Aug-2026**
 
-`syafiqo.zhafran@erajaya.com` tidak ada di `res_users`. Sebagai pembanding,
+**Selesai 18-Aug-2026** (PR #175): dibuat sebagai id=81, hak akses cermin Mei
+(13 grup, selisih nol), `authenticate` terverifikasi, bukan admin sistem.
+Sebelumnya `syafiqo.zhafran@erajaya.com` tidak ada sama sekali di `res_users`. Sebagai pembanding,
 `feri.01@`, `mei.mey@`, `sumida.01@`, `nuri.pancawati@`, `kurnia.adhi@` semuanya ada
 dan aktif — jadi item 7 sudah bisa ditutup. Ingat login Odoo 19 **case-sensitive**.
 
@@ -149,10 +157,31 @@ dikonfirmasi, eksekusinya kecil — rapikan master term, set default per partner
 Invoice yang sudah salah due date-nya tidak ikut terkoreksi dan harus diperbaiki
 lewat jalur yang benar (sudah posted).
 
-### 1.9 Item 2 — template Excel "Invoice PPN"
+### 1.9 Item 2 — template Excel "Invoice PPN" — **SELESAI 18-Aug-2026**
 
-`custom_coretax_export` 19.0.1.3.0 terpasang dan report Faktur Pajak sudah ada,
-tapi template tarikan Excel ala Otomotif belum dibuat.
+Yang diminta ternyata bukan rekap per faktur, melainkan **buku besar akun PPN**:
+setiap baris jurnal yang menyentuh VAT In / VAT Out, urut tanggal, saldo berjalan
+per akun, plus No Faktur Pajak dan Nama Pemasok. Referensinya dilacak lewat
+workbook di item 3 → baris 10 "Pajak → PPN (VAT)" → file contoh PT ERA MODE
+INDONESIA, berjudul "Rincian Buku Besar / REPORT VAT".
+
+Dibangun sebagai laporan baru `custom.report.vat` — **bukan** mengubah
+`custom.report.faktur.pajak`, yang menjawab pertanyaan berbeda (satu baris per
+invoice, DPP di sebelah PPN, untuk SPT 1111). Keduanya dipakai.
+
+Akun PPN diturunkan dari repartition line pajak sale/purchase dikurangi yang
+namanya diawali `PPh` — tidak di-hardcode. Di prd_arkaaim otomatis ketemu
+`1117200001` dan `2104300001`.
+
+**Terdeploy ke `prd_arkaaim` saja** (18-Aug-2026, modul 19.0.0.20.0, PR #177).
+DB lain tetap di 19.0.0.19.0 dan menunya tidak muncul di sana. Dump pra-deploy:
+`/var/backups/odoo/prd_arkaaim-pre-reportvat-20260818.dump`. Menu: *Invoicing →
+Reporting → Reports → Laporan Pajak → Report VAT (Invoice PPN)*.
+
+Satu hal yang perlu dikonfirmasi Tax: kolom **No. Trans #**. ERP asal contoh
+menomori voucher GL terpisah dari dokumennya, sementara Odoo satu move satu nama
+— jadi kolom itu dipetakan ke `invoice_origin`, bukan disalin. Pemetaannya
+diisolasi di `_transaction_no` supaya bisa digeser dengan satu baris.
 
 ---
 
