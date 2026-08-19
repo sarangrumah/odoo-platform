@@ -101,6 +101,13 @@ On `custom.coretax.fk.builder`:
   its header on row 1 and carry raw values.
 - **Only `out_invoice` is exported.** Credit notes are not FK records — they belong to Faktur
   Pengganti or Retur Masukan, which have their own paths.
+- **"Tidak ada faktur ... yang cocok" is almost always the company, not the period.** Both
+  wizards export one NPWP at a time and default `company_id` to the active company, so a
+  group user sitting on the holding company sees an empty July while the invoices sit in a
+  sibling company. `_coretax_fk_empty_hints()` (builder mixin) reruns the search with one
+  filter dropped at a time — other companies, unposted invoices, credit notes, the
+  partner/journal filters — and both the wizard banner (`empty_reason`) and the `UserError`
+  quote the result. Add a probe there, not in the wizards, so all entry points inherit it.
 - **`ir.actions.server` uses `group_ids`, not `groups_id`,** on Odoo 19. In XML data the
   rename fails as a bare `ParseError` that names no field.
 

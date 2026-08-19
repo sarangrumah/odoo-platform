@@ -167,6 +167,60 @@ class TestCoretaxFkEntryPoints(AccountTestInvoicingCommon):
         with self.assertRaises(UserError):
             self._wizard(date_from="2027-01-01", date_to="2027-01-31").action_export()
 
+    # ---------------------------------------------------- empty-set diagnosis
+
+    def test_empty_reason_names_the_other_company(self):
+        """The complaint behind this: the invoices existed, just not here."""
+        other = self.setup_other_company()["company"]
+        theirs = (
+            self.env["account.move"]
+            .sudo()
+            .with_company(other)
+            .create(
+                {
+                    "move_type": "out_invoice",
+                    "company_id": other.id,
+                    "partner_id": self.partner_a.id,
+                    "invoice_date": "2026-08-03",
+                    "invoice_line_ids": [(0, 0, {"name": "X", "quantity": 1, "price_unit": 10.0})],
+                }
+            )
+        )
+        theirs.action_post()
+
+        wizard = self._wizard()
+        self.assertEqual(wizard.preview_count, 0)
+        self.assertIn(other.name, wizard.empty_reason)
+
+        with self.assertRaises(UserError) as caught:
+            wizard.action_export()
+        # The company that was filtered on and the one holding the data both
+        # have to appear, or the message still leaves the user guessing.
+        self.assertIn(self.company.name, str(caught.exception))
+        self.assertIn(other.name, str(caught.exception))
+
+    def test_empty_reason_counts_unposted_invoices(self):
+        self._invoice(invoice_date="2026-08-12", post=False)
+        wizard = self._wizard()
+        self.assertEqual(wizard.preview_count, 0)
+        self.assertIn("posting", wizard.empty_reason.lower())
+
+    def test_empty_reason_blames_the_partner_filter(self):
+        self._invoice(invoice_date="2026-08-12")
+        wizard = self._wizard(partner_ids=[(6, 0, self.partner_b.ids)])
+        self.assertEqual(wizard.preview_count, 0)
+        self.assertIn("pelanggan", wizard.empty_reason)
+
+    def test_empty_reason_points_at_the_nearest_invoice(self):
+        self._invoice(invoice_date="2026-08-12")
+        wizard = self._wizard(date_from="2027-01-01", date_to="2027-01-31")
+        self.assertEqual(wizard.preview_count, 0)
+        self.assertIn("12/08/2026", wizard.empty_reason)
+
+    def test_empty_reason_is_blank_when_the_export_would_run(self):
+        self._invoice(invoice_date="2026-08-12")
+        self.assertFalse(self._wizard().empty_reason)
+
     def test_wizard_rejects_inverted_range(self):
         from odoo.exceptions import ValidationError
 

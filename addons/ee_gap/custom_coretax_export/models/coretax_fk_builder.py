@@ -267,6 +267,118 @@ class CoretaxFkBuilder(models.AbstractModel):
 
         return moves.sorted(lambda m: (m.invoice_date, m.name or "")), companies
 
+    # ------------------------------------------------------- empty-selection
+
+    def _coretax_fk_empty_hints(self, date_from, date_to, company, partner_ids=None, journal_ids=None):
+        """Explain an empty FK selection by loosening one filter at a time.
+
+        "Tidak ada data" is almost never an empty month — it is the active
+        company, a draft invoice, or a nota kredit that the user counted on.
+        Each probe keeps the period and drops exactly one condition, so the
+        line that comes back names the filter that actually emptied the set.
+        Record rules already bound every search to the user's allowed
+        companies, so the cross-company probe cannot leak another tenant.
+        """
+        Move = self.env["account.move"]
+        period = [("invoice_date", ">=", date_from), ("invoice_date", "<=", date_to)]
+        posted_sale = period + [("move_type", "=", "out_invoice"), ("state", "=", "posted")]
+        hints = []
+
+        elsewhere = Move._read_group(
+            posted_sale + [("company_id", "!=", company.id)],
+            groupby=["company_id"],
+            aggregates=["__count"],
+        )
+        if elsewhere:
+            per_company = [
+                _("%(name)s (%(count)s faktur)", name=other.display_name, count=count) for other, count in elsewhere
+            ]
+            hints.append(
+                _(
+                    "Ada faktur ter-posting di periode ini, tetapi milik perusahaan lain: "
+                    "%(companies)s. Satu berkas FK hanya memuat satu NPWP — ganti "
+                    "'Perusahaan' di wizard (atau pindah perusahaan aktif), lalu ekspor "
+                    "per perusahaan.",
+                    companies=", ".join(per_company),
+                )
+            )
+
+        in_company = [("company_id", "=", company.id)]
+        unposted = Move.search_count(
+            period + in_company + [("move_type", "=", "out_invoice"), ("state", "!=", "posted")]
+        )
+        if unposted:
+            hints.append(
+                _(
+                    "%(count)s faktur penjualan di periode ini belum ter-posting (draft/batal). "
+                    "Coretax hanya menerima faktur ter-posting — posting dulu, lalu ulangi ekspor.",
+                    count=unposted,
+                )
+            )
+
+        refunds = Move.search_count(period + in_company + [("move_type", "=", "out_refund"), ("state", "=", "posted")])
+        if refunds:
+            hints.append(
+                _(
+                    "%(count)s nota kredit (retur penjualan) ada di periode ini. Nota kredit "
+                    "tidak masuk berkas FK — gunakan template Retur.",
+                    count=refunds,
+                )
+            )
+
+        if partner_ids:
+            loosened = Move.search_count(posted_sale + in_company + self._coretax_journal_domain(journal_ids))
+            if loosened:
+                hints.append(
+                    _(
+                        "Tanpa filter pelanggan ada %(count)s faktur — filter pelanggannya yang terlalu sempit.",
+                        count=loosened,
+                    )
+                )
+        if journal_ids:
+            loosened = Move.search_count(posted_sale + in_company + self._coretax_partner_domain(partner_ids))
+            if loosened:
+                hints.append(
+                    _(
+                        "Tanpa filter jurnal ada %(count)s faktur — filter jurnalnya yang terlalu sempit.",
+                        count=loosened,
+                    )
+                )
+
+        if not hints:
+            # Nothing anywhere in the period: point at the nearest invoice so the
+            # user can see at a glance whether they are off by a month.
+            nearest = Move.search(
+                [("move_type", "=", "out_invoice"), ("state", "=", "posted")] + in_company,
+                order="invoice_date desc",
+                limit=1,
+            )
+            if nearest:
+                hints.append(
+                    _(
+                        "Faktur penjualan ter-posting terakhir di %(company)s bertanggal "
+                        "%(date)s — periksa kembali periode yang dipilih.",
+                        company=company.name,
+                        date=self._fmt_date(nearest.invoice_date),
+                    )
+                )
+            else:
+                hints.append(
+                    _(
+                        "Belum ada satu pun faktur penjualan ter-posting di %(company)s.",
+                        company=company.name,
+                    )
+                )
+        return hints
+
+    @staticmethod
+    def _coretax_partner_domain(partner_ids):
+        return [("partner_id", "child_of", partner_ids.ids)] if partner_ids else []
+
+    @staticmethod
+    def _coretax_journal_domain(journal_ids):
+        return [("journal_id", "in", journal_ids.ids)] if journal_ids else []
+
     # --------------------------------------------------------- row building
 
     def _coretax_fk_rows(self, moves, company=None):

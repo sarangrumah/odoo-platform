@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-19T02:52:24+00:00",
+  "generated_at": "2026-08-19T03:51:47+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "482bd09",
-    "branch": "feat/levis-tax-amount-reset-draft"
+    "commit": "7bc905e",
+    "branch": "fix/coretax-empty-export-explains-itself"
   },
   "buckets": [
     {
@@ -2113,14 +2113,19 @@
       "module": "custom_coretax_export",
       "bucket": "ee_gap",
       "name": "Coretax Import File Export (DJP Templates)",
-      "version": "19.0.1.3.0",
+      "version": "19.0.1.4.0",
       "summary": "Emit DJP-conformant Coretax import workbooks: e-Faktur Keluaran (FK/OF), Retur Masukan, Bupot Unifikasi, Bupot PPh 21, Bupot Non-Resident",
       "category": "Accounting/Localizations",
       "depends": 3,
       "public": true,
-      "last_change": "2026-08-05",
-      "change_count": 5,
+      "last_change": "2026-08-19",
+      "change_count": 6,
       "changes": [
+        {
+          "sha": "7bc905e",
+          "date": "2026-08-19",
+          "subject": "fix(coretax): say which company the missing faktur are actually in"
+        },
         {
           "sha": "43281e2",
           "date": "2026-08-05",
@@ -4909,9 +4914,9 @@
       "change_count": 21,
       "changes": [
         {
-          "sha": "482bd09",
+          "sha": "294f94d",
           "date": "2026-08-19",
-          "subject": "fix(tax): a reset to draft must not retype the PPN and PPh the operator entered"
+          "subject": "fix(tax): a reset to draft must not retype the PPN and PPh the operator entered (#178)"
         },
         {
           "sha": "62b4b5d",

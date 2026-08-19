@@ -588,12 +588,33 @@ class CoretaxTemplateExportWizard(models.TransientModel):
         method, sheet_name, stem = builder
         header_rows, data_rows = getattr(self, method)()
         if not data_rows:
+            start, end = self._period_bounds()
+            # The FK sheet is the one template whose emptiness has a cheap
+            # explanation — reuse the date-range wizard's probes instead of the
+            # generic "periksa bukti potong" line, which sends the user looking
+            # in the wrong place entirely.
+            if self.template == "fk":
+                detail = "\n\n".join(self._coretax_fk_empty_hints(start, end, self.company_id))
+            elif self.template == "retur":
+                detail = _(
+                    "Retur Masukan diambil dari nota kredit pemasok (vendor credit note) "
+                    "ter-posting di periode ini — bukan dari retur penjualan."
+                )
+            elif self.template == "taxlist":
+                detail = _("Perusahaan ini belum punya pajak yang terkonfigurasi.")
+            else:
+                detail = _("Periksa: apakah ada bukti potong ter-posting di periode tersebut?")
             raise UserError(
                 _(
-                    "Tidak ada data untuk masa pajak %(masa)s/%(tahun)s pada template ini.\n\n"
-                    "Periksa: apakah ada bukti potong ter-posting di periode tersebut?",
+                    "Tidak ada data untuk masa pajak %(masa)s/%(tahun)s pada template ini.\n"
+                    "  - perusahaan: %(company)s\n"
+                    "  - periode %(start)s s/d %(end)s\n\n%(detail)s",
                     masa=self.masa_pajak,
                     tahun=self.tahun_pajak,
+                    company=self.company_id.display_name,
+                    start=start,
+                    end=end,
+                    detail=detail,
                 )
             )
         content = self._render(header_rows, data_rows, sheet_name)
