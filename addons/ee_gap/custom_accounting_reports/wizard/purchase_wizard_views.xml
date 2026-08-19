@@ -10,6 +10,9 @@
                         <field name="date_from"/>
                         <field name="date_to"/>
                         <field name="group_by"/>
+                        <field name="show_purchase_type" invisible="1"/>
+                        <field name="purchase_type"
+                               invisible="not show_purchase_type"/>
                         <field name="posted_only"/>
                     </group>
                     <group>

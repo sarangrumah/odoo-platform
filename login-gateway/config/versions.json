@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-19T04:21:56+00:00",
+  "generated_at": "2026-08-19T04:29:29+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "4c76705",
-    "branch": "feat/levis-voucher-bill-rows"
+    "commit": "087ae18",
+    "branch": "HEAD"
   },
   "buckets": [
     {
@@ -349,9 +349,9 @@
       "change_count": 50,
       "changes": [
         {
-          "sha": "4c76705",
+          "sha": "e0f5965",
           "date": "2026-08-19",
-          "subject": "feat(levis): the payment voucher names every bill it settles, with the amount applied to each"
+          "subject": "feat(levis): the payment voucher names every bill it settles, with the amount applied to each (#184)"
         },
         {
           "sha": "2653a4b",
@@ -1697,14 +1697,19 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.19.0",
+      "version": "19.0.0.21.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 4,
       "public": true,
-      "last_change": "2026-08-11",
-      "change_count": 50,
+      "last_change": "2026-08-19",
+      "change_count": 51,
       "changes": [
+        {
+          "sha": "087ae18",
+          "date": "2026-08-19",
+          "subject": "feat(reports): split the Purchase Register into Trade and Non-Trade"
+        },
         {
           "sha": "c854c71",
           "date": "2026-08-11",
@@ -1739,11 +1744,6 @@
           "sha": "7d2c250",
           "date": "2026-08-04",
           "subject": "docs(reports): record the on-screen table contract and the grouped flattener"
-        },
-        {
-          "sha": "11aeafa",
-          "date": "2026-08-04",
-          "subject": "fix(reports): render grouped reports on screen, not just in Excel"
         }
       ]
     },
