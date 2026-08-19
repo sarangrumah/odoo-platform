@@ -15,6 +15,7 @@ access_advance_wizard_user,advance wizard user,model_custom_report_advance_wizar
 access_sales_wizard_user,sales wizard user,model_custom_report_sales_wizard,group_report_user,1,1,1,1
 access_tax_wizard_user,tax wizard user,model_custom_report_tax_wizard,group_report_user,1,1,1,1
 access_faktur_pajak_wizard_user,faktur pajak wizard user,model_custom_report_faktur_pajak_wizard,group_report_user,1,1,1,1
+access_ppn_digunggung_wizard_user,ppn digunggung wizard user,model_custom_report_ppn_digunggung_wizard,group_report_user,1,1,1,1
 access_ppn_masukan_import_wizard_user,ppn masukan import wizard user,model_custom_report_ppn_masukan_import_wizard,group_report_user,1,1,1,1
 access_bupot_wizard_user,bupot wizard user,model_custom_report_bupot_wizard,group_report_user,1,1,1,1
 access_spt_ppn_wizard_user,spt ppn wizard user,model_custom_report_spt_ppn_wizard,group_report_user,1,1,1,1

@@ -13,6 +13,7 @@ from . import advance_wizard
 from . import sales_wizard
 from . import tax_report_wizard
 from . import faktur_pajak_wizard
+from . import ppn_digunggung_wizard
 from . import ppn_masukan_import_wizard
 from . import bupot_wizard
 from . import spt_ppn_wizard

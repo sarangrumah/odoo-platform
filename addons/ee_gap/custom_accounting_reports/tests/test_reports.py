@@ -1696,3 +1696,120 @@ class TestCustomReports(TransactionCase):
             wizard.show_purchase_type,
             "l10n_purchase_type" in self.Move._fields,
         )
+
+    # ------------------------------------------------------------------
+    # PPN Keluaran Digunggung (PKP Pedagang Eceran)
+    # ------------------------------------------------------------------
+    def _post_retail_sale(self, amount, tax, when=None):
+        """A POS-shaped sale: a journal entry, no customer invoice."""
+        when = when or date.today()
+        # One cash account for every retail sale in a test: ``_mk_account``
+        # would trip Odoo's unique-code constraint on the second call.
+        # ``account.account.code`` is company-dependent in Odoo 19 and the model
+        # has no ``company_id`` — search it under the company, and create only
+        # once so the unique-code constraint is not tripped on a second sale.
+        acc_cash = self.Account.with_company(self.company).search(
+            [("code", "=", "11190")], limit=1
+        ) or self._mk_account("11190", "Kas Toko", "asset_current")
+        move = self.Move.create(
+            {
+                "move_type": "entry",
+                "journal_id": self.j_sale.id,
+                "date": when,
+                "company_id": self.company.id,
+                # Only the base and the cash side: Odoo derives the tax line
+                # from ``tax_ids`` itself. Writing one by hand as well leaves
+                # the entry unbalanced by exactly the PPN.
+                "line_ids": [
+                    Command.create(
+                        {
+                            "name": "Penjualan eceran",
+                            "account_id": self.acc_revenue.id,
+                            "credit": amount,
+                            "tax_ids": [Command.set([tax.id])],
+                        }
+                    ),
+                    Command.create(
+                        {
+                            "name": "Kas",
+                            "account_id": acc_cash.id,
+                            "debit": amount * (1 + tax.amount / 100.0),
+                        }
+                    ),
+                ],
+            }
+        )
+        move.action_post()
+        return move
+
+    def test_ppn_digunggung_presents_11_percent_as_12_on_nilai_lain(self):
+        acc_ppn_out = self._mk_account("21201", "PPN Keluaran Eceran", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Eceran 11%", "sale", acc_ppn_out)
+        self._post_retail_sale(1_200_000.0, ppn)
+
+        lines = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
+        masa = [l for l in lines if l.get("type") == "subtotal"]
+        self.assertEqual(len(masa), 1, "One tax period expected.")
+        # Harga jual stays whole; the presented base is 11/12 of it and the
+        # tariff is the statutory 12 — the PPN rupiah is unchanged at 11%.
+        self.assertAlmostEqual(masa[0]["dpp_penuh"], 1_200_000.0, places=2)
+        self.assertAlmostEqual(masa[0]["dpp_lain"], 1_100_000.0, places=2)
+        self.assertEqual(masa[0]["tarif"], 12.0)
+        self.assertAlmostEqual(masa[0]["ppn"], 132_000.0, places=2)
+        self.assertAlmostEqual(masa[0]["dpp_lain"] * 0.12, masa[0]["ppn"], places=2)
+
+    def test_ppn_digunggung_excludes_customer_invoices(self):
+        """An invoiced sale belongs to the per-faktur report, never here."""
+        acc_ppn_out = self._mk_account("21202", "PPN Keluaran FK", "liability_current")
+        ppn = self._mk_ppn_tax("PPN FK 11%", "sale", acc_ppn_out)
+        inv = self.Move.create(
+            {
+                "move_type": "out_invoice",
+                "journal_id": self.j_sale.id,
+                "partner_id": self.partner_a.id,
+                "invoice_date": date.today(),
+                "date": date.today(),
+                "company_id": self.company.id,
+                "invoice_line_ids": [
+                    Command.create(
+                        {
+                            "name": "Barang B",
+                            "quantity": 1.0,
+                            "price_unit": 500_000.0,
+                            "account_id": self.acc_revenue.id,
+                            "tax_ids": [Command.set([ppn.id])],
+                        }
+                    )
+                ],
+            }
+        )
+        inv.action_post()
+        self._post_retail_sale(1_200_000.0, ppn)
+
+        lines = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        # Only the retail sale: 1.200.000 harga jual, never 1.700.000.
+        self.assertAlmostEqual(grand["dpp_penuh"], 1_200_000.0, places=2)
+        self.assertAlmostEqual(grand["ppn"], 132_000.0, places=2)
+
+    def test_ppn_digunggung_daily_detail_follows_the_recap(self):
+        acc_ppn_out = self._mk_account("21203", "PPN Keluaran Harian", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Harian 11%", "sale", acc_ppn_out)
+        today = date.today()
+        self._post_retail_sale(1_200_000.0, ppn, when=today)
+        self._post_retail_sale(600_000.0, ppn, when=today - timedelta(days=1))
+
+        lines = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
+        detail = [l for l in lines if not l.get("type")]
+        self.assertEqual(len(detail), 2, "One line per trading day expected.")
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(sum(d["ppn"] for d in detail), grand["ppn"], places=2)
+        self.assertAlmostEqual(grand["dpp_penuh"], 1_800_000.0, places=2)
+
+    def test_ppn_digunggung_registered_in_both_dispatch_registries(self):
+        """Guard against the silent Trial-Balance fallback (19.0.0.9.0)."""
+        from odoo.addons.custom_accounting_reports.models.custom_report_dispatch import REPORT_MODEL_MAP
+
+        self.assertEqual(REPORT_MODEL_MAP.get("ppn_digunggung"), "custom.report.ppn.digunggung")
+        router = self.env.ref("custom_accounting_reports.report_dispatch").arch
+        self.assertIn("report_ppn_digunggung", router)

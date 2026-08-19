@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-19T11:19:30+00:00",
+  "generated_at": "2026-08-19T23:16:00+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "8069d0f",
-    "branch": "fix/coretax-fk-referensi-invoice-number"
+    "commit": "c402dc4",
+    "branch": "feat/ppn-digunggung-report"
   },
   "buckets": [
     {
@@ -1697,7 +1697,7 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.21.0",
+      "version": "19.0.0.22.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 4,
@@ -2122,9 +2122,9 @@
       "change_count": 9,
       "changes": [
         {
-          "sha": "8069d0f",
+          "sha": "c402dc4",
           "date": "2026-08-19",
-          "subject": "fix(coretax): FK REFERENSI carries the invoice number, not the sales order"
+          "subject": "fix(coretax): FK REFERENSI carries the invoice number, not the sales order (#189)"
         },
         {
           "sha": "af714e7",

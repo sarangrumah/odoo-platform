@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ppn_digunggung_wizard_form" model="ir.ui.view">
+        <field name="name">custom.report.ppn.digunggung.wizard.form</field>
+        <field name="model">custom.report.ppn.digunggung.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Rekap PPN Keluaran Digunggung">
+                <div class="alert alert-info" role="status">
+                    Penyerahan eceran tanpa identitas pembeli (PKP Pedagang Eceran).
+                    Penjualan yang diterbitkan faktur pajak per transaksi ada di
+                    <b>Rekap Faktur Pajak</b>, bukan di sini.
+                </div>
+                <group>
+                    <group>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="posted_only"/>
+                    </group>
+                    <group>
+                        <field name="company_ids" widget="many2many_tags"/>
+                    </group>
+                </group>
+                <footer>
+                    <button string="View" name="action_view"
+                            type="object" class="btn-primary"/>
+                    <button string="Print PDF" name="action_print"
+                            type="object" class="btn-secondary"/>
+                    <button string="Export Excel" name="action_export_xlsx"
+                            type="object" class="btn-secondary"/>
+                    <button string="Lihat Transaksi" name="action_view_source"
+                            type="object" class="btn-secondary"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ppn_digunggung_wizard" model="ir.actions.act_window">
+        <field name="name">Rekap PPN Digunggung</field>
+        <field name="res_model">custom.report.ppn.digunggung.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
