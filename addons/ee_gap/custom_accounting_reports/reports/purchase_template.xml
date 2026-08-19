@@ -3,11 +3,15 @@
     <data>
         <template id="report_purchase">
             <t t-call="custom_accounting_reports.report_header"/>
+            <p t-if="purchase_type_label" class="fw-bold">
+                Purchase Type: <span t-esc="purchase_type_label"/>
+            </p>
             <table class="table table-sm table-bordered">
                 <thead class="table-light">
                     <tr>
                         <th>Date</th>
                         <th>Bill No</th>
+                        <th t-if="show_ptype">Type</th>
                         <th>Vendor</th>
                         <th>Product</th>
                         <th class="text-end">Qty</th>
@@ -21,6 +25,7 @@
                         t-att-class="'fw-bold table-secondary' if line.get('type') in ('subtotal', 'grand_total') else ''">
                         <td t-esc="line.get('date')"/>
                         <td t-esc="line.get('invoice_no')"/>
+                        <td t-if="show_ptype" t-esc="line.get('ptype')"/>
                         <td t-esc="line.get('vendor')"/>
                         <td t-esc="line.get('product')"/>
                         <td class="text-end" t-esc="line.get('quantity')"/>

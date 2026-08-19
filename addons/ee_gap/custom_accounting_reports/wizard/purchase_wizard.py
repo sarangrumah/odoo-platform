@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import date
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class PurchaseWizard(models.TransientModel):
@@ -29,12 +29,39 @@ class PurchaseWizard(models.TransientModel):
             ("vendor", "By Vendor"),
             ("product", "By Product"),
             ("month", "By Month"),
+            ("purchase_type", "By Trade / Non-Trade"),
         ],
         string="Group By",
         default="none",
         required=True,
     )
     posted_only = fields.Boolean(default=True)
+
+    # Trade / Non-Trade stream (Levi's feature #9). The underlying
+    # ``account.move.l10n_purchase_type`` comes from the tenant module
+    # custom_levis_localization; on databases without it the filter is hidden
+    # and the report keeps its previous shape.
+    purchase_type = fields.Selection(
+        [
+            ("all", "All"),
+            ("trade", "Trade"),
+            ("non_trade", "Non-Trade"),
+            ("unclassified", "Unclassified"),
+        ],
+        string="Purchase Type",
+        default="all",
+        required=True,
+        help="Restrict the register to one purchase stream. Bills without a "
+        "stream fall back to the reversed entry and the source purchase order "
+        "before being reported as Unclassified.",
+    )
+    show_purchase_type = fields.Boolean(compute="_compute_show_purchase_type")
+
+    @api.depends_context("uid")
+    def _compute_show_purchase_type(self):
+        available = "l10n_purchase_type" in self.env["account.move"]._fields
+        for wizard in self:
+            wizard.show_purchase_type = available
 
     def _build_filters(self):
         self.ensure_one()
@@ -45,6 +72,7 @@ class PurchaseWizard(models.TransientModel):
             "partner_ids": self.partner_ids.ids,
             "group_by": self.group_by,
             "posted_only": self.posted_only,
+            "purchase_type": self.purchase_type,
         }
 
     def action_print(self):
@@ -67,5 +95,8 @@ class PurchaseWizard(models.TransientModel):
             "date_from": self.date_from.isoformat(),
             "date_to": self.date_to.isoformat(),
         }
-        filename = "Purchase_Report_%s_%s.xlsx" % (self.date_from, self.date_to)
+        suffix = {"trade": "_Trade", "non_trade": "_NonTrade", "unclassified": "_Unclassified"}.get(
+            self.purchase_type, ""
+        )
+        filename = "Purchase_Report%s_%s_%s.xlsx" % (suffix, self.date_from, self.date_to)
         return self.env["custom.report.purchase"]._xlsx_action(options, filename)

@@ -1610,3 +1610,91 @@ class TestCustomReports(TransactionCase):
         table = self.env["custom.report.aged.payable"].get_report_table(options, {"aging_detail": True})
         self.assertTrue(table["columns"])
         self.assertEqual(table["lines"][-1]["type"], "grand_total")
+
+    # ------------------------------------------------------------------
+    # 23) Purchase register: Trade / Non-Trade split.
+    #     ``account.move.l10n_purchase_type`` belongs to the tenant module
+    #     custom_levis_localization, which this addon must not depend on, so
+    #     the column and the filter are gated on the field being present.
+    #     Both branches are asserted here — CI runs the "absent" one.
+    # ------------------------------------------------------------------
+    def _mk_bill(self, price, ptype=None):
+        j_purchase = self.env["account.journal"].search(
+            [("type", "=", "purchase"), ("company_id", "=", self.company.id)], limit=1
+        ) or self.Journal.create(
+            {"name": "Purchases Reg", "code": "BLLR", "type": "purchase", "company_id": self.company.id}
+        )
+        vals = {
+            "move_type": "in_invoice",
+            "journal_id": j_purchase.id,
+            "partner_id": self.partner_b.id,
+            "invoice_date": date.today(),
+            "date": date.today(),
+            "company_id": self.company.id,
+            "invoice_line_ids": [
+                Command.create(
+                    {
+                        "name": "Barang",
+                        "quantity": 1.0,
+                        "price_unit": price,
+                        "account_id": self.acc_expense.id,
+                        "tax_ids": [Command.clear()],
+                    }
+                )
+            ],
+        }
+        if ptype and "l10n_purchase_type" in self.Move._fields:
+            vals["l10n_purchase_type"] = ptype
+        bill = self.Move.create(vals)
+        bill.action_post()
+        return bill
+
+    def _purchase_options(self, **extra):
+        return {
+            "date_from": date.today().replace(month=1, day=1),
+            "date_to": date.today(),
+            "company_ids": [self.company.id],
+            "posted_only": True,
+            **extra,
+        }
+
+    def test_purchase_register_purchase_type_split(self):
+        report = self.env["custom.report.purchase"]
+        self._mk_bill(1000.0, "trade")
+        self._mk_bill(400.0, "non_trade")
+
+        headers = [c["header"] for c in report._xlsx_columns()]
+        available = report._purchase_type_available()
+        self.assertEqual("Type" in headers, available)
+
+        lines = report._build_lines(self._purchase_options())
+        self.assertEqual(lines[-1]["type"], "grand_total")
+        self.assertAlmostEqual(lines[-1]["untaxed"], 1400.0, places=2)
+
+        if not available:
+            # Without the tenant field the filter is inert, never empty.
+            inert = report._build_lines(self._purchase_options(purchase_type="trade"))
+            self.assertAlmostEqual(inert[-1]["untaxed"], 1400.0, places=2)
+            return
+
+        trade = report._build_lines(self._purchase_options(purchase_type="trade"))
+        self.assertAlmostEqual(trade[-1]["untaxed"], 1000.0, places=2)
+        non_trade = report._build_lines(self._purchase_options(purchase_type="non_trade"))
+        self.assertAlmostEqual(non_trade[-1]["untaxed"], 400.0, places=2)
+
+        grouped = report._build_lines(self._purchase_options(group_by="purchase_type"))
+        subtotals = {
+            line["ptype"]: line["untaxed"] for line in grouped if line.get("type") == "subtotal"
+        }
+        self.assertEqual(
+            {"Subtotal: Trade": 1000.0, "Subtotal: Non-Trade": 400.0},
+            {k: round(v, 2) for k, v in subtotals.items()},
+        )
+
+    def test_purchase_wizard_filter_flows_through(self):
+        wizard = self.env["custom.report.purchase.wizard"].create({"purchase_type": "non_trade"})
+        self.assertEqual(wizard._build_filters()["purchase_type"], "non_trade")
+        self.assertEqual(
+            wizard.show_purchase_type,
+            "l10n_purchase_type" in self.Move._fields,
+        )
