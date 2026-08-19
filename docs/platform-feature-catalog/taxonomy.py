@@ -317,6 +317,7 @@ DOMAIN_BY_MODULE = {
     "custom_crm": "penjualan-retail-pos",
     "custom_ecommerce": "penjualan-retail-pos",
     "custom_pos_id": "penjualan-retail-pos",
+    "custom_pos_tax_id": "perpajakan-indonesia",
     "custom_retail_import": "penjualan-retail-pos",
     "custom_operating_unit_pos": "penjualan-retail-pos",
     "custom_retail_import_api": "penjualan-retail-pos",
@@ -420,6 +421,7 @@ DOMAIN_SECONDARY = {
     "custom_payment_id": ["penjualan-retail-pos"],
     "custom_petty_cash": ["sdm-payroll"],
     "custom_pos_id": ["perpajakan-indonesia"],
+    "custom_pos_tax_id": ["penjualan-retail-pos"],
     "custom_ppob_commission": ["perpajakan-indonesia"],
     "custom_ppob_rollup": ["perpajakan-indonesia"],
     "custom_retail_import_pos": ["keuangan-akuntansi"],
@@ -889,6 +891,10 @@ ID_LABELS = {
     "custom_crm": (
         "CRM & Prospek",
         "Penambangan prospek, skoring prediktif, pengayaan data, formulir web, dan otomasi.",
+    ),
+    "custom_pos_tax_id": (
+        "Identitas Pajak di POS",
+        "NPWP/NIK pembeli di POS: syarat e-Faktur atas penjualan eceran yang diminta fakturnya.",
     ),
     "custom_ecommerce": (
         "eCommerce Indonesia",
