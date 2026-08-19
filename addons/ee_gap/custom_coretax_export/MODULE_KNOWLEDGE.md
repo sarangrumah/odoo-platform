@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-08-05T00:00:00Z
 generator: claude-code-handwritten
 module: custom_coretax_export
-manifest_version: 19.0.1.3.0
+manifest_version: 19.0.1.6.1
 ---
 
 # custom_coretax_export
@@ -122,6 +122,12 @@ On `custom.coretax.fk.builder`:
   filter dropped at a time — other companies, unposted invoices, credit notes, the
   partner/journal filters — and both the wizard banner (`empty_reason`) and the `UserError`
   quote the result. Add a probe there, not in the wizards, so all entry points inherit it.
+- **`REFERENSI` on an FK row is `move.name`, never `move.ref`.** On a customer invoice
+  `ref` holds the source order / customer reference — in the Levi's flows, the sales-order
+  number — so the old `move.ref or move.name` shipped the SO and the invoice number never
+  appeared in the column the tax team reconciles the upload against. The bupot layouts keep
+  `move.ref` on purpose: their reference document is a vendor bill, where `ref` really is
+  the counterparty's invoice number.
 - **`ir.actions.server` uses `group_ids`, not `groups_id`,** on Odoo 19. In XML data the
   rename fails as a bare `ParseError` that names no field.
 
