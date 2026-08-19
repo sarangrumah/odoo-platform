@@ -53,6 +53,11 @@ class CoretaxFkExportWizard(models.TransientModel):
         string="Faktur Terpilih",
         help="Jumlah faktur penjualan ter-posting yang akan masuk ke berkas.",
     )
+    empty_reason = fields.Text(
+        compute="_compute_preview_count",
+        string="Kenapa kosong",
+        help="Alasan filter saat ini tidak menjaring faktur apa pun.",
+    )
 
     @api.constrains("date_from", "date_to")
     def _check_dates(self):
@@ -67,8 +72,12 @@ class CoretaxFkExportWizard(models.TransientModel):
             # half-filled form must not blow up on the search.
             if not (wizard.date_from and wizard.date_to and wizard.date_from <= wizard.date_to):
                 wizard.preview_count = 0
+                wizard.empty_reason = False
                 continue
             wizard.preview_count = self.env["account.move"].search_count(wizard._fk_domain())
+            # Say why while the filters are still on screen and editable —
+            # by the time the export raises, the user has already committed.
+            wizard.empty_reason = "\n\n".join(wizard._empty_hints()) if not wizard.preview_count else False
 
     def _fk_domain(self):
         self.ensure_one()
@@ -79,11 +88,19 @@ class CoretaxFkExportWizard(models.TransientModel):
             ("invoice_date", ">=", self.date_from),
             ("invoice_date", "<=", self.date_to),
         ]
-        if self.partner_ids:
-            domain.append(("partner_id", "child_of", self.partner_ids.ids))
-        if self.journal_ids:
-            domain.append(("journal_id", "in", self.journal_ids.ids))
+        domain += self._coretax_partner_domain(self.partner_ids)
+        domain += self._coretax_journal_domain(self.journal_ids)
         return domain
+
+    def _empty_hints(self):
+        self.ensure_one()
+        return self._coretax_fk_empty_hints(
+            self.date_from,
+            self.date_to,
+            self.company_id,
+            partner_ids=self.partner_ids,
+            journal_ids=self.journal_ids,
+        )
 
     def _fk_moves(self):
         self.ensure_one()
@@ -94,16 +111,23 @@ class CoretaxFkExportWizard(models.TransientModel):
         moves = self._fk_moves()
         if not moves:
             # Name the filters back: "no data" is almost always a filter that
-            # was narrower than the user thought, not an empty period.
-            applied = [_("periode %s s/d %s", self.date_from, self.date_to)]
+            # was narrower than the user thought, not an empty period. The
+            # company is listed first because it is the one filter the wizard
+            # fills in by itself, and therefore the one the user never checks.
+            applied = [
+                _("perusahaan: %s", self.company_id.display_name),
+                _("periode %s s/d %s", self.date_from, self.date_to),
+            ]
             if self.partner_ids:
                 applied.append(_("pelanggan: %s", ", ".join(self.partner_ids.mapped("name"))))
             if self.journal_ids:
                 applied.append(_("jurnal: %s", ", ".join(self.journal_ids.mapped("name"))))
+            hints = self._empty_hints()
             raise UserError(
                 _(
-                    "Tidak ada faktur penjualan ter-posting yang cocok dengan filter:\n%s",
-                    "\n".join("  - %s" % item for item in applied),
+                    "Tidak ada faktur penjualan ter-posting yang cocok dengan filter:\n%(filters)s\n\n%(hints)s",
+                    filters="\n".join("  - %s" % item for item in applied),
+                    hints="\n\n".join(hints),
                 )
             )
         filename = "faktur_keluaran_%s_%s.xlsx" % (
