@@ -57,16 +57,12 @@ class TestPosInvoiceIdentity(TestPoSCommon):
 
     def test_partner_with_nik_is_accepted(self):
         """DJP accepts NIK for an individual buyer, so the guard must too."""
-        partner = self.env["res.partner"].create(
-            {"name": "Pembeli Orang Pribadi", "x_custom_nik": "3171234567890001"}
-        )
+        partner = self.env["res.partner"].create({"name": "Pembeli Orang Pribadi", "x_custom_nik": "3171234567890001"})
         order = self._order(partner)
         self.assertFalse(order._pos_tax_identity_missing())
 
     def test_partner_with_npwp_is_accepted(self):
-        partner = self.env["res.partner"].create(
-            {"name": "PT Pembeli", "x_custom_npwp": "0012345678901000"}
-        )
+        partner = self.env["res.partner"].create({"name": "PT Pembeli", "x_custom_npwp": "0012345678901000"})
         order = self._order(partner)
         self.assertFalse(order._pos_tax_identity_missing())
 
