@@ -32,7 +32,7 @@ import logging
 from odoo import _, models
 from odoo.addons.custom_tax_id.models.uom_inherit import CORETAX_UOM_FALLBACK
 from odoo.exceptions import UserError
-from odoo.tools import float_round
+from odoo.tools import float_is_zero, float_round
 
 _logger = logging.getLogger(__name__)
 
@@ -44,6 +44,15 @@ XLSX_MIMETYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.she
 # ``currency.rounding`` would emit decimals Coretax does not accept. Every money
 # cell in the client's reference workbook is a whole rupiah.
 FK_AMOUNT_ROUNDING = 1.0
+
+# PMK 131/2024. The statutory PPN rate is 12%; the 11%-effective rate everyone
+# actually charges is filed as *12% on a "nilai lain" base of 11/12 of the
+# price*, not as a bare 11% tariff — Coretax has no 11% tariff to accept. The
+# arithmetic is exact (12% x 11/12 == 11%), so a line the ledger booked at 11%
+# exports with the identical PPN rupiah; only its presentation changes.
+PMK_131_EFFECTIVE_RATE = 11.0
+PMK_131_STATUTORY_RATE = 12.0
+PMK_131_DPP_FACTOR = 11.0 / 12.0
 
 FK_COLUMNS = (
     "FK",
@@ -147,16 +156,38 @@ class CoretaxFkBuilder(models.AbstractModel):
         """(dpp, dpp_lain, ppn, tarif_ppn, uses_dpp_lain) for one invoice line.
 
         ``dpp`` is the contractual base; ``dpp_lain`` is the PMK 131/2024 "nilai
-        lain" base the PPN is actually charged on. When no nilai-lain tax
-        applies the two coincide and CHECK_DPP_LAIN is 'N'.
+        lain" base the PPN is actually charged on.
+
+        Three cases, in order:
+
+        * a tax configured as *DPP Nilai Lain* carries its own factor and rate —
+          emitted as configured;
+        * a plain 11% tax is the same PMK 131/2024 arrangement expressed the
+          short way in the ledger, so it is *presented* in the filing form:
+          TARIF_PPN 12 on a DPP_LAIN of 11/12, CHECK_DPP_LAIN 'Y'. The PPN
+          rupiah is unchanged (12% x 11/12 == 11%), so the file still ties to
+          the GL. Emitting a bare 11% tariff instead gets the import rejected —
+          Coretax only knows the statutory 12%;
+        * anything else (12% penuh, 15%, PPnBM rates) is a regular DPP: the two
+          bases coincide and CHECK_DPP_LAIN is 'N'.
         """
         dpp = line.price_subtotal
         vat = line.tax_ids.filtered(lambda t: t.amount_type == "percent" and t.amount > 0)[:1]
         if not vat:
             return dpp, 0.0, 0.0, 0.0, False
-        dpp_lain = vat._dpp_adjust(dpp)
-        uses = vat.x_custom_dpp_method == "nilai_lain" and bool(vat.x_custom_dpp_factor)
-        return dpp, dpp_lain, dpp_lain * vat.amount / 100.0, vat.amount, uses
+        if vat.x_custom_dpp_method == "nilai_lain" and vat.x_custom_dpp_factor:
+            dpp_lain = vat._dpp_adjust(dpp)
+            return dpp, dpp_lain, dpp_lain * vat.amount / 100.0, vat.amount, True
+        if float_is_zero(vat.amount - PMK_131_EFFECTIVE_RATE, precision_digits=4):
+            dpp_lain = dpp * PMK_131_DPP_FACTOR
+            return (
+                dpp,
+                dpp_lain,
+                dpp_lain * PMK_131_STATUTORY_RATE / 100.0,
+                PMK_131_STATUTORY_RATE,
+                True,
+            )
+        return dpp, dpp, dpp * vat.amount / 100.0, vat.amount, False
 
     @staticmethod
     def _item_jenis(line):
