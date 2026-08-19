@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-18T11:01:22+00:00",
+  "generated_at": "2026-08-19T02:52:24+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "0e16ae6",
-    "branch": "feat/levis-quickwins-aug18-batch2"
+    "commit": "482bd09",
+    "branch": "feat/levis-tax-amount-reset-draft"
   },
   "buckets": [
     {
@@ -346,22 +346,17 @@
       "depends": 9,
       "public": false,
       "last_change": "2026-08-18",
-      "change_count": 50,
+      "change_count": 49,
       "changes": [
         {
-          "sha": "9496655",
+          "sha": "2653a4b",
           "date": "2026-08-18",
-          "subject": "feat(levis): show which bills a payment covers, on the wizard and the payment"
+          "subject": "feat(levis): batch menengah sheet after-go-live — filter status bill, kolom store, daftar bill di payment, jurnal sales return (#176)"
         },
         {
-          "sha": "c72238f",
+          "sha": "62b4b5d",
           "date": "2026-08-18",
-          "subject": "feat(levis): let the bill list be filtered by payment status and grouped by store"
-        },
-        {
-          "sha": "4147631",
-          "date": "2026-08-18",
-          "subject": "fix(levis): a bill with no faktur pajak must print an empty Tax Number"
+          "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
         },
         {
           "sha": "5021153",
@@ -387,6 +382,11 @@
           "sha": "8092ac5",
           "date": "2026-08-11",
           "subject": "fix(levis): stop two rules claiming one bank terminal, and pick the specific keyword (#138)"
+        },
+        {
+          "sha": "48ac177",
+          "date": "2026-08-11",
+          "subject": "feat(levis): clear the month's POS receivables from the bank statement itself (#130)"
         }
       ]
     },
@@ -4470,9 +4470,9 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "7e7c414",
+          "sha": "2653a4b",
           "date": "2026-08-18",
-          "subject": "fix(levis): a returned item grosses up Sales Return, never Gross Sales"
+          "subject": "feat(levis): batch menengah sheet after-go-live — filter status bill, kolom store, daftar bill di payment, jurnal sales return (#176)"
         },
         {
           "sha": "3fd30e8",
@@ -4900,18 +4900,23 @@
       "module": "custom_tax_id",
       "bucket": "ee_gap",
       "name": "Custom Tax Indonesia (PPh + DPP Nilai Lain)",
-      "version": "19.0.0.6.0",
+      "version": "19.0.0.7.0",
       "summary": "PPh 23 / 4(2) / 26 withholding engine, PPN DPP Nilai Lain (PMK 131/2024), Faktur Pengganti workflow",
       "category": "Accounting/Localizations",
       "depends": 9,
       "public": true,
-      "last_change": "2026-08-18",
-      "change_count": 20,
+      "last_change": "2026-08-19",
+      "change_count": 21,
       "changes": [
         {
-          "sha": "f2bb7ad",
+          "sha": "482bd09",
+          "date": "2026-08-19",
+          "subject": "fix(tax): a reset to draft must not retype the PPN and PPh the operator entered"
+        },
+        {
+          "sha": "62b4b5d",
           "date": "2026-08-18",
-          "subject": "feat(tax): find a Kode Objek PPh by its code, not by its 60-character name"
+          "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
         },
         {
           "sha": "635bde3",
@@ -4942,11 +4947,6 @@
           "sha": "745825f",
           "date": "2026-07-21",
           "subject": "feat(tax): DJP Coretax import-file exporter (e-Faktur FK/OF, Retur, Bupot)"
-        },
-        {
-          "sha": "45201a5",
-          "date": "2026-07-17",
-          "subject": "fix(tax_id): stop withholding every bill line at 15% \"Deviden\"; let the operator pick the code"
         }
       ]
     },

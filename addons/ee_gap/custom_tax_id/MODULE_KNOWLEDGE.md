@@ -81,6 +81,19 @@ This is the canonical Indonesian withholding + DPP module. Any BRD with "potong 
   and `code` (our internal handle, e.g. Z5-AF); `display_name` leads with the
   object code. Reports read `category.name` directly, so they are unaffected by
   the display change.
+- **Reset to draft must change the state and nothing else.** Odoo treats the
+  state write as "the currency changed" (the pre-write snapshot in
+  `_sync_tax_lines` only covers moves that were already draft), so it rebuilds
+  the tax lines from the base lines: the keterangan goes back to the tax's own
+  name and the nominal back to the computed one, dragging the payable line with
+  it. `button_draft` therefore stashes both — labels via
+  `x_custom_tax_label`, amounts via an in-call snapshot of every `tax` and
+  `payment_term` line — and writes them back after `super()`, with
+  `skip_invoice_sync=True` so the restore does not re-trigger the rebuild. The
+  amount restore is skipped when the surviving tax/payment-term lines are not
+  the ones snapshotted (regrouped, not revalued), because restoring one side
+  alone would unbalance the entry. Editing a base line later still recomputes
+  normally — that is a real edit.
 - **`_post` ordering**: `_custom_apply_withholding` runs BEFORE `super()._post`. The withholding lines are created but the JOURNAL ITEMS for the hutang pajak are NOT created (`account_id` on the rule is captured but no `account.move.line` is debited/credited). The bupot draft is the only persistence. Module description says "balancing journal items" but code currently only materialises bupot.
 - **Idempotency via line presence** — if `x_custom_withholding_line_ids` exist, the engine skips. Re-posting a move that lost its lines (e.g. through `unlink`) will NOT re-apply.
 - **`_resolve_for_line` ignores `pph_22`/`pph_21` filters** — there's no special-casing; PPh 21 should be handled by a payroll module, not vendor bills.

@@ -91,12 +91,11 @@ class AccountMove(models.Model):
     # Reset to draft: keep the keterangan, and undo the withholding
     # ------------------------------------------------------------------
     def button_draft(self):
-        """Reset to draft without losing the PPh/PPN keterangan or orphaning
-        the withholding entry.
+        """Reset to draft without losing the PPh/PPN keterangan or amounts, and
+        without orphaning the withholding entry.
 
-        Two defects the client reported as one ("keterangan di jurnal PPh dan
-        PPN hilang/kembali ke awal ketika posted vendor bill dilakukan reset to
-        draft"):
+        Three defects, all of them "the reset changed something it was never
+        asked to change":
 
         * Odoo rebuilds the tax lines when the move becomes editable and resets
           each ``name`` to the tax's own name, discarding what the operator
@@ -107,12 +106,25 @@ class AccountMove(models.Model):
           edit made in draft never reached the PPh. It is now reversed (or
           dropped while still draft) and the guard cleared, so re-posting
           recomputes the withholding against the bill as it now stands.
+        * The same rebuild recomputed the tax **amounts** from the base lines,
+          so a PPN or PPh figure the operator had typed by hand — to match the
+          faktur to the rupiah, or to book a tarif the engine cannot express —
+          silently went back to the computed one, taking the payable line with
+          it ("nominal PPN dan PPh yang diinput user ... auto recalculate
+          apabila confirmed vendor bill di-reset kembali to draft").
+
+        The amounts are snapshotted before ``super()`` and written back after,
+        so the reset moves the state and nothing else. Editing a base line
+        afterwards recomputes the taxes as usual — that is a real edit, and
+        this is not the place to freeze it.
         """
         self._custom_stash_tax_labels()
+        amounts = self._custom_stash_tax_amounts()
         res = super().button_draft()
         for move in self:
             move._custom_unwind_withholding()
         self._custom_restore_tax_labels()
+        self._custom_restore_tax_amounts(amounts)
         return res
 
     def _custom_tax_default_label(self, line):
@@ -139,6 +151,59 @@ class AccountMove(models.Model):
                     # skip_invoice_sync: writing a label must not re-trigger the
                     # dynamic-line rebuild we are repairing.
                     line.with_context(skip_invoice_sync=True).write({"name": label})
+
+    def _custom_stash_tax_amounts(self):
+        """Snapshot the amounts the rebuild is about to recompute.
+
+        Both sides are taken: the tax lines carry the figure the operator
+        typed, and the payment-term line is the counterweight Odoo adjusts to
+        match, so restoring one without the other would leave the entry
+        unbalanced.
+
+        :return: ``{line_id: (amount_currency, balance)}``
+        """
+        return {
+            line.id: (line.amount_currency, line.balance)
+            for move in self
+            for line in move.line_ids
+            if line.display_type in ("tax", "payment_term")
+        }
+
+    def _custom_restore_tax_amounts(self, snapshot):
+        """Put the snapshotted amounts back, per move and in a single write.
+
+        A move whose tax / payment-term lines are no longer the ones that were
+        snapshotted is left alone: they were regrouped rather than merely
+        revalued, so there is no one-to-one counterpart to restore and writing
+        one side by itself would unbalance the entry.
+        """
+        for move in self:
+            lines = move.line_ids.filtered(lambda line: line.display_type in ("tax", "payment_term"))
+            before_ids = {line_id for line_id in snapshot if line_id in move.line_ids.ids}
+            if not before_ids:
+                continue
+            if set(lines.ids) != before_ids:
+                _logger.info(
+                    "Move %s: tax lines were rebuilt, not revalued — amounts left as recomputed.",
+                    move.name,
+                )
+                continue
+            commands = []
+            for line in lines:
+                amount_currency, balance = snapshot[line.id]
+                if line.currency_id.compare_amounts(
+                    line.amount_currency, amount_currency
+                ) or line.company_currency_id.compare_amounts(line.balance, balance):
+                    commands.append(
+                        Command.update(
+                            line.id,
+                            {"amount_currency": amount_currency, "balance": balance},
+                        )
+                    )
+            if commands:
+                # skip_invoice_sync, as for the labels: writing the amounts back
+                # must not re-trigger the rebuild we are undoing.
+                move.with_context(skip_invoice_sync=True).write({"line_ids": commands})
 
     def _custom_unwind_withholding(self):
         """Undo the withholding side so a re-post recomputes it from scratch."""
