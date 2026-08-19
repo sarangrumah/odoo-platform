@@ -102,6 +102,7 @@ This is the canonical Indonesian withholding + DPP module. Any BRD with "potong 
 - **`account.tax._compute_amount` legacy hook is NOT overridden** — only the Odoo 19 `_eval_tax_amount_*` methods. Backports to 16/17 will not pick up DPP NL.
 - **`foreign_only` flag uses `partner.country_id != company.country_id`** — if either country is unset, treated as not foreign (no PPh 26).
 - **NPWP regex strips dots/hyphens** — formatted display like `01.234.567.8-901.000` is treated as valid; raw `01234567890100` (14 digits) is invalid.
+- **`vat` and `x_custom_npwp` are one number, kept in sync by `res.partner.create/write`** — `vat` wins when a write touches both. Values are normalised to 16 digits (a 15-digit legacy NPWP gets a leading `0`); a non-NPWP `vat` such as a foreign VAT number is left alone and not mirrored. Before 19.0.0.8.0 the two were independent, so a Tax ID corrected on the partner form left every Coretax / e-Faktur export emitting the stale NPWP. Read them through `partner._custom_coretax_npwp()`, never off the raw field.
 - **`tarif_no_npwp=0` is a sentinel** for "no bump" — explicitly setting 0 does NOT mean "0% tarif when no NPWP"; use `0.0001` or similar for true zero.
 - **`x_custom_pkp` is a flag without behavior in-tree** — fiscal-position automation is left for Coretax / verticals.
 - **Bupot creation failure does NOT block withholding line creation** — error posted to chatter, line stays.

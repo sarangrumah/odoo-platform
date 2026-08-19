@@ -48,7 +48,10 @@ class ResCompany(models.Model):
         """
         self.ensure_one()
         partner = self.partner_id
-        npwp = (partner.x_custom_npwp or "").replace(".", "").replace("-", "")
+        # ``vat`` is the fallback, not decoration: on a database whose partners
+        # predate the vat/NPWP sync, only the Tax ID may carry the number, and
+        # exporting nothing is worse than exporting the one value on record.
+        npwp = partner._npwp_normalize(partner.x_custom_npwp) or partner._npwp_normalize(partner.vat)
         missing = []
         if not npwp:
             missing.append(_("NPWP Pemotong (pada partner perusahaan)"))

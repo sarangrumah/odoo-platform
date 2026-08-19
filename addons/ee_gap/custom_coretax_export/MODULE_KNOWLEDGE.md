@@ -99,6 +99,13 @@ On `custom.coretax.fk.builder`:
 - **`_render` deliberately does not use `custom.report.engine`.** The engine prefixes a
   title/company/period banner and formats numbers for humans; a DJP import file must start
   its header on row 1 and carry raw values.
+- **A plain 11% tax is exported as 12% on a DPP Nilai Lain of 11/12, never as an 11% tariff.**
+  Coretax knows only the statutory 12% rate; the 11%-effective rate is the PMK 131/2024 nilai-lain
+  arrangement, which `l10n_id` books the short way as a bare 11% tax (its "12% (Non-Luxury Good)"
+  is rated `amount=11.0`). So `_line_vat` translates: `TARIF_PPN` 12, `DPP_LAIN` 11/12 of DPP,
+  `CHECK_DPP_LAIN` 'Y', and the FK gets `KD_JENIS_TRANSAKSI` 04. The rupiah is untouched —
+  12% × 11/12 == 11% exactly — so the file still ties to the GL. A tax explicitly configured
+  `x_custom_dpp_method = nilai_lain` keeps its own factor and rate and is not second-guessed.
 - **Only `out_invoice` is exported.** Credit notes are not FK records — they belong to Faktur
   Pengganti or Retur Masukan, which have their own paths.
 - **"Tidak ada faktur ... yang cocok" is almost always the company, not the period.** Both

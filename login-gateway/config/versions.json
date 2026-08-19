@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-19T04:29:29+00:00",
+  "generated_at": "2026-08-19T04:50:11+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "087ae18",
+    "commit": "49c8f74",
     "branch": "HEAD"
   },
   "buckets": [
@@ -1706,9 +1706,9 @@
       "change_count": 51,
       "changes": [
         {
-          "sha": "087ae18",
+          "sha": "49c8f74",
           "date": "2026-08-19",
-          "subject": "feat(reports): split the Purchase Register into Trade and Non-Trade"
+          "subject": "feat(reports): split the Purchase Register into Trade and Non-Trade (#183)"
         },
         {
           "sha": "c854c71",
@@ -2113,7 +2113,7 @@
       "module": "custom_coretax_export",
       "bucket": "ee_gap",
       "name": "Coretax Import File Export (DJP Templates)",
-      "version": "19.0.1.4.0",
+      "version": "19.0.1.5.0",
       "summary": "Emit DJP-conformant Coretax import workbooks: e-Faktur Keluaran (FK/OF), Retur Masukan, Bupot Unifikasi, Bupot PPh 21, Bupot Non-Resident",
       "category": "Accounting/Localizations",
       "depends": 3,
@@ -4905,7 +4905,7 @@
       "module": "custom_tax_id",
       "bucket": "ee_gap",
       "name": "Custom Tax Indonesia (PPh + DPP Nilai Lain)",
-      "version": "19.0.0.7.0",
+      "version": "19.0.0.8.0",
       "summary": "PPh 23 / 4(2) / 26 withholding engine, PPN DPP Nilai Lain (PMK 131/2024), Faktur Pengganti workflow",
       "category": "Accounting/Localizations",
       "depends": 9,
