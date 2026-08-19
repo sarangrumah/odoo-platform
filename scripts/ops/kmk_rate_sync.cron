@@ -1,0 +1,19 @@
+# Keep the Kurs Pajak KMK table current on the tenants that book foreign currency.
+# Install as /etc/cron.d/odoo-kmk-rate (root:root, mode 0644).
+#
+# A KMK period runs Wednesday to Tuesday and the decree is normally published the
+# day before it takes effect. So: Wednesday 07:00 WIB, when the new one should be
+# up and the working day has not started booking against a stale rate yet.
+#
+# Thursday is the retry, not a second job: the loader is idempotent (an existing
+# row for the same currency+date is left alone), and every run also re-reads the
+# last few weeks, so a Wednesday that failed -- or a box that was down -- heals
+# itself without anyone noticing it broke. A missed week is invisible in the
+# ledger: Odoo just carries the previous rate forward and posts a wrong number.
+# trn_arkaaim rides along: it has USD active and is the training mirror of prod,
+# so a stale rate there teaches people the wrong number. Add databases here, not
+# in the script.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+0 7 * * 3,4 root DBS="prd_arkaaim trn_arkaaim" /opt/odoo-platform/scripts/ops/kmk_rate_sync.sh >> /var/log/odoo-kmk-rate.log 2>&1
