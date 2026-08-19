@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <template id="report_ppn_digunggung">
+            <t t-call="custom_accounting_reports.report_header"/>
+            <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Masa Pajak</th>
+                        <th>Tanggal</th>
+                        <th>Kode Toko</th>
+                        <th>Toko / Operating Unit</th>
+                        <th class="text-end">Jml Dok</th>
+                        <th class="text-end">Harga Jual (DPP Penuh)</th>
+                        <th class="text-end">DPP Nilai Lain</th>
+                        <th class="text-end">Tarif</th>
+                        <th class="text-end">PPN Keluaran</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-foreach="lines" t-as="line">
+                        <tr t-if="line.get('type') == 'header'" class="table-secondary fw-bold">
+                            <td colspan="9" t-esc="line.get('label')"/>
+                        </tr>
+                        <tr t-elif="line.get('type') == 'note'">
+                            <td colspan="9" t-esc="line.get('masa')"/>
+                        </tr>
+                        <tr t-elif="line.get('type') in ('grand_total', 'subtotal')"
+                            t-attf-class="fw-bold #{'table-dark' if line.get('type') == 'grand_total' else 'table-light'}">
+                            <td t-esc="line.get('masa')"/>
+                            <td/>
+                            <td/>
+                            <td t-esc="line.get('ou_name')"/>
+                            <td class="text-end" t-esc="line.get('doc_count')"/>
+                            <td class="text-end">
+                                <span t-esc="line.get('dpp_penuh')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="line.get('dpp_lain')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end" t-esc="line.get('tarif')"/>
+                            <td class="text-end">
+                                <span t-esc="line.get('ppn')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                        </tr>
+                        <tr t-else="">
+                            <td t-esc="line.get('masa')"/>
+                            <td t-esc="line.get('date')" t-options="{'widget': 'date'}"/>
+                            <td t-esc="line.get('ou_code')"/>
+                            <td t-esc="line.get('ou_name')"/>
+                            <td class="text-end" t-esc="line.get('doc_count')"/>
+                            <td class="text-end">
+                                <span t-esc="line.get('dpp_penuh')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="line.get('dpp_lain')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end" t-esc="line.get('tarif')"/>
+                            <td class="text-end">
+                                <span t-esc="line.get('ppn')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                        </tr>
+                    </t>
+                </tbody>
+            </table>
+            <t t-call="custom_accounting_reports.report_footer_signature"/>
+        </template>
+    </data>
+</odoo>

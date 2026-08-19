@@ -48,6 +48,7 @@ REPORT_MODEL_MAP = {
     "nsfp_monitoring": "custom.report.nsfp.monitoring",
     "npwp_quality": "custom.report.npwp.quality",
     "dpp_nilai_lain": "custom.report.dpp.nilai.lain",
+    "ppn_digunggung": "custom.report.ppn.digunggung",
     "ppn_masukan_import": "custom.report.ppn.masukan.import",
     "faktur_pengganti": "custom.report.faktur.pengganti",
     "ekualisasi_omzet": "custom.report.ekualisasi.omzet",

@@ -22,6 +22,7 @@ from . import custom_report_bill_payment
 from . import custom_report_sales_detail
 from . import custom_report_tax
 from . import custom_report_faktur_pajak
+from . import custom_report_ppn_digunggung
 from . import custom_report_ppn_masukan_import
 from . import custom_report_bupot
 from . import custom_report_spt_ppn

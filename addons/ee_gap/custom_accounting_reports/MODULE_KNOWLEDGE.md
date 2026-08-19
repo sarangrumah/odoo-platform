@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T07:43:22Z
 generator: bootstrap-v1
 module: custom_accounting_reports
-manifest_version: 19.0.0.18.0
+manifest_version: 19.0.0.22.0
 ---
 
 # custom_accounting_reports
@@ -35,6 +35,7 @@ All report models are `AbstractModel`s that inherit `custom.report.engine` (the 
 - `custom.report.advance` — Uang Muka / Down-Payment ledger (auto-detects advance accounts).
 - `custom.report.sales` — Sales report.
 - `custom.report.tax` — Tax report (PPN / PPh subtotals; cross-references Coretax).
+- `custom.report.ppn.digunggung` — **Rekap PPN Keluaran Digunggung (PKP Pedagang Eceran).** Output VAT riding on **non-invoice** moves (POS journal entries), which is what a retail tenant actually has: `custom.report.faktur.pajak` and the FK/OF export are both keyed on `out_invoice` and show nothing. Emits a per-masa recap (the SPT 1111 figure) followed by a per-day, per-Operating-Unit detail. Presents an 11% tax PMK 131-style — statutory 12% on a DPP Nilai Lain of 11/12 — matching `custom_coretax_export`'s FK rows; the PPN rupiah is unchanged so it still ties to the GL.
 - `custom.report.book.mixin` — Day/Cash/Bank book mixin, subclassed by `custom.report.day.book`, `custom.report.cash.book`, `custom.report.bank.book` (three distinct models).
 - `custom.report.journal.audit` — Journal Audit.
 - `custom.report.financial` — **Concrete `models.Model`.** The only ORM model with stored fields; a self-referential tree defining custom financial-report line structure. Rendered by the `custom.report.financial.renderer` AbstractModel.
@@ -98,6 +99,7 @@ Report models are AbstractModels and generally have no stored fields; user input
   `_get_move_lines_query`, `_sum_by_account`,
   `custom_report_general_ledger`, `custom_report_profit_loss_branch._sum_by_account_and_branch`.
 - All computation runs through the single `custom.report.engine` base; overriding `_build_lines` is the extension point, not adding fields.
+- **Output VAT is split across exactly two reports, by buyer identity.** Invoiced sales (`out_invoice`/`out_refund`) belong to `custom.report.faktur.pajak` + the FK export; everything else — retail, buyer not identified — belongs to `custom.report.ppn.digunggung`, whose domain excludes those two move types on purpose. Widen either side and the masa is double-counted; narrow both and PPN disappears from the working papers with the GL still balanced.
 - **Never bucket a P&L by `account_type` alone.** Indonesian charts type every cost-of-sales account plain `expense` (not `expense_direct_cost`), so a type-based split reports COGS as zero, files `income_other` under Revenue, and drops `expense_other` entirely. Section membership comes from the account-code prefix via `account.group`.
 - `account.account.group_id` is **computed, not stored** in Odoo 19 (resolved from the code prefix). It cannot appear in a SQL join or an ORM domain — read it off a browsed recordset, as `_account_groups` does.
 - `account.group` rows are company-scoped; `account.analytic.plan` is not, but its accounts are. Both are filtered against the active companies.
