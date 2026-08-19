@@ -1683,9 +1683,7 @@ class TestCustomReports(TransactionCase):
         self.assertAlmostEqual(non_trade[-1]["untaxed"], 400.0, places=2)
 
         grouped = report._build_lines(self._purchase_options(group_by="purchase_type"))
-        subtotals = {
-            line["ptype"]: line["untaxed"] for line in grouped if line.get("type") == "subtotal"
-        }
+        subtotals = {line["ptype"]: line["untaxed"] for line in grouped if line.get("type") == "subtotal"}
         self.assertEqual(
             {"Subtotal: Trade": 1000.0, "Subtotal: Non-Trade": 400.0},
             {k: round(v, 2) for k, v in subtotals.items()},
