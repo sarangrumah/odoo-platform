@@ -106,6 +106,13 @@ On `custom.coretax.fk.builder`:
   `CHECK_DPP_LAIN` 'Y', and the FK gets `KD_JENIS_TRANSAKSI` 04. The rupiah is untouched —
   12% × 11/12 == 11% exactly — so the file still ties to the GL. A tax explicitly configured
   `x_custom_dpp_method = nilai_lain` keeps its own factor and rate and is not second-guessed.
+- **`FG_UANG_MUKA` is derived, not hard-coded.** `_is_uang_muka()` reads the originating sale
+  order line's `is_downpayment`, because core bills a down payment through a product-less "fake"
+  line that nothing else distinguishes. Every billed line must be one: the settlement faktur
+  carries the deducted down payment *alongside* the goods, and flagging it would tell Coretax two
+  down payments were issued. The companion columns (`NOMOR_FAKTUR_UM_SEBELUMNYA`, `UANG_MUKA_*`)
+  stay empty — they want the *nomor faktur pajak* Coretax assigned to the earlier faktur, which
+  this database does not hold.
 - **Only `out_invoice` is exported.** Credit notes are not FK records — they belong to Faktur
   Pengganti or Retur Masukan, which have their own paths.
 - **"Tidak ada faktur ... yang cocok" is almost always the company, not the period.** Both

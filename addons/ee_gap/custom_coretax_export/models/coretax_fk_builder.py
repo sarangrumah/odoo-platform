@@ -212,6 +212,28 @@ class CoretaxFkBuilder(models.AbstractModel):
         return "Barang"
 
     @staticmethod
+    def _is_uang_muka(move):
+        """True when this faktur *is* a down payment, for FG_UANG_MUKA.
+
+        Core bills a down payment through a "fake" order line that carries no
+        product of its own, so the only trustworthy marker is the originating
+        sale order line's ``is_downpayment``. Every billed line has to be one:
+        the settlement invoice carries the deducted down payment *alongside* the
+        goods it settles, and that is a regular faktur, not a down-payment one.
+
+        The companion columns (NOMOR_FAKTUR_UM_SEBELUMNYA, UANG_MUKA_*) are the
+        settlement side of the arrangement — how much already-invoiced down
+        payment a final faktur subtracts — and they stay empty until the client
+        confirms how they file it: the number wanted there is the *nomor faktur
+        pajak* Coretax assigned to the earlier faktur, which this database does
+        not hold.
+        """
+        lines = move.invoice_line_ids.filtered(lambda l: l.display_type == "product")
+        if not lines or "sale_line_ids" not in lines._fields:
+            return False
+        return all(line.sale_line_ids and all(sol.is_downpayment for sol in line.sale_line_ids) for line in lines)
+
+    @staticmethod
     def _round_and_plug(raw_values, rounding):
         """Whole-currency-unit OF amounts whose written sum ties to the total.
 
@@ -443,20 +465,20 @@ class CoretaxFkBuilder(models.AbstractModel):
                     "%02d" % move.invoice_date.month,
                     str(move.invoice_date.year),
                     self._fmt_date(move.invoice_date),
-                    self._digits(partner.x_custom_npwp),
+                    partner._custom_coretax_npwp(),
                     "",  # JENIS_IDENTITAS
                     "",  # NIK_NOMOR_PASSPORT
                     partner.country_id.x_custom_code_alpha3 or "",
                     partner.name or "",
                     partner.email or "",
                     self._partner_address(partner),
-                    partner._custom_coretax_nitku()[-6:] if partner.x_custom_npwp else "",
+                    partner._custom_coretax_nitku()[-6:] if partner._custom_coretax_npwp() else "",
                     totals[0],
                     totals[1],
                     totals[2],
                     0,  # JUMLAH_PPNBM
                     "",  # ID_KETERANGAN_TAMBAHAN
-                    "0",  # FG_UANG_MUKA
+                    "1" if self._is_uang_muka(move) else "0",  # FG_UANG_MUKA
                     "",
                     0,
                     0,
