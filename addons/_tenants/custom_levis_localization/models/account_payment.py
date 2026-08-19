@@ -94,34 +94,101 @@ class AccountPayment(models.Model):
         bills = counterparts.filtered(lambda m: m.move_type in _INVOICE_TYPES)
         return bills[:1]
 
+    def _edo_line_allocations(self, line):
+        """What this line settled, per bill: ``[(bill, amount, amount_currency)]``.
+
+        One payment that pays three bills still carries a **single** payable
+        line, so a voucher built one-row-per-journal-item can only ever name one
+        of them — ``_edo_line_source_doc`` returns the first and the other two go
+        unmentioned. 40 of the 145 reconciled payments in prd_levis_begbal settle
+        more than one bill, and the operator signing the voucher has no way to
+        see what the rest of the money went to.
+
+        The partials carry the split. ``matched_debit_ids`` holds the ones where
+        ``line`` is the CREDIT side (counterpart in ``debit_move_id``, our own
+        figure in ``credit_amount_currency``) and ``matched_credit_ids`` the
+        mirror image; ``amount`` is company currency on both.
+        """
+        allocations = []
+        for partial in line.matched_debit_ids:
+            allocations.append((partial.debit_move_id.move_id, partial.amount, abs(partial.credit_amount_currency)))
+        for partial in line.matched_credit_ids:
+            allocations.append((partial.credit_move_id.move_id, partial.amount, abs(partial.debit_amount_currency)))
+        return [
+            (move, amount, amount_currency)
+            for move, amount, amount_currency in allocations
+            if move.move_type in _INVOICE_TYPES
+        ]
+
+    def _edo_row_vals(self, line, doc_ap, ref_vendor, debit, credit, orig_amount):
+        """One voucher table row. ``rate`` stays the line's, not the split's."""
+        rate = 1.0
+        if line.amount_currency and line.balance:
+            rate = abs(line.balance) / abs(line.amount_currency)
+        return {
+            "coa": line.account_id.name or line.name or "",
+            "desc": line.name or "",
+            "doc_ap": doc_ap or "",
+            "ref_vendor": ref_vendor or "",
+            "vendor": (line.partner_id or self.partner_id).name or "",
+            "currency": self.currency_id.name or "",
+            "orig_amount": orig_amount,
+            "rate": rate,
+            "debit": debit,
+            "credit": credit,
+        }
+
     def _edo_voucher_rows(self):
-        """One dict per journal item of the payment's move — the voucher table."""
+        """The voucher table: one row per journal item, **split per bill**.
+
+        A line reconciled against several bills becomes one row per bill,
+        carrying that bill's number, its vendor reference, and the amount
+        actually applied to it. Anything left over — a payment larger than the
+        bills it was matched to, or a rounding tail — keeps a final row under the
+        payment's own number, so DEBIT and CREDIT still total the journal entry.
+        """
         self.ensure_one()
         rows = []
         move = self.move_id
         if not move:
             return rows
+        currency = self.company_id.currency_id
         lines = move.line_ids.filtered(lambda l: l.display_type not in ("line_section", "line_note"))
         for line in lines:
-            src = self._edo_line_source_doc(line)
-            orig = abs(line.amount_currency) if line.amount_currency else abs(line.balance)
-            rate = 1.0
-            if line.amount_currency and line.balance:
-                rate = abs(line.balance) / abs(line.amount_currency)
-            rows.append(
-                {
-                    "coa": line.account_id.name or line.name or "",
-                    "desc": line.name or "",
-                    "doc_ap": (src.name if src else self.name) or "",
-                    "ref_vendor": (src.ref if src else (self.payment_reference or self.memo or "")) or "",
-                    "vendor": (line.partner_id or self.partner_id).name or "",
-                    "currency": self.currency_id.name or "",
-                    "orig_amount": orig,
-                    "rate": rate,
-                    "debit": line.debit,
-                    "credit": line.credit,
-                }
-            )
+            allocations = self._edo_line_allocations(line)
+            fallback_ref = self.payment_reference or self.memo or ""
+            if not allocations:
+                orig = abs(line.amount_currency) if line.amount_currency else abs(line.balance)
+                rows.append(self._edo_row_vals(line, self.name, fallback_ref, line.debit, line.credit, orig))
+                continue
+
+            # The side the line sits on decides which column each split fills.
+            is_debit = bool(line.debit)
+            allocated = 0.0
+            for bill, amount, amount_currency in allocations:
+                allocated += amount
+                rows.append(
+                    self._edo_row_vals(
+                        line,
+                        bill.name,
+                        bill.ref,
+                        amount if is_debit else 0.0,
+                        0.0 if is_debit else amount,
+                        amount_currency or amount,
+                    )
+                )
+            remainder = (line.debit or line.credit) - allocated
+            if currency.compare_amounts(remainder, 0.0) > 0:
+                rows.append(
+                    self._edo_row_vals(
+                        line,
+                        self.name,
+                        fallback_ref,
+                        remainder if is_debit else 0.0,
+                        0.0 if is_debit else remainder,
+                        remainder,
+                    )
+                )
         return rows
 
     # ------------------------------------------------------------------

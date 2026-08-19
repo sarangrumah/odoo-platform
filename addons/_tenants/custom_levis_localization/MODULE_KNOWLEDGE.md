@@ -67,6 +67,22 @@ This module implements five specific requirements for the Levi's tenant: HS Code
   - `action_view_move()`: Returns an act_window action opening the generated `account.move`.
   - `_cron_generate_drafts()`: Creates one computed reconciliation per company and generates a DRAFT entry when a difference exists. Never posts automatically. Bound to an inactive monthly cron.
 
+### Voucher table: one row per settled bill
+`_edo_voucher_rows()` does **not** map one-to-one onto journal items. A payment
+carries a single payable line however many bills it clears, so that line is
+split into one row per bill using `account.partial.reconcile`
+(`_edo_line_allocations`): each row carries that bill's number, its own vendor
+reference, and the amount actually applied to it. 40 of the 145 reconciled
+payments in prd_levis_begbal settle more than one bill, and before this the
+voucher printed only the first (`bills[:1]`).
+
+Anything the allocations do not account for — an overpayment, or a rounding
+tail — is emitted as a final row under the payment's own number, so the table's
+DEBIT/CREDIT totals still equal the journal entry. A voucher that does not tie
+to its own entry gets rejected on review, so the remainder row is not optional.
+`_edo_line_source_doc` is kept: it still answers "which bill is this line
+against" for callers that want a single record.
+
 ## Integration Points
 - **Depends on**: `product`, `stock`, `stock_account`, `stock_delivery`, `purchase`, `account`.
 - **Inherits from**: `stock.move` and `stock.picking`.
