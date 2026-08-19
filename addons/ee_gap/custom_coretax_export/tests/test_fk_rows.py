@@ -25,6 +25,7 @@ FK_TAHUN = 7
 FK_JUMLAH_DPP = 17
 FK_JUMLAH_DPP_LAIN = 18
 FK_JUMLAH_PPN = 19
+FK_REFERENSI = 28
 
 
 @tagged("post_install", "-at_install", "custom_coretax_export")
@@ -93,6 +94,18 @@ class TestCoretaxFkRows(AccountTestInvoicingCommon):
             [r for r in rows if r[0] == "FK"],
             [r for r in rows if r[0] == "OF"],
         )
+
+    # ------------------------------------------------------------- REFERENSI
+
+    def test_referensi_carries_invoice_number_not_source_order(self):
+        """REFERENSI must be the invoice number even when ``ref`` holds the SO."""
+        invoice = self._invoice([{"price": 100000.0}])
+        invoice.ref = "SO12345"
+        invoice.action_post()
+        fk_rows, _of = self._split(self._rows(invoice))
+
+        self.assertEqual(fk_rows[0][FK_REFERENSI], invoice.name)
+        self.assertNotEqual(fk_rows[0][FK_REFERENSI], "SO12345")
 
     # ------------------------------------------------- DISKON / HARGA_TOTAL
 

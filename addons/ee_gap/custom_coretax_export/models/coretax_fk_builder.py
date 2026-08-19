@@ -484,7 +484,11 @@ class CoretaxFkBuilder(models.AbstractModel):
                     0,
                     0,
                     0,
-                    move.ref or move.name or "",
+                    # REFERENSI — the invoice number, never the sales order.
+                    # ``move.ref`` on a customer invoice carries the source
+                    # order / customer reference, which is not what the tax
+                    # team reconciles the FK against.
+                    move.name or "",
                     "",  # KODE_DOKUMEN_PENDUKUNG
                     "HO",  # BRANCH
                     "",

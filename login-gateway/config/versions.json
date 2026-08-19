@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-19T05:09:07+00:00",
+  "generated_at": "2026-08-19T11:19:30+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "21d9fe9",
-    "branch": "fix/coretax-fg-uang-muka"
+    "commit": "8069d0f",
+    "branch": "fix/coretax-fk-referensi-invoice-number"
   },
   "buckets": [
     {
@@ -2113,14 +2113,24 @@
       "module": "custom_coretax_export",
       "bucket": "ee_gap",
       "name": "Coretax Import File Export (DJP Templates)",
-      "version": "19.0.1.6.0",
+      "version": "19.0.1.6.1",
       "summary": "Emit DJP-conformant Coretax import workbooks: e-Faktur Keluaran (FK/OF), Retur Masukan, Bupot Unifikasi, Bupot PPh 21, Bupot Non-Resident",
       "category": "Accounting/Localizations",
       "depends": 3,
       "public": true,
       "last_change": "2026-08-19",
-      "change_count": 7,
+      "change_count": 9,
       "changes": [
+        {
+          "sha": "8069d0f",
+          "date": "2026-08-19",
+          "subject": "fix(coretax): FK REFERENSI carries the invoice number, not the sales order"
+        },
+        {
+          "sha": "af714e7",
+          "date": "2026-08-19",
+          "subject": "fix(coretax): flag a faktur uang muka as one instead of hard-coding FG_UANG_MUKA to 0 (#187)"
+        },
         {
           "sha": "c824872",
           "date": "2026-08-19",
@@ -2150,11 +2160,6 @@
           "sha": "d2a3f26",
           "date": "2026-08-04",
           "subject": "fix(coretax): report a down payment's Jenis Barang Jasa from the order"
-        },
-        {
-          "sha": "745825f",
-          "date": "2026-07-21",
-          "subject": "feat(tax): DJP Coretax import-file exporter (e-Faktur FK/OF, Retur, Bupot)"
         }
       ]
     },
