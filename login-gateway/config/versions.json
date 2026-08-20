@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-19T23:16:00+00:00",
+  "generated_at": "2026-08-19T23:54:17+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "c402dc4",
-    "branch": "feat/ppn-digunggung-report"
+    "commit": "3e7fdd6",
+    "branch": "feat/pos-tax-id-bridge"
   },
   "buckets": [
     {
@@ -1702,9 +1702,14 @@
       "category": "Accounting/Accounting",
       "depends": 4,
       "public": true,
-      "last_change": "2026-08-19",
-      "change_count": 51,
+      "last_change": "2026-08-20",
+      "change_count": 52,
       "changes": [
+        {
+          "sha": "3e7fdd6",
+          "date": "2026-08-20",
+          "subject": "feat(reports): rekap PPN Keluaran Digunggung untuk PKP Pedagang Eceran (#190)"
+        },
         {
           "sha": "49c8f74",
           "date": "2026-08-19",
@@ -1739,11 +1744,6 @@
           "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
-        },
-        {
-          "sha": "7d2c250",
-          "date": "2026-08-04",
-          "subject": "docs(reports): record the on-screen table contract and the grouped flattener"
         }
       ]
     },
@@ -3911,6 +3911,19 @@
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
       ]
+    },
+    {
+      "module": "custom_pos_tax_id",
+      "bucket": "ee_gap",
+      "name": "Custom POS Tax ID (e-Faktur dari POS)",
+      "version": "19.0.0.1.0",
+      "summary": "Identitas pembeli di POS: syarat e-Faktur Keluaran atas penjualan eceran",
+      "category": "Accounting/Localizations",
+      "depends": 2,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
     },
     {
       "module": "custom_project_api",
