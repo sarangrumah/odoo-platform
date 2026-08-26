@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- ===================== FORM ===================== -->
+        <record id="view_petty_cash_float_form" model="ir.ui.view">
+            <field name="name">petty.cash.float.form</field>
+            <field name="model">petty.cash.float</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_requests" type="object" class="oe_stat_button" icon="fa-list">
+                                <field name="request_count" widget="statinfo" string="Requests"/>
+                            </button>
+                        </div>
+                        <div class="oe_title">
+                            <label for="l10n_ou_analytic_id" string="Store"/>
+                            <h1><field name="l10n_ou_analytic_id" options="{'no_create': True}"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                                <field name="currency_id" invisible="1"/>
+                                <field name="active" invisible="1"/>
+                                <field name="amount_plafon"/>
+                            </group>
+                            <group>
+                                <field name="amount_granted"/>
+                                <field name="amount_reserved"/>
+                                <field name="amount_available"/>
+                                <field name="amount_gl_balance"/>
+                            </group>
+                        </group>
+                        <div class="alert alert-info" role="alert">
+                            <b>Available</b> is the control balance new Realisasi requests are gated on:
+                            granted minus the un-realized part of every open request.
+                            <b>GL Balance</b> is what the advance account says — it drops with every
+                            posted realization and only climbs back once the replenishment cash is booked,
+                            so the two figures are expected to differ between a realization and its top-up.
+                        </div>
+                        <notebook>
+                            <page string="Requests" name="requests">
+                                <field name="request_ids" readonly="1">
+                                    <list decoration-danger="amount_float_consumed &gt; 0 and state == 'draft'"
+                                          decoration-muted="state in ('settled', 'cancelled')">
+                                        <field name="name"/>
+                                        <field name="employee_id"/>
+                                        <field name="advance_type_id"/>
+                                        <field name="request_date"/>
+                                        <field name="amount_requested" sum="Requested"/>
+                                        <field name="amount_realized" sum="Realized"/>
+                                        <field name="amount_float_granted" sum="Granted" optional="show"/>
+                                        <field name="amount_float_consumed" sum="Reserved"/>
+                                        <field name="currency_id" column_invisible="1"/>
+                                        <field name="company_currency_id" column_invisible="1"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ===================== LIST ===================== -->
+        <record id="view_petty_cash_float_list" model="ir.ui.view">
+            <field name="name">petty.cash.float.list</field>
+            <field name="model">petty.cash.float</field>
+            <field name="arch" type="xml">
+                <list decoration-danger="amount_available &lt;= 0"
+                      decoration-warning="amount_available &gt; 0 and amount_available &lt; amount_plafon * 0.2">
+                    <field name="l10n_ou_analytic_id"/>
+                    <field name="company_id" groups="base.group_multi_company"/>
+                    <field name="amount_plafon"/>
+                    <field name="amount_granted"/>
+                    <field name="amount_reserved"/>
+                    <field name="amount_available"/>
+                    <field name="amount_gl_balance" optional="show"/>
+                    <field name="request_count" optional="hide"/>
+                    <field name="currency_id" column_invisible="1"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ===================== SEARCH ===================== -->
+        <record id="view_petty_cash_float_search" model="ir.ui.view">
+            <field name="name">petty.cash.float.search</field>
+            <field name="model">petty.cash.float</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="l10n_ou_analytic_id"/>
+                    <filter name="exhausted" string="Exhausted" domain="[('amount_available', '&lt;=', 0)]"/>
+                    <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+                    <group>
+                        <filter name="group_company" string="Company" context="{'group_by': 'company_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_petty_cash_float" model="ir.actions.act_window">
+            <field name="name">Store Petty Cash Floats</field>
+            <field name="res_model">petty.cash.float</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_petty_cash_float_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">No store float yet</p>
+                <p>A float appears here the first time a store's <b>Petty Cash Awal</b>
+                   request is approved. You can also create one up front to set a
+                   plafon other than the platform default.</p>
+            </field>
+        </record>
+    </data>
+</odoo>

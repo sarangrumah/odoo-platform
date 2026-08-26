@@ -15,14 +15,20 @@ to 19.0 and cannot be ported as-is: Odoo 19 removed `hr.expense.sheet`.)
 ## Models
 - `petty.cash.type` — per-(company, kind) map from an advance type to its
   advance account, its four journals, its sequence and its limits. `kind` ∈
-  `cash_advance` / `petty_cash` / `other`; `is_default` pre-selects one per
-  company (constrained to one). Unique `(code, company_id)`.
+  `pc_initial` / `pc_realization` / `pc_claim` (the 0.6.0 store-float families)
+  and `cash_advance` / `petty_cash` / `other` (pre-0.6.0, untouched by the
+  float); `is_default` pre-selects one per company (constrained to one).
+  Unique `(code, company_id)`.
+- `petty.cash.float` — one revolving float per (company, Operating Unit).
+  Carries the store's plafon and the four balances. See **Store float** below.
 - `petty.cash.request` — pengajuan + pencairan + settlement. Inherits
   `mail.thread`, `mail.activity.mixin`, `approval.mixin`, `pdp.audited.mixin`.
   State: `draft → to_approve → approved → disbursed → in_realization → settled`
   (+ `cancelled`). `amount_outstanding` is the net balance of advance-account
   lines tagged to the request (`account.move.petty_cash_request_id`).
 - `petty.cash.request.line` — optional estimate breakdown.
+- `petty.cash.review.wizard` — Finance's batch approve / send-back / refuse with
+  a reason that lands in each request's chatter.
 - `petty.cash.realization` — pertanggungjawaban; `action_post` builds the GL.
 - `petty.cash.realization.line` — `line_type` `third_party` / `expense`.
 - `account.move` — tagged with `petty_cash_request_id` / `petty_cash_realization_id`.
@@ -90,6 +96,72 @@ field.
 `action_settle` tags any exchange-difference entry `reconcile()` produces with
 `petty_cash_request_id` (`_pc_tag_exchange_moves`), so the FX move shows on the
 smart button and in the Kartu Uang Muka instead of making the card look unclosed.
+
+## Store float (0.6.0)
+Every store (Operating Unit) is granted a revolving float — 1.000.000 by
+default, `ir.config_parameter custom_petty_cash.initial_amount`, overridable per
+store on `petty.cash.float.amount_plafon`. The three `pc_*` kinds are the whole
+mechanism:
+
+| Kind | Draws on the float? | Bank-Out? | Gate |
+|---|---|---|---|
+| `pc_initial` "Petty Cash Awal" | *grants* it | yes | ≤ the store's plafon |
+| `pc_realization` "Realisasi" | reserves from **draft** | no | ≤ available |
+| `pc_claim` "Claim" | no | yes | none — it *is* the over-plafon escape hatch |
+
+```
+available = Σ granted (approved pc_initial) − Σ (requested − realized) over open pc_realization
+```
+
+Three things about that formula are deliberate and easy to "fix" wrongly:
+
+- **The reservation starts at `draft`** (`FLOAT_OPEN_STATES`). Finance asked for
+  it: otherwise a store queues five drafts that each look affordable alone.
+- **Realizing frees exactly what was realized** — "saldo pulih sesuai nilai yang
+  direalisasikan". Reserve 300k, realize 250k → available climbs by 250k, and
+  the un-realized 50k stays reserved until `action_close_release` hands it back.
+  The cash for that 50k never left the drawer, so releasing it books nothing.
+- **`amount_available` ≠ `amount_gl_balance`.** Available is the control ledger
+  and assumes the realized spend gets replenished; the GL balance is what the
+  advance account says and drops with every posted realization. They re-converge
+  when the top-up is booked. Both are on the float form, labelled, with the
+  reason in an inline alert — do not "reconcile" them by changing either.
+
+`pc_realization` / `pc_claim` requests have **no disbursement step**: the money
+is already in the store's drawer, so `_pc_realizable_states()` lets a realization
+be recorded straight from `approved`, and `action_settle` routes to
+`_settle_float_request()` (which releases the reservation) instead of demanding
+a zero GL outstanding.
+
+`float_id` is a **stored compute that never creates**. A compute that created
+floats would spawn one every time an employee opened a blank request form;
+creation happens only in `action_approve` on a `pc_initial` request and on the
+Finance Configuration screen, and `action_approve` then calls
+`rec._compute_float_id()` by hand because "a record I just created now exists"
+is not a dependency change the ORM can see.
+
+The module ships the kinds and the engine but seeds **no type records**:
+`custom_petty_cash` is shared by six DBs and two of those tenants never asked for
+the store float. `scripts/tenants/levis/101_setup_petty_cash_store_float.py`
+(idempotent, PREVIEW by default) opts one tenant in — three types per company
+inheriting the default type's accounting map, plus one float per OU analytic.
+
+## Finance review + dashboard (0.6.0)
+- **Finance Review ▸ Review Queue** — `action_petty_cash_review`, domain
+  `state = to_approve`, with a dedicated list carrying inline Approve /
+  Send Back buttons. The `petty.cash.review.wizard` is bound to the list
+  (`binding_model_id`) for the multi-record case with a mandatory reason.
+- **Finance Review ▸ Store Floats** — plafon / granted / reserved / available /
+  GL per OU. Exhausted stores are red, under-20% ones amber.
+- **Finance Review ▸ Outstanding per Operating Unit** — pivot-first, pre-grouped
+  by OU × state.
+- **Dashboard** — `action_petty_cash_dashboard`, `list,kanban,pivot,graph,form`
+  over the same search view (filters per kind, overdue, reserving-float, this
+  month; group by OU / employee / type / kind / status / month). Export is
+  Odoo's native list export, so nothing custom to maintain.
+
+`ir.actions.act_window` takes **`group_ids`**, not `groups_id`, on Odoo 19 —
+the rename cost one install run.
 
 ## Limits
 Resolution order for the outstanding ceiling: **employee → job → type**; `0.0`

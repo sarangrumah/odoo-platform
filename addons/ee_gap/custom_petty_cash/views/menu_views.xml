@@ -21,6 +21,24 @@
                   parent="menu_petty_cash_root"
                   action="action_petty_cash_realization" sequence="20"/>
 
+        <menuitem id="menu_petty_cash_review_root" name="Finance Review"
+                  parent="menu_petty_cash_root" sequence="25"
+                  groups="custom_petty_cash.group_petty_cash_finance"/>
+        <menuitem id="menu_petty_cash_review_queue" name="Review Queue"
+                  parent="menu_petty_cash_review_root"
+                  action="action_petty_cash_review" sequence="5"/>
+        <menuitem id="menu_petty_cash_review_floats" name="Store Floats"
+                  parent="menu_petty_cash_review_root"
+                  action="action_petty_cash_float" sequence="10"/>
+        <menuitem id="menu_petty_cash_review_outstanding_ou" name="Outstanding per Operating Unit"
+                  parent="menu_petty_cash_review_root"
+                  action="action_petty_cash_outstanding_ou" sequence="15"/>
+
+        <menuitem id="menu_petty_cash_dashboard" name="Dashboard"
+                  parent="menu_petty_cash_root" sequence="28"
+                  action="action_petty_cash_dashboard"
+                  groups="custom_petty_cash.group_petty_cash_finance"/>
+
         <menuitem id="menu_petty_cash_reporting" name="Reporting"
                   parent="menu_petty_cash_root" sequence="30"
                   groups="custom_petty_cash.group_petty_cash_finance"/>
@@ -40,6 +58,9 @@
         <menuitem id="menu_petty_cash_types" name="Advance Types"
                   parent="menu_petty_cash_config_root"
                   action="action_petty_cash_type" sequence="5"/>
+        <menuitem id="menu_petty_cash_floats_config" name="Store Floats"
+                  parent="menu_petty_cash_config_root"
+                  action="action_petty_cash_float" sequence="7"/>
         <menuitem id="menu_petty_cash_settings" name="Settings"
                   parent="menu_petty_cash_config_root"
                   action="action_petty_cash_config" sequence="10"/>
