@@ -35,10 +35,19 @@ class PpnDigunggungWizard(models.TransientModel):
             "posted_only": self.posted_only,
         }
 
+    def _report_code_for_view(self):
+        """Recap by default; the per-transaction detail when the menu asks.
+
+        Both menus drive this one wizard on purpose — the filters are
+        identical, and a second ``TransientModel`` would force an ``-u`` on
+        every tenant that has this addon installed.
+        """
+        return "ppn_digunggung_detail" if self.env.context.get("ppn_digunggung_detail") else "ppn_digunggung"
+
     def action_print(self):
         self.ensure_one()
         data = {
-            "report_code": "ppn_digunggung",
+            "report_code": self._report_code_for_view(),
             "doc_model": self._name,
             "options": {
                 **self._build_filters(),
@@ -55,8 +64,11 @@ class PpnDigunggungWizard(models.TransientModel):
             "date_from": self.date_from.isoformat(),
             "date_to": self.date_to.isoformat(),
         }
-        filename = "PPN_Digunggung_%s_%s.xlsx" % (self.date_from, self.date_to)
-        return self.env["custom.report.ppn.digunggung"]._xlsx_action(options, filename)
+        code = self._report_code_for_view()
+        stem = "PPN_Digunggung_Detail" if code == "ppn_digunggung_detail" else "PPN_Digunggung"
+        filename = "%s_%s_%s.xlsx" % (stem, self.date_from, self.date_to)
+        report = self.env["report.custom_accounting_reports.report_dispatch"]._report_model(code)
+        return report._xlsx_action(options, filename)
 
     def action_view_source(self):
         """The POS journal entries behind the recap, never the invoices."""

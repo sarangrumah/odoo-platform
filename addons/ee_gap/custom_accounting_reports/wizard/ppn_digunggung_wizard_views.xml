@@ -5,10 +5,19 @@
         <field name="model">custom.report.ppn.digunggung.wizard</field>
         <field name="arch" type="xml">
             <form string="Rekap PPN Keluaran Digunggung">
-                <div class="alert alert-info" role="status">
+                <div class="alert alert-info" role="status"
+                     invisible="context.get('ppn_digunggung_detail')">
                     Penyerahan eceran tanpa identitas pembeli (PKP Pedagang Eceran).
                     Penjualan yang diterbitkan faktur pajak per transaksi ada di
                     <b>Rekap Faktur Pajak</b>, bukan di sini.
+                </div>
+                <div class="alert alert-info" role="status"
+                     invisible="not context.get('ppn_digunggung_detail')">
+                    Rincian penyerahan eceran <b>sampai nomor transaksi</b> — satu baris
+                    per struk POS (atau per jurnal untuk penjualan non-POS), dikelompokkan
+                    per masa. Totalnya sama dengan <b>Rekap PPN Digunggung</b>; periode
+                    panjang menghasilkan puluhan ribu baris, jadi ekspor Excel lebih nyaman
+                    daripada layar.
                 </div>
                 <group>
                     <group>
@@ -34,6 +43,14 @@
                 </footer>
             </form>
         </field>
+    </record>
+
+    <record id="action_ppn_digunggung_detail_wizard" model="ir.actions.act_window">
+        <field name="name">Rincian PPN Digunggung per Transaksi</field>
+        <field name="res_model">custom.report.ppn.digunggung.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'ppn_digunggung_detail': 1}</field>
     </record>
 
     <record id="action_ppn_digunggung_wizard" model="ir.actions.act_window">
