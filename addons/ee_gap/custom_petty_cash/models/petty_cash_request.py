@@ -113,13 +113,13 @@ class PettyCashRequest(models.Model):
     line_ids = fields.One2many(
         "petty.cash.request.line",
         "request_id",
-        string="Estimate Breakdown",
+        string="Detail Lines",
     )
     amount_requested = fields.Monetary(
         string="Amount Requested",
         currency_field="currency_id",
         tracking=True,
-        help="Amount the employee is asking for. When an estimate breakdown is entered it must match this total.",
+        help="Amount the employee is asking for. When detail lines are entered they must add up to this total.",
     )
     realization_deadline = fields.Date(
         string="Realization Deadline",
@@ -672,7 +672,7 @@ class PettyCashRequest(models.Model):
                 if not rec.currency_id.is_zero(total - rec.amount_requested):
                     raise UserError(
                         _(
-                            "The estimate breakdown (%(bd)s) does not match the requested amount (%(req)s).",
+                            "The detail lines (%(bd)s) do not add up to the requested amount (%(req)s).",
                             bd=total,
                             req=rec.amount_requested,
                         )

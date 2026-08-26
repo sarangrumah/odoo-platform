@@ -16,7 +16,7 @@ Odoo 19 Community.
    journals, sequence and ceilings, per company. The first three drive the
    store float described below.
 1. **Request** (`petty.cash.request`) — an employee asks for cash for an
-   Operating Unit, optionally with an estimate breakdown.
+   Operating Unit, optionally itemised into detail lines.
 2. **Approval** — routed through `custom_approval_engine`'s matrix; when no
    matrix matches, a Finance user approves directly.
 3. **Disbursement (Bank Out)** — Finance disburses the approved amount:

@@ -25,7 +25,7 @@ employees on Odoo 19 Community:
    exactly what was realized. A **Claim** is the escape hatch for a spend the
    float cannot cover and bypasses the check.
 1. **Pengajuan** — an employee requests an advance for an Operating Unit
-   (``petty.cash.request``), optionally broken down into estimate lines.
+   (``petty.cash.request``), optionally itemised into detail lines.
 2. **Review & Approval** — Finance reviews; approval routes through the
    generic ``custom_approval_engine`` matrix (multi-tier, delegation, SLA).
 3. **Pencairan (Bank Out)** — Finance disburses the approved amount, booking
@@ -67,7 +67,7 @@ Part of the Custom Platform — multi-tenant Odoo 19 for Indonesian SMB.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.6.0",
+    "version": "19.0.0.6.1",
     "license": "LGPL-3",
     "depends": [
         "custom_core",

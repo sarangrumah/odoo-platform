@@ -103,7 +103,7 @@
                             </group>
                         </group>
                         <notebook>
-                            <page string="Estimate Breakdown" name="breakdown">
+                            <page string="Detail Lines" name="detail_lines">
                                 <field name="line_ids" readonly="state not in ('draft', 'to_approve')">
                                     <list editable="bottom">
                                         <field name="sequence" widget="handle"/>
@@ -111,16 +111,6 @@
                                         <field name="account_id"/>
                                         <field name="currency_id" column_invisible="1"/>
                                         <field name="amount" sum="Total"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Realizations" name="realizations">
-                                <field name="realization_ids" readonly="1">
-                                    <list>
-                                        <field name="name"/>
-                                        <field name="date"/>
-                                        <field name="amount_total"/>
-                                        <field name="state" widget="badge"/>
                                     </list>
                                 </field>
                             </page>

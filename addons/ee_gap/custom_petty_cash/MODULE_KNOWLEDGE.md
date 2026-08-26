@@ -26,7 +26,7 @@ to 19.0 and cannot be ported as-is: Odoo 19 removed `hr.expense.sheet`.)
   State: `draft → to_approve → approved → disbursed → in_realization → settled`
   (+ `cancelled`). `amount_outstanding` is the net balance of advance-account
   lines tagged to the request (`account.move.petty_cash_request_id`).
-- `petty.cash.request.line` — optional estimate breakdown.
+- `petty.cash.request.line` — optional detail lines (what the money is for).
 - `petty.cash.review.wizard` — Finance's batch approve / send-back / refuse with
   a reason that lands in each request's chatter.
 - `petty.cash.realization` — pertanggungjawaban; `action_post` builds the GL.
