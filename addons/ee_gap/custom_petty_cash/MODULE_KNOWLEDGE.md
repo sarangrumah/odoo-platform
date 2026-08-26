@@ -147,13 +147,22 @@ the store float. `scripts/tenants/levis/101_setup_petty_cash_store_float.py`
 inheriting the default type's accounting map, plus one float per OU analytic.
 
 ## Finance review + dashboard (0.6.0)
-- **Finance Review ▸ Review Queue** — `action_petty_cash_review`, domain
+Menu topology: the **Cash Advance app keeps only Requests + Realizations** (what
+an employee needs). Everything Finance touches hangs off **Invoicing ▸ Cash
+Advance** (`menu_petty_cash_finance_root`, parent `account.menu_finance`).
+They nest under that one section rather than sitting at Invoicing's top level
+because `account.menu_finance` already ships its own Dashboard, Review,
+Reporting and Configuration — four namesakes side by side would be unreadable.
+**Invoicing is gated on the account groups**, so a user holding only
+`group_petty_cash_finance` sees none of it without an accounting group too.
+
+- **Invoicing ▸ Cash Advance ▸ Finance Review ▸ Review Queue** — `action_petty_cash_review`, domain
   `state = to_approve`, with a dedicated list carrying inline Approve /
   Send Back buttons. The `petty.cash.review.wizard` is bound to the list
   (`binding_model_id`) for the multi-record case with a mandatory reason.
-- **Finance Review ▸ Store Floats** — plafon / granted / reserved / available /
+- **… ▸ Finance Review ▸ Store Floats** — plafon / granted / reserved / available /
   GL per OU. Exhausted stores are red, under-20% ones amber.
-- **Finance Review ▸ Outstanding per Operating Unit** — pivot-first, pre-grouped
+- **… ▸ Finance Review ▸ Outstanding per Operating Unit** — pivot-first, pre-grouped
   by OU × state.
 - **Dashboard** — `action_petty_cash_dashboard`, `list,kanban,pivot,graph,form`
   over the same search view (filters per kind, overdue, reserving-float, this

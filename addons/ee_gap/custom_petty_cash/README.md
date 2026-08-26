@@ -56,7 +56,7 @@ realized frees a rupiah of the reservation ("saldo pulih sesuai nilai yang
 direalisasikan"). Whatever was never realized is handed back by **Close &
 Release**, which books nothing — that cash never left the store.
 
-`Cash Advance → Finance Review → Store Floats` shows plafon, granted, reserved
+`Invoicing → Cash Advance → Finance Review → Store Floats` shows plafon, granted, reserved
 and available per store, next to the advance-account GL balance. The two differ
 between a realization and its replenishment, by design.
 
@@ -65,7 +65,7 @@ Store` and can be overridden store by store on the float itself.
 
 ## Finance review & dashboard
 
-`Cash Advance → Finance Review`
+`Invoicing → Cash Advance → Finance Review`
 
 * **Review Queue** — everything awaiting approval, with inline Approve / Send
   Back, and a batch wizard (Approve / Send back / Refuse) whose reason is posted
@@ -74,7 +74,7 @@ Store` and can be overridden store by store on the float itself.
 * **Outstanding per Operating Unit** — pivot of requested / realized / reserved /
   outstanding, pre-grouped by store and status.
 
-`Cash Advance → Dashboard` is the same data over **list, kanban, pivot and
+`Invoicing → Cash Advance → Dashboard` is the same data over **list, kanban, pivot and
 graph**, with filters per type kind, overdue, reserving-float and this month,
 and group-by store / employee / type / status / month. Export uses Odoo's
 native list export (XLSX / CSV).
