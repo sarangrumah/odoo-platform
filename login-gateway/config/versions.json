@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-19T23:54:17+00:00",
+  "generated_at": "2026-08-25T23:40:09+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "3e7fdd6",
-    "branch": "feat/pos-tax-id-bridge"
+    "commit": "59addf2",
+    "branch": "feat/levis-sheet-aug26"
   },
   "buckets": [
     {
@@ -1697,7 +1697,7 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.22.0",
+      "version": "19.0.0.23.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 4,
@@ -3921,9 +3921,15 @@
       "category": "Accounting/Localizations",
       "depends": 2,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-08-20",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "59addf2",
+          "date": "2026-08-20",
+          "subject": "feat(pos): syarat identitas pembeli sebelum POS order boleh di-invoice (#191)"
+        }
+      ]
     },
     {
       "module": "custom_project_api",

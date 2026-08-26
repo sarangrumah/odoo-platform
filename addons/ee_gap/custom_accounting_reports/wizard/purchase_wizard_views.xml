@@ -7,6 +7,8 @@
             <form string="Purchase Report">
                 <group>
                     <group>
+                        <field name="show_gr" invisible="1"/>
+                        <field name="date_basis" invisible="not show_gr"/>
                         <field name="date_from"/>
                         <field name="date_to"/>
                         <field name="group_by"/>

@@ -1689,6 +1689,73 @@ class TestCustomReports(TransactionCase):
             {k: round(v, 2) for k, v in subtotals.items()},
         )
 
+    def test_purchase_register_gr_basis_shape(self):
+        """GR basis drives the window; without stock/purchase it stays bill-based."""
+        report = self.env["custom.report.purchase"]
+        self._mk_bill(1000.0, "trade")
+        headers = [c["header"] for c in report._xlsx_columns()]
+        self.assertIn("Item Code", headers)
+        self.assertIn("Item Name", headers)
+        self.assertNotIn("Product", headers)
+
+        available = report._gr_available()
+        self.assertEqual("Tgl GR" in headers, available)
+        self.assertEqual("No. GR" in headers, available)
+        self.assertEqual("Date" in headers, not available)
+
+        # Asking for the GR basis on a database without stock/purchase must not
+        # empty the register — every row falls back to its bill date.
+        lines = report._build_lines(self._purchase_options(date_basis="gr"))
+        self.assertAlmostEqual(lines[-1]["untaxed"], 1000.0, places=2)
+        rows = [line for line in lines if not line.get("type")]
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertEqual(row["date"], row["bill_date"])
+            if not available:
+                self.assertFalse(row["gr_date"])
+                self.assertFalse(row["gr_no"])
+
+    def test_purchase_wizard_carries_the_date_basis(self):
+        wizard = self.env["custom.report.purchase.wizard"].create({})
+        self.assertEqual(wizard.date_basis, "gr")
+        self.assertEqual(wizard.show_gr, self.env["custom.report.purchase"]._gr_available())
+        expected = "gr" if wizard.show_gr else "bill"
+        self.assertEqual(wizard._build_filters()["date_basis"], expected)
+
+    def test_ppn_masukan_import_carries_the_faktur_pajak(self):
+        """Sheet #33: nomor + tanggal faktur pajak next to the invoice pair."""
+        report = self.env["custom.report.ppn.masukan.import"]
+        headers = [c["header"] for c in report._xlsx_columns()]
+        self.assertEqual(
+            headers[:8],
+            [
+                "NPWP",
+                "Nama Lawan Transaksi",
+                "Tanggal Jurnal",
+                "Nomor Dokumen Jurnal",
+                "Tanggal Invoice",
+                "Nomor Invoice",
+                "Tanggal Faktur Pajak",
+                "Nomor Faktur Pajak",
+            ],
+        )
+
+        bill = self._mk_bill(1000.0, "trade")
+        if "x_custom_nsfp" in bill._fields:
+            bill.write(
+                {
+                    "x_custom_nsfp": "01000123456789012",
+                    "x_custom_tanggal_faktur_pajak": bill.invoice_date or bill.date,
+                }
+            )
+        lines = report._build_lines(self._purchase_options())
+        rows = [line for line in lines if not line.get("type")]
+        for row in rows:
+            self.assertIn("faktur_no", row)
+            self.assertIn("faktur_date", row)
+        if rows and "x_custom_nsfp" in bill._fields:
+            self.assertEqual(rows[0]["faktur_no"], "01000123456789012")
+
     def test_purchase_wizard_filter_flows_through(self):
         wizard = self.env["custom.report.purchase.wizard"].create({"purchase_type": "non_trade"})
         self.assertEqual(wizard._build_filters()["purchase_type"], "non_trade")

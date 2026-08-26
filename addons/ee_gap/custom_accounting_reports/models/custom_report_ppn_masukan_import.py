@@ -6,7 +6,12 @@ flat list. This report emits exactly the columns they need, per posted vendor
 bill/refund that carries PPN:
 
     NPWP / Nama Lawan Transaksi / Tanggal Jurnal / Nomor Dokumen Jurnal /
-    Tanggal Invoice / Nomor Invoice / Nilai DPP / Nilai PPN
+    Tanggal Invoice / Nomor Invoice / Tanggal Faktur Pajak / Nomor Faktur Pajak /
+    Nilai DPP / Nilai PPN
+
+The faktur pajak pair comes from ``custom_coretax`` (``x_custom_tanggal_faktur_pajak``
+/ ``x_custom_nsfp``) and is read through ``_opt``, so the two columns stay blank
+instead of crashing on a tenant that never installed that module.
 
 DPP and PPN are computed exactly like ``custom.report.faktur.pajak`` (masukan
 side): DPP = sum of base lines bearing a PPN tax; PPN = sum of the PPN tax
@@ -36,6 +41,8 @@ class CustomReportPpnMasukanImport(models.AbstractModel):
             {"header": "Nomor Dokumen Jurnal", "field": "journal_no", "kind": "text", "width": 20},
             {"header": "Tanggal Invoice", "field": "invoice_date", "kind": "date", "width": 14},
             {"header": "Nomor Invoice", "field": "invoice_no", "kind": "text", "width": 20},
+            {"header": "Tanggal Faktur Pajak", "field": "faktur_date", "kind": "date", "width": 16},
+            {"header": "Nomor Faktur Pajak", "field": "faktur_no", "kind": "text", "width": 24},
             {"header": "Nilai DPP", "field": "dpp", "kind": "number", "width": 18},
             {"header": "Nilai PPN", "field": "ppn", "kind": "number", "width": 18},
         ]
@@ -88,6 +95,8 @@ class CustomReportPpnMasukanImport(models.AbstractModel):
                         "journal_no": move.name or "",
                         "invoice_date": move.invoice_date,
                         "invoice_no": move.ref or "",
+                        "faktur_date": self._opt(move, "x_custom_tanggal_faktur_pajak", default=None),
+                        "faktur_no": self._opt(move, "x_custom_nsfp"),
                         "dpp": dpp,
                         "ppn": ppn,
                     }
