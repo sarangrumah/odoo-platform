@@ -81,6 +81,9 @@
                         <t t-elif="report_code == 'ppn_digunggung'">
                             <t t-call="custom_accounting_reports.report_ppn_digunggung"/>
                         </t>
+                        <t t-elif="report_code == 'ppn_digunggung_detail'">
+                            <t t-call="custom_accounting_reports.report_ppn_digunggung_detail"/>
+                        </t>
                         <t t-elif="report_code == 'ppn_masukan_import'">
                             <t t-call="custom_accounting_reports.report_ppn_masukan_import"/>
                         </t>

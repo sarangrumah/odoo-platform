@@ -1813,3 +1813,104 @@ class TestCustomReports(TransactionCase):
         self.assertEqual(REPORT_MODEL_MAP.get("ppn_digunggung"), "custom.report.ppn.digunggung")
         router = self.env.ref("custom_accounting_reports.report_dispatch").arch
         self.assertIn("report_ppn_digunggung", router)
+
+    # ------------------------------------------------------------------
+    # Rincian PPN Digunggung per transaksi
+    # ------------------------------------------------------------------
+    def test_ppn_digunggung_detail_one_row_per_transaction(self):
+        """Every supply is named, and the rows still add up to the recap."""
+        acc_ppn_out = self._mk_account("21204", "PPN Keluaran Rinci", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Rinci 11%", "sale", acc_ppn_out)
+        today = date.today()
+        first = self._post_retail_sale(1_200_000.0, ppn, when=today)
+        second = self._post_retail_sale(600_000.0, ppn, when=today)
+
+        lines = self.env["custom.report.ppn.digunggung.detail"]._build_lines(self._filters())
+        rows = [l for l in lines if not l.get("type")]
+        self.assertEqual(
+            {row["doc_no"] for row in rows},
+            {first.name, second.name},
+            "Without POS the transaction number is the journal entry's own.",
+        )
+        recap = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
+        recap_total = next(l for l in recap if l.get("type") == "grand_total")
+        detail_total = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(detail_total["ppn"], recap_total["ppn"], places=2)
+        self.assertAlmostEqual(detail_total["dpp_penuh"], recap_total["dpp_penuh"], places=2)
+        self.assertAlmostEqual(detail_total["dpp_lain"], recap_total["dpp_lain"], places=2)
+        # PMK 131 presentation survives one level down.
+        self.assertTrue(all(row["tarif"] == 12.0 for row in rows))
+        self.assertAlmostEqual(sum(row["dpp_lain"] for row in rows) * 0.12, detail_total["ppn"], places=2)
+
+    def test_ppn_digunggung_detail_subtotals_every_masa(self):
+        acc_ppn_out = self._mk_account("21205", "PPN Keluaran Dua Masa", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Dua Masa 11%", "sale", acc_ppn_out)
+        this_masa = date.today().replace(day=15)
+        prev_masa = (this_masa.replace(day=1) - timedelta(days=1)).replace(day=15)
+        self._post_retail_sale(1_200_000.0, ppn, when=this_masa)
+        self._post_retail_sale(600_000.0, ppn, when=prev_masa)
+
+        filters = self._filters()
+        filters["date_from"] = prev_masa.replace(day=1)
+        lines = self.env["custom.report.ppn.digunggung.detail"]._build_lines(filters)
+        subtotals = [l for l in lines if l.get("type") == "subtotal"]
+        self.assertEqual(len(subtotals), 2, "One subtotal per tax period expected.")
+        headers = [l for l in lines if l.get("type") == "header"]
+        self.assertEqual(len(headers), 2)
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(sum(s["ppn"] for s in subtotals), grand["ppn"], places=2)
+
+    def test_ppn_digunggung_detail_excludes_customer_invoices(self):
+        """The invoiced half stays with the per-faktur report, as in the recap."""
+        acc_ppn_out = self._mk_account("21206", "PPN Keluaran Rinci FK", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Rinci FK 11%", "sale", acc_ppn_out)
+        inv = self.Move.create(
+            {
+                "move_type": "out_invoice",
+                "journal_id": self.j_sale.id,
+                "partner_id": self.partner_a.id,
+                "invoice_date": date.today(),
+                "date": date.today(),
+                "company_id": self.company.id,
+                "invoice_line_ids": [
+                    Command.create(
+                        {
+                            "name": "Barang C",
+                            "quantity": 1.0,
+                            "price_unit": 500_000.0,
+                            "account_id": self.acc_revenue.id,
+                            "tax_ids": [Command.set([ppn.id])],
+                        }
+                    )
+                ],
+            }
+        )
+        inv.action_post()
+        self._post_retail_sale(1_200_000.0, ppn)
+
+        lines = self.env["custom.report.ppn.digunggung.detail"]._build_lines(self._filters())
+        self.assertNotIn(inv.name, {l.get("doc_no") for l in lines if not l.get("type")})
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(grand["dpp_penuh"], 1_200_000.0, places=2)
+
+    def test_ppn_digunggung_detail_registered_in_both_dispatch_registries(self):
+        """Guard against the silent Trial-Balance fallback (19.0.0.9.0)."""
+        from odoo.addons.custom_accounting_reports.models.custom_report_dispatch import REPORT_MODEL_MAP
+
+        self.assertEqual(
+            REPORT_MODEL_MAP.get("ppn_digunggung_detail"),
+            "custom.report.ppn.digunggung.detail",
+        )
+        router = self.env.ref("custom_accounting_reports.report_dispatch").arch
+        self.assertIn("report_ppn_digunggung_detail", router)
+
+    def test_ppn_digunggung_wizard_switches_report_on_context(self):
+        """One wizard, two menus: the context key picks the layout."""
+        wizard = self.env["custom.report.ppn.digunggung.wizard"].create({})
+        self.assertEqual(wizard._report_code_for_view(), "ppn_digunggung")
+        detail = wizard.with_context(ppn_digunggung_detail=1)
+        self.assertEqual(detail._report_code_for_view(), "ppn_digunggung_detail")
+        self.assertEqual(
+            detail.action_view()["params"]["report_code"],
+            "ppn_digunggung_detail",
+        )

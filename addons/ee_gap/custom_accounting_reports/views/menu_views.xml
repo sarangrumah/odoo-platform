@@ -114,6 +114,12 @@
               action="action_ppn_digunggung_wizard"
               sequence="22"/>
 
+    <menuitem id="menu_custom_reports_ppn_digunggung_detail"
+              name="Rincian PPN Digunggung per Transaksi"
+              parent="menu_custom_reports_tax_root"
+              action="action_ppn_digunggung_detail_wizard"
+              sequence="23"/>
+
     <menuitem id="menu_custom_reports_ppn_masukan_import"
               name="Import PPN Masukan"
               parent="menu_custom_reports_tax_root"
