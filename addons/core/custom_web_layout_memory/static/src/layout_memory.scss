@@ -1,0 +1,52 @@
+// Collapsed chatter.
+//
+// The collapsed flag lives on the toggle button rather than on the chatter
+// root, because the root's class list is built by the mail templates and the
+// form compiler; :has() lets us style the ancestors from the one element we
+// actually own.
+
+.o-mail-Chatter:has(> .o-mail-Chatter-top .o-ux-chatterToggle.o-ux-chatterCollapsed) {
+    width: auto !important;
+    min-width: 0;
+    flex-grow: 0 !important;
+    overflow: visible !important;
+
+    // Everything except the toggle itself: the message list, the composer, the
+    // follower dropdown, the attachment uploader.
+    .o-mail-Chatter-content,
+    .o-mail-Chatter-top .o-mail-Composer,
+    .o-mail-Chatter-topbar > *:not(.o-ux-chatterToggle) {
+        display: none !important;
+    }
+
+    .o-mail-Chatter-topbar {
+        overflow: visible;
+    }
+}
+
+// The aside container carries a fixed width from mail's own SCSS
+// (`$o-mail-Chatter-minWidth`); without this the sheet would not reclaim the
+// space the chatter just gave up.
+.o-mail-ChatterContainer,
+.o-mail-Form-chatter {
+    &:has(.o-ux-chatterToggle.o-ux-chatterCollapsed) {
+        width: auto;
+        min-width: 0;
+        flex-grow: 0;
+        padding-bottom: 0;
+
+        &.o-aside {
+            width: auto;
+            flex-grow: 0;
+            --ChatterAsideForm-padding-left: 0px;
+        }
+    }
+}
+
+// Keep the rail visible against the sheet, and hint that it opens leftwards.
+.o-ux-chatterToggle {
+    &.o-ux-chatterCollapsed {
+        position: sticky;
+        top: 0;
+    }
+}
