@@ -11,10 +11,10 @@ Amounts use the document-currency ``price_subtotal`` / ``price_total`` (equal
 to the company currency for single-currency books).
 """
 
-from datetime import date as date_cls
+from datetime import date as date_cls, datetime, time
 from itertools import groupby
 
-from odoo import models
+from odoo import fields, models
 
 PTYPE_LABELS = {"trade": "Trade", "non_trade": "Non-Trade"}
 UNCLASSIFIED = "Unclassified"
@@ -27,6 +27,68 @@ class CustomReportPurchase(models.AbstractModel):
 
     _report_code = "purchase"
     _report_title = "Purchase Report"
+
+    # ------------------------------------------------------------------
+    # Goods-receipt basis (Levi's sheet #25 / #30)
+    # ------------------------------------------------------------------
+    # Accounting pulls the register per *receiving* period, not per billing
+    # period: a July receipt billed in August belongs to July. The bill line is
+    # still the row (that is where price, discount and tax live), but the
+    # period filter, the leading date and the month grouping follow the first
+    # done goods receipt of its purchase order line.
+    #
+    # Bill lines with no purchase order behind them — services, non-trade
+    # expenses, manual bills — have no receipt at all. They keep the bill date
+    # as their basis date so the register stays complete instead of silently
+    # dropping every non-trade cost.
+    def _gr_available(self):
+        return "purchase_line_id" in self.env["account.move.line"]._fields and "stock.move" in self.env
+
+    def _first_gr_dates(self, filters):
+        """{purchase.order.line id: date of its first done receipt} up to date_to."""
+        if not self._gr_available():
+            return {}
+        date_to = fields.Date.to_date(filters["date_to"])
+        groups = (
+            self.env["stock.move"]
+            .sudo()
+            ._read_group(
+                domain=[
+                    ("state", "=", "done"),
+                    ("purchase_line_id", "!=", False),
+                    ("company_id", "in", list(filters["company_ids"])),
+                    ("date", "<=", datetime.combine(date_to, time.max)),
+                ],
+                groupby=["purchase_line_id"],
+                aggregates=["date:min"],
+            )
+        )
+        return {pol.id: dt.date() for pol, dt in groups if dt}
+
+    def _gr_numbers(self, po_line_ids, filters):
+        """{purchase.order.line id: "WH/IN/00012, WH/IN/00019"} for done receipts."""
+        if not po_line_ids or not self._gr_available():
+            return {}
+        date_to = fields.Date.to_date(filters["date_to"])
+        moves = (
+            self.env["stock.move"]
+            .sudo()
+            .search_read(
+                [
+                    ("state", "=", "done"),
+                    ("purchase_line_id", "in", list(po_line_ids)),
+                    ("date", "<=", datetime.combine(date_to, time.max)),
+                ],
+                ["purchase_line_id", "picking_id"],
+            )
+        )
+        names = {}
+        for mv in moves:
+            picking = mv.get("picking_id")
+            if not picking:
+                continue
+            names.setdefault(mv["purchase_line_id"][0], set()).add(picking[1])
+        return {pol: ", ".join(sorted(vals)) for pol, vals in names.items()}
 
     # ------------------------------------------------------------------
     # Trade / Non-Trade split (Levi's feature #9)
@@ -54,26 +116,23 @@ class CustomReportPurchase(models.AbstractModel):
         return ptype or False
 
     def _xlsx_columns(self):
-        if self._purchase_type_available():
-            return [
-                {"header": "Date", "field": "date", "kind": "date", "width": 12},
-                {"header": "Bill No", "field": "invoice_no", "kind": "text", "width": 18},
-                {"header": "Type", "field": "ptype", "kind": "text", "width": 12},
-                {"header": "Vendor", "field": "vendor", "kind": "text", "width": 28},
-                {"header": "Product", "field": "product", "kind": "text", "width": 26},
-                {"header": "Description", "field": "label", "kind": "text", "width": 30},
-                {"header": "Qty", "field": "quantity", "kind": "number", "width": 10},
-                {"header": "Unit Price", "field": "price_unit", "kind": "number", "width": 14},
-                {"header": "Disc %", "field": "discount", "kind": "number", "width": 9},
-                {"header": "Untaxed", "field": "untaxed", "kind": "number", "width": 16},
-                {"header": "Tax", "field": "tax", "kind": "number", "width": 14},
-                {"header": "Total", "field": "total", "kind": "number", "width": 16},
+        cols = []
+        show_gr = self._gr_available()
+        if show_gr:
+            cols += [
+                {"header": "Tgl GR", "field": "gr_date", "kind": "date", "width": 12},
+                {"header": "No. GR", "field": "gr_no", "kind": "text", "width": 20},
+                {"header": "Tgl Bill", "field": "bill_date", "kind": "date", "width": 12},
             ]
-        return [
-            {"header": "Date", "field": "date", "kind": "date", "width": 12},
-            {"header": "Bill No", "field": "invoice_no", "kind": "text", "width": 18},
+        else:
+            cols.append({"header": "Date", "field": "date", "kind": "date", "width": 12})
+        cols.append({"header": "Bill No", "field": "invoice_no", "kind": "text", "width": 18})
+        if self._purchase_type_available():
+            cols.append({"header": "Type", "field": "ptype", "kind": "text", "width": 12})
+        cols += [
             {"header": "Vendor", "field": "vendor", "kind": "text", "width": 28},
-            {"header": "Product", "field": "product", "kind": "text", "width": 26},
+            {"header": "Item Code", "field": "item_code", "kind": "text", "width": 16},
+            {"header": "Item Name", "field": "product", "kind": "text", "width": 30},
             {"header": "Description", "field": "label", "kind": "text", "width": 30},
             {"header": "Qty", "field": "quantity", "kind": "number", "width": 10},
             {"header": "Unit Price", "field": "price_unit", "kind": "number", "width": 14},
@@ -82,6 +141,7 @@ class CustomReportPurchase(models.AbstractModel):
             {"header": "Tax", "field": "tax", "kind": "number", "width": 14},
             {"header": "Total", "field": "total", "kind": "number", "width": 16},
         ]
+        return cols
 
     # The engine's generic flat ``_xlsx_body`` already renders these lines
     # (subtotal / grand_total rows are emitted bold).
@@ -96,6 +156,10 @@ class CustomReportPurchase(models.AbstractModel):
             "non_trade": "Non-Trade",
             "unclassified": UNCLASSIFIED,
         }.get(want, "")
+        show_gr = self._gr_available()
+        ctx["show_gr"] = show_gr
+        basis = (ctx["filters"].get("date_basis") or "gr") if show_gr else "bill"
+        ctx["date_basis_label"] = "Tanggal GR" if basis == "gr" else "Tanggal Bill"
         return ctx
 
     def _group_key(self, row, group_by):
@@ -111,13 +175,20 @@ class CustomReportPurchase(models.AbstractModel):
 
     def _build_lines(self, filters):
         group_by = filters.get("group_by") or "none"
+        show_gr = self._gr_available()
+        basis = (filters.get("date_basis") or "gr") if show_gr else "bill"
         domain = [
             ("company_id", "in", filters["company_ids"]),
-            ("date", ">=", filters["date_from"]),
-            ("date", "<=", filters["date_to"]),
             ("move_id.move_type", "in", ("in_invoice", "in_refund")),
             ("display_type", "=", "product"),
         ]
+        first_gr = self._first_gr_dates(filters) if basis == "gr" else {}
+        date_window = [
+            ("date", ">=", filters["date_from"]),
+            ("date", "<=", filters["date_to"]),
+        ]
+        if basis != "gr":
+            domain += date_window
         if filters.get("posted_only", True):
             domain.append(("parent_state", "=", "posted"))
         else:
@@ -137,8 +208,27 @@ class CustomReportPurchase(models.AbstractModel):
             # blanks still go through _resolve_purchase_type below.
             domain.append(("move_id.l10n_purchase_type", "in", (want_ptype, False)))
 
+        AML = self.env["account.move.line"]
+        if basis == "gr":
+            date_from = fields.Date.to_date(filters["date_from"])
+            date_to = fields.Date.to_date(filters["date_to"])
+            in_window = [pol for pol, gr in first_gr.items() if date_from <= gr <= date_to]
+            # Two populations make up a GR-basis pull: lines whose receipt lands
+            # in the window, whatever month their bill carries — and lines that
+            # have no receipt at all (services, non-trade, a bill keyed before
+            # the goods arrived), which keep their bill date so no cost is ever
+            # silently dropped by switching basis.
+            received = AML.search(domain + [("purchase_line_id", "in", in_window)])
+            unreceived = AML.search(domain + date_window).filtered(lambda ml: not first_gr.get(ml.purchase_line_id.id))
+            move_lines = received | unreceived
+        else:
+            move_lines = AML.search(domain)
+        gr_numbers = self._gr_numbers(move_lines.mapped("purchase_line_id").ids, filters) if show_gr else {}
+        if show_gr and basis != "gr":
+            first_gr = self._first_gr_dates(filters)
+
         rows = []
-        for ml in self.env["account.move.line"].search(domain):
+        for ml in move_lines:
             ptype = self._resolve_purchase_type(ml) if has_ptype else False
             if want_ptype == "unclassified":
                 if ptype:
@@ -148,13 +238,19 @@ class CustomReportPurchase(models.AbstractModel):
             sign = -1.0 if ml.move_id.move_type == "in_refund" else 1.0
             untaxed = ml.price_subtotal * sign
             total = ml.price_total * sign
+            pol_id = ml.purchase_line_id.id if show_gr else False
+            gr_date = first_gr.get(pol_id) if pol_id else None
             rows.append(
                 {
-                    "date": ml.date,
+                    "date": (gr_date or ml.date) if basis == "gr" else ml.date,
+                    "bill_date": ml.date,
+                    "gr_date": gr_date,
+                    "gr_no": gr_numbers.get(pol_id, "") if pol_id else "",
                     "invoice_no": ml.move_id.name or "",
                     "ptype": PTYPE_LABELS.get(ptype, UNCLASSIFIED if has_ptype else ""),
                     "vendor": ml.move_id.partner_id.display_name or "",
-                    "product": ml.product_id.display_name or "",
+                    "item_code": ml.product_id.default_code or "",
+                    "product": ml.product_id.name or "",
                     "label": ml.name or "",
                     "quantity": (ml.quantity or 0.0) * sign,
                     "price_unit": ml.price_unit or 0.0,
