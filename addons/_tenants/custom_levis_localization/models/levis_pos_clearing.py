@@ -168,6 +168,7 @@ class LevisPosClearing(models.Model):
     line_ids = fields.One2many("levis.pos.clearing.line", "run_id", copy=False)
     leg_ids = fields.One2many("levis.pos.clearing.leg", "run_id", copy=False)
     diag_ids = fields.One2many("levis.pos.clearing.diag", "run_id", copy=False)
+    day_ids = fields.One2many("levis.pos.clearing.day", "run_id", copy=False)
     # The bank statement lines' own entries, tagged as this run touched them.
     # Only filled at posting: there is nothing of ours to look at before that.
     move_ids = fields.One2many("account.move", "levis_pos_clearing_id", readonly=True, copy=False)
@@ -696,6 +697,7 @@ class LevisPosClearing(models.Model):
         self.diag_ids = [(0, 0, vals) for vals in diag_config + diag_vals]
         self._build_diagnostics(residual)
         self._simulate_balances()
+        self.env["levis.pos.clearing.day"]._rebuild_for_run(self)
         self.state = "computed"
         return True
 
@@ -1681,6 +1683,15 @@ class LevisPosClearingLine(models.Model):
         copy=False,
     )
     writeoff_uid = fields.Many2one("res.users", string="Written Off By", readonly=True, copy=False)
+    day_id = fields.Many2one(
+        "levis.pos.clearing.day",
+        string="Clearing Day",
+        index="btree_not_null",
+        ondelete="set null",
+        copy=False,
+        help="The settlement day this line belongs to. A projection for the "
+        "operator; nothing about the accounting depends on it.",
+    )
     mismatch_amount = fields.Monetary(
         compute="_compute_narrative_amounts",
         currency_field="currency_id",

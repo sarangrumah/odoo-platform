@@ -475,6 +475,60 @@ the residual leg is smaller by the fee that was pro-rated away (600 000 vs
 cap. The wizard also refuses the suspense account and any POS receivable — a
 residual must not be hidden back in the accounts it came from.
 
+## Feature 19 — The settlement day (`levis.pos.clearing.day`)
+
+Phase 4. The clearing runs over a month because that is the unit its accounting
+belongs to — one sequence, one lock-date check, one balance simulation. But
+nobody works a month, and the question an operator has is "is the 12th done?".
+Until now there was nowhere to ask it: status belonged to the run.
+
+`levis.pos.clearing.day` is **a projection, not a fourth posting stage**. It books
+nothing, `_rebuild_for_run` recreates every row on each `action_compute`, and
+deleting them all costs nothing but the screen. `line.day_id` is the one column
+this phase adds to an existing table.
+
+Stored rather than a `read_group`, for three reasons that each rule the
+alternative out: the day compares **two populations in different places** (bank
+lines dated D against POS receivables dated D-1, so no grouping over either can
+show the other); it needs a status that persists and buttons to press; and it
+carries a reviewer's note.
+
+### The green rule, and what it deliberately is not
+
+`is_balanced` is `unexplained_total` at nil — every bank line allocated, or
+written off on purpose — plus nothing unmapped or unreadable. **It is not gated
+on `tally_variance`.**
+
+That is the most important decision in this model. A settlement legitimately
+draws on more than one trading day: that is exactly why `_candidate_dates` walks
+a ±`lookback_days` ladder and why `settlement_lag_days` calls itself an
+assumption. Gating the colour on `gross_total == sales_h1_total` would paint days
+red for a reason no operator can fix, and a red that cannot be cleared is quickly
+a red nobody reads.
+
+So the H-1 comparison the business asked for is kept — it *is* `tally_variance`,
+with its own column and its own colour — but as supervisory information, not a
+workflow gate. `test_a_tally_gap_alone_does_not_stop_a_day_going_green` is the
+load-bearing test: a store sells 1.5 M on the 8th, 1.0 M settles on the 9th, the
+day is green and the variance still reads -500 000.
+
+`sales_h1_total` is read straight from the ledger by SQL, **not** from this run's
+allocations — answering "did roughly the right amount of money show up" from what
+the run managed to match would make it agree with itself by construction.
+
+`kanban_color`: 10 green (settled or posted), 1 red (a line names no store or
+could not be read), 3 amber (partly done), 0 grey (untouched). The kanban binds
+straight to it.
+
+### Not done in this phase
+
+The partial generate/post refactor (`_generate_moves(lines=None)` /
+`_post(lines=None)`, so a single day can be booked on its own) is **deliberately
+left out**. It is the riskiest change in the whole plan — it turns the run's
+state into something derived from its lines — and it rewrites the same methods
+that the uncommitted receipt-matching work touches. Do it after that lands, on
+its own, so it can be reverted alone.
+
 ## Gotchas
 - **The vendor-bill list has no bare `partner_id` to anchor a view on.** Core's
   `account.view_invoice_tree` carries `invoice_partner_display_name` **twice**,
