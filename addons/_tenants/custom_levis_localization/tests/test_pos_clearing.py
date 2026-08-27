@@ -839,6 +839,177 @@ class TestPosClearing(AccountTestInvoicingCommon):
         pool = run._pool_accounts_for_channel({"kind": "settlement", "channel": "qris"}, self.tender_c)
         self.assertEqual(set(pool.ids), set(self.tenders.ids) - {self.tender_c.id})
 
+    def test_the_bank_entry_number_is_readable_on_the_settlement(self):
+        """The number to quote in the ledger, without opening the statement line."""
+        self._posrec(self.tender_a, self.store_one, date(2026, 7, 8), 1_000_000.0)
+        statement = self._statement(date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0))
+        run = self._run()
+        run.action_compute()
+        self.assertEqual(run.line_ids.move_name, statement.move_id.name)
+
+    def test_receipt_numbers_stay_empty_without_the_staged_rows(self):
+        """The receipt list is a courtesy, never a precondition for clearing.
+
+        ``custom_retail_import`` is not a dependency: on a database without it —
+        or before X70D was ever staged — the settlement must still compute, and
+        say nothing rather than guess.
+        """
+        self._posrec(self.tender_a, self.store_one, date(2026, 7, 8), 1_000_000.0)
+        self._statement(date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0))
+        run = self._run()
+        run.action_compute()
+        line = run.line_ids
+        self.assertTrue(line.alloc_ids)
+        self.assertFalse(line.x24_trans_refs)
+        self.assertEqual(line.x24_trans_count, 0)
+        self.assertEqual(line.x24_match, "none")
+        self.assertFalse(line.x24_tender)
+        self.assertFalse(line.x24_tender_mismatch)
+
+    def test_the_tender_is_read_off_the_receivable_account_name(self):
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        cash = self.env["account.account"].create(
+            {
+                "name": "POS Receivable - CASH",
+                "code": "CLRT99",
+                "account_type": "asset_receivable",
+                "reconcile": True,
+            }
+        )
+        self.assertEqual(Alloc._x24_tender_of_account(cash), "CASH")
+        self.assertIsNone(
+            Alloc._x24_tender_of_account(self.config.mdr_account_id),
+            "an account that is not a per-tender receivable names no tender",
+        )
+
+    def test_receipts_are_named_only_when_the_money_names_them(self):
+        """The whole point of the rewrite: a partial settlement claims nothing.
+
+        A day holding 16.865.300 across ten card transactions can compose 250.900
+        many ways. Listing that day's receipts made a 250.900 line read as though
+        it had paid millions — so unless one transaction, or one tender's whole
+        day, equals the settlement exactly, nothing is named.
+        """
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        day = [
+            ("OFFLINE_DOMESTIC_CARD", "80433-1-3066", 3_749_600.0),
+            ("OFFLINE_DOMESTIC_CARD", "80433-1-3076", 349_900.0),
+            ("OFFLINE_VISA", "80433-1-3122", 250_900.0),
+            ("OFFLINE_OTHER_CREDITCARD", "80433-1-3074", 600_900.0),
+            ("OFFLINE_OTHER_CREDITCARD", "80433-1-3094", 449_900.0),
+        ]
+
+        state, tender, refs = Alloc._x24_identify(day, 250_900.0)
+        self.assertEqual((state, tender, refs), ("exact", "OFFLINE_VISA", ["80433-1-3122"]))
+
+        # One tender's whole trading day: 600.900 + 449.900.
+        state, tender, refs = Alloc._x24_identify(day, 1_050_800.0)
+        self.assertEqual(state, "batch")
+        self.assertEqual(tender, "OFFLINE_OTHER_CREDITCARD")
+        self.assertEqual(sorted(refs), ["80433-1-3074", "80433-1-3094"])
+
+        # 4.099.500 is 3.749.600 + 349.900 — a real subset, and still not claimed,
+        # because a subset that adds up is not the same as evidence.
+        self.assertEqual(Alloc._x24_identify(day, 3_000_000.0), ("none", False, []))
+
+        twins = [("OFFLINE_VISA", "80433-1-1", 500.0), ("OFFLINE_JCB", "80433-1-2", 500.0)]
+        state, tender, refs = Alloc._x24_identify(twins, 500.0)
+        self.assertEqual(state, "ambiguous")
+        self.assertFalse(tender, "two tenders could have paid it — name neither")
+        self.assertEqual(sorted(refs), ["80433-1-1", "80433-1-2"])
+
+    def test_a_long_receipt_list_states_the_count_instead_of_being_cut(self):
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        refs = ["80431-1-%s" % n for n in range(1, 11)]
+        self.assertEqual(Alloc._x24_format_refs(refs, 20), ", ".join(refs))
+        spelled = Alloc._x24_format_refs(refs, 3)
+        self.assertTrue(spelled.startswith("80431-1-1, 80431-1-2, 80431-1-3"))
+        self.assertIn("7", spelled, "the seven it does not spell out must still be stated")
+        self.assertFalse(Alloc._x24_format_refs([], 3))
+
+    def _receipt(self, line, ref, amount, tender="OFFLINE_VISA", matched=False):
+        return self.env["levis.pos.clearing.receipt"].create(
+            {
+                "line_id": line.id,
+                "ref": ref,
+                "tender": tender,
+                "trans_date": line.trans_date or line.settlement_date,
+                "amount": amount,
+                "matched": matched,
+            }
+        )
+
+    def _two_settlements(self):
+        """Two bank lines on the same store and trading day — the case that bites."""
+        day = date(2026, 7, 8)
+        self._posrec(self.tender_a, self.store_one, day, 2_000_000.0)
+        self._statement(date(2026, 7, 9), 495_000.0, self._settlement_ref(MID_ONE, 500_000.0, 5_000.0, trans_day=day))
+        self._statement(date(2026, 7, 9), 297_000.0, self._settlement_ref(MID_ONE, 300_000.0, 3_000.0, trans_day=day))
+        run = self._run()
+        run.action_compute()
+        return run, run.line_ids.sorted("gross")
+
+    def test_a_ticked_receipt_leaves_every_other_bank_line(self):
+        """One transaction is paid once — so it stops being offered elsewhere."""
+        run, (smaller, larger) = self._two_settlements()
+        here = self._receipt(larger, "80435-1-3089", 500_000.0)
+        there = self._receipt(smaller, "80435-1-3089", 500_000.0)
+
+        here.matched = True
+
+        self.assertFalse(there.exists(), "the same transaction may not stay on offer elsewhere")
+        self.assertEqual(larger.x24_trans_refs, "80435-1-3089")
+        self.assertEqual(larger.matched_total, 500_000.0)
+        self.assertEqual(larger.match_gap, 0.0)
+        self.assertEqual(smaller.matched_total, 0.0)
+        self.assertEqual(smaller.match_gap, 300_000.0, "and the other line is still short of an answer")
+
+    def test_matching_one_transaction_to_two_bank_lines_is_refused(self):
+        run, (smaller, larger) = self._two_settlements()
+        self._receipt(larger, "80435-1-3089", 500_000.0, matched=True)
+        with self.assertRaises(UserError):
+            self._receipt(smaller, "80435-1-3089", 500_000.0, matched=True)
+
+    def test_unticking_returns_the_transaction_to_the_pool(self):
+        run, (smaller, larger) = self._two_settlements()
+        receipt = self._receipt(larger, "80435-1-3089", 500_000.0, matched=True)
+
+        receipt.action_unmatch()
+
+        self.assertFalse(receipt.exists() and receipt.matched)
+        self.assertFalse(larger.x24_trans_refs)
+        self.assertEqual(larger.match_gap, larger.gross)
+        # Free again: the other line may now claim it.
+        self._receipt(smaller, "80435-1-3089", 500_000.0, matched=True)
+        self.assertEqual(smaller.matched_total, 500_000.0)
+
+    def test_the_gap_is_what_is_left_to_explain(self):
+        run, (smaller, larger) = self._two_settlements()
+        self._receipt(larger, "80435-1-3089", 300_000.0, matched=True)
+        self.assertEqual(larger.matched_total, 300_000.0)
+        self.assertEqual(larger.match_gap, 200_000.0)
+        self._receipt(larger, "80435-1-3093", 200_000.0, matched=True)
+        self.assertEqual(larger.x24_trans_count, 2)
+        self.assertEqual(larger.match_gap, 0.0)
+
+    def test_suggesting_needs_a_computed_run(self):
+        run, (smaller, _larger) = self._two_settlements()
+        run.action_cancel()
+        with self.assertRaises(UserError):
+            smaller.action_suggest_receipts()
+
+    def test_suggesting_leaves_the_ticks_alone(self):
+        """Refreshing a line's offer must never undo an answer already given."""
+        run, (_smaller, larger) = self._two_settlements()
+        kept = self._receipt(larger, "80435-1-3089", 500_000.0, matched=True)
+        loose = self._receipt(larger, "80435-1-3093", 120_000.0)
+
+        larger.action_suggest_receipts()
+
+        self.assertTrue(kept.exists(), "a matched receipt survives a refresh")
+        self.assertFalse(loose.exists(), "an unticked suggestion is rebuilt, not kept")
+        self.assertEqual(larger.x24_trans_refs, "80435-1-3089")
+
     def test_incomplete_configuration_says_what_is_missing(self):
         self.config.mdr_account_id = False
         run = self._run()

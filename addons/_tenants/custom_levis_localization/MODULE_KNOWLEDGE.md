@@ -286,6 +286,63 @@ history; `action_levis_reread_narrative()` (via `add_to_compute`, so the ORM own
 the write) re-reads the lines Finance chooses. `custom_levis_bank_reconcile`
 builds the interactive matching wizard on exactly these fields.
 
+**The receipt numbers behind a settlement are recovered, and only where the
+money proves them.** The receivable a settlement consumes is an X70D transfer
+line — one per store, per trading day, per tender — so it carries no receipt
+number at all. The staged X70D rows do (`retail.import.line.raw_data_json`:
+`store_code`, `register`, `transnum`, `tender_type`, `tender_amount`), and X24DN
+posts the same keys as `pos.order.pos_reference` (`store-register-transaction`).
+`_x24_rows` joins them to the Operating Unit through `ir.model.data`
+(`posconfig_<store>`) → `pos.config` → `stock.warehouse.l10n_ou_analytic_id`.
+
+`_x24_identify` then matches on **arithmetic only**: one transaction equal to the
+settlement's gross (`exact`), or one tender whose whole trading day sums to it
+(`batch`); several of either is `ambiguous` and lists them all without claiming
+one; anything else is `none` and names nothing. There is deliberately **no subset
+search** — a 250.900 settlement out of a day holding 16.865.300 across ten card
+transactions can be composed many ways. Reading the receipts off the *allocated*
+receivable (the first cut of this feature, 19.0.1.36.0) was worse still: the
+allocation picks by residual and cannot see a tender, so that 250.900 line listed
+the day's ten card receipts and read as though it had paid millions.
+
+Where the match lands, it yields the one thing the narrative can never say: the
+**tender**. `x24_tender` records it and `x24_tender_mismatch` flags the lines
+where the allocation credited a different tender receivable — 377 of 1.420
+identified settlements on prd_levis_begbal's August run. That is a real
+divergence between evidence and `_allocate`'s largest-residual guess, not a
+display bug. `custom_retail_import` stays a non-dependency: without it the
+columns are simply empty and clearing is unaffected.
+`levis.pos.clearing.line.move_name` is the statement line's own entry number.
+
+Gotcha: some staged rows carry an empty `trans_date`/`tender_amount`, so both
+casts live inside a `CASE` — a bare `WHERE` is free to run after the cast and
+dies with `invalid input syntax for type date`.
+
+**The matching worksheet: `levis.pos.clearing.receipt`.** Roughly half a month's
+settlements pay *part* of a trading day, which no arithmetic can decompose (see
+`_x24_identify`), so the last word is a human's and has to be storable. One row =
+one X24DN transaction offered to one bank line, with a `matched` tick.
+
+* **Generated per line, on demand.** `action_suggest_receipts` builds one bank
+  line's candidates (~0,6 s, ~20 rows). Generating a whole month up front was
+  36.000 rows and **143 seconds** — a button no web worker survives — for a
+  question that is always asked one line at a time. `action_compute` therefore
+  writes only the ticks the amount proves (947 rows, ~4 s on prd_levis_begbal).
+* **A tick is exclusive company-wide.** A partial unique index
+  (`levis_pos_clearing_receipt_matched_uniq ... WHERE matched`) is the guarantee —
+  `_sql_constraints` cannot express "only ticked rows are unique", and every
+  candidate row is a duplicate of some other line's candidate by design.
+  `_assert_unclaimed` checks first so the user gets a sentence naming the bank
+  line that already holds the transaction, not an integrity error mid-flush;
+  `_release_elsewhere` (per record) and `_sweep_claimed` (one DELETE, used by the
+  generator) then take the receipt off every other line.
+* **Unticking does not sweep the run.** The receipt is free the moment it is
+  unticked; it reappears wherever it belongs the next time that line is opened.
+* Refreshing a line rebuilds only its *unticked* suggestions — an answer already
+  given is never undone by asking the question again.
+* `matched_total` / `match_gap` on the line are what has been confirmed and what
+  is still unexplained; `x24_trans_refs` follows the ticks, not the evidence.
+
 **Two rules may never claim one terminal.** `_check_no_colliding_rule` refuses a
 mapping that would compete with an existing one, comparing through the resolver's own
 `_keys_match` — so it catches an identical key, a leading-zero variant
