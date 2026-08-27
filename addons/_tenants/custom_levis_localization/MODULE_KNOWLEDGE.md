@@ -308,6 +308,69 @@ because M sorts before O, and the two name different stores.
 that already has the module. The MID mapping is deliberately not seeded — see the
 gotcha below.
 
+## Feature 16 — Store code + advanced-matching foundations
+
+Phase 1 of the daily-clearing work. Nothing here changes what the clearing
+allocates; it puts the pieces in place that later phases stand on.
+
+**`stock.warehouse.l10n_store_code`** — the store's identity *outside* Odoo. The
+analytic OU is the identity inside the ledger, but it is a record id: a cashier
+cannot type it on a transfer memo and a bank cannot print it on a statement. A
+textual code already existed, but only inside the X24DN feed, reachable only via
+`ir.model.data` xids named `posconfig_<CODE>`. This promotes it to a real column
+so one code serves the retail feed, the cash-deposit *berita acara*, and bank
+matching alike.
+
+* Unique per company (`models.Constraint`; Odoo 19 ignores `_sql_constraints`).
+  NULLs stay distinct in Postgres, which is what lets a fleet where most stores
+  have no code yet pass the constraint during backfill.
+* `pos.config.l10n_store_code` is a **non-stored** related. Storing it would force
+  a full recompute of every `pos.config` row on `-u` in each of the ~10 databases
+  sharing this addon, and nothing needs it in SQL — the clearing's raw queries
+  already join `ir_model_data` -> `pos_config` -> `stock_warehouse`.
+* `_levis_store_code_index(company_id)` is an `ormcache`d `{CODE: (warehouse_id,
+  analytic_id)}`; `_levis_store_by_code(company, code)` is what callers use.
+  `create`/`write`/`unlink` clear the cache when a code, an analytic or a company
+  changes — a renamed code must stop resolving, and there is a test for that.
+* `seed_store_codes(env)` backfills from the feed's xids. It **never** overwrites
+  a code already on a warehouse (a hand correction outranks the feed) and
+  **never** moves a code off the warehouse holding it (a silent steal is worse
+  than a visible gap). Both cases are counted and logged. Run it on an existing
+  database with `scripts/tenants/levis/41_seed_store_codes.py`; check the
+  `skipped` / `orphan` counters it prints — a large number means the feed's store
+  mapping disagrees with the warehouses, which is a finding, not a hiccup.
+
+**`levis.clearing.matcher`** (AbstractModel) — one answer to a question two
+screens were each answering their own way.
+
+* `_score_candidate(...)` is the bank-reconcile wizard's `score()`, lifted
+  unchanged; `custom_levis_bank_reconcile._get_match_candidates` now calls it, so
+  the clearing and the wizard can no longer drift apart in what they rank first.
+* `_subset_match(items, target, tolerance, max_items, node_budget)` composes a
+  settlement out of several open items — but only when exactly one composition
+  fits. It is deliberately *not* the same decision `_x24_identify` refuses:
+  that method declines to name a subset of **receipt numbers**, which would be an
+  unverifiable claim about which customers the acquirer paid. This is ledger
+  allocation, where a subset is already being chosen greedily today and every
+  item taken is recorded on `levis.pos.clearing.alloc` and reconciled as an exact
+  pair. **Do not carry subset search back into `_x24_identify`.**
+* Its honesty rests on two properties, both tested: items are put in a total
+  order (`-amount, date, key`) before anything is searched, so a shuffled pool
+  yields the identical subset; and the search stops at the **second** solution,
+  not the first, reporting `ambiguous` and allocating nothing.
+* An exhausted node budget returns `none`, never a partial answer.
+
+**Seven new `levis.clearing.config` fields, all inert on arrival** —
+`suggest_tolerance_amount` / `_ratio` (0.0), `advanced_matching` (False),
+`subset_max_items`, `subset_node_budget`, `deposit_match_window_days`,
+`writeoff_limit_amount` (0.0). `_match_tolerance(amount)` returns the wider of
+the two tolerances. The tolerance is a **suggestion band only**: it widens which
+candidates are offered and lifts their rank, and it never sizes, absorbs or books
+anything. A difference inside the band still lands on suspense until a human
+writes it off. Keep it distinct from `_EPS` (0.005), which is float noise — a
+tolerance-sized difference is money someone decided to absorb and has to stay
+visible as such.
+
 ## Gotchas
 - **The vendor-bill list has no bare `partner_id` to anchor a view on.** Core's
   `account.view_invoice_tree` carries `invoice_partner_display_name` **twice**,

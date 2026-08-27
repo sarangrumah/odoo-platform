@@ -38,6 +38,29 @@
                         <field name="pos_receivable_account_ids" nolabel="1" colspan="2"
                                widget="many2many_tags"/>
                     </group>
+                    <group string="Advanced Matching">
+                        <p colspan="2" class="text-muted">
+                            Every setting here ships inert, so allocation behaves exactly
+                            as it did before advanced matching existed. Switch them on
+                            deliberately, one database at a time, and compare the
+                            allocations before and after — a tolerance is a decision about
+                            money, not a knob to loosen until the numbers agree.
+                        </p>
+                        <group>
+                            <field name="advanced_matching"/>
+                            <field name="suggest_tolerance_amount"/>
+                            <field name="suggest_tolerance_ratio"/>
+                            <field name="deposit_match_window_days"/>
+                        </group>
+                        <group>
+                            <field name="subset_max_items"
+                                   invisible="not advanced_matching"/>
+                            <field name="subset_node_budget"
+                                   invisible="not advanced_matching"/>
+                            <field name="writeoff_limit_amount"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
                 </sheet>
             </form>
         </field>

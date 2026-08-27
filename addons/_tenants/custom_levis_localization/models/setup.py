@@ -483,3 +483,66 @@ def seed_clearing_config(env):
         formats,
     )
     return {"created": made, "updated": filled, "formats": formats}
+
+
+def seed_store_codes(env):
+    """Fill ``stock.warehouse.l10n_store_code`` from the X24DN retail feed.
+
+    The retail importer already decided which ``pos.config`` a store code names,
+    and recorded that decision as an ``ir.model.data`` xid ``posconfig_<CODE>``
+    (see ``custom_retail_import/models/retail_import_executor.py``). This walks
+    those xids back to the warehouse and writes the code there, so the code stops
+    being reachable only through raw SQL.
+
+    Idempotent, and deliberately conservative:
+
+    * a warehouse that already carries a code is **never** overwritten — a hand
+      correction outranks the feed;
+    * a code already held by a different warehouse is skipped and logged rather
+      than moved, because the unique constraint would refuse it anyway and a
+      silent steal is worse than a visible gap;
+    * a store whose xid points at no warehouse is left empty, not guessed.
+    """
+    Data = env["ir.model.data"].sudo()
+    Config = env["pos.config"].sudo()
+    Warehouse = env["stock.warehouse"].sudo()
+
+    xids = Data.search([("model", "=", "pos.config"), ("name", "=like", "posconfig_%")])
+    filled = skipped = orphan = 0
+    taken = {}
+    for warehouse in Warehouse.search([("l10n_store_code", "!=", False)]):
+        taken[(warehouse.company_id.id, (warehouse.l10n_store_code or "").strip().upper())] = warehouse
+
+    for xid in xids:
+        code = xid.name[len("posconfig_") :].strip().upper()
+        if not code:
+            continue
+        config = Config.browse(xid.res_id).exists()
+        warehouse = config.warehouse_id if config else Warehouse
+        if not warehouse:
+            orphan += 1
+            _logger.info("Store code %s: xid points at no warehouse, left empty", code)
+            continue
+        if warehouse.l10n_store_code:
+            continue
+        holder = taken.get((warehouse.company_id.id, code))
+        if holder and holder != warehouse:
+            skipped += 1
+            _logger.warning(
+                "Store code %s already held by warehouse %s; %s left empty",
+                code,
+                holder.display_name,
+                warehouse.display_name,
+            )
+            continue
+        warehouse.l10n_store_code = code
+        taken[(warehouse.company_id.id, code)] = warehouse
+        filled += 1
+
+    _logger.info(
+        "Levi's store-code seeding: %d filled, %d skipped (code taken), %d orphan xids",
+        filled,
+        skipped,
+        orphan,
+    )
+    return {"filled": filled, "skipped": skipped, "orphan": orphan}
