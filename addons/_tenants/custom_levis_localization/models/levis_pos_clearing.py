@@ -1605,6 +1605,24 @@ class LevisPosClearing(models.Model):
             "view_mode": "list,form",
         }
 
+    def action_view_lines(self):
+        """The run's settlements as a real list, with the search bar the form cannot have.
+
+        An embedded one2many has no search panel, so on a month of eleven bank
+        journals the Settlements tab is a thousand rows you can only scroll. This
+        is the same records under a normal action: filter to the store, the bank,
+        the tender or the ones still short, and group them.
+        """
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "levis.pos.clearing.line",
+            "name": _("Settlements — %s", self.name),
+            "domain": [("run_id", "=", self.id)],
+            "view_mode": "list,form",
+            "context": {"search_default_group_store": 1},
+        }
+
     def action_open_mapping_wizard(self):
         self.ensure_one()
         return {
@@ -1612,7 +1630,9 @@ class LevisPosClearing(models.Model):
             "res_model": "levis.bank.mid.map.wizard",
             "name": _("Map Unmapped Settlements"),
             "view_mode": "form",
-            "target": "new",
+            # Full page, not a modal: dozens of merchant ids, each needing its
+            # amounts read against a bank statement, do not fit in a dialog.
+            "target": "current",
             "context": {
                 "default_run_id": self.id,
                 "default_date_from": self.date_from,
@@ -1628,6 +1648,10 @@ class LevisPosClearingLine(models.Model):
     _order = "settlement_date, bank_journal_id, id"
 
     run_id = fields.Many2one("levis.pos.clearing", required=True, ondelete="cascade", index=True)
+    # Stored so the settlements can be searched and grouped away from their run's
+    # form, where the parent's state is no longer on screen to read.
+    run_state = fields.Selection(related="run_id.state", store=True, string="Run Status")
+    run_period_ref = fields.Char(related="run_id.period_ref", store=True, string="Period")
     company_id = fields.Many2one(related="run_id.company_id", store=True)
     currency_id = fields.Many2one(related="run_id.currency_id")
     statement_line_id = fields.Many2one("account.bank.statement.line", required=True, ondelete="cascade", index=True)

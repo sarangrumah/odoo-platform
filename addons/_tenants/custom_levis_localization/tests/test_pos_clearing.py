@@ -21,6 +21,8 @@ from odoo.tests import tagged
 
 MID_ONE = "885004600001"
 MID_TWO = "885004600002"
+# Deliberately has no mapping rule: this is what the mapping wizard must find.
+MID_UNMAPPED = "885004600009"
 
 
 @tagged("post_install", "-at_install")
@@ -1015,3 +1017,76 @@ class TestPosClearing(AccountTestInvoicingCommon):
         run = self._run()
         with self.assertRaises(UserError):
             run.action_compute()
+
+    # ------------------------------------------------------------------
+    # Searching the settlements, and reading the mapping wizard's totals
+    # ------------------------------------------------------------------
+    def test_settlements_can_be_searched_away_from_the_run(self):
+        """The run's own state must be searchable from the settlement records.
+
+        The Settlements tab is a one2many, which has no search panel, so the
+        filters live on a normal action over the lines. Every field those filters
+        name has to be stored — a filter on a non-stored one silently returns
+        nothing rather than failing.
+        """
+        self._posrec(self.tender_a, self.store_one, date(2026, 7, 8), 1_000_000.0)
+        self._statement(date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0))
+        run = self._run()
+        run.action_compute()
+
+        Line = self.env["levis.pos.clearing.line"]
+        self.assertEqual(run.line_ids.run_state, "computed")
+        self.assertEqual(run.line_ids.run_period_ref, run.period_ref)
+        self.assertEqual(
+            Line.search([("run_state", "not in", ("posted", "cancel")), ("run_id", "=", run.id)]),
+            run.line_ids,
+        )
+        # The search view's headline filters, exercised as domains.
+        self.assertEqual(Line.search([("analytic_account_id", "=", self.store_one.id)]), run.line_ids)
+        self.assertTrue(Line.search([("payment_ref", "ilike", MID_ONE)]))
+        self.assertTrue(Line.search([("mid_key", "ilike", MID_ONE[-6:])]))
+
+        action = run.action_view_lines()
+        self.assertEqual(action["res_model"], "levis.pos.clearing.line")
+        self.assertEqual(action["domain"], [("run_id", "=", run.id)])
+
+    def test_unmapped_totals_can_be_tied_back_to_the_mutation(self):
+        """A proposal's amount is a sum over many lines; it must prove itself.
+
+        The sample narrative belongs to one statement line while Bank Amount adds
+        up all of them, so on its own the figure looks as though it disagreed with
+        the account mutation. Gross and MDR beside it, and the lines behind it,
+        are what make it checkable.
+        """
+        first = self._statement(date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_UNMAPPED, 1_000_000.0, 10_000.0))
+        second = self._statement(date(2026, 7, 10), 495_000.0, self._settlement_ref(MID_UNMAPPED, 500_000.0, 5_000.0))
+
+        wizard = self.env["levis.bank.mid.map.wizard"].create(
+            {
+                "company_id": self.company.id,
+                "date_from": date(2026, 7, 1),
+                "date_to": date(2026, 7, 31),
+                "journal_ids": [Command.set(self.bank.ids)],
+            }
+        )
+        wizard.action_scan()
+        proposal = wizard.line_ids.filtered(lambda line: MID_UNMAPPED[-6:] in (line.key or ""))
+        self.assertEqual(len(proposal), 1)
+
+        self.assertEqual(proposal.line_count, 2)
+        self.assertEqual(proposal.total_amount, 1_485_000.0, "the mutation, net of the fee")
+        self.assertEqual(proposal.gross_total, 1_500_000.0, "what the narratives claim")
+        self.assertEqual(proposal.mdr_total, 15_000.0)
+        self.assertEqual(proposal.narrative_gap, 0.0, "gross minus MDR is the money that moved")
+        self.assertEqual(proposal.statement_line_ids, first | second)
+
+        self.assertEqual(wizard.unmapped_total, sum(wizard.line_ids.mapped("total_amount")))
+        self.assertEqual(wizard.unmapped_gross, sum(wizard.line_ids.mapped("gross_total")))
+
+        action = proposal.action_open_statement_lines()
+        self.assertEqual(action["res_model"], "account.bank.statement.line")
+        self.assertEqual(sorted(action["domain"][0][2]), sorted((first | second).ids))
+
+    def test_mapping_wizard_opens_as_a_page_not_a_dialog(self):
+        run = self._run()
+        self.assertEqual(run.action_open_mapping_wizard()["target"], "current")

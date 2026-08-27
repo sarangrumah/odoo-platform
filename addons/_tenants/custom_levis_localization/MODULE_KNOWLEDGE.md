@@ -263,6 +263,33 @@ specific set of numbers and posting books that set — and if the underlying
 receivables moved in between, `_preflight` refuses instead of quietly booking
 something else. No cron, no auto-post, and `action_compute` never generates.
 
+**The settlements are searchable away from the run form (19.0.1.39.0).** The
+Settlements tab is a `one2many`, and an embedded `one2many` has no search panel —
+a month across eleven bank journals is a thousand rows you can only scroll.
+`action_view_lines` ("Search Settlements" in the header, plus an *Invoicing ▸
+POS Settlements* menu over every run) opens the same records under a normal
+action with `view_levis_pos_clearing_line_search`: filter by store, bank, tender,
+merchant id, narrative or X24DN transaction number; group by any of them. The
+line's `run_state` and `run_period_ref` are stored relateds added for exactly
+this — a filter on a non-stored field returns nothing rather than failing. The
+settlement form moved out of the tab into a top-level
+`view_levis_pos_clearing_line_form` so the row popup and the standalone list are
+the same screen; receipt ticking there is gated on `run_state`, which the tab used
+to get for free from the parent's state.
+
+**The mapping wizard is a full page, and its totals prove themselves
+(19.0.1.39.0).** A proposal is one merchant id summed over a whole period, while
+the *Sample Narrative* beside it belongs to exactly one of those statement lines —
+so the amount reads as though it disagreed with the account mutation and the
+berita transfer. Three things fix that, and none of them is a different sum:
+`gross_total` and `mdr_total` carry the narratives' own figures next to the bank's
+(gross − MDR is what the bank moved, and `narrative_gap` shows anything left
+over — a cash deposit quotes no gross, so its whole amount lands there by
+design), and `statement_line_ids` holds the lines behind the total with a
+*Bank Lines* button to open them. The wizard opens `target="current"`, not a
+dialog: dozens of ids each needing their amounts read against a statement do not
+fit in a modal, so the buttons live in a `<header>` rather than a `<footer>`.
+
 **Undo is per statement line.** Once posted, the legs live on the bank entries,
 so `action_cancel` refuses; reversing means Odoo's own "Undo Reconciliation" on
 the lines concerned.
@@ -446,6 +473,12 @@ gotcha below.
   and REF Invoice Vendor columns showed no bill at all until 19.0.1.25.1. The failure is
   invisible in the PDF — it looks like a filled-in column.
 
+- **Search views here take no `<group string="Group By">`.** Odoo 19's
+  `base/rng/common.rng` defines `group` with no `string` attribute and `field`
+  children only, so wrapping group-by filters in one fails view validation with
+  `RELAXNG_ERR_INVALIDATTR` *and* a misleading `Element search has extra content:
+  field` on the line above. Group-by filters go flat after a `<separator/>`,
+  which is what the receipt search view already did.
 - **`account.bank.statement.line` has no SQL `date` column.** It is delegated from
   `account.move` via `_inherits`, so an ORM domain on `date` works but raw SQL must
   join `move_id` — `select sl.date ...` fails with `column sl.date does not exist`.
