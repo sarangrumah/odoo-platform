@@ -371,6 +371,62 @@ writes it off. Keep it distinct from `_EPS` (0.005), which is float noise — a
 tolerance-sized difference is money someone decided to absorb and has to stay
 visible as such.
 
+## Feature 17 — Store cash deposits and the daily closing
+
+Phase 2 of the daily clearing. Two models, neither of which books anything.
+
+**`levis.store.cash.deposit`** — the document that replaces a guess with evidence.
+Card money names its own store (the acquirer prints a MID); cash does not, and
+until now the only way to attribute a cash credit was a hand-written keyword rule
+guessing at the transfer memo. Finance keys what the store says it paid in,
+attaches the slip, and validates it; the clearing then matches a bank credit to
+*that*.
+
+* **Finance owns it, not the store.** There are no store users in this database
+  and this creates none. `draft -> submitted -> validated` still earns its keep:
+  it separates whoever typed a number from whoever checked it against the slip.
+* `berita_acara_ref` (`SETOR/<CODE>/<YYYYMMDD>/<nnnn>`) is the string the store
+  must put on the transfer memo. That is the whole mechanism by which a bank
+  credit stops needing to be guessed at.
+* `action_validate` refuses without an attachment and without a store OU. A
+  deposit nobody vouched for is not evidence.
+* `_bank_credit_uniq` is a **plain** `unique(statement_line_id)` — Postgres treats
+  NULLs as distinct, so any number of deposits may await a credit while a claimed
+  credit cannot be claimed twice. No partial index needed.
+* `write()` freezes `amount` / `warehouse_id` / `deposit_date` / `bank_journal_id`
+  once `state = matched`: those figures are what made the match, and editing them
+  would leave the clearing pointing at a document that no longer says what it
+  said. `action_unmatch` releases the credit and unfreezes them.
+* `_find_for_statement_line()` returns a record **only when exactly one candidate
+  fits**. Two deposits of the same amount in the same window is a real situation
+  (two stores, one bank, one flat float) and is evidence for neither.
+* `expected_amount` with no linked session is 0 **and so is `variance`** —
+  "nobody measured" must not render as "the store was short".
+
+**`levis.store.daily.closing`** — one row per store per trading day, `_auto =
+False`. Deliberately a view: `pos.session` already *is* the daily closing, with a
+state and a cash count, and a second stateful record covering the same day would
+drift from it. If Finance later needs to write on it, these column names become
+field names unchanged.
+
+Three numbers that are easy to conflate and must not be:
+`cash_counted` (what the cashier counted), `cash_expected` (opening float plus
+the cash the orders say was taken), and the POS receivable the clearing consumes.
+`cash_variance` is a till problem; `cash_undeposited` is a banking one.
+
+**Column facts the upgrade taught us** (both cost a failed `-u`):
+`pos_session` has **no `company_id` column** — company lives on `pos_config`; and
+`cash_register_balance_end` is **computed and unstored**, so the view rebuilds it
+as `cash_register_balance_start + cash payments`, the same way core does. Only
+`cash_register_balance_start` and `cash_register_balance_end_real` are stored.
+
+A deposit covering several trading days is spread evenly across them in the view.
+That is presentation only — nothing allocates or books from the split figure.
+
+**Odoo 19 view gotcha:** `<group expand="0" string="Group By">` inside a `<search>`
+no longer validates (`RELAXNG_ERR_INVALIDATTR`). Group-by filters go flat after a
+`<separator/>`, which is what every other search view in this module already does.
+
 ## Gotchas
 - **The vendor-bill list has no bare `partner_id` to anchor a view on.** Core's
   `account.view_invoice_tree` carries `invoice_partner_display_name` **twice**,

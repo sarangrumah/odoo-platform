@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Per-year, per-month numbering: the reference is typed onto a bank transfer
+      memo by a human, so it has to stay short enough to survive a 40-character
+      field and legible enough to read back off a statement.
+    -->
+    <record id="seq_levis_store_cash_deposit" model="ir.sequence">
+        <field name="name">Store Cash Deposit</field>
+        <field name="code">levis.store.cash.deposit</field>
+        <field name="prefix">SETOR/%(year)s/%(month)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>

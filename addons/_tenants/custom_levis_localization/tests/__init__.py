@@ -9,3 +9,4 @@ from . import test_mid_map_guard
 from . import test_journal_billing_tax_number
 from . import test_clearing_matcher
 from . import test_store_code
+from . import test_store_cash_deposit
