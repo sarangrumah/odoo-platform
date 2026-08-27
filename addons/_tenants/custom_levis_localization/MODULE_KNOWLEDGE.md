@@ -427,6 +427,54 @@ That is presentation only — nothing allocates or books from the split figure.
 no longer validates (`RELAXNG_ERR_INVALIDATTR`). Group-by filters go flat after a
 `<separator/>`, which is what every other search view in this module already does.
 
+## Feature 18 — Writing off a clearing residual
+
+Phase 5. A settlement that does not fully explain itself leaves a residual on the
+bank suspense account, and the statement line stays open. That is the right
+default and it stays the default: `levis.clearing.writeoff.wizard` opens on
+`mode = suspense`, and applying it changes nothing.
+
+Some residuals are genuinely explained — a rounding crumb, an unprinted admin
+fee, a store that banked less than it counted. Leaving those on suspense stops
+being honest bookkeeping and becomes a queue nobody can clear. The wizard records
+that decision with an account, a reason, a label and the user who made it
+(`writeoff_account_id` / `_label` / `_reason` / `_uid` on
+`levis.pos.clearing.line`).
+
+**The whole feature is one expression.** `_counterpart_plan` already computes the
+residual leg as the *balancing figure*; the write-off changes only which account
+that leg names (`writeoff_account_id or config.suspense_account_id`), and its
+role becomes `writeoff`. The entry therefore still balances by construction and
+`_preflight`'s `planned == -st_line.amount` identity is untouched.
+
+**Two paths:**
+
+* *Before posting* (the ordinary one) the wizard books nothing. It writes the
+  account onto the line and calls `run._retarget_residual_legs()`, which flips
+  the **existing** residual leg in place. The receivable and MDR legs keep their
+  ids and their reviewed values — rebuilding the whole plan would discard a
+  review nobody asked to redo.
+* *After posting* the residual is a real journal item. A separate journal entry
+  cannot clear it: suspense ships `reconcile = False`, so `Dr write-off / Cr
+  suspense` would leave two open items instead of one. So
+  `_apply_writeoff_to_posted_move` does what `_apply_to_statement_lines` does —
+  replaces the suspense item on the statement line's own move — and the line then
+  goes reconciled on its own. **This is the only place the module writes to a
+  posted move outside the clearing's posting stage.** It identifies the item to
+  move through `leg.move_line_id`, never by "whatever is on suspense": two
+  settlements can leave suspense items on one statement line.
+
+**The trap that cost a test run.** `short_amount` is the **gross** left unmatched;
+the residual leg is smaller by the fee that was pro-rated away (600 000 vs
+594 000 in the fixture). A guard comparing the posted suspense item against
+`short_amount` rejects every legitimate write-off. Compare against the leg's own
+`balance`.
+
+`writeoff_limit_amount` on the config caps what one line may absorb, checked in
+`_preflight` via `_assert_writeoffs_within_limit`; zero (the default) means no
+cap. The wizard also refuses the suspense account and any POS receivable — a
+residual must not be hidden back in the accounts it came from.
+
 ## Gotchas
 - **The vendor-bill list has no bare `partner_id` to anchor a view on.** Core's
   `account.view_invoice_tree` carries `invoice_partner_display_name` **twice**,

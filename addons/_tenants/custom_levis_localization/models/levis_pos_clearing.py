@@ -1267,6 +1267,35 @@ class LevisPosClearing(models.Model):
     # ------------------------------------------------------------------
     # Stage 3 — post and reconcile
     # ------------------------------------------------------------------
+    def _assert_writeoffs_within_limit(self):
+        """No single line may absorb more than Finance allowed.
+
+        Modelled on the guard in ``custom_bank_reconcile``'s wizard, which refuses
+        to let the MDR account absorb anything other than the printed fee. A
+        write-off is a decision about money; a cap makes it a decision someone
+        with authority signed off on, rather than one a tired operator could make
+        by clicking through. Zero means no cap, which is the default.
+        """
+        self.ensure_one()
+        limit = self.config_id.writeoff_limit_amount or 0.0
+        if limit <= 0:
+            return True
+        currency = self.company_id.currency_id
+        over = self.line_ids.filtered(
+            lambda line: line.writeoff_account_id and currency.compare_amounts(abs(line.short_amount), limit) > 0
+        )
+        if over:
+            raise UserError(
+                _(
+                    "These lines would write off more than the %(limit)s limit:\n%(lines)s",
+                    limit=limit,
+                    lines="\n".join(
+                        "  %s — %s" % (line.payment_ref or line.id, abs(line.short_amount)) for line in over
+                    ),
+                )
+            )
+        return True
+
     def _preflight(self):
         self.ensure_one()
         if self.state != "generated":
@@ -1274,6 +1303,7 @@ class LevisPosClearing(models.Model):
         self._assert_period_open()
         if not self.leg_ids:
             raise UserError(_("The planned legs are gone. Cancel and generate them again."))
+        self._assert_writeoffs_within_limit()
 
         company_currency = self.company_id.currency_id
         for line in self.leg_ids.line_id:
@@ -1348,6 +1378,61 @@ class LevisPosClearing(models.Model):
         self._reconcile_allocations()
         self._snapshot_after()
         self.state = "posted"
+        return True
+
+    def _retarget_residual_legs(self, lines):
+        """Point the residual leg at the chosen account, in place.
+
+        Only the residual leg changes. The receivable and MDR legs of the same
+        settlement were reviewed and are still right, so they are left exactly as
+        they are — including their ids, so the allocations hanging off them keep
+        pointing at the same records. Rebuilding the whole plan would throw away
+        a review nobody asked to redo, and the balancing figure does not change
+        just because its destination did.
+        """
+        self.ensure_one()
+        lines = lines.filtered(lambda line: line.run_id == self)
+        if not lines:
+            return True
+        if self.state != "generated":
+            raise UserError(_("Legs can only be retargeted while the run is prepared but unposted."))
+        config = self.config_id
+        for line in lines:
+            residual = self.leg_ids.filtered(lambda leg, l=line: leg.line_id == l and leg.role in ("short", "writeoff"))
+            if not residual:
+                # Nothing was left over on this settlement, so there is nothing
+                # to send anywhere. Not an error: a fully explained line simply
+                # has no residual leg.
+                continue
+            bank = line.bank_journal_id.code or ""
+            store = line.analytic_account_id.display_name or ""
+            if line.writeoff_account_id:
+                residual.write(
+                    {
+                        "role": "writeoff",
+                        "account_id": line.writeoff_account_id.id,
+                        "name": line.writeoff_label
+                        or _(
+                            "Write-off %(bank)s %(date)s (%(store)s)",
+                            bank=bank,
+                            date=line.settlement_date,
+                            store=store,
+                        ),
+                    }
+                )
+            else:
+                residual.write(
+                    {
+                        "role": "short",
+                        "account_id": config.suspense_account_id.id,
+                        "name": _(
+                            "Unsettled %(bank)s %(date)s (%(store)s)",
+                            bank=bank,
+                            date=line.settlement_date,
+                            store=store,
+                        ),
+                    }
+                )
         return True
 
     def _apply_to_statement_lines(self):
@@ -1571,6 +1656,31 @@ class LevisPosClearingLine(models.Model):
     cash_in = fields.Monetary(compute="_compute_narrative_amounts", currency_field="currency_id", store=True)
     allocated = fields.Monetary(compute="_compute_allocated", currency_field="currency_id", store=True)
     short_amount = fields.Monetary(compute="_compute_allocated", currency_field="currency_id", store=True)
+    # --- write-off: where the residual goes instead of suspense ------------
+    # Left empty, the residual lands on suspense exactly as it always has. This
+    # is the whole of the write-off feature: the residual leg is already
+    # computed as the balancing figure in ``_counterpart_plan``, so choosing a
+    # different account for it is the only change the accounting needs.
+    writeoff_account_id = fields.Many2one(
+        "account.account",
+        string="Write-off Account",
+        copy=False,
+        help="Where the unexplained residual is booked instead of suspense. "
+        "Empty means it stays on suspense and the statement line stays open.",
+    )
+    writeoff_label = fields.Char(string="Write-off Label", copy=False)
+    writeoff_reason = fields.Selection(
+        [
+            ("rounding", "Rounding"),
+            ("admin_fee", "Bank / Admin Fee"),
+            ("short_deposit", "Short Deposit"),
+            ("overage", "Overage"),
+            ("other", "Other"),
+        ],
+        string="Write-off Reason",
+        copy=False,
+    )
+    writeoff_uid = fields.Many2one("res.users", string="Written Off By", readonly=True, copy=False)
     mismatch_amount = fields.Monetary(
         compute="_compute_narrative_amounts",
         currency_field="currency_id",
@@ -1697,24 +1807,126 @@ class LevisPosClearingLine(models.Model):
         # making the move unpostable.
         residual = round(-self.statement_amount - sum(vals["debit"] - vals["credit"] for _a, _r, vals in plan), 2)
         if abs(residual) > _EPS:
-            plan.append(
-                (
-                    Alloc,
-                    "short",
-                    run._line_vals(
-                        config.suspense_account_id.id,
-                        _(
-                            "Unsettled %(bank)s %(date)s (%(store)s)",
-                            bank=bank,
-                            date=self.settlement_date,
-                            store=store,
-                        ),
-                        residual,
-                        analytic,
-                    ),
+            # An identified difference may be sent to an account someone chose;
+            # anything else stays on suspense, which is the truth about it.
+            target = self.writeoff_account_id or config.suspense_account_id
+            role = "writeoff" if self.writeoff_account_id else "short"
+            if self.writeoff_account_id:
+                label = self.writeoff_label or _(
+                    "Write-off %(bank)s %(date)s (%(store)s)",
+                    bank=bank,
+                    date=self.settlement_date,
+                    store=store,
                 )
-            )
+            else:
+                label = _(
+                    "Unsettled %(bank)s %(date)s (%(store)s)",
+                    bank=bank,
+                    date=self.settlement_date,
+                    store=store,
+                )
+            plan.append((Alloc, role, run._line_vals(target.id, label, residual, analytic)))
         return plan
+
+    def _apply_writeoff_to_posted_move(self):
+        """Move an already-posted residual off suspense, on the line's own move.
+
+        Only reachable after posting, and deliberately the narrow path. A
+        separate journal entry cannot help here: the suspense account ships with
+        ``reconcile = False``, so a Dr write-off / Cr suspense entry would leave
+        two open suspense items instead of one and clear nothing. What actually
+        closes the statement line is the same write the clearing already does —
+        replace the surviving suspense leg with a leg on the chosen account.
+
+        Refuses rather than guesses when the line has moved on: no suspense leg
+        left (someone reconciled it by hand), an amount that no longer matches, or
+        a locked period. A residual that cannot be moved honestly stays where it
+        is.
+        """
+        company_currency = self.env.company.currency_id
+        for line in self:
+            if not line.writeoff_account_id:
+                continue
+            config = line.run_id.config_id
+            st_line = line.statement_line_id
+            if not st_line:
+                raise UserError(_("Settlement %s has no statement line.", line.id))
+            line.run_id._assert_period_open()
+            # The item to move is the one this clearing created, identified by
+            # the leg that made it — not "whatever is sitting on suspense". Two
+            # settlements can leave suspense items on the same statement line,
+            # and picking by account would move the wrong one.
+            residual_leg = line.leg_ids.filtered(lambda leg: leg.role in ("short", "writeoff"))
+            suspense = residual_leg.move_line_id.filtered(lambda aml: aml.account_id == config.suspense_account_id)
+            if not suspense:
+                raise UserError(
+                    _(
+                        "Statement line %s has nothing left on suspense from this "
+                        "clearing — it has been written off, reconciled or edited "
+                        "since the run posted.",
+                        st_line.payment_ref or st_line.id,
+                    )
+                )
+            balance = sum(suspense.mapped("debit")) - sum(suspense.mapped("credit"))
+            # Compare against the leg's own balance. ``short_amount`` is the
+            # *gross* left unmatched; the residual is the balancing figure, which
+            # is smaller by the fee that was pro-rated away. Confusing the two is
+            # how this guard rejected every legitimate write-off on first write.
+            planned = sum(residual_leg.mapped("balance"))
+            if abs(balance - planned) > _EPS:
+                raise UserError(
+                    _(
+                        "Statement line %(ref)s has %(actual)s on suspense but the "
+                        "clearing planned %(expected)s. Refusing to book a difference "
+                        "nobody has looked at.",
+                        ref=st_line.payment_ref or st_line.id,
+                        actual=balance,
+                        expected=planned,
+                    )
+                )
+            analytic = {str(line.analytic_account_id.id): 100.0} if line.analytic_account_id else False
+            label = line.writeoff_label or _("Write-off %s", st_line.payment_ref or st_line.id)
+            st_line.with_context(force_delete=True, skip_readonly_check=True).write(
+                {
+                    "line_ids": [
+                        (2, suspense.id, 0),
+                        (
+                            0,
+                            0,
+                            {
+                                "name": label,
+                                "account_id": line.writeoff_account_id.id,
+                                "partner_id": st_line.partner_id.id,
+                                "currency_id": company_currency.id,
+                                "amount_currency": balance,
+                                "debit": balance if balance > 0 else 0.0,
+                                "credit": -balance if balance < 0 else 0.0,
+                                "analytic_distribution": analytic,
+                            },
+                        ),
+                    ]
+                }
+            )
+            booked = st_line.move_id.line_ids.filtered(lambda aml: aml.account_id == line.writeoff_account_id).sorted(
+                key=lambda aml: aml.id
+            )
+            if booked:
+                residual_leg.write({"role": "writeoff", "move_line_id": booked[-1].id})
+        return True
+
+    def action_open_writeoff_wizard(self):
+        """Open the write-off screen for the selected settlements."""
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Write Off Residual"),
+            "res_model": "levis.clearing.writeoff.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "active_model": "levis.pos.clearing.line",
+                "active_ids": self.ids,
+            },
+        }
 
     def action_open_statement_line(self):
         self.ensure_one()
@@ -1792,6 +2004,7 @@ class LevisPosClearingLeg(models.Model):
             ("mdr", "MDR Expense"),
             ("bank", "Sweep / Charge"),
             ("short", "Left on Suspense"),
+            ("writeoff", "Written Off"),
         ],
         required=True,
     )

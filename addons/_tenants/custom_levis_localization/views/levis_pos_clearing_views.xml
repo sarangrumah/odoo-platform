@@ -131,6 +131,11 @@
                             <field name="line_ids" readonly="1" domain="[('block', '=', 'a')]"
                                    context="{'default_block': 'a'}">
                                 <list create="false" delete="false" default_order="analytic_account_id, settlement_date">
+                                    <header>
+                                        <button name="action_open_writeoff_wizard" type="object"
+                                                string="Write Off Residual"
+                                                groups="account.group_account_manager"/>
+                                    </header>
                                     <field name="analytic_account_id"/>
                                     <field name="settlement_date"/>
                                     <field name="trans_date"/>
