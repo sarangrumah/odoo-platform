@@ -58,11 +58,16 @@ export const layoutPrefsService = {
         // A user who drags a column and immediately switches tabs or closes
         // the browser would otherwise lose the write still sitting in the
         // debounce window.
-        browser.addEventListener("visibilitychange", () => {
-            if (browser.document.visibilityState === "hidden") {
+        //
+        // These listen on `document`, not on Odoo's `browser` wrapper: that
+        // wrapper exposes window APIs only and has no `document`, and
+        // visibilitychange is a document event in the first place.
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "hidden") {
                 flush();
             }
         });
+        browser.addEventListener("pagehide", () => flush());
 
         return {
             /**

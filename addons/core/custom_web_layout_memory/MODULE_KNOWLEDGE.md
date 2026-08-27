@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-08-27T00:00:00Z
 generator: hand-written
 module: custom_web_layout_memory
-manifest_version: 19.0.1.0.0
+manifest_version: 19.0.1.3.0
 ---
 
 # custom_web_layout_memory
@@ -84,6 +84,15 @@ Neither behaviour is configurable in Odoo 19 core:
   touched entry and is the first to go.
 
 ## Frontend
+- `static/src/resizable_table_hook.js` — `useResizableColumnWidths(tableRef,
+  {getKey, getColumns})`, for tables that are **not** Odoo list views. List
+  views get the grips and the width algebra from core and only need
+  remembering; a hand-written OWL table needs the drag, the freeze and the
+  persistence supplied whole. Consumers must put `data-name` on each `<th>`,
+  render a `.o-ux-resizeGrip` wired to `onStartResize`, and add
+  `o-ux-resizableTable` to the table. First consumer:
+  `custom_accounting_reports`' `ReportTable` (Trial Balance, GL, and every
+  other on-screen report).
 - `static/src/layout_prefs_service.js` — the session cache (service name
   `custom_web_layout_memory.prefs`). Every RPC failure is swallowed: layout
   memory is a convenience, and a view must still render without it.
@@ -120,6 +129,22 @@ Neither behaviour is configurable in Odoo 19 core:
 - **The collapsed chatter is still mounted.** It is reduced to a rail by CSS,
   not unmounted — otherwise the toggle would disappear with it and there would
   be no way back. Messages therefore still load in the background.
+- **Changing a static file is not enough to ship it.** Replacing the JS/SCSS in
+  `/opt` leaves the running workers serving the previously generated asset
+  bundle — the browser keeps getting the old hash and the change appears to
+  have done nothing. Bump the manifest and run `-u` to invalidate the bundle.
+  (Verified the hard way: a fix sat in `/opt` and measured as absent in a real
+  browser until the upgrade ran.)
+- **`browser` has no `document`.** `@web/core/browser/browser` wraps window
+  APIs only. `browser.document.visibilityState` throws a TypeError at runtime
+  — visibilitychange is a document event and must be bound on `document`.
+- **Collapsing the chatter needs the sheet cap lifted.** `.o_form_sheet_bg`
+  carries `max-width: $o-form-view-sheet-max-width` (1400px) plus
+  `margin-right: auto`. That is invisible while the aside chatter has
+  `flex-grow: 1` and swallows the surplus, but with the chatter folded to a
+  44px rail the cap turns the reclaimed width into a dead gap — the form still
+  reads as a page split in two. Measured on a 1920px viewport: sheet 1257 →
+  1400 with the cap, 1257 → 1876 without it.
 - **Shared addon.** This installs in every tenant database that gets it, and it
   patches core web/mail components. Follow the platform rule for shared addons:
   bump the manifest version and run `-u custom_web_layout_memory` on every

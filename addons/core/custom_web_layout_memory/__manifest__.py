@@ -37,7 +37,7 @@ it never travels in the mail store payload or over the settings bus.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Custom Platform/Technical/UX",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.3.0",
     "license": "LGPL-3",
     "depends": ["base", "web", "mail"],
     "capability_tags": ["ux", "user-preferences", "list-view", "chatter"],
