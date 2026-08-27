@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-26T06:36:37+00:00",
+  "generated_at": "2026-08-27T00:46:00+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "03bfa6d",
-    "branch": "feat/ppn-digunggung-detail"
+    "commit": "9f10150",
+    "branch": "feat/backend-layout-memory"
   },
   "buckets": [
     {
@@ -1421,6 +1421,25 @@
       ]
     },
     {
+      "module": "custom_web_layout_memory",
+      "bucket": "core",
+      "name": "Backend Layout Memory",
+      "version": "19.0.1.3.0",
+      "summary": "Remember list column widths per user and let the chatter be folded away",
+      "category": "Custom Platform/Technical/UX",
+      "depends": 3,
+      "public": true,
+      "last_change": "2026-08-27",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "9f10150",
+          "date": "2026-08-27",
+          "subject": "feat(ux): remember column widths on the user, and let the chatter fold away"
+        }
+      ]
+    },
+    {
       "module": "authenticate_keycloak",
       "bucket": "ee_gap",
       "name": "Auth Keycloak — Authorization Code Flow",
@@ -1706,9 +1725,9 @@
       "change_count": 53,
       "changes": [
         {
-          "sha": "03bfa6d",
+          "sha": "bde8a4e",
           "date": "2026-08-26",
-          "subject": "feat(reports): rincian PPN Keluaran Digunggung sampai nomor transaksi"
+          "subject": "feat(reports): rincian PPN Keluaran Digunggung sampai nomor transaksi (#195)"
         },
         {
           "sha": "3e7fdd6",

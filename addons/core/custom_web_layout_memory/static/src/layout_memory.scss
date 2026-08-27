@@ -1,0 +1,96 @@
+// Collapsed chatter.
+//
+// The collapsed flag lives on the toggle button rather than on the chatter
+// root, because the root's class list is built by the mail templates and the
+// form compiler; :has() lets us style the ancestors from the one element we
+// actually own.
+
+.o-mail-Chatter:has(> .o-mail-Chatter-top .o-ux-chatterToggle.o-ux-chatterCollapsed) {
+    width: auto !important;
+    min-width: 0;
+    flex-grow: 0 !important;
+    overflow: visible !important;
+
+    // Everything except the toggle itself: the message list, the composer, the
+    // follower dropdown, the attachment uploader.
+    .o-mail-Chatter-content,
+    .o-mail-Chatter-top .o-mail-Composer,
+    .o-mail-Chatter-topbar > *:not(.o-ux-chatterToggle) {
+        display: none !important;
+    }
+
+    .o-mail-Chatter-topbar {
+        overflow: visible;
+    }
+}
+
+// The aside container carries a fixed width from mail's own SCSS
+// (`$o-mail-Chatter-minWidth`); without this the sheet would not reclaim the
+// space the chatter just gave up.
+.o-mail-ChatterContainer,
+.o-mail-Form-chatter {
+    &:has(.o-ux-chatterToggle.o-ux-chatterCollapsed) {
+        width: auto;
+        min-width: 0;
+        flex-grow: 0;
+        padding-bottom: 0;
+
+        &.o-aside {
+            width: auto;
+            flex-grow: 0;
+            --ChatterAsideForm-padding-left: 0px;
+        }
+    }
+}
+
+// Keep the rail visible against the sheet, and hint that it opens leftwards.
+.o-ux-chatterToggle {
+    &.o-ux-chatterCollapsed {
+        position: sticky;
+        top: 0;
+    }
+}
+
+// Give the sheet the page back.
+//
+// The XXL form layout caps `.o_form_sheet_bg` at $o-form-view-sheet-max-width
+// (1400px) and leaves `margin-right: auto`. That is invisible while the aside
+// chatter has `flex-grow: 1` and swallows everything past the cap -- but once
+// the chatter is a 44px rail, the cap turns the reclaimed space into a dead
+// gap, and the form still reads as a page split in two. Lift the cap for as
+// long as the chatter stays folded.
+.o_form_renderer:has(.o-ux-chatterToggle.o-ux-chatterCollapsed) {
+    max-width: none;
+
+    > .o_form_sheet_bg {
+        max-width: none;
+        margin-right: 0;
+    }
+}
+
+// Resize grips for hand-written tables using `useResizableColumnWidths`.
+// Odoo's list view draws its own; this is the equivalent for tables that are
+// not list views, styled to match so the interaction feels like one product.
+.o-ux-resizableTable {
+    th {
+        position: relative;
+    }
+
+    .o-ux-resizeGrip {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 5px;
+        cursor: col-resize;
+        background-color: rgba(0, 0, 0, 0.25);
+        opacity: 0;
+        z-index: 1;
+        touch-action: none;
+    }
+
+    th:hover .o-ux-resizeGrip,
+    th.o-ux-resizing .o-ux-resizeGrip {
+        opacity: 0.5;
+    }
+}
