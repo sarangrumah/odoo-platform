@@ -178,6 +178,47 @@ class TestClearingDay(TestPosClearing):
         self.assertTrue(run.day_ids.is_balanced, "a decision taken is not an open item")
         self.assertGreater(run.day_ids.writeoff_total, 0.0)
 
+    def test_a_day_is_compared_only_against_its_own_stores(self):
+        """Found on real data, not in a fixture.
+
+        A date can carry more than one bank feed. Measured on August production
+        data, an IBNI feed holding a single Rp 1 line was being compared against
+        the whole company's sales for the day and reported a variance of minus
+        412 million. A comparison is only meaningful between the same population
+        on both sides.
+        """
+        day = date(2026, 7, 8)
+        # store_one sells and settles through the main bank...
+        self._posrec(self.tender_a, self.store_one, day, 1_000_000.0)
+        self._statement(
+            date(2026, 7, 9),
+            990_000.0,
+            self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, trans_day=day),
+        )
+        # ...while store_two sells the same day and settles nowhere.
+        self._posrec(self.tender_a, self.store_two, day, 5_000_000.0)
+
+        run = self._run()
+        run.action_compute()
+        clearing_day = run.day_ids
+
+        # The day only settled store_one, so only store_one's sales are its
+        # yardstick. Counting store_two's 5 000 000 would report a variance of
+        # minus five million against a day that did nothing wrong.
+        self.assertAlmostEqual(clearing_day.sales_h1_total, 1_000_000.0, places=2)
+        self.assertAlmostEqual(clearing_day.tally_variance, 0.0, places=2)
+
+    def test_a_day_that_settled_no_store_compares_against_nothing(self):
+        # A feed carrying only a bank charge has no store and therefore no
+        # yardstick — zero, not "the entire company's sales".
+        self._posrec(self.tender_a, self.store_one, date(2026, 7, 8), 1_000_000.0)
+        self._statement(date(2026, 7, 9), -25_000.0, "BIAYA ADM")
+        run = self._run()
+        run.action_compute()
+        self.assertTrue(run.day_ids)
+        self.assertAlmostEqual(run.day_ids.sales_h1_total, 0.0, places=2)
+        self.assertAlmostEqual(run.day_ids.tally_variance, 0.0, places=2)
+
     # ------------------------------------------------------------------
     # It is a projection, not accounting
     # ------------------------------------------------------------------

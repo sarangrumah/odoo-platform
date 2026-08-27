@@ -239,18 +239,29 @@ class LevisPosClearingDay(models.Model):
         return True
 
     def _sales_of_trading_day(self):
-        """POS receivables posted on the trading day, cleared or not.
+        """POS receivables of this day's stores, on the trading day.
 
         Read straight from the ledger rather than from this run's allocations:
         the question is "did roughly the right amount of money show up", and
         answering it from what the run managed to match would make it agree with
         itself by construction.
+
+        **Scoped to the stores this day actually settled**, which is not a
+        refinement but a correctness fix. A date can carry more than one bank
+        feed, and measured on real August data an IBNI feed holding a single
+        Rp 1 line was being compared against the entire company's sales for the
+        day — reporting a variance of minus 412 million for a row representing
+        one rupiah. A comparison is only meaningful between the same population
+        on both sides.
         """
         self.ensure_one()
         config = self.run_id.config_id
         accounts = config.pos_receivable_account_ids
-        if not accounts or not self.trading_date:
+        stores = self.line_ids.filtered(lambda line: line.block in ("a", "b")).mapped("analytic_account_id")
+        if not accounts or not self.trading_date or not stores:
             return 0.0
+        # The store lives in ``analytic_distribution``, a JSON map of analytic id
+        # to percentage, so it is matched by key rather than by a column.
         self.env.cr.execute(
             """
             SELECT COALESCE(SUM(aml.debit), 0.0)
@@ -260,8 +271,14 @@ class LevisPosClearingDay(models.Model):
                AND aml.date = %s
                AND aml.company_id = %s
                AND m.state = 'posted'
+               AND aml.analytic_distribution ?| %s
             """,
-            (list(accounts.ids), self.trading_date, self.company_id.id),
+            (
+                list(accounts.ids),
+                self.trading_date,
+                self.company_id.id,
+                [str(store_id) for store_id in stores.ids],
+            ),
         )
         return self.env.cr.fetchone()[0] or 0.0
 

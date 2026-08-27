@@ -520,6 +520,38 @@ the run managed to match would make it agree with itself by construction.
 could not be read), 3 amber (partly done), 0 grey (untouched). The kanban binds
 straight to it.
 
+### Measured on real data (August 2026, prd_levis_begbal clone)
+
+3 149 lines over 22 days. The day roll-up reproduces the run's own totals to the
+rupiah — Rp 10 305 228 221 unexplained — which is the correctness check that
+matters.
+
+Two things only real data showed:
+
+* **`sales_h1_total` must be scoped to the day's own stores.** A date carries
+  more than one bank feed, and an IBNI feed holding a single Rp 1 line was being
+  compared against the entire company's sales, reporting a variance of minus 412
+  million. Fixtures cannot catch this — they never have two feeds on one date.
+* **The H-1 assumption does not hold in a backlog month.** Early-August
+  settlements ran 3-4x the H-1 sales (3-Aug: Rp 2,88 bn gross against Rp 0,67 bn
+  sold), because they were paying for July. Had `is_balanced` been gated on the
+  tally, all 22 days would have been red for a reason no operator could fix. This
+  is the concrete justification for the green rule above.
+
+### BNI and Mandiri carry no settlements
+
+Checked across June-August 2026 in production, this is the whole of both feeds:
+IBNI 4 lines in July and 3 in August, IMand 4 and 1 — all of them Rp 1 or Rp 31
+QR onboarding transfers, plus Meterai and Buku Cek charges that `_parse_minor`
+already handles. Against IBCA's 2 111 + 3 145 and IBRI's 416.
+
+So **do not write `_parse_bni` / `_parse_mandiri` settlement grammars** on the
+strength of "those journals are configured". They are configured and empty; a
+day of work per bank would recover about Rp 40 over two months. The store names
+in those narratives (`LEVIS GRAND INDONESIA`, …) are already reachable through
+keyword rules on `levis.bank.mid.map` with no new code. Revisit only if Levi's
+moves card settlement to those banks.
+
 ### Not done in this phase
 
 The partial generate/post refactor (`_generate_moves(lines=None)` /
