@@ -37,7 +37,7 @@ class PettyCashRealization(models.Model):
         required=True,
         ondelete="restrict",
         tracking=True,
-        domain="[('state', 'in', ('disbursed', 'in_realization'))]",
+        domain="[('state', 'in', ('approved', 'disbursed', 'in_realization'))]",
     )
     employee_id = fields.Many2one(related="request_id.employee_id", store=True, string="Employee")
     company_id = fields.Many2one(related="request_id.company_id", store=True, string="Company")
@@ -115,6 +115,14 @@ class PettyCashRealization(models.Model):
             raise UserError(_("Only draft/submitted realizations can be posted."))
         if not self.line_ids:
             raise UserError(_("Nothing to post."))
+        # The domain lets an ``approved`` request through for the Realisasi /
+        # Claim kinds, which have no Bank-Out step; every other kind must still
+        # have been disbursed before its money can be accounted for.
+        if self.request_id.state not in self.request_id._pc_realizable_states():
+            raise UserError(
+                _("%(req)s is not ready for a realization (state: %(state)s).")
+                % {"req": self.request_id.name, "state": self.request_id.state}
+            )
         self._check_third_party_attachment()
 
         third_party = self.line_ids.filtered(lambda l: l.line_type == "third_party")

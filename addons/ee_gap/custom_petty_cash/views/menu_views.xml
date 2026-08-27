@@ -21,8 +21,40 @@
                   parent="menu_petty_cash_root"
                   action="action_petty_cash_realization" sequence="20"/>
 
+        <!-- ============================================================
+             Finance's half of the module lives in Invoicing.
+             `account.menu_finance` already carries its own Dashboard,
+             Review, Reporting and Configuration, so the four petty-cash
+             menus nest under one "Cash Advance" section rather than sitting
+             beside their namesakes.
+             NOTE: Invoicing itself is gated on the account groups, so a user
+             holding only 'Petty Cash / Finance' sees none of this without an
+             accounting group as well.
+             ============================================================ -->
+        <menuitem id="menu_petty_cash_finance_root" name="Cash Advance"
+                  parent="account.menu_finance" sequence="8"
+                  groups="custom_petty_cash.group_petty_cash_finance"/>
+
+        <menuitem id="menu_petty_cash_review_root" name="Finance Review"
+                  parent="menu_petty_cash_finance_root" sequence="20"
+                  groups="custom_petty_cash.group_petty_cash_finance"/>
+        <menuitem id="menu_petty_cash_review_queue" name="Review Queue"
+                  parent="menu_petty_cash_review_root"
+                  action="action_petty_cash_review" sequence="5"/>
+        <menuitem id="menu_petty_cash_review_floats" name="Store Floats"
+                  parent="menu_petty_cash_review_root"
+                  action="action_petty_cash_float" sequence="10"/>
+        <menuitem id="menu_petty_cash_review_outstanding_ou" name="Outstanding per Operating Unit"
+                  parent="menu_petty_cash_review_root"
+                  action="action_petty_cash_outstanding_ou" sequence="15"/>
+
+        <menuitem id="menu_petty_cash_dashboard" name="Dashboard"
+                  parent="menu_petty_cash_finance_root" sequence="10"
+                  action="action_petty_cash_dashboard"
+                  groups="custom_petty_cash.group_petty_cash_finance"/>
+
         <menuitem id="menu_petty_cash_reporting" name="Reporting"
-                  parent="menu_petty_cash_root" sequence="30"
+                  parent="menu_petty_cash_finance_root" sequence="30"
                   groups="custom_petty_cash.group_petty_cash_finance"/>
         <menuitem id="menu_petty_cash_statement" name="Kartu Uang Muka"
                   parent="menu_petty_cash_reporting"
@@ -35,11 +67,14 @@
                   action="action_petty_cash_aging" sequence="20"/>
 
         <menuitem id="menu_petty_cash_config_root" name="Configuration"
-                  parent="menu_petty_cash_root" sequence="90"
+                  parent="menu_petty_cash_finance_root" sequence="90"
                   groups="custom_petty_cash.group_petty_cash_finance"/>
         <menuitem id="menu_petty_cash_types" name="Advance Types"
                   parent="menu_petty_cash_config_root"
                   action="action_petty_cash_type" sequence="5"/>
+        <menuitem id="menu_petty_cash_floats_config" name="Store Floats"
+                  parent="menu_petty_cash_config_root"
+                  action="action_petty_cash_float" sequence="7"/>
         <menuitem id="menu_petty_cash_settings" name="Settings"
                   parent="menu_petty_cash_config_root"
                   action="action_petty_cash_config" sequence="10"/>

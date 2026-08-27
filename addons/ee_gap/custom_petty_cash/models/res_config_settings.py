@@ -33,6 +33,14 @@ class ResConfigSettings(models.TransientModel):
         "employee must submit the realization. Drives the overdue filter "
         "and reminder cron.",
     )
+    petty_cash_initial_amount = fields.Float(
+        string="Initial Petty Cash per Store",
+        config_parameter="custom_petty_cash.initial_amount",
+        default=1000000.0,
+        help="Plafon every store's 'Petty Cash Awal' request is capped at. "
+        "Seeds the plafon of each new store float; Finance can still raise or "
+        "lower it store by store on the float itself.",
+    )
     petty_cash_ou_plan_name = fields.Char(
         string="Operating Unit Analytic Plan",
         config_parameter="custom_petty_cash.ou_plan_name",

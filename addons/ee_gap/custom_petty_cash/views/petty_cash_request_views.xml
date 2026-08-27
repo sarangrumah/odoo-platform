@@ -16,11 +16,16 @@
                         <button name="action_reject" type="object" string="Send Back"
                                 invisible="state != 'to_approve'"
                                 groups="custom_petty_cash.group_petty_cash_finance"/>
+                        <button name="action_refuse" type="object" string="Refuse"
+                                invisible="state not in ('to_approve', 'approved')"
+                                groups="custom_petty_cash.group_petty_cash_finance"/>
                         <button name="action_disburse" type="object" string="Disburse (Bank Out)"
-                                class="btn-primary" invisible="state != 'approved'"
+                                class="btn-primary"
+                                invisible="state != 'approved' or advance_type_kind in ('pc_realization', 'pc_claim')"
                                 groups="custom_petty_cash.group_petty_cash_finance"/>
                         <button name="action_open_realization" type="object" string="New Realization"
-                                class="btn-primary" invisible="state not in ('disbursed', 'in_realization')"/>
+                                class="btn-primary"
+                                invisible="state not in ('disbursed', 'in_realization') and not (state == 'approved' and advance_type_kind in ('pc_realization', 'pc_claim'))"/>
                         <button name="action_return_balance" type="object" string="Return Balance"
                                 invisible="state not in ('disbursed', 'in_realization') or amount_outstanding &lt;= 0"
                                 groups="custom_petty_cash.group_petty_cash_finance"/>
@@ -29,8 +34,13 @@
                                 groups="custom_petty_cash.group_petty_cash_finance"/>
                         <button name="action_settle" type="object" string="Settle"
                                 class="btn-primary"
-                                invisible="state not in ('disbursed', 'in_realization') or amount_outstanding != 0"
+                                invisible="advance_type_kind in ('pc_realization', 'pc_claim') or state not in ('disbursed', 'in_realization') or amount_outstanding != 0"
                                 groups="custom_petty_cash.group_petty_cash_finance"/>
+                        <button name="action_close_release" type="object" string="Close &amp; Release"
+                                class="btn-primary"
+                                invisible="advance_type_kind not in ('pc_realization', 'pc_claim') or state not in ('approved', 'disbursed', 'in_realization')"
+                                groups="custom_petty_cash.group_petty_cash_finance"
+                                help="Close the request and hand any un-realized remainder back to the store's available balance."/>
                         <button name="action_cancel" type="object" string="Cancel"
                                 invisible="state in ('settled', 'cancelled')"/>
                         <button name="action_reset_to_draft" type="object" string="Reset to Draft"
@@ -59,6 +69,7 @@
                                 <field name="employee_id" readonly="state != 'draft'"/>
                                 <field name="advance_type_id" readonly="state != 'draft'"
                                        options="{'no_create': True}"/>
+                                <field name="advance_type_kind" invisible="1"/>
                                 <field name="pc_ou_allowed_ids" invisible="1"/>
                                 <field name="l10n_ou_analytic_id" readonly="state != 'draft'"/>
                                 <field name="purpose" readonly="state not in ('draft', 'to_approve')"/>
@@ -70,6 +81,10 @@
                                 <field name="request_date" readonly="state != 'draft'"/>
                                 <field name="realization_deadline"/>
                                 <field name="amount_requested" readonly="state not in ('draft', 'to_approve')"/>
+                                <field name="float_id" readonly="1"
+                                       invisible="advance_type_kind not in ('pc_initial', 'pc_realization', 'pc_claim')"/>
+                                <field name="amount_float_consumed" readonly="1"
+                                       invisible="advance_type_kind != 'pc_realization'"/>
                                 <field name="x_custom_approval_state" string="Approval Status" readonly="1"
                                        invisible="not x_custom_approval_request_id"/>
                             </group>
@@ -88,7 +103,7 @@
                             </group>
                         </group>
                         <notebook>
-                            <page string="Estimate Breakdown" name="breakdown">
+                            <page string="Detail Lines" name="detail_lines">
                                 <field name="line_ids" readonly="state not in ('draft', 'to_approve')">
                                     <list editable="bottom">
                                         <field name="sequence" widget="handle"/>
@@ -96,16 +111,6 @@
                                         <field name="account_id"/>
                                         <field name="currency_id" column_invisible="1"/>
                                         <field name="amount" sum="Total"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Realizations" name="realizations">
-                                <field name="realization_ids" readonly="1">
-                                    <list>
-                                        <field name="name"/>
-                                        <field name="date"/>
-                                        <field name="amount_total"/>
-                                        <field name="state" widget="badge"/>
                                     </list>
                                 </field>
                             </page>
@@ -190,7 +195,19 @@
                             domain="[('state', 'in', ('disbursed', 'in_realization'))]"/>
                     <filter name="settled" string="Settled" domain="[('state', '=', 'settled')]"/>
                     <separator/>
+                    <filter name="kind_initial" string="Petty Cash Awal"
+                            domain="[('advance_type_kind', '=', 'pc_initial')]"/>
+                    <filter name="kind_realization" string="Realisasi"
+                            domain="[('advance_type_kind', '=', 'pc_realization')]"/>
+                    <filter name="kind_claim" string="Claim"
+                            domain="[('advance_type_kind', '=', 'pc_claim')]"/>
+                    <separator/>
                     <filter name="overdue" string="Overdue" domain="[('is_overdue', '=', True)]"/>
+                    <filter name="reserved" string="Reserving Float"
+                            domain="[('amount_float_consumed', '&gt;', 0)]"/>
+                    <separator/>
+                    <filter name="this_month" string="This Month"
+                            domain="[('request_date', '&gt;=', (context_today() + relativedelta(day=1)).strftime('%Y-%m-%d'))]"/>
                     <filter name="outstanding" string="Outstanding"
                             domain="[('state', 'in', ('disbursed', 'in_realization')), ('amount_outstanding', '!=', 0)]"/>
                     <group>
@@ -198,6 +215,8 @@
                         <filter name="group_type" string="Type" context="{'group_by': 'advance_type_id'}"/>
                         <filter name="group_ou" string="Operating Unit" context="{'group_by': 'l10n_ou_analytic_id'}"/>
                         <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                        <filter name="group_kind" string="Type Kind" context="{'group_by': 'advance_type_kind'}"/>
+                        <filter name="group_month" string="Request Month" context="{'group_by': 'request_date:month'}"/>
                     </group>
                 </search>
             </field>
@@ -206,7 +225,7 @@
         <record id="action_petty_cash_request" model="ir.actions.act_window">
             <field name="name">Cash Advance Requests</field>
             <field name="res_model">petty.cash.request</field>
-            <field name="view_mode">kanban,list,form</field>
+            <field name="view_mode">kanban,list,form,pivot,graph</field>
             <field name="search_view_id" ref="view_petty_cash_request_search"/>
             <field name="context">{'search_default_my_requests': 1}</field>
             <field name="help" type="html">
