@@ -2,7 +2,9 @@
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onWillStart, useRef, useState } from "@odoo/owl";
+
+import { useResizableColumnWidths } from "@custom_web_layout_memory/resizable_table_hook";
 
 /**
  * Generic on-screen table for every custom accounting report.
@@ -36,6 +38,15 @@ export class ReportTable extends Component {
             sortField: null,
             sortDir: 1,
             filter: "",
+        });
+        this.tableRef = useRef("table");
+        // Column widths are remembered per report, per user, on the user
+        // record -- the same store the list views use. A report is read at a
+        // width the reader chose; making them choose it again on every run is
+        // the whole complaint this answers.
+        this.columnWidths = useResizableColumnWidths(this.tableRef, {
+            getKey: () => `report:${this.reportCode}`,
+            getColumns: () => this.state.columns.map((col) => col.field),
         });
         onWillStart(() => this.load());
     }
@@ -181,6 +192,13 @@ export class ReportTable extends Component {
     }
 
     onSort(column) {
+        if (this.columnWidths.shouldSuppressClick()) {
+            // The click that closes a drag lands on the header; without this
+            // every resize would also re-sort the report -- and the re-render
+            // that follows would drop the frozen widths of the columns the
+            // user did not touch.
+            return;
+        }
         if (this.state.sortField === column.field) {
             this.state.sortDir = -this.state.sortDir;
         } else {

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-27T00:46:00+00:00",
+  "generated_at": "2026-08-27T00:47:09+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "9f10150",
-    "branch": "feat/backend-layout-memory"
+    "commit": "9db256e",
+    "branch": "feat/report-table-column-widths"
   },
   "buckets": [
     {
@@ -1430,8 +1430,13 @@
       "depends": 3,
       "public": true,
       "last_change": "2026-08-27",
-      "change_count": 1,
+      "change_count": 2,
       "changes": [
+        {
+          "sha": "9db256e",
+          "date": "2026-08-27",
+          "subject": "fix(ux): give the sheet the page back when the chatter folds, and stop the TypeError"
+        },
         {
           "sha": "9f10150",
           "date": "2026-08-27",
@@ -1716,10 +1721,10 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.24.0",
+      "version": "19.0.0.25.2",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
-      "depends": 4,
+      "depends": 5,
       "public": true,
       "last_change": "2026-08-26",
       "change_count": 53,

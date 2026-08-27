@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T07:43:22Z
 generator: bootstrap-v1
 module: custom_accounting_reports
-manifest_version: 19.0.0.22.0
+manifest_version: 19.0.0.25.2
 ---
 
 # custom_accounting_reports
@@ -127,3 +127,17 @@ Report models are AbstractModels and generally have no stored fields; user input
 ## Out of Scope
 - No real-time reporting or live data updates; reports are computed on demand from posted/existing move lines.
 - No direct integration with external tax-filing systems (the tax report only cross-references Coretax data).
+
+## Column widths on the on-screen tables (0.25.0)
+`ReportTable` now remembers its column widths per user, per report, via
+`useResizableColumnWidths` from `custom_web_layout_memory` (a new dependency).
+Each `<th>` carries `data-name="<field>"` and a `.o-ux-resizeGrip`; drag to
+resize, double-click the grip to reset. Widths are stored under
+`report:<report_code>|<hash of the column fields>` — folding the column set
+into the key matters because the same report run with different options can
+come back with a different column list, and widths measured against one set
+mean nothing against another.
+
+`onSort` bails out while `columnWidths.resizing` is true: the click that closes
+a drag lands on the header, so without that guard every resize would also
+re-sort the report.
