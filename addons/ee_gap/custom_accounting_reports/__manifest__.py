@@ -26,10 +26,11 @@ render to QWeb PDF or HTML. PSAK-aligned default tree shipped under
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.24.0",
+    "version": "19.0.0.25.2",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
+        "custom_web_layout_memory",
         "custom_pdp_audit",
         "custom_accounting_full",
         "account",
