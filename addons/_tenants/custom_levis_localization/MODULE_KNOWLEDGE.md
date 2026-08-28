@@ -102,6 +102,30 @@ This module implements five specific requirements for the Levi's tenant: HS Code
 - **EBR account codes**: trade payable `2103100001`, non-trade payable
   `2103300001`, non-trade GR/IR `2103300008`. Trade GR/IR stays per product
   category (`account_stock_variation_id`, e.g. `2103109121` textile).
+- **Related parties (19.0.1.35.0)**: the EBR chart splits AP four ways —
+  trade/non-trade (the purchase stream, on the bill) x third/related party (a
+  property of the *vendor*). `res.partner.l10n_related_party` (Boolean, tracked,
+  on the Accounting tab next to Account Payable) marks in-group Erajaya
+  companies; `levis.purchase.account.map.related_payable_account_id` holds the
+  related-party AP per stream (`2103200001` trade / `2103400001` non-trade).
+  `account.move.line._levis_stream_payable(mapping, move)` picks the account,
+  reading the flag off the **commercial** partner (an invoicing child bills to
+  its parent) and falling back to the ordinary payable when the related column
+  is empty. Before this, PT Sinar Eka Selaras carried `2103200001` on its
+  contact yet all 439 posted bills in `prd_levis_begbal` (Rp 44,58 M still open)
+  landed on third-party `2103100001` — the stream mapping overwrote whatever
+  core computed from the partner property. Manual bills never hit the bug: with
+  no `l10n_purchase_type` at line-precompute time the override never fired and
+  core's partner property stood.
+- **Seeding the flag**: `setup.py::_flag_related_parties(env, companies)` (called
+  from `seed_trade_ou`) ticks the flag on every vendor whose contact already
+  points at a related-party AP account — the only way accounting could express
+  the intent before the flag existed. It only ever ticks, never unticks, so a
+  manual correction survives the next upgrade.
+- **GR/IR is deliberately NOT split third/related**: the goods receipt accrues to
+  the category's third-party clearing account, so routing the bill elsewhere
+  would leave that accrual un-netted. Existing AP balances are left as-is —
+  reclassing them is an accounting decision, not a side effect of this fix.
 
 ## Feature 8 — Admin fees (and card MDR) on payment registration
 - **Models**: `levis.payment.register.fee` (TransientModel, one fee line on the
@@ -354,6 +378,82 @@ one X24DN transaction offered to one bank line, with a `matched` tick.
 * `matched_total` / `match_gap` on the line are what has been confirmed and what
   is still unexplained; `x24_trans_refs` follows the ticks, not the evidence.
 
+**Readiness before anything else (19.0.1.40.0).** `action_check_readiness` answers
+"is this month fit to clear" in draft, without computing: it creates no lines and
+leaves the run in `draft`. It exists because of August 2026 in prd_levis_begbal,
+where the IBCA statement had been imported **four times** — each import restarting
+at the 1st, cumulatively: 386 lines (07-Aug), 717 (12-Aug), 840 (14-Aug), 1.202
+(19-Aug), for 3.145 posted rows where 1.202 were real. Nothing noticed. The run
+reported Rp 10,3 m of settlements with no receivable left, which was true of the
+duplicates and useless as a finding. Deduplicated on a clone the same month comes
+out at 1.148 settled / 2 short / **Rp 899.730** unexplained.
+
+* `_diag_duplicates` groups on `(journal, date, payment_ref, amount)` and then
+  splits on **when the rows were written**: two sales can agree on all four, but
+  rows created an hour or more apart (`_DUP_BATCH_GAP_SECONDS`) cannot have come
+  from one file. Blocking, and `_assert_generatable` refuses to generate over it.
+* `_diag_import_incomplete` reports a journal whose statement stops before the
+  period does — the August run read as a month and covered eighteen days, and
+  `_diag_missing_days` by design cannot say so (it looks for *interior* gaps).
+  It also reports a journal with no lines at all, which `_diag_missing_days` can
+  only say after a Compute.
+* `_diag_coverage` compares settlement gross against the open receivable pool
+  measured **before allocation spends it**. Past `_COVERAGE_TOLERANCE` it says so
+  as a ratio: the cause is never in this module — a repeated bank import, or a POS
+  import that never ran — and both leave the same footprint.
+
+**Evidence before the residual ordering (19.0.1.40.0).** `_attach_evidence` runs
+between parsing and allocation and asks the trading day's receipts two questions
+the narrative cannot answer:
+
+* **Which tender receivable.** Measured on August 2026: 377 settlements had their
+  tender named by the receipts and a *different* account credited by
+  `_allocate`, which picks by largest residual and cannot see a tender.
+  `_allocate_with_evidence` drains the proven account first and only then falls
+  back to the ordinary search — a **priority, not a restriction**, so a proven
+  tender that is already reconciled still gets settled instead of stranding money.
+  `only_accounts` still binds: a cash deposit may not consume a card receivable
+  however its receipts read, because the channel restriction answers a different
+  question. `line.tender_locked` records where the receipts decided it.
+* **Which trading day.** Most BCA narratives carry no transaction date, so the day
+  is inferred from the settlement lag and widened into a ladder. The ladder is now
+  walked looking for proof, and a day whose receipts add up replaces the inferred
+  one. `trans_date_is_derived` stays true — the narrative still never said it —
+  and `x24_match` carries how it was established.
+
+`_allocation_order` then allocates proven settlements first. Order decides who
+gets the money when the pool is thin, and a proven claim beats an unproven one;
+statement order is kept inside each group so a rerun allocates identically.
+
+**`subset`: a unique combination is proof, an ambiguous one is not.** `_x24_subset`
+extends `_x24_identify` with a bounded meet-in-the-middle search *per tender*.
+The doctrine is unchanged — only arithmetic counts — but a combination that is
+the **only** way to make the number is arithmetic. Two tenders that can each make
+it, or one tender that can make it twice, name nothing. Bounded twice:
+`_SUBSET_MAX_ITEMS` (20 candidates after dropping anything above the target) and
+`_SUBSET_MAX_SOLUTIONS` (stop at the second). `_subset_totals` reaches each subset
+sum one addition from a known one, which is what keeps the search from becoming
+the slowest step of a 3.000-line run; the callers additionally memoise per
+`(store, day, gross)`. On a deduplicated August it fires on **470 of 1.130**
+allocations. It does not move the totals — greedy reached the same accounts —
+which is a narrower claim than it sounds: there was almost nothing left to correct.
+
+**Bulk instead of line by line.** `action_match_proven` re-ticks everything the
+amounts prove across a whole run, which matters after mapping a MID: a line only
+becomes readable once it has a store, and without this the month would have to be
+recomputed — throwing away every tick already made — to collect free ticks.
+`action_suggest_receipts` takes a recordset, so a selection in the settlement list
+can be built as a batch (the `<header>` button); the cost is per line either way.
+
+**The mapping wizard proposes from takings, not from names.** `_evidence_suggestions`
+indexes every store's X70D transactions by amount — single transactions, and each
+tender's day total — and votes: a deposit that equals exactly one store's cash for
+exactly one trading day says which shop it came from without reading the narrative
+at all. A figure that fits two stores votes for neither, and a group whose best
+store does not beat the runner-up is left for a person. `evidence_note` on the
+wizard line says why; empty means the old name-overlap guess and nothing
+corroborating it. Silent when the OU field or the staged rows are absent.
+
 **Two rules may never claim one terminal.** `_check_no_colliding_rule` refuses a
 mapping that would compete with an existing one, comparing through the resolver's own
 `_keys_match` — so it catches an identical key, a leading-zero variant
@@ -375,6 +475,371 @@ because M sorts before O, and the two name different stores.
 `scripts/tenants/levis/96_setup_pos_clearing.py` does the same for a database
 that already has the module. The MID mapping is deliberately not seeded — see the
 gotcha below.
+
+## Feature 16 — Store code + advanced-matching foundations
+
+Phase 1 of the daily-clearing work. Nothing here changes what the clearing
+allocates; it puts the pieces in place that later phases stand on.
+
+**`stock.warehouse.l10n_store_code`** — the store's identity *outside* Odoo. The
+analytic OU is the identity inside the ledger, but it is a record id: a cashier
+cannot type it on a transfer memo and a bank cannot print it on a statement. A
+textual code already existed, but only inside the X24DN feed, reachable only via
+`ir.model.data` xids named `posconfig_<CODE>`. This promotes it to a real column
+so one code serves the retail feed, the cash-deposit *berita acara*, and bank
+matching alike.
+
+* Unique per company (`models.Constraint`; Odoo 19 ignores `_sql_constraints`).
+  NULLs stay distinct in Postgres, which is what lets a fleet where most stores
+  have no code yet pass the constraint during backfill.
+* `pos.config.l10n_store_code` is a **non-stored** related. Storing it would force
+  a full recompute of every `pos.config` row on `-u` in each of the ~10 databases
+  sharing this addon, and nothing needs it in SQL — the clearing's raw queries
+  already join `ir_model_data` -> `pos_config` -> `stock_warehouse`.
+* `_levis_store_code_index(company_id)` is an `ormcache`d `{CODE: (warehouse_id,
+  analytic_id)}`; `_levis_store_by_code(company, code)` is what callers use.
+  `create`/`write`/`unlink` clear the cache when a code, an analytic or a company
+  changes — a renamed code must stop resolving, and there is a test for that.
+* `seed_store_codes(env)` backfills from the feed's xids. It **never** overwrites
+  a code already on a warehouse (a hand correction outranks the feed) and
+  **never** moves a code off the warehouse holding it (a silent steal is worse
+  than a visible gap). Both cases are counted and logged. Run it on an existing
+  database with `scripts/tenants/levis/41_seed_store_codes.py`; check the
+  `skipped` / `orphan` counters it prints — a large number means the feed's store
+  mapping disagrees with the warehouses, which is a finding, not a hiccup.
+
+**`levis.clearing.matcher`** (AbstractModel) — one answer to a question two
+screens were each answering their own way.
+
+* `_score_candidate(...)` is the bank-reconcile wizard's `score()`, lifted
+  unchanged; `custom_levis_bank_reconcile._get_match_candidates` now calls it, so
+  the clearing and the wizard can no longer drift apart in what they rank first.
+* `_subset_match(items, target, tolerance, max_items, node_budget)` composes a
+  settlement out of several open items — but only when exactly one composition
+  fits. It is deliberately *not* the same decision `_x24_identify` refuses:
+  that method declines to name a subset of **receipt numbers**, which would be an
+  unverifiable claim about which customers the acquirer paid. This is ledger
+  allocation, where a subset is already being chosen greedily today and every
+  item taken is recorded on `levis.pos.clearing.alloc` and reconciled as an exact
+  pair. **Do not carry subset search back into `_x24_identify`.**
+* Its honesty rests on two properties, both tested: items are put in a total
+  order (`-amount, date, key`) before anything is searched, so a shuffled pool
+  yields the identical subset; and the search stops at the **second** solution,
+  not the first, reporting `ambiguous` and allocating nothing.
+* An exhausted node budget returns `none`, never a partial answer.
+
+**Seven new `levis.clearing.config` fields, all inert on arrival** —
+`suggest_tolerance_amount` / `_ratio` (0.0), `advanced_matching` (False),
+`subset_max_items`, `subset_node_budget`, `deposit_match_window_days`,
+`writeoff_limit_amount` (0.0). `_match_tolerance(amount)` returns the wider of
+the two tolerances. The tolerance is a **suggestion band only**: it widens which
+candidates are offered and lifts their rank, and it never sizes, absorbs or books
+anything. A difference inside the band still lands on suspense until a human
+writes it off. Keep it distinct from `_EPS` (0.005), which is float noise — a
+tolerance-sized difference is money someone decided to absorb and has to stay
+visible as such.
+
+## Feature 17 — Store cash deposits and the daily closing
+
+Phase 2 of the daily clearing. Two models, neither of which books anything.
+
+**`levis.store.cash.deposit`** — the document that replaces a guess with evidence.
+Card money names its own store (the acquirer prints a MID); cash does not, and
+until now the only way to attribute a cash credit was a hand-written keyword rule
+guessing at the transfer memo. Finance keys what the store says it paid in,
+attaches the slip, and validates it; the clearing then matches a bank credit to
+*that*.
+
+* **Finance owns it, not the store.** There are no store users in this database
+  and this creates none. `draft -> submitted -> validated` still earns its keep:
+  it separates whoever typed a number from whoever checked it against the slip.
+* `berita_acara_ref` (`SETOR/<CODE>/<YYYYMMDD>/<nnnn>`) is the string the store
+  must put on the transfer memo. That is the whole mechanism by which a bank
+  credit stops needing to be guessed at.
+* `action_validate` refuses without an attachment and without a store OU. A
+  deposit nobody vouched for is not evidence.
+* `_bank_credit_uniq` is a **plain** `unique(statement_line_id)` — Postgres treats
+  NULLs as distinct, so any number of deposits may await a credit while a claimed
+  credit cannot be claimed twice. No partial index needed.
+* `write()` freezes `amount` / `warehouse_id` / `deposit_date` / `bank_journal_id`
+  once `state = matched`: those figures are what made the match, and editing them
+  would leave the clearing pointing at a document that no longer says what it
+  said. `action_unmatch` releases the credit and unfreezes them.
+* `_find_for_statement_line()` returns a record **only when exactly one candidate
+  fits**. Two deposits of the same amount in the same window is a real situation
+  (two stores, one bank, one flat float) and is evidence for neither.
+* `expected_amount` with no linked session is 0 **and so is `variance`** —
+  "nobody measured" must not render as "the store was short".
+
+**`levis.store.daily.closing`** — one row per store per trading day, `_auto =
+False`. Deliberately a view: `pos.session` already *is* the daily closing, with a
+state and a cash count, and a second stateful record covering the same day would
+drift from it. If Finance later needs to write on it, these column names become
+field names unchanged.
+
+Three numbers that are easy to conflate and must not be:
+`cash_counted` (what the cashier counted), `cash_expected` (opening float plus
+the cash the orders say was taken), and the POS receivable the clearing consumes.
+`cash_variance` is a till problem; `cash_undeposited` is a banking one.
+
+**Column facts the upgrade taught us** (both cost a failed `-u`):
+`pos_session` has **no `company_id` column** — company lives on `pos_config`; and
+`cash_register_balance_end` is **computed and unstored**, so the view rebuilds it
+as `cash_register_balance_start + cash payments`, the same way core does. Only
+`cash_register_balance_start` and `cash_register_balance_end_real` are stored.
+
+A deposit covering several trading days is spread evenly across them in the view.
+That is presentation only — nothing allocates or books from the split figure.
+
+**Odoo 19 view gotcha:** `<group expand="0" string="Group By">` inside a `<search>`
+no longer validates (`RELAXNG_ERR_INVALIDATTR`). Group-by filters go flat after a
+`<separator/>`, which is what every other search view in this module already does.
+
+## Feature 18 — Writing off a clearing residual
+
+Phase 5. A settlement that does not fully explain itself leaves a residual on the
+bank suspense account, and the statement line stays open. That is the right
+default and it stays the default: `levis.clearing.writeoff.wizard` opens on
+`mode = suspense`, and applying it changes nothing.
+
+Some residuals are genuinely explained — a rounding crumb, an unprinted admin
+fee, a store that banked less than it counted. Leaving those on suspense stops
+being honest bookkeeping and becomes a queue nobody can clear. The wizard records
+that decision with an account, a reason, a label and the user who made it
+(`writeoff_account_id` / `_label` / `_reason` / `_uid` on
+`levis.pos.clearing.line`).
+
+**The whole feature is one expression.** `_counterpart_plan` already computes the
+residual leg as the *balancing figure*; the write-off changes only which account
+that leg names (`writeoff_account_id or config.suspense_account_id`), and its
+role becomes `writeoff`. The entry therefore still balances by construction and
+`_preflight`'s `planned == -st_line.amount` identity is untouched.
+
+**Two paths:**
+
+* *Before posting* (the ordinary one) the wizard books nothing. It writes the
+  account onto the line and calls `run._retarget_residual_legs()`, which flips
+  the **existing** residual leg in place. The receivable and MDR legs keep their
+  ids and their reviewed values — rebuilding the whole plan would discard a
+  review nobody asked to redo.
+* *After posting* the residual is a real journal item. A separate journal entry
+  cannot clear it: suspense ships `reconcile = False`, so `Dr write-off / Cr
+  suspense` would leave two open items instead of one. So
+  `_apply_writeoff_to_posted_move` does what `_apply_to_statement_lines` does —
+  replaces the suspense item on the statement line's own move — and the line then
+  goes reconciled on its own. **This is the only place the module writes to a
+  posted move outside the clearing's posting stage.** It identifies the item to
+  move through `leg.move_line_id`, never by "whatever is on suspense": two
+  settlements can leave suspense items on one statement line.
+
+**The trap that cost a test run.** `short_amount` is the **gross** left unmatched;
+the residual leg is smaller by the fee that was pro-rated away (600 000 vs
+594 000 in the fixture). A guard comparing the posted suspense item against
+`short_amount` rejects every legitimate write-off. Compare against the leg's own
+`balance`.
+
+`writeoff_limit_amount` on the config caps what one line may absorb, checked in
+`_preflight` via `_assert_writeoffs_within_limit`; zero (the default) means no
+cap. The wizard also refuses the suspense account and any POS receivable — a
+residual must not be hidden back in the accounts it came from.
+
+## Feature 19 — The settlement day (`levis.pos.clearing.day`)
+
+Phase 4. The clearing runs over a month because that is the unit its accounting
+belongs to — one sequence, one lock-date check, one balance simulation. But
+nobody works a month, and the question an operator has is "is the 12th done?".
+Until now there was nowhere to ask it: status belonged to the run.
+
+`levis.pos.clearing.day` is **a projection, not a fourth posting stage**. It books
+nothing, `_rebuild_for_run` recreates every row on each `action_compute`, and
+deleting them all costs nothing but the screen. `line.day_id` is the one column
+this phase adds to an existing table.
+
+Stored rather than a `read_group`, for three reasons that each rule the
+alternative out: the day compares **two populations in different places** (bank
+lines dated D against POS receivables dated D-1, so no grouping over either can
+show the other); it needs a status that persists and buttons to press; and it
+carries a reviewer's note.
+
+### The green rule, and what it deliberately is not
+
+`is_balanced` is `unexplained_total` at nil — every bank line allocated, or
+written off on purpose — plus nothing unmapped or unreadable. **It is not gated
+on `tally_variance`.**
+
+That is the most important decision in this model. A settlement legitimately
+draws on more than one trading day: that is exactly why `_candidate_dates` walks
+a ±`lookback_days` ladder and why `settlement_lag_days` calls itself an
+assumption. Gating the colour on `gross_total == sales_h1_total` would paint days
+red for a reason no operator can fix, and a red that cannot be cleared is quickly
+a red nobody reads.
+
+So the H-1 comparison the business asked for is kept — it *is* `tally_variance`,
+with its own column and its own colour — but as supervisory information, not a
+workflow gate. `test_a_tally_gap_alone_does_not_stop_a_day_going_green` is the
+load-bearing test: a store sells 1.5 M on the 8th, 1.0 M settles on the 9th, the
+day is green and the variance still reads -500 000.
+
+`sales_h1_total` is read straight from the ledger by SQL, **not** from this run's
+allocations — answering "did roughly the right amount of money show up" from what
+the run managed to match would make it agree with itself by construction.
+
+`kanban_color`: 10 green (settled or posted), 1 red (a line names no store or
+could not be read), 3 amber (partly done), 0 grey (untouched). The kanban binds
+straight to it.
+
+### Measured on real data (August 2026, prd_levis_begbal clone)
+
+3 149 lines over 22 days. The day roll-up reproduces the run's own totals to the
+rupiah — Rp 10 305 228 221 unexplained — which is the correctness check that
+matters.
+
+Two things only real data showed:
+
+* **`sales_h1_total` must be scoped to the day's own stores.** A date carries
+  more than one bank feed, and an IBNI feed holding a single Rp 1 line was being
+  compared against the entire company's sales, reporting a variance of minus 412
+  million. Fixtures cannot catch this — they never have two feeds on one date.
+* **The H-1 assumption does not hold in a backlog month.** Early-August
+  settlements ran 3-4x the H-1 sales (3-Aug: Rp 2,88 bn gross against Rp 0,67 bn
+  sold), because they were paying for July. Had `is_balanced` been gated on the
+  tally, all 22 days would have been red for a reason no operator could fix. This
+  is the concrete justification for the green rule above.
+
+### BNI and Mandiri carry no settlements
+
+Checked across June-August 2026 in production, this is the whole of both feeds:
+IBNI 4 lines in July and 3 in August, IMand 4 and 1 — all of them Rp 1 or Rp 31
+QR onboarding transfers, plus Meterai and Buku Cek charges that `_parse_minor`
+already handles. Against IBCA's 2 111 + 3 145 and IBRI's 416.
+
+So **do not write `_parse_bni` / `_parse_mandiri` settlement grammars** on the
+strength of "those journals are configured". They are configured and empty; a
+day of work per bank would recover about Rp 40 over two months. The store names
+in those narratives (`LEVIS GRAND INDONESIA`, …) are already reachable through
+keyword rules on `levis.bank.mid.map` with no new code. Revisit only if Levi's
+moves card settlement to those banks.
+
+### Not done in this phase
+
+The partial generate/post refactor (`_generate_moves(lines=None)` /
+`_post(lines=None)`, so a single day can be booked on its own) is **deliberately
+left out**. It is the riskiest change in the whole plan — it turns the run's
+state into something derived from its lines — and it rewrites the same methods
+that the uncommitted receipt-matching work touches. Do it after that lands, on
+its own, so it can be reverted alone.
+
+## The August 2026 gap was a duplicate import, not a reconciliation problem
+
+Worth reading before anyone builds a matcher to close a gap in this module.
+
+**IBCA August statements were imported four times into prd_levis_begbal**, each
+run reloading the file cumulatively from 1-Aug: 386 rows on 07-Aug, 717 on
+12-Aug, 840 on 14-Aug, 1 202 on 19-Aug. 3 145 posted rows where 1 202 are real —
+a factor of 2.62. July is clean (2 111 of 2 111), so this is specific to August.
+
+    select count(*), count(distinct (mv.date, sl.payment_ref, sl.amount))
+      from account_bank_statement_line sl
+      join account_move mv on mv.id = sl.move_id
+      join account_journal j on j.id = sl.journal_id
+     where j.code = 'IBCA' and mv.date >= '2026-08-01' and mv.date < '2026-09-01'
+
+Measured on a clone, deduplicated by keeping one row per
+(date, payment_ref, amount):
+
+| | as imported | deduplicated |
+|---|---|---|
+| clearing lines | 3 149 | 1 206 |
+| ok / short | 1 853 / 1 169 | **1 148 / 2** |
+| Σ short_amount | 9 044 212 116 | **899 730** |
+
+**The nine-billion "unexplained" was an artefact.** The duplicate lines promised
+the open receivable pool away to statements that do not exist, so every line
+processed after them found nothing left and reported itself short. On real data
+the clearing already resolves 1 148 of 1 206 lines and leaves under a million
+rupiah outstanding on two of them.
+
+It also moves the bank GL: IBCA August turnover reads ~20.98 bn against a real
+~8 bn, and the net is out by 940 983. The three early batches are all `posted`,
+so correcting production means deleting 1 943 statement lines and their journal
+entries — not something to do without a decision. It is being handled separately;
+do not "fix" it from here.
+
+**Correction to what this file said earlier.** A previous version of this section
+concluded, from the *duplicated* run, that subset matching "abstains on ~95%" and
+"has not earned its place". Both figures were measured on corrupt data and are
+withdrawn. On the deduplicated month subset matching participates in 470 of 1 130
+allocations (42%). It still does not change the totals — the greedy pass reaches
+the same answer — but that is a much narrower claim than the one made before, and
+it rests on there being almost nothing left to improve rather than on the search
+being useless.
+
+The lesson generalises: **measure the input before drawing a conclusion from the
+output.** A ratio of gross to open receivables far from 1.0 (this run: 20.8 bn
+against 11.65 bn, i.e. 1.79) is a signal that the statement side is inflated, not
+that the receivable side is missing.
+
+## Evidence-led allocation (`feat/pos-clearing-evidence`) — design notes inherited
+
+Written by the session that built the receipt subsystem, recorded here because
+none of it is visible in the code and all of it was paid for once already.
+
+**Receipt evidence is a priority, not a restriction.** `_allocate_with_evidence`
+drains the tender account the receipts name first, then falls back to the ordinary
+largest-residual search. Making it a restriction would strand money whenever a
+proven tender's receivable happens to be already reconciled — a case the old
+behaviour handles correctly. This is deliberate; do not "fix" it into a
+restriction.
+
+Traps already hit, so nobody hits them twice:
+
+* **`only_accounts` still binds, above the evidence.** A cash deposit landing on a
+  trading day that also holds a card transaction of the same amount will
+  "prove" itself against the card. Wrong: the channel restriction answers a
+  different question from the one receipts answer. Covered by
+  `test_evidence_never_lets_a_cash_deposit_clear_a_card_receivable`.
+* **Tender is read from the account NAME** via `_x24_tender_of_account`, prefix
+  `POS Receivable - `. A test fixture whose account is called "POS Debit Card"
+  silently yields zero evidence — it does not fail, it goes quiet. If a tender
+  field ever lands on the account, prefer it to name-matching.
+* **Receipt exclusivity is deliberately NOT in the evidence pass.** `x24_match` /
+  `x24_tender` are stored computes, and a compute that depends on processing
+  order is not idempotent. `_x24_identify` stays stateless; exclusivity lives only
+  in the worksheet. Two twin settlements in a day will point at the same
+  receipts — same tender, so no account is harmed.
+* **The day ladder is walked to find evidence**, and a day whose receipts fit
+  replaces the guessed day. `trans_date_is_derived` deliberately stays true: the
+  narrative still never stated a date, only the guess got better.
+* **Performance.** Subset search is the only expensive step. Three guards: a
+  20-candidate cap counted *after* dropping items larger than the target,
+  `_subset_totals` reaching each subset sum one addition from a known one, and
+  memoisation per (store, day, gross) in both `_attach_evidence` and
+  `_compute_x24_trans`. Without the memo a 3 000-line run is dominated by it.
+* `_x24_subset` refuses to name anything once two tenders can both compose the
+  figure — it does not pick the tidier one. Same for one tender with two
+  solutions.
+
+**Two subset-sum implementations must not coexist.** `levis.clearing.matcher.
+_subset_match` (tolerance + node budget, used by bank reconcile) and `_x24_subset`
+(faster, stricter, zero tolerance) do the same thing. Whichever survives, the
+other should call it.
+
+### The dedup script
+
+`scripts/tenants/levis/100_dedupe_bank_statement_imports.py`, on branch
+`feat/pos-clearing-evidence`. **Never run anywhere, not even dry.** Env:
+`LEVIS_DEDUPE_APPLY=1` (without it, reports and rolls back),
+`LEVIS_DEDUPE_JOURNAL` (default IBCA), `LEVIS_DEDUPE_FROM` / `_TO`.
+
+Its duplicate rule is deliberately identical to `_duplicate_groups` in the module
+— group on (journal, date, payment_ref, amount), split on a `create_date` gap of
+≥ 3600s — so the readiness gate and the script cannot disagree about what a
+duplicate is. It refuses (lists rather than deletes) any line already reconciled,
+already held by a `levis_clearing_line_id`, or carrying legs other than
+Dr bank / Cr suspense.
+
+Before APPLY: dump, then dry-run on a clone and compare its count against the
+1 943 measured independently here.
 
 ## Gotchas
 - **Never `_inherit "product.value"` from this module.** Doing so pulls

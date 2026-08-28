@@ -40,3 +40,10 @@ access_levis_pos_clearing_leg_user,levis.pos.clearing.leg user,model_levis_pos_c
 access_levis_pos_clearing_receipt_user,levis.pos.clearing.receipt user,model_levis_pos_clearing_receipt,account.group_account_invoice,1,1,0,0
 access_levis_mid_map_wizard_acct,levis.bank.mid.map.wizard account,model_levis_bank_mid_map_wizard,account.group_account_manager,1,1,1,1
 access_levis_mid_map_wizard_line_acct,levis.bank.mid.map.wizard.line account,model_levis_bank_mid_map_wizard_line,account.group_account_manager,1,1,1,1
+access_levis_store_cash_deposit_mgr,levis.store.cash.deposit manager,model_levis_store_cash_deposit,account.group_account_manager,1,1,1,1
+access_levis_store_cash_deposit_user,levis.store.cash.deposit invoicing,model_levis_store_cash_deposit,account.group_account_invoice,1,1,1,0
+access_levis_store_daily_closing_mgr,levis.store.daily.closing manager,model_levis_store_daily_closing,account.group_account_manager,1,0,0,0
+access_levis_store_daily_closing_user,levis.store.daily.closing invoicing,model_levis_store_daily_closing,account.group_account_invoice,1,0,0,0
+access_levis_clearing_writeoff_wizard,levis.clearing.writeoff.wizard manager,model_levis_clearing_writeoff_wizard,account.group_account_manager,1,1,1,1
+access_levis_pos_clearing_day_mgr,levis.pos.clearing.day manager,model_levis_pos_clearing_day,account.group_account_manager,1,1,1,1
+access_levis_pos_clearing_day_user,levis.pos.clearing.day invoicing,model_levis_pos_clearing_day,account.group_account_invoice,1,0,0,0

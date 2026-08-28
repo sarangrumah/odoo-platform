@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from . import res_bank
+from . import res_partner
 from . import res_company
 from . import account_account
 from . import levis_purchase_account_map
@@ -17,11 +18,16 @@ from . import account_payment_method
 from . import levis_mdr_bin
 from . import account_payment_register
 from . import pos_session
+from . import pos_config
 from . import product_product
 from . import categ_reclass
 from . import account_journal
 from . import account_bank_statement_line
 from . import levis_clearing_config
+from . import levis_clearing_matcher
+from . import levis_store_cash_deposit
+from . import levis_store_daily_closing
 from . import levis_bank_mid_map
 from . import levis_bank_narrative
 from . import levis_pos_clearing
+from . import levis_pos_clearing_day

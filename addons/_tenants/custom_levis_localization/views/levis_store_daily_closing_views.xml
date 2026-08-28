@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_levis_store_daily_closing_list" model="ir.ui.view">
+        <field name="name">levis.store.daily.closing.list</field>
+        <field name="model">levis.store.daily.closing</field>
+        <field name="arch" type="xml">
+            <list string="Store Daily Closing" create="false" edit="false"
+                  decoration-success="status == 'ok'"
+                  decoration-warning="status == 'undeposited'"
+                  decoration-muted="status == 'open'">
+                <field name="closing_date"/>
+                <field name="store_code"/>
+                <field name="warehouse_id"/>
+                <field name="session_count" optional="show"/>
+                <field name="open_session_count" optional="hide"/>
+                <field name="cash_counted" sum="Counted"/>
+                <field name="cash_expected" sum="Expected" optional="hide"/>
+                <field name="cash_variance" sum="Till Variance" optional="show"/>
+                <field name="deposit_total" sum="Deposited"/>
+                <field name="cash_undeposited" sum="Not Yet Deposited"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'ok'"
+                       decoration-warning="status == 'undeposited'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_store_daily_closing_search" model="ir.ui.view">
+        <field name="name">levis.store.daily.closing.search</field>
+        <field name="model">levis.store.daily.closing</field>
+        <field name="arch" type="xml">
+            <search string="Store Daily Closing">
+                <field name="store_code"/>
+                <field name="warehouse_id"/>
+                <field name="closing_date"/>
+                <filter name="undeposited" string="Awaiting Deposit"
+                        domain="[('status', '=', 'undeposited')]"/>
+                <filter name="session_open" string="Session Still Open"
+                        domain="[('status', '=', 'open')]"/>
+                <filter name="till_variance" string="Till Disagrees"
+                        domain="[('cash_variance', '!=', 0)]"/>
+                <separator/>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'warehouse_id'}"/>
+                    <filter name="group_day" string="Trading Day"
+                            context="{'group_by': 'closing_date'}"/>
+                    <filter name="group_status" string="Status"
+                            context="{'group_by': 'status'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_store_daily_closing" model="ir.actions.act_window">
+        <field name="name">Store Daily Closing</field>
+        <field name="res_model">levis.store.daily.closing</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nothing has closed yet</p>
+            <p>One row per store per trading day: what the tills counted beside what a
+               validated deposit says was banked. Every figure is derived from the POS
+               sessions and the deposit documents, so it cannot go stale.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_levis_store_daily_closing"
+              name="Store Daily Closing"
+              parent="account.menu_finance_entries"
+              action="action_levis_store_daily_closing"
+              sequence="95"/>
+</odoo>

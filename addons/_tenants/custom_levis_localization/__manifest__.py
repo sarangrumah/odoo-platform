@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.39.0",
+    "version": "19.0.1.45.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -168,6 +168,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "purchase",
         "purchase_stock",
         "account",
+        "mail",
         "point_of_sale",
         "custom_retail_import_pos",
     ],
@@ -175,6 +176,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "security/ir.model.access.csv",
         "data/res.bank.csv",
         "data/config_parameters.xml",
+        "data/cash_deposit_sequence.xml",
         "data/po_sequences.xml",
         "data/bill_sequences.xml",
         "data/payment_methods.xml",
@@ -190,8 +192,13 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "views/cogs_run_views.xml",
         "views/categ_reclass_views.xml",
         "views/levis_clearing_config_views.xml",
+        "views/stock_warehouse_views.xml",
+        "views/levis_store_cash_deposit_views.xml",
+        "views/levis_store_daily_closing_views.xml",
+        "wizard/levis_clearing_writeoff_wizard_views.xml",
         "wizard/levis_bank_mid_map_wizard_views.xml",
         "views/levis_pos_clearing_views.xml",
+        "views/levis_pos_clearing_day_views.xml",
         "views/account_bank_statement_line_views.xml",
         "views/scrap_batch_views.xml",
         "views/levis_mdr_bin_views.xml",
@@ -202,6 +209,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "views/stock_report_action.xml",
         "views/purchase_order_views.xml",
         "views/levis_purchase_account_map_views.xml",
+        "views/res_partner_views.xml",
         "reports/paperformat.xml",
         "reports/payment_report_actions.xml",
         "reports/payment_voucher_templates.xml",

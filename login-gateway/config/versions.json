@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-28T00:56:44+00:00",
+  "generated_at": "2026-08-28T09:01:18+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "cf60920",
-    "branch": "feat/levis-clearing-receipts"
+    "commit": "1c1fafb",
+    "branch": "feat/levis-daily-pos-clearing"
   },
   "buckets": [
     {
@@ -298,12 +298,17 @@
       "depends": 2,
       "public": false,
       "last_change": "2026-08-28",
-      "change_count": 3,
+      "change_count": 4,
       "changes": [
         {
-          "sha": "cf60920",
+          "sha": "889ce24",
           "date": "2026-08-28",
-          "subject": "feat(levis): prove a settlement against the receipts it paid"
+          "subject": "feat(levis): prove a settlement against the receipts it paid (#198)"
+        },
+        {
+          "sha": "f26ad47",
+          "date": "2026-08-27",
+          "subject": "feat(levis): give every store a code, and the clearing one way to rank a match"
         },
         {
           "sha": "49c9eff",
@@ -345,53 +350,53 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.39.0",
+      "version": "19.0.1.45.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
-      "depends": 9,
+      "depends": 10,
       "public": false,
       "last_change": "2026-08-28",
-      "change_count": 51,
+      "change_count": 59,
       "changes": [
         {
-          "sha": "cf60920",
+          "sha": "b77e8dd",
           "date": "2026-08-28",
-          "subject": "feat(levis): prove a settlement against the receipts it paid"
+          "subject": "fix(bank-import): catch a repeated transaction, not just a repeated file"
         },
         {
-          "sha": "e0f5965",
-          "date": "2026-08-19",
-          "subject": "feat(levis): the payment voucher names every bill it settles, with the amount applied to each (#184)"
+          "sha": "cc3e8fc",
+          "date": "2026-08-28",
+          "subject": "feat(levis): tanya struknya dulu, tebak belakangan (POS clearing 1.40.0)"
         },
         {
-          "sha": "2653a4b",
-          "date": "2026-08-18",
-          "subject": "feat(levis): batch menengah sheet after-go-live — filter status bill, kolom store, daftar bill di payment, jurnal sales return (#176)"
+          "sha": "f3c087a",
+          "date": "2026-08-28",
+          "subject": "feat(levis): infer a store when the narrative will not say — but only ever suggest"
         },
         {
-          "sha": "62b4b5d",
-          "date": "2026-08-18",
-          "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
+          "sha": "889ce24",
+          "date": "2026-08-28",
+          "subject": "feat(levis): prove a settlement against the receipts it paid (#198)"
         },
         {
-          "sha": "5021153",
-          "date": "2026-08-13",
-          "subject": "feat(levis): read NFC settlements off the BCA narrative (#168)"
+          "sha": "8ffdedc",
+          "date": "2026-08-28",
+          "subject": "fix(levis): compare a settlement day against its own stores, not the whole company"
         },
         {
-          "sha": "d45b75b",
-          "date": "2026-08-12",
-          "subject": "feat(levis): clear the POS receivable on the statement line, not beside it (#167)"
+          "sha": "2b94a2d",
+          "date": "2026-08-27",
+          "subject": "feat(levis): give the operator a day to work, and a green when it is done"
         },
         {
-          "sha": "e283281",
-          "date": "2026-08-11",
-          "subject": "fix(levis): a card settlement may not clear the cash receivable either (#141)"
+          "sha": "6b43063",
+          "date": "2026-08-27",
+          "subject": "feat(levis): let an identified residual leave suspense, without changing the default"
         },
         {
-          "sha": "5ac3467",
-          "date": "2026-08-11",
-          "subject": "fix(levis): the tender account names its tender — use that in allocation and mapping (#140)"
+          "sha": "3cc772f",
+          "date": "2026-08-27",
+          "subject": "feat(levis): give a cash deposit a document, and the day a closing report"
         }
       ]
     },
@@ -2010,14 +2015,19 @@
       "module": "custom_bank_import",
       "bucket": "ee_gap",
       "name": "Custom Bank Import",
-      "version": "19.0.0.3.0",
+      "version": "19.0.0.4.0",
       "summary": "CSV template-based bank statement import + H2H bank API adapter framework",
       "category": "Accounting/Bank",
       "depends": 4,
       "public": true,
-      "last_change": "2026-07-29",
-      "change_count": 9,
+      "last_change": "2026-08-28",
+      "change_count": 10,
       "changes": [
+        {
+          "sha": "b77e8dd",
+          "date": "2026-08-28",
+          "subject": "fix(bank-import): catch a repeated transaction, not just a repeated file"
+        },
         {
           "sha": "4704e07",
           "date": "2026-07-29",
@@ -2052,11 +2062,6 @@
           "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
-        },
-        {
-          "sha": "358f7db",
-          "date": "2026-05-21",
-          "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
       ]
     },
