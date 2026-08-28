@@ -17,7 +17,40 @@ pg_hba line.
 | `/finance/openitems` | Apa yang belum tuntas di setiap akun rekonsiliasi per tanggal potong, dan — setelah netting FIFO — siapa yang sebenarnya masih berhutang. Fokus GR/IR |
 | `/finance/pos` | Seberapa jauh piutang POS per tender sudah dipertemukan dengan settlement bank; run clearing, diagnostik, baris rekening koran yang memblokir lock date |
 | `/finance/close` | Apa yang masih menghalangi tutup buku: draft, jurnal tak seimbang, lock exception, lompatan nomor, baris tanpa analitik |
-| `/finance/tie` | **Bukti** bahwa keempat halaman di atas boleh dipercaya |
+| `/finance/actions` | Temuan berperingkat dari seluruh dasbor, dengan ambang penilaiannya dicetak di halaman |
+| `/finance/tie` | **Bukti** bahwa halaman di atas boleh dipercaya |
+
+Setiap halaman berpasangan dengan tabel yang memuat angka yang sama. Itu bukan
+kebiasaan gaya: palet kategorikalnya lulus validator di kedua mode kecuali satu
+WARN kontras pada `--series-3` (2,74:1 di light), dan WARN itu mewajibkan
+"relief" berupa label terlihat atau tabel. Tabelnya adalah pemenuhan syarat itu.
+
+## Asisten
+
+Widget maskot di pojok kanan bawah, sama seperti di sales cockpit. Katalog skill
+deterministik — **tidak ada model bahasa di jalur mana pun di build ini**. Sidecar
+yang dipakai sales cockpit untuk eskalasi tidak berjalan di host ini, dan asisten
+akuntansi yang menebak lebih buruk daripada yang mengaku tidak tahu, jadi
+pertanyaan yang tidak cocok mendapat penolakan jujur.
+
+Tiga belas skill, dan `src/lib/agent/skills.ts` adalah **satu-satunya pintu ke
+data**: tidak ada SQL bebas di mana pun di asisten, hanya pemanggilan ke
+`queries/` yang sudah ditulis, sudah diparameterkan, dan sudah dibatasi pada apa
+yang boleh dibaca `finance_ro`.
+
+Dua perilaku yang sengaja:
+
+* **Setiap jawaban menyebut tanggal potongnya.** Saldo tanpa tanggal bukan
+  jawaban, melainkan jebakan.
+* **Pertanyaan tentang tanggal lampau dijawab dengan varian as-of**, dan angka
+  paritas Odoo disebut di sampingnya. Di 31 Juli 2026 pembacaan paritas hanya
+  menemukan 3 baris hutang terbuka senilai Rp 26,4 juta, karena 420 baris lainnya
+  sudah dibayar sejak itu — tak seorang pun yang bertanya "berapa hutang per
+  akhir Juli" menginginkan angka itu tanpa diberi tahu.
+
+Yang ditolak mentah-mentah, karena memang di luar cakupan: laba rugi, pajak,
+stok, anggaran, arus kas, kepegawaian, nama pengguna, dan pertanyaan penjualan
+(dijawab Sales Cockpit di `/cockpit`).
 
 ## The promise, and how it is kept
 
@@ -180,7 +213,8 @@ crosses accounts, and it is what keeps the largest page under two seconds.
 
 ```bash
 npm run typecheck
-npm test              # pure units: bucket boundaries, netting invariants
+npm test              # 26 pure units: bucket boundaries, netting invariants,
+                      # intent matching, refusals, cut-off phrases
 npm run test:tie      # all fourteen checks against the live database
 npm run test:parity   # against the Odoo reports; needs an accounting login
 ```
@@ -193,11 +227,35 @@ docker run --rm --network odoo19-platform-net \
   -e FINANCE_DB_HOST=postgres node:22-alpine npx tsx tests/tie.smoke.ts
 ```
 
+`tests/intent.test.ts` mostly asserts refusals and nulls rather than matches —
+pada dasbor akuntansi, jawaban percaya diri yang salah lebih buruk daripada tidak
+menjawab. `tests/slots.test.ts` mem-pin frasa tanggal ke "today" tetap sehingga
+suite-nya tidak ikut hanyut bersama jam dinding.
+
 `tests/netting.test.ts` property-tests the invariant that makes the whole design
 work: FIFO only moves rupiah between rows, so `sum(outstanding)` always equals
 `sum(residualAsOf)`. That is why the headline figure on `/finance/openitems` is
 computed **without** netting — it cannot be broken by a bug in the port, and
 check 8 asserts the two agree.
+
+## Grafik
+
+Palet dan komponennya identik dengan sales cockpit, tapi dua keputusan berbeda
+karena datanya berbeda:
+
+* **Hampir semua grafik satu seri.** Pertanyaan finance di sini adalah satu
+  ukuran atas satu dimensi, dan delapan warna ketika ceritanya satu angka adalah
+  cara paling umum sebuah grafik meleset dari maksudnya.
+* **Umur item terbuka digambar bertanda, bukan absolut.** Di seluruh akun
+  rekonsiliasi, bucket 0–30 hari bersaldo kredit (−Rp 17,7 M) dan 31–90 bersaldo
+  debit (+Rp 21,9 M). Menggambar besarannya saja membuat dua hal berlawanan
+  tampak sejenis.
+
+Sebaran umur hutang **menolak menggambar dirinya** ketika kurang dari dua bucket
+mencapai 3% dari total tunggakan. Pada 28 Agustus praktis seluruh tunggakan ada
+di bucket 1–30 hari, jadi halaman itu mencetak satu kalimat alih-alih grafik satu
+batang — sebuah grafik satu batang hanyalah stat tile yang dibuat lebih sulit
+dibaca.
 
 ## Traps this code already stepped in
 
@@ -216,6 +274,9 @@ check 8 asserts the two agree.
   columns.
 - **`account_bank_statement_line` `_inherits` `account.move`,** so `date`,
   `company_id` and `currency_id` are not on its table. Always join.
+- **`account_analytic_account.name` is JSONB too**, and a bare
+  `COALESCE(aa.name, 'fallback')` fails with *invalid input syntax for type json*
+  rather than falling back. Cost one 500 on the clearing run page.
 - **A partial only counts when both sides are posted.** None violate this today,
   which is exactly why the guard is written now.
 

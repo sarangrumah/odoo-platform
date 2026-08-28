@@ -455,3 +455,175 @@ table.data tr.total-row td { background: var(--surface-2); }
 .sev[data-level="blocking"] { color: var(--critical); }
 .sev[data-level="warning"] { color: var(--seq-550); }
 .sev[data-level="info"] { color: var(--text-muted); }
+
+/* ---------------------------------------------------------------------------
+   The assistant widget. Identical to the sales cockpit's, so the two feel like
+   one product; only the copy inside it differs.
+   --------------------------------------------------------------------------- */
+
+.agent-launcher {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-1);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.agent-launcher:hover { transform: translateY(-2px); }
+.agent-launcher:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+.mascot { pointer-events: none; }
+.agent-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 92px;
+  z-index: 41;
+  width: 380px;
+  max-height: min(70vh, 620px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.agent-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.agent-head > div { display: flex; flex-direction: column; line-height: 1.3; }
+.agent-head strong { font-size: 13px; }
+.agent-head span { font-size: 11px; color: var(--text-muted); }
+.agent-head button {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+}
+.agent-head button:hover { background: var(--surface-0); color: var(--text-primary); }
+.agent-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.agent-turn { font-size: 13px; line-height: 1.55; }
+.agent-turn p { margin: 0; }
+.agent-turn-user {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--seq-100);
+  color: var(--text-primary);
+  padding: 7px 10px;
+  border-radius: var(--radius) var(--radius) 2px var(--radius);
+}
+.agent-turn-assistant {
+  align-self: flex-start;
+  max-width: 100%;
+  background: var(--surface-2);
+  padding: 9px 11px;
+  border-radius: var(--radius) var(--radius) var(--radius) 2px;
+}
+.agent-thinking { color: var(--text-muted); font-style: italic; }
+.agent-table-wrap { margin-top: 8px; overflow-x: auto; }
+.agent-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.agent-table th, .agent-table td {
+  text-align: left;
+  padding: 4px 8px 4px 0;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.agent-table th { color: var(--text-muted); font-weight: 600; }
+.agent-table td:not(:first-child) { font-variant-numeric: tabular-nums; }
+.agent-note {
+  margin-top: 8px !important;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.agent-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--series-1);
+  text-decoration: none;
+}
+.agent-link:hover { text-decoration: underline; }
+.agent-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.agent-chips button {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.agent-chips button:hover { color: var(--text-primary); border-color: var(--series-1); }
+.agent-form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.agent-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.agent-form input:focus-visible { outline: 2px solid var(--series-1); outline-offset: -1px; }
+.agent-form button {
+  border: 1px solid var(--series-1);
+  background: var(--series-1);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.agent-form button:disabled { opacity: 0.5; cursor: default; }
+
+/* On a phone the panel takes the screen; a 380px card would be unreadable. */
+@media (max-width: 640px) {
+  .agent-panel {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 85vh;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .agent-launcher { right: 14px; bottom: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-launcher { transition: none; }
+}

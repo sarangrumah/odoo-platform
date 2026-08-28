@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
+import { AgentWidget } from "@/components/agent/agent-widget";
 import { FilterBar } from "@/components/filter-bar";
 import { Nav } from "@/components/nav";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -49,6 +50,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </Suspense>
 
       <main className="main">{children}</main>
+
+      {/* Rides on every page. Reads the cut-off through useSearchParams, so it
+          needs the same Suspense boundary the filter bar gets. */}
+      <Suspense fallback={null}>
+        <AgentWidget />
+      </Suspense>
     </div>
   );
 }

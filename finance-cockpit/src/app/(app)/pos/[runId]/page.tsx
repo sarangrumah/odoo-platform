@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { OrderedBars, RankBars } from "@/components/charts";
 import { Kpi } from "@/components/kpi";
 import { parseFinanceFilters, serialiseFinanceFilters, today } from "@/lib/finance-filters";
 import { count, dayLabel, rupiah, rupiahShort } from "@/lib/format";
@@ -66,6 +67,23 @@ export default async function RunDetailPage({
   const legBalance = runLegs.reduce((s, l) => s + l.balance, 0);
   const legCount = runLegs.reduce((s, l) => s + l.legCount, 0);
   const legPosted = runLegs.reduce((s, l) => s + l.postedLines, 0);
+
+  // Short by settlement day reads as a sequence — the order is the calendar's,
+  // not the values'. Short by store is a ranking, so it sorts by size.
+  const shortByDay = byDay
+    .filter((d) => d.key !== "none")
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((d) => ({ name: d.label.slice(5), value: Math.abs(d.short), signed: d.short }));
+
+  const shortByStore = byStore
+    .filter((d) => d.short)
+    .map((d) => ({
+      name: d.label.length > 30 ? `${d.label.slice(0, 29)}…` : d.label,
+      value: Math.abs(d.short),
+      signed: d.short,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 15);
 
   const dimensions: { title: string; note: string; rows: typeof byStore }[] = [
     {
@@ -157,6 +175,24 @@ export default async function RunDetailPage({
           </table>
         </div>
       </div>
+
+      {shortByDay.some((d) => d.value) && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <h2>Kekurangan per tanggal settlement</h2>
+          <p className="sub">
+            Urutannya kalender, bukan besarnya — yang dicari di sini adalah polanya: satu hari yang
+            meleset sendirian berbeda masalahnya dari kekurangan yang merata setiap hari.
+          </p>
+          <OrderedBars data={shortByDay} height={220} />
+        </div>
+      )}
+
+      {shortByStore.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <h2>Kekurangan terbesar per Operating Unit</h2>
+          <RankBars data={shortByStore} labelWidth={210} />
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 14 }}>
         <h2>Diagnostik</h2>

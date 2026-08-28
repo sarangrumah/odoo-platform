@@ -9,9 +9,11 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:tie": "tsx tests/tie.smoke.ts",
-    "test:parity": "tsx tests/parity.smoke.ts"
+    "test:parity": "tsx tests/parity.smoke.ts",
+    "mascot": "python3 scripts/gen_mascot.py"
   },
   "dependencies": {
+    "lottie-web": "^5.13.0",
     "next": "15.5.21",
     "pg": "^8.13.1",
     "react": "^18.3.1",

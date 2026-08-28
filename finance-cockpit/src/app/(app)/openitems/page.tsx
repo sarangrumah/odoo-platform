@@ -1,10 +1,16 @@
 import Link from "next/link";
 
+import { OrderedBars, RankBars } from "@/components/charts";
 import { Kpi } from "@/components/kpi";
 import { parseFinanceFilters, serialiseFinanceFilters, today } from "@/lib/finance-filters";
 import { count, dayLabel, rupiah, rupiahShort } from "@/lib/format";
 import { defaultCompanyIds } from "@/lib/queries/common";
-import { grirAccounts, reconcileAccountView, summaryByAccount } from "@/lib/queries/openitems";
+import {
+  grirAccounts,
+  openItemsByAge,
+  reconcileAccountView,
+  summaryByAccount,
+} from "@/lib/queries/openitems";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +21,11 @@ export default async function OpenItemsPage({ searchParams }: { searchParams: Se
   const filters = parseFinanceFilters(params, defaults);
   const scope = { asOf: filters.asOf, companies: filters.companies };
 
-  const [summary, view, grir] = await Promise.all([
+  const [summary, view, grir, ageBands] = await Promise.all([
     summaryByAccount(scope),
     reconcileAccountView(),
     grirAccounts(),
+    openItemsByAge(scope),
   ]);
 
   const viewById = new Map(view.map((v) => [v.accountId, v]));
@@ -33,6 +40,26 @@ export default async function OpenItemsPage({ searchParams }: { searchParams: Se
   const qs = serialiseFinanceFilters(filters, { asOf: today() }).toString();
   const drill = (accountId: number) =>
     qs ? `/openitems/${accountId}?${qs}` : `/openitems/${accountId}`;
+
+  // Magnitude, so a receivable and a payable of the same size rank together:
+  // the question this chart answers is "where is the most unfinished business",
+  // and the direction is in the table column beside it.
+  const byAccount = summary
+    .map((row) => ({
+      // Code plus a trimmed name: the full account names run past 40 characters,
+      // wrap to three lines and collide with the row below.
+      name: row.name.length > 24 ? `${row.code} ${row.name.slice(0, 23)}…` : `${row.code} ${row.name}`,
+      value: Math.abs(row.outstanding),
+      signed: row.outstanding,
+      href: drill(row.accountId),
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 15);
+
+  // Signed, not absolute. Across all reconcile accounts the bands genuinely
+  // point in opposite directions — 0–30 days nets to a credit, 31–90 to a debit
+  // — and drawing magnitudes would make those look like the same thing.
+  const ageChart = ageBands.map((b) => ({ name: b.label, value: b.outstanding }));
 
   return (
     <>
@@ -58,6 +85,47 @@ export default async function OpenItemsPage({ searchParams }: { searchParams: Se
           value={count(stale.length)}
           hint="Diukur dari item terbuka tertua"
         />
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h2>Umur item terbuka</h2>
+        <p className="sub">
+          Dihitung dari tanggal baris ke tanggal potong, bukan dari jatuh tempo: akun kliring
+          tidak punya jatuh tempo, dan pertanyaan yang sebenarnya diajukan ke akun seperti itu
+          adalah &ldquo;sudah berapa lama ini menggantung&rdquo;. Batang digambar bertanda:
+          yang di bawah garis nol bersaldo kredit, yang di atas bersaldo debit.
+        </p>
+        <OrderedBars data={ageChart} />
+        <div className="table-wrap" style={{ marginTop: 12 }}>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Umur</th>
+                <th>Baris</th>
+                <th>Outstanding</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ageBands.map((b) => (
+                <tr key={b.code}>
+                  <td>{b.label}</td>
+                  <td className="num">{count(b.lineCount)}</td>
+                  <td className="num">{b.outstanding ? rupiah(b.outstanding) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h2>Akun dengan outstanding terbesar</h2>
+        <p className="sub">
+          Diperingkat menurut besarnya, tanpa memandang arah — piutang dan hutang sebesar itu
+          sama-sama pekerjaan yang belum selesai. Arahnya ada di kolom tabel berikutnya. Klik
+          batang untuk membuka akunnya.
+        </p>
+        <RankBars data={byAccount} labelWidth={250} />
       </div>
 
       <div className="card" style={{ marginBottom: 14 }}>

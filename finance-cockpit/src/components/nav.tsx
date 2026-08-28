@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/openitems", label: "Open Items & GR/IR" },
   { href: "/pos", label: "Clearing POS & Bank" },
   { href: "/close", label: "Kesiapan Tutup Buku" },
+  { href: "/actions", label: "Rekomendasi" },
   { href: "/tie", label: "Pembuktian Angka" },
 ];
 

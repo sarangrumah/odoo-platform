@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { RankBars } from "@/components/charts";
 import { Kpi } from "@/components/kpi";
 import { parseFinanceFilters, serialiseFinanceFilters, today } from "@/lib/finance-filters";
 import { count, dayLabel, rupiah, rupiahShort } from "@/lib/format";
@@ -121,6 +122,25 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
 
       <div className="card" style={{ marginBottom: 14 }}>
         <h2>Piutang POS per tender</h2>
+        <p className="sub" style={{ marginBottom: 10 }}>
+          Saldo yang masih menunggu settlement, per jenis pembayaran.
+        </p>
+        <RankBars
+          data={tenders
+            .filter((t) => t.balance)
+            .map((t) => ({
+              name: t.name.replace(/^POS Receivable - /, "") || t.code,
+              value: Math.abs(t.balance),
+              signed: t.balance,
+            }))
+            .sort((a, b) => b.value - a.value)}
+          labelWidth={230}
+          emptyLabel="Tidak ada saldo piutang POS terbuka."
+        />
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h2>Rincian piutang POS per tender</h2>
         <p className="sub">
           Inilah yang seharusnya dikuras oleh clearing. Akun ditemukan lewat prefix kode 11060001
           karena relasi <code>pos_receivable_account_ids</code> pada konfigurasi clearing masih

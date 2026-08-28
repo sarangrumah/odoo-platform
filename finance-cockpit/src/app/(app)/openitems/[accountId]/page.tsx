@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { OrderedBars } from "@/components/charts";
 import { Kpi } from "@/components/kpi";
 import { q } from "@/lib/db";
 import { parseFinanceFilters, serialiseFinanceFilters, today } from "@/lib/finance-filters";
 import { count, dayLabel, rupiah, rupiahShort } from "@/lib/format";
 import { focusPartner as narrowToPartner } from "@/lib/netting";
 import { accountCodeSql, accountNameSql, defaultCompanyIds, rootCompanyId } from "@/lib/queries/common";
-import { nettedForAccount, partnerBreakdown } from "@/lib/queries/openitems";
+import { ageBandsOf, nettedForAccount, partnerBreakdown } from "@/lib/queries/openitems";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,14 @@ async function NettedBody({
   // would leave them out of that pass and print a larger remainder than the
   // account summary promised.
   const rows = narrowToPartner(netted.rows, focus);
+
+  // The age profile is of what SURVIVED the netting, which is the only version
+  // worth looking at: the 57.461 rows that cancelled each other on GR/IR were
+  // never anybody's outstanding balance.
+  const ageBands = ageBandsOf(
+    rows.map((r) => ({ date: r.date, outstanding: r.outstanding })),
+    asOf,
+  );
   const shown = rows.slice(0, ROW_LIMIT);
   const shownTotal = rows.reduce((s, r) => s + r.outstanding, 0);
 
@@ -115,6 +124,22 @@ async function NettedBody({
           hint={`${count(netted.linesBefore - netted.linesAfter)} baris saling menghapus`}
         />
         <Kpi label="Lawan transaksi tersisa" value={count(partners.length)} />
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h2>Umur yang tersisa setelah netting</h2>
+        <p className="sub">
+          Profil umur dari baris yang bertahan, bukan dari semua baris yang pernah menyentuh akun
+          ini — yang saling menghapus tidak pernah menjadi tunggakan siapa pun.
+        </p>
+        <OrderedBars
+          data={ageBands.map((b) => ({
+            name: b.label,
+            value: Math.abs(b.outstanding),
+            signed: b.outstanding,
+          }))}
+          height={200}
+        />
       </div>
 
       <div className="card" style={{ marginBottom: 14 }}>

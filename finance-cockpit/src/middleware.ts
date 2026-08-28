@@ -15,6 +15,10 @@ export function middleware(request: NextRequest) {
   // it stripped and `NextResponse.redirect` wants an absolute URL, so without
   // this an anonymous hit on /finance/ap would be sent to /login — which the
   // shared Caddy hands to Odoo, not to this app.
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+  }
+
   const login = new URL(`${request.nextUrl.basePath}/login`, request.url);
   if (request.nextUrl.pathname !== "/") {
     login.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
@@ -25,5 +29,17 @@ export function middleware(request: NextRequest) {
 export const config = {
   // Everything except /login and the health check, which the container's own
   // healthcheck hits unauthenticated.
-  matcher: ["/", "/ap/:path*", "/pos/:path*", "/openitems/:path*", "/close/:path*", "/tie/:path*"],
+  matcher: [
+    "/",
+    "/ap/:path*",
+    "/pos/:path*",
+    "/openitems/:path*",
+    "/close/:path*",
+    "/actions/:path*",
+    "/tie/:path*",
+    // Listed exactly, without ":path*": the widget calls it by fetch, and a
+    // 307 to /login would arrive as an HTML page and read as a parse error.
+    // The route verifies the session itself; this is defence in depth.
+    "/api/agent",
+  ],
 };

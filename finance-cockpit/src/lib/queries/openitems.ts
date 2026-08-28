@@ -295,3 +295,127 @@ export const grirAccounts = cache(async (): Promise<AccountSummary["accountId"][
   );
   return rows.map((r) => num(r.id));
 });
+
+export interface AgeBand {
+  code: string;
+  label: string;
+  lineCount: number;
+  outstanding: number;
+}
+
+/**
+ * Open items bucketed by how long they have been standing.
+ *
+ * Aged from the line's own date to the cut-off, not from a due date: a clearing
+ * account has no maturity, and "how long has this been sitting there" is the
+ * question those accounts are actually asked. One aggregate over the same as-of
+ * CTE, so it costs a single sweep rather than pulling 70k rows to the client.
+ */
+export async function openItemsByAge(scope: {
+  asOf: string;
+  companies: number[];
+  accountIds?: number[];
+}): Promise<AgeBand[]> {
+  const rounding = await companyRounding(scope.companies[0]);
+  const rows = await q<Record<string, string | null>>(
+    `
+    WITH cand AS (
+      SELECT aml.id, aml.date, aml.balance
+        FROM account_move_line aml
+        JOIN account_account aa ON aa.id = aml.account_id
+       WHERE aml.company_id = ANY($1::int[])
+         AND aa.reconcile
+         AND aml.parent_state = 'posted'
+         AND aml.date <= $2::date
+         AND ($3::int[] IS NULL OR aml.account_id = ANY($3::int[]))
+    ),
+    posted_partial AS (
+      SELECT p.debit_move_id, p.credit_move_id, p.amount
+        FROM account_partial_reconcile p
+        JOIN account_move_line dl ON dl.id = p.debit_move_id
+        JOIN account_move_line cl ON cl.id = p.credit_move_id
+       WHERE p.max_date <= $2::date
+         AND dl.parent_state = 'posted'
+         AND cl.parent_state = 'posted'
+    ),
+    settled AS (
+      SELECT line_id, SUM(amt) AS settled
+        FROM (
+          SELECT debit_move_id, amount FROM posted_partial
+          UNION ALL
+          SELECT credit_move_id, -amount FROM posted_partial
+        ) s(line_id, amt)
+       GROUP BY line_id
+    ),
+    open_lines AS (
+      SELECT c.date, c.balance - COALESCE(s.settled, 0.0) AS residual_asof
+        FROM cand c
+        LEFT JOIN settled s ON s.line_id = c.id
+       WHERE ABS(c.balance - COALESCE(s.settled, 0.0)) >= $4::numeric / 2
+    )
+    SELECT CASE
+             WHEN ($2::date - o.date) <= 30  THEN 'd_0_30'
+             WHEN ($2::date - o.date) <= 60  THEN 'd_31_60'
+             WHEN ($2::date - o.date) <= 90  THEN 'd_61_90'
+             WHEN ($2::date - o.date) <= 180 THEN 'd_91_180'
+             WHEN ($2::date - o.date) <= 365 THEN 'd_181_365'
+             ELSE 'd_over_365'
+           END AS band,
+           COUNT(*) AS line_count,
+           SUM(o.residual_asof) AS outstanding
+      FROM open_lines o
+     GROUP BY 1`,
+    [scope.companies, scope.asOf, scope.accountIds?.length ? scope.accountIds : null, rounding],
+  );
+
+  const byCode = new Map(rows.map((r) => [String(r.band), r]));
+  // The full ladder is always returned, zeroes included: a reader scanning for
+  // "> 365 hari" needs the band to be where they expect it.
+  return AGE_BANDS.map((b) => {
+    const r = byCode.get(b.code);
+    return {
+      code: b.code,
+      label: b.label,
+      lineCount: r ? num(r.line_count) : 0,
+      outstanding: r ? num(r.outstanding) : 0,
+    };
+  });
+}
+
+export const AGE_BANDS = [
+  { code: "d_0_30", label: "0–30 hari" },
+  { code: "d_31_60", label: "31–60 hari" },
+  { code: "d_61_90", label: "61–90 hari" },
+  { code: "d_91_180", label: "91–180 hari" },
+  { code: "d_181_365", label: "181–365 hari" },
+  { code: "d_over_365", label: "> 365 hari" },
+] as const;
+
+/** The same ladder, computed in TypeScript from rows already in memory. */
+export function ageBandsOf(
+  rows: { date: string; outstanding: number }[],
+  asOf: string,
+): AgeBand[] {
+  const cutoff = new Date(`${asOf}T00:00:00Z`).getTime();
+  const tally = new Map<string, { lineCount: number; outstanding: number }>();
+  for (const row of rows) {
+    const days = Math.round((cutoff - new Date(`${row.date}T00:00:00Z`).getTime()) / 86_400_000);
+    const code =
+      days <= 30 ? "d_0_30"
+      : days <= 60 ? "d_31_60"
+      : days <= 90 ? "d_61_90"
+      : days <= 180 ? "d_91_180"
+      : days <= 365 ? "d_181_365"
+      : "d_over_365";
+    const entry = tally.get(code) ?? { lineCount: 0, outstanding: 0 };
+    entry.lineCount += 1;
+    entry.outstanding += row.outstanding;
+    tally.set(code, entry);
+  }
+  return AGE_BANDS.map((b) => ({
+    code: b.code,
+    label: b.label,
+    lineCount: tally.get(b.code)?.lineCount ?? 0,
+    outstanding: tally.get(b.code)?.outstanding ?? 0,
+  }));
+}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { CountBars, OrderedBars } from "@/components/charts";
 import { Kpi } from "@/components/kpi";
 import { parseFinanceFilters, serialiseFinanceFilters, today } from "@/lib/finance-filters";
 import { count, dayLabel, rupiah, rupiahShort } from "@/lib/format";
@@ -47,6 +48,20 @@ export default async function ClosePage({ searchParams }: { searchParams: Search
   const draftCount = drafts.reduce((s, d) => s + d.moveCount, 0);
   const draftAmount = drafts.reduce((s, d) => s + d.amount, 0);
   const problems = anomalies.filter((a) => a.isProblem && a.count > 0);
+
+  // Draft entries roll up to the period, because "which month is still open"
+  // is the close question; the journal breakdown is the table below.
+  const draftByPeriod = Array.from(
+    drafts.reduce((acc, d) => {
+      const entry = acc.get(d.period) ?? { moveCount: 0, amount: 0 };
+      entry.moveCount += d.moveCount;
+      entry.amount += d.amount;
+      acc.set(d.period, entry);
+      return acc;
+    }, new Map<string, { moveCount: number; amount: number }>()),
+  )
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([period, v]) => ({ name: period, value: v.moveCount, signed: v.amount }));
   const permanent = exceptions.filter((e) => e.permanent);
   const active = exceptions.filter((e) => e.active);
   const qs = serialiseFinanceFilters(filters, { asOf: today() }).toString();
@@ -191,6 +206,17 @@ export default async function ClosePage({ searchParams }: { searchParams: Search
           </table>
         </div>
       </div>
+
+      {draftByPeriod.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <h2>Jurnal draft per periode</h2>
+          <p className="sub">
+            Jumlah entry, bukan nilainya — satu draft bernilai besar dan lima draft kecil
+            sama-sama satu pekerjaan yang belum selesai. Nilai rupiahnya ada di tabel di bawah.
+          </p>
+          <CountBars data={draftByPeriod} height={200} />
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 14 }}>
         <h2>Jurnal draft per jurnal dan periode</h2>
