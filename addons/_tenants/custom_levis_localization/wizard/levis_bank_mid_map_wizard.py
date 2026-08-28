@@ -152,6 +152,16 @@ class LevisBankMidMapWizard(models.TransientModel):
             bucket["mdr"] += parsed["mdr"] or 0.0
             bucket["statement_ids"].append(statement_line.id)
             bucket.setdefault("channels", set()).add(parsed["channel"])
+            # What to look for in the stores' own takings: the gross the narrative
+            # quotes where there is one, and the bank amount where there is not —
+            # a cash deposit quotes nothing, and the sum banked IS the takings.
+            bucket.setdefault("probes", []).append(
+                (
+                    round(parsed["gross"] or statement_line.amount, 2),
+                    statement_line.date,
+                    parsed["kind"] == "cash_deposit",
+                )
+            )
             if not bucket["sample"]:
                 bucket["sample"] = statement_line.payment_ref or ""
                 bucket["narrative"] = self._store_hint(statement_line.payment_ref or "")
@@ -161,6 +171,7 @@ class LevisBankMidMapWizard(models.TransientModel):
         # got done is the part that matters.
         ordered = sorted(buckets.items(), key=lambda item: -abs(item[1]["amount"]))
         analytics = self.env["account.analytic.account"].search([])
+        evidence = self._evidence_suggestions(buckets)
         self.line_ids = [
             (
                 0,
@@ -176,7 +187,15 @@ class LevisBankMidMapWizard(models.TransientModel):
                     "mdr_total": bucket["mdr"],
                     "statement_line_ids": [(6, 0, bucket["statement_ids"])],
                     "sample_narrative": bucket["sample"],
-                    "analytic_account_id": self._suggest_analytic(bucket["narrative"], analytics).id or False,
+                    # Evidence first, the name only as a last resort: store names
+                    # in narratives are abbreviations that collide, which is the
+                    # reason this table exists at all.
+                    "analytic_account_id": (
+                        evidence.get((journal_id, match_type, key), {}).get("analytic_id")
+                        or self._suggest_analytic(bucket["narrative"], analytics).id
+                        or False
+                    ),
+                    "evidence_note": evidence.get((journal_id, match_type, key), {}).get("note") or False,
                 },
             )
             for (journal_id, match_type, key), bucket in ordered
@@ -218,6 +237,7 @@ class LevisBankMidMapWizard(models.TransientModel):
             into["mdr"] += bucket.get("mdr") or 0.0
             into["statement_ids"] = list(into.get("statement_ids") or ()) + list(bucket.get("statement_ids") or ())
             into.setdefault("channels", set()).update(bucket.get("channels") or ())
+            into.setdefault("probes", []).extend(bucket.get("probes") or ())
             if not into.get("sample"):
                 into["sample"] = bucket.get("sample")
                 into["narrative"] = bucket.get("narrative")
@@ -243,6 +263,95 @@ class LevisBankMidMapWizard(models.TransientModel):
             if index > 0:
                 text = text[:index]
         return " ".join(word for word in text.split() if not word.isdigit())
+
+    def _evidence_suggestions(self, buckets):
+        """Which store's own takings account for this group's money.
+
+        The narrative names a store the way a cashier would — ``LEVIS GANCIT``
+        for Gandaria City, ``LEVIS BIP`` for Bandung Indah Plaza — and most cash
+        deposits name only the person who walked to the bank. Neither can be
+        matched against an Operating Unit called ``OLS SES - ...``: there is no
+        word in common, and guessing from initials misdirects money between
+        shops.
+
+        The takings can be matched. X70D stages every transaction per store, day
+        and tender, so a deposit of 1.234.567 that equals exactly one store's
+        cash for exactly one trading day says which shop it came from — without
+        reading the name at all. A figure that fits two shops proves nothing and
+        is dropped rather than broken by a tie-break.
+
+        Returns ``{bucket key: {analytic_id, note}}`` and stays silent when
+        ``custom_retail_import`` is absent or its rows were never staged.
+        """
+        self.ensure_one()
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        # The Operating Unit lives on the warehouse, and that field belongs to the
+        # OU module. Absent it there is no store axis at all, and the wizard falls
+        # back to reading names — which is where it started.
+        if "l10n_ou_analytic_id" not in self.env["stock.warehouse"]._fields:
+            return {}
+        analytic_ids = set(
+            self.env["stock.warehouse"]
+            .search([("company_id", "=", self.company_id.id)])
+            .mapped("l10n_ou_analytic_id")
+            .ids
+        )
+        if not analytic_ids:
+            return {}
+        lag = timedelta(days=7)
+        rows = Alloc._x24_rows(analytic_ids, self.date_from - lag, self.date_to, self.company_id)
+        if not rows:
+            return {}
+        # Two indexes, both keyed on money: one transaction of that amount, and
+        # one tender's whole day of that amount. Cash is banked as a day's total,
+        # cards settle either way.
+        singles = defaultdict(set)
+        tender_days = defaultdict(set)
+        for (analytic_id, _day), items in rows.items():
+            totals = defaultdict(float)
+            for tender, _ref, amount in items:
+                singles[round(amount, 2)].add(analytic_id)
+                totals[tender] = round(totals[tender] + amount, 2)
+            for tender, total in totals.items():
+                tender_days[(self._is_cash_tender(tender), total)].add(analytic_id)
+        out = {}
+        for key, bucket in buckets.items():
+            votes = defaultdict(int)
+            for amount, _date, is_cash in bucket.get("probes") or ():
+                if not amount:
+                    continue
+                # A day's total for cash, a day's total or a single transaction
+                # for cards. Only a figure that fits ONE store votes.
+                fits = set(tender_days.get((is_cash, amount), ()))
+                if not is_cash:
+                    fits |= singles.get(amount, set())
+                if len(fits) == 1:
+                    votes[fits.pop()] += 1
+            if not votes:
+                continue
+            ranked = sorted(votes.items(), key=lambda item: -item[1])
+            best, best_votes = ranked[0]
+            runner_up = ranked[1][1] if len(ranked) > 1 else 0
+            # A clear winner, not a plurality: a store that explains half this
+            # group's lines while another explains the other half is two rules
+            # sharing one merchant id, and that has to be looked at by a person.
+            if best_votes <= runner_up:
+                continue
+            out[key] = {
+                "analytic_id": best,
+                "note": _(
+                    "%(votes)s of %(total)s statement line(s) match this store's own takings exactly%(rival)s.",
+                    votes=best_votes,
+                    total=len(bucket.get("probes") or ()),
+                    rival=_(", against %s for the next best", runner_up) if runner_up else "",
+                ),
+            }
+        return out
+
+    @api.model
+    def _is_cash_tender(self, tender):
+        """X70D names the cash tender in its own words; only the word is certain."""
+        return "CASH" in (tender or "").upper()
 
     @api.model
     def _suggest_analytic(self, hint, analytics):
@@ -371,8 +480,16 @@ class LevisBankMidMapWizardLine(models.TransientModel):
     analytic_account_id = fields.Many2one(
         "account.analytic.account",
         string="Operating Unit",
-        help="Pre-filled from the store name in the narrative when one could be "
-        "guessed. Check it — truncated names collide between stores.",
+        help="Pre-filled from the store's own takings where the amounts identify "
+        "it, and from the store name in the narrative otherwise. Check it — "
+        "abbreviated names collide between stores.",
+    )
+    evidence_note = fields.Char(
+        readonly=True,
+        string="Why",
+        help="How the Operating Unit was arrived at, when it was the takings that "
+        "said so rather than the wording. Empty means the name was guessed and "
+        "nothing corroborates it.",
     )
     warehouse_id = fields.Many2one("stock.warehouse")
     skip = fields.Boolean(help="Leave unmapped for now; the money stays on suspense.")

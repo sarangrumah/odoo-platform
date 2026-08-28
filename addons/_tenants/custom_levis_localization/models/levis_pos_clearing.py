@@ -94,6 +94,23 @@ _POS_RECV_PREFIX = "POS Receivable - "
 _TRANS_REF_CAP_ALLOC = 20
 _TRANS_REF_CAP_LINE = 6
 
+# Bounded subset search. A tender's trading day with more transactions than this
+# is left unidentified rather than searched: 2**20 halves already cost more than
+# the answer is worth, and a bucket that large is ambiguous in practice anyway.
+_SUBSET_MAX_ITEMS = 20
+# Two solutions are enough to know the answer is not unique; the search stops
+# there instead of enumerating a combinatorial pile it would only discard.
+_SUBSET_MAX_SOLUTIONS = 2
+
+# Two statement lines identical in journal, date, narrative and amount are
+# normally the same money imported twice. They are only reported as duplicates
+# when they arrived in DIFFERENT imports — rows created this far apart cannot
+# have come from one file.
+_DUP_BATCH_GAP_SECONDS = 3600
+# Settlements exceeding the open receivable pool by more than this are reported:
+# the money cannot have come from sales that were never booked.
+_COVERAGE_TOLERANCE = 1.2
+
 _BLOCKS = [
     ("a", "A Settlement"),
     ("b", "B Prior-Month AR"),
@@ -114,7 +131,14 @@ _DIAG_KINDS = [
     ("sweep_double", "Sweep destination is also a statement source"),
     ("no_cash_account", "No CASH tender receivable configured"),
     ("overlap", "Another run covers part of this period"),
+    ("dup_statement", "Bank statement imported more than once"),
+    ("import_incomplete", "Bank statement stops before the period ends"),
+    ("coverage", "Settlements exceed the open receivable pool"),
 ]
+
+# Diagnostics answering "is the data fit to clear at all", as opposed to those
+# describing what the clearing found. Only these run before Compute.
+_READINESS_KINDS = ("dup_statement", "import_incomplete", "no_statement", "overlap", "coverage")
 
 # Statement kinds that settle a receivable (block A/B).
 _SETTLING_KINDS = ("settlement", "cash_deposit")
@@ -407,6 +431,221 @@ class LevisPosClearing(models.Model):
         )
         return lines.sorted(key=lambda sl: (sl.date, sl.journal_id.id, sl.id))
 
+    # ------------------------------------------------------------------
+    # Readiness — is the data fit to clear at all
+    # ------------------------------------------------------------------
+    def _duplicate_groups(self):
+        """Statement lines the same import wrote twice: ``[(journal, date, ref, amount, ids)]``.
+
+        Measured on prd_levis_begbal in August 2026: the IBCA statement was
+        imported four times, each file starting again at the 1st, leaving 3.145
+        lines where 1.202 were real. Nothing in the clearing noticed — it simply
+        reported that Rp 10,3 m of settlements had no receivable left, which was
+        true of the duplicates and useless as a finding.
+
+        The discriminator is the import, not the wording. Two genuine sales can
+        share a store, a day, an amount and a narrative; two rows written **an
+        hour or more apart** cannot have come from one file. So the group is
+        keyed on what the bank said and split on when it was written.
+
+        Raw SQL joins ``move_id`` for the date: ``account.bank.statement.line``
+        has no ``date`` column of its own, only the delegated one.
+        """
+        self.ensure_one()
+        journals = self._bank_journals()
+        if not journals:
+            return []
+        self.env["account.bank.statement.line"].flush_model()
+        self.env.cr.execute(
+            """
+            SELECT sl.journal_id, mv.date, sl.payment_ref, sl.amount,
+                   array_agg(sl.id ORDER BY sl.create_date, sl.id),
+                   array_agg(EXTRACT(EPOCH FROM sl.create_date) ORDER BY sl.create_date, sl.id)
+              FROM account_bank_statement_line sl
+              JOIN account_move mv ON mv.id = sl.move_id
+             WHERE sl.journal_id IN %s
+               AND sl.company_id = %s
+               AND mv.state = 'posted'
+               AND mv.date BETWEEN %s AND %s
+             GROUP BY sl.journal_id, mv.date, sl.payment_ref, sl.amount
+            HAVING count(*) > 1
+             ORDER BY sum(abs(sl.amount)) DESC
+            """,
+            (tuple(journals.ids), self.company_id.id, self.date_from, self.date_to),
+        )
+        groups = []
+        for journal_id, date, payment_ref, amount, ids, stamps in self.env.cr.fetchall():
+            # Keep only what a second import added: rows written within the same
+            # hour as the first are one file repeating itself, which is a real
+            # pair of transactions rather than a re-import.
+            first = stamps[0]
+            extra = [line_id for line_id, stamp in zip(ids, stamps) if stamp - first >= _DUP_BATCH_GAP_SECONDS]
+            if extra:
+                groups.append((journal_id, date, payment_ref, amount, extra))
+        return groups
+
+    def _diag_duplicates(self):
+        """One row per repeated statement line, plus a per-journal total."""
+        self.ensure_one()
+        out = []
+        by_journal = defaultdict(lambda: [0, 0.0])
+        groups = self._duplicate_groups()
+        for journal_id, date, payment_ref, amount, extra in groups:
+            tally = by_journal[journal_id]
+            tally[0] += len(extra)
+            tally[1] += amount * len(extra)
+            if len(out) < _DIAG_DETAIL_CAP:
+                out.append(
+                    {
+                        "kind": "dup_statement",
+                        "severity": "blocking",
+                        "date": date,
+                        "bank_journal_id": journal_id,
+                        "amount": amount * len(extra),
+                        "count": len(extra),
+                        "res_model": "account.bank.statement.line",
+                        "res_id": extra[0],
+                        "message": _(
+                            "%(count)s later import(s) of the same line: %(ref)s",
+                            count=len(extra),
+                            ref=(payment_ref or "")[:100],
+                        ),
+                    }
+                )
+        for journal_id, (count, amount) in by_journal.items():
+            out.append(
+                {
+                    "kind": "dup_statement",
+                    "severity": "blocking",
+                    "bank_journal_id": journal_id,
+                    "amount": amount,
+                    "count": count,
+                    "message": _(
+                        "%(count)s statement line(s) in this period were imported again "
+                        "later. The bank moved this money once; clearing them would "
+                        "settle receivables that do not exist.",
+                        count=count,
+                    ),
+                }
+            )
+        return out
+
+    def _diag_import_incomplete(self):
+        """A journal whose statement stops before the period does.
+
+        The August run read as a month and covered eighteen days. Nothing said
+        so: the missing days were all at the end, where the interior-gap check by
+        design does not look.
+        """
+        self.ensure_one()
+        out = []
+        today = fields.Date.context_today(self)
+        horizon = min(self.date_to, today - timedelta(days=1))
+        if horizon < self.date_from:
+            return out
+        self.env["account.bank.statement.line"].flush_model()
+        for journal in self._bank_journals():
+            last = self.env["account.bank.statement.line"].search(
+                [
+                    ("journal_id", "=", journal.id),
+                    ("company_id", "=", self.company_id.id),
+                    ("date", ">=", self.date_from),
+                    ("date", "<=", self.date_to),
+                    ("move_id.state", "=", "posted"),
+                ],
+                order="date desc",
+                limit=1,
+            )
+            if not last:
+                # Said here as well as in ``_diag_missing_days``, which reads the
+                # run's own lines and so can only speak after a Compute — too
+                # late to be a readiness check.
+                out.append(
+                    {
+                        "kind": "no_statement",
+                        "severity": "warning",
+                        "bank_journal_id": journal.id,
+                        "count": 1,
+                        "message": _("No statement lines imported for this period."),
+                    }
+                )
+                continue
+            if last.date >= horizon:
+                continue
+            out.append(
+                {
+                    "kind": "import_incomplete",
+                    "severity": "warning",
+                    "date": last.date,
+                    "bank_journal_id": journal.id,
+                    "count": (horizon - last.date).days,
+                    "message": _(
+                        "The last statement line is dated %(last)s, %(days)s day(s) short "
+                        "of %(horizon)s. Settlements for the missing days will read as "
+                        "receivables nobody paid.",
+                        last=last.date,
+                        days=(horizon - last.date).days,
+                        horizon=horizon,
+                    ),
+                }
+            )
+        return out
+
+    def _diag_coverage(self, pool_total):
+        """Settlements far larger than the receivable they can possibly settle.
+
+        Stated as a ratio because the cause is never in this module: either the
+        bank statement repeats itself, or the POS import that books the
+        receivable has not run. Both leave the same footprint — money arriving
+        against sales that were never recorded — and both make a clearing run
+        meaningless before anyone starts ticking anything.
+        """
+        self.ensure_one()
+        gross = round(
+            sum(line.gross for line in self.line_ids if line.kind in _SETTLING_KINDS and line.block != "c"), 2
+        )
+        if not gross or not pool_total or gross <= pool_total * _COVERAGE_TOLERANCE:
+            return []
+        return [
+            {
+                "kind": "coverage",
+                "severity": "warning",
+                "amount": round(gross - pool_total, 2),
+                "count": 1,
+                "message": _(
+                    "Settlements total %(gross)s against %(pool)s of open POS receivable "
+                    "(%(ratio)s×). Either the bank statement was imported more than once "
+                    "or the POS sales behind it were never booked.",
+                    gross=round(gross),
+                    pool=round(pool_total),
+                    ratio=round(gross / pool_total, 2),
+                ),
+            }
+        ]
+
+    def action_check_readiness(self):
+        """Answer "is this month fit to clear" without computing anything.
+
+        Deliberately available in draft and cheap: the whole point is to be
+        pressed before a month of work, not after it.
+        """
+        for run in self:
+            run.diag_ids.filtered(lambda diag: diag.kind in _READINESS_KINDS).unlink()
+            vals = run._diag_duplicates() + run._diag_import_incomplete() + run._diag_overlap()
+            run.diag_ids = [(0, 0, item) for item in vals]
+            blocking = [item for item in vals if item["severity"] == "blocking"]
+            run.warning_text = (
+                _(
+                    "%(blocking)s blocking and %(warning)s other finding(s) — read the "
+                    "Diagnostics tab before computing.",
+                    blocking=len(blocking),
+                    warning=len(vals) - len(blocking),
+                )
+                if vals
+                else _("Nothing found: the statements in this period look complete and unrepeated.")
+            )
+        return True
+
     def _promised_elsewhere(self):
         """Amounts other DRAFT-generating runs have already earmarked per AML.
 
@@ -664,6 +903,8 @@ class LevisPosClearing(models.Model):
             self.date_to,
             promised,
         )
+        # Before allocation spends it: ``residual`` is mutated as lines consume it.
+        pool_total = round(sum(residual.values()), 2)
         ar_pool, ar_residual = self._open_ar_pool(promised)
         cash_account = self._cash_receivable_account()
         if not cash_account:
@@ -685,29 +926,41 @@ class LevisPosClearing(models.Model):
             diag_config = []
 
         rules_cache = {}
-        line_vals = []
         diag_vals = []
+        prepared = []
         for statement_line in self._statement_lines():
             journal = statement_line.journal_id
             if journal.id not in rules_cache:
                 rules_cache[journal.id] = MidMap._candidates(self.company_id, journal)
             parsed = Narrative.parse(journal, statement_line.payment_ref, statement_line.amount, statement_line.date)
-            line_vals.append(
-                self._line_from_parsed(
-                    statement_line,
-                    parsed,
-                    rules_cache[journal.id],
-                    pool,
-                    residual,
-                    ar_pool,
-                    ar_residual,
-                    diag_vals,
-                    cash_account,
-                )
+            prepared.append(
+                {
+                    "statement_line": statement_line,
+                    "parsed": parsed,
+                    "rules": rules_cache[journal.id],
+                    "evidence": None,
+                }
+            )
+        self._attach_evidence(prepared, pos_accounts)
+
+        line_vals = [None] * len(prepared)
+        for index in self._allocation_order(prepared):
+            prep = prepared[index]
+            line_vals[index] = self._line_from_parsed(
+                prep["statement_line"],
+                prep["parsed"],
+                prep["rules"],
+                pool,
+                residual,
+                ar_pool,
+                ar_residual,
+                diag_vals,
+                cash_account,
+                prep=prep,
             )
         self.line_ids = [(0, 0, vals) for vals in line_vals]
         self.diag_ids = [(0, 0, vals) for vals in diag_config + diag_vals]
-        self._build_diagnostics(residual)
+        self._build_diagnostics(residual, pool_total=pool_total)
         self._simulate_balances()
         # Only the ticks the amount proves. The rest of a trading day is offered
         # one bank line at a time, when someone actually opens it: a month is
@@ -793,6 +1046,21 @@ class LevisPosClearing(models.Model):
             Receipt._sweep_claimed(self.company_id)
         return True
 
+    def action_match_proven(self):
+        """Re-tick everything the amounts prove, across the whole run.
+
+        Compute already does this once, but the answer moves afterwards: a MID
+        mapped in the wizard gives a line a store, and a store is what makes its
+        trading day readable at all. Without this the accountant would have to
+        recompute the month — which throws away every tick already made — to
+        collect ticks that are free.
+        """
+        for run in self:
+            if run.state not in ("computed", "generated"):
+                raise UserError(_("Compute the summary first — there is nothing to match yet."))
+            run._generate_receipts(proven_only=True)
+        return True
+
     def action_view_receipts(self):
         self.ensure_one()
         return {
@@ -804,8 +1072,167 @@ class LevisPosClearing(models.Model):
             "context": {"search_default_group_line": 1, "search_default_unmatched": 1, "create": False},
         }
 
+    # ------------------------------------------------------------------
+    # Evidence — what the receipts prove before the allocation guesses
+    # ------------------------------------------------------------------
+    def _resolve_target(self, statement_line, parsed, rules):
+        """``(rule, trading day, day was inferred)`` for one settlement."""
+        self.ensure_one()
+        rule = self.env["levis.bank.mid.map"]._resolve(
+            self.company_id, statement_line.journal_id, parsed, statement_line.date, candidates=rules
+        )
+        exact = parsed["confidence"] == "exact" and parsed["trans_date"]
+        primary = (
+            parsed["trans_date"]
+            if exact
+            else statement_line.date - timedelta(days=self.config_id.settlement_lag_days or 0)
+        )
+        return rule, primary, not exact
+
+    def _tender_accounts(self, accounts):
+        """``{tender name: account}`` for the tenders an account name spells out."""
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        out = {}
+        for account in accounts:
+            tender = Alloc._x24_tender_of_account(account)
+            if tender and tender not in out:
+                out[tender] = account
+        return out
+
+    def _attach_evidence(self, prepared, pos_accounts):
+        """Ask the receipts, per settlement, which tender and which day it paid.
+
+        Two claims come out of this, and both were previously left to the greedy
+        allocation to guess at:
+
+        * **Which tender account.** The narrative cannot say — one card MID
+          covers Visa, Mastercard, JCB and Amex — so the account used to be
+          whichever had the largest residual. Where the day's transactions
+          identify the settlement by arithmetic, they name the tender outright,
+          and that beats a residual ordering: measured on August 2026, 377
+          settlements had their tender named by the receipts and a *different*
+          account credited by the allocation.
+        * **Which trading day.** Most BCA narratives carry no transaction date,
+          so the day is inferred from the settlement lag and then widened into a
+          ladder. A day whose receipts add up exactly is not an inference.
+
+        Both are recorded, neither is forced: a settlement nothing proves keeps
+        the old behaviour exactly.
+        """
+        self.ensure_one()
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        settling = []
+        for prep in prepared:
+            parsed = prep["parsed"]
+            if parsed["kind"] not in _SETTLING_KINDS:
+                continue
+            rule, primary, derived = self._resolve_target(prep["statement_line"], parsed, prep["rules"])
+            prep.update({"rule": rule, "trans_date": primary, "trans_date_is_derived": derived})
+            if rule and parsed.get("gross"):
+                settling.append(prep)
+        if not settling:
+            return prepared
+        dates = [prep["trans_date"] for prep in settling]
+        lookback = timedelta(days=(self.config_id.lookback_days or 0) + 1)
+        rows = Alloc._x24_rows(
+            set(prep["rule"].analytic_account_id.id for prep in settling),
+            min(dates) - lookback,
+            max(dates) + lookback,
+            self.company_id,
+        )
+        if not rows:
+            return prepared
+        tender_accounts = self._tender_accounts(pos_accounts)
+        # Hundreds of settlements share a store, a day and an amount — a card
+        # terminal batches the same figures repeatedly — and the subset search is
+        # the one expensive step in the run. Asked once, answered for all of them.
+        cache = {}
+        for prep in settling:
+            analytic_id = prep["rule"].analytic_account_id.id
+            gross = round(prep["parsed"]["gross"], 2)
+            for day in self._candidate_dates(prep["trans_date"]):
+                key = (analytic_id, day, gross)
+                if key not in cache:
+                    cache[key] = Alloc._x24_identify(rows.get((analytic_id, day), ()), gross)
+                state, tender, refs = cache[key]
+                if state not in ("exact", "batch", "subset"):
+                    continue
+                prep["evidence"] = {
+                    "state": state,
+                    "tender": tender,
+                    "refs": refs,
+                    "day": day,
+                    "account": tender_accounts.get(tender) if tender else None,
+                }
+                # The proven day replaces the inferred one, and stays flagged as
+                # inferred: the narrative still never said it. What changed is
+                # that the guess now has receipts behind it.
+                prep["trans_date"] = day
+                break
+        return prepared
+
+    def _allocate_with_evidence(self, pool, residual, analytic_id, dates, gross, only, evidence, vals):
+        """Spend the settlement on the tender the receipts name, then on the rest.
+
+        The evidence account is not a restriction, it is a *priority*. Restricting
+        outright would turn "these receipts prove the tender" into "this
+        settlement may only ever clear that account", and a tender receivable
+        that is already reconciled or short would then leave money unexplained
+        that the old behaviour would have settled correctly. So the proven
+        account is drained first and whatever it cannot cover falls back to the
+        ordinary largest-residual search over the channel's pool.
+
+        ``only_accounts`` still binds: a cash deposit may not consume a card
+        receivable however its receipts read, because the channel restriction
+        answers a question the receipts do not.
+        """
+        self.ensure_one()
+        account = (evidence or {}).get("account")
+        allowed = set(only.ids) if only else None
+        if not account or (allowed is not None and account.id not in allowed):
+            return self._allocate(pool, residual, analytic_id, dates, gross, only_accounts=only)
+        day = evidence.get("day")
+        taken, left = self._allocate(
+            pool,
+            residual,
+            analytic_id,
+            # The proven day first — the receipts belong to it — but the rest of
+            # the ladder stays open, because a trading day can be booked a day
+            # late without making the tender wrong.
+            [day] + [other for other in dates if other != day] if day else dates,
+            gross,
+            only_accounts=account,
+        )
+        vals["tender_locked"] = bool(taken)
+        if left > _EPS:
+            rest, left = self._allocate(pool, residual, analytic_id, dates, left, only_accounts=only)
+            taken += rest
+        return taken, left
+
+    def _allocation_order(self, prepared):
+        """Indices to allocate in: what the receipts prove, before what they don't.
+
+        Order decides who gets the money when the pool is thin, and a proven
+        settlement has a better claim on a receivable than a settlement that
+        merely wants one. Statement order is kept inside each group so a rerun
+        allocates identically.
+        """
+        proven = [index for index, prep in enumerate(prepared) if (prep.get("evidence") or {}).get("account")]
+        rest = [index for index, prep in enumerate(prepared) if not (prep.get("evidence") or {}).get("account")]
+        return proven + rest
+
     def _line_from_parsed(
-        self, statement_line, parsed, rules, pool, residual, ar_pool, ar_residual, diag_vals, cash_account=None
+        self,
+        statement_line,
+        parsed,
+        rules,
+        pool,
+        residual,
+        ar_pool,
+        ar_residual,
+        diag_vals,
+        cash_account=None,
+        prep=None,
     ):
         """One statement line -> one clearing line, allocations included.
 
@@ -814,7 +1241,6 @@ class LevisPosClearing(models.Model):
         gap in the list.
         """
         self.ensure_one()
-        config = self.config_id
         vals = {
             "statement_line_id": statement_line.id,
             "settlement_date": statement_line.date,
@@ -863,9 +1289,11 @@ class LevisPosClearing(models.Model):
             return vals
 
         # --- a settlement: it must belong to a store ---------------------
-        rule = self.env["levis.bank.mid.map"]._resolve(
-            self.company_id, statement_line.journal_id, parsed, statement_line.date, candidates=rules
-        )
+        prep = prep or {}
+        if "rule" in prep:
+            rule, primary, derived = prep["rule"], prep["trans_date"], prep["trans_date_is_derived"]
+        else:
+            rule, primary, derived = self._resolve_target(statement_line, parsed, rules)
         if not rule:
             vals.update(
                 {
@@ -891,17 +1319,13 @@ class LevisPosClearing(models.Model):
 
         vals["map_id"] = rule.id
         vals["analytic_account_id"] = rule.analytic_account_id.id
-        exact = parsed["confidence"] == "exact" and parsed["trans_date"]
-        primary = (
-            parsed["trans_date"] if exact else statement_line.date - timedelta(days=config.settlement_lag_days or 0)
-        )
         vals["trans_date"] = primary
-        vals["trans_date_is_derived"] = not exact
+        vals["trans_date_is_derived"] = derived
         dates = self._candidate_dates(primary)
 
         only = self._pool_accounts_for_channel(parsed, cash_account)
-        taken, left = self._allocate(
-            pool, residual, rule.analytic_account_id.id, dates, parsed["gross"], only_accounts=only
+        taken, left = self._allocate_with_evidence(
+            pool, residual, rule.analytic_account_id.id, dates, parsed["gross"], only, prep.get("evidence"), vals
         )
         block = "a"
         if left > _EPS and ar_pool:
@@ -951,9 +1375,12 @@ class LevisPosClearing(models.Model):
     # ------------------------------------------------------------------
     # Diagnostics — findings, never repairs
     # ------------------------------------------------------------------
-    def _build_diagnostics(self, residual):
+    def _build_diagnostics(self, residual, pool_total=0.0):
         self.ensure_one()
         vals = []
+        vals += self._diag_duplicates()
+        vals += self._diag_import_incomplete()
+        vals += self._diag_coverage(pool_total)
         vals += self._diag_mismatch()
         vals += self._diag_missing_days()
         vals += self._diag_no_analytic()
@@ -1286,6 +1713,11 @@ class LevisPosClearing(models.Model):
             )
         if not self.ignore_warnings:
             problems = []
+            # First, because it invalidates every other figure on the run: a
+            # statement imported twice offers receivables that were never sold.
+            dup = sum(self.diag_ids.filtered(lambda d: d.kind == "dup_statement" and not d.date).mapped("count"))
+            if dup:
+                problems.append(_("%s statement line(s) imported more than once", dup))
             if self.unparsed_count:
                 problems.append(_("%s unparsed narrative(s)", self.unparsed_count))
             if self.unmapped_count:
@@ -1854,6 +2286,7 @@ class LevisPosClearingLine(models.Model):
         [
             ("exact", "One transaction"),
             ("batch", "Whole tender batch"),
+            ("subset", "Only possible combination"),
             ("ambiguous", "Several possibilities"),
             ("none", "Not identified"),
         ],
@@ -1861,9 +2294,16 @@ class LevisPosClearingLine(models.Model):
         compute="_compute_x24_trans",
         store=True,
         help="How the receipts below were established. Only arithmetic counts: one "
-        "transaction of exactly this gross, or one tender whose whole trading day "
-        "sums to it. Anything else is left unnamed — a settlement that pays part of "
-        "a day can be composed many ways, and picking one would be a guess.",
+        "transaction of exactly this gross, one tender whose whole trading day sums "
+        "to it, or — within one tender — the single combination of transactions "
+        "that adds up to it. A day that can be composed more than one way is left "
+        "unnamed, because picking one would be a guess.",
+    )
+    tender_locked = fields.Boolean(
+        string="Tender Proven",
+        help="The receivable credited here is the one the receipts name, not the "
+        "one that merely had the largest open balance. Set where the trading day's "
+        "transactions identify the settlement by amount.",
     )
     receipt_ids = fields.One2many("levis.pos.clearing.receipt", "line_id", copy=False)
     x24_trans_refs = fields.Char(
@@ -1972,10 +2412,12 @@ class LevisPosClearingLine(models.Model):
             max(dates),
             settling.company_id[:1] or self.env.company,
         )
+        cache = {}
         for line in settling:
-            state, tender, refs = Alloc._x24_identify(
-                rows.get((line.analytic_account_id.id, line.trans_date), ()), round(line.gross, 2)
-            )
+            key = (line.analytic_account_id.id, line.trans_date, round(line.gross, 2))
+            if key not in cache:
+                cache[key] = Alloc._x24_identify(rows.get(key[:2], ()), key[2])
+            state, tender, refs = cache[key]
             line.x24_match = state
             line.x24_tender = tender or False
             booked = {Alloc._x24_tender_of_account(alloc.account_id) for alloc in line.alloc_ids}
@@ -2189,11 +2631,15 @@ class LevisPosClearingLine(models.Model):
         *this* payment — is always asked about one line at a time. Ticked
         receipts are left alone; only the suggestions are refreshed, so a receipt
         freed on another line shows up here the next time this is pressed.
+
+        Takes a recordset so a handful of lines can be worked as a batch from the
+        settlement list: the cost is per line either way, and selecting one
+        store's twenty lines beats opening them one at a time.
         """
-        self.ensure_one()
-        if self.run_id.state not in ("computed", "generated"):
-            raise UserError(_("Compute the summary first — there is nothing to match yet."))
-        self.run_id._generate_receipts(lines=self)
+        for run, lines in self.grouped("run_id").items():
+            if run.state not in ("computed", "generated"):
+                raise UserError(_("Compute the summary first — there is nothing to match yet."))
+            run._generate_receipts(lines=lines)
         return True
 
     def action_open_receipts(self):
@@ -2361,7 +2807,96 @@ class LevisPosClearingAlloc(models.Model):
             return "batch", hits[0], buckets[hits[0]]
         if len(hits) > 1:
             return "ambiguous", False, [ref for tender in hits for ref in buckets[tender]]
-        return "none", False, []
+        return self._x24_subset(rows, gross)
+
+    @api.model
+    def _x24_subset(self, rows, gross):
+        """The one combination of a trading day that adds up to this settlement.
+
+        The doctrine here is unchanged — only arithmetic counts as proof — but a
+        combination that is the **only** one possible is arithmetic, not a guess.
+        That is the whole distinction: 250.900 out of a day holding 16.865.300
+        across ten card transactions can be composed many ways and must stay
+        unnamed, while 250.900 out of a day whose only subset summing to it is
+        one pair of receipts is as certain as a single transaction of that
+        amount.
+
+        Searched per tender, because a combination spanning two tenders would
+        name neither. Bounded twice over: buckets larger than
+        ``_SUBSET_MAX_ITEMS`` are not searched at all (past that size a day is
+        ambiguous in practice, whatever the search says), and the search stops at
+        the second solution, which is all it takes to know there is no unique
+        one. A tender with more than one solution poisons the whole
+        identification rather than deferring to another tender's single one:
+        two answers exist, and picking the tidier one would be exactly the guess
+        this refuses to make.
+        """
+        if not rows or not gross:
+            return "none", False, []
+        target = int(round(gross * 100))
+        buckets = defaultdict(list)
+        for tender, ref, amount in rows:
+            cents = int(round(amount * 100))
+            if 0 < cents <= target:
+                buckets[tender].append((ref, cents))
+        found = []
+        for tender, items in buckets.items():
+            if len(items) > _SUBSET_MAX_ITEMS or sum(cents for _ref, cents in items) < target:
+                continue
+            solutions = self._subset_solutions(items, target)
+            if not solutions:
+                continue
+            if len(solutions) > 1 or found:
+                # More than one way to make the number: nothing is proven.
+                return "none", False, []
+            found = [(tender, solutions[0])]
+        if not found:
+            return "none", False, []
+        tender, refs = found[0]
+        return "subset", tender, refs
+
+    @api.model
+    def _subset_solutions(self, items, target):
+        """Up to ``_SUBSET_MAX_SOLUTIONS`` subsets of ``items`` summing to ``target``.
+
+        Meet in the middle rather than a dynamic table over the amount: rupiah
+        targets run to eight digits, so a table indexed by money would be
+        millions of cells wide, while halving twenty items is 1.024 sums a side.
+        """
+        half = len(items) // 2
+        left, right = items[:half], items[half:]
+        sums = defaultdict(list)
+        for mask, total in self._subset_totals(left):
+            if total <= target:
+                sums[total].append(mask)
+        out = []
+        for mask, total in self._subset_totals(right):
+            if total > target:
+                continue
+            for left_mask in sums.get(target - total, ()):
+                if not left_mask and not mask:
+                    continue
+                refs = [ref for index, (ref, _cents) in enumerate(left) if left_mask >> index & 1]
+                refs += [ref for index, (ref, _cents) in enumerate(right) if mask >> index & 1]
+                out.append(sorted(refs))
+                if len(out) >= _SUBSET_MAX_SOLUTIONS:
+                    return out
+        return out
+
+    @api.model
+    def _subset_totals(self, items):
+        """``(mask, total)`` for every subset, each total one addition away from a known one.
+
+        Summing each mask from scratch is 2**n * n additions and turns the search
+        into the slowest thing in the run; clearing the lowest bit reaches a
+        subset already totalled, which makes it 2**n.
+        """
+        totals = [0] * (1 << len(items))
+        yield 0, 0
+        for mask in range(1, 1 << len(items)):
+            low = mask & -mask
+            totals[mask] = totals[mask ^ low] + items[low.bit_length() - 1][1]
+            yield mask, totals[mask]
 
     @api.model
     def _x24_format_refs(self, refs, cap):

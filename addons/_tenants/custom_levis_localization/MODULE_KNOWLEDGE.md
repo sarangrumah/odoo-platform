@@ -354,6 +354,82 @@ one X24DN transaction offered to one bank line, with a `matched` tick.
 * `matched_total` / `match_gap` on the line are what has been confirmed and what
   is still unexplained; `x24_trans_refs` follows the ticks, not the evidence.
 
+**Readiness before anything else (19.0.1.40.0).** `action_check_readiness` answers
+"is this month fit to clear" in draft, without computing: it creates no lines and
+leaves the run in `draft`. It exists because of August 2026 in prd_levis_begbal,
+where the IBCA statement had been imported **four times** — each import restarting
+at the 1st, cumulatively: 386 lines (07-Aug), 717 (12-Aug), 840 (14-Aug), 1.202
+(19-Aug), for 3.145 posted rows where 1.202 were real. Nothing noticed. The run
+reported Rp 10,3 m of settlements with no receivable left, which was true of the
+duplicates and useless as a finding. Deduplicated on a clone the same month comes
+out at 1.148 settled / 2 short / **Rp 899.730** unexplained.
+
+* `_diag_duplicates` groups on `(journal, date, payment_ref, amount)` and then
+  splits on **when the rows were written**: two sales can agree on all four, but
+  rows created an hour or more apart (`_DUP_BATCH_GAP_SECONDS`) cannot have come
+  from one file. Blocking, and `_assert_generatable` refuses to generate over it.
+* `_diag_import_incomplete` reports a journal whose statement stops before the
+  period does — the August run read as a month and covered eighteen days, and
+  `_diag_missing_days` by design cannot say so (it looks for *interior* gaps).
+  It also reports a journal with no lines at all, which `_diag_missing_days` can
+  only say after a Compute.
+* `_diag_coverage` compares settlement gross against the open receivable pool
+  measured **before allocation spends it**. Past `_COVERAGE_TOLERANCE` it says so
+  as a ratio: the cause is never in this module — a repeated bank import, or a POS
+  import that never ran — and both leave the same footprint.
+
+**Evidence before the residual ordering (19.0.1.40.0).** `_attach_evidence` runs
+between parsing and allocation and asks the trading day's receipts two questions
+the narrative cannot answer:
+
+* **Which tender receivable.** Measured on August 2026: 377 settlements had their
+  tender named by the receipts and a *different* account credited by
+  `_allocate`, which picks by largest residual and cannot see a tender.
+  `_allocate_with_evidence` drains the proven account first and only then falls
+  back to the ordinary search — a **priority, not a restriction**, so a proven
+  tender that is already reconciled still gets settled instead of stranding money.
+  `only_accounts` still binds: a cash deposit may not consume a card receivable
+  however its receipts read, because the channel restriction answers a different
+  question. `line.tender_locked` records where the receipts decided it.
+* **Which trading day.** Most BCA narratives carry no transaction date, so the day
+  is inferred from the settlement lag and widened into a ladder. The ladder is now
+  walked looking for proof, and a day whose receipts add up replaces the inferred
+  one. `trans_date_is_derived` stays true — the narrative still never said it —
+  and `x24_match` carries how it was established.
+
+`_allocation_order` then allocates proven settlements first. Order decides who
+gets the money when the pool is thin, and a proven claim beats an unproven one;
+statement order is kept inside each group so a rerun allocates identically.
+
+**`subset`: a unique combination is proof, an ambiguous one is not.** `_x24_subset`
+extends `_x24_identify` with a bounded meet-in-the-middle search *per tender*.
+The doctrine is unchanged — only arithmetic counts — but a combination that is
+the **only** way to make the number is arithmetic. Two tenders that can each make
+it, or one tender that can make it twice, name nothing. Bounded twice:
+`_SUBSET_MAX_ITEMS` (20 candidates after dropping anything above the target) and
+`_SUBSET_MAX_SOLUTIONS` (stop at the second). `_subset_totals` reaches each subset
+sum one addition from a known one, which is what keeps the search from becoming
+the slowest step of a 3.000-line run; the callers additionally memoise per
+`(store, day, gross)`. On a deduplicated August it fires on **470 of 1.130**
+allocations. It does not move the totals — greedy reached the same accounts —
+which is a narrower claim than it sounds: there was almost nothing left to correct.
+
+**Bulk instead of line by line.** `action_match_proven` re-ticks everything the
+amounts prove across a whole run, which matters after mapping a MID: a line only
+becomes readable once it has a store, and without this the month would have to be
+recomputed — throwing away every tick already made — to collect free ticks.
+`action_suggest_receipts` takes a recordset, so a selection in the settlement list
+can be built as a batch (the `<header>` button); the cost is per line either way.
+
+**The mapping wizard proposes from takings, not from names.** `_evidence_suggestions`
+indexes every store's X70D transactions by amount — single transactions, and each
+tender's day total — and votes: a deposit that equals exactly one store's cash for
+exactly one trading day says which shop it came from without reading the narrative
+at all. A figure that fits two stores votes for neither, and a group whose best
+store does not beat the runner-up is left for a person. `evidence_note` on the
+wizard line says why; empty means the old name-overlap guess and nothing
+corroborating it. Silent when the OU field or the staged rows are absent.
+
 **Two rules may never claim one terminal.** `_check_no_colliding_rule` refuses a
 mapping that would compete with an existing one, comparing through the resolver's own
 `_keys_match` — so it catches an identical key, a leading-zero variant

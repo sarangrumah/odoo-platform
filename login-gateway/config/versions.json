@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-28T06:57:25+00:00",
+  "generated_at": "2026-08-28T06:58:44+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "f3c087a",
+    "commit": "b77e8dd",
     "branch": "feat/levis-daily-pos-clearing"
   },
   "buckets": [
@@ -350,14 +350,19 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.43.0",
+      "version": "19.0.1.44.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
       "public": false,
       "last_change": "2026-08-28",
-      "change_count": 57,
+      "change_count": 58,
       "changes": [
+        {
+          "sha": "b77e8dd",
+          "date": "2026-08-28",
+          "subject": "fix(bank-import): catch a repeated transaction, not just a repeated file"
+        },
         {
           "sha": "f3c087a",
           "date": "2026-08-28",
@@ -392,11 +397,6 @@
           "sha": "f26ad47",
           "date": "2026-08-27",
           "subject": "feat(levis): give every store a code, and the clearing one way to rank a match"
-        },
-        {
-          "sha": "e0f5965",
-          "date": "2026-08-19",
-          "subject": "feat(levis): the payment voucher names every bill it settles, with the amount applied to each (#184)"
         }
       ]
     },
@@ -2020,9 +2020,14 @@
       "category": "Accounting/Bank",
       "depends": 4,
       "public": true,
-      "last_change": "2026-07-29",
-      "change_count": 9,
+      "last_change": "2026-08-28",
+      "change_count": 10,
       "changes": [
+        {
+          "sha": "b77e8dd",
+          "date": "2026-08-28",
+          "subject": "fix(bank-import): catch a repeated transaction, not just a repeated file"
+        },
         {
           "sha": "4704e07",
           "date": "2026-07-29",
@@ -2057,11 +2062,6 @@
           "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
-        },
-        {
-          "sha": "358f7db",
-          "date": "2026-05-21",
-          "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
       ]
     },
