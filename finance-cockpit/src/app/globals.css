@@ -1,0 +1,457 @@
+/* ==========================================================================
+   Tokens. Light is the base; dark redefines only what changes, under both the
+   OS media query and an explicit [data-theme] stamp so the toggle wins in both
+   directions. Series colours are the validated categorical palette — slots are
+   assigned by entity, never by rank.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  --surface-0: #f4f4f2;
+  --surface-1: #fcfcfb;
+  --surface-2: #efefec;
+  --border: #dededa;
+  --border-strong: #c4c4be;
+
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7c7b76;
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+
+  --seq-100: #cde2fb;
+  --seq-250: #86b6ef;
+  --seq-400: #3987e5;
+  --seq-550: #1c5cab;
+  --seq-700: #0d366b;
+
+  --good: #008300;
+  --critical: #e34948;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 2px rgb(11 11 11 / 6%), 0 4px 12px rgb(11 11 11 / 4%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #242422;
+    --border: #35352f;
+    --border-strong: #4b4b44;
+
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #93928a;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+
+    --seq-100: #0d366b;
+    --seq-250: #184f95;
+    --seq-400: #256abf;
+    --seq-550: #3987e5;
+    --seq-700: #86b6ef;
+
+    --good: #4caf50;
+    --critical: #e66767;
+
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 12px rgb(0 0 0 / 30%);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --surface-2: #242422;
+  --border: #35352f;
+  --border-strong: #4b4b44;
+
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #93928a;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+
+  --seq-100: #0d366b;
+  --seq-250: #184f95;
+  --seq-400: #256abf;
+  --seq-550: #3987e5;
+  --seq-700: #86b6ef;
+
+  --good: #4caf50;
+  --critical: #e66767;
+
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 12px rgb(0 0 0 / 30%);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* --- Shell ---------------------------------------------------------------- */
+
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 20px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }
+.brand span { color: var(--text-muted); font-weight: 400; margin-left: 8px; }
+
+.nav { display: flex; gap: 2px; flex-wrap: wrap; }
+.nav a {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.nav a:hover { background: var(--surface-2); color: var(--text-primary); }
+.nav a[aria-current="page"] { background: var(--surface-2); color: var(--text-primary); }
+
+.main { flex: 1; padding: 20px; max-width: 1400px; width: 100%; margin: 0 auto; }
+
+.page-head { margin-bottom: 16px; }
+.page-head h1 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.01em; }
+.page-head p { margin: 0; color: var(--text-secondary); max-width: 70ch; }
+
+/* --- Cards ---------------------------------------------------------------- */
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.card h2 { margin: 0 0 2px; font-size: 15px; letter-spacing: -0.01em; }
+.card .sub { margin: 0 0 14px; color: var(--text-muted); font-size: 12.5px; }
+
+.card .panel-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.grid { display: grid; gap: 14px; }
+.grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+.grid.kpis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+/* --- KPI tile ------------------------------------------------------------- */
+
+.kpi { display: flex; flex-direction: column; gap: 4px; }
+.kpi .label { color: var(--text-secondary); font-size: 12.5px; font-weight: 500; }
+.kpi .value { font-size: 24px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.kpi .foot { display: flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--text-muted); }
+.kpi .delta { font-weight: 600; font-variant-numeric: tabular-nums; }
+.kpi .delta[data-sign="1"] { color: var(--good); }
+.kpi .delta[data-sign="-1"] { color: var(--critical); }
+.kpi .delta[data-sign="0"] { color: var(--text-muted); }
+
+/* --- Tables --------------------------------------------------------------- */
+
+.table-wrap { overflow-x: auto; }
+
+table.data { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 7px 10px; text-align: right; white-space: nowrap; }
+table.data th:first-child, table.data td:first-child { text-align: left; white-space: normal; }
+table.data thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-strong);
+}
+table.data tbody tr { border-bottom: 1px solid var(--border); }
+table.data tbody tr:hover { background: var(--surface-2); }
+table.data td.num { font-variant-numeric: tabular-nums; }
+table.data .rank { color: var(--text-muted); width: 1%; }
+
+/* A 2px surface gap keeps adjacent fills from reading as one mark. */
+.minibar {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--series-1);
+  box-shadow: 0 0 0 2px var(--surface-1);
+}
+
+/* --- Filter bar ----------------------------------------------------------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 49px;
+  z-index: 15;
+}
+
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field label { font-size: 11.5px; color: var(--text-muted); font-weight: 500; }
+
+.field input, .field select, .btn {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  min-height: 32px;
+}
+
+.field select[multiple] { min-height: 32px; }
+
+.btn { cursor: pointer; font-weight: 500; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+.btn.primary:hover { filter: brightness(1.06); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.chip button {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.chip button:hover { background: var(--border); color: var(--text-primary); }
+
+/* --- Notes / callouts ----------------------------------------------------- */
+
+.note {
+  border-left: 3px solid var(--border-strong);
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--text-secondary);
+}
+.note strong { color: var(--text-primary); }
+.note.unavailable { border-left-color: var(--text-muted); }
+.note.ok { border-left-color: var(--good); }
+
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-secondary); }
+.legend .item { display: inline-flex; align-items: center; gap: 6px; }
+.legend .swatch { width: 10px; height: 10px; border-radius: 3px; }
+
+.tooltip {
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
+}
+.tooltip .t-title { font-weight: 600; margin-bottom: 4px; }
+.tooltip .t-row { display: flex; gap: 12px; justify-content: space-between; }
+.tooltip .t-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.skeleton {
+  height: 260px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-1) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+/* --- Recommendations ------------------------------------------------------ */
+
+.narrative { margin: 0 0 12px; color: var(--text-secondary); max-width: 78ch; line-height: 1.6; }
+
+.findings { display: grid; gap: 14px; }
+
+.finding header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.finding header h2 { margin: 0 0 4px; }
+.finding .rank {
+  flex: none;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12px; font-weight: 650;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.finding .meta {
+  margin: 0;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--text-muted);
+}
+.finding .tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+.finding .tag[data-severity="peluang"] { border-color: var(--good); color: var(--good); }
+.finding .tag[data-severity="risiko"] { border-color: var(--critical); color: var(--critical); }
+.finding .impact {
+  margin-left: auto;
+  text-align: right;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.finding .impact .value {
+  font-size: 18px; font-weight: 650; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.finding .impact .label { font-size: 11.5px; color: var(--text-muted); }
+
+.finding .evidence {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.finding .evidence .item {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.finding .evidence .k { font-size: 11.5px; color: var(--text-muted); }
+.finding .evidence .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.finding h3 { margin: 0 0 6px; font-size: 13px; letter-spacing: -0.005em; }
+.finding ol.actions { margin: 0 0 14px; padding-left: 20px; color: var(--text-secondary); }
+.finding ol.actions li { margin-bottom: 5px; line-height: 1.55; max-width: 78ch; }
+.finding .note.assumption { font-size: 12.5px; line-height: 1.55; }
+
+ul.caveats { margin: 0; padding-left: 20px; color: var(--text-secondary); }
+ul.caveats li { margin-bottom: 5px; line-height: 1.55; max-width: 78ch; }
+
+/* ==========================================================================
+   Agent widget. Floating mascot + question panel, mounted once in the app
+   layout so it rides along on every page. Uses only the tokens above, so dark
+   mode needs nothing of its own.
+   ========================================================================== */
+
+/* Tables can be wider than the panel; they scroll inside it, never the page. */
+
+/* ---------------------------------------------------------------------------
+   Finance-specific marks.
+
+   The tie page is the reason this app is believable, so its two states are
+   named rather than inlined: a check that reconciles and one that does not.
+   Colour is never the only signal — every row also carries the numeric
+   difference, and the status word is spelled out.
+   --------------------------------------------------------------------------- */
+
+.tie-ok { color: var(--good); font-variant-numeric: tabular-nums; }
+.tie-bad { color: var(--critical); font-variant-numeric: tabular-nums; font-weight: 600; }
+.tie-info { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.tie-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+}
+.tie-status[data-state="ok"] { color: var(--good); border-color: var(--good); }
+.tie-status[data-state="bad"] { color: var(--critical); border-color: var(--critical); }
+.tie-status[data-state="info"] { color: var(--text-muted); }
+
+/* The SQL behind each check, folded away. The tie page exists to be audited,
+   so the query is on the page rather than in a file nobody opens. */
+details.sql { margin-top: 10px; }
+details.sql summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+details.sql pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-size: 11.5px;
+  line-height: 1.5;
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* Aging: seven buckets plus a total is too wide for a card on a laptop, so the
+   table scrolls inside its wrapper and the bucket columns keep a floor width
+   rather than collapsing to illegibility. */
+.aging-grid table.data th, .aging-grid table.data td { min-width: 96px; }
+.aging-grid table.data th:first-child,
+.aging-grid table.data td:first-child { min-width: 220px; position: sticky; left: 0; }
+.aging-grid table.data thead th:first-child { background: var(--surface-1); }
+.aging-grid table.data tbody td:first-child { background: var(--surface-1); }
+
+/* A total row that must not be mistaken for another partner. */
+table.data tr.total-row { border-top: 2px solid var(--border-strong); font-weight: 600; }
+table.data tr.total-row td { background: var(--surface-2); }
+
+/* Severity in the clearing diagnostics board. */
+.sev { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.sev[data-level="blocking"] { color: var(--critical); }
+.sev[data-level="warning"] { color: var(--seq-550); }
+.sev[data-level="info"] { color: var(--text-muted); }
