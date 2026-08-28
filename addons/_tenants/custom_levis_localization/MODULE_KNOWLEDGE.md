@@ -67,22 +67,6 @@ This module implements five specific requirements for the Levi's tenant: HS Code
   - `action_view_move()`: Returns an act_window action opening the generated `account.move`.
   - `_cron_generate_drafts()`: Creates one computed reconciliation per company and generates a DRAFT entry when a difference exists. Never posts automatically. Bound to an inactive monthly cron.
 
-### Voucher table: one row per settled bill
-`_edo_voucher_rows()` does **not** map one-to-one onto journal items. A payment
-carries a single payable line however many bills it clears, so that line is
-split into one row per bill using `account.partial.reconcile`
-(`_edo_line_allocations`): each row carries that bill's number, its own vendor
-reference, and the amount actually applied to it. 40 of the 145 reconciled
-payments in prd_levis_begbal settle more than one bill, and before this the
-voucher printed only the first (`bills[:1]`).
-
-Anything the allocations do not account for — an overpayment, or a rounding
-tail — is emitted as a final row under the payment's own number, so the table's
-DEBIT/CREDIT totals still equal the journal entry. A voucher that does not tie
-to its own entry gets rejected on review, so the remainder row is not optional.
-`_edo_line_source_doc` is kept: it still answers "which bill is this line
-against" for callers that want a single record.
-
 ## Integration Points
 - **Depends on**: `product`, `stock`, `stock_account`, `stock_delivery`, `purchase`, `account`.
 - **Inherits from**: `stock.move` and `stock.picking`.
@@ -263,6 +247,33 @@ specific set of numbers and posting books that set — and if the underlying
 receivables moved in between, `_preflight` refuses instead of quietly booking
 something else. No cron, no auto-post, and `action_compute` never generates.
 
+**The settlements are searchable away from the run form (19.0.1.39.0).** The
+Settlements tab is a `one2many`, and an embedded `one2many` has no search panel —
+a month across eleven bank journals is a thousand rows you can only scroll.
+`action_view_lines` ("Search Settlements" in the header, plus an *Invoicing ▸
+POS Settlements* menu over every run) opens the same records under a normal
+action with `view_levis_pos_clearing_line_search`: filter by store, bank, tender,
+merchant id, narrative or X24DN transaction number; group by any of them. The
+line's `run_state` and `run_period_ref` are stored relateds added for exactly
+this — a filter on a non-stored field returns nothing rather than failing. The
+settlement form moved out of the tab into a top-level
+`view_levis_pos_clearing_line_form` so the row popup and the standalone list are
+the same screen; receipt ticking there is gated on `run_state`, which the tab used
+to get for free from the parent's state.
+
+**The mapping wizard is a full page, and its totals prove themselves
+(19.0.1.39.0).** A proposal is one merchant id summed over a whole period, while
+the *Sample Narrative* beside it belongs to exactly one of those statement lines —
+so the amount reads as though it disagreed with the account mutation and the
+berita transfer. Three things fix that, and none of them is a different sum:
+`gross_total` and `mdr_total` carry the narratives' own figures next to the bank's
+(gross − MDR is what the bank moved, and `narrative_gap` shows anything left
+over — a cash deposit quotes no gross, so its whole amount lands there by
+design), and `statement_line_ids` holds the lines behind the total with a
+*Bank Lines* button to open them. The wizard opens `target="current"`, not a
+dialog: dozens of ids each needing their amounts read against a statement do not
+fit in a modal, so the buttons live in a `<header>` rather than a `<footer>`.
+
 **Undo is per statement line.** Once posted, the legs live on the bank entries,
 so `action_cancel` refuses; reversing means Odoo's own "Undo Reconciliation" on
 the lines concerned.
@@ -285,6 +296,63 @@ compute depends on the narrative, the amount and the journal's format — **not*
 history; `action_levis_reread_narrative()` (via `add_to_compute`, so the ORM owns
 the write) re-reads the lines Finance chooses. `custom_levis_bank_reconcile`
 builds the interactive matching wizard on exactly these fields.
+
+**The receipt numbers behind a settlement are recovered, and only where the
+money proves them.** The receivable a settlement consumes is an X70D transfer
+line — one per store, per trading day, per tender — so it carries no receipt
+number at all. The staged X70D rows do (`retail.import.line.raw_data_json`:
+`store_code`, `register`, `transnum`, `tender_type`, `tender_amount`), and X24DN
+posts the same keys as `pos.order.pos_reference` (`store-register-transaction`).
+`_x24_rows` joins them to the Operating Unit through `ir.model.data`
+(`posconfig_<store>`) → `pos.config` → `stock.warehouse.l10n_ou_analytic_id`.
+
+`_x24_identify` then matches on **arithmetic only**: one transaction equal to the
+settlement's gross (`exact`), or one tender whose whole trading day sums to it
+(`batch`); several of either is `ambiguous` and lists them all without claiming
+one; anything else is `none` and names nothing. There is deliberately **no subset
+search** — a 250.900 settlement out of a day holding 16.865.300 across ten card
+transactions can be composed many ways. Reading the receipts off the *allocated*
+receivable (the first cut of this feature, 19.0.1.36.0) was worse still: the
+allocation picks by residual and cannot see a tender, so that 250.900 line listed
+the day's ten card receipts and read as though it had paid millions.
+
+Where the match lands, it yields the one thing the narrative can never say: the
+**tender**. `x24_tender` records it and `x24_tender_mismatch` flags the lines
+where the allocation credited a different tender receivable — 377 of 1.420
+identified settlements on prd_levis_begbal's August run. That is a real
+divergence between evidence and `_allocate`'s largest-residual guess, not a
+display bug. `custom_retail_import` stays a non-dependency: without it the
+columns are simply empty and clearing is unaffected.
+`levis.pos.clearing.line.move_name` is the statement line's own entry number.
+
+Gotcha: some staged rows carry an empty `trans_date`/`tender_amount`, so both
+casts live inside a `CASE` — a bare `WHERE` is free to run after the cast and
+dies with `invalid input syntax for type date`.
+
+**The matching worksheet: `levis.pos.clearing.receipt`.** Roughly half a month's
+settlements pay *part* of a trading day, which no arithmetic can decompose (see
+`_x24_identify`), so the last word is a human's and has to be storable. One row =
+one X24DN transaction offered to one bank line, with a `matched` tick.
+
+* **Generated per line, on demand.** `action_suggest_receipts` builds one bank
+  line's candidates (~0,6 s, ~20 rows). Generating a whole month up front was
+  36.000 rows and **143 seconds** — a button no web worker survives — for a
+  question that is always asked one line at a time. `action_compute` therefore
+  writes only the ticks the amount proves (947 rows, ~4 s on prd_levis_begbal).
+* **A tick is exclusive company-wide.** A partial unique index
+  (`levis_pos_clearing_receipt_matched_uniq ... WHERE matched`) is the guarantee —
+  `_sql_constraints` cannot express "only ticked rows are unique", and every
+  candidate row is a duplicate of some other line's candidate by design.
+  `_assert_unclaimed` checks first so the user gets a sentence naming the bank
+  line that already holds the transaction, not an integrity error mid-flush;
+  `_release_elsewhere` (per record) and `_sweep_claimed` (one DELETE, used by the
+  generator) then take the receipt off every other line.
+* **Unticking does not sweep the run.** The receipt is free the moment it is
+  unticked; it reappears wherever it belongs the next time that line is opened.
+* Refreshing a line rebuilds only its *unticked* suggestions — an answer already
+  given is never undone by asking the question again.
+* `matched_total` / `match_gap` on the line are what has been confirmed and what
+  is still unexplained; `x24_trans_refs` follows the ticks, not the evidence.
 
 **Two rules may never claim one terminal.** `_check_no_colliding_rule` refuses a
 mapping that would compete with an existing one, comparing through the resolver's own
@@ -309,27 +377,6 @@ that already has the module. The MID mapping is deliberately not seeded — see 
 gotcha below.
 
 ## Gotchas
-- **The vendor-bill list has no bare `partner_id` to anchor a view on.** Core's
-  `account.view_invoice_tree` carries `invoice_partner_display_name` **twice**,
-  one variant per move type, each `column_invisible` on the other. Inheriting
-  `<field name="partner_id" position="after">` raises *"cannot be located in
-  parent view"* and the whole module fails to load. Anchor on `ref` instead.
-- **Bill status lives in two fields.** Core's Draft / Posted / Cancelled filters
-  read `state`; Paid / Partially Paid / Reversed read `payment_state`. A bill is
-  routinely Posted **and** Paid, so the two filter groups must stay separate
-  rather than being merged into one status list.
-- **`payment_reference` is deliberately not auto-filled** from the bills a
-  payment settles. It feeds the Payment Voucher print-out and the bank export,
-  so populating it is an accounting decision, not a display convenience. The
-  bill list on the payment form (`reconciled_bill_ids`) and on the register
-  wizard (`l10n_bill_ids`) is read-only for the same reason.
-- **`l10n_id_kode_transaksi` is not a faktur number.** It is the two-digit DJP
-  *transaction code* ("04" = DPP nilai lain). It used to sit at the end of
-  `_edo_tax_number`'s fallback chain, so every bill entered without a faktur
-  pajak printed "04" in the Tax Number row of the Journal Billing voucher — 80
-  posted bills in `prd_levis_begbal` on 18-Aug-2026. A bill with no faktur must
-  print an empty Tax Number; guarded by
-  `tests/test_journal_billing_tax_number.py`.
 - **Never `_inherit "product.value"` from this module.** Doing so pulls
   `product.value` into the module's `init_models()` pass, and
   `registry.check_foreign_keys()` then re-creates any *missing* core foreign key
@@ -389,6 +436,12 @@ gotcha below.
   and REF Invoice Vendor columns showed no bill at all until 19.0.1.25.1. The failure is
   invisible in the PDF — it looks like a filled-in column.
 
+- **Search views here take no `<group string="Group By">`.** Odoo 19's
+  `base/rng/common.rng` defines `group` with no `string` attribute and `field`
+  children only, so wrapping group-by filters in one fails view validation with
+  `RELAXNG_ERR_INVALIDATTR` *and* a misleading `Element search has extra content:
+  field` on the line above. Group-by filters go flat after a `<separator/>`,
+  which is what the receipt search view already did.
 - **`account.bank.statement.line` has no SQL `date` column.** It is delegated from
   `account.move` via `_inherits`, so an ORM domain on `date` works but raw SQL must
   join `move_id` — `select sl.date ...` fails with `column sl.date does not exist`.

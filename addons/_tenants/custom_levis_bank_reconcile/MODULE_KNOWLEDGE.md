@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-08-11T00:00:00Z
 generator: claude-code-handwritten
 module: custom_levis_bank_reconcile
-manifest_version: 19.0.1.1.0
+manifest_version: 19.0.1.2.0
 ---
 
 # custom_levis_bank_reconcile
@@ -41,7 +41,12 @@ same facts, same sources, one line at a time.
 - `custom.bank.reconcile.wizard` (`_inherit`) — `levis_target`, `levis_gap`,
   `action_levis_suggest`, MDR defaults in `default_get`, analytic on the fee leg.
 - `custom.bank.reconcile.wizard.line` (`_inherit`) — `levis_ou_analytic_id`,
-  `levis_ou_matches` (rows of another store are decorated as a warning).
+  `levis_ou_matches` (rows of another store are decorated as a warning), and
+  `levis_transaction_ref` (*Transaction No.*, related to the AML field below).
+- `account.move.line` (`_inherit`) — `levis_transaction_ref`: the number the
+  document is known by outside Odoo. Read most specific first — line ref, entry
+  ref, an invoice's payment reference, the source document — and only the entry
+  name when there is nothing else. The entry name stays its own column.
 
 ## Integration Points
 - **Depends on:** `custom_levis_localization` (narrative parser, MID map, clearing
@@ -79,6 +84,14 @@ same facts, same sources, one line at a time.
   never sees the statement line.
 - The day window is `settlement_lag_days` plus 12 days back / 3 forward. A
   settlement older than that needs *Search More*.
+- **Nothing dated after the bank moved the money is offered.**
+  `_get_default_amls_matching_domain` is overridden to add `date <= st_line.date`,
+  which is why the ceiling also holds for *Search More* and for the generic
+  scorer on lines this module does not recognise. It is a real restriction: a
+  receivable posted with a later date will not appear however wide the net is
+  cast — correct it (or its date) rather than looking for it in the matcher.
+  Note this narrows the forward end of the day window too, so a settlement dated
+  before its own trading day sees a window that ends on the bank date.
 
 ## Out of Scope
 - No bank statement import (`custom_bank_import`), no narrative grammars (those

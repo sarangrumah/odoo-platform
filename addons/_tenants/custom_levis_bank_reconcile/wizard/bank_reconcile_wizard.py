@@ -27,6 +27,11 @@ class BankReconcileWizard(models.TransientModel):
     levis_mid = fields.Char(related="st_line_id.levis_mid", string="Merchant / Terminal")
     levis_ou_analytic_id = fields.Many2one(related="st_line_id.levis_ou_analytic_id", string="Operating Unit")
     levis_trans_date = fields.Date(related="st_line_id.levis_trans_date", string="Trading Day")
+    levis_bank_ref = fields.Char(
+        related="st_line_id.ref",
+        string="Bank Transaction No.",
+        help="The reference the bank printed on this mutation — what a query to the bank is made with.",
+    )
     levis_gross = fields.Monetary(
         related="st_line_id.levis_gross", string="Gross (Narrative)", currency_field="currency_id"
     )
@@ -215,6 +220,13 @@ class BankReconcileWizardLine(models.TransientModel):
         "wrong outlet.",
     )
     levis_ou_matches = fields.Boolean(compute="_compute_levis_ou_analytic_id")
+    levis_transaction_ref = fields.Char(
+        related="aml_id.levis_transaction_ref",
+        string="Transaction No.",
+        help="How this item is identified on the document it came from — the "
+        "settlement reference, the invoice's payment reference, or the source "
+        "document. The entry number is a separate column.",
+    )
 
     @api.depends("aml_id", "wizard_id.levis_ou_analytic_id")
     def _compute_levis_ou_analytic_id(self):

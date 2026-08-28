@@ -19,25 +19,17 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 #   Go stdlib CVE is compiled into it and trivy reports it as a `gobinary`
 #   target. 27.3.1 was built with go1.22.7 and carried 15 HIGH/CRITICAL
 #   findings; 29.7.1 is built with go1.26.5 and carries none.
-# The `--only-upgrade` call patches the util-linux family to the distro's fixed
-# build (CVE-2026-53615, integer overflow in libblkid's DOS partition parser).
-# python:3.12-slim ships trixie's 2.41-5 and the fix lives in trixie-security as
-# 2.41.5-0+deb13u1, so it only arrives when upstream rebuilds the base image --
-# patching here keeps the scan green without waiting on that. `--only-upgrade`
-# skips any name that is not installed, so the list survives a base change.
-# Same idiom as odoo/Dockerfile.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Security patches from the base image, not just the packages we add. The
+# python:3.12-slim tag is rebuilt on its own schedule, so between rebuilds its
+# Debian packages fall behind the security archive — CVE-2026-14456 (openssl
+# DoS) sat in libssl3t64 3.5.6 while 3.5.7 had been published. Upgrading here
+# means our rebuild picks it up instead of waiting for upstream's.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+ && apt-get install -y --no-install-recommends \
     postgresql-client \
     ca-certificates \
     curl \
     tini \
- && apt-get install -y --no-install-recommends --only-upgrade \
-      util-linux \
-      bsdutils \
-      libblkid1 \
-      libmount1 \
-      libsmartcols1 \
-      libuuid1 \
  && rm -rf /var/lib/apt/lists/* \
  && curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-29.7.1.tgz \
       | tar -xz -C /tmp \
