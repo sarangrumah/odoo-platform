@@ -17,9 +17,16 @@
                             string="Post &amp; Reconcile" class="btn-primary"
                             invisible="state != 'generated'"
                             confirm="This writes the planned items onto the bank statement lines and reconciles the receivables they settle. Undoing it afterwards means Undo Reconciliation on each statement line. Continue?"/>
+                    <button name="action_check_readiness" type="object"
+                            string="Check Data" invisible="state not in ('draft', 'computed')"
+                            help="Before anything else: is this period's bank statement complete, and was any of it imported twice? Reads only, computes nothing."/>
                     <button name="action_open_mapping_wizard" type="object"
                             string="Map Unmapped Settlements"
                             invisible="unmapped_count == 0"/>
+                    <button name="action_match_proven" type="object"
+                            string="Tick What Is Proven"
+                            invisible="state not in ('computed', 'generated')"
+                            help="Re-tick every receipt the amounts prove, across the whole run. Ticks already made are left alone."/>
                     <button name="action_cancel" type="object" string="Cancel"
                             invisible="state not in ('computed', 'generated')"/>
                     <button name="action_view_lines" type="object"
@@ -151,9 +158,11 @@
                                     <field name="x24_trans_refs" string="X24DN Transactions"/>
                                     <field name="x24_match" widget="badge" optional="show"
                                            decoration-success="x24_match in ('exact', 'batch')"
+                                           decoration-info="x24_match == 'subset'"
                                            decoration-warning="x24_match == 'ambiguous'"
                                            decoration-muted="x24_match == 'none'"/>
                                     <field name="x24_tender" optional="hide"/>
+                                    <field name="tender_locked" optional="show" string="Tender Proven"/>
                                     <field name="x24_tender_mismatch" optional="show"
                                            string="Tender Disagrees"/>
                                     <field name="x24_trans_count" optional="hide"/>
@@ -322,6 +331,7 @@
                             <field name="x24_match" readonly="1"/>
                             <field name="x24_trans_count" readonly="1"/>
                             <field name="x24_tender" readonly="1"/>
+                            <field name="tender_locked" readonly="1"/>
                             <field name="x24_tender_mismatch" readonly="1"/>
                             <field name="settlement_date" readonly="1"/>
                             <field name="trans_date" readonly="1"/>
@@ -435,6 +445,13 @@
         <field name="arch" type="xml">
             <list string="Settlements" create="false" delete="false"
                   default_order="settlement_date, bank_journal_id, id">
+                <!-- Building a whole month of candidates takes two minutes; building
+                     the twenty lines someone selected takes a second. So the batch
+                     lives here, on a selection, rather than as a run-wide button. -->
+                <header>
+                    <button name="action_suggest_receipts" type="object"
+                            string="Build Receipt Suggestions" display="always"/>
+                </header>
                 <field name="run_id" optional="hide"/>
                 <field name="run_period_ref" optional="hide" string="Period"/>
                 <field name="settlement_date"/>
@@ -449,9 +466,11 @@
                 <field name="x24_trans_refs" string="X24DN Transactions" optional="show"/>
                 <field name="x24_match" widget="badge" optional="show"
                        decoration-success="x24_match in ('exact', 'batch')"
+                       decoration-info="x24_match == 'subset'"
                        decoration-warning="x24_match == 'ambiguous'"
                        decoration-muted="x24_match == 'none'"/>
                 <field name="x24_tender" optional="hide"/>
+                <field name="tender_locked" optional="show" string="Tender Proven"/>
                 <field name="x24_tender_mismatch" optional="hide" string="Tender Disagrees"/>
                 <field name="statement_amount" sum="Bank" optional="hide"/>
                 <field name="gross" sum="Gross"/>
@@ -500,6 +519,8 @@
                         domain="[('x24_match', 'in', ('ambiguous', 'none'))]"/>
                 <filter name="tender_disagrees" string="Tender Disagrees"
                         domain="[('x24_tender_mismatch', '=', True)]"/>
+                <filter name="tender_locked" string="Tender Proven"
+                        domain="[('tender_locked', '=', True)]"/>
                 <filter name="derived_date" string="Trading Day Inferred"
                         domain="[('trans_date_is_derived', '=', True)]"/>
                 <separator/>
@@ -520,6 +541,8 @@
                 <filter name="group_block" string="Block" context="{'group_by': 'block'}"/>
                 <filter name="group_kind" string="Kind" context="{'group_by': 'kind'}"/>
                 <filter name="group_match" string="Receipt Match" context="{'group_by': 'x24_match'}"/>
+                <filter name="group_tender_locked" string="Tender Proven"
+                        context="{'group_by': 'tender_locked'}"/>
                 <filter name="group_settlement" string="Settlement Date"
                         context="{'group_by': 'settlement_date'}"/>
                 <filter name="group_trans" string="Trading Day" context="{'group_by': 'trans_date'}"/>
