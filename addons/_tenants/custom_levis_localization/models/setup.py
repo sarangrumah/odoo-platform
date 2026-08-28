@@ -41,8 +41,13 @@ IN_METHODS = ("manual", "bank_transfer", "giro")
 # Account codes in the EBR chart of accounts (company-dependent → resolve with
 # ``with_company``). Trade GR/IR stays per product category, so no code here.
 ACCOUNT_CODES = {
-    "trade": {"payable": "2103100001"},
-    "non_trade": {"payable": "2103300001", "grir": "2103300008", "expense": "6120010001"},
+    "trade": {"payable": "2103100001", "related_payable": "2103200001"},
+    "non_trade": {
+        "payable": "2103300001",
+        "related_payable": "2103400001",
+        "grir": "2103300008",
+        "expense": "6120010001",
+    },
 }
 
 
@@ -322,6 +327,10 @@ def seed_trade_ou(env):
                 acc = _find_account(env, company, codes.get("payable"))
                 if acc:
                     vals["payable_account_id"] = acc.id
+            if not mapping.related_payable_account_id and codes.get("related_payable"):
+                acc = _find_account(env, company, codes["related_payable"])
+                if acc:
+                    vals["related_payable_account_id"] = acc.id
             if not mapping.grir_account_id and codes.get("grir"):
                 acc = _find_account(env, company, codes["grir"])
                 if acc:
@@ -339,6 +348,7 @@ def seed_trade_ou(env):
             # import stored one as a plain current liability. Runs every time so
             # already-mapped accounts are also normalised.
             _ensure_payable(mapping.payable_account_id)
+            _ensure_payable(mapping.related_payable_account_id)
 
     # GR/IR clearing accounts used on vendor-bill product lines must be current
     # liabilities, not payable, or core's due-date rule blocks bill posting.
@@ -361,13 +371,17 @@ def seed_trade_ou(env):
                 if _ensure_grir_current(acc):
                     made_grir += 1
 
+    made_related = _flag_related_parties(env, companies)
+
     _logger.info(
-        "Levi's Trade/OU seeding: %d analytic, %d HO, %d journals, %d mappings, %d GR/IR normalised",
+        "Levi's Trade/OU seeding: %d analytic, %d HO, %d journals, %d mappings, "
+        "%d GR/IR normalised, %d related parties flagged",
         made_analytic,
         made_ho,
         made_journal,
         made_map,
         made_grir,
+        made_related,
     )
     return {
         "analytic": made_analytic,
@@ -375,7 +389,45 @@ def seed_trade_ou(env):
         "journals": made_journal,
         "mappings": made_map,
         "grir_normalised": made_grir,
+        "related_parties": made_related,
     }
+
+
+def _flag_related_parties(env, companies):
+    """Tick ``l10n_related_party`` on vendors already pointed at a related AP.
+
+    Accounting flagged the Erajaya-group vendors the only way the system let
+    them: by putting "Trade Payables - Related parties" on the contact's Account
+    Payable field. That field never reached the vendor bill (the stream mapping
+    overrode it), but it does record the intent — so adopt it as the seed for the
+    new flag instead of asking anyone to re-tag the vendors by hand.
+
+    Idempotent: only ever ticks, never unticks, so a deliberate manual change
+    survives the next upgrade.
+    """
+    Partner = env["res.partner"]
+    flagged = 0
+    for company in companies:
+        accounts = (
+            env["levis.purchase.account.map"].search([("company_id", "=", company.id)]).related_payable_account_id
+        )
+        if not accounts:
+            continue
+        partners = Partner.with_company(company).search(
+            [
+                ("l10n_related_party", "=", False),
+                ("property_account_payable_id", "in", accounts.ids),
+            ]
+        )
+        if partners:
+            partners.l10n_related_party = True
+            flagged += len(partners)
+            _logger.info(
+                "Levi's Trade/OU: flagged %d related-party vendor(s): %s",
+                len(partners),
+                ", ".join(partners.mapped("name")[:10]),
+            )
+    return flagged
 
 
 # --- POS clearing (feature #15) ---------------------------------------------

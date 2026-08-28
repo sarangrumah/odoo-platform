@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Related-party flag, right next to the Account Payable field it
+         qualifies (Accounting tab of the contact form). -->
+    <record id="view_partner_form_levis_related_party" model="ir.ui.view">
+        <field name="name">res.partner.form.levis.related.party</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="account.view_partner_property_form"/>
+        <field name="arch" type="xml">
+            <field name="property_account_payable_id" position="after">
+                <field name="l10n_related_party"/>
+            </field>
+        </field>
+    </record>
+</odoo>

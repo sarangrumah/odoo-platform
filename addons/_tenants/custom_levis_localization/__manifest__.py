@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.44.0",
+    "version": "19.0.1.45.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -209,6 +209,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "views/stock_report_action.xml",
         "views/purchase_order_views.xml",
         "views/levis_purchase_account_map_views.xml",
+        "views/res_partner_views.xml",
         "reports/paperformat.xml",
         "reports/payment_report_actions.xml",
         "reports/payment_voucher_templates.xml",

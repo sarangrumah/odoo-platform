@@ -102,6 +102,30 @@ This module implements five specific requirements for the Levi's tenant: HS Code
 - **EBR account codes**: trade payable `2103100001`, non-trade payable
   `2103300001`, non-trade GR/IR `2103300008`. Trade GR/IR stays per product
   category (`account_stock_variation_id`, e.g. `2103109121` textile).
+- **Related parties (19.0.1.35.0)**: the EBR chart splits AP four ways —
+  trade/non-trade (the purchase stream, on the bill) x third/related party (a
+  property of the *vendor*). `res.partner.l10n_related_party` (Boolean, tracked,
+  on the Accounting tab next to Account Payable) marks in-group Erajaya
+  companies; `levis.purchase.account.map.related_payable_account_id` holds the
+  related-party AP per stream (`2103200001` trade / `2103400001` non-trade).
+  `account.move.line._levis_stream_payable(mapping, move)` picks the account,
+  reading the flag off the **commercial** partner (an invoicing child bills to
+  its parent) and falling back to the ordinary payable when the related column
+  is empty. Before this, PT Sinar Eka Selaras carried `2103200001` on its
+  contact yet all 439 posted bills in `prd_levis_begbal` (Rp 44,58 M still open)
+  landed on third-party `2103100001` — the stream mapping overwrote whatever
+  core computed from the partner property. Manual bills never hit the bug: with
+  no `l10n_purchase_type` at line-precompute time the override never fired and
+  core's partner property stood.
+- **Seeding the flag**: `setup.py::_flag_related_parties(env, companies)` (called
+  from `seed_trade_ou`) ticks the flag on every vendor whose contact already
+  points at a related-party AP account — the only way accounting could express
+  the intent before the flag existed. It only ever ticks, never unticks, so a
+  manual correction survives the next upgrade.
+- **GR/IR is deliberately NOT split third/related**: the goods receipt accrues to
+  the category's third-party clearing account, so routing the bill elsewhere
+  would leave that accrual un-netted. Existing AP balances are left as-is —
+  reclassing them is an accounting decision, not a side effect of this fix.
 
 ## Feature 8 — Admin fees (and card MDR) on payment registration
 - **Models**: `levis.payment.register.fee` (TransientModel, one fee line on the

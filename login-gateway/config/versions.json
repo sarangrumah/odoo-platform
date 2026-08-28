@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-28T06:58:44+00:00",
+  "generated_at": "2026-08-28T09:01:18+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "b77e8dd",
+    "commit": "1c1fafb",
     "branch": "feat/levis-daily-pos-clearing"
   },
   "buckets": [
@@ -350,18 +350,23 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.44.0",
+      "version": "19.0.1.45.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
       "public": false,
       "last_change": "2026-08-28",
-      "change_count": 58,
+      "change_count": 59,
       "changes": [
         {
           "sha": "b77e8dd",
           "date": "2026-08-28",
           "subject": "fix(bank-import): catch a repeated transaction, not just a repeated file"
+        },
+        {
+          "sha": "cc3e8fc",
+          "date": "2026-08-28",
+          "subject": "feat(levis): tanya struknya dulu, tebak belakangan (POS clearing 1.40.0)"
         },
         {
           "sha": "f3c087a",
@@ -392,11 +397,6 @@
           "sha": "3cc772f",
           "date": "2026-08-27",
           "subject": "feat(levis): give a cash deposit a document, and the day a closing report"
-        },
-        {
-          "sha": "f26ad47",
-          "date": "2026-08-27",
-          "subject": "feat(levis): give every store a code, and the clearing one way to rank a match"
         }
       ]
     },
