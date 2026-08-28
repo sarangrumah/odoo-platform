@@ -22,6 +22,11 @@
                             invisible="unmapped_count == 0"/>
                     <button name="action_cancel" type="object" string="Cancel"
                             invisible="state not in ('computed', 'generated')"/>
+                    <button name="action_view_lines" type="object"
+                            string="Search Settlements" invisible="state == 'draft'"
+                            help="The same settlements as the tab below, in a list you can filter, search and group."/>
+                    <button name="action_view_receipts" type="object"
+                            string="Receipt Matching" invisible="state not in ('computed', 'generated')"/>
                     <button name="action_view_moves" type="object"
                             string="Journal Entries" invisible="move_count == 0"/>
                     <field name="state" widget="statusbar"
@@ -128,7 +133,12 @@
 
                     <notebook invisible="state == 'draft'">
                         <page string="Settlements" name="block_a">
-                            <field name="line_ids" readonly="1" domain="[('block', '=', 'a')]"
+                            <!-- Not readonly as a whole: the receipt ticks live inside this
+                                 form, and a readonly x2many makes every field under it
+                                 readonly too. Everything the clearing itself computes is
+                                 marked readonly field by field instead. -->
+                            <field name="line_ids" domain="[('block', '=', 'a')]"
+                                   readonly="state not in ('computed', 'generated')"
                                    context="{'default_block': 'a'}">
                                 <list create="false" delete="false" default_order="analytic_account_id, settlement_date">
                                     <field name="analytic_account_id"/>
@@ -136,7 +146,18 @@
                                     <field name="trans_date"/>
                                     <field name="trans_date_is_derived" optional="show"/>
                                     <field name="bank_journal_id"/>
+                                    <field name="move_name"/>
                                     <field name="channel"/>
+                                    <field name="x24_trans_refs" string="X24DN Transactions"/>
+                                    <field name="x24_match" widget="badge" optional="show"
+                                           decoration-success="x24_match in ('exact', 'batch')"
+                                           decoration-warning="x24_match == 'ambiguous'"
+                                           decoration-muted="x24_match == 'none'"/>
+                                    <field name="x24_tender" optional="hide"/>
+                                    <field name="x24_tender_mismatch" optional="show"
+                                           string="Tender Disagrees"/>
+                                    <field name="x24_trans_count" optional="hide"/>
+                                    <field name="match_gap" optional="hide" sum="Unmatched"/>
                                     <field name="gross" sum="Gross"/>
                                     <field name="mdr" sum="MDR"/>
                                     <field name="cash_in" sum="Cash in"/>
@@ -146,45 +167,14 @@
                                            decoration-success="state == 'ok'"
                                            decoration-warning="state == 'short'"
                                            decoration-danger="state in ('unmapped', 'unparsed', 'mismatch')"/>
+                                    <button name="action_open_receipts" type="object"
+                                            string="Match" icon="fa-check-square-o"
+                                            title="Tick the transactions this bank line paid for"/>
                                     <field name="payment_ref" optional="hide"/>
                                     <field name="mid_key" optional="hide"/>
                                     <field name="tid_key" optional="hide"/>
                                     <field name="currency_id" column_invisible="1"/>
                                 </list>
-                                <form string="Settlement">
-                                    <group>
-                                        <group>
-                                            <field name="analytic_account_id"/>
-                                            <field name="map_id"/>
-                                            <field name="bank_journal_id"/>
-                                            <field name="settlement_date"/>
-                                            <field name="trans_date"/>
-                                            <field name="trans_date_is_derived"/>
-                                        </group>
-                                        <group>
-                                            <field name="statement_amount"/>
-                                            <field name="gross"/>
-                                            <field name="mdr"/>
-                                            <field name="mdr_booked"/>
-                                            <field name="allocated"/>
-                                            <field name="short_amount"/>
-                                            <field name="mismatch_amount"/>
-                                            <field name="currency_id" invisible="1"/>
-                                        </group>
-                                    </group>
-                                    <field name="payment_ref" readonly="1"/>
-                                    <field name="note" readonly="1"/>
-                                    <field name="alloc_ids" readonly="1">
-                                        <list create="false" delete="false">
-                                            <field name="account_id"/>
-                                            <field name="source_date"/>
-                                            <field name="source_aml_id"/>
-                                            <field name="amount" sum="Allocated"/>
-                                            <field name="move_line_id" optional="show"/>
-                                            <field name="currency_id" column_invisible="1"/>
-                                        </list>
-                                    </field>
-                                </form>
                             </field>
                         </page>
                         <page string="Prior-Month AR" name="block_b">
@@ -193,6 +183,7 @@
                                     <field name="analytic_account_id"/>
                                     <field name="settlement_date"/>
                                     <field name="bank_journal_id"/>
+                                    <field name="move_name"/>
                                     <field name="gross" sum="Gross"/>
                                     <field name="mdr" sum="MDR"/>
                                     <field name="allocated" sum="Allocated"/>
@@ -312,6 +303,244 @@
         </field>
     </record>
 
+    <!-- Top-level, so the very same form serves the Settlements tab's row popup and
+         the standalone searchable list. The clearing owns every figure on it, hence
+         readonly field by field rather than on the form. -->
+    <record id="view_levis_pos_clearing_line_form" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.line.form</field>
+        <field name="model">levis.pos.clearing.line</field>
+        <field name="arch" type="xml">
+                <form string="Settlement">
+                    <group>
+                        <group>
+                            <field name="run_id" readonly="1"/>
+                            <field name="run_state" invisible="1"/>
+                            <field name="analytic_account_id" readonly="1"/>
+                            <field name="map_id" readonly="1"/>
+                            <field name="bank_journal_id" readonly="1"/>
+                            <field name="move_name" readonly="1"/>
+                            <field name="x24_match" readonly="1"/>
+                            <field name="x24_trans_count" readonly="1"/>
+                            <field name="x24_tender" readonly="1"/>
+                            <field name="x24_tender_mismatch" readonly="1"/>
+                            <field name="settlement_date" readonly="1"/>
+                            <field name="trans_date" readonly="1"/>
+                            <field name="trans_date_is_derived" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="statement_amount" readonly="1"/>
+                            <field name="gross" readonly="1"/>
+                            <field name="mdr" readonly="1"/>
+                            <field name="mdr_booked" readonly="1"/>
+                            <field name="allocated" readonly="1"/>
+                            <field name="short_amount" readonly="1"/>
+                            <field name="mismatch_amount" readonly="1"/>
+                            <field name="matched_total" readonly="1"/>
+                            <field name="match_gap" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <field name="payment_ref" readonly="1"/>
+                    <field name="note" readonly="1"/>
+                    <separator string="X24DN Transactions"/>
+                    <div class="text-muted mb-2">
+                        Tick the transactions this bank line paid for. Rows are
+                        pre-ticked only where the amount proves them — one
+                        transaction equal to the settlement, or one tender's whole
+                        trading day. A ticked transaction disappears from every
+                        other statement line's list, because it is paid once.
+                    </div>
+                    <button name="action_suggest_receipts" type="object"
+                            invisible="run_state not in ('computed', 'generated')"
+                            string="Suggest Transactions" class="btn-secondary mb-2"
+                            help="Offer this trading day's transactions to tick from. Leaves anything already ticked alone."/>
+                    <field name="receipt_ids" nolabel="1" readonly="run_state not in ('computed', 'generated')">
+                        <list create="false" delete="false" editable="bottom"
+                              default_order="matched desc, trans_date, ref">
+                            <field name="matched" widget="boolean_toggle"/>
+                            <field name="ref" readonly="1"/>
+                            <field name="tender" readonly="1"/>
+                            <field name="trans_date" readonly="1"/>
+                            <field name="amount" sum="Total" readonly="1"/>
+                            <field name="suggested" readonly="1" optional="show"/>
+                            <field name="currency_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                    <field name="alloc_ids" readonly="1">
+                        <list create="false" delete="false">
+                            <field name="account_id"/>
+                            <field name="source_date"/>
+                            <field name="source_aml_id"/>
+                            <field name="amount" sum="Allocated"/>
+                            <field name="move_line_id" optional="show"/>
+                            <field name="currency_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                </form>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_receipt_list" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.receipt.list</field>
+        <field name="model">levis.pos.clearing.receipt</field>
+        <field name="arch" type="xml">
+            <list string="Receipt Matching" editable="bottom" create="false" delete="false"
+                  default_order="move_name, trans_date, ref">
+                <header>
+                    <button name="action_match" type="object" string="Match Selected"/>
+                    <button name="action_unmatch" type="object" string="Unmatch Selected"/>
+                </header>
+                <field name="matched" widget="boolean_toggle"/>
+                <field name="move_name" readonly="1"/>
+                <field name="analytic_account_id" readonly="1"/>
+                <field name="settlement_date" readonly="1" optional="hide"/>
+                <field name="trans_date" readonly="1"/>
+                <field name="ref" readonly="1"/>
+                <field name="tender" readonly="1"/>
+                <field name="amount" sum="Total" readonly="1"/>
+                <field name="suggested" readonly="1" optional="show"/>
+                <field name="bank_journal_id" readonly="1" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_receipt_search" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.receipt.search</field>
+        <field name="model">levis.pos.clearing.receipt</field>
+        <field name="arch" type="xml">
+            <search string="Receipt Matching">
+                <field name="ref"/>
+                <field name="move_name"/>
+                <field name="analytic_account_id"/>
+                <field name="tender"/>
+                <filter name="matched" string="Matched" domain="[('matched', '=', True)]"/>
+                <filter name="unmatched" string="Not Matched" domain="[('matched', '=', False)]"/>
+                <filter name="suggested" string="Proven by Amount" domain="[('suggested', '=', True)]"/>
+                <separator/>
+                <filter name="group_line" string="Bank Line" context="{'group_by': 'move_name'}"/>
+                <filter name="group_store" string="Operating Unit" context="{'group_by': 'analytic_account_id'}"/>
+                <filter name="group_day" string="Trading Day" context="{'group_by': 'trans_date'}"/>
+                <filter name="group_tender" string="Tender" context="{'group_by': 'tender'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- The settlements as first-class records. The Settlements tab can show them
+         but never search them: an embedded one2many has no search panel, and a
+         month across eleven bank journals is a thousand rows to scroll. -->
+    <record id="view_levis_pos_clearing_line_list" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.line.list</field>
+        <field name="model">levis.pos.clearing.line</field>
+        <field name="arch" type="xml">
+            <list string="Settlements" create="false" delete="false"
+                  default_order="settlement_date, bank_journal_id, id">
+                <field name="run_id" optional="hide"/>
+                <field name="run_period_ref" optional="hide" string="Period"/>
+                <field name="settlement_date"/>
+                <field name="trans_date" optional="show"/>
+                <field name="trans_date_is_derived" optional="hide"/>
+                <field name="analytic_account_id"/>
+                <field name="bank_journal_id"/>
+                <field name="move_name"/>
+                <field name="block" optional="hide"/>
+                <field name="kind" optional="hide"/>
+                <field name="channel"/>
+                <field name="x24_trans_refs" string="X24DN Transactions" optional="show"/>
+                <field name="x24_match" widget="badge" optional="show"
+                       decoration-success="x24_match in ('exact', 'batch')"
+                       decoration-warning="x24_match == 'ambiguous'"
+                       decoration-muted="x24_match == 'none'"/>
+                <field name="x24_tender" optional="hide"/>
+                <field name="x24_tender_mismatch" optional="hide" string="Tender Disagrees"/>
+                <field name="statement_amount" sum="Bank" optional="hide"/>
+                <field name="gross" sum="Gross"/>
+                <field name="mdr" sum="MDR"/>
+                <field name="cash_in" sum="Cash in" optional="hide"/>
+                <field name="allocated" sum="Allocated"/>
+                <field name="short_amount" sum="Short"/>
+                <field name="match_gap" sum="Unmatched" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'ok'"
+                       decoration-warning="state == 'short'"
+                       decoration-danger="state in ('unmapped', 'unparsed', 'mismatch')"/>
+                <field name="payment_ref" optional="hide"/>
+                <field name="mid_key" optional="hide"/>
+                <field name="tid_key" optional="hide"/>
+                <field name="run_state" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_line_search" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.line.search</field>
+        <field name="model">levis.pos.clearing.line</field>
+        <field name="arch" type="xml">
+            <search string="Settlements">
+                <field name="payment_ref" string="Narrative"
+                       filter_domain="['|', '|', '|', ('payment_ref', 'ilike', self), ('move_name', 'ilike', self), ('mid_key', 'ilike', self), ('tid_key', 'ilike', self)]"/>
+                <field name="move_name" string="Bank Entry No."/>
+                <field name="analytic_account_id" string="Operating Unit"/>
+                <field name="bank_journal_id" string="Bank"/>
+                <field name="x24_trans_refs" string="X24DN Transaction"/>
+                <field name="mid_key" string="MID"/>
+                <field name="tid_key" string="Terminal"/>
+                <field name="run_id" string="Clearing Run"/>
+                <field name="settlement_date"/>
+
+                <filter name="state_ok" string="Settled" domain="[('state', '=', 'ok')]"/>
+                <filter name="state_short" string="Short" domain="[('short_amount', '&gt;', 0)]"/>
+                <filter name="state_unmapped" string="Unmapped" domain="[('state', '=', 'unmapped')]"/>
+                <filter name="state_unparsed" string="Unparsed" domain="[('state', '=', 'unparsed')]"/>
+                <filter name="not_booked" string="Not Booked"
+                        domain="[('state', 'in', ('unmapped', 'unparsed', 'mismatch', 'skipped'))]"/>
+                <separator/>
+                <filter name="unmatched_receipts" string="Receipts Not Proven"
+                        domain="[('x24_match', 'in', ('ambiguous', 'none'))]"/>
+                <filter name="tender_disagrees" string="Tender Disagrees"
+                        domain="[('x24_tender_mismatch', '=', True)]"/>
+                <filter name="derived_date" string="Trading Day Inferred"
+                        domain="[('trans_date_is_derived', '=', True)]"/>
+                <separator/>
+                <filter name="block_a" string="Settlements" domain="[('block', '=', 'a')]"/>
+                <filter name="block_b" string="Prior-Month AR" domain="[('block', '=', 'b')]"/>
+                <filter name="block_c" string="Sweep &amp; Charges" domain="[('block', '=', 'c')]"/>
+                <separator/>
+                <filter name="run_open" string="Run Not Posted"
+                        domain="[('run_state', 'not in', ('posted', 'cancel'))]"/>
+                <separator/>
+                <filter name="settlement_month" string="Settlement Date" date="settlement_date"/>
+                <separator/>
+                <filter name="group_store" string="Operating Unit"
+                        context="{'group_by': 'analytic_account_id'}"/>
+                <filter name="group_bank" string="Bank" context="{'group_by': 'bank_journal_id'}"/>
+                <filter name="group_channel" string="Tender / Channel" context="{'group_by': 'channel'}"/>
+                <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="group_block" string="Block" context="{'group_by': 'block'}"/>
+                <filter name="group_kind" string="Kind" context="{'group_by': 'kind'}"/>
+                <filter name="group_match" string="Receipt Match" context="{'group_by': 'x24_match'}"/>
+                <filter name="group_settlement" string="Settlement Date"
+                        context="{'group_by': 'settlement_date'}"/>
+                <filter name="group_trans" string="Trading Day" context="{'group_by': 'trans_date'}"/>
+                <filter name="group_run" string="Clearing Run" context="{'group_by': 'run_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_pos_clearing_line" model="ir.actions.act_window">
+        <field name="name">POS Settlements</field>
+        <field name="res_model">levis.pos.clearing.line</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_run_open': 1, 'search_default_group_store': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No settlement matches this filter</p>
+            <p>Every bank line a clearing run read, searchable across runs: by store,
+               by bank, by tender, by merchant id, by narrative, or by X24DN
+               transaction number.</p>
+        </field>
+    </record>
+
     <record id="view_levis_pos_clearing_list" model="ir.ui.view">
         <field name="name">levis.pos.clearing.list</field>
         <field name="model">levis.pos.clearing</field>
@@ -343,12 +572,25 @@
             <search string="POS Clearing">
                 <field name="name"/>
                 <field name="period_ref"/>
+                <field name="bank_journal_ids" string="Bank"/>
+                <field name="date_from"/>
                 <filter name="not_posted" string="Not Posted"
                         domain="[('state', 'not in', ('posted', 'cancel'))]"/>
+                <filter name="posted" string="Posted" domain="[('state', '=', 'posted')]"/>
+                <separator/>
                 <filter name="has_short" string="Has Shortfall"
                         domain="[('line_ids.short_amount', '>', 0)]"/>
+                <filter name="has_unmapped" string="Has Unmapped"
+                        domain="[('line_ids.state', '=', 'unmapped')]"/>
+                <filter name="has_unparsed" string="Has Unparsed"
+                        domain="[('line_ids.state', '=', 'unparsed')]"/>
+                <separator/>
+                <filter name="period" string="Period" date="date_from"/>
                 <separator/>
                 <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                <filter name="group_period" string="Period" context="{'group_by': 'period_ref'}"/>
+                <filter name="group_company" string="Company" context="{'group_by': 'company_id'}"
+                        groups="base.group_multi_company"/>
             </search>
         </field>
     </record>
@@ -370,6 +612,12 @@
                not be matched is listed rather than absorbed.</p>
         </field>
     </record>
+
+    <menuitem id="menu_levis_pos_clearing_line"
+              name="POS Settlements"
+              parent="account.menu_finance_entries"
+              action="action_levis_pos_clearing_line"
+              sequence="93"/>
 
     <menuitem id="menu_levis_pos_clearing"
               name="POS Clearing"
