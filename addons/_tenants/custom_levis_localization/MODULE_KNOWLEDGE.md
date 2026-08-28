@@ -629,6 +629,83 @@ state into something derived from its lines — and it rewrites the same methods
 that the uncommitted receipt-matching work touches. Do it after that lands, on
 its own, so it can be reverted alone.
 
+## Feature 20 — Store inference and subset matching (measure before switching on)
+
+Phase 3. All of it sits behind `levis.clearing.config.advanced_matching`, which
+ships **False**, and the measurement below is the reason it should probably stay
+that way on this tenant.
+
+### The ladder
+
+`_infer_store` answers "whose money is this", first rung that answers *uniquely*:
+
+| # | rung | attributes money? |
+|---|---|---|
+| 1 | MID / TID via `levis.bank.mid.map` (unchanged) | yes |
+| 2 | a store code appearing as a whole token in the narrative | yes |
+| 3 | a validated `levis.store.cash.deposit` of the same amount in the window | yes |
+| 4 | `levis.bank.narrative.hint` — what this wording meant before | **suggestion** |
+| 5 | exactly one store could have produced this gross that day | **suggestion** |
+
+The bottom two do not set `analytic_account_id`. They fill
+`suggested_analytic_account_id`, leave the line `unmapped`, raise an
+`inferred_store` diagnostic, and `_assert_unconfirmed_stores` refuses to generate
+until a human confirms. **The ladder removes the manual searching, not the manual
+deciding** — that split is the whole safety argument, and
+`test_a_weak_inference_is_a_suggestion_not_an_attribution` is what holds it.
+
+Every rung abstains when two answers fit. Ambiguity is not weaker evidence, it is
+none.
+
+Note one deliberate deviation: `levis.bank.mid.map._resolve` refuses to fall
+through to a *keyword* rule when a MID exists but is unmapped, and that guard is
+untouched. The ladder does continue past it to rungs 2-5, on the reasoning that a
+store code and a validated deposit are stronger evidence than a keyword guess,
+and that rungs 4-5 only suggest. If that turns out to be wrong, one condition in
+`_infer_store` closes it.
+
+`action_confirm_store` accepts a suggestion **and learns the wording**, so next
+month's identical memo resolves at rung 1 instead of returning to the queue. A
+fingerprint ever seen pointing at two stores is deactivated, not re-scored: a
+hint that has been wrong once is worse than no hint.
+
+### What the measurement actually showed
+
+Run over August 2026 in a clone of prd_levis_begbal, 3 149 lines, same run
+computed twice:
+
+| | advanced OFF | advanced ON |
+|---|---|---|
+| ok / short / unmapped / unparsed | 1853 / 1169 / 119 / 8 | **identical** |
+| Σ short_amount | 9 044 212 116 | **identical** |
+| Σ allocated | 11 766 531 170 | **identical** |
+| matched by subset | — | 83 lines |
+| store suggestions | 0 | 1 |
+
+**Subset matching changed nothing.** It fired on 83 of 2 966 lines and reached
+the same allocation the greedy pass already reached; verdicts were unique=83,
+ambiguous=57, none=2826. It abstains on ~95%.
+
+The reason is not the algorithm. **954 of the 1 169 short lines allocated
+nothing at all**, and they carry 8.11 bn of the 9.04 bn gap — 90%. There were no
+open receivables to compose from. A composition search cannot invent the
+receivables it is asked to compose, so no amount of cleverness here moves that
+number; the question is why those trading days have no open POS receivable, and
+that is a data question, not a matching one.
+
+**And all 119 unmapped lines are cash deposits with no MID** — precisely what
+rung 3 exists for. It produced nothing only because no deposits have been keyed
+yet. That is the lever on this tenant: `levis.store.cash.deposit` records and
+store codes on transfer memos, not a smarter matcher.
+
+The plan for this phase set the acceptance criterion in advance — Σ short_amount
+must fall, and a subset matcher abstaining on most lines "is not worth its
+complexity and should be dropped rather than loosened". By that criterion the
+subset matcher has not earned its place on this data. It is kept only because it
+is inert by default and costs nothing switched off; **do not switch
+`advanced_matching` on expecting the gap to shrink.** Re-measure before enabling
+it anywhere.
+
 ## Gotchas
 - **Never `_inherit "product.value"` from this module.** Doing so pulls
   `product.value` into the module's `init_models()` pass, and

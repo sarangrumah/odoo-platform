@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-28T01:27:27+00:00",
+  "generated_at": "2026-08-28T03:48:03+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "4f4b25f",
+    "commit": "ead7eca",
     "branch": "feat/levis-daily-pos-clearing"
   },
   "buckets": [
@@ -297,9 +297,14 @@
       "category": "Tenants/Levis",
       "depends": 2,
       "public": false,
-      "last_change": "2026-08-27",
-      "change_count": 3,
+      "last_change": "2026-08-28",
+      "change_count": 4,
       "changes": [
+        {
+          "sha": "889ce24",
+          "date": "2026-08-28",
+          "subject": "feat(levis): prove a settlement against the receipts it paid (#198)"
+        },
         {
           "sha": "f26ad47",
           "date": "2026-08-27",
@@ -345,14 +350,19 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.43.0",
+      "version": "19.0.1.44.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
       "public": false,
       "last_change": "2026-08-28",
-      "change_count": 55,
+      "change_count": 56,
       "changes": [
+        {
+          "sha": "889ce24",
+          "date": "2026-08-28",
+          "subject": "feat(levis): prove a settlement against the receipts it paid (#198)"
+        },
         {
           "sha": "8ffdedc",
           "date": "2026-08-28",
@@ -387,11 +397,6 @@
           "sha": "2653a4b",
           "date": "2026-08-18",
           "subject": "feat(levis): batch menengah sheet after-go-live — filter status bill, kolom store, daftar bill di payment, jurnal sales return (#176)"
-        },
-        {
-          "sha": "62b4b5d",
-          "date": "2026-08-18",
-          "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
         }
       ]
     },

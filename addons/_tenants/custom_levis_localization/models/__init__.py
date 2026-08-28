@@ -28,5 +28,6 @@ from . import levis_store_cash_deposit
 from . import levis_store_daily_closing
 from . import levis_bank_mid_map
 from . import levis_bank_narrative
+from . import levis_bank_narrative_hint
 from . import levis_pos_clearing
 from . import levis_pos_clearing_day
