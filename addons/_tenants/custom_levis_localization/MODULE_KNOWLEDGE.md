@@ -629,82 +629,117 @@ state into something derived from its lines — and it rewrites the same methods
 that the uncommitted receipt-matching work touches. Do it after that lands, on
 its own, so it can be reverted alone.
 
-## Feature 20 — Store inference and subset matching (measure before switching on)
+## The August 2026 gap was a duplicate import, not a reconciliation problem
 
-Phase 3. All of it sits behind `levis.clearing.config.advanced_matching`, which
-ships **False**, and the measurement below is the reason it should probably stay
-that way on this tenant.
+Worth reading before anyone builds a matcher to close a gap in this module.
 
-### The ladder
+**IBCA August statements were imported four times into prd_levis_begbal**, each
+run reloading the file cumulatively from 1-Aug: 386 rows on 07-Aug, 717 on
+12-Aug, 840 on 14-Aug, 1 202 on 19-Aug. 3 145 posted rows where 1 202 are real —
+a factor of 2.62. July is clean (2 111 of 2 111), so this is specific to August.
 
-`_infer_store` answers "whose money is this", first rung that answers *uniquely*:
+    select count(*), count(distinct (mv.date, sl.payment_ref, sl.amount))
+      from account_bank_statement_line sl
+      join account_move mv on mv.id = sl.move_id
+      join account_journal j on j.id = sl.journal_id
+     where j.code = 'IBCA' and mv.date >= '2026-08-01' and mv.date < '2026-09-01'
 
-| # | rung | attributes money? |
+Measured on a clone, deduplicated by keeping one row per
+(date, payment_ref, amount):
+
+| | as imported | deduplicated |
 |---|---|---|
-| 1 | MID / TID via `levis.bank.mid.map` (unchanged) | yes |
-| 2 | a store code appearing as a whole token in the narrative | yes |
-| 3 | a validated `levis.store.cash.deposit` of the same amount in the window | yes |
-| 4 | `levis.bank.narrative.hint` — what this wording meant before | **suggestion** |
-| 5 | exactly one store could have produced this gross that day | **suggestion** |
+| clearing lines | 3 149 | 1 206 |
+| ok / short | 1 853 / 1 169 | **1 148 / 2** |
+| Σ short_amount | 9 044 212 116 | **899 730** |
 
-The bottom two do not set `analytic_account_id`. They fill
-`suggested_analytic_account_id`, leave the line `unmapped`, raise an
-`inferred_store` diagnostic, and `_assert_unconfirmed_stores` refuses to generate
-until a human confirms. **The ladder removes the manual searching, not the manual
-deciding** — that split is the whole safety argument, and
-`test_a_weak_inference_is_a_suggestion_not_an_attribution` is what holds it.
+**The nine-billion "unexplained" was an artefact.** The duplicate lines promised
+the open receivable pool away to statements that do not exist, so every line
+processed after them found nothing left and reported itself short. On real data
+the clearing already resolves 1 148 of 1 206 lines and leaves under a million
+rupiah outstanding on two of them.
 
-Every rung abstains when two answers fit. Ambiguity is not weaker evidence, it is
-none.
+It also moves the bank GL: IBCA August turnover reads ~20.98 bn against a real
+~8 bn, and the net is out by 940 983. The three early batches are all `posted`,
+so correcting production means deleting 1 943 statement lines and their journal
+entries — not something to do without a decision. It is being handled separately;
+do not "fix" it from here.
 
-Note one deliberate deviation: `levis.bank.mid.map._resolve` refuses to fall
-through to a *keyword* rule when a MID exists but is unmapped, and that guard is
-untouched. The ladder does continue past it to rungs 2-5, on the reasoning that a
-store code and a validated deposit are stronger evidence than a keyword guess,
-and that rungs 4-5 only suggest. If that turns out to be wrong, one condition in
-`_infer_store` closes it.
+**Correction to what this file said earlier.** A previous version of this section
+concluded, from the *duplicated* run, that subset matching "abstains on ~95%" and
+"has not earned its place". Both figures were measured on corrupt data and are
+withdrawn. On the deduplicated month subset matching participates in 470 of 1 130
+allocations (42%). It still does not change the totals — the greedy pass reaches
+the same answer — but that is a much narrower claim than the one made before, and
+it rests on there being almost nothing left to improve rather than on the search
+being useless.
 
-`action_confirm_store` accepts a suggestion **and learns the wording**, so next
-month's identical memo resolves at rung 1 instead of returning to the queue. A
-fingerprint ever seen pointing at two stores is deactivated, not re-scored: a
-hint that has been wrong once is worse than no hint.
+The lesson generalises: **measure the input before drawing a conclusion from the
+output.** A ratio of gross to open receivables far from 1.0 (this run: 20.8 bn
+against 11.65 bn, i.e. 1.79) is a signal that the statement side is inflated, not
+that the receivable side is missing.
 
-### What the measurement actually showed
+## Evidence-led allocation (`feat/pos-clearing-evidence`) — design notes inherited
 
-Run over August 2026 in a clone of prd_levis_begbal, 3 149 lines, same run
-computed twice:
+Written by the session that built the receipt subsystem, recorded here because
+none of it is visible in the code and all of it was paid for once already.
 
-| | advanced OFF | advanced ON |
-|---|---|---|
-| ok / short / unmapped / unparsed | 1853 / 1169 / 119 / 8 | **identical** |
-| Σ short_amount | 9 044 212 116 | **identical** |
-| Σ allocated | 11 766 531 170 | **identical** |
-| matched by subset | — | 83 lines |
-| store suggestions | 0 | 1 |
+**Receipt evidence is a priority, not a restriction.** `_allocate_with_evidence`
+drains the tender account the receipts name first, then falls back to the ordinary
+largest-residual search. Making it a restriction would strand money whenever a
+proven tender's receivable happens to be already reconciled — a case the old
+behaviour handles correctly. This is deliberate; do not "fix" it into a
+restriction.
 
-**Subset matching changed nothing.** It fired on 83 of 2 966 lines and reached
-the same allocation the greedy pass already reached; verdicts were unique=83,
-ambiguous=57, none=2826. It abstains on ~95%.
+Traps already hit, so nobody hits them twice:
 
-The reason is not the algorithm. **954 of the 1 169 short lines allocated
-nothing at all**, and they carry 8.11 bn of the 9.04 bn gap — 90%. There were no
-open receivables to compose from. A composition search cannot invent the
-receivables it is asked to compose, so no amount of cleverness here moves that
-number; the question is why those trading days have no open POS receivable, and
-that is a data question, not a matching one.
+* **`only_accounts` still binds, above the evidence.** A cash deposit landing on a
+  trading day that also holds a card transaction of the same amount will
+  "prove" itself against the card. Wrong: the channel restriction answers a
+  different question from the one receipts answer. Covered by
+  `test_evidence_never_lets_a_cash_deposit_clear_a_card_receivable`.
+* **Tender is read from the account NAME** via `_x24_tender_of_account`, prefix
+  `POS Receivable - `. A test fixture whose account is called "POS Debit Card"
+  silently yields zero evidence — it does not fail, it goes quiet. If a tender
+  field ever lands on the account, prefer it to name-matching.
+* **Receipt exclusivity is deliberately NOT in the evidence pass.** `x24_match` /
+  `x24_tender` are stored computes, and a compute that depends on processing
+  order is not idempotent. `_x24_identify` stays stateless; exclusivity lives only
+  in the worksheet. Two twin settlements in a day will point at the same
+  receipts — same tender, so no account is harmed.
+* **The day ladder is walked to find evidence**, and a day whose receipts fit
+  replaces the guessed day. `trans_date_is_derived` deliberately stays true: the
+  narrative still never stated a date, only the guess got better.
+* **Performance.** Subset search is the only expensive step. Three guards: a
+  20-candidate cap counted *after* dropping items larger than the target,
+  `_subset_totals` reaching each subset sum one addition from a known one, and
+  memoisation per (store, day, gross) in both `_attach_evidence` and
+  `_compute_x24_trans`. Without the memo a 3 000-line run is dominated by it.
+* `_x24_subset` refuses to name anything once two tenders can both compose the
+  figure — it does not pick the tidier one. Same for one tender with two
+  solutions.
 
-**And all 119 unmapped lines are cash deposits with no MID** — precisely what
-rung 3 exists for. It produced nothing only because no deposits have been keyed
-yet. That is the lever on this tenant: `levis.store.cash.deposit` records and
-store codes on transfer memos, not a smarter matcher.
+**Two subset-sum implementations must not coexist.** `levis.clearing.matcher.
+_subset_match` (tolerance + node budget, used by bank reconcile) and `_x24_subset`
+(faster, stricter, zero tolerance) do the same thing. Whichever survives, the
+other should call it.
 
-The plan for this phase set the acceptance criterion in advance — Σ short_amount
-must fall, and a subset matcher abstaining on most lines "is not worth its
-complexity and should be dropped rather than loosened". By that criterion the
-subset matcher has not earned its place on this data. It is kept only because it
-is inert by default and costs nothing switched off; **do not switch
-`advanced_matching` on expecting the gap to shrink.** Re-measure before enabling
-it anywhere.
+### The dedup script
+
+`scripts/tenants/levis/100_dedupe_bank_statement_imports.py`, on branch
+`feat/pos-clearing-evidence`. **Never run anywhere, not even dry.** Env:
+`LEVIS_DEDUPE_APPLY=1` (without it, reports and rolls back),
+`LEVIS_DEDUPE_JOURNAL` (default IBCA), `LEVIS_DEDUPE_FROM` / `_TO`.
+
+Its duplicate rule is deliberately identical to `_duplicate_groups` in the module
+— group on (journal, date, payment_ref, amount), split on a `create_date` gap of
+≥ 3600s — so the readiness gate and the script cannot disagree about what a
+duplicate is. It refuses (lists rather than deletes) any line already reconciled,
+already held by a `levis_clearing_line_id`, or carrying legs other than
+Dr bank / Cr suspense.
+
+Before APPLY: dump, then dry-run on a clone and compare its count against the
+1 943 measured independently here.
 
 ## Gotchas
 - **Never `_inherit "product.value"` from this module.** Doing so pulls

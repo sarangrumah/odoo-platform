@@ -47,5 +47,3 @@ access_levis_store_daily_closing_user,levis.store.daily.closing invoicing,model_
 access_levis_clearing_writeoff_wizard,levis.clearing.writeoff.wizard manager,model_levis_clearing_writeoff_wizard,account.group_account_manager,1,1,1,1
 access_levis_pos_clearing_day_mgr,levis.pos.clearing.day manager,model_levis_pos_clearing_day,account.group_account_manager,1,1,1,1
 access_levis_pos_clearing_day_user,levis.pos.clearing.day invoicing,model_levis_pos_clearing_day,account.group_account_invoice,1,0,0,0
-access_levis_bank_narrative_hint_mgr,levis.bank.narrative.hint manager,model_levis_bank_narrative_hint,account.group_account_manager,1,1,1,1
-access_levis_bank_narrative_hint_user,levis.bank.narrative.hint invoicing,model_levis_bank_narrative_hint,account.group_account_invoice,1,0,0,0

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-28T03:48:03+00:00",
+  "generated_at": "2026-08-28T06:57:25+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "ead7eca",
+    "commit": "f3c087a",
     "branch": "feat/levis-daily-pos-clearing"
   },
   "buckets": [
@@ -350,14 +350,19 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.44.0",
+      "version": "19.0.1.43.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
       "public": false,
       "last_change": "2026-08-28",
-      "change_count": 56,
+      "change_count": 57,
       "changes": [
+        {
+          "sha": "f3c087a",
+          "date": "2026-08-28",
+          "subject": "feat(levis): infer a store when the narrative will not say — but only ever suggest"
+        },
         {
           "sha": "889ce24",
           "date": "2026-08-28",
@@ -392,11 +397,6 @@
           "sha": "e0f5965",
           "date": "2026-08-19",
           "subject": "feat(levis): the payment voucher names every bill it settles, with the amount applied to each (#184)"
-        },
-        {
-          "sha": "2653a4b",
-          "date": "2026-08-18",
-          "subject": "feat(levis): batch menengah sheet after-go-live — filter status bill, kolom store, daftar bill di payment, jurnal sales return (#176)"
         }
       ]
     },
@@ -2015,7 +2015,7 @@
       "module": "custom_bank_import",
       "bucket": "ee_gap",
       "name": "Custom Bank Import",
-      "version": "19.0.0.3.0",
+      "version": "19.0.0.4.0",
       "summary": "CSV template-based bank statement import + H2H bank API adapter framework",
       "category": "Accounting/Bank",
       "depends": 4,

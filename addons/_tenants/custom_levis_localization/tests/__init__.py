@@ -12,4 +12,3 @@ from . import test_store_code
 from . import test_store_cash_deposit
 from . import test_clearing_writeoff
 from . import test_clearing_day
-from . import test_store_inference

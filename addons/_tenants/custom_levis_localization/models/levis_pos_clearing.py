@@ -65,7 +65,6 @@ generate, and ``action_generate_moves`` does not post.
 """
 
 import logging
-import re
 from collections import defaultdict
 from datetime import timedelta
 
@@ -115,8 +114,6 @@ _DIAG_KINDS = [
     ("sweep_double", "Sweep destination is also a statement source"),
     ("no_cash_account", "No CASH tender receivable configured"),
     ("overlap", "Another run covers part of this period"),
-    ("inferred_store", "Store inferred — needs confirming"),
-    ("subset_ambiguous", "Several compositions fit"),
 ]
 
 # Statement kinds that settle a receivable (block A/B).
@@ -807,178 +804,6 @@ class LevisPosClearing(models.Model):
             "context": {"search_default_group_line": 1, "search_default_unmatched": 1, "create": False},
         }
 
-    def _subset_or_greedy(self, pool, residual, analytic_id, dates, amount, only, vals):
-        """Compose the settlement out of open items, or fall back to greedy.
-
-        Tries the bounded subset search first, and takes its answer **only when
-        exactly one composition fits**. Anything else — several compositions, a
-        pool too big to search, a budget exhausted — falls through to the greedy
-        allocation that has always run here, unchanged.
-
-        That fallback is what makes this safe to switch on: the worst case is
-        the behaviour we already had, and the recorded ``match_method`` says
-        which one produced the answer, so a month can be measured rather than
-        trusted.
-        """
-        self.ensure_one()
-        config = self.config_id
-        if not config.advanced_matching:
-            vals["match_method"] = "greedy"
-            return self._allocate(pool, residual, analytic_id, dates, amount, only_accounts=only)
-
-        allowed = set(only.ids) if only else None
-        items = []
-        for date in dates:
-            for aml in pool.get((analytic_id, date), ()):
-                if allowed is not None and aml.account_id.id not in allowed:
-                    continue
-                left_on_aml = residual.get(aml.id, 0.0)
-                if left_on_aml > _EPS:
-                    items.append(((aml.id, aml.account_id.id, date), left_on_aml, date))
-
-        verdict, chosen = self.env["levis.clearing.matcher"]._subset_match(
-            items,
-            amount,
-            tolerance=config._match_tolerance(amount),
-            max_items=config.subset_max_items,
-            node_budget=config.subset_node_budget,
-        )
-        vals["match_verdict"] = verdict
-        if verdict == "unique":
-            taken = []
-            for aml_id, account_id, date in chosen:
-                take = round(residual.get(aml_id, 0.0), 2)
-                if take <= _EPS:
-                    continue
-                residual[aml_id] = 0.0
-                taken.append((account_id, aml_id, date, take))
-            left = round(amount - sum(item[3] for item in taken), 2)
-            vals["match_method"] = "subset"
-            return taken, max(left, 0.0)
-
-        vals["match_method"] = "greedy"
-        return self._allocate(pool, residual, analytic_id, dates, amount, only_accounts=only)
-
-    def _infer_store(self, statement_line, parsed, rules, cash_account=None):
-        """Whose money this is — first rung that answers uniquely wins.
-
-        Returns ``(analytic, rule, method, confidence)``. ``rule`` is set only
-        when a deliberate mapping matched, because that is the record the line
-        should point at.
-
-        The ladder exists because a MID names a store and free text does not. It
-        is ordered by how much the evidence proves, and every rung abstains when
-        it finds more than one answer — an ambiguity is not weaker evidence, it
-        is no evidence.
-
-        Only the top four rungs actually attribute money. The bottom two produce
-        a *suggestion*: the line stays unmapped, an operator is shown what the
-        system thinks, and generation is blocked until someone confirms. That
-        split is the whole safety story — the ladder removes the manual
-        *searching*, not the manual *deciding*.
-        """
-        self.ensure_one()
-        Analytic = self.env["account.analytic.account"]
-        company = self.company_id
-        journal = statement_line.journal_id
-        config = self.config_id
-
-        # 1. A deliberate mapping on MID / terminal / keyword. Unchanged, and
-        #    still refuses to fall through to keyword when a MID exists but is
-        #    unmapped — see levis.bank.mid.map._resolve.
-        rule = self.env["levis.bank.mid.map"]._resolve(company, journal, parsed, statement_line.date, candidates=rules)
-        if rule:
-            return rule.analytic_account_id, rule, "mid", "exact"
-
-        if not config.advanced_matching:
-            return Analytic, self.env["levis.bank.mid.map"], False, False
-
-        # 2. A store code typed into the narrative — the berita acara rule. This
-        #    is why the deposit document prints a reference at all.
-        analytic = self._store_from_narrative(statement_line)
-        if analytic:
-            return analytic, self.env["levis.bank.mid.map"], "store_code", "exact"
-
-        # 3. A validated cash deposit of the same amount, in the window. The
-        #    deterministic answer for cash, which a keyword rule can only guess.
-        if parsed["kind"] == "cash_deposit":
-            tolerance = config._match_tolerance(abs(statement_line.amount))
-            deposit = self.env["levis.store.cash.deposit"]._find_for_statement_line(
-                statement_line, tolerance=tolerance, window_days=config.deposit_match_window_days
-            )
-            if deposit:
-                return deposit.analytic_account_id, self.env["levis.bank.mid.map"], "deposit", "exact"
-
-        # 4. Learned from what this same wording meant before. Strong, but it is
-        #    an observation rather than a decision, so it is only a suggestion.
-        learned = self.env["levis.bank.narrative.hint"]._suggest(company, journal, statement_line.payment_ref)
-        if learned:
-            return learned, self.env["levis.bank.mid.map"], "learned", "weak"
-
-        # 5. Exactly one store could have produced this amount on the day. A
-        #    coincidence, and treated as one.
-        guess = self._store_from_amount(statement_line, parsed, cash_account)
-        if guess:
-            return guess, self.env["levis.bank.mid.map"], "amount", "weak"
-
-        return Analytic, self.env["levis.bank.mid.map"], False, False
-
-    def _store_from_narrative(self, statement_line):
-        """A warehouse store code appearing as a whole token in the memo."""
-        self.ensure_one()
-        text = (statement_line.payment_ref or "").upper()
-        if not text:
-            return self.env["account.analytic.account"]
-        index = self.env["stock.warehouse"]._levis_store_code_index(self.company_id.id)
-        hits = set()
-        for code, (_warehouse_id, analytic_id) in index.items():
-            # Whole-token only, and never on a code so short that it appears
-            # inside an account number by chance.
-            if len(code) < 3 or not analytic_id:
-                continue
-            if re.search(r"(?<![A-Z0-9])%s(?![A-Z0-9])" % re.escape(code), text):
-                hits.add(analytic_id)
-        if len(hits) != 1:
-            return self.env["account.analytic.account"]
-        return self.env["account.analytic.account"].browse(hits.pop())
-
-    def _store_from_amount(self, statement_line, parsed, cash_account=None):
-        """The one store whose open receivables could have produced this gross.
-
-        Deliberately the weakest rung, and it abstains the moment a second store
-        could have produced the same figure — which, in a chain where every shop
-        sells the same jeans at the same price, is often.
-        """
-        self.ensure_one()
-        config = self.config_id
-        gross = parsed.get("gross") or 0.0
-        if gross <= 0:
-            return self.env["account.analytic.account"]
-        tolerance = max(config._match_tolerance(gross), _EPS)
-        primary = statement_line.date - timedelta(days=config.settlement_lag_days or 0)
-        dates = self._candidate_dates(primary)
-        only = self._pool_accounts_for_channel(parsed, cash_account)
-        domain = [
-            ("account_id", "in", (only or config.pos_receivable_account_ids).ids),
-            ("date", "in", dates),
-            ("company_id", "=", self.company_id.id),
-            ("parent_state", "=", "posted"),
-            ("debit", ">", 0),
-        ]
-        totals = {}
-        for aml in self.env["account.move.line"].search(domain):
-            store = aml.l10n_ou_analytic_id
-            if not store and aml.analytic_distribution:
-                keys = [int(k) for k in aml.analytic_distribution if str(k).isdigit()]
-                store = self.env["account.analytic.account"].browse(keys[:1])
-            if not store:
-                continue
-            totals[store.id] = totals.get(store.id, 0.0) + aml.debit
-        fits = [sid for sid, total in totals.items() if abs(total - gross) <= tolerance]
-        if len(fits) != 1:
-            return self.env["account.analytic.account"]
-        return self.env["account.analytic.account"].browse(fits[0])
-
     def _line_from_parsed(
         self, statement_line, parsed, rules, pool, residual, ar_pool, ar_residual, diag_vals, cash_account=None
     ):
@@ -1038,43 +863,10 @@ class LevisPosClearing(models.Model):
             return vals
 
         # --- a settlement: it must belong to a store ---------------------
-        store, rule, method, confidence = self._infer_store(statement_line, parsed, rules, cash_account)
-        vals["store_method"] = method or False
-        vals["store_confidence"] = confidence or False
-
-        # A weak rung is a suggestion, not an attribution: the line stays
-        # unmapped and the store is offered for confirmation. Attributing money
-        # on a coincidence is the one thing this ladder must never do.
-        if store and confidence == "weak":
-            vals["suggested_analytic_account_id"] = store.id
-            vals.update(
-                {
-                    "state": "unmapped",
-                    "block": False,
-                    "note": _(
-                        "Suggested %(store)s (%(how)s) — confirm before booking.",
-                        store=store.display_name,
-                        how=method,
-                    ),
-                }
-            )
-            diag_vals.append(
-                {
-                    "kind": "inferred_store",
-                    "severity": "warning",
-                    "date": statement_line.date,
-                    "bank_journal_id": statement_line.journal_id.id,
-                    "analytic_account_id": store.id,
-                    "amount": statement_line.amount,
-                    "count": 1,
-                    "res_model": "account.bank.statement.line",
-                    "res_id": statement_line.id,
-                    "message": _("Looks like %s — needs confirming.", store.display_name),
-                }
-            )
-            return vals
-
-        if not store:
+        rule = self.env["levis.bank.mid.map"]._resolve(
+            self.company_id, statement_line.journal_id, parsed, statement_line.date, candidates=rules
+        )
+        if not rule:
             vals.update(
                 {
                     "state": "unmapped",
@@ -1097,9 +889,8 @@ class LevisPosClearing(models.Model):
             )
             return vals
 
-        if rule:
-            vals["map_id"] = rule.id
-        vals["analytic_account_id"] = store.id
+        vals["map_id"] = rule.id
+        vals["analytic_account_id"] = rule.analytic_account_id.id
         exact = parsed["confidence"] == "exact" and parsed["trans_date"]
         primary = (
             parsed["trans_date"] if exact else statement_line.date - timedelta(days=config.settlement_lag_days or 0)
@@ -1109,10 +900,12 @@ class LevisPosClearing(models.Model):
         dates = self._candidate_dates(primary)
 
         only = self._pool_accounts_for_channel(parsed, cash_account)
-        taken, left = self._subset_or_greedy(pool, residual, store.id, dates, parsed["gross"], only, vals)
+        taken, left = self._allocate(
+            pool, residual, rule.analytic_account_id.id, dates, parsed["gross"], only_accounts=only
+        )
         block = "a"
         if left > _EPS and ar_pool:
-            ar_taken, left = self._allocate_flat(ar_pool, ar_residual, store.id, left)
+            ar_taken, left = self._allocate_flat(ar_pool, ar_residual, rule.analytic_account_id.id, left)
             if ar_taken and not taken:
                 # Nothing of this store's POS receivable was open: the settlement is
                 # collecting an older trade receivable, not this month's sales.
@@ -1141,14 +934,14 @@ class LevisPosClearing(models.Model):
                     "severity": "warning",
                     "date": statement_line.date,
                     "bank_journal_id": statement_line.journal_id.id,
-                    "analytic_account_id": store.id,
+                    "analytic_account_id": rule.analytic_account_id.id,
                     "amount": left,
                     "count": 1,
                     "res_model": "account.bank.statement.line",
                     "res_id": statement_line.id,
                     "message": _(
                         "No open receivable left for %(store)s around %(date)s.",
-                        store=store.display_name,
+                        store=rule.analytic_account_id.display_name,
                         date=primary,
                     ),
                 }
@@ -1459,36 +1252,6 @@ class LevisPosClearing(models.Model):
     # ------------------------------------------------------------------
     # Stage 2 — DRAFT entries
     # ------------------------------------------------------------------
-    def _assert_unconfirmed_stores(self):
-        """A suggested store may not book until somebody accepts it.
-
-        Mirrors the existing unmapped/unparsed guard rather than inventing a new
-        kind of refusal, and honours ``ignore_warnings`` the same way — an
-        accountant who has read the list can still proceed, deliberately.
-        """
-        self.ensure_one()
-        if self.ignore_warnings:
-            return True
-        pending = self.line_ids.filtered(lambda line: line.store_confidence == "weak" and not line.store_confirmed)
-        if pending:
-            raise UserError(
-                _(
-                    "%(count)s settlement(s) only have a *suggested* store. Confirm "
-                    "or map them before booking — the clearing will not attribute "
-                    "money on a resemblance:\n%(lines)s",
-                    count=len(pending),
-                    lines="\n".join(
-                        "  %s — looks like %s"
-                        % (
-                            line.payment_ref or line.id,
-                            line.suggested_analytic_account_id.display_name or "?",
-                        )
-                        for line in pending[:20]
-                    ),
-                )
-            )
-        return True
-
     def _assert_generatable(self):
         self.ensure_one()
         if self.state != "computed":
@@ -1555,7 +1318,6 @@ class LevisPosClearing(models.Model):
         """Stage 2: write down what stage 3 will book, and book nothing."""
         self.ensure_one()
         self._assert_generatable()
-        self._assert_unconfirmed_stores()
         self.leg_ids.unlink()
         # Built as one batch: a month of settlements is a few thousand legs, and
         # creating them one at a time is a few thousand round trips.
@@ -2048,46 +1810,6 @@ class LevisPosClearingLine(models.Model):
         copy=False,
     )
     writeoff_uid = fields.Many2one("res.users", string="Written Off By", readonly=True, copy=False)
-    # --- how this line was matched, and how it found its store -------------
-    # Recorded so a month can be measured rather than trusted: switching
-    # advanced matching on has to be defensible line by line.
-    match_method = fields.Selection(
-        [("subset", "Composed"), ("greedy", "Greedy"), ("ar_fallback", "Prior AR"), ("manual", "Manual")],
-        string="Matched By",
-        readonly=True,
-    )
-    match_verdict = fields.Selection(
-        [("unique", "One composition"), ("ambiguous", "Several fit"), ("none", "None fit")],
-        string="Composition",
-        readonly=True,
-    )
-    store_method = fields.Selection(
-        [
-            ("mid", "MID / Terminal"),
-            ("store_code", "Store Code in Narrative"),
-            ("deposit", "Validated Deposit"),
-            ("learned", "Learned Wording"),
-            ("amount", "Amount + Day"),
-        ],
-        string="Store Found By",
-        readonly=True,
-    )
-    store_confidence = fields.Selection(
-        [("exact", "Identified"), ("weak", "Suggested")],
-        string="Store Confidence",
-        readonly=True,
-    )
-    suggested_analytic_account_id = fields.Many2one(
-        "account.analytic.account",
-        string="Suggested Store",
-        readonly=True,
-        help="What the inference ladder thinks this is. It books nothing until somebody confirms it.",
-    )
-    store_confirmed = fields.Boolean(
-        string="Store Confirmed",
-        copy=False,
-        help="Set when a human accepts a suggested store. Generation refuses without it.",
-    )
     day_id = fields.Many2one(
         "levis.pos.clearing.day",
         string="Clearing Day",
@@ -2443,34 +2165,6 @@ class LevisPosClearingLine(models.Model):
             )
             if booked:
                 residual_leg.write({"role": "writeoff", "move_line_id": booked[-1].id})
-        return True
-
-    def action_confirm_store(self):
-        """Accept the suggested store, and remember the wording that found it.
-
-        Two things happen, and the second is the point: the line becomes
-        bookable, and the narrative is learned, so the next month's identical
-        memo resolves at the top of the ladder instead of coming back here.
-        """
-        Hint = self.env["levis.bank.narrative.hint"]
-        for line in self:
-            if not line.suggested_analytic_account_id:
-                raise UserError(_("%s has no suggested store to confirm.", line.payment_ref or line.id))
-            line.write(
-                {
-                    "analytic_account_id": line.suggested_analytic_account_id.id,
-                    "store_confirmed": True,
-                    "store_confidence": "exact",
-                }
-            )
-            Hint._learn(
-                line.company_id,
-                line.bank_journal_id,
-                line.statement_line_id.payment_ref,
-                line.suggested_analytic_account_id,
-                "manual",
-                when=line.settlement_date,
-            )
         return True
 
     def action_open_writeoff_wizard(self):
