@@ -30,6 +30,12 @@ the days Finance wants to look a settlement in the eye:
    resolution is stored on the line itself, so the reconciliation list can be
    filtered and grouped per Operating Unit.
 
+5. **Nothing dated after the money moved is offered.** A settlement pays for
+   takings that already happened, so the bank's own date is a ceiling on every
+   candidate — in the tender window, in *Search More*, and in the generic scorer.
+   Each candidate also carries its **transaction number**, the reference on the
+   document itself, next to (not instead of) the journal entry name.
+
 Nothing here changes how a reconciliation is written: it is still
 ``custom_account_reconcile``'s ``_reconcile_with_amls`` on top of core
 ``reconcile()``. This module only decides what is *offered*.

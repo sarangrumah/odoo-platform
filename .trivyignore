@@ -10,3 +10,35 @@
 # Example:
 # # justification: false positive — affects only debian buster, we run bookworm. expires 2026-12-31
 # CVE-2024-99999
+
+# --------------------------------------------------------------------------
+# Go stdlib compiled into the static docker CLI (tenant-orchestrator image)
+#
+# justification: these are go1.26.5 stdlib CVEs baked into
+# /usr/local/bin/docker, the static Docker CLI the orchestrator uses to run
+# `docker exec odoo-mgmt odoo -d <db> --init=...`. They cannot be fixed by us
+# today: the newest published static release, 29.7.2, is still built with
+# go1.26.5 (verified by `go version` on the extracted binary), and the fixes
+# land in go1.26.6. Bumping the pin changes nothing.
+#
+# Why the exposure is not real here: the binary is a local CLI. It serves no
+# HTTP, terminates no TLS, and parses no attacker-supplied ASN.1, XML, URLs or
+# templates — it opens /var/run/docker.sock, which is mounted read-only, and
+# exits. Every finding below is a DoS or content-injection reachable only by
+# feeding untrusted input to a server, which this binary never is.
+#
+# These are listed by ID rather than as a package rule on purpose. A rule on
+# `stdlib` would silence every future Go CVE in every Go binary we ship, and the
+# whole point is that the NEXT batch should fail loudly.
+#
+# On 26-Aug this binary scanned clean; these eight were published since. Recheck
+# when Docker ships a static build on go1.26.6 or later, drop this block, and
+# re-scan. expires 2026-10-01
+CVE-2026-33818
+CVE-2026-39821
+CVE-2026-46600
+CVE-2026-56853
+CVE-2026-56858
+CVE-2026-56859
+CVE-2026-56860
+CVE-2026-56862

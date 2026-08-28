@@ -80,13 +80,47 @@ class AccountBankStatementLine(models.Model):
         return accounts
 
     def _levis_day_window(self):
-        """``(from, to)`` trading days this settlement may draw on."""
+        """``(from, to)`` trading days this settlement may draw on.
+
+        The upper end is never later than the day the money moved: a sale made
+        after the bank paid for it cannot be what the bank paid for. See
+        ``_levis_match_date_cutoff``.
+        """
         self.ensure_one()
         config = self._levis_clearing_config()
         primary = self.levis_trans_date or self.date
         if not self.levis_trans_date and config:
             primary -= timedelta(days=config.settlement_lag_days or 0)
-        return primary - timedelta(days=_DAY_WINDOW_BEFORE), primary + timedelta(days=_DAY_WINDOW_AFTER)
+        date_to = primary + timedelta(days=_DAY_WINDOW_AFTER)
+        cutoff = self._levis_match_date_cutoff()
+        if cutoff and date_to > cutoff:
+            date_to = cutoff
+        return primary - timedelta(days=_DAY_WINDOW_BEFORE), date_to
+
+    # ------------------------------------------------------------------
+    # Nothing dated after the money moved
+    # ------------------------------------------------------------------
+    def _levis_match_date_cutoff(self):
+        """The latest journal-item date this line may be offered.
+
+        A settlement pays for takings that already happened. Offering a sale, a
+        payment or an invoice dated *after* the bank moved the money invites the
+        operator to clear a receivable with money that was received before it
+        existed — the reconciliation looks tidy and the period it belongs to is
+        wrong. So the bank's own transaction date is a ceiling, and it holds for
+        every route into the matcher: the tender window, "Search More", and the
+        generic scorer for lines this module does not recognise.
+        """
+        self.ensure_one()
+        return self.date
+
+    def _get_default_amls_matching_domain(self, allow_draft=False):
+        domain = super()._get_default_amls_matching_domain(allow_draft=allow_draft)
+        cutoff = self._levis_match_date_cutoff()
+        # Applied here rather than in each caller: every candidate search in this
+        # module and in ``custom_account_reconcile`` builds on this domain, so a
+        # single leaf covers relax mode and the non-tender fallback too.
+        return domain + [("date", "<=", cutoff)] if cutoff else domain
 
     def _levis_candidate_domain(self, relax=False):
         """Open tender receivables of this line's store, around its trading day."""
