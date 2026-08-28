@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-26T06:36:37+00:00",
+  "generated_at": "2026-08-28T00:56:44+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "03bfa6d",
-    "branch": "feat/ppn-digunggung-detail"
+    "commit": "cf60920",
+    "branch": "feat/levis-clearing-receipts"
   },
   "buckets": [
     {
@@ -292,14 +292,19 @@
       "module": "custom_levis_bank_reconcile",
       "bucket": "_tenants",
       "name": "Levi's Bank Reconciliation (POS Tender)",
-      "version": "19.0.1.1.0",
+      "version": "19.0.1.2.0",
       "summary": "Match bank settlements against POS tender receivables per store, net of MDR, with a cash suggestion capped at the statement amount.",
       "category": "Tenants/Levis",
       "depends": 2,
       "public": false,
-      "last_change": "2026-08-11",
-      "change_count": 2,
+      "last_change": "2026-08-28",
+      "change_count": 3,
       "changes": [
+        {
+          "sha": "cf60920",
+          "date": "2026-08-28",
+          "subject": "feat(levis): prove a settlement against the receipts it paid"
+        },
         {
           "sha": "49c9eff",
           "date": "2026-08-11",
@@ -340,14 +345,19 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.34.0",
+      "version": "19.0.1.39.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
-      "last_change": "2026-08-19",
-      "change_count": 50,
+      "last_change": "2026-08-28",
+      "change_count": 51,
       "changes": [
+        {
+          "sha": "cf60920",
+          "date": "2026-08-28",
+          "subject": "feat(levis): prove a settlement against the receipts it paid"
+        },
         {
           "sha": "e0f5965",
           "date": "2026-08-19",
@@ -382,11 +392,6 @@
           "sha": "5ac3467",
           "date": "2026-08-11",
           "subject": "fix(levis): the tender account names its tender — use that in allocation and mapping (#140)"
-        },
-        {
-          "sha": "8092ac5",
-          "date": "2026-08-11",
-          "subject": "fix(levis): stop two rules claiming one bank terminal, and pick the specific keyword (#138)"
         }
       ]
     },
@@ -1706,9 +1711,9 @@
       "change_count": 53,
       "changes": [
         {
-          "sha": "03bfa6d",
+          "sha": "bde8a4e",
           "date": "2026-08-26",
-          "subject": "feat(reports): rincian PPN Keluaran Digunggung sampai nomor transaksi"
+          "subject": "feat(reports): rincian PPN Keluaran Digunggung sampai nomor transaksi (#195)"
         },
         {
           "sha": "3e7fdd6",
