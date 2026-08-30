@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-30T03:48:55+00:00",
+  "generated_at": "2026-08-30T15:19:23+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "34f54d8",
-    "branch": "feat/pooled-quantity-assets"
+    "commit": "0893fef",
+    "branch": "feat/pooled-asset-merge"
   },
   "buckets": [
     {
@@ -1540,18 +1540,23 @@
       "module": "custom_accounting_asset",
       "bucket": "ee_gap",
       "name": "Custom Accounting - Fixed Assets",
-      "version": "19.0.0.6.0",
+      "version": "19.0.0.7.0",
       "summary": "Fixed asset register with depreciation schedule, monthly posting cron, and disposal workflow",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
       "last_change": "2026-08-30",
-      "change_count": 24,
+      "change_count": 25,
       "changes": [
         {
-          "sha": "34f54d8",
+          "sha": "0893fef",
           "date": "2026-08-30",
-          "subject": "feat(assets): satu nomor aset untuk banyak unit, dan cara mengeluarkan yang rusak"
+          "subject": "feat(assets): gabungkan aset per-unit lama menjadi satu aset berjumlah"
+        },
+        {
+          "sha": "c9c500f",
+          "date": "2026-08-30",
+          "subject": "feat(assets): satu nomor aset untuk banyak unit, dan cara mengeluarkan yang rusak (#203)"
         },
         {
           "sha": "f5d8d58",
@@ -1582,11 +1587,6 @@
           "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
-        },
-        {
-          "sha": "41cfff9",
-          "date": "2026-07-06",
-          "subject": "feat(asset): reversible depreciation + self-heal on external entry changes"
         }
       ]
     },
@@ -1941,9 +1941,9 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "34f54d8",
+          "sha": "c9c500f",
           "date": "2026-08-30",
-          "subject": "feat(assets): satu nomor aset untuk banyak unit, dan cara mengeluarkan yang rusak"
+          "subject": "feat(assets): satu nomor aset untuk banyak unit, dan cara mengeluarkan yang rusak (#203)"
         },
         {
           "sha": "4704e07",
