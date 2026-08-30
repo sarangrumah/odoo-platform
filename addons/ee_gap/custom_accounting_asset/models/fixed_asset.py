@@ -105,12 +105,12 @@ class CustomFixedAsset(models.Model):
     )
     retired_quantity = fields.Float(
         string="Retired Quantity",
-        compute="_compute_quantity_figures",
+        compute="_compute_quantity_flags",
         digits="Product Unit of Measure",
     )
     is_quantity_asset = fields.Boolean(
         string="Pooled Asset",
-        compute="_compute_quantity_figures",
+        compute="_compute_quantity_flags",
         store=True,
         help="Set automatically when the asset carries more than one unit, or "
         "when units have already been retired from it.",
@@ -404,9 +404,22 @@ class CustomFixedAsset(models.Model):
             asset.accumulated_depreciation = accum
             asset.net_book_value = (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0) - accum
 
+    @api.depends("quantity", "original_quantity")
+    def _compute_quantity_flags(self):
+        """Kept apart from the money figures on purpose.
+
+        ``is_quantity_asset`` is stored, and depreciation totals move every time
+        a line is posted — folding it into the same compute would rewrite the
+        column for every asset on every monthly run.
+        """
+        for asset in self:
+            qty = asset.quantity or 0.0
+            original = asset.original_quantity or qty
+            asset.retired_quantity = max(0.0, original - qty)
+            asset.is_quantity_asset = original > 1.0 or qty > 1.0 or original > qty
+
     @api.depends(
         "quantity",
-        "original_quantity",
         "acquisition_value",
         "revaluation_value",
         "accumulated_depreciation",
@@ -414,9 +427,6 @@ class CustomFixedAsset(models.Model):
     def _compute_quantity_figures(self):
         for asset in self:
             qty = asset.quantity or 0.0
-            original = asset.original_quantity or qty
-            asset.retired_quantity = max(0.0, original - qty)
-            asset.is_quantity_asset = original > 1.0 or qty > 1.0 or bool(asset.retired_quantity)
             gross = (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0)
             asset.unit_acquisition_value = gross / qty if qty else 0.0
             asset.unit_net_book_value = (asset.net_book_value or 0.0) / qty if qty else 0.0
