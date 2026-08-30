@@ -845,8 +845,9 @@ class CustomFixedAsset(models.Model):
         pool = self | others
         if not self.env.context.get("allow_serial_merge"):
             serialised = pool.filtered(
-                lambda a: ("lot_id" in a._fields and a.lot_id)
-                or ("rental_asset_ids" in a._fields and a.rental_asset_ids)
+                lambda a: (
+                    ("lot_id" in a._fields and a.lot_id) or ("rental_asset_ids" in a._fields and a.rental_asset_ids)
+                )
             )
             if serialised:
                 raise UserError(
