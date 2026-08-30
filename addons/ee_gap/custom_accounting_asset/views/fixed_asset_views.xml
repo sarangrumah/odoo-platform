@@ -52,6 +52,12 @@
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
+                        <button name="action_view_merged_assets" type="object"
+                                class="oe_stat_button" icon="fa-compress"
+                                invisible="merged_count == 0">
+                            <field name="merged_count" widget="statinfo"
+                                   string="Merged In"/>
+                        </button>
                         <button name="action_view_partial_disposals" type="object"
                                 class="oe_stat_button" icon="fa-scissors"
                                 invisible="partial_disposal_count == 0">
@@ -103,6 +109,8 @@
                             <field name="currency_id" invisible="1"/>
                         </group>
                         <group string="Assignment">
+                            <field name="merged_into_id"
+                                   invisible="not merged_into_id"/>
                             <field name="group_id"/>
                             <field name="location_id"/>
                             <field name="custodian_id"/>
@@ -133,6 +141,8 @@
                                invisible="not is_quantity_asset"/>
                         <field name="retired_cost"
                                invisible="retired_cost == 0"/>
+                        <field name="opening_accumulated_depreciation"
+                               invisible="opening_accumulated_depreciation == 0"/>
                         <field name="retired_accumulated_depreciation"
                                invisible="retired_accumulated_depreciation == 0"/>
                     </group>
