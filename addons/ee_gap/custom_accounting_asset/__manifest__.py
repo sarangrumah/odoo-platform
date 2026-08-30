@@ -17,6 +17,10 @@ Closes the EE 'account_asset' gap for Odoo CE. Provides:
 * Monthly cron auto-posts all due (date <= today, not yet posted) depreciation lines
   for running assets, debiting depreciation expense and crediting accumulated
   depreciation per the asset/group account configuration.
+* Historic per-unit assets can be folded into one pool with
+  ``_merge_assets_into_pool`` (see ``scripts/consolidate_pooled_assets.py``); the
+  absorbed depreciation is carried in ``opening_accumulated_depreciation``, which
+  also covers opening balances loaded without a schedule.
 * Pooled (quantity-managed) assets — one asset code can carry N identical units
   (``quantity``). A partial retirement wizard takes n units out, releases their
   pro-rata share of cost and accumulated depreciation to the GL, and rebuilds the
@@ -27,7 +31,7 @@ Closes the EE 'account_asset' gap for Odoo CE. Provides:
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.6.0",
+    "version": "19.0.0.7.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",

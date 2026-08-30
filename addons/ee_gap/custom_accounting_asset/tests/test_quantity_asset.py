@@ -238,3 +238,58 @@ class TestPooledFixedAsset(TransactionCase):
         self.assertEqual(len(asset.partial_disposal_ids), 2)
         remaining = asset.depreciation_line_ids.filtered(lambda line: not line.posted and not line.reversed)
         self.assertAlmostEqual(sum(remaining.mapped("amount")), 2400.0, places=2)
+
+    def test_10_merging_per_unit_assets_creates_a_pool(self):
+        """Five bins booked one record each become one pooled asset of five."""
+        assets = self.env["custom.fixed.asset"]
+        for _i in range(5):
+            assets |= self._make_pool(quantity=1.0, value=1000.0)
+        assets.action_confirm()
+        assets._post_due_depreciation(as_of=date(2025, 3, 10))
+        # Each carries 2 months of 100 (1,000 over 10 months).
+        for asset in assets:
+            self.assertAlmostEqual(asset.accumulated_depreciation, 200.0, places=2)
+        nbv_before = sum(assets.mapped("net_book_value"))
+
+        survivor = assets[0]
+        survivor._merge_assets_into_pool(assets[1:])
+
+        self.assertAlmostEqual(survivor.quantity, 5.0, places=2)
+        self.assertAlmostEqual(survivor.original_quantity, 5.0, places=2)
+        self.assertTrue(survivor.is_quantity_asset)
+        self.assertAlmostEqual(survivor.acquisition_value, 5000.0, places=2)
+        # 200 of its own posted lines + 800 carried from the four absorbed ones.
+        self.assertAlmostEqual(survivor.opening_accumulated_depreciation, 800.0, places=2)
+        self.assertAlmostEqual(survivor.accumulated_depreciation, 1000.0, places=2)
+        self.assertAlmostEqual(survivor.net_book_value, 4000.0, places=2)
+        self.assertAlmostEqual(survivor.net_book_value, nbv_before, places=2)
+
+        absorbed = assets[1:]
+        self.assertEqual(set(absorbed.mapped("state")), {"cancelled"})
+        self.assertEqual(set(absorbed.mapped("merged_into_id")), {survivor})
+        # Posted history stays attached to the record it was booked against.
+        self.assertTrue(all(a.depreciation_line_ids.filtered("posted") for a in absorbed))
+        self.assertFalse(absorbed.depreciation_line_ids.filtered(lambda line: not line.posted))
+
+        # And the pool now depreciates five bins over the remaining 8 months.
+        remaining = survivor.depreciation_line_ids.filtered(lambda line: not line.posted and not line.reversed)
+        self.assertEqual(len(remaining), 8)
+        self.assertAlmostEqual(sum(remaining.mapped("amount")), 4000.0, places=2)
+        self.assertAlmostEqual(remaining[0].amount, 500.0, places=2)
+
+    def test_11_retiring_from_a_merged_pool_keeps_the_maths(self):
+        assets = self.env["custom.fixed.asset"]
+        for _i in range(5):
+            assets |= self._make_pool(quantity=1.0, value=1000.0)
+        assets.action_confirm()
+        assets._post_due_depreciation(as_of=date(2025, 3, 10))
+        survivor = assets[0]
+        survivor._merge_assets_into_pool(assets[1:])
+
+        wiz = self._retire(survivor)
+        self.assertAlmostEqual(wiz.cost_removed, 1000.0, places=2)
+        self.assertAlmostEqual(wiz.accumulated_removed, 200.0, places=2)
+        wiz.action_retire()
+        self.assertAlmostEqual(survivor.quantity, 4.0, places=2)
+        self.assertAlmostEqual(survivor.accumulated_depreciation, 800.0, places=2)
+        self.assertAlmostEqual(survivor.net_book_value, 3200.0, places=2)

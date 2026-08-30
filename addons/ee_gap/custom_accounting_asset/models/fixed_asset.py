@@ -105,7 +105,7 @@ class CustomFixedAsset(models.Model):
     )
     retired_quantity = fields.Float(
         string="Retired Quantity",
-        compute="_compute_quantity_flags",
+        compute="_compute_retired_quantity",
         digits="Product Unit of Measure",
     )
     is_quantity_asset = fields.Boolean(
@@ -146,6 +146,33 @@ class CustomFixedAsset(models.Model):
         "Subtracted from the posted schedule so the remaining pool keeps a correct "
         "accumulated depreciation and net book value.",
     )
+    opening_accumulated_depreciation = fields.Monetary(
+        string="Opening / Carried Accum. Depreciation",
+        default=0.0,
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
+        tracking=True,
+        help="Accumulated depreciation the asset carries WITHOUT a posted schedule "
+        "line behind it: an opening balance loaded at cutover, or the depreciation "
+        "absorbed from assets merged into this one. Added to the posted total.",
+    )
+    merged_into_id = fields.Many2one(
+        comodel_name="custom.fixed.asset",
+        string="Merged Into",
+        readonly=True,
+        copy=False,
+        index=True,
+        help="Set on an asset that was absorbed into a pooled asset. The record is "
+        "kept (its posted depreciation is history) but is no longer depreciated.",
+    )
+    merged_asset_ids = fields.One2many(
+        comodel_name="custom.fixed.asset",
+        inverse_name="merged_into_id",
+        string="Merged Assets",
+        readonly=True,
+    )
+    merged_count = fields.Integer(compute="_compute_merged_count")
     partial_disposal_ids = fields.One2many(
         comodel_name="custom.fixed.asset.partial.disposal",
         inverse_name="asset_id",
@@ -393,6 +420,7 @@ class CustomFixedAsset(models.Model):
         "acquisition_value",
         "revaluation_value",
         "retired_accumulated_depreciation",
+        "opening_accumulated_depreciation",
     )
     def _compute_depreciation_totals(self):
         for asset in self:
@@ -400,23 +428,34 @@ class CustomFixedAsset(models.Model):
             # A partial retirement releases its share of the accumulated
             # depreciation in the GL; the posted lines themselves stay untouched
             # (they are history), so the released share is netted off here.
-            accum = sum(posted.mapped("amount")) - (asset.retired_accumulated_depreciation or 0.0)
+            accum = (
+                sum(posted.mapped("amount"))
+                + (asset.opening_accumulated_depreciation or 0.0)
+                - (asset.retired_accumulated_depreciation or 0.0)
+            )
             asset.accumulated_depreciation = accum
             asset.net_book_value = (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0) - accum
 
     @api.depends("quantity", "original_quantity")
     def _compute_quantity_flags(self):
-        """Kept apart from the money figures on purpose.
+        """Only the stored flag, and only off the quantities.
 
-        ``is_quantity_asset`` is stored, and depreciation totals move every time
-        a line is posted — folding it into the same compute would rewrite the
-        column for every asset on every monthly run.
+        Depreciation totals move every time a line is posted; folding this into
+        the money compute would rewrite the stored column for every asset on
+        every monthly run. Odoo also warns when one compute mixes stored and
+        non-stored fields, which is why ``retired_quantity`` has its own.
         """
         for asset in self:
             qty = asset.quantity or 0.0
             original = asset.original_quantity or qty
-            asset.retired_quantity = max(0.0, original - qty)
             asset.is_quantity_asset = original > 1.0 or qty > 1.0 or original > qty
+
+    @api.depends("quantity", "original_quantity")
+    def _compute_retired_quantity(self):
+        for asset in self:
+            qty = asset.quantity or 0.0
+            original = asset.original_quantity or qty
+            asset.retired_quantity = max(0.0, original - qty)
 
     @api.depends(
         "quantity",
@@ -430,6 +469,10 @@ class CustomFixedAsset(models.Model):
             gross = (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0)
             asset.unit_acquisition_value = gross / qty if qty else 0.0
             asset.unit_net_book_value = (asset.net_book_value or 0.0) / qty if qty else 0.0
+
+    def _compute_merged_count(self):
+        for asset in self:
+            asset.merged_count = len(asset.merged_asset_ids)
 
     def _compute_partial_disposal_count(self):
         for asset in self:
@@ -744,6 +787,100 @@ class CustomFixedAsset(models.Model):
         }
         self.write(vals)
         self._build_schedule()
+
+    def action_view_merged_assets(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Merged Assets"),
+            "res_model": "custom.fixed.asset",
+            "view_mode": "list,form",
+            "domain": [("merged_into_id", "=", self.id)],
+        }
+
+    def _merge_assets_into_pool(self, others):
+        """Absorb ``others`` into ``self``, turning it into a pooled asset.
+
+        For assets that are physically one purchase but were booked one record
+        per unit. Nothing is posted to the GL: the cost already sits in the asset
+        account and the depreciation already sits in accumulated depreciation.
+        What moves is the subledger — the values are summed onto the survivor,
+        the absorbed accumulated depreciation is carried in
+        ``opening_accumulated_depreciation`` (its posted lines stay attached to
+        the record they were booked against, so the audit trail survives), and
+        the absorbed records are marked ``merged_into_id`` and cancelled.
+        """
+        self.ensure_one()
+        others = others - self
+        if not others:
+            raise UserError(_("Nothing to merge into %(code)s.", code=self.code))
+        for other in others:
+            if other.company_id != self.company_id:
+                raise UserError(_("Cannot merge assets across companies."))
+            if other.currency_id != self.currency_id:
+                raise UserError(_("Cannot merge assets in different currencies."))
+            if other.state not in ("draft", "running"):
+                raise UserError(
+                    _(
+                        'Asset "%(code)s" is %(state)s and cannot be merged.',
+                        code=other.code,
+                        state=other.state,
+                    )
+                )
+            if other.merged_into_id:
+                raise UserError(_('Asset "%(code)s" has already been merged elsewhere.', code=other.code))
+            if other.partial_disposal_ids:
+                raise UserError(
+                    _(
+                        'Asset "%(code)s" has partial retirements; merge it by hand.',
+                        code=other.code,
+                    )
+                )
+
+        absorbed_accum = sum(others.mapped("accumulated_depreciation"))
+        vals = {
+            "acquisition_value": self.acquisition_value + sum(others.mapped("acquisition_value")),
+            "salvage_value": (self.salvage_value or 0.0) + sum(others.mapped("salvage_value")),
+            "revaluation_value": (self.revaluation_value or 0.0) + sum(others.mapped("revaluation_value")),
+            "revaluation_surplus_balance": (self.revaluation_surplus_balance or 0.0)
+            + sum(others.mapped("revaluation_surplus_balance")),
+            "revaluation_loss_recognized": (self.revaluation_loss_recognized or 0.0)
+            + sum(others.mapped("revaluation_loss_recognized")),
+            "opening_accumulated_depreciation": (self.opening_accumulated_depreciation or 0.0) + absorbed_accum,
+            "quantity": self.quantity + sum(others.mapped("quantity")),
+        }
+        vals["original_quantity"] = vals["quantity"]
+        self.write(vals)
+
+        # The absorbed records keep their posted lines (history) but must never
+        # be depreciated again.
+        others.depreciation_line_ids.filtered(lambda line: not line.posted and not line.reversed).unlink()
+        others.write({"merged_into_id": self.id, "state": "cancelled"})
+        for other in others:
+            other.message_post(
+                body=_(
+                    "Merged into pooled asset %(code)s. Cost %(cost)s and accumulated "
+                    "depreciation %(accum)s carried over; this record is cancelled and "
+                    "no longer depreciated.",
+                    code=self.code,
+                    cost=other.acquisition_value,
+                    accum=other.accumulated_depreciation,
+                )
+            )
+        self.message_post(
+            body=_(
+                "Absorbed %(count)s asset(s): %(codes)s. Quantity is now %(qty)s, "
+                "acquisition value %(value)s, carried accumulated depreciation %(accum)s.",
+                count=len(others),
+                codes=", ".join(others.mapped("code")),
+                qty=self.quantity,
+                value=self.acquisition_value,
+                accum=absorbed_accum,
+            )
+        )
+        if self.state == "running":
+            self._build_schedule()
+        return self
 
     def action_view_revaluations(self):
         self.ensure_one()

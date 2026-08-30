@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-05-21T00:00:00Z
 generator: claude-code-bootstrap-v1
 module: custom_accounting_asset
-manifest_version: 19.0.0.6.0
+manifest_version: 19.0.0.7.0
 ---
 
 # custom_accounting_asset
@@ -27,6 +27,7 @@ This is the canonical FA module. Anything BRD-related to "aset tetap", "penyusut
   - **Downward** (increment < 0): CR asset `decrease`; the debit offsets any existing surplus first — DR revaluation surplus `min(decrease, surplus_balance)` — then DR revaluation loss for the remainder.
   It adds the increment to `revaluation_value`, optionally sets `useful_life_months = posted_count + new_remaining_life`, then calls `_build_schedule()` to re-spread the new remaining base over the remaining life. **Prospective: previously posted lines/moves are never touched.** A `custom.fixed.asset.revaluation` history record captures each event (amounts, account split, running balances after). Default surplus/loss/income/retained-earnings accounts come from the asset group (`custom.fixed.asset.group.default_revaluation_*`).
 - **Pooled (quantity-managed) assets** — one asset code can carry N identical units (`quantity`, `original_quantity`). The whole pool shares one acquisition value and one schedule; `unit_acquisition_value = (acquisition + revaluation) / quantity`. When some units go (a broken bin out of five), `action_open_partial_disposal_wizard()` (running-only, `quantity > 1`) opens `custom.fixed.asset.partial.disposal.wizard`: `_partial_retirement_split(qty)` pro-rates cost, revaluation, accumulated depreciation, salvage, surplus and recognised loss on the units still held; the wizard books DR accum + DR proceeds + DR loss / CR asset cost + CR gain (plus the IAS 16.41 surplus transfer), then `_apply_partial_retirement()` shrinks the asset and calls `_build_schedule()` so the remaining months depreciate the smaller pool. Retiring *every* remaining unit is a plain disposal: state `disposed`, carrying amounts left on the record, unposted lines dropped. Each event lands in `custom.fixed.asset.partial.disposal` (history).
+- **Folding historic per-unit assets into a pool** — `_merge_assets_into_pool(others)` sums acquisition, salvage, revaluation and surplus onto the survivor, sets `quantity`/`original_quantity` to the unit count, carries the absorbed accumulated depreciation in `opening_accumulated_depreciation`, drops the absorbed records' unposted lines, flags them `merged_into_id` + `cancelled`, and rebuilds the survivor's schedule. **Nothing is posted to the GL** — cost and accumulated depreciation are already there; only the subledger is rearranged, and the pooled NBV equals the sum of the NBVs that went in. `scripts/consolidate_pooled_assets.py` finds the candidates (strict signature match incl. the exact set of posted depreciation dates) and drives it, dry-run by default.
 - `action_cancel()` allowed only if no depreciation has posted; `action_reset_draft()` unlinks all schedule lines and reverts to draft.
 - Manual single-line posting via `custom.fixed.asset.depreciation.line.action_post_now()` (delegates to `_post_due_depreciation(as_of=line.date)`).
 
@@ -62,7 +63,9 @@ This is the canonical FA module. Anything BRD-related to "aset tetap", "penyusut
 - `custom.fixed.asset.is_quantity_asset` (Boolean, computed **stored**, `_compute_quantity_flags`) — True when the asset holds more than one unit or has had units retired. Drives the pooled-only UI and the *Pooled (multi-unit)* filter. Deliberately computed apart from the money figures: it depends only on the quantities, so a monthly depreciation run does not rewrite the column for every asset.
 - `custom.fixed.asset.unit_acquisition_value` / `unit_net_book_value` (Monetary, computed) — per-unit gross carrying amount and NBV.
 - `custom.fixed.asset.retired_cost` / `retired_accumulated_depreciation` (Monetary, readonly) — cumulative amounts released by partial retirements. **`retired_accumulated_depreciation` is netted off `accumulated_depreciation`** — posted lines are history and are never edited.
-- `custom.fixed.asset.accumulated_depreciation` / `net_book_value` (Monetary, computed, non-stored) — `sum(posted lines) - retired_accumulated_depreciation` and `acquisition + revaluation_value - accum`.
+- `custom.fixed.asset.opening_accumulated_depreciation` (Monetary, readonly) — accumulated depreciation with no posted line behind it: an opening balance loaded at cutover, or depreciation absorbed from merged assets. **Added** to the posted total.
+- `custom.fixed.asset.merged_into_id` / `merged_asset_ids` — an absorbed record points at the pool it joined; it stays `cancelled` with its posted history intact and is never depreciated again (the cron only walks `running`).
+- `custom.fixed.asset.accumulated_depreciation` / `net_book_value` (Monetary, computed, non-stored) — `sum(posted lines) + opening_accumulated_depreciation - retired_accumulated_depreciation` and `acquisition + revaluation_value - accum`.
 - `custom.fixed.asset.disposal_date` / `disposal_value` / `disposal_gain_loss` / `disposal_move_id` (readonly, set by wizard).
 - `custom.fixed.asset.depreciation.line.posted` (Boolean) — gates the cron; once True the line is immutable to the cron.
 - `custom.fixed.asset.depreciation.line.sequence` (Integer, required) — drives schedule order; new lines built from `max(sequence)+1`.
@@ -73,6 +76,7 @@ This is the canonical FA module. Anything BRD-related to "aset tetap", "penyusut
 - `custom.fixed.asset.action_open_dispose_wizard()` / `action_open_revaluation_wizard()` / `action_view_revaluations()` — running-only (last two).
 - `custom.fixed.asset._build_schedule()` — preserves posted lines, rebuilds unposted from current parameters. Works off `accumulated_depreciation` (net of retirements), not the raw posted total.
 - `custom.fixed.asset.action_open_partial_disposal_wizard()` / `action_view_partial_disposals()` — running-only; the first refuses a single-unit asset (use Dispose).
+- `custom.fixed.asset._merge_assets_into_pool(others)` — absorb per-unit assets into this one; refuses across companies/currencies, on non-draft/running records, on already-merged records and on records carrying partial retirements.
 - `custom.fixed.asset._partial_retirement_split(quantity)` — pro-rata split of every carrying amount on the units going out; `full=True` when the whole remaining pool is retired.
 - `custom.fixed.asset._apply_partial_retirement(split, date, proceeds, gain_loss, move)` — shrinks the asset (or disposes it when full) and reschedules.
 - `custom.fixed.asset.partial.disposal.wizard.action_retire()` / `_create_retirement_move()` — books the balanced release + writes the history record.
@@ -94,6 +98,8 @@ This is the canonical FA module. Anything BRD-related to "aset tetap", "penyusut
 - **Cross-vertical:** generic.
 
 ## Gotchas
+- **Merging never books a journal entry, and that is the point** — if a merge ever needs a GL leg, the register and the ledger have already drifted and the merge is not the fix.
+- **An absorbed asset is `cancelled`, not deleted** — it keeps its posted lines so the moves stay explained. Any report that counts assets by record will therefore see the old rows; filter on `merged_into_id = False`.
 - **A partial retirement pro-rates on the units still held, not on the original ones** — retiring 1 of 5 takes a fifth; retiring another takes a quarter of what is left. That is what keeps `unit_acquisition_value` stable, but it means the amounts released for identical units differ once revaluation or an earlier retirement has moved the carrying amount.
 - **Posted depreciation lines are never edited by a retirement** — the released share lives in `retired_accumulated_depreciation` and is subtracted in `_compute_depreciation_totals`. Anything reading `sum(posted lines)` directly (a custom report, a SQL view) will overstate accumulated depreciation on a pooled asset that has had units retired.
 - **Retiring the last units is a disposal, not a shrink** — carrying amounts stay on the record and `state` goes `disposed`, mirroring the disposal wizard, so the register still shows what left. `quantity` is NOT zeroed.
