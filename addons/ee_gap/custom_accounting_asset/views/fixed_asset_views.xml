@@ -13,7 +13,9 @@
                 <field name="group_id"/>
                 <field name="location_id"/>
                 <field name="acquisition_date"/>
+                <field name="quantity" optional="show"/>
                 <field name="acquisition_value"/>
+                <field name="unit_acquisition_value" optional="hide"/>
                 <field name="accumulated_depreciation"/>
                 <field name="net_book_value"/>
                 <field name="state"/>
@@ -34,6 +36,9 @@
                     <button name="action_open_revaluation_wizard" type="object"
                             string="Revalue"
                             invisible="state != 'running'"/>
+                    <button name="action_open_partial_disposal_wizard" type="object"
+                            string="Retire Units"
+                            invisible="state != 'running' or quantity &lt;= 1"/>
                     <button name="action_open_dispose_wizard" type="object"
                             string="Dispose"
                             invisible="state != 'running'"/>
@@ -47,6 +52,12 @@
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
+                        <button name="action_view_partial_disposals" type="object"
+                                class="oe_stat_button" icon="fa-scissors"
+                                invisible="partial_disposal_count == 0">
+                            <field name="partial_disposal_count" widget="statinfo"
+                                   string="Retirements"/>
+                        </button>
                         <button name="action_view_revaluations" type="object"
                                 class="oe_stat_button" icon="fa-line-chart"
                                 invisible="revaluation_count == 0">
@@ -68,8 +79,18 @@
                                    readonly="state != 'draft'"/>
                             <field name="depreciation_date_mode"
                                    readonly="state != 'draft'"/>
-                            <field name="acquisition_value"
+                            <field name="quantity"
                                    readonly="state != 'draft'"/>
+                            <field name="original_quantity"
+                                   invisible="not is_quantity_asset"/>
+                            <field name="retired_quantity"
+                                   invisible="retired_quantity == 0"/>
+                            <field name="is_quantity_asset" invisible="1"/>
+                            <field name="acquisition_value"
+                                   readonly="state != 'draft'"
+                                   help="Total value of every unit under this asset number."/>
+                            <field name="unit_acquisition_value"
+                                   invisible="not is_quantity_asset"/>
                             <field name="salvage_value"
                                    readonly="state != 'draft'"/>
                             <field name="useful_life_months"
@@ -108,6 +129,12 @@
                         <field name="revaluation_loss_recognized"
                                invisible="revaluation_loss_recognized == 0"/>
                         <field name="net_book_value"/>
+                        <field name="unit_net_book_value"
+                               invisible="not is_quantity_asset"/>
+                        <field name="retired_cost"
+                               invisible="retired_cost == 0"/>
+                        <field name="retired_accumulated_depreciation"
+                               invisible="retired_accumulated_depreciation == 0"/>
                     </group>
                     <group string="Disposal" invisible="state != 'disposed'">
                         <field name="disposal_date"/>
@@ -133,6 +160,25 @@
                                             type="object" string="Reverse"
                                             invisible="not posted"
                                             confirm="Reverse this posted depreciation? A reversing journal entry will be booked and the asset NBV will be restored."/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Partial Retirements"
+                              invisible="partial_disposal_count == 0">
+                            <field name="partial_disposal_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="disposal_date"/>
+                                    <field name="reason"/>
+                                    <field name="quantity"/>
+                                    <field name="quantity_after"/>
+                                    <field name="cost_removed"/>
+                                    <field name="accumulated_removed"/>
+                                    <field name="net_book_value_removed"/>
+                                    <field name="proceeds"/>
+                                    <field name="gain_loss"/>
+                                    <field name="move_id"/>
+                                    <field name="currency_id" column_invisible="True"/>
                                 </list>
                             </field>
                         </page>
@@ -189,6 +235,9 @@
                         domain="[('state','=','running')]"/>
                 <filter name="state_disposed" string="Disposed"
                         domain="[('state','=','disposed')]"/>
+                <separator/>
+                <filter name="pooled_assets" string="Pooled (multi-unit)"
+                        domain="[('is_quantity_asset','=',True)]"/>
 
                     <filter name="group_group" string="Group"
                             context="{'group_by':'group_id'}"/>

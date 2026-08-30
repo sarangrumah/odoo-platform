@@ -33,10 +33,14 @@
                                    widget="boolean_toggle"
                                    readonly="existing_asset_id"/>
                             <field name="product_id" readonly="1"/>
+                            <field name="conversion_mode" readonly="1" optional="show"/>
                             <field name="serial_number" readonly="1"/>
+                            <field name="quantity"
+                                   readonly="conversion_mode == 'serial'"/>
                             <field name="unit_cost"/>
+                            <field name="subtotal" readonly="1"/>
                             <field name="create_rental_asset"
-                                   readonly="existing_asset_id"/>
+                                   readonly="existing_asset_id or conversion_mode == 'quantity'"/>
                             <field name="status" readonly="1"/>
                             <field name="existing_asset_id" column_invisible="True"/>
                             <field name="currency_id" column_invisible="True"/>

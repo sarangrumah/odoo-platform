@@ -4,6 +4,7 @@ import logging
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
+from odoo.tools import float_compare
 from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
@@ -82,6 +83,77 @@ class CustomFixedAsset(models.Model):
     salvage_value = fields.Monetary(
         default=0.0,
         currency_field="currency_id",
+    )
+    quantity = fields.Float(
+        string="Quantity",
+        default=1.0,
+        required=True,
+        digits="Product Unit of Measure",
+        tracking=True,
+        help="Number of physical units carried under this single asset number. A "
+        "pooled asset (e.g. 5 waste bins bought together) keeps one code, one "
+        "acquisition value and one schedule; retiring a broken unit reduces this "
+        "quantity and the value along with it.",
+    )
+    original_quantity = fields.Float(
+        string="Original Quantity",
+        default=1.0,
+        digits="Product Unit of Measure",
+        readonly=True,
+        copy=False,
+        help="Quantity at acquisition. Kept as the denominator for the register; never changed by a retirement.",
+    )
+    retired_quantity = fields.Float(
+        string="Retired Quantity",
+        compute="_compute_quantity_flags",
+        digits="Product Unit of Measure",
+    )
+    is_quantity_asset = fields.Boolean(
+        string="Pooled Asset",
+        compute="_compute_quantity_flags",
+        store=True,
+        help="Set automatically when the asset carries more than one unit, or "
+        "when units have already been retired from it.",
+    )
+    unit_acquisition_value = fields.Monetary(
+        string="Value per Unit",
+        compute="_compute_quantity_figures",
+        currency_field="currency_id",
+        help="Gross carrying amount (acquisition + revaluation) divided by the "
+        "quantity still held. This is the amount removed when one unit is retired.",
+    )
+    unit_net_book_value = fields.Monetary(
+        string="NBV per Unit",
+        compute="_compute_quantity_figures",
+        currency_field="currency_id",
+    )
+    retired_cost = fields.Monetary(
+        string="Retired Cost",
+        default=0.0,
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
+        tracking=True,
+        help="Cumulative gross carrying amount taken out of the asset account by partial retirements.",
+    )
+    retired_accumulated_depreciation = fields.Monetary(
+        string="Retired Accum. Depreciation",
+        default=0.0,
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
+        help="Cumulative accumulated depreciation released by partial retirements. "
+        "Subtracted from the posted schedule so the remaining pool keeps a correct "
+        "accumulated depreciation and net book value.",
+    )
+    partial_disposal_ids = fields.One2many(
+        comodel_name="custom.fixed.asset.partial.disposal",
+        inverse_name="asset_id",
+        string="Partial Retirements",
+        copy=False,
+    )
+    partial_disposal_count = fields.Integer(
+        compute="_compute_partial_disposal_count",
     )
     revaluation_value = fields.Monetary(
         string="Cumulative Revaluation",
@@ -257,6 +329,28 @@ class CustomFixedAsset(models.Model):
                     )
                 )
 
+    @api.constrains("quantity", "original_quantity")
+    def _check_quantity(self):
+        for asset in self:
+            if asset.quantity <= 0:
+                raise ValidationError(
+                    _(
+                        'Asset "%(name)s": quantity must be strictly positive. Retire '
+                        "the whole pool through Dispose instead.",
+                        name=asset.name,
+                    )
+                )
+            if asset.original_quantity and asset.quantity > asset.original_quantity:
+                raise ValidationError(
+                    _(
+                        'Asset "%(name)s": quantity (%(qty)s) cannot exceed the original '
+                        "quantity (%(orig)s). Book an addition as a separate asset.",
+                        name=asset.name,
+                        qty=asset.quantity,
+                        orig=asset.original_quantity,
+                    )
+                )
+
     @api.constrains("declining_factor", "depreciation_method")
     def _check_declining_factor(self):
         for asset in self:
@@ -298,13 +392,48 @@ class CustomFixedAsset(models.Model):
         "depreciation_line_ids.reversed",
         "acquisition_value",
         "revaluation_value",
+        "retired_accumulated_depreciation",
     )
     def _compute_depreciation_totals(self):
         for asset in self:
             posted = asset.depreciation_line_ids.filtered("posted")
-            accum = sum(posted.mapped("amount"))
+            # A partial retirement releases its share of the accumulated
+            # depreciation in the GL; the posted lines themselves stay untouched
+            # (they are history), so the released share is netted off here.
+            accum = sum(posted.mapped("amount")) - (asset.retired_accumulated_depreciation or 0.0)
             asset.accumulated_depreciation = accum
             asset.net_book_value = (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0) - accum
+
+    @api.depends("quantity", "original_quantity")
+    def _compute_quantity_flags(self):
+        """Kept apart from the money figures on purpose.
+
+        ``is_quantity_asset`` is stored, and depreciation totals move every time
+        a line is posted — folding it into the same compute would rewrite the
+        column for every asset on every monthly run.
+        """
+        for asset in self:
+            qty = asset.quantity or 0.0
+            original = asset.original_quantity or qty
+            asset.retired_quantity = max(0.0, original - qty)
+            asset.is_quantity_asset = original > 1.0 or qty > 1.0 or original > qty
+
+    @api.depends(
+        "quantity",
+        "acquisition_value",
+        "revaluation_value",
+        "accumulated_depreciation",
+    )
+    def _compute_quantity_figures(self):
+        for asset in self:
+            qty = asset.quantity or 0.0
+            gross = (asset.acquisition_value or 0.0) + (asset.revaluation_value or 0.0)
+            asset.unit_acquisition_value = gross / qty if qty else 0.0
+            asset.unit_net_book_value = (asset.net_book_value or 0.0) / qty if qty else 0.0
+
+    def _compute_partial_disposal_count(self):
+        for asset in self:
+            asset.partial_disposal_count = len(asset.partial_disposal_ids)
 
     def _compute_revaluation_count(self):
         for asset in self:
@@ -352,8 +481,10 @@ class CustomFixedAsset(models.Model):
         # Drop unposted lines so we can rebuild from current parameters. Reversed
         # lines are kept for audit (posted=False but excluded from scheduling).
         self.depreciation_line_ids.filtered(lambda l: not l.posted and not l.reversed).unlink()
-        posted_amount = sum(self.depreciation_line_ids.filtered("posted").mapped("amount"))
-        remaining = max(0.0, base - posted_amount)
+        # ``accumulated_depreciation`` is the posted total minus whatever a
+        # partial retirement already released, so the remaining pool is
+        # depreciated over what is genuinely left of its depreciable base.
+        remaining = max(0.0, base - self.accumulated_depreciation)
         if remaining <= 0:
             return
 
@@ -490,6 +621,129 @@ class CustomFixedAsset(models.Model):
             "target": "new",
             "context": {"default_asset_id": self.id},
         }
+
+    def action_open_partial_disposal_wizard(self):
+        """Retire part of a pooled asset (e.g. 1 broken bin out of 5)."""
+        self.ensure_one()
+        if self.state != "running":
+            raise UserError(_("Only running assets can have units retired."))
+        if self.quantity <= 1:
+            raise UserError(
+                _(
+                    'Asset "%(name)s" carries a single unit. Use Dispose to retire it.',
+                    name=self.name,
+                )
+            )
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Retire Units"),
+            "res_model": "custom.fixed.asset.partial.disposal.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_asset_id": self.id},
+        }
+
+    def action_view_partial_disposals(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Partial Retirements"),
+            "res_model": "custom.fixed.asset.partial.disposal",
+            "view_mode": "list,form",
+            "domain": [("asset_id", "=", self.id)],
+        }
+
+    def _partial_retirement_split(self, quantity):
+        """Split the asset's carrying amounts on ``quantity`` units going out.
+
+        Everything is pro-rated on the units still held, so retiring 1 unit of 5
+        takes exactly a fifth of the cost, of the revaluation, of the accumulated
+        depreciation and of the salvage value with it. Returns a dict of the
+        amounts that leave the asset, rounded to the company currency.
+        """
+        self.ensure_one()
+        rounding = self.currency_id.round
+        qty = self.quantity or 0.0
+        if quantity <= 0:
+            raise UserError(_("Retired quantity must be strictly positive."))
+        if quantity > qty:
+            raise UserError(
+                _(
+                    "Cannot retire %(out)s units: the asset only carries %(qty)s.",
+                    out=quantity,
+                    qty=qty,
+                )
+            )
+        full = float_compare(quantity, qty, precision_rounding=0.000001) == 0
+        ratio = 1.0 if full else quantity / qty
+        acquisition = rounding(self.acquisition_value * ratio) if not full else self.acquisition_value
+        revaluation = rounding((self.revaluation_value or 0.0) * ratio) if not full else (self.revaluation_value or 0.0)
+        accum = rounding(self.accumulated_depreciation * ratio) if not full else self.accumulated_depreciation
+        salvage = rounding((self.salvage_value or 0.0) * ratio) if not full else (self.salvage_value or 0.0)
+        surplus = (
+            rounding((self.revaluation_surplus_balance or 0.0) * ratio)
+            if not full
+            else (self.revaluation_surplus_balance or 0.0)
+        )
+        loss_recognized = (
+            rounding((self.revaluation_loss_recognized or 0.0) * ratio)
+            if not full
+            else (self.revaluation_loss_recognized or 0.0)
+        )
+        cost = acquisition + revaluation
+        return {
+            "full": full,
+            "quantity": quantity,
+            "acquisition_value": acquisition,
+            "revaluation_value": revaluation,
+            "cost": cost,
+            "accumulated_depreciation": accum,
+            "salvage_value": salvage,
+            "surplus": surplus,
+            "loss_recognized": loss_recognized,
+            "net_book_value": rounding(cost - accum),
+        }
+
+    def _apply_partial_retirement(self, split, disposal_date, proceeds, gain_loss, move):
+        """Shrink the asset to the units it still holds and reschedule.
+
+        The posted depreciation lines are history and stay as they are; the share
+        of accumulated depreciation released by the retirement is carried in
+        ``retired_accumulated_depreciation`` and netted off the totals. The
+        unposted part of the schedule is then rebuilt, so from the next run the
+        monthly charge follows the smaller pool.
+        """
+        self.ensure_one()
+        if split["full"]:
+            # Every unit is gone: this is a plain disposal. The carrying amounts
+            # stay on the record (the journal entry has released them) exactly as
+            # the disposal wizard leaves them, so the register still shows what
+            # was disposed of and when.
+            self.write(
+                {
+                    "state": "disposed",
+                    "disposal_date": disposal_date,
+                    "disposal_value": proceeds,
+                    "disposal_gain_loss": gain_loss,
+                    "disposal_move_id": move.id if move else False,
+                    "revaluation_surplus_balance": 0.0,
+                }
+            )
+            self.depreciation_line_ids.filtered(lambda l: not l.posted and not l.reversed).unlink()
+            return
+        vals = {
+            "acquisition_value": self.acquisition_value - split["acquisition_value"],
+            "revaluation_value": (self.revaluation_value or 0.0) - split["revaluation_value"],
+            "salvage_value": (self.salvage_value or 0.0) - split["salvage_value"],
+            "revaluation_surplus_balance": (self.revaluation_surplus_balance or 0.0) - split["surplus"],
+            "revaluation_loss_recognized": (self.revaluation_loss_recognized or 0.0) - split["loss_recognized"],
+            "retired_cost": (self.retired_cost or 0.0) + split["cost"],
+            "retired_accumulated_depreciation": (self.retired_accumulated_depreciation or 0.0)
+            + split["accumulated_depreciation"],
+            "quantity": self.quantity - split["quantity"],
+        }
+        self.write(vals)
+        self._build_schedule()
 
     def action_view_revaluations(self):
         self.ensure_one()
@@ -660,4 +914,19 @@ class CustomFixedAsset(models.Model):
             # Default the depreciation anchor to the acquisition date.
             if not vals.get("posting_date") and vals.get("acquisition_date"):
                 vals["posting_date"] = vals["acquisition_date"]
+            # A pooled asset records the quantity it was bought with; retirements
+            # only ever move ``quantity`` down from there.
+            if not vals.get("original_quantity"):
+                vals["original_quantity"] = vals.get("quantity", 1.0)
         return super().create(vals_list)
+
+    def write(self, vals):
+        res = super().write(vals)
+        if "quantity" in vals and "original_quantity" not in vals:
+            # While still draft the asset is being set up, so the original
+            # quantity follows what the user types. Once running, only a
+            # retirement moves the quantity and the original must stay put.
+            draft = self.filtered(lambda a: a.state == "draft")
+            if draft:
+                super(CustomFixedAsset, draft).write({"original_quantity": vals["quantity"]})
+        return res

@@ -8,9 +8,12 @@
             <xpath expr="//page[@name='purchase']" position="inside">
                 <group string="Fixed Asset Provisioning">
                     <field name="is_rental_asset"/>
+                    <field name="is_fixed_asset"/>
+                    <field name="asset_tracking_mode"
+                           invisible="not is_fixed_asset"/>
                     <field name="asset_group_id"
-                           invisible="not is_rental_asset"
-                           required="is_rental_asset"/>
+                           invisible="not is_rental_asset and not is_fixed_asset"
+                           required="is_rental_asset or is_fixed_asset"/>
                     <field name="auto_create_rental_asset"
                            invisible="not is_rental_asset"/>
                 </group>

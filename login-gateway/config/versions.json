@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-28T00:56:44+00:00",
+  "generated_at": "2026-08-30T03:48:55+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "cf60920",
-    "branch": "feat/levis-clearing-receipts"
+    "commit": "34f54d8",
+    "branch": "feat/pooled-quantity-assets"
   },
   "buckets": [
     {
@@ -301,9 +301,9 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "cf60920",
+          "sha": "889ce24",
           "date": "2026-08-28",
-          "subject": "feat(levis): prove a settlement against the receipts it paid"
+          "subject": "feat(levis): prove a settlement against the receipts it paid (#198)"
         },
         {
           "sha": "49c9eff",
@@ -354,9 +354,9 @@
       "change_count": 51,
       "changes": [
         {
-          "sha": "cf60920",
+          "sha": "889ce24",
           "date": "2026-08-28",
-          "subject": "feat(levis): prove a settlement against the receipts it paid"
+          "subject": "feat(levis): prove a settlement against the receipts it paid (#198)"
         },
         {
           "sha": "e0f5965",
@@ -1540,14 +1540,19 @@
       "module": "custom_accounting_asset",
       "bucket": "ee_gap",
       "name": "Custom Accounting - Fixed Assets",
-      "version": "19.0.0.5.0",
+      "version": "19.0.0.6.0",
       "summary": "Fixed asset register with depreciation schedule, monthly posting cron, and disposal workflow",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
-      "last_change": "2026-08-04",
-      "change_count": 23,
+      "last_change": "2026-08-30",
+      "change_count": 24,
       "changes": [
+        {
+          "sha": "34f54d8",
+          "date": "2026-08-30",
+          "subject": "feat(assets): satu nomor aset untuk banyak unit, dan cara mengeluarkan yang rusak"
+        },
         {
           "sha": "f5d8d58",
           "date": "2026-08-04",
@@ -1582,11 +1587,6 @@
           "sha": "41cfff9",
           "date": "2026-07-06",
           "subject": "feat(asset): reversible depreciation + self-heal on external entry changes"
-        },
-        {
-          "sha": "c2c2b9c",
-          "date": "2026-07-05",
-          "subject": "perf(reports): self-contained PDF wrappers + per-company letterhead"
         }
       ]
     },
@@ -1932,14 +1932,19 @@
       "module": "custom_asset_from_receipt",
       "bucket": "ee_gap",
       "name": "Custom Asset From Receipt",
-      "version": "19.0.0.1.0",
-      "summary": "Bulk-convert received serial-numbered products into Fixed Assets + Rental Assets via a per-item picker wizard",
+      "version": "19.0.0.2.0",
+      "summary": "Convert received goods into Fixed Assets from the receipt — one asset per serial number, or one pooled asset for the received quantity",
       "category": "Inventory/Inventory",
       "depends": 5,
       "public": true,
-      "last_change": "2026-07-29",
-      "change_count": 3,
+      "last_change": "2026-08-30",
+      "change_count": 4,
       "changes": [
+        {
+          "sha": "34f54d8",
+          "date": "2026-08-30",
+          "subject": "feat(assets): satu nomor aset untuk banyak unit, dan cara mengeluarkan yang rusak"
+        },
         {
           "sha": "4704e07",
           "date": "2026-07-29",

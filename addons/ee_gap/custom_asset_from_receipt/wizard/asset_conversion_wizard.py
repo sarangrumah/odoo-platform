@@ -32,38 +32,79 @@ class AssetConversionWizard(models.TransientModel):
     # Populate lines from picking move_line_ids
     # ------------------------------------------------------------------
     def _populate_lines(self):
+        """Build one wizard line per unit-to-be for serial products, and one
+        aggregated line per (product, purchase line) for pooled products.
+        """
         self.ensure_one()
         Asset = self.env["custom.fixed.asset"]
         vals_list = []
+        pooled = {}
         for ml in self.picking_id.move_line_ids:
             product = ml.product_id
-            if not product.is_rental_asset:
-                continue
-            if not ml.lot_id:
+            mode = product._asset_conversion_mode()
+            if not mode:
                 continue
             if ml.quantity <= 0:
                 continue
             po_line = ml.move_id.purchase_line_id
-            existing = Asset.search([("lot_id", "=", ml.lot_id.id)], limit=1)
-            vals_list.append(
-                {
-                    "wizard_id": self.id,
-                    "move_line_id": ml.id,
-                    "product_id": product.id,
-                    "lot_id": ml.lot_id.id,
-                    "purchase_line_id": po_line.id if po_line else False,
-                    "unit_cost": po_line.price_unit if po_line else 0.0,
-                    "selected": not existing,
-                    "create_rental_asset": product.auto_create_rental_asset,
-                    "existing_asset_id": existing.id if existing else False,
-                }
-            )
+            if mode == "serial":
+                if not ml.lot_id:
+                    continue
+                existing = Asset.search([("lot_id", "=", ml.lot_id.id)], limit=1)
+                vals_list.append(
+                    {
+                        "wizard_id": self.id,
+                        "move_line_id": ml.id,
+                        "conversion_mode": "serial",
+                        "product_id": product.id,
+                        "lot_id": ml.lot_id.id,
+                        "quantity": 1.0,
+                        "purchase_line_id": po_line.id if po_line else False,
+                        "unit_cost": po_line.price_unit if po_line else 0.0,
+                        "selected": not existing,
+                        "create_rental_asset": product.auto_create_rental_asset,
+                        "existing_asset_id": existing.id if existing else False,
+                    }
+                )
+                continue
+            # Pooled: every unit of the same product on the same purchase line
+            # ends up under one asset number carrying the total quantity.
+            key = (product.id, po_line.id if po_line else False)
+            if key in pooled:
+                pooled[key]["quantity"] += ml.quantity
+                continue
+            pooled[key] = {
+                "wizard_id": self.id,
+                "move_line_id": ml.id,
+                "conversion_mode": "quantity",
+                "product_id": product.id,
+                "lot_id": False,
+                "quantity": ml.quantity,
+                "purchase_line_id": po_line.id if po_line else False,
+                "unit_cost": po_line.price_unit if po_line else product.standard_price,
+                "create_rental_asset": False,
+            }
+        for key, vals in pooled.items():
+            product_id, po_line_id = key
+            domain = [
+                ("picking_id", "=", self.picking_id.id),
+                ("product_id", "=", product_id),
+                ("lot_id", "=", False),
+            ]
+            if po_line_id:
+                domain.append(("purchase_line_id", "=", po_line_id))
+            existing = Asset.search(domain, limit=1)
+            vals["selected"] = not existing
+            vals["existing_asset_id"] = existing.id if existing else False
+            vals_list.append(vals)
+
         self.env["custom.asset.conversion.line"].create(vals_list)
         if not vals_list:
             raise UserError(
                 _(
-                    "No serial-tracked rental-asset lines found in this receipt. "
-                    "Ensure products are flagged 'Is Rental Asset' and have serial numbers assigned."
+                    "No asset lines found in this receipt. Flag the products with "
+                    "'Is Rental Asset' or 'Create Fixed Asset on Receipt'; products "
+                    "converted per serial number also need their serials assigned."
                 )
             )
         if self.picking_id.date_done:
@@ -110,14 +151,32 @@ class AssetConversionWizard(models.TransientModel):
                     _('Product "%s" has no Asset Group. Set one on the product or in the wizard override.')
                     % line.product_id.display_name
                 )
+            pooled = line.conversion_mode == "quantity"
+            if pooled and line.quantity <= 0:
+                raise UserError(
+                    _('Product "%s": quantity to capitalise must be strictly positive.') % line.product_id.display_name
+                )
+            quantity = line.quantity if pooled else 1.0
+            if pooled:
+                name = _(
+                    "%(product)s (%(qty)s unit)",
+                    product=line.product_id.display_name,
+                    qty=quantity,
+                )
+            else:
+                name = "%s / %s" % (line.product_id.display_name, line.lot_id.name)
             asset_vals = {
-                "name": "%s / %s" % (line.product_id.display_name, line.lot_id.name),
+                "name": name,
                 "product_id": line.product_id.id,
-                "lot_id": line.lot_id.id,
+                "lot_id": line.lot_id.id if line.lot_id else False,
+                "quantity": quantity,
+                "original_quantity": quantity,
                 "purchase_line_id": line.purchase_line_id.id or False,
                 "picking_id": self.picking_id.id,
                 "group_id": group.id,
-                "acquisition_value": line.unit_cost,
+                # Pooled assets capitalise the whole received quantity under one
+                # value; the per-unit amount stays derivable as value / quantity.
+                "acquisition_value": line.unit_cost * quantity,
                 "acquisition_date": self.acquisition_date,
                 "useful_life_months": group.default_useful_life_months or 60,
                 "asset_account_id": group.default_asset_account_id.id or False,
@@ -128,7 +187,7 @@ class AssetConversionWizard(models.TransientModel):
             asset = Asset.create(asset_vals)
             created |= asset
 
-            if line.create_rental_asset:
+            if line.create_rental_asset and line.lot_id:
                 rental = Rental.create(
                     {
                         "name": "%s %s" % (line.product_id.display_name, line.lot_id.name),
@@ -173,8 +232,28 @@ class AssetConversionLine(models.TransientModel):
     lot_id = fields.Many2one(
         comodel_name="stock.lot",
         string="Serial/Lot",
+        readonly=True,
+    )
+    conversion_mode = fields.Selection(
+        selection=[
+            ("serial", "Per serial number"),
+            ("quantity", "Pooled quantity"),
+        ],
+        default="serial",
         required=True,
         readonly=True,
+    )
+    quantity = fields.Float(
+        string="Quantity",
+        default=1.0,
+        required=True,
+        digits="Product Unit of Measure",
+        help="Units capitalised under the asset created from this line.",
+    )
+    subtotal = fields.Monetary(
+        compute="_compute_subtotal",
+        currency_field="currency_id",
+        string="Asset Value",
     )
     serial_number = fields.Char(
         related="lot_id.name",
@@ -200,6 +279,11 @@ class AssetConversionLine(models.TransientModel):
         string="Already Converted",
     )
     status = fields.Char(compute="_compute_status")
+
+    @api.depends("unit_cost", "quantity")
+    def _compute_subtotal(self):
+        for line in self:
+            line.subtotal = (line.unit_cost or 0.0) * (line.quantity or 0.0)
 
     @api.depends("existing_asset_id")
     def _compute_status(self):
