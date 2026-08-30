@@ -391,7 +391,18 @@ out at 1.148 settled / 2 short / **Rp 899.730** unexplained.
 * `_diag_duplicates` groups on `(journal, date, payment_ref, amount)` and then
   splits on **when the rows were written**: two sales can agree on all four, but
   rows created an hour or more apart (`_DUP_BATCH_GAP_SECONDS`) cannot have come
-  from one file. Blocking, and `_assert_generatable` refuses to generate over it.
+  from one file.
+* **The copies are skipped, not blocked (19.0.1.47.0).** The client imports the
+  month cumulatively — 1–7, then 1–14, then 1–31 — so repeats are the routine, and
+  refusing the run over them was the wrong lever: a month with any other finding is
+  booked with *Ignore warnings* ticked, and the copies would ride along with
+  everything else. `_duplicate_line_ids()` maps each re-import to the line it
+  repeats, `_compute_one` hangs it on the prepared row, and `_line_from_parsed`
+  returns `state='skipped'`, no block, no allocation, with a note naming the entry
+  it copies. It must happen **before** allocation: a copy that consumed the day's
+  receivable would make the original read as short, and the run would then be wrong
+  about the real line too. The diagnostic drops to `warning` and
+  `_assert_generatable` no longer refuses — there is nothing left for it to stop.
 * `_diag_import_incomplete` reports a journal whose statement stops before the
   period does — the August run read as a month and covered eighteen days, and
   `_diag_missing_days` by design cannot say so (it looks for *interior* gaps).
@@ -424,6 +435,25 @@ the narrative cannot answer:
 `_allocation_order` then allocates proven settlements first. Order decides who
 gets the money when the pool is thin, and a proven claim beats an unproven one;
 statement order is kept inside each group so a rerun allocates identically.
+
+**`leg` / `leg_partial`: when the gross names nothing, ask the receivable.**
+`_x24_identify` searches inside one tender, so a bank line paying two tenders at
+once (Visa's whole day *plus* Mastercard's whole day, one BCA credit) stays
+`none` however plainly the money reads. `_x24_identify_legs` asks the smaller
+question instead: `line._x24_alloc_legs()` turns the allocation into
+`(tender, trading day, amount)` — the tender read off the account name, which is
+the only place it survives — and each leg is put through the *same*
+`_x24_identify` against that tender's bucket of that day. Nothing weaker than a
+proof is accepted; what changed is the target, not the standard. All legs proven
+reads `leg`, some of them `leg_partial`, and an unproven leg names nothing at
+all: a leg is a residual whenever several bank lines share a day's receivable,
+and a residual need not be a whole number of transactions. This is only ever a
+*fallback* — a line the gross already explains never reaches it — so it cannot
+weaken the `exact`/`batch`/`subset` readings. Measured on run 10 of
+`prd_levis_begbal`: 41 more lines fully named, and 407 of the 949 legs in
+still-unnamed lines given their receipts. It also reaches a day the line's own
+ladder walked past, so `_generate_receipts` widens its `_x24_rows` window to the
+allocation's dates and stamps each candidate with the day it really came from.
 
 **`subset`: a unique combination is proof, an ambiguous one is not.** `_x24_subset`
 extends `_x24_identify` with a bounded meet-in-the-middle search *per tender*.

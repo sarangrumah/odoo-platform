@@ -445,6 +445,86 @@ class TestBankImport(TransactionCase):
 
     # ----- H2H mock adapter -----
 
+    def _h2h_connection(self):
+        cfg = self.AdapterConfig.create(
+            {
+                "name": "test-h2h-repeat",
+                "adapter_type": "bank_test_mock_h2h",
+                "base_url": "http://localhost/none",
+                "auth_method": "none",
+                "timeout_s": 1,
+                "retry_count": 1,
+                "circuit_breaker_threshold": 5,
+                "circuit_breaker_cooldown_s": 60,
+            }
+        )
+        return self.Conn.create(
+            {
+                "name": "Mock Conn Repeat",
+                "bank_code": "Other",
+                "adapter_config_id": cfg.id,
+                "account_number": "1234567890",
+                "journal_id": self.journal.id,
+                "sync_interval_minutes": 1,
+            }
+        )
+
+    def test_h2h_does_not_re_create_a_window_it_already_fetched(self):
+        """A fetch window overlaps the last one by design.
+
+        The CSV path learned this the hard way — four overlapping exports, 1.943
+        duplicate lines — and a cron repeating it unattended is worse. Two syncs
+        of the same payload must leave one set of lines.
+        """
+        _MockH2HAdapter.fixture_lines = [
+            {"date": "2026-05-01", "description": "Salary", "ref": "SAL001", "amount": 5000.0},
+            {"date": "2026-05-02", "description": "Vendor pay", "ref": "VND001", "amount": -1200.0},
+        ]
+        conn = self._h2h_connection()
+        conn._do_sync()
+        conn._do_sync()
+
+        lines = self.env["account.bank.statement.line"].search([("journal_id", "=", self.journal.id)])
+        self.assertEqual(len(lines), 2, "the second fetch carried the same two transactions")
+        log = self.Log.search([("journal_id", "=", self.journal.id)], limit=1, order="id desc")
+        self.assertEqual(log.line_count, 0)
+        self.assertEqual(log.duplicate_count, 2)
+        self.assertFalse(log.statement_id, "an entirely repeated window creates no statement")
+
+    def test_h2h_creates_only_what_the_window_added(self):
+        """Overlap is the norm, so the new day still has to arrive."""
+        _MockH2HAdapter.fixture_lines = [
+            {"date": "2026-05-01", "description": "Salary", "ref": "SAL001", "amount": 5000.0},
+        ]
+        conn = self._h2h_connection()
+        conn._do_sync()
+        _MockH2HAdapter.fixture_lines = [
+            {"date": "2026-05-01", "description": "Salary", "ref": "SAL001", "amount": 5000.0},
+            {"date": "2026-05-02", "description": "Vendor pay", "ref": "VND001", "amount": -1200.0},
+        ]
+        conn._do_sync()
+
+        lines = self.env["account.bank.statement.line"].search([("journal_id", "=", self.journal.id)])
+        self.assertEqual(len(lines), 2)
+        log = self.Log.search([("journal_id", "=", self.journal.id)], limit=1, order="id desc")
+        self.assertEqual((log.line_count, log.duplicate_count), (1, 1))
+
+    def test_h2h_keeps_two_genuinely_identical_transactions(self):
+        """Twins are real: same day, same amount, same memo, two sales.
+
+        The guard is a count difference for exactly this reason — one copy in the
+        database and two in the feed means one is still missing.
+        """
+        twin = {"date": "2026-05-03", "description": "Kopi", "ref": "TWIN", "amount": 25000.0}
+        _MockH2HAdapter.fixture_lines = [dict(twin)]
+        conn = self._h2h_connection()
+        conn._do_sync()
+        _MockH2HAdapter.fixture_lines = [dict(twin), dict(twin)]
+        conn._do_sync()
+
+        lines = self.env["account.bank.statement.line"].search([("journal_id", "=", self.journal.id)])
+        self.assertEqual(len(lines), 2, "the second twin was never imported before")
+
     def test_h2h_mock_adapter_creates_lines(self):
         _MockH2HAdapter.fixture_lines = [
             {"date": "2026-05-01", "description": "Salary", "ref": "SAL001", "amount": 5000.0},

@@ -1105,7 +1105,7 @@ class TestPosClearing(AccountTestInvoicingCommon):
         twin.invalidate_recordset(["create_date"])
         return twin
 
-    def test_a_statement_imported_twice_is_a_blocking_finding(self):
+    def test_a_statement_imported_twice_is_reported(self):
         """The finding August needed and nobody made.
 
         prd_levis_begbal held four imports of the same IBCA file, each starting
@@ -1122,17 +1122,40 @@ class TestPosClearing(AccountTestInvoicingCommon):
         run.action_check_readiness()
         dups = run.diag_ids.filtered(lambda diag: diag.kind == "dup_statement")
         self.assertTrue(dups, "a line imported again two days later is a duplicate")
-        self.assertTrue(all(diag.severity == "blocking" for diag in dups))
         summary = dups.filtered(lambda diag: not diag.date)
         self.assertEqual(summary.count, 1, "one extra copy, not two lines")
         self.assertEqual(summary.amount, 990_000.0)
 
-        # And it must stop the run, not merely annotate it: the receivables the
-        # second copy would settle were never sold.
+    def test_a_re_imported_line_clears_nothing_and_leaves_the_original_alone(self):
+        """The client imports 1–7, then 1–14, then 1–31: repeats are the routine.
+
+        So the copy must be left out rather than made to block the month. It also
+        has to be left out *before* allocation: a copy that consumed the day's
+        receivable would make the original read as short, and the run would then
+        be wrong about the real line too.
+        """
+        self._posrec(self.tender_a, self.store_one, date(2026, 7, 5), 1_000_000.0)
+        original = self._statement(
+            date(2026, 7, 6), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, date(2026, 7, 5))
+        )
+        twin = self._reimport(original, hours=48)
+        run = self._run()
         run.action_compute()
-        with self.assertRaises(UserError) as caught:
-            run.action_generate_moves()
-        self.assertIn("imported more than once", str(caught.exception))
+
+        kept = run.line_ids.filtered(lambda line: line.statement_line_id == original)
+        copy = run.line_ids.filtered(lambda line: line.statement_line_id == twin)
+        self.assertEqual(copy.state, "skipped")
+        self.assertFalse(copy.alloc_ids, "a re-import must settle nothing")
+        self.assertFalse(copy.block)
+        self.assertIn(original.move_id.name, copy.note)
+        self.assertEqual(kept.state, "ok", "the line it repeats is untouched")
+        self.assertEqual(kept.allocated, 1_000_000.0)
+
+        # And the month is bookable: the copies cannot ride along on "Ignore
+        # warnings", because they are not in the run's figures at all.
+        run.action_generate_moves()
+        self.assertEqual(run.state, "generated")
+        self.assertFalse(copy.leg_ids, "nothing planned for a line that clears nothing")
 
     def test_two_identical_lines_from_one_import_are_not_duplicates(self):
         """Two real sales can agree on store, day, amount and wording.
@@ -1258,6 +1281,85 @@ class TestPosClearing(AccountTestInvoicingCommon):
             Alloc._x24_identify(day, 500_000.0),
             ("none", False, []),
             "Visa 300+200 and JCB 100+400 both make it: two answers, so none",
+        )
+
+    def test_a_settlement_across_two_tenders_is_named_leg_by_leg(self):
+        """The gross names nothing; the receivable it paid names everything.
+
+        AEON BSD, 31 July: one BCA line of 8.401.200 that no transaction and no
+        single tender's day equals — it is Visa's whole day plus Mastercard's
+        whole day. The allocation already booked it that way, one leg per tender,
+        because that is the grain the POS receivable exists at. Asking each leg
+        its own question answers what the gross could not.
+        """
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        day = [
+            ("OFFLINE_VISA", "80440-1-1", 1_501_500.0),
+            ("OFFLINE_VISA", "80440-1-2", 3_550_000.0),
+            ("OFFLINE_MASTERCARD", "80440-1-3", 3_349_700.0),
+            ("OFFLINE_DOMESTIC_CARD", "80440-1-4", 12_209_700.0),
+        ]
+        rows = {(7, date(2026, 7, 31)): day}
+
+        self.assertEqual(
+            Alloc._x24_identify(day, 8_401_200.0),
+            ("none", False, []),
+            "no one tender adds up to it — that is why the legs are asked",
+        )
+
+        legs = [
+            ("OFFLINE_VISA", date(2026, 7, 31), 5_051_500.0),
+            ("OFFLINE_MASTERCARD", date(2026, 7, 31), 3_349_700.0),
+        ]
+        found, proven, total = Alloc._x24_identify_legs(rows, 7, legs)
+        self.assertEqual((proven, total), (2, 2))
+        self.assertEqual(sorted(found), ["80440-1-1", "80440-1-2", "80440-1-3"])
+        self.assertEqual(
+            round(sum(amount for _tender, _day, amount in found.values()), 2),
+            8_401_200.0,
+            "the receipts named add up to the bank line, or they are not evidence",
+        )
+        self.assertNotIn("80440-1-4", found, "the day's other tender was paid by another line")
+
+    def test_a_leg_the_day_cannot_compose_names_nothing_and_blocks_nothing(self):
+        """Partial proof is still proof of its part.
+
+        A leg is a residual whenever several bank lines share one day's
+        receivable, and a residual need not be a whole number of transactions. So
+        the leg that cannot be composed simply names nothing, while the leg that
+        can is not held hostage by it.
+        """
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        rows = {
+            (7, date(2026, 7, 31)): [
+                ("OFFLINE_VISA", "80440-1-1", 500_000.0),
+                ("OFFLINE_JCB", "80440-1-2", 300_000.0),
+                ("OFFLINE_JCB", "80440-1-3", 400_000.0),
+            ]
+        }
+        legs = [
+            ("OFFLINE_VISA", date(2026, 7, 31), 500_000.0),
+            ("OFFLINE_JCB", date(2026, 7, 31), 250_000.0),
+        ]
+        found, proven, total = Alloc._x24_identify_legs(rows, 7, legs)
+        self.assertEqual((proven, total), (1, 2))
+        self.assertEqual(list(found), ["80440-1-1"])
+
+    def test_a_leg_will_not_claim_a_receipt_another_line_already_holds(self):
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        rows = {
+            (7, date(2026, 7, 31)): [
+                ("OFFLINE_VISA", "80440-1-1", 300_000.0),
+                ("OFFLINE_VISA", "80440-1-2", 300_000.0),
+            ]
+        }
+        legs = [("OFFLINE_VISA", date(2026, 7, 31), 300_000.0)]
+        found, proven, _total = Alloc._x24_identify_legs(rows, 7, legs, claimed={"80440-1-1"})
+        self.assertEqual((proven, list(found)), (1, ["80440-1-2"]))
+        self.assertEqual(
+            Alloc._x24_identify_legs(rows, 7, legs, claimed={"80440-1-1", "80440-1-2"})[1],
+            0,
+            "with both receipts spoken for there is nothing left to prove",
         )
 
     def test_a_trading_day_too_large_is_left_unsearched(self):
