@@ -131,3 +131,43 @@ class TestPooledAssetConversion(TransactionCase):
         self.assertFalse(again.line_ids.selected)
         # And a full retirement round-trip still leaves exactly one asset.
         self.assertEqual(len(self.env["custom.fixed.asset"].search([("picking_id", "=", picking.id)])), 1)
+
+    def test_04_serial_linked_assets_are_never_pooled(self):
+        """The lot is what the stock quant and the rental unit hang off."""
+        from odoo.exceptions import UserError
+
+        group = self.group
+        serial_product = self.env["product.product"].create(
+            {
+                "name": "Drone X",
+                "is_storable": True,
+                "tracking": "serial",
+                "standard_price": 5000.0,
+                "is_rental_asset": True,
+                "asset_group_id": group.id,
+            }
+        )
+        Asset = self.env["custom.fixed.asset"]
+        assets = Asset
+        for i in range(2):
+            lot = self.env["stock.lot"].create({"name": "SN-POOL-%s" % i, "product_id": serial_product.id})
+            assets |= Asset.create(
+                {
+                    "name": "Drone X",
+                    "group_id": group.id,
+                    "acquisition_value": 5000.0,
+                    "product_id": serial_product.id,
+                    "lot_id": lot.id,
+                    "useful_life_months": 10,
+                    "asset_account_id": self.asset_account.id,
+                    "depreciation_account_id": self.accum_account.id,
+                    "expense_account_id": self.expense_account.id,
+                    "journal_id": self.journal.id,
+                }
+            )
+        with self.assertRaises(UserError):
+            assets[0]._merge_assets_into_pool(assets[1:])
+        # Explicitly overridden, it goes through -- the guard is a safety net,
+        # not a wall.
+        assets[0].with_context(allow_serial_merge=True)._merge_assets_into_pool(assets[1:])
+        self.assertAlmostEqual(assets[0].quantity, 2.0, places=2)

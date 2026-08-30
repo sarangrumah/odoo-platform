@@ -25,7 +25,9 @@ company, asset group, location, custodian, source product, acquisition and
 posting dates, depreciation date rule, method, declining factor, useful life,
 the four accounts, the journal, the per-unit acquisition value, the name, and
 the exact set of dates on which depreciation has been posted. Anything that has
-been revalued, already pooled, already merged, or partially retired is skipped.
+been revalued, already pooled, already merged, or partially retired is skipped,
+and so is anything carrying a serial number or a rental unit: those are tracked
+per unit on purpose (the stock quant and the rental record hang off the lot).
 Widen this only with an accountant in the room.
 
 USAGE (odoo shell, inside a container that can reach the DB)::
@@ -103,6 +105,16 @@ Asset = env["custom.fixed.asset"].with_context(active_test=False)
 candidates = Asset.search(domain, order="code, id")
 candidates = candidates.filtered(lambda a: not a.partial_disposal_ids and not a.revaluation_ids)
 log("candidates: %s running single-unit assets" % len(candidates))
+
+# A serial-linked asset IS the unit -- the stock quant and the rental unit hang
+# off its lot. Those are per-unit on purpose and are never pooled. (On ARKA-AIM
+# that is the entire register: 3,180 of 3,180.)
+serialised = candidates.filtered(
+    lambda a: ("lot_id" in a._fields and a.lot_id) or ("rental_asset_ids" in a._fields and a.rental_asset_ids)
+)
+if serialised:
+    log("skipping %s serial-linked / rental asset(s) -- tracked per unit on purpose" % len(serialised))
+    candidates -= serialised
 
 buckets = defaultdict(lambda: env["custom.fixed.asset"])
 for asset in candidates:

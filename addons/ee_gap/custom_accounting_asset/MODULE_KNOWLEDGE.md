@@ -98,6 +98,7 @@ This is the canonical FA module. Anything BRD-related to "aset tetap", "penyusut
 - **Cross-vertical:** generic.
 
 ## Gotchas
+- **A serial-linked asset is never pooled** — `_merge_assets_into_pool` refuses any asset carrying `lot_id` or a `rental.asset` (override with context `allow_serial_merge` only if you know what the serials are for). The whole ARKA-AIM drone register is serial-linked, so a consolidation run there correctly merges nothing.
 - **Merging never books a journal entry, and that is the point** — if a merge ever needs a GL leg, the register and the ledger have already drifted and the merge is not the fix.
 - **An absorbed asset is `cancelled`, not deleted** — it keeps its posted lines so the moves stay explained. Any report that counts assets by record will therefore see the old rows; filter on `merged_into_id = False`.
 - **A partial retirement pro-rates on the units still held, not on the original ones** — retiring 1 of 5 takes a fifth; retiring another takes a quarter of what is left. That is what keeps `unit_acquisition_value` stable, but it means the amounts released for identical units differ once revaluation or an earlier retirement has moved the carrying amount.

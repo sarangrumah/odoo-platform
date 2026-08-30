@@ -837,6 +837,28 @@ class CustomFixedAsset(models.Model):
                     )
                 )
 
+        # A serial-linked asset IS the unit: ``custom_asset_from_receipt`` gives it
+        # a ``lot_id`` and ``custom_asset_stock_link`` hangs the physical stock and
+        # the rental unit off that. Pooling those would leave 1,600 serials
+        # pointing at cancelled records. The whole ARKA-AIM drone register is
+        # serial-linked, so this guard is what stops a consolidation run there.
+        pool = self | others
+        if not self.env.context.get("allow_serial_merge"):
+            serialised = pool.filtered(
+                lambda a: ("lot_id" in a._fields and a.lot_id)
+                or ("rental_asset_ids" in a._fields and a.rental_asset_ids)
+            )
+            if serialised:
+                raise UserError(
+                    _(
+                        "%(count)s of these assets are tied to a serial number or a "
+                        "rental unit (e.g. %(sample)s). Those are tracked per unit on "
+                        "purpose and must not be pooled.",
+                        count=len(serialised),
+                        sample=", ".join(serialised[:5].mapped("code")),
+                    )
+                )
+
         absorbed_accum = sum(others.mapped("accumulated_depreciation"))
         vals = {
             "acquisition_value": self.acquisition_value + sum(others.mapped("acquisition_value")),
