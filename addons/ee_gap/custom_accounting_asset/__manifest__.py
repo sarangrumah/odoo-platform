@@ -17,13 +17,17 @@ Closes the EE 'account_asset' gap for Odoo CE. Provides:
 * Monthly cron auto-posts all due (date <= today, not yet posted) depreciation lines
   for running assets, debiting depreciation expense and crediting accumulated
   depreciation per the asset/group account configuration.
+* Pooled (quantity-managed) assets — one asset code can carry N identical units
+  (``quantity``). A partial retirement wizard takes n units out, releases their
+  pro-rata share of cost and accumulated depreciation to the GL, and rebuilds the
+  remaining schedule so the monthly charge follows the smaller pool.
 * Disposal wizard captures disposal date and sale value, computes gain/loss vs. NBV,
   and writes the asset back to ``disposed`` state with full audit trail.
 """,
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.5.0",
+    "version": "19.0.0.6.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -43,10 +47,12 @@ Closes the EE 'account_asset' gap for Odoo CE. Provides:
         "views/fixed_asset_location_views.xml",
         "views/fixed_asset_views.xml",
         "views/fixed_asset_revaluation_views.xml",
+        "views/fixed_asset_partial_disposal_views.xml",
         "wizards/asset_disposal_wizard_views.xml",
         "wizards/asset_register_wizard_views.xml",
         "wizards/asset_post_wizard_views.xml",
         "wizards/asset_revaluation_wizard_views.xml",
+        "wizards/asset_partial_disposal_wizard_views.xml",
         "report/asset_register_report.xml",
         "report/asset_register_template.xml",
         "views/menu_views.xml",

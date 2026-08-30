@@ -15,7 +15,10 @@ class StockPicking(models.Model):
         compute="_compute_fixed_asset_count",
     )
     has_rental_asset_lines = fields.Boolean(
+        string="Has Asset Lines",
         compute="_compute_has_rental_asset_lines",
+        help="True when this validated receipt carries at least one product flagged "
+        "for fixed-asset conversion, per serial or as a pooled quantity.",
     )
 
     @api.depends("fixed_asset_ids")
@@ -23,13 +26,18 @@ class StockPicking(models.Model):
         for picking in self:
             picking.fixed_asset_count = len(picking.fixed_asset_ids)
 
-    @api.depends("move_line_ids.product_id.is_rental_asset", "state", "picking_type_id.code")
+    @api.depends(
+        "move_line_ids.product_id.is_rental_asset",
+        "move_line_ids.product_id.is_fixed_asset",
+        "state",
+        "picking_type_id.code",
+    )
     def _compute_has_rental_asset_lines(self):
         for picking in self:
             picking.has_rental_asset_lines = (
                 picking.state == "done"
                 and picking.picking_type_id.code == "incoming"
-                and any(ml.product_id.is_rental_asset for ml in picking.move_line_ids)
+                and any(ml.product_id._asset_conversion_mode() for ml in picking.move_line_ids)
             )
 
     def action_open_asset_conversion_wizard(self):
