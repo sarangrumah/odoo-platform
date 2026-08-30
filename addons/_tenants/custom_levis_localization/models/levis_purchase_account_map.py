@@ -6,7 +6,8 @@ resale) and a **non-trade** stream (operational / opex). The two streams post
 to different accounts:
 
 * the **payable** account on the vendor bill (Trade Payables vs Non-Trade
-  payable), and
+  payable) — each in a third-party and a related-party flavour, picked by the
+  vendor's ``l10n_related_party`` flag, and
 * the **GR/IR clearing** (stock-variation) account used by the platform-way GR
   valuation journal for storable lines.
 
@@ -42,6 +43,14 @@ class LevisPurchaseAccountMap(models.Model):
         string="Payable Account",
         domain="[('account_type', '=', 'liability_payable')]",
         help="Payable (AP) account used on the vendor bill for this stream.",
+    )
+    related_payable_account_id = fields.Many2one(
+        "account.account",
+        string="Related-Party Payable Account",
+        domain="[('account_type', '=', 'liability_payable')]",
+        help="Payable (AP) account used instead of the one above when the vendor "
+        "is flagged as a Related Party on its contact form (an in-group company). "
+        "Leave empty to route related parties like everyone else.",
     )
     grir_account_id = fields.Many2one(
         "account.account",

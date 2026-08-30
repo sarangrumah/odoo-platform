@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 from decimal import Decimal
 
+from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
 from odoo.addons.custom_adapter_framework.models.adapter_base import (
@@ -444,6 +445,86 @@ class TestBankImport(TransactionCase):
 
     # ----- H2H mock adapter -----
 
+    def _h2h_connection(self):
+        cfg = self.AdapterConfig.create(
+            {
+                "name": "test-h2h-repeat",
+                "adapter_type": "bank_test_mock_h2h",
+                "base_url": "http://localhost/none",
+                "auth_method": "none",
+                "timeout_s": 1,
+                "retry_count": 1,
+                "circuit_breaker_threshold": 5,
+                "circuit_breaker_cooldown_s": 60,
+            }
+        )
+        return self.Conn.create(
+            {
+                "name": "Mock Conn Repeat",
+                "bank_code": "Other",
+                "adapter_config_id": cfg.id,
+                "account_number": "1234567890",
+                "journal_id": self.journal.id,
+                "sync_interval_minutes": 1,
+            }
+        )
+
+    def test_h2h_does_not_re_create_a_window_it_already_fetched(self):
+        """A fetch window overlaps the last one by design.
+
+        The CSV path learned this the hard way — four overlapping exports, 1.943
+        duplicate lines — and a cron repeating it unattended is worse. Two syncs
+        of the same payload must leave one set of lines.
+        """
+        _MockH2HAdapter.fixture_lines = [
+            {"date": "2026-05-01", "description": "Salary", "ref": "SAL001", "amount": 5000.0},
+            {"date": "2026-05-02", "description": "Vendor pay", "ref": "VND001", "amount": -1200.0},
+        ]
+        conn = self._h2h_connection()
+        conn._do_sync()
+        conn._do_sync()
+
+        lines = self.env["account.bank.statement.line"].search([("journal_id", "=", self.journal.id)])
+        self.assertEqual(len(lines), 2, "the second fetch carried the same two transactions")
+        log = self.Log.search([("journal_id", "=", self.journal.id)], limit=1, order="id desc")
+        self.assertEqual(log.line_count, 0)
+        self.assertEqual(log.duplicate_count, 2)
+        self.assertFalse(log.statement_id, "an entirely repeated window creates no statement")
+
+    def test_h2h_creates_only_what_the_window_added(self):
+        """Overlap is the norm, so the new day still has to arrive."""
+        _MockH2HAdapter.fixture_lines = [
+            {"date": "2026-05-01", "description": "Salary", "ref": "SAL001", "amount": 5000.0},
+        ]
+        conn = self._h2h_connection()
+        conn._do_sync()
+        _MockH2HAdapter.fixture_lines = [
+            {"date": "2026-05-01", "description": "Salary", "ref": "SAL001", "amount": 5000.0},
+            {"date": "2026-05-02", "description": "Vendor pay", "ref": "VND001", "amount": -1200.0},
+        ]
+        conn._do_sync()
+
+        lines = self.env["account.bank.statement.line"].search([("journal_id", "=", self.journal.id)])
+        self.assertEqual(len(lines), 2)
+        log = self.Log.search([("journal_id", "=", self.journal.id)], limit=1, order="id desc")
+        self.assertEqual((log.line_count, log.duplicate_count), (1, 1))
+
+    def test_h2h_keeps_two_genuinely_identical_transactions(self):
+        """Twins are real: same day, same amount, same memo, two sales.
+
+        The guard is a count difference for exactly this reason — one copy in the
+        database and two in the feed means one is still missing.
+        """
+        twin = {"date": "2026-05-03", "description": "Kopi", "ref": "TWIN", "amount": 25000.0}
+        _MockH2HAdapter.fixture_lines = [dict(twin)]
+        conn = self._h2h_connection()
+        conn._do_sync()
+        _MockH2HAdapter.fixture_lines = [dict(twin), dict(twin)]
+        conn._do_sync()
+
+        lines = self.env["account.bank.statement.line"].search([("journal_id", "=", self.journal.id)])
+        self.assertEqual(len(lines), 2, "the second twin was never imported before")
+
     def test_h2h_mock_adapter_creates_lines(self):
         _MockH2HAdapter.fixture_lines = [
             {"date": "2026-05-01", "description": "Salary", "ref": "SAL001", "amount": 5000.0},
@@ -481,3 +562,109 @@ class TestBankImport(TransactionCase):
         self.assertEqual(len(log.statement_id.line_ids), 2)
         self.assertEqual(conn.status, "active")
         self.assertTrue(conn.last_sync_at)
+
+
+@tagged("post_install", "-at_install")
+class TestBankImportDuplicates(TransactionCase):
+    """Overlapping bank exports must not re-create the transactions they repeat.
+
+    Written after four IBCA exports of August 2026 each started at the 1st and
+    ran to a later day: four different files, four passing hash checks, and
+    1 943 duplicate statement lines posted — 3 145 rows where 1 202 were real,
+    and the bank GL out by 940 983.
+
+    The test that matters most here is the last one. The guard must not become
+    "this key exists, skip it": two genuine sales can be identical, and losing
+    the second is as wrong as inventing a duplicate.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.Wizard = cls.env["custom.bank.import.csv.wizard"]
+        cls.Log = cls.env["custom.bank.import.log"]
+        cls.journal = cls.env["account.journal"].create({"name": "Dup Bank", "type": "bank", "code": "DBNK"})
+        cls.template = cls.env["custom.bank.import.template"].create(
+            {
+                "name": "Dup CSV",
+                "code": "dup_csv",
+                "encoding": "utf-8",
+                "delimiter": ",",
+                "has_header": True,
+                "date_format": "%Y-%m-%d",
+                "date_column_index": 1,
+                "ref_column_index": 2,
+                "signed_amount_column_index": 3,
+                "decimal_separator": ".",
+                "thousand_separator": "",
+            }
+        )
+
+    def _import(self, csv, filename):
+        wiz = self.Wizard.create(
+            {
+                "journal_id": self.journal.id,
+                "template_id": self.template.id,
+                "file": base64.b64encode(csv).decode(),
+                "filename": filename,
+            }
+        )
+        return self.Log.browse(wiz.action_import()["res_id"])
+
+    def test_an_overlapping_export_only_adds_what_is_new(self):
+        first = b"date,ref,amount\n2026-08-01,A,100.00\n2026-08-02,B,200.00\n"
+        second = b"date,ref,amount\n2026-08-01,A,100.00\n2026-08-02,B,200.00\n2026-08-03,C,300.00\n"
+        log1 = self._import(first, "aug01-02.csv")
+        self.assertEqual(log1.line_count, 2)
+
+        log2 = self._import(second, "aug01-03.csv")
+        self.assertEqual(log2.line_count, 1, "only the new day may be created")
+        self.assertEqual(log2.duplicate_count, 2)
+
+        lines = self.env["account.bank.statement.line"].search([("journal_id", "=", self.journal.id)])
+        self.assertEqual(len(lines), 3, "three transactions existed; three must remain")
+
+    def test_a_full_re_import_creates_nothing_and_says_so(self):
+        csv = b"date,ref,amount\n2026-08-01,A,100.00\n2026-08-02,B,200.00\n"
+        self._import(csv, "first.csv")
+        # A different filename, so the file-hash guard does not fire; the
+        # per-transaction guard has to.
+        with self.assertRaises(UserError):
+            self._import(csv, "same-content-different-name.csv")
+        lines = self.env["account.bank.statement.line"].search([("journal_id", "=", self.journal.id)])
+        self.assertEqual(len(lines), 2)
+
+    def test_a_genuinely_repeated_transaction_is_still_imported(self):
+        """The whole reason this counts rather than matches.
+
+        Two identical sales in one day — same amount, same memo — are ordinary.
+        A guard that skipped the second would quietly lose real money.
+        """
+        csv = b"date,ref,amount\n2026-08-01,TWIN,100.00\n2026-08-01,TWIN,100.00\n"
+        log = self._import(csv, "twins.csv")
+        self.assertEqual(log.line_count, 2, "both twins are real and both belong")
+        self.assertEqual(log.duplicate_count, 0)
+
+    def test_a_later_file_adds_the_second_twin_only_once(self):
+        self._import(b"date,ref,amount\n2026-08-01,TWIN,100.00\n", "one.csv")
+        log = self._import(b"date,ref,amount\n2026-08-01,TWIN,100.00\n2026-08-01,TWIN,100.00\n", "two.csv")
+        self.assertEqual(log.line_count, 1, "the database had one; the file has two")
+        self.assertEqual(log.duplicate_count, 1)
+
+    def test_another_journal_is_not_consulted(self):
+        other = self.env["account.journal"].create({"name": "Other Bank", "type": "bank", "code": "OBK2"})
+        self._import(b"date,ref,amount\n2026-08-01,A,100.00\n", "first.csv")
+        # Deliberately not byte-identical: the pre-existing file-hash guard is
+        # global rather than per-journal, so reusing the same bytes would trip
+        # that instead and this test would prove nothing about the new one.
+        wiz = self.Wizard.create(
+            {
+                "journal_id": other.id,
+                "template_id": self.template.id,
+                "file": base64.b64encode(b"date,ref,amount\n2026-08-01,A,100.00\n2026-08-01,Z,999.00\n").decode(),
+                "filename": "other-journal.csv",
+            }
+        )
+        log = self.Log.browse(wiz.action_import()["res_id"])
+        self.assertEqual(log.line_count, 2, "a different bank's transactions are not duplicates")
+        self.assertEqual(log.duplicate_count, 0)

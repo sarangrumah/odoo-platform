@@ -90,10 +90,86 @@ class LevisClearingConfig(models.Model):
         "previous one.",
     )
 
+    currency_id = fields.Many2one(related="company_id.currency_id")
+
+    # ------------------------------------------------------------------
+    # Advanced matching — every one of these ships inert
+    # ------------------------------------------------------------------
+    # The defaults below reproduce today's behaviour exactly: no tolerance, no
+    # subset search. Each tenant is switched on deliberately, after the before /
+    # after measurement described in MODULE_KNOWLEDGE.md. If turning them off no
+    # longer restores the old numbers, the defaults are not actually inert and
+    # that is a bug, not a tuning question.
+    suggest_tolerance_amount = fields.Monetary(
+        string="Suggestion Tolerance",
+        default=0.0,
+        help="Widens which open items are OFFERED and how they are ranked. It "
+        "never books anything: a difference inside this band still lands on "
+        "suspense until someone writes it off. Zero disables it.",
+    )
+    suggest_tolerance_ratio = fields.Float(
+        string="Suggestion Tolerance (%)",
+        digits=(16, 4),
+        default=0.0,
+        help="Same as the amount above, but relative to the settlement gross. The wider of the two applies.",
+    )
+    advanced_matching = fields.Boolean(
+        string="Advanced Matching",
+        default=False,
+        help="Master switch for subset matching and store inference. Off means "
+        "allocation behaves exactly as it did before those were written.",
+    )
+    subset_max_items = fields.Integer(
+        string="Subset — Max Items",
+        default=24,
+        help="Largest number of open items a single settlement may be composed "
+        "of. Bigger pools are not searched; they fall through to the greedy "
+        "allocation instead.",
+    )
+    subset_node_budget = fields.Integer(
+        string="Subset — Node Budget",
+        default=20000,
+        help="Search effort ceiling per settlement. Exhausting it means 'no answer', never a partial guess.",
+    )
+    deposit_match_window_days = fields.Integer(
+        string="Deposit Match Window (days)",
+        default=3,
+        help="How far a validated cash deposit may sit from the bank credit that pays it in.",
+    )
+    writeoff_limit_amount = fields.Monetary(
+        string="Write-off Limit",
+        default=0.0,
+        help="Largest residual a single line may absorb into a chosen account. Zero means no limit.",
+    )
+
     _company_uniq = models.Constraint(
         "unique(company_id)",
         "POS clearing accounts are already configured for this company.",
     )
+
+    @api.constrains("suggest_tolerance_amount", "suggest_tolerance_ratio", "writeoff_limit_amount")
+    def _check_tolerances_not_negative(self):
+        for config in self:
+            if (
+                config.suggest_tolerance_amount < 0
+                or config.suggest_tolerance_ratio < 0
+                or config.writeoff_limit_amount < 0
+            ):
+                raise UserError(_("Tolerances and limits cannot be negative."))
+
+    def _match_tolerance(self, amount):
+        """The suggestion band around ``amount`` — the wider of the two settings.
+
+        Note this is *not* ``_EPS``. ``_EPS`` is float noise; this is a business
+        decision about how much difference is worth offering a human. Never let
+        one stand in for the other: a tolerance-sized difference is money someone
+        chose to absorb, and it has to stay visible as such.
+        """
+        self.ensure_one()
+        return max(
+            self.suggest_tolerance_amount or 0.0,
+            abs(amount or 0.0) * (self.suggest_tolerance_ratio or 0.0) / 100.0,
+        )
 
     @api.constrains("suspense_account_id", "bank_journal_ids")
     def _check_suspense_matches_journals(self):

@@ -93,6 +93,20 @@ same facts, same sources, one line at a time.
   Note this narrows the forward end of the day window too, so a settlement dated
   before its own trading day sees a window that ends on the bank date.
 
+- **The candidate ranking no longer lives here.** `score()` moved to
+  `levis.clearing.matcher._score_candidate` in `custom_levis_localization`, and
+  `_get_match_candidates` calls it. The weights are unchanged (+100 exact
+  residual, +40 same trading day / +20 decaying, +15 tender account, +<=10
+  proximity); the point of the move is that the clearing's allocation and this
+  wizard's ranking can no longer disagree about which open item answers a
+  settlement first. Change the weights there, not here.
+- The matcher's `tolerance` argument is read from
+  `levis.clearing.config._match_tolerance()` and ships at **zero**, so ranking is
+  byte-identical to before until a tenant sets it. When set, it can only lift a
+  near-miss into view (+80, below the +100 an exact match scores). It never sizes
+  a write-off. `_get_auto_match_candidate` is deliberately **not** tolerance-aware
+  — auto-match still requires an exact hit.
+
 ## Out of Scope
 - No bank statement import (`custom_bank_import`), no narrative grammars (those
   are `levis.bank.narrative` — adding a bank is one `_parse_<format>` there), no

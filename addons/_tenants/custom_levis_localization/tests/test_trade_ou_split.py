@@ -30,6 +30,23 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
                 "reconcile": True,
             }
         )
+        # In-group (related-party) counterparts of both AP control accounts.
+        cls.trade_payable_related = Account.create(
+            {
+                "name": "Trade Payables - Related parties",
+                "code": "RELTPAY1",
+                "account_type": "liability_payable",
+                "reconcile": True,
+            }
+        )
+        cls.nontrade_payable_related = Account.create(
+            {
+                "name": "Non Trade Payable - Related parties",
+                "code": "RELNTPAY",
+                "account_type": "liability_payable",
+                "reconcile": True,
+            }
+        )
         # GR/IR clearing is a current-liability control account in the real EBR
         # chart (e.g. "GR/IR clearing-Non Trade Payables", account_type
         # liability_current, reconcilable) — NOT a liability_payable subtype, so
@@ -101,6 +118,7 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
                 "company_id": cls.company.id,
                 "purchase_type": "trade",
                 "payable_account_id": cls.trade_payable.id,
+                "related_payable_account_id": cls.trade_payable_related.id,
             }
         )
         Map.create(
@@ -108,6 +126,7 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
                 "company_id": cls.company.id,
                 "purchase_type": "non_trade",
                 "payable_account_id": cls.nontrade_payable.id,
+                "related_payable_account_id": cls.nontrade_payable_related.id,
                 "grir_account_id": cls.grir_nontrade.id,
             }
         )
@@ -442,6 +461,68 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
             self.assertEqual(po.order_line.product_qty, 413011.0)
         finally:
             self.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.po_swap_guard_qty", "")
+
+    # ------------------------------------------------------------------
+    # 14. Related-party vendors take the related AP account of their stream
+    # ------------------------------------------------------------------
+    def test_14_related_party_vendor_takes_related_trade_payable(self):
+        # the reported bug: SES (Erajaya group) must not land on third-party AP.
+        self.vendor.l10n_related_party = True
+
+        bill = self._bill(self._trade_po_received())
+        pay = bill.line_ids.filtered(lambda l: l.display_type == "payment_term")
+        self.assertEqual(pay.account_id, self.trade_payable_related)
+        self.assertNotEqual(pay.account_id, self.trade_payable)
+
+    def test_14b_related_party_vendor_takes_related_nontrade_payable(self):
+        self.vendor.l10n_related_party = True
+
+        bill = self._bill(self._nontrade_po_received())
+        pay = bill.line_ids.filtered(lambda l: l.display_type == "payment_term")
+        self.assertEqual(pay.account_id, self.nontrade_payable_related)
+
+    def test_14c_child_contact_follows_the_parent_flag(self):
+        # SES exists twice: the TBK parent and a child contact. The AP account
+        # follows the commercial (parent) partner, like core does.
+        self.vendor.l10n_related_party = True
+        child = self.env["res.partner"].create({"name": "SES - branch", "parent_id": self.vendor.id})
+
+        po = self._make_po("trade")
+        po.partner_id = child
+        self._receive(po)
+        bill = self._bill(po)
+        pay = bill.line_ids.filtered(lambda l: l.display_type == "payment_term")
+        self.assertEqual(pay.account_id, self.trade_payable_related)
+
+    def test_14d_unflagged_vendor_keeps_the_third_party_payable(self):
+        # no flag -> unchanged behaviour, whatever sits on the contact's own
+        # Account Payable field
+        self.vendor.with_company(self.company).property_account_payable_id = self.trade_payable_related
+        bill = self._bill(self._trade_po_received())
+        pay = bill.line_ids.filtered(lambda l: l.display_type == "payment_term")
+        self.assertEqual(pay.account_id, self.trade_payable)
+
+    def test_14e_unconfigured_related_account_falls_back(self):
+        # a company that never configured the related-party column must keep
+        # posting rather than end up with no AP account at all
+        self.env["levis.purchase.account.map"]._get_map(self.company, "trade").related_payable_account_id = False
+        self.vendor.l10n_related_party = True
+
+        bill = self._bill(self._trade_po_received())
+        pay = bill.line_ids.filtered(lambda l: l.display_type == "payment_term")
+        self.assertEqual(pay.account_id, self.trade_payable)
+
+    def test_14f_seeding_flags_vendors_already_pointed_at_a_related_account(self):
+        from odoo.addons.custom_levis_localization.models.setup import _flag_related_parties
+
+        self.vendor.with_company(self.company).property_account_payable_id = self.trade_payable_related
+        self.assertFalse(self.vendor.l10n_related_party)
+
+        flagged = _flag_related_parties(self.env, self.company)
+        self.assertEqual(flagged, 1)
+        self.assertTrue(self.vendor.l10n_related_party)
+        # idempotent: a second pass flags nobody
+        self.assertEqual(_flag_related_parties(self.env, self.company), 0)
 
     # ------------------------------------------------------------------
     # helpers

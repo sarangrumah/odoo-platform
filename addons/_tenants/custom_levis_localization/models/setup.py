@@ -41,8 +41,13 @@ IN_METHODS = ("manual", "bank_transfer", "giro")
 # Account codes in the EBR chart of accounts (company-dependent → resolve with
 # ``with_company``). Trade GR/IR stays per product category, so no code here.
 ACCOUNT_CODES = {
-    "trade": {"payable": "2103100001"},
-    "non_trade": {"payable": "2103300001", "grir": "2103300008", "expense": "6120010001"},
+    "trade": {"payable": "2103100001", "related_payable": "2103200001"},
+    "non_trade": {
+        "payable": "2103300001",
+        "related_payable": "2103400001",
+        "grir": "2103300008",
+        "expense": "6120010001",
+    },
 }
 
 
@@ -322,6 +327,10 @@ def seed_trade_ou(env):
                 acc = _find_account(env, company, codes.get("payable"))
                 if acc:
                     vals["payable_account_id"] = acc.id
+            if not mapping.related_payable_account_id and codes.get("related_payable"):
+                acc = _find_account(env, company, codes["related_payable"])
+                if acc:
+                    vals["related_payable_account_id"] = acc.id
             if not mapping.grir_account_id and codes.get("grir"):
                 acc = _find_account(env, company, codes["grir"])
                 if acc:
@@ -339,6 +348,7 @@ def seed_trade_ou(env):
             # import stored one as a plain current liability. Runs every time so
             # already-mapped accounts are also normalised.
             _ensure_payable(mapping.payable_account_id)
+            _ensure_payable(mapping.related_payable_account_id)
 
     # GR/IR clearing accounts used on vendor-bill product lines must be current
     # liabilities, not payable, or core's due-date rule blocks bill posting.
@@ -361,13 +371,17 @@ def seed_trade_ou(env):
                 if _ensure_grir_current(acc):
                     made_grir += 1
 
+    made_related = _flag_related_parties(env, companies)
+
     _logger.info(
-        "Levi's Trade/OU seeding: %d analytic, %d HO, %d journals, %d mappings, %d GR/IR normalised",
+        "Levi's Trade/OU seeding: %d analytic, %d HO, %d journals, %d mappings, "
+        "%d GR/IR normalised, %d related parties flagged",
         made_analytic,
         made_ho,
         made_journal,
         made_map,
         made_grir,
+        made_related,
     )
     return {
         "analytic": made_analytic,
@@ -375,7 +389,45 @@ def seed_trade_ou(env):
         "journals": made_journal,
         "mappings": made_map,
         "grir_normalised": made_grir,
+        "related_parties": made_related,
     }
+
+
+def _flag_related_parties(env, companies):
+    """Tick ``l10n_related_party`` on vendors already pointed at a related AP.
+
+    Accounting flagged the Erajaya-group vendors the only way the system let
+    them: by putting "Trade Payables - Related parties" on the contact's Account
+    Payable field. That field never reached the vendor bill (the stream mapping
+    overrode it), but it does record the intent — so adopt it as the seed for the
+    new flag instead of asking anyone to re-tag the vendors by hand.
+
+    Idempotent: only ever ticks, never unticks, so a deliberate manual change
+    survives the next upgrade.
+    """
+    Partner = env["res.partner"]
+    flagged = 0
+    for company in companies:
+        accounts = (
+            env["levis.purchase.account.map"].search([("company_id", "=", company.id)]).related_payable_account_id
+        )
+        if not accounts:
+            continue
+        partners = Partner.with_company(company).search(
+            [
+                ("l10n_related_party", "=", False),
+                ("property_account_payable_id", "in", accounts.ids),
+            ]
+        )
+        if partners:
+            partners.l10n_related_party = True
+            flagged += len(partners)
+            _logger.info(
+                "Levi's Trade/OU: flagged %d related-party vendor(s): %s",
+                len(partners),
+                ", ".join(partners.mapped("name")[:10]),
+            )
+    return flagged
 
 
 # --- POS clearing (feature #15) ---------------------------------------------
@@ -483,3 +535,66 @@ def seed_clearing_config(env):
         formats,
     )
     return {"created": made, "updated": filled, "formats": formats}
+
+
+def seed_store_codes(env):
+    """Fill ``stock.warehouse.l10n_store_code`` from the X24DN retail feed.
+
+    The retail importer already decided which ``pos.config`` a store code names,
+    and recorded that decision as an ``ir.model.data`` xid ``posconfig_<CODE>``
+    (see ``custom_retail_import/models/retail_import_executor.py``). This walks
+    those xids back to the warehouse and writes the code there, so the code stops
+    being reachable only through raw SQL.
+
+    Idempotent, and deliberately conservative:
+
+    * a warehouse that already carries a code is **never** overwritten — a hand
+      correction outranks the feed;
+    * a code already held by a different warehouse is skipped and logged rather
+      than moved, because the unique constraint would refuse it anyway and a
+      silent steal is worse than a visible gap;
+    * a store whose xid points at no warehouse is left empty, not guessed.
+    """
+    Data = env["ir.model.data"].sudo()
+    Config = env["pos.config"].sudo()
+    Warehouse = env["stock.warehouse"].sudo()
+
+    xids = Data.search([("model", "=", "pos.config"), ("name", "=like", "posconfig_%")])
+    filled = skipped = orphan = 0
+    taken = {}
+    for warehouse in Warehouse.search([("l10n_store_code", "!=", False)]):
+        taken[(warehouse.company_id.id, (warehouse.l10n_store_code or "").strip().upper())] = warehouse
+
+    for xid in xids:
+        code = xid.name[len("posconfig_") :].strip().upper()
+        if not code:
+            continue
+        config = Config.browse(xid.res_id).exists()
+        warehouse = config.warehouse_id if config else Warehouse
+        if not warehouse:
+            orphan += 1
+            _logger.info("Store code %s: xid points at no warehouse, left empty", code)
+            continue
+        if warehouse.l10n_store_code:
+            continue
+        holder = taken.get((warehouse.company_id.id, code))
+        if holder and holder != warehouse:
+            skipped += 1
+            _logger.warning(
+                "Store code %s already held by warehouse %s; %s left empty",
+                code,
+                holder.display_name,
+                warehouse.display_name,
+            )
+            continue
+        warehouse.l10n_store_code = code
+        taken[(warehouse.company_id.id, code)] = warehouse
+        filled += 1
+
+    _logger.info(
+        "Levi's store-code seeding: %d filled, %d skipped (code taken), %d orphan xids",
+        filled,
+        skipped,
+        orphan,
+    )
+    return {"filled": filled, "skipped": skipped, "orphan": orphan}

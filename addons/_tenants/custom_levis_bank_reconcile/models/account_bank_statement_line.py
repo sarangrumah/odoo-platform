@@ -178,21 +178,15 @@ class AccountBankStatementLine(models.Model):
         target = self._levis_match_target()
         currency = self.company_id.currency_id
         primary_day = self.levis_trans_date
-        tender_accounts = self._levis_clearing_config().pos_receivable_account_ids
+        config = self._levis_clearing_config()
+        tender_accounts = config.pos_receivable_account_ids
+        # Ships at zero, so ranking is unchanged until a tenant sets it. It can
+        # only lift a near-miss into view; it never sizes or books anything.
+        tolerance = config._match_tolerance(target) if config else 0.0
+        matcher = self.env["levis.clearing.matcher"]
 
         def score(aml):
-            s = 0.0
-            if not currency.compare_amounts(aml.amount_residual, target):
-                s += 100.0
-            if primary_day and aml.date == primary_day:
-                s += 40.0
-            elif primary_day:
-                s += max(0.0, 20.0 - abs((aml.date - primary_day).days) * 2.0)
-            if aml.account_id in tender_accounts:
-                s += 15.0  # a tender receivable before a trade one
-            if target:
-                s += max(0.0, 10.0 - abs(aml.amount_residual - target) / target * 10.0)
-            return s
+            return matcher._score_candidate(aml, target, primary_day, tender_accounts, currency, tolerance)
 
         return pool.sorted(key=score, reverse=True)[:limit]
 
