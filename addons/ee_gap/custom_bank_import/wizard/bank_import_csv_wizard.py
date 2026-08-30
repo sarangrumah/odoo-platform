@@ -14,6 +14,7 @@ _logger = logging.getLogger(__name__)
 
 class BankImportCsvWizard(models.TransientModel):
     _name = "custom.bank.import.csv.wizard"
+    _inherit = ["custom.bank.import.dedup"]
     _description = "Bank Statement CSV Import Wizard"
 
     journal_id = fields.Many2one("account.journal", required=True, domain=[("type", "=", "bank")])
@@ -21,63 +22,6 @@ class BankImportCsvWizard(models.TransientModel):
     file = fields.Binary(string="Statement File", required=True)
     filename = fields.Char()
     statement_name = fields.Char(default="Imported")
-
-    # ------------------------------------------------------------------
-    # Per-transaction duplicate guard
-    # ------------------------------------------------------------------
-    # The file hash below catches a byte-identical re-upload and nothing else,
-    # which is not the shape this actually goes wrong in. Four IBCA exports of
-    # August 2026 each started at the 1st and ran to a later day, so every one
-    # was a *different* file that re-carried every earlier transaction. The hash
-    # passed each time and 1 943 duplicate statement lines were posted — 3 145
-    # rows where 1 202 were real, and the bank GL out by 940 983.
-    #
-    # So the guard has to be per transaction. It is deliberately a **count
-    # difference**, not "key exists -> skip": two genuine sales can be identical
-    # — same store, same price, same day, same memo — and skipping the second
-    # would lose real money as surely as importing it twice invents it.
-    #
-    #     create = max(0, times the key appears in the file
-    #                     - times it already exists in the database)
-    #
-    # A full re-import therefore creates nothing; a file that genuinely holds two
-    # twins where the database has one creates exactly one.
-    #
-    # The key matches ``levis.pos.clearing._duplicate_groups`` on purpose, so the
-    # importer and the clearing's readiness gate cannot disagree about what a
-    # duplicate is.
-    _DEDUP_PRECISION = 2
-
-    def _dedup_key(self, date, payment_ref, amount):
-        """The identity of one bank transaction, as both sides must see it."""
-        return (
-            date,
-            (payment_ref or "")[:255],
-            round(float(amount or 0.0), self._DEDUP_PRECISION),
-        )
-
-    def _existing_line_counts(self, dates):
-        """How many times each key is already on this journal, in this range.
-
-        Scoped to the journal and the file's own date span: a statement file says
-        nothing about days it does not cover, and widening the search would make
-        a large history expensive for no gain.
-        """
-        self.ensure_one()
-        counts = {}
-        if not dates:
-            return counts
-        existing = self.env["account.bank.statement.line"].search(
-            [
-                ("journal_id", "=", self.journal_id.id),
-                ("date", ">=", min(dates)),
-                ("date", "<=", max(dates)),
-            ]
-        )
-        for line in existing:
-            key = self._dedup_key(line.date, line.payment_ref, line.amount)
-            counts[key] = counts.get(key, 0) + 1
-        return counts
 
     def action_import(self):
         self.ensure_one()
@@ -159,22 +103,16 @@ class BankImportCsvWizard(models.TransientModel):
                 )
 
         # Drop the transactions this journal already holds. Counted, not merely
-        # matched — see _dedup_key above for why the difference matters.
-        already = self._existing_line_counts([ln["date"] for ln in lines])
-        seen_in_file = {}
-        fresh, duplicates = [], []
-        for ln in lines:
-            key = self._dedup_key(
-                ln["date"],
-                (ln["ref"] or ln.get("partner_hint") or "/"),
-                ln["amount"],
-            )
-            seen_in_file[key] = seen_in_file.get(key, 0) + 1
-            if seen_in_file[key] <= already.get(key, 0):
-                duplicates.append(ln)
-            else:
-                fresh.append(ln)
-        lines = fresh
+        # matched — see custom.bank.import.dedup for why the difference matters.
+        lines, duplicates = self._split_already_imported(
+            [
+                (
+                    self._dedup_key(ln["date"], ln["ref"] or ln.get("partner_hint") or "/", ln["amount"]),
+                    ln,
+                )
+                for ln in lines
+            ]
+        )
 
         if not lines:
             # Every row was already here. Say so plainly: creating an empty

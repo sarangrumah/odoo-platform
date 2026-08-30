@@ -435,7 +435,11 @@ class LevisPosClearing(models.Model):
     # Readiness — is the data fit to clear at all
     # ------------------------------------------------------------------
     def _duplicate_groups(self):
-        """Statement lines the same import wrote twice: ``[(journal, date, ref, amount, ids)]``.
+        """Statement lines the same import wrote twice.
+
+        ``[(journal, date, ref, amount, kept id, [re-imported ids])]`` — the kept
+        one is named too, because a copy is only skippable if the line it repeats
+        can be pointed at.
 
         Measured on prd_levis_begbal in August 2026: the IBCA statement was
         imported four times, each file starting again at the 1st, leaving 3.145
@@ -481,8 +485,25 @@ class LevisPosClearing(models.Model):
             first = stamps[0]
             extra = [line_id for line_id, stamp in zip(ids, stamps) if stamp - first >= _DUP_BATCH_GAP_SECONDS]
             if extra:
-                groups.append((journal_id, date, payment_ref, amount, extra))
+                groups.append((journal_id, date, payment_ref, amount, ids[0], extra))
         return groups
+
+    def _duplicate_line_ids(self):
+        """``{re-imported statement line: the line it repeats}``.
+
+        The client imports the month cumulatively — 1–7, then 1–14, then 1–31 —
+        so the same days arrive again and again by design. What must never happen
+        is the second arrival being cleared: the bank moved that money once, and
+        settling a receivable twice invents one. Reporting it was not enough,
+        because a run with other findings is booked with "Ignore warnings" ticked
+        and the copies would ride along with everything else.
+        """
+        self.ensure_one()
+        return {
+            extra_id: kept_id
+            for _journal, _date, _ref, _amount, kept_id, extra in self._duplicate_groups()
+            for extra_id in extra
+        }
 
     def _diag_duplicates(self):
         """One row per repeated statement line, plus a per-journal total."""
@@ -490,7 +511,7 @@ class LevisPosClearing(models.Model):
         out = []
         by_journal = defaultdict(lambda: [0, 0.0])
         groups = self._duplicate_groups()
-        for journal_id, date, payment_ref, amount, extra in groups:
+        for journal_id, date, payment_ref, amount, _kept_id, extra in groups:
             tally = by_journal[journal_id]
             tally[0] += len(extra)
             tally[1] += amount * len(extra)
@@ -498,7 +519,7 @@ class LevisPosClearing(models.Model):
                 out.append(
                     {
                         "kind": "dup_statement",
-                        "severity": "blocking",
+                        "severity": "warning",
                         "date": date,
                         "bank_journal_id": journal_id,
                         "amount": amount * len(extra),
@@ -516,14 +537,14 @@ class LevisPosClearing(models.Model):
             out.append(
                 {
                     "kind": "dup_statement",
-                    "severity": "blocking",
+                    "severity": "warning",
                     "bank_journal_id": journal_id,
                     "amount": amount,
                     "count": count,
                     "message": _(
                         "%(count)s statement line(s) in this period were imported again "
-                        "later. The bank moved this money once; clearing them would "
-                        "settle receivables that do not exist.",
+                        "later. The bank moved this money once, so the later copies are "
+                        "listed and left out of the clearing — nothing here is booked.",
                         count=count,
                     ),
                 }
@@ -928,6 +949,7 @@ class LevisPosClearing(models.Model):
         rules_cache = {}
         diag_vals = []
         prepared = []
+        duplicates = self._duplicate_line_ids()
         for statement_line in self._statement_lines():
             journal = statement_line.journal_id
             if journal.id not in rules_cache:
@@ -939,6 +961,7 @@ class LevisPosClearing(models.Model):
                     "parsed": parsed,
                     "rules": rules_cache[journal.id],
                     "evidence": None,
+                    "duplicate_of": duplicates.get(statement_line.id),
                 }
             )
         self._attach_evidence(prepared, pos_accounts)
@@ -998,7 +1021,9 @@ class LevisPosClearing(models.Model):
         lines.receipt_ids.filtered(lambda receipt: not receipt.matched).unlink()
         if not lines:
             return True
-        dates = lines.mapped("trans_date")
+        legs_by_line = {line.id: line._x24_alloc_legs() for line in lines}
+        dates = list(lines.mapped("trans_date"))
+        dates += [day for legs in legs_by_line.values() for _tender, day, _amount in legs]
         rows = Alloc._x24_rows(
             set(lines.mapped("analytic_account_id").ids),
             min(dates),
@@ -1010,18 +1035,34 @@ class LevisPosClearing(models.Model):
         claimed = set(Receipt.search([("company_id", "=", self.company_id.id), ("matched", "=", True)]).mapped("ref"))
         to_create = []
         for line in lines:
-            day = rows.get((line.analytic_account_id.id, line.trans_date), ())
-            if not day:
-                continue
+            ou_id = line.analytic_account_id.id
+            day = rows.get((ou_id, line.trans_date), ())
             _state, _tender, proven = Alloc._x24_identify(day, round(line.gross, 2))
             proven = {ref for ref in proven if ref not in claimed}
+            # ``(tender, ref, amount, day)`` — the line's own trading day, which is
+            # what a human ticks from, plus anything the legs proved on a
+            # neighbouring day, which a human could not have found here at all.
+            offer = [(tender, ref, amount, line.trans_date) for tender, ref, amount in day]
+            if not proven:
+                found, _proven_legs, _total = Alloc._x24_identify_legs(rows, ou_id, legs_by_line[line.id], claimed)
+                proven = set(found)
+                known = {ref for _tender, ref, _amount in day}
+                offer += [
+                    (tender, ref, amount, leg_day)
+                    for ref, (tender, leg_day, amount) in found.items()
+                    if ref not in known
+                ]
+            if not offer:
+                continue
             # A line the amount already explains gets only its proven receipts.
             # Offering it the rest of the day's transactions as well would be
             # tens of thousands of rows answering a question nobody still has —
             # and unticking one puts the line back in play, so Refresh
             # Suggestions hands it the whole day again the moment it matters.
-            settled = proven and abs(round(sum(a for _t, r, a in day if r in proven), 2) - round(line.gross, 2)) <= _EPS
-            for tender, ref, amount in day:
+            settled = (
+                proven and abs(round(sum(a for _t, r, a, _d in offer if r in proven), 2) - round(line.gross, 2)) <= _EPS
+            )
+            for tender, ref, amount, row_day in offer:
                 tick = ref in proven
                 if ref in claimed or ((settled or proven_only) and not tick):
                     continue
@@ -1032,7 +1073,7 @@ class LevisPosClearing(models.Model):
                         "line_id": line.id,
                         "ref": ref,
                         "tender": tender,
-                        "trans_date": line.trans_date,
+                        "trans_date": row_day,
                         "amount": amount,
                         "suggested": tick,
                         "matched": tick,
@@ -1270,6 +1311,19 @@ class LevisPosClearing(models.Model):
                     "res_id": statement_line.id,
                     "message": _("Consumed by %s.", other_run.name),
                 }
+            )
+            return vals
+
+        duplicate_of = (prep or {}).get("duplicate_of")
+        if duplicate_of:
+            # Left out before anything is allocated, not filtered at posting: a
+            # copy that consumed a receivable here would make the original read
+            # as short, and the run would then be wrong about the real line too.
+            kept = self.env["account.bank.statement.line"].browse(duplicate_of)
+            vals.update({"state": "skipped", "block": False})
+            vals["note"] = _(
+                "A later import of %(entry)s. The bank moved this money once, so this copy clears nothing.",
+                entry=kept.move_id.name or kept.payment_ref or duplicate_of,
             )
             return vals
 
@@ -1713,11 +1767,10 @@ class LevisPosClearing(models.Model):
             )
         if not self.ignore_warnings:
             problems = []
-            # First, because it invalidates every other figure on the run: a
-            # statement imported twice offers receivables that were never sold.
-            dup = sum(self.diag_ids.filtered(lambda d: d.kind == "dup_statement" and not d.date).mapped("count"))
-            if dup:
-                problems.append(_("%s statement line(s) imported more than once", dup))
+            # A statement imported twice used to refuse the run outright. It no
+            # longer has to: the copies are left out at compute time, so there is
+            # nothing here for "Ignore warnings" to let through. They stay on the
+            # Diagnostics tab, because the import is still worth fixing upstream.
             if self.unparsed_count:
                 problems.append(_("%s unparsed narrative(s)", self.unparsed_count))
             if self.unmapped_count:
@@ -2287,6 +2340,8 @@ class LevisPosClearingLine(models.Model):
             ("exact", "One transaction"),
             ("batch", "Whole tender batch"),
             ("subset", "Only possible combination"),
+            ("leg", "Every receivable leg"),
+            ("leg_partial", "Some receivable legs"),
             ("ambiguous", "Several possibilities"),
             ("none", "Not identified"),
         ],
@@ -2296,8 +2351,11 @@ class LevisPosClearingLine(models.Model):
         help="How the receipts below were established. Only arithmetic counts: one "
         "transaction of exactly this gross, one tender whose whole trading day sums "
         "to it, or — within one tender — the single combination of transactions "
-        "that adds up to it. A day that can be composed more than one way is left "
-        "unnamed, because picking one would be a guess.",
+        "that adds up to it. Where the gross names nothing because it paid two "
+        "tenders at once, the same test is applied to each receivable leg instead, "
+        "and the line reads as proven per leg — every leg, or only some. A day that "
+        "can be composed more than one way is left unnamed, because picking one "
+        "would be a guess.",
     )
     tender_locked = fields.Boolean(
         string="Tender Proven",
@@ -2384,7 +2442,34 @@ class LevisPosClearingLine(models.Model):
             line.matched_total = round(sum(matched.mapped("amount")), 2)
             line.match_gap = round(line.gross - line.matched_total, 2) if line.kind in _SETTLING_KINDS else 0.0
 
-    @api.depends("analytic_account_id", "trans_date", "gross", "kind", "alloc_ids.account_id")
+    def _x24_alloc_legs(self):
+        """``[(tender, trading day, amount)]`` — what this settlement was booked against.
+
+        One leg per tender per trading day, which is exactly the grain
+        ``custom_retail_import`` books the POS receivable at, so every leg is a
+        target the X70D transactions of that day can be matched against. The
+        tender is read off the account name because that is the only place it
+        survives: ``POS Receivable - OFFLINE_VISA`` and nothing else says Visa.
+        """
+        self.ensure_one()
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        legs = defaultdict(float)
+        for alloc in self.alloc_ids:
+            tender = Alloc._x24_tender_of_account(alloc.account_id)
+            if not tender or not alloc.source_date:
+                continue
+            legs[(_X24_TENDER_FOLD.get(tender, tender), alloc.source_date)] += alloc.amount
+        return [(tender, day, round(amount, 2)) for (tender, day), amount in legs.items()]
+
+    @api.depends(
+        "analytic_account_id",
+        "trans_date",
+        "gross",
+        "kind",
+        "alloc_ids.account_id",
+        "alloc_ids.amount",
+        "alloc_ids.source_date",
+    )
     def _compute_x24_trans(self):
         """Name the receipts this bank line proves it paid — or name none.
 
@@ -2405,7 +2490,12 @@ class LevisPosClearingLine(models.Model):
             line.x24_tender_mismatch = False
         if not settling:
             return
-        dates = settling.mapped("trans_date")
+        legs_by_line = {line.id: line._x24_alloc_legs() for line in settling}
+        # The legs can sit a day either side of the line's own trading day: the
+        # allocation walks a ladder of candidate days, and a leg it settled on is
+        # still the day whose receipts have to be read.
+        dates = list(settling.mapped("trans_date"))
+        dates += [day for legs in legs_by_line.values() for _tender, day, _amount in legs]
         rows = Alloc._x24_rows(
             set(settling.mapped("analytic_account_id").ids),
             min(dates),
@@ -2413,11 +2503,24 @@ class LevisPosClearingLine(models.Model):
             settling.company_id[:1] or self.env.company,
         )
         cache = {}
+        leg_cache = {}
         for line in settling:
             key = (line.analytic_account_id.id, line.trans_date, round(line.gross, 2))
             if key not in cache:
                 cache[key] = Alloc._x24_identify(rows.get(key[:2], ()), key[2])
             state, tender, refs = cache[key]
+            if state == "none":
+                # Nothing adds up to the whole payment; ask the receivable it was
+                # booked against instead. Same arithmetic, smaller question.
+                legs = legs_by_line[line.id]
+                leg_key = (line.analytic_account_id.id, tuple(sorted(legs)))
+                if leg_key not in leg_cache:
+                    leg_cache[leg_key] = Alloc._x24_identify_legs(rows, line.analytic_account_id.id, legs)
+                found, proven_legs, total_legs = leg_cache[leg_key]
+                if proven_legs:
+                    state = "leg" if proven_legs == total_legs else "leg_partial"
+                    tenders = {leg_tender for leg_tender, _day, _amount in found.values()}
+                    tender = tenders.pop() if len(tenders) == 1 else False
             line.x24_match = state
             line.x24_tender = tender or False
             booked = {Alloc._x24_tender_of_account(alloc.account_id) for alloc in line.alloc_ids}
@@ -2897,6 +3000,45 @@ class LevisPosClearingAlloc(models.Model):
             low = mask & -mask
             totals[mask] = totals[mask ^ low] + items[low.bit_length() - 1][1]
             yield mask, totals[mask]
+
+    @api.model
+    def _x24_identify_legs(self, rows, ou_id, legs, claimed=()):
+        """Identify the receipts leg by leg, when nothing names the whole payment.
+
+        ``_x24_identify`` asks one question — which transactions add up to the
+        *bank's* gross — and answers it inside a single tender, because a
+        combination spanning two would name neither. So a settlement that pays
+        two tenders at once stays unnamed, even though the split is not in doubt:
+        the receivable it consumes is booked per tender per trading day out of
+        the very X70D file the receipts come from, and the allocation already
+        holds that split as its legs. What the whole-gross question has to search
+        for, the legs are given.
+
+        This asks the smaller question once per leg — which of *this* tender's
+        transactions on *this* trading day add up to *this* receivable — and
+        settles it with the same arithmetic, so nothing weaker than a proof is
+        accepted. A leg the day cannot compose names nothing and leaves its share
+        of the settlement to the accountant, which is the honest answer: the leg
+        amount is a residual whenever several bank lines share one day's
+        receivable, and a residual need not be a sum of whole transactions.
+
+        Returns ``({ref: (tender, day, amount)}, legs proven, legs in total)``.
+        """
+        found = {}
+        resolved = 0
+        taken = set(claimed)
+        for tender, day, amount in legs:
+            bucket = [row for row in rows.get((ou_id, day), ()) if row[0] == tender and row[1] not in taken]
+            state, _tender, refs = self._x24_identify(bucket, amount)
+            if state not in ("exact", "batch", "subset"):
+                continue
+            resolved += 1
+            refs = set(refs)
+            for row_tender, ref, row_amount in bucket:
+                if ref in refs:
+                    found[ref] = (row_tender, day, row_amount)
+                    taken.add(ref)
+        return found, resolved, len(legs)
 
     @api.model
     def _x24_format_refs(self, refs, cap):
