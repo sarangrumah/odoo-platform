@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-08-30T15:19:23+00:00",
+  "generated_at": "2026-09-02T11:14:00+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "0893fef",
-    "branch": "feat/pooled-asset-merge"
+    "commit": "3e8e793",
+    "branch": "feat/rental-bom-explosion"
   },
   "buckets": [
     {
@@ -1549,9 +1549,9 @@
       "change_count": 25,
       "changes": [
         {
-          "sha": "0893fef",
+          "sha": "cde92d6",
           "date": "2026-08-30",
-          "subject": "feat(assets): gabungkan aset per-unit lama menjadi satu aset berjumlah"
+          "subject": "feat(assets): gabungkan aset per-unit lama menjadi satu aset berjumlah (#204)"
         },
         {
           "sha": "c9c500f",
@@ -1938,8 +1938,13 @@
       "depends": 5,
       "public": true,
       "last_change": "2026-08-30",
-      "change_count": 4,
+      "change_count": 5,
       "changes": [
+        {
+          "sha": "cde92d6",
+          "date": "2026-08-30",
+          "subject": "feat(assets): gabungkan aset per-unit lama menjadi satu aset berjumlah (#204)"
+        },
         {
           "sha": "c9c500f",
           "date": "2026-08-30",
@@ -4178,14 +4183,24 @@
       "module": "custom_rental",
       "bucket": "ee_gap",
       "name": "Custom Rental",
-      "version": "19.0.0.3.1",
+      "version": "19.0.0.4.0",
       "summary": "Asset rental lifecycle: pricing tiers, schedule, BAST, late fees, portal, stock pickings",
       "category": "Sales/Rental",
       "depends": 8,
       "public": true,
-      "last_change": "2026-07-24",
-      "change_count": 20,
+      "last_change": "2026-09-02",
+      "change_count": 22,
       "changes": [
+        {
+          "sha": "3e8e793",
+          "date": "2026-09-02",
+          "subject": "feat(rental): explode a kit BOM into stock moves and BAST lines"
+        },
+        {
+          "sha": "842f820",
+          "date": "2026-09-02",
+          "subject": "fix(rental): stock.move label lives on description_picking in Odoo 19"
+        },
         {
           "sha": "7e9d66b",
           "date": "2026-07-24",
@@ -4215,16 +4230,6 @@
           "sha": "6697d1f",
           "date": "2026-07-02",
           "subject": "docs(modules): correct MODULE_KNOWLEDGE.md drafts against source"
-        },
-        {
-          "sha": "a2fe99d",
-          "date": "2026-07-02",
-          "subject": "docs(modules): regenerate MODULE_KNOWLEDGE.md for 7 drifted modules"
-        },
-        {
-          "sha": "d55bc0e",
-          "date": "2026-07-01",
-          "subject": "feat(rental,intercompany): drone asset-loan flow via existing modules"
         }
       ]
     },
@@ -4232,14 +4237,19 @@
       "module": "custom_rental_bom_explosion",
       "bucket": "ee_gap",
       "name": "Custom Rental — BOM Explosion",
-      "version": "19.0.0.1.0",
+      "version": "19.0.0.2.0",
       "summary": "Bundling drone + perangkat via BOM kit, otomatis populate BAST lines saat pickup/return rental",
       "category": "Sales/Rental",
       "depends": 3,
       "public": true,
-      "last_change": "2026-06-02",
-      "change_count": 2,
+      "last_change": "2026-09-02",
+      "change_count": 3,
       "changes": [
+        {
+          "sha": "3e8e793",
+          "date": "2026-09-02",
+          "subject": "feat(rental): explode a kit BOM into stock moves and BAST lines"
+        },
         {
           "sha": "cfb2e5f",
           "date": "2026-06-02",
