@@ -27,7 +27,7 @@ deduplication and PDP audit-log integration.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Bank",
-    "version": "19.0.0.3.0",
+    "version": "19.0.0.6.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
