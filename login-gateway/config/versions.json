@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-02T11:14:00+00:00",
+  "generated_at": "2026-09-02T11:20:41+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "3e8e793",
-    "branch": "feat/rental-bom-explosion"
+    "commit": "1e4f11e",
+    "branch": "feat/ic-mirror-note"
   },
   "buckets": [
     {
@@ -3221,14 +3221,19 @@
       "module": "custom_intercompany_procurement",
       "bucket": "ee_gap",
       "name": "Custom Intercompany Procurement",
-      "version": "19.0.0.1.0",
+      "version": "19.0.0.2.0",
       "summary": "Auto-mirror purchase.order + stock.picking antar sister company (Erajaya group pattern)",
       "category": "Inventory/Purchase",
       "depends": 7,
       "public": true,
-      "last_change": "2026-07-29",
-      "change_count": 7,
+      "last_change": "2026-09-02",
+      "change_count": 8,
       "changes": [
+        {
+          "sha": "f2d68b4",
+          "date": "2026-09-02",
+          "subject": "fix(intercompany): carry the PO header note and section lines to the mirrored SO"
+        },
         {
           "sha": "61d1a7a",
           "date": "2026-07-29",
@@ -4189,17 +4194,12 @@
       "depends": 8,
       "public": true,
       "last_change": "2026-09-02",
-      "change_count": 22,
+      "change_count": 21,
       "changes": [
         {
-          "sha": "3e8e793",
+          "sha": "34a196d",
           "date": "2026-09-02",
-          "subject": "feat(rental): explode a kit BOM into stock moves and BAST lines"
-        },
-        {
-          "sha": "842f820",
-          "date": "2026-09-02",
-          "subject": "fix(rental): stock.move label lives on description_picking in Odoo 19"
+          "subject": "feat(rental): explode a kit BOM into stock moves and BAST lines (#205)"
         },
         {
           "sha": "7e9d66b",
@@ -4230,6 +4230,11 @@
           "sha": "6697d1f",
           "date": "2026-07-02",
           "subject": "docs(modules): correct MODULE_KNOWLEDGE.md drafts against source"
+        },
+        {
+          "sha": "a2fe99d",
+          "date": "2026-07-02",
+          "subject": "docs(modules): regenerate MODULE_KNOWLEDGE.md for 7 drifted modules"
         }
       ]
     },
@@ -4246,9 +4251,9 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "3e8e793",
+          "sha": "34a196d",
           "date": "2026-09-02",
-          "subject": "feat(rental): explode a kit BOM into stock moves and BAST lines"
+          "subject": "feat(rental): explode a kit BOM into stock moves and BAST lines (#205)"
         },
         {
           "sha": "cfb2e5f",
