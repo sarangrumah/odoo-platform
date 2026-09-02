@@ -345,7 +345,9 @@ class RentalOrder(models.Model):
                 0,
                 0,
                 {
-                    "name": name,
+                    # Odoo 19 dropped stock.move.name; the picking label lives
+                    # on description_picking now.
+                    "description_picking": name,
                     "product_id": product.id,
                     "product_uom_qty": float(qty),
                     "product_uom": product.uom_id.id,

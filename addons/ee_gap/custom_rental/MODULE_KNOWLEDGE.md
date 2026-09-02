@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T08:10:48Z
 generator: bootstrap-v1
 module: custom_rental
-manifest_version: 19.0.0.3.0
+manifest_version: 19.0.0.3.2
 ---
 
 # custom_rental
@@ -71,6 +71,8 @@ This module manages the lifecycle of asset rentals: rentable products with per-p
 - **External calls:** None.
 
 ## Gotchas
+- **Pickings carry no serial of their own.** `_create_stock_picking` builds the `stock.move` with no `move_line_ids`, so for a serial-tracked product an operator must type the serial in before validating — and `_check_returned_serials` short-circuits on an empty pickup, silently skipping the return-integrity check. `custom_asset_stock_link` overrides the method to pre-assign the unit's serial when the `rental.asset` is backed by a fixed asset.
+- **`stock.move` has no `name` in Odoo 19** — the picking label lives on `description_picking`. Writing `name` raises `KeyError: 'name'` from `_update_cache`, which took the whole stock-integration path down until 19.0.0.3.2.
 - **No late-fee cron is wired.** `_cron_accrue_late_fees()` exists but `data/cron_data.xml` defines no `ir.cron`; accrual never runs automatically in a shipped install — only tests call it.
 - Internal asset-loan mode requires `on_loan_location_id`; the constraint raises otherwise.
 - Serial-mode return runs a serial-for-serial check (`_check_returned_serials`) — missing or substituted serials block validation.
