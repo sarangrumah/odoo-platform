@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T07:54:45Z
 generator: bootstrap-v1
 module: custom_intercompany_procurement
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_intercompany_procurement
@@ -86,6 +86,8 @@ This module automates the mirroring of purchase orders and stock pickings betwee
 - Asset-loan spawning is guarded on `is_asset_loan` (the SO must actually carry the loan service line) before a rental order is created.
 - For asset-loan PO mirrors, physical (non-service) lines are deliberately skipped so no COGS/asset derecognition posts; a `UserError`/`ValueError` is raised **only** if this leaves no service line to mirror. Non-asset-loan mirrors carry all lines.
 - Mirror failures are caught, logged, and posted to chatter — they do not block the source PO/picking.
+- **The mirrored SO copies the PO header `note`, and nothing else from the header.** For this client the note is where the event lives ("MERDEKA RUN - MONAS"), so dropping it left the selling company with an order it could not place. Other header fields (dates, terms, incoterms) are still deliberately not carried.
+- **Section and note lines (`display_type`) are copied through as display lines.** They carry no product, so before 19.0.0.2.0 they fell into the product branch and became product-less SO lines the buyer never wrote — or, under an asset-loan rule, were dropped by the non-service filter. The "no service line to mirror" guard counts **product** lines only, so a PO of nothing but notes still raises.
 
 ## Out of Scope
 - Does not mirror other document types beyond the two flows above (base invoice/GL mirroring lives in `custom_accounting_full`).
