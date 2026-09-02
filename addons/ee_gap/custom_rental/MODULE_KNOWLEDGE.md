@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T08:10:48Z
 generator: bootstrap-v1
 module: custom_rental
-manifest_version: 19.0.0.3.2
+manifest_version: 19.0.0.4.0
 ---
 
 # custom_rental
@@ -57,6 +57,8 @@ This module manages the lifecycle of asset rentals: rentable products with per-p
 - `rental.order.action_validate_loan_return()`: enforces loan-qty return and calls `_check_returned_serials()` (serial-for-serial match on serial-tracked products).
 - `rental.order.action_generate_bast_pickup()` / `action_generate_bast_return()`: create `custom.bast.document` handover records.
 - `rental.order._cron_accrue_late_fees()`: `@api.model` accrual routine (see gotcha — not wired to any cron).
+- `rental.order._prepare_move_vals_list(product, loc_src, loc_dst)`: returns the move vals for one picking — main qty plus an `is_loan` move when `loan_qty > 0`. **Extension point:** `custom_rental_bom_explosion` overrides it to emit one move per exploded BOM component, so a bundle rented as a single qty-1 line still moves every physical unit behind it.
+- `rental.order._stock_move_vals(product, qty, loc_src, loc_dst, is_loan=False, uom=None)`: builds one `stock.move` vals tuple; split out so overrides reuse the exact same move shape.
 - `custom.rental.pricing._get_rental_price(self, product, start_dt, end_dt, currency=None)`: `@api.model`. First positional arg is the **product** (product.product or product.template); returns the total price using the cheapest tier combination for the `start_dt`→`end_dt` span.
 
 ## Integration Points
@@ -67,7 +69,7 @@ This module manages the lifecycle of asset rentals: rentable products with per-p
   - `stock.move` — adds `is_loan` (flags loan/cadangan moves).
   - `res.config.settings` — adds `rental_stock_integration` and `rental_default_late_fee_rate` config params.
   - `rental.order` itself mixes in `mail.thread`, `mail.activity.mixin`, `pdp.audited.mixin`.
-- **Extended by:** None.
+- **Extended by:** `custom_asset_stock_link` (wraps `_create_stock_picking` to pre-assign the unit's serial), `custom_rental_bom_explosion` (overrides `_prepare_move_vals_list` and `_bast_lines_vals` to explode a kit BOM into its components).
 - **External calls:** None.
 
 ## Gotchas
@@ -76,6 +78,7 @@ This module manages the lifecycle of asset rentals: rentable products with per-p
 - **No late-fee cron is wired.** `_cron_accrue_late_fees()` exists but `data/cron_data.xml` defines no `ir.cron`; accrual never runs automatically in a shipped install — only tests call it.
 - Internal asset-loan mode requires `on_loan_location_id`; the constraint raises otherwise.
 - Serial-mode return runs a serial-for-serial check (`_check_returned_serials`) — missing or substituted serials block validation.
+- **The serial check is gated on the serials dispatched, not on the rented product's `tracking`.** Until 19.0.0.4.0 it bailed out whenever the rented product was not itself serial-tracked, which silently disabled the check for kit/bundle rentals — the bundle line carries no tracking even though its components do. It now runs whenever the pickup picking carries any lot, and is still a no-op when none were assigned.
 - `custom.rental.schedule.state` has a `late` value not present on `rental.order.state`; do not treat the two selections as identical.
 - Fees are computed only; there is no invoice/journal creation despite the `account` dependency.
 - **Portal sign route uses `type="jsonrpc"`** (`controllers/portal.py` `portal_rental_sign`, `/my/rentals/<id>/sign`). Odoo 19 renamed the old `type="json"` dispatch type to `jsonrpc`; keeping `type="json"` makes the signature-capture call fail.
