@@ -13,7 +13,7 @@ class BankH2HConnection(models.Model):
     _name = "custom.bank.h2h.connection"
     _description = "Bank Host-to-Host Connection"
     _order = "name"
-    _inherit = ["mail.thread"]
+    _inherit = ["mail.thread", "custom.bank.import.dedup"]
 
     name = fields.Char(required=True, tracking=True)
     bank_code = fields.Selection(
@@ -103,16 +103,41 @@ class BankH2HConnection(models.Model):
         )
 
     def _persist_lines(self, lines: list[dict], raw_payload: dict | None) -> None:
+        """Write down what the bank sent, minus what this journal already holds.
+
+        A fetch window is not a fresh set of transactions: ``_sync_one`` asks for
+        a span that deliberately overlaps the last one, so the same transaction
+        arrives again on every run by design. Without the guard the H2H feed
+        would repeat exactly what the CSV uploads did — and worse, because a cron
+        does it unattended.
+        """
         Log = self.env["custom.bank.import.log"].sudo()
         StatementLine = self.env["account.bank.statement.line"]
         Statement = self.env["account.bank.statement"]
-        if not lines:
+        vals = [
+            {
+                "journal_id": self.journal_id.id,
+                "date": ln.get("date") or fields.Date.today(),
+                "payment_ref": (ln.get("description") or ln.get("ref") or "/")[:255],
+                "ref": (ln.get("ref") or "")[:64] or False,
+                "amount": float(ln.get("amount") or 0.0),
+            }
+            for ln in lines
+        ]
+        line_vals, duplicates = self._split_already_imported(
+            [(self._dedup_key(row["date"], row["payment_ref"], row["amount"]), row) for row in vals]
+        )
+        if not line_vals:
+            # Nothing new — an empty window and an entirely repeated one are the
+            # same event here, and neither may create a statement: an empty
+            # statement reads as a delivery that happened.
             Log.create(
                 {
                     "template_id": self._h2h_pseudo_template().id,
                     "journal_id": self.journal_id.id,
                     "filename": f"h2h-{self.bank_code}-{fields.Datetime.now()}",
                     "line_count": 0,
+                    "duplicate_count": len(duplicates),
                     "state": "imported",
                     "raw_payload": str(raw_payload)[:8000] if raw_payload else None,
                 }
@@ -125,18 +150,8 @@ class BankH2HConnection(models.Model):
                 "journal_id": self.journal_id.id,
             }
         )
-        line_vals = []
-        for ln in lines:
-            line_vals.append(
-                {
-                    "statement_id": statement.id,
-                    "journal_id": self.journal_id.id,
-                    "date": ln.get("date") or fields.Date.today(),
-                    "payment_ref": (ln.get("description") or ln.get("ref") or "/")[:255],
-                    "ref": (ln.get("ref") or "")[:64] or False,
-                    "amount": float(ln.get("amount") or 0.0),
-                }
-            )
+        for row in line_vals:
+            row["statement_id"] = statement.id
         StatementLine.create(line_vals)
         Log.create(
             {
@@ -145,6 +160,7 @@ class BankH2HConnection(models.Model):
                 "statement_id": statement.id,
                 "filename": f"h2h-{self.bank_code}-{fields.Datetime.now()}",
                 "line_count": len(line_vals),
+                "duplicate_count": len(duplicates),
                 "state": "imported",
                 "raw_payload": str(raw_payload)[:8000] if raw_payload else None,
             }

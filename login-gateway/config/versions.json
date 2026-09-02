@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-02T11:20:41+00:00",
+  "generated_at": "2026-09-02T11:39:09+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "1e4f11e",
-    "branch": "feat/ic-mirror-note"
+    "commit": "a51975c",
+    "branch": "feat/bank-import-bri-mutasi"
   },
   "buckets": [
     {
@@ -2020,14 +2020,19 @@
       "module": "custom_bank_import",
       "bucket": "ee_gap",
       "name": "Custom Bank Import",
-      "version": "19.0.0.3.0",
+      "version": "19.0.0.6.0",
       "summary": "CSV template-based bank statement import + H2H bank API adapter framework",
       "category": "Accounting/Bank",
       "depends": 4,
       "public": true,
-      "last_change": "2026-07-29",
-      "change_count": 9,
+      "last_change": "2026-09-02",
+      "change_count": 10,
       "changes": [
+        {
+          "sha": "a51975c",
+          "date": "2026-09-02",
+          "subject": "feat(bank_import): recognise BRI's second export, and stop overlapping files from re-posting"
+        },
         {
           "sha": "4704e07",
           "date": "2026-07-29",
@@ -2062,11 +2067,6 @@
           "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
-        },
-        {
-          "sha": "358f7db",
-          "date": "2026-05-21",
-          "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
       ]
     },
@@ -3230,9 +3230,9 @@
       "change_count": 8,
       "changes": [
         {
-          "sha": "f2d68b4",
+          "sha": "b20428a",
           "date": "2026-09-02",
-          "subject": "fix(intercompany): carry the PO header note and section lines to the mirrored SO"
+          "subject": "fix(intercompany): carry the PO header note and section lines to the mirrored SO (#206)"
         },
         {
           "sha": "61d1a7a",

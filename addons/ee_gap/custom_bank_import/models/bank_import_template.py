@@ -175,6 +175,8 @@ class BankImportTemplate(models.Model):
             return self._parse_bca_corp(rows)
         if self._is_brisim(rows):
             return self._parse_brisim(rows)
+        if self._is_bri_mutasi(rows):
+            return self._parse_bri_mutasi(rows)
         if self._is_trx_inquiry(rows):
             return self._parse_trx_inquiry(rows)
         if self._is_acc_statement(rows):
@@ -421,6 +423,67 @@ class BankImportTemplate(models.Model):
                     seg_date = d
                 add_segment(n, seg_date, segment)
 
+        return {"lines": lines, "errors": errors, "total_rows": len(data_rows)}
+
+    # ------------------------------------------------------------------
+    # BRI "MUTASI" XLSX — the honest column layout
+    # ------------------------------------------------------------------
+    # Same bank as BRISIM above, different export path: here the grid means
+    # what it says. Tanggal is a real date cell, Debet/Kredit/Saldo are
+    # numbers in their own columns, and only the AMT/MDR pair stays inside the
+    # Uraian text. Because the header spells the labels out ("Uraian
+    # Transaksi", "Teller ID") the BRISIM exact-match detector never fires,
+    # and a BRISIM template carries no column indexes — so before this handler
+    # every row parsed to a zero amount and was skipped, which reached the user
+    # as "No transaction lines parsed" with zero errors to read.
+
+    _BRI_MUTASI_PREFIXES = ("Tanggal", "Uraian", "Teller", "Debet", "Kredit", "Saldo")
+
+    def _bri_mutasi_header(self, rows) -> Optional[int]:
+        """Index of the header row, or None. Checked after ``_is_brisim`` so the
+        shifted-column export keeps its own handler: its header is an exact
+        prefix match of this one."""
+        for i, row in enumerate(rows[:5]):
+            cells = [str(c or "").strip() for c in row[:6]]
+            if len(cells) == 6 and all(c.startswith(p) for c, p in zip(cells, self._BRI_MUTASI_PREFIXES)):
+                return i
+        return None
+
+    def _is_bri_mutasi(self, rows) -> bool:
+        return self._bri_mutasi_header(rows) is not None
+
+    def _parse_bri_mutasi(self, rows) -> dict:
+        lines: list[dict] = []
+        errors: list[tuple[int, str]] = []
+        header_idx = self._bri_mutasi_header(rows)
+        data_rows = rows[header_idx + 1 :]
+        for n, row in enumerate(data_rows, start=header_idx + 2):
+            if not row or all(str(c or "").strip() == "" for c in row):
+                continue
+            raw_date = self._safe_cell(row, 1)
+            d = self._parse_date(raw_date)
+            if not d:
+                errors.append((n, f"Bad/missing date: {raw_date!r}"))
+                continue
+            # Cells arrive either as numbers or as padded text (" 2,383,786 ")
+            # depending on who re-saved the file; both go through the US-separator
+            # reader, independent of the template's configured separators.
+            debet = self._bca_corp_amount(self._safe_cell(row, 4))
+            kredit = self._bca_corp_amount(self._safe_cell(row, 5))
+            amount = kredit - debet
+            if amount == Decimal("0"):
+                continue
+            balance_raw = self._safe_cell(row, 6)
+            balance = self._bca_corp_amount(balance_raw) if balance_raw not in (None, "") else None
+            lines.append(
+                {
+                    "date": d,
+                    "ref": re.sub(r"\s+", " ", str(self._safe_cell(row, 2) or "")).strip(),
+                    "partner_hint": "",
+                    "amount": amount,
+                    "balance": balance,
+                }
+            )
         return {"lines": lines, "errors": errors, "total_rows": len(data_rows)}
 
     # ------------------------------------------------------------------
