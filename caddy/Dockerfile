@@ -30,8 +30,11 @@
 
 # ---- Build -------------------------------------------------------------------
 # golang:1.26-alpine rather than Caddy's own builder image: the toolchain version
-# is itself a scan finding (stdlib CVE-2026-39822 below Go 1.26.5), so it has to
-# be something this file controls.
+# is itself a scan finding, so it has to be something this file controls. The tag
+# floats within 1.26.x deliberately -- a stdlib CVE is fixed by rebuilding, not by
+# editing this file, and eight of them (CVE-2026-33818, -39821, -46600, -56853,
+# -56858, -56859, -56860, -56862) were cleared by nothing more than a --no-cache
+# rebuild picking up 1.26.8 over 1.26.5.
 FROM golang:1.26-alpine AS builder
 
 # hadolint DL4006: nothing in this stage pipes today, but SHELL applies to the
@@ -63,10 +66,11 @@ COPY main.go ./main.go
 # caught up, otherwise the CVE returns silently.
 #
 # The versions in that group are higher than the ones trivy names as the fix,
-# because the modules constrain each other: x/text@v0.39.0 requires x/net >=
-# v0.56.0, which in turn requires x/crypto >= v0.53.0, and `go get` refuses a
-# lower pin outright rather than resolving upward. Raise as a set, not one at a
-# time.
+# because the modules constrain each other and `go get` refuses a lower pin
+# outright rather than resolving upward. Raise as a set, not one at a time: the
+# 4-Sep-2026 bump for CVE-2026-56854 needed three rounds of `docker build` to
+# find the closure -- x/crypto@v0.55.0 demands x/net@v0.57.0, and the two of
+# them together demand x/text@v0.41.0.
 #
 # NOTE: no `#` comments inside the RUN below. The backslashes join it into one
 # logical shell line, so a `#` at the start of a continued line begins a comment
@@ -77,10 +81,10 @@ RUN go mod init eal-hub/caddy \
  && go get "github.com/corazawaf/coraza-caddy/v2@${CORAZA_VERSION}" \
  && go get "github.com/mholt/caddy-ratelimit@${RATELIMIT_VERSION}" \
  && go get \
-      golang.org/x/crypto@v0.53.0 \
-      golang.org/x/net@v0.56.0 \
-      golang.org/x/text@v0.39.0 \
-      google.golang.org/grpc@v1.82.1 \
+      golang.org/x/crypto@v0.55.0 \
+      golang.org/x/net@v0.57.0 \
+      golang.org/x/text@v0.41.0 \
+      google.golang.org/grpc@v1.83.1 \
       github.com/go-jose/go-jose/v3@v3.0.5 \
  && go mod tidy \
  && CGO_ENABLED=0 go build -trimpath -ldflags "-w -s" -o /out/caddy .
