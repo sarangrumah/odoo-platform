@@ -46,3 +46,5 @@ access_levis_cogs_charge_acct,levis.cogs.charge account,model_levis_cogs_charge,
 access_levis_cogs_catchup_stock,levis.cogs.catchup stock,model_levis_cogs_catchup,stock.group_stock_manager,1,0,0,0
 access_levis_cogs_catchup_line_stock,levis.cogs.catchup.line stock,model_levis_cogs_catchup_line,stock.group_stock_manager,1,0,0,0
 access_levis_cogs_charge_stock,levis.cogs.charge stock,model_levis_cogs_charge,stock.group_stock_manager,1,0,0,0
+access_levis_po_dup_sku_wizard_purchase,levis.po.dup.sku.wizard purchase,model_levis_po_dup_sku_wizard,purchase.group_purchase_user,1,1,1,1
+access_levis_po_dup_sku_wizard_line_purchase,levis.po.dup.sku.wizard.line purchase,model_levis_po_dup_sku_wizard_line,purchase.group_purchase_user,1,1,1,1
