@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA Show Date",
-    "version": "19.0.1.5.0",
+    "version": "19.0.1.6.0",
     "summary": "Show-date, event and DP fields on quotation/SO/customer invoice, "
     "with payment terms anchored to the show date. PT ARKA only.",
     "description": """
@@ -50,6 +50,19 @@ lands in one cell of the coretax import file. A fixed-amount down payment gets
 line because the trailing marker already states the down payment. The journal item carries the same label; the
 down payment stays identifiable in the GL through account 2108100001 and the
 order's "Down Payments" section.
+
+Settlement (pelunasan) deduction line
+-------------------------------------
+The deduction line on the settlement invoice is labelled by core
+``sale.order.line._get_downpayment_description()`` as ``Down Payment (ref: INV/…
+on 08/14/2026)``, and that string reaches the order's "Down Payments" section,
+the settlement invoice PDF and the settlement's Faktur Pajak alike. For flagged
+companies it becomes the same product + event wording, with the core reference
+kept as the trailing marker so Finance can still tie the deduction back to the
+down-payment invoice::
+
+    Jasa Drone Show 1000 Unit, Event Soekarno Cup, Lokasi Stadion Gelora Bung
+    Tomo Surabaya, 24.08.26 (Uang Muka ref: INV/ARKA/2026/08/002 tgl 14/08/2026)
 
 TENANT-SCOPED: built for the PT ARKA company on the aimarka tenant DBs
 (uat_aimarka, rnd_aimarka, prd_EAL_ArkaAim). The behaviour is gated by the
