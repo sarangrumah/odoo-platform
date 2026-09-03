@@ -23,3 +23,11 @@ class ResCompany(models.Model):
         "company's Head Office. Seeded automatically; picked on bills/payments "
         "that belong to Head Office rather than a store.",
     )
+
+    l10n_cogs_reported_through = fields.Date(
+        string="COGS Reported Through",
+        help="Last date whose figures were already reported to the client. The "
+        "COGS catch-up never books into a month ending on or before it, even "
+        "when no lock date stops it — reported numbers do not move. Leave empty "
+        "to let the lock dates decide on their own.",
+    )

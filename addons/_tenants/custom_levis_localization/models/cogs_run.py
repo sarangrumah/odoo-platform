@@ -25,14 +25,18 @@ inventory into P&L per store, that one absorbs whatever drift is left.
 No stock moves are involved, so the X20 on-hand snapshot the retail import
 relies on is untouched.
 
+What this run books is written to ``levis.cogs.charge``, the ledger of cost
+already recognised per (product, store, sale month), and what the receipt-driven
+catch-up (``cogs_catchup.py``) already charged is subtracted before booking. The
+two mechanisms therefore compose: whichever learns the cost first recognises it,
+and the other stays quiet.
+
 Unit cost is ``product.standard_price`` read in the company's context, which is
 what ``product._update_standard_price()`` refreshes on every goods receipt.
 Products still without a cost are counted and reported rather than silently
 contributing zero — an understated COGS that nobody notices is worse than a
 visible gap.
 """
-
-from datetime import datetime, time
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -104,75 +108,109 @@ class LevisCogsRun(models.Model):
         their own. Returns ``{product: qty}``.
         """
         self.ensure_one()
-        configs = self.env["pos.config"].with_context(active_test=False).search([("warehouse_id", "=", warehouse.id)])
-        if not configs:
-            return {}
-        # date_order is a Datetime: bounding it with a bare Date would resolve
-        # date_to to midnight and silently drop the last day's sales.
-        grouped = self.env["pos.order.line"]._read_group(
-            [
-                ("order_id.session_id.config_id", "in", configs.ids),
-                ("order_id.state", "in", _SOLD_STATES),
-                ("order_id.company_id", "=", self.company_id.id),
-                ("order_id.date_order", ">=", datetime.combine(self.date_from, time.min)),
-                ("order_id.date_order", "<=", datetime.combine(self.date_to, time.max)),
-            ],
-            ["product_id"],
-            ["qty:sum"],
-        )
-        return {product: qty for product, qty in grouped if qty}
+        return self.env["levis.cogs.charge"]._sold_quantities(self.company_id, warehouse, self.date_from, self.date_to)
 
-    def _cogs_by_category(self, warehouse):
-        """Aggregate one warehouse's sales into per-category cost.
+    def _detail(self):
+        """Units awaiting COGS, per (sale month, warehouse, product).
 
-        Returns ``{category: {"qty", "amount", "zero_cost_qty"}}``. Only
-        storable products are costed: services and the non-merchandise items the
-        retail import passes through (paper bags and the like) never sat in
-        inventory, so they have no cost to release.
+        Sales already charged by a receipt catch-up (``levis.cogs.charge``) are
+        subtracted here — without that, a month in which a late goods receipt
+        revealed a cost would be charged twice, once by the catch-up and once
+        by this run. The ledger is kept per sale MONTH, so a run covering only
+        part of a month subtracts that whole month's catch-up: partial-month
+        runs are not how this is operated, and over-subtracting is the safe
+        direction (cost deferred, never doubled).
+
+        Returns a list of dicts, the raw material for both the aggregated run
+        lines and the ledger rows written when the entry is generated.
+        """
+        self.ensure_one()
+        Charge = self.env["levis.cogs.charge"]
+        company = self.company_id
+        rows = []
+        warehouses = self.env["stock.warehouse"].search([("company_id", "=", company.id)])
+        for period_date in Charge._months_between(self.date_from, self.date_to):
+            month_start = max(period_date, self.date_from)
+            month_end = min(Charge._month_end(period_date), self.date_to)
+            for warehouse in warehouses:
+                sold = Charge._sold_quantities(company, warehouse, month_start, month_end)
+                if not sold:
+                    continue
+                charged = Charge._charged_quantities(company, warehouse, period_date)
+                for product, qty in sold.items():
+                    # Services and the non-merchandise items the retail import
+                    # passes through (paper bags and the like) never sat in
+                    # inventory, so they have no cost to release.
+                    if not product.is_storable:
+                        continue
+                    remaining = qty - charged.get(product, 0.0)
+                    if company.currency_id.is_zero(remaining):
+                        continue
+                    cost = product.with_company(company).standard_price
+                    rows.append(
+                        {
+                            "period_date": period_date,
+                            "warehouse": warehouse,
+                            "product": product,
+                            "quantity": remaining,
+                            "cost": cost,
+                            "amount": remaining * cost if cost else 0.0,
+                        }
+                    )
+        return rows
+
+    def _cogs_by_warehouse_category(self, detail=None):
+        """Aggregate the detail into ``{(warehouse, category): bucket}``.
+
+        A bucket is ``{"qty", "amount", "zero_cost_qty"}``. Products still
+        without a cost are counted in ``zero_cost_qty`` rather than silently
+        contributing zero — an understated COGS that nobody notices is worse
+        than a visible gap.
         """
         self.ensure_one()
         company = self.company_id
         result = {}
-        for product, qty in self._sold_quantities(warehouse).items():
-            if not product.is_storable:
+        for row in detail if detail is not None else self._detail():
+            categ = row["product"].categ_id.with_company(company)
+            key = (row["warehouse"], categ)
+            bucket = result.setdefault(key, {"qty": 0.0, "amount": 0.0, "zero_cost_qty": 0.0})
+            bucket["qty"] += row["quantity"]
+            if not row["cost"]:
+                bucket["zero_cost_qty"] += row["quantity"]
                 continue
-            categ = product.categ_id.with_company(company)
-            bucket = result.setdefault(categ, {"qty": 0.0, "amount": 0.0, "zero_cost_qty": 0.0})
-            bucket["qty"] += qty
-            cost = product.with_company(company).standard_price
-            if not cost:
-                bucket["zero_cost_qty"] += qty
-                continue
-            bucket["amount"] += qty * cost
+            bucket["amount"] += row["amount"]
         return result
+
+    def _cogs_by_category(self, warehouse):
+        """One warehouse's slice of :meth:`_cogs_by_warehouse_category`."""
+        self.ensure_one()
+        return {categ: bucket for (wh, categ), bucket in self._cogs_by_warehouse_category().items() if wh == warehouse}
 
     def action_compute(self):
         for run in self:
             if run.move_id:
                 raise UserError(_("A journal entry was already generated for %s.", run.name))
             run.line_ids.unlink()
-            company = run.company_id
-            warehouses = self.env["stock.warehouse"].search([("company_id", "=", company.id)])
             lines = []
-            for warehouse in warehouses:
+            buckets = run._cogs_by_warehouse_category()
+            for (warehouse, categ), bucket in sorted(buckets.items(), key=lambda item: (item[0][0].id, item[0][1].id)):
                 ou = warehouse.l10n_ou_analytic_id
-                for categ, bucket in run._cogs_by_category(warehouse).items():
-                    lines.append(
-                        (
-                            0,
-                            0,
-                            {
-                                "warehouse_id": warehouse.id,
-                                "analytic_account_id": ou.id if ou else False,
-                                "product_categ_id": categ.id,
-                                "expense_account_id": categ.property_account_expense_categ_id.id,
-                                "valuation_account_id": categ.property_stock_valuation_account_id.id,
-                                "quantity": bucket["qty"],
-                                "zero_cost_qty": bucket["zero_cost_qty"],
-                                "amount": bucket["amount"],
-                            },
-                        )
+                lines.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "warehouse_id": warehouse.id,
+                            "analytic_account_id": ou.id if ou else False,
+                            "product_categ_id": categ.id,
+                            "expense_account_id": categ.property_account_expense_categ_id.id,
+                            "valuation_account_id": categ.property_stock_valuation_account_id.id,
+                            "quantity": bucket["qty"],
+                            "zero_cost_qty": bucket["zero_cost_qty"],
+                            "amount": bucket["amount"],
+                        },
                     )
+                )
             run.line_ids = lines
             run.state = "computed"
         return True
@@ -250,7 +288,35 @@ class LevisCogsRun(models.Model):
         )
         self.move_id = move.id
         self.state = "generated"
+        self._record_charges()
         return True
+
+    def _record_charges(self):
+        """Write what this run charged into ``levis.cogs.charge``.
+
+        Recomputed rather than derived from the (category-level) run lines: the
+        ledger is per product and per sale month, which is the grain a later
+        receipt catch-up needs in order not to charge the same unit again.
+        """
+        self.ensure_one()
+        company = self.company_id
+        rows = [row for row in self._detail() if row["cost"] and not company.currency_id.is_zero(row["amount"])]
+        self.env["levis.cogs.charge"].create(
+            [
+                {
+                    "company_id": company.id,
+                    "product_id": row["product"].id,
+                    "warehouse_id": row["warehouse"].id,
+                    "period_date": row["period_date"],
+                    "quantity": row["quantity"],
+                    "amount": company.currency_id.round(row["amount"]),
+                    "source": "run",
+                    "run_id": self.id,
+                    "move_id": self.move_id.id,
+                }
+                for row in rows
+            ]
+        )
 
     def action_view_move(self):
         self.ensure_one()

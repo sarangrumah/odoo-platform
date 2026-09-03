@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.39.0",
+    "version": "19.0.1.40.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -154,6 +154,42 @@ Bundles four tenant-specific requirements for the Levi's databases
     and posted receivables lacking an Operating Unit are all surfaced as
     diagnostics with click-through, and block generation until acknowledged.
 
+16. **COGS catch-up on goods receipt.** The companion to #12, for the cost that
+    arrives late. When a vendor receipt establishes a cost for a product, the
+    units of *that* product already sold and not yet charged are recognised
+    immediately: Dr COGS-<category> / Cr Inventories-<category>, the selling
+    store's OU analytic on both legs, as a DRAFT entry grouped per booking date.
+    The booking date is the end of the month the sale happened in while that
+    month is still open, and today's date once it is closed — "closed" being the
+    latest of the fiscal-year lock date, the hard lock date and the company's
+    own *COGS Reported Through*, since a period already reported to the client
+    does not move even when nothing technically locks it.
+
+    Products not on the receipt are left alone, and by default only the booking
+    month is looked at (``custom_levis_localization.cogs_catchup_start`` widens
+    it — carefully: months whose COGS was booked by hand carry no ledger row and
+    would be charged twice). Cost basis is the receipt's PO price net of tax,
+    falling back to ``standard_price``. Every charge is recorded per (product,
+    store, sale month) in ``levis.cogs.charge``, which the Periodic COGS run
+    subtracts before it books, so no unit is ever charged twice by the two
+    mechanisms. Off by default: enable with
+    ``custom_levis_localization.cogs_catchup_enabled`` = ``1``. A failure here
+    never blocks the receipt — it is logged and the cost is picked up by the
+    next receipt or by the monthly run. Visible at Accounting > Accounting >
+    COGS Catch-up.
+
+17. **Duplicate-SKU gate on purchase orders.** Every garment size is its own
+    variant with its own PROD SKU, so a PO sheet whose product column was copied
+    down orders one size several times -- and receiving books exactly that, because
+    the receipt inherits its products from the order (feature #6). Confirming an
+    order that repeats a SKU therefore opens a confirmation listing the repeats,
+    their size/inseam values and **the sizes of the same template that are NOT on
+    the order**; a reason must be typed, and it is stamped on the order
+    (``l10n_dup_sku_ack`` / ``l10n_dup_sku_reason``) and posted to the chatter. Not
+    a hard block -- the same SKU on two delivery dates is legitimate -- and the
+    acknowledgement is cleared again as soon as the order returns to draft or a line
+    changes product or quantity.
+
 TENANT-SCOPED: install only on the Levi's tenant databases.
 """,
     "author": "Custom Platform",
@@ -181,6 +217,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "data/scrap_batch_sequence.xml",
         "data/inventory_reconciliation_data.xml",
         "data/cogs_run_data.xml",
+        "data/cogs_catchup_data.xml",
         "data/categ_reclass_sequence.xml",
         "data/pos_clearing_data.xml",
         "views/res_bank_views.xml",
@@ -188,6 +225,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "views/product_product_views.xml",
         "views/inventory_reconciliation_views.xml",
         "views/cogs_run_views.xml",
+        "views/cogs_catchup_views.xml",
         "views/categ_reclass_views.xml",
         "views/levis_clearing_config_views.xml",
         "wizard/levis_bank_mid_map_wizard_views.xml",
