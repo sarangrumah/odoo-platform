@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-06-09T00:00:00Z
 generator: hand-authored
 module: custom_arka_show_date
-manifest_version: 19.0.1.5.0
+manifest_version: 19.0.1.6.0
 ---
 
 # custom_arka_show_date
@@ -57,6 +57,24 @@ Two constraints hold this shape:
   trailing marker already states the down payment; including it would print
   "DP 50% (Uang Muka 50%)". A fixed-amount DP gets `(Uang Muka)`, no percentage.
 
+## Settlement Deduction Line (1.6+)
+On the *pelunasan* invoice, core labels the down-payment deduction line
+"Down Payment (ref: INV/… on 08/14/2026)" via
+`sale.order.line._get_downpayment_description()`, and that one string is what the
+order's "Down Payments" section, the settlement invoice PDF **and** the Faktur
+Pajak of the settlement all show — the coretax exporter takes every
+`display_type == 'product'` line, including this negative one. The override
+reuses `_custom_down_payment_description()` and keeps the core reference as the
+trailing marker built by `_custom_down_payment_marker()`:
+
+    <product names>, <event block> (Uang Muka ref: INV/ARKA/2026/08/002 tgl 14/08/2026)
+
+Draft and cancelled down payments mirror core's own states
+(`(Uang Muka Draft dd/mm/YYYY)`, `(Uang Muka Dibatalkan)`). Section lines
+("Down Payments") and non-flagged companies keep the core wording. Dates are
+formatted `dd/mm/YYYY` explicitly, not through `format_date`, because the string
+also reaches the coretax import file.
+
 ## Key Models
 - `res.company` (inherited) — `x_custom_show_date_enabled` (Boolean gate flag).
 - `sale.order` (inherited) — `x_custom_show_date` (Date),
@@ -65,6 +83,8 @@ Two constraints hold this shape:
 - `account.move` (inherited) — `x_custom_show_date` (Date). Overrides
   `_compute_needed_terms`.
 - `account.payment.term` (inherited) — overrides `_compute_terms`.
+- `sale.order.line` (inherited) — overrides `_compute_name` (event block) and
+  `_get_downpayment_description` (settlement deduction label).
 
 ## Important Fields
 - `res.company.x_custom_show_date_enabled` (Boolean, default False) — gate.

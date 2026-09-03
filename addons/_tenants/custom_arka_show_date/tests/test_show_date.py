@@ -195,3 +195,50 @@ class TestArkaShowDate(AccountTestInvoicingCommon):
         invoice.invoice_date = date(2026, 6, 1)
         # 30 days after INVOICE date (2026-06-01) => 2026-07-01.
         self.assertEqual(invoice.invoice_date_due, date(2026, 7, 1))
+
+    # (11) the DP deduction line on the settlement invoice (and the "Down
+    # Payments" section line of the order) carries the product + event wording,
+    # with the core reference kept as the trailing marker.
+    def test_settlement_down_payment_line_relabelled(self):
+        so = self._make_so(self.show)
+        so.write(
+            {
+                "x_custom_event_name": "Soekarno Cup",
+                "x_custom_event_location": "Stadion Gelora Bung Tomo Surabaya",
+            }
+        )
+        so.action_confirm()
+        dp_invoice = self._make_dp_invoice(so)
+        dp_invoice.invoice_date = date(2026, 8, 14)
+        dp_invoice.action_post()
+
+        dp_so_line = so.order_line.filtered(lambda line: line.is_downpayment and not line.display_type)
+        expected = (
+            "%s, Event Soekarno Cup, Lokasi Stadion Gelora Bung Tomo Surabaya, 01.09.26 "
+            "(Uang Muka ref: %s tgl 14/08/2026)" % (self.product.name, dp_invoice.name)
+        )
+        self.assertEqual(dp_so_line.name, expected)
+        self.assertNotIn("\n", dp_so_line.name)
+
+        final = so._create_invoices(final=True)
+        deduction = final.invoice_line_ids.filtered(lambda line: line.is_downpayment)
+        self.assertTrue(deduction)
+        self.assertEqual(set(deduction.mapped("name")), {expected})
+        self.assertNotIn("Down Payment (ref", expected)
+
+    # (12) the section line ("Down Payments") keeps the core wording
+    def test_settlement_section_line_untouched(self):
+        so = self._make_so(self.show)
+        so.action_confirm()
+        self._make_dp_invoice(so)
+        section = so.order_line.filtered(lambda line: line.display_type == "line_section" and line.is_downpayment)
+        self.assertEqual(section.name, "Down Payments")
+
+    # (13) flag off -> core "Down Payment …" deduction wording is left intact
+    def test_settlement_down_payment_line_untouched_when_flag_off(self):
+        self.company.x_custom_show_date_enabled = False
+        so = self._make_so(self.show)
+        so.action_confirm()
+        self._make_dp_invoice(so)
+        dp_so_line = so.order_line.filtered(lambda line: line.is_downpayment and not line.display_type)
+        self.assertIn("Down Payment", dp_so_line.name)

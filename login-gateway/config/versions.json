@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-02T11:20:41+00:00",
+  "generated_at": "2026-09-03T22:10:56+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "1e4f11e",
-    "branch": "feat/ic-mirror-note"
+    "commit": "0237763",
+    "branch": "feat/arka-dp-settlement-label"
   },
   "buckets": [
     {
@@ -204,14 +204,19 @@
       "module": "custom_arka_show_date",
       "bucket": "_tenants",
       "name": "ARKA Show Date",
-      "version": "19.0.1.5.0",
+      "version": "19.0.1.6.0",
       "summary": "Show-date, event and DP fields on quotation/SO/customer invoice, with payment terms anchored to the show date. PT ARKA only.",
       "category": "Tenants/ARKA-AIM",
       "depends": 4,
       "public": false,
-      "last_change": "2026-08-05",
-      "change_count": 8,
+      "last_change": "2026-09-04",
+      "change_count": 9,
       "changes": [
+        {
+          "sha": "0237763",
+          "date": "2026-09-04",
+          "subject": "feat(arka): label the settlement down-payment deduction line"
+        },
         {
           "sha": "827b115",
           "date": "2026-08-05",
@@ -246,11 +251,6 @@
           "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
-        },
-        {
-          "sha": "812d3ff",
-          "date": "2026-06-09",
-          "subject": "feat(custom_arka_show_date): PT ARKA show date on SO/invoice with anchored payment terms (#35)"
         }
       ]
     },
@@ -3230,9 +3230,9 @@
       "change_count": 8,
       "changes": [
         {
-          "sha": "f2d68b4",
+          "sha": "b20428a",
           "date": "2026-09-02",
-          "subject": "fix(intercompany): carry the PO header note and section lines to the mirrored SO"
+          "subject": "fix(intercompany): carry the PO header note and section lines to the mirrored SO (#206)"
         },
         {
           "sha": "61d1a7a",
