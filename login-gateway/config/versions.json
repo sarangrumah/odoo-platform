@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-04T00:04:54+00:00",
+  "generated_at": "2026-09-04T00:13:35+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "65df1a3",
-    "branch": "feat/levis-cogs-catchup"
+    "commit": "e817989",
+    "branch": "HEAD"
   },
   "buckets": [
     {
@@ -345,18 +345,23 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.40.0",
+      "version": "19.0.1.41.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
       "last_change": "2026-09-04",
-      "change_count": 52,
+      "change_count": 53,
       "changes": [
         {
-          "sha": "35aed92",
+          "sha": "e817989",
           "date": "2026-09-04",
-          "subject": "feat(levis): recognise COGS when a goods receipt reveals the cost"
+          "subject": "feat(levis): make a repeated SKU on a purchase order say so out loud"
+        },
+        {
+          "sha": "9742a00",
+          "date": "2026-09-04",
+          "subject": "feat(levis): recognise COGS when a goods receipt reveals the cost (#210)"
         },
         {
           "sha": "889ce24",
@@ -387,11 +392,6 @@
           "sha": "d45b75b",
           "date": "2026-08-12",
           "subject": "feat(levis): clear the POS receivable on the statement line, not beside it (#167)"
-        },
-        {
-          "sha": "e283281",
-          "date": "2026-08-11",
-          "subject": "fix(levis): a card settlement may not clear the cash receivable either (#141)"
         }
       ]
     },

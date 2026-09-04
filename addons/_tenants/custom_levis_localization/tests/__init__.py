@@ -8,3 +8,4 @@ from . import test_bank_narrative
 from . import test_pos_clearing
 from . import test_mid_map_guard
 from . import test_journal_billing_tax_number
+from . import test_po_dup_sku_guard
