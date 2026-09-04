@@ -28,7 +28,10 @@ This module implements five specific requirements for the Levi's tenant: HS Code
 ## Key Models
 - `levis.inventory.reconciliation` — Manages periodic inventory reconciliations, computing differences between GL balances and actual stock values and producing a DRAFT `account.move`.
 - `levis.inventory.reconciliation.line` — One line per stock-valuation account, holding the GL balance, stock value, and computed difference.
-- `stock.move` — Overrides to skip GL journal entries on vendor goods-receipt moves.
+- `stock.move` — Overrides to skip GL journal entries on vendor goods-receipt moves, and to trigger the COGS catch-up when a receipt reveals a cost.
+- `levis.cogs.run` — Periodic COGS per Operating Unit: quantity sold x unit cost, aggregated per (store, product category), as a DRAFT entry.
+- `levis.cogs.catchup` / `levis.cogs.catchup.line` — COGS recognised at goods receipt for units already sold (feature 16).
+- `levis.cogs.charge` — Ledger of COGS already recognised per (product, store, sale month); read and written by BOTH mechanisms above, which is what keeps a unit from being charged twice.
 - `stock.picking` — Overrides to validate receipt quantities against demand quantities.
 
 ## Important Fields
@@ -375,6 +378,99 @@ because M sorts before O, and the two name different stores.
 `scripts/tenants/levis/96_setup_pos_clearing.py` does the same for a database
 that already has the module. The MID mapping is deliberately not seeded — see the
 gotcha below.
+
+## Feature 16 — COGS catch-up on goods receipt (`levis.cogs.catchup`)
+
+Levi's sells before it buys, so a unit usually leaves the store while its product
+still has no cost. Odoo 19 cannot repair that afterwards — `stock.move.value` is
+written once in `_action_done` and `_run_fifo_vacuum` is gone, so an outgoing move
+made against empty stock is worth zero for ever. `levis.cogs.run` answers this once
+a month; this feature answers it *as the cost arrives*.
+
+**Trigger.** `stock.move._action_done` → `_levis_cogs_catchup()`, for vendor
+receipts only (`location_id.usage == "supplier"`), gated by the system parameter
+`custom_levis_localization.cogs_catchup_enabled` (default `0`). A failure is caught
+and logged: it must never block a transfer, because the cost is picked up by the
+next receipt or by the monthly run anyway.
+
+**What it charges.** Only the products on that receipt, only what is still
+outstanding, and the *whole* outstanding quantity — ten sold against four received
+still charges ten, because the cost is known now. Cost basis is the receipt's own
+`purchase_line_id.price_unit` net of tax (`compute_all`, since this tenant's POs are
+tax-included), converted to company currency, with `standard_price` as the fallback.
+That is the basis the June/July 2026 reconciliation proved right; `standard_price`
+alone understated July by Rp 252 m.
+
+**Where it books.** `Dr COGS-<category> / Cr Inventories-<category>` with the
+*selling* store's OU analytic on both legs — the store that sold, not the one that
+received. The entry is DRAFT and grouped per booking date, so a day of receipts
+produces one entry rather than one per picking. The booking date is the end of the
+month the sale happened in while that month is open, and today once it is closed;
+"closed" is the latest of `fiscalyear_lock_date`, `hard_lock_date` and the new
+company field `l10n_cogs_reported_through`, because Levi's policy is that a period
+already reported to the client does not move even when nothing technically locks it
+(see the platform memory on closed periods). Lock *exceptions* are ignored on
+purpose: they exist to let one correction through, not to reopen a month for cost.
+
+**The ledger is the real output.** Every charge is written to `levis.cogs.charge`
+as (product, warehouse, sale month, qty, amount, source). `levis.cogs.run._detail()`
+subtracts it before booking, and records its own charges when it generates, so the
+two mechanisms can never charge the same unit twice — whichever learns the cost
+first recognises it and the other stays quiet.
+
+**Window.** By default only the booking month is examined. This is deliberate:
+June and July 2026 COGS were booked by hand and by `COGS/2026/0001` *without*
+leaving `levis.cogs.charge` rows, so a catch-up reaching into them would charge
+their cost a second time. `custom_levis_localization.cogs_catchup_start` widens the
+window — only after checking that the months it opens carry no COGS yet.
+
+Journal: `custom_levis_localization.cogs_catchup_journal_code`, falling back to the
+company stock journal and then any general journal. UI at Accounting > Accounting >
+COGS Catch-up (read-only; the entry is edited as a normal draft journal entry).
+
+## Feature 17 — Duplicate-SKU gate on purchase orders
+
+A garment size is not an attribute of the thing ordered, it **is** the thing ordered:
+each size is its own `product.product` with its own PROD SKU. So a PO sheet whose
+product column was copied down in Excel produces four perfectly valid lines that all
+ask for size 25 — and nothing downstream can catch it, because the receipt inherits
+its products from the order (feature #6, `_check_levis_receipt_line_from_po`). The
+mistake surfaces only when the carton is opened and holds 25, 26, 27 and 28.
+
+Confirming an order whose lines repeat a product therefore opens
+`levis.po.dup.sku.wizard` instead of confirming. It lists each repeated SKU with its
+Size/Inseam values, how many lines carry it, the total quantity — and **the variants
+of the same template that are NOT on this order**, which is the line that gives the
+mistake away. A reason is mandatory; on confirm it is written to
+`purchase.order.l10n_dup_sku_reason`, `l10n_dup_sku_ack` is set, the wizard posts a
+chatter message naming the SKUs and the reason, and `button_confirm` is called again.
+
+Deliberate design decisions:
+- **A wizard, not a constraint.** Ordering the same SKU twice is legitimate (two
+  delivery dates, two prices). The `_check_levis_qty_price_swap` treatment — a hard
+  `ValidationError` — would break real orders. What was missing is a moment where a
+  person looks and says yes.
+- **Not an onchange either**: `base_import` never runs onchanges, and the upload is
+  exactly where this mistake is made. The gate sits on `button_confirm`, which every
+  path (UI, import, script) has to pass.
+- **The acknowledgement is per line-up, not per order.** It is cleared by
+  `button_draft` and by any create/write/unlink on the lines that touches
+  `product_id` or `product_qty`, so it can never be earned on one set of lines and
+  spent on another. The wizard passes `levis_dup_sku_confirming` in the context so
+  core's own writes during confirm do not wipe the acknowledgement it just set.
+- **Batch confirm refuses rather than half-confirms**: selecting several orders and
+  confirming raises a `UserError` naming the offenders, because an action window can
+  only be returned for one of them.
+- `reason` is required **in the view only** — the wizard record is created before the
+  user has typed anything, so a required column would refuse to open it.
+
+Finding the orders that predate the gate:
+`scripts/tenants/levis/103_report_po_duplicate_sku.py` (SELECT-only) lists every PO
+with a repeated SKU together with the receipt, the `GR-VAL:<move_id>` valuation
+entries and the vendor bill — the three facts that decide whether the correction is
+"cancel the receipt and fix the order" or a full return. On `prd_levis_begbal`
+(4-Sep-2026) it found 8 (PO, SKU) pairs over 5 orders of Aug-2026, all received and
+billed; `005DS0000025` ×4 lines on `PO/T/EBR/2026/08/00336` is the reported case.
 
 ## Gotchas
 - **Never `_inherit "product.value"` from this module.** Doing so pulls

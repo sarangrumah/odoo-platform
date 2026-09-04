@@ -40,3 +40,9 @@ access_levis_pos_clearing_leg_user,levis.pos.clearing.leg user,model_levis_pos_c
 access_levis_pos_clearing_receipt_user,levis.pos.clearing.receipt user,model_levis_pos_clearing_receipt,account.group_account_invoice,1,1,0,0
 access_levis_mid_map_wizard_acct,levis.bank.mid.map.wizard account,model_levis_bank_mid_map_wizard,account.group_account_manager,1,1,1,1
 access_levis_mid_map_wizard_line_acct,levis.bank.mid.map.wizard.line account,model_levis_bank_mid_map_wizard_line,account.group_account_manager,1,1,1,1
+access_levis_cogs_catchup_acct,levis.cogs.catchup account,model_levis_cogs_catchup,account.group_account_manager,1,1,1,1
+access_levis_cogs_catchup_line_acct,levis.cogs.catchup.line account,model_levis_cogs_catchup_line,account.group_account_manager,1,1,1,1
+access_levis_cogs_charge_acct,levis.cogs.charge account,model_levis_cogs_charge,account.group_account_manager,1,1,1,1
+access_levis_cogs_catchup_stock,levis.cogs.catchup stock,model_levis_cogs_catchup,stock.group_stock_manager,1,0,0,0
+access_levis_cogs_catchup_line_stock,levis.cogs.catchup.line stock,model_levis_cogs_catchup_line,stock.group_stock_manager,1,0,0,0
+access_levis_cogs_charge_stock,levis.cogs.charge stock,model_levis_cogs_charge,stock.group_stock_manager,1,0,0,0

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-03T22:10:56+00:00",
+  "generated_at": "2026-09-04T00:04:54+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "0237763",
-    "branch": "feat/arka-dp-settlement-label"
+    "commit": "65df1a3",
+    "branch": "feat/levis-cogs-catchup"
   },
   "buckets": [
     {
@@ -213,9 +213,9 @@
       "change_count": 9,
       "changes": [
         {
-          "sha": "0237763",
+          "sha": "2546f07",
           "date": "2026-09-04",
-          "subject": "feat(arka): label the settlement down-payment deduction line"
+          "subject": "feat(arka): label the settlement down-payment deduction line (#209)"
         },
         {
           "sha": "827b115",
@@ -345,14 +345,19 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.39.0",
+      "version": "19.0.1.40.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 9,
       "public": false,
-      "last_change": "2026-08-28",
-      "change_count": 51,
+      "last_change": "2026-09-04",
+      "change_count": 52,
       "changes": [
+        {
+          "sha": "35aed92",
+          "date": "2026-09-04",
+          "subject": "feat(levis): recognise COGS when a goods receipt reveals the cost"
+        },
         {
           "sha": "889ce24",
           "date": "2026-08-28",
@@ -387,11 +392,6 @@
           "sha": "e283281",
           "date": "2026-08-11",
           "subject": "fix(levis): a card settlement may not clear the cash receivable either (#141)"
-        },
-        {
-          "sha": "5ac3467",
-          "date": "2026-08-11",
-          "subject": "fix(levis): the tender account names its tender — use that in allocation and mapping (#140)"
         }
       ]
     },
