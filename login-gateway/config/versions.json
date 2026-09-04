@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-04T10:47:59+00:00",
+  "generated_at": "2026-09-04T10:48:33+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "eea3d86",
+    "commit": "49080cd",
     "branch": "HEAD"
   },
   "buckets": [
@@ -1976,9 +1976,15 @@
       "category": "Inventory/Inventory",
       "depends": 5,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-09-04",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "49080cd",
+          "date": "2026-09-04",
+          "subject": "feat(payment): type the dealt exchange rate on a payment (#214)"
+        }
+      ]
     },
     {
       "module": "custom_attendance",
@@ -3705,7 +3711,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "eea3d86",
+          "sha": "49080cd",
           "date": "2026-09-04",
           "subject": "feat(payment): type the dealt exchange rate on a payment (#214)"
         }
