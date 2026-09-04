@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-04T00:13:35+00:00",
+  "generated_at": "2026-09-04T10:09:03+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "e817989",
-    "branch": "HEAD"
+    "commit": "dc7b21a",
+    "branch": "feat/fk-uang-muka-settlement"
   },
   "buckets": [
     {
@@ -354,9 +354,9 @@
       "change_count": 53,
       "changes": [
         {
-          "sha": "e817989",
+          "sha": "17200d4",
           "date": "2026-09-04",
-          "subject": "feat(levis): make a repeated SKU on a purchase order say so out loud"
+          "subject": "feat(levis): make a repeated SKU on a purchase order say so out loud (#211)"
         },
         {
           "sha": "9742a00",
@@ -2128,14 +2128,19 @@
       "module": "custom_coretax_export",
       "bucket": "ee_gap",
       "name": "Coretax Import File Export (DJP Templates)",
-      "version": "19.0.1.6.1",
+      "version": "19.0.1.7.0",
       "summary": "Emit DJP-conformant Coretax import workbooks: e-Faktur Keluaran (FK/OF), Retur Masukan, Bupot Unifikasi, Bupot PPh 21, Bupot Non-Resident",
       "category": "Accounting/Localizations",
       "depends": 3,
       "public": true,
-      "last_change": "2026-08-19",
-      "change_count": 9,
+      "last_change": "2026-09-04",
+      "change_count": 10,
       "changes": [
+        {
+          "sha": "dc7b21a",
+          "date": "2026-09-04",
+          "subject": "fix(coretax): report a deducted down payment in the FK block, not as a negative OF row"
+        },
         {
           "sha": "c402dc4",
           "date": "2026-08-19",
@@ -2170,11 +2175,6 @@
           "sha": "635bde3",
           "date": "2026-08-04",
           "subject": "fix(coretax): require NPWP Penandatangan only where the layout carries it"
-        },
-        {
-          "sha": "d2a3f26",
-          "date": "2026-08-04",
-          "subject": "fix(coretax): report a down payment's Jenis Barang Jasa from the order"
         }
       ]
     },

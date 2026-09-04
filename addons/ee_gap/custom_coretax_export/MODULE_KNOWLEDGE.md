@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-08-05T00:00:00Z
 generator: claude-code-handwritten
 module: custom_coretax_export
-manifest_version: 19.0.1.6.1
+manifest_version: 19.0.1.7.0
 ---
 
 # custom_coretax_export
@@ -106,13 +106,24 @@ On `custom.coretax.fk.builder`:
   `CHECK_DPP_LAIN` 'Y', and the FK gets `KD_JENIS_TRANSAKSI` 04. The rupiah is untouched —
   12% × 11/12 == 11% exactly — so the file still ties to the GL. A tax explicitly configured
   `x_custom_dpp_method = nilai_lain` keeps its own factor and rate and is not second-guessed.
-- **`FG_UANG_MUKA` is derived, not hard-coded.** `_is_uang_muka()` reads the originating sale
-  order line's `is_downpayment`, because core bills a down payment through a product-less "fake"
-  line that nothing else distinguishes. Every billed line must be one: the settlement faktur
-  carries the deducted down payment *alongside* the goods, and flagging it would tell Coretax two
-  down payments were issued. The companion columns (`NOMOR_FAKTUR_UM_SEBELUMNYA`, `UANG_MUKA_*`)
-  stay empty — they want the *nomor faktur pajak* Coretax assigned to the earlier faktur, which
-  this database does not hold.
+- **`FG_UANG_MUKA` is derived, not hard-coded.** `_is_uang_muka()` marks the faktur that *bills*
+  a down payment: every product line has to be one. `_line_is_downpayment()` reads the line's own
+  `is_downpayment` first and only then the originating sale order line, because an invoice built
+  by hand or copied from an earlier one keeps the flag but loses `sale_line_ids` — which is the
+  shape every ARKA-AIM faktur is in, and why reading the order line alone reported a real faktur
+  uang muka as an ordinary sale.
+- **A settlement faktur reports its down payment in the FK record, never as an OF row.** Odoo
+  puts the already-invoiced down payment on the final invoice as a negative line (`is_downpayment`
+  with a negative `price_subtotal`); exporting it as an item produced `JUMLAH_BARANG` -1 and
+  negative amounts, which the Coretax importer rejects. `_is_dp_deduction()` lifts that line out
+  of the OF rows into `NOMOR_FAKTUR_UM_SEBELUMNYA` + `UANG_MUKA_DPP`/`_DPP_LAIN`/`_PPN`, so the
+  OF rows and `JUMLAH_*` stay the **gross** price and what is still owed is the difference.
+  The number reported is `x_custom_nsfp` on the down-payment invoice — the nomor faktur pajak
+  Coretax assigned it, not its Odoo sequence — and the export is refused by name when it is
+  blank: an empty `NOMOR_FAKTUR_UM_SEBELUMNYA` beside a non-zero `UANG_MUKA_PPN` is a file
+  Coretax accepts and files wrongly. `_coretax_fk_downpayment_invoices()` finds the earlier
+  faktur through the sale order when the link survives, otherwise through the shared
+  `invoice_origin`.
 - **Only `out_invoice` is exported.** Credit notes are not FK records — they belong to Faktur
   Pengganti or Retur Masukan, which have their own paths.
 - **"Tidak ada faktur ... yang cocok" is almost always the company, not the period.** Both
