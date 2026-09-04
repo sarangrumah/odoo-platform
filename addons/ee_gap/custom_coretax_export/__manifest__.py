@@ -55,6 +55,19 @@ omits an invoice is worse than one that will not render.
 ``MASA_PAJAK``/``TAHUN_PAJAK`` are derived per invoice from ``invoice_date``, so
 a selection straddling two periods still stamps each FK row correctly.
 
+Down payments
+-------------
+A sale part-billed in advance is two fakturs to DJP: one for the down payment,
+then a settlement faktur that reports the **full** price in its OF rows and
+subtracts the earlier one through ``NOMOR_FAKTUR_UM_SEBELUMNYA`` and the
+``UANG_MUKA_*`` columns. Odoo models the same thing as a negative line on the
+final invoice; exporting that line as an OF item produced negative quantities
+and amounts, which the Coretax importer rejects. The deduction line is now
+lifted out of the OF rows and into the FK record, and the number reported is
+``x_custom_nsfp`` on the down-payment invoice — the nomor faktur pajak Coretax
+assigned it, not its Odoo sequence. An export is refused, by name, when that
+number is missing.
+
 Discounts, rounding, and the FK↔OF tie
 --------------------------------------
 Coretax validates the *written* cells, not the floats behind them, and it checks
@@ -101,7 +114,7 @@ e-Faktur Keluaran and Retur Masukan are not blocked on it.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Localizations",
-    "version": "19.0.1.6.1",
+    "version": "19.0.1.7.0",
     "license": "LGPL-3",
     "depends": [
         "custom_tax_id",
