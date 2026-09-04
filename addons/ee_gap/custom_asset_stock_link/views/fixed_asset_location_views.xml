@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_fixed_asset_location_form_stock" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.location.form.stock</field>
+        <field name="model">custom.fixed.asset.location</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_location_form"/>
+        <field name="arch" type="xml">
+            <field name="code" position="after">
+                <field name="stock_location_id"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_fixed_asset_location_list_stock" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.location.list.stock</field>
+        <field name="model">custom.fixed.asset.location</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_location_list"/>
+        <field name="arch" type="xml">
+            <field name="code" position="after">
+                <field name="stock_location_id"/>
+            </field>
+        </field>
+    </record>
+</odoo>

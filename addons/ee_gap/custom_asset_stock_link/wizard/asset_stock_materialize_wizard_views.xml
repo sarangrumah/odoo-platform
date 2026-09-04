@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_asset_stock_materialize_wizard_form" model="ir.ui.view">
+        <field name="name">custom.asset.stock.materialize.wizard.form</field>
+        <field name="model">custom.asset.stock.materialize.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Materialise Into Stock">
+                <div class="alert alert-info" role="status">
+                    These units are already capitalised in the general ledger. Putting
+                    them into stock creates serial numbers and an inventory adjustment
+                    only &#8212; no accounting entry is posted, and the wizard refuses to
+                    run if the target category or product would value the stock.
+                </div>
+                <group>
+                    <group>
+                        <field name="pending_count" string="To materialise"/>
+                        <field name="linked_count" string="Already in stock"/>
+                    </group>
+                    <group>
+                        <field name="location_id"
+                               placeholder="From each asset's asset location"/>
+                        <field name="categ_id"/>
+                        <field name="create_rental_asset"/>
+                    </group>
+                </group>
+                <field name="asset_ids" invisible="1"/>
+                <footer>
+                    <button name="action_confirm" type="object" string="Materialise"
+                            class="btn-primary" invisible="pending_count == 0"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_asset_stock_materialize_wizard" model="ir.actions.act_window">
+        <field name="name">Materialise Into Stock</field>
+        <field name="res_model">custom.asset.stock.materialize.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="custom_accounting_asset.model_custom_fixed_asset"/>
+        <field name="binding_view_types">list,form</field>
+    </record>
+</odoo>

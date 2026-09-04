@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Home for products that represent already-capitalised fixed assets.
+             Their value lives in the fixed-asset register, never in inventory,
+             so every product filed here carries a zero cost and the category is
+             pinned to periodic valuation per company by the materialise wizard
+             (both valuation fields are company-dependent). A dedicated category
+             means a future company-wide switch to Perpetual valuation cannot
+             sweep the fleet in by accident. -->
+        <record id="product_category_fixed_asset_non_valued" model="product.category">
+            <field name="name">Fixed Assets (Non-Valuated)</field>
+            <field name="property_valuation">periodic</field>
+            <field name="property_cost_method">standard</field>
+        </record>
+    </data>
+</odoo>

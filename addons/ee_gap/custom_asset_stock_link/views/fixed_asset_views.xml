@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_fixed_asset_form_stock" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.form.stock</field>
+        <field name="model">custom.fixed.asset</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_stock_moves" type="object"
+                        class="oe_stat_button" icon="fa-exchange"
+                        invisible="move_line_count == 0">
+                    <field name="move_line_count" widget="statinfo" string="Movements"/>
+                </button>
+            </xpath>
+            <xpath expr="//notebook" position="before">
+                <group string="Inventory">
+                    <field name="product_id" readonly="1"/>
+                    <field name="lot_id" readonly="1"/>
+                    <field name="stock_location_id"/>
+                    <field name="stock_state"/>
+                    <field name="stock_qty"/>
+                    <field name="stock_synced_on"/>
+                    <button name="action_resync_stock_location" type="object"
+                            string="Resync From Stock" class="btn-link"
+                            invisible="not lot_id"/>
+                </group>
+                <group string="Rental">
+                    <field name="rental_asset_id" readonly="1"/>
+                    <field name="rental_state"/>
+                    <field name="is_rentable"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_fixed_asset_list_stock" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.list.stock</field>
+        <field name="model">custom.fixed.asset</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_list"/>
+        <field name="arch" type="xml">
+            <field name="location_id" position="after">
+                <field name="stock_location_id" optional="show"/>
+                <field name="stock_state" optional="hide"/>
+                <field name="rental_state" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_fixed_asset_search_stock" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.search.stock</field>
+        <field name="model">custom.fixed.asset</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_search"/>
+        <field name="arch" type="xml">
+            <field name="location_id" position="after">
+                <field name="stock_location_id"/>
+                <field name="lot_id" string="Serial"/>
+            </field>
+            <filter name="state_disposed" position="after">
+                <separator/>
+                <filter name="rentable" string="Available To Rent"
+                        domain="[('is_rentable', '=', True)]"/>
+                <filter name="not_in_stock" string="Not In Stock"
+                        domain="[('stock_state', '!=', 'in_stock')]"/>
+                <filter name="no_serial" string="No Serial Yet"
+                        domain="[('lot_id', '=', False)]"/>
+            </filter>
+            <filter name="group_location" position="after">
+                <filter name="group_stock_location" string="Physical Location"
+                        context="{'group_by': 'stock_location_id'}"/>
+                <filter name="group_stock_state" string="Stock Status"
+                        context="{'group_by': 'stock_state'}"/>
+            </filter>
+        </field>
+    </record>
+</odoo>

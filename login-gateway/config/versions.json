@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-04T10:09:03+00:00",
+  "generated_at": "2026-09-04T10:47:59+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "dc7b21a",
-    "branch": "feat/fk-uang-muka-settlement"
+    "commit": "eea3d86",
+    "branch": "HEAD"
   },
   "buckets": [
     {
@@ -1968,6 +1968,19 @@
       ]
     },
     {
+      "module": "custom_asset_stock_link",
+      "bucket": "ee_gap",
+      "name": "Custom Asset Stock Link",
+      "version": "19.0.1.0.0",
+      "summary": "Materialise existing fixed assets into inventory as serial numbers so each unit can be located, moved and rented -- without any stock valuation GL impact",
+      "category": "Inventory/Inventory",
+      "depends": 5,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
+    },
+    {
       "module": "custom_attendance",
       "bucket": "ee_gap",
       "name": "Custom Attendance",
@@ -2137,9 +2150,9 @@
       "change_count": 10,
       "changes": [
         {
-          "sha": "dc7b21a",
+          "sha": "24c3f7c",
           "date": "2026-09-04",
-          "subject": "fix(coretax): report a deducted down payment in the FK block, not as a negative OF row"
+          "subject": "fix(coretax): report a deducted down payment in the FK block, not as a negative OF row (#213)"
         },
         {
           "sha": "c402dc4",
@@ -3676,6 +3689,25 @@
           "sha": "73b07a4",
           "date": "2026-08-04",
           "subject": "feat(account): multi-COA admin fees on the Register Payment wizard (#73)"
+        }
+      ]
+    },
+    {
+      "module": "custom_payment_fx_rate",
+      "bucket": "ee_gap",
+      "name": "Payment Exchange Rate",
+      "version": "19.0.1.1.0",
+      "summary": "Type the dealt exchange rate on a payment, the way Odoo already lets you type it on a bill.",
+      "category": "Accounting/Accounting",
+      "depends": 1,
+      "public": true,
+      "last_change": "2026-09-04",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "eea3d86",
+          "date": "2026-09-04",
+          "subject": "feat(payment): type the dealt exchange rate on a payment (#214)"
         }
       ]
     },

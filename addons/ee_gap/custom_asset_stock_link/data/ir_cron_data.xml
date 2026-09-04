@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Safety net for positions changed outside stock.move.line._action_done
+             (SQL fixes, restores, quant edits with the sync context suppressed). -->
+        <record id="ir_cron_sync_asset_stock_location" model="ir.cron">
+            <field name="name">Fixed Assets: sync physical location from stock</field>
+            <field name="model_id" ref="custom_accounting_asset.model_custom_fixed_asset"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_sync_stock_locations()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>
