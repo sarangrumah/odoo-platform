@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-07T22:24:34+00:00",
+  "generated_at": "2026-09-07T22:45:01+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "e72d4f2",
-    "branch": "feat/arkaaim-asset-serial-numbers"
+    "commit": "effee9d",
+    "branch": "HEAD"
   },
   "buckets": [
     {
@@ -63,9 +63,9 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "e72d4f2",
+          "sha": "effee9d",
           "date": "2026-09-08",
-          "subject": "feat(arkaaim): put the real serial in Serial Number, and let people search it"
+          "subject": "feat(arkaaim): put the real serial in Serial Number, and let people search it (#217)"
         },
         {
           "sha": "f5d8d58",
@@ -1973,6 +1973,19 @@
       ]
     },
     {
+      "module": "custom_asset_stock_link",
+      "bucket": "ee_gap",
+      "name": "Custom Asset Stock Link",
+      "version": "19.0.1.1.0",
+      "summary": "Materialise existing fixed assets into inventory as serial numbers so each unit can be located, moved and rented -- without any stock valuation GL impact",
+      "category": "Inventory/Inventory",
+      "depends": 5,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
+    },
+    {
       "module": "custom_attendance",
       "bucket": "ee_gap",
       "name": "Custom Attendance",
@@ -3654,9 +3667,9 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "e72d4f2",
+          "sha": "effee9d",
           "date": "2026-09-08",
-          "subject": "feat(arkaaim): put the real serial in Serial Number, and let people search it"
+          "subject": "feat(arkaaim): put the real serial in Serial Number, and let people search it (#217)"
         },
         {
           "sha": "0e89d2c",

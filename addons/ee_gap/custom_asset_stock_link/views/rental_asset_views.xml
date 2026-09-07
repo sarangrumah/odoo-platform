@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_rental_asset_form_stock" model="ir.ui.view">
+        <field name="name">rental.asset.form.stock</field>
+        <field name="model">rental.asset</field>
+        <field name="inherit_id" ref="custom_rental.view_rental_asset_form"/>
+        <field name="arch" type="xml">
+            <field name="serial_number" position="after">
+                <field name="lot_id" readonly="1"/>
+                <field name="stock_location_id" readonly="1"/>
+                <field name="is_available_now" readonly="1"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_rental_asset_list_stock" model="ir.ui.view">
+        <field name="name">rental.asset.list.stock</field>
+        <field name="model">rental.asset</field>
+        <field name="inherit_id" ref="custom_rental.view_rental_asset_list"/>
+        <field name="arch" type="xml">
+            <field name="state" position="before">
+                <field name="stock_location_id" optional="show"/>
+                <field name="is_available_now" optional="show"/>
+            </field>
+        </field>
+    </record>
+</odoo>
