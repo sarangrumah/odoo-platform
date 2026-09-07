@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-04T10:42:52+00:00",
+  "generated_at": "2026-09-07T22:24:34+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "24c3f7c",
-    "branch": "HEAD"
+    "commit": "e72d4f2",
+    "branch": "feat/arkaaim-asset-serial-numbers"
   },
   "buckets": [
     {
@@ -54,14 +54,19 @@
       "module": "custom_arka_aim_asset_register",
       "bucket": "_tenants",
       "name": "ARKA-AIM Drone Fixed-Asset Register",
-      "version": "19.0.2.0.0",
+      "version": "19.0.2.1.0",
       "summary": "Per-unit fixed-asset subledger for ARKA/AIM, built from the client's begbal sheet and reconciled to the 31-May-2026 opening-balance GL.",
       "category": "Tenants/ARKA-AIM",
       "depends": 1,
       "public": false,
-      "last_change": "2026-08-04",
-      "change_count": 4,
+      "last_change": "2026-09-08",
+      "change_count": 5,
       "changes": [
+        {
+          "sha": "e72d4f2",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): put the real serial in Serial Number, and let people search it"
+        },
         {
           "sha": "f5d8d58",
           "date": "2026-08-04",
@@ -3640,14 +3645,19 @@
       "module": "custom_ops_reports",
       "bucket": "ee_gap",
       "name": "Custom Operational Reports",
-      "version": "19.0.0.1.0",
+      "version": "19.0.0.2.0",
       "summary": "Operational reports for the AIM drone fleet — asset opname, event movement, spare parts, maintenance health, repair history.",
       "category": "Operations/Reports",
       "depends": 7,
       "public": true,
-      "last_change": "2026-07-17",
-      "change_count": 1,
+      "last_change": "2026-09-08",
+      "change_count": 2,
       "changes": [
+        {
+          "sha": "e72d4f2",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): put the real serial in Serial Number, and let people search it"
+        },
         {
           "sha": "0e89d2c",
           "date": "2026-07-17",
@@ -3688,9 +3698,15 @@
       "category": "Accounting/Accounting",
       "depends": 1,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-09-04",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "eea3d86",
+          "date": "2026-09-04",
+          "subject": "feat(payment): type the dealt exchange rate on a payment (#214)"
+        }
+      ]
     },
     {
       "module": "custom_payment_id",
