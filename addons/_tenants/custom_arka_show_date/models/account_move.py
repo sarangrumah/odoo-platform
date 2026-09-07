@@ -3,7 +3,8 @@ from odoo import api, fields, models
 
 
 class AccountMove(models.Model):
-    _inherit = "account.move"
+    _name = "account.move"
+    _inherit = ["account.move", "custom.arka.event.mixin"]
 
     x_custom_show_date = fields.Date(
         string="Show Date",
@@ -12,6 +13,43 @@ class AccountMove(models.Model):
         "Date enabled, the customer-invoice payment-term due dates are anchored "
         "to this date instead of the invoice date.",
     )
+    x_custom_event_name = fields.Char(
+        string="Event",
+        copy=False,
+        help="Event this document belongs to. Filled automatically from the "
+        "sales order or the purchase order; set it by hand on a bill that has "
+        "neither, then use 'Tag Event' to book it to the event.",
+    )
+    x_custom_event_location = fields.Char(
+        string="Lokasi Event",
+        copy=False,
+        help="Venue of the event this document belongs to.",
+    )
+    x_custom_event_visible = fields.Boolean(
+        compute="_compute_x_custom_event_visible",
+        help="Technical helper: True when this company captures event data.",
+    )
+
+    @api.depends(
+        "company_id",
+        "company_id.x_custom_show_date_enabled",
+        "company_id.x_custom_event_tracking_enabled",
+    )
+    def _compute_x_custom_event_visible(self):
+        for move in self:
+            company = move.company_id
+            move.x_custom_event_visible = bool(
+                company.x_custom_show_date_enabled or company.x_custom_event_tracking_enabled
+            )
+
+    def _custom_event_taggable_lines(self):
+        """Only the costed/earning lines — never tax or payment-term lines.
+
+        A journal entry carries the payable/receivable and tax lines too;
+        putting analytic on them would double the event's result.
+        """
+        self.ensure_one()
+        return self.line_ids.filtered(lambda line: line.display_type == "product")
 
     # Re-declares the EXACT core @api.depends list (verified against
     # account/models/account_move.py@19.0) PLUS the two new triggers. Omitting

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_purchase_order_form_arka_event" model="ir.ui.view">
+        <field name="name">purchase.order.form.arka.event</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <field name="date_planned" position="after">
+                <field name="x_custom_event_visible" invisible="1"/>
+                <field name="x_custom_show_date" invisible="not x_custom_event_visible"/>
+                <field name="x_custom_event_name" invisible="not x_custom_event_visible"/>
+                <field name="x_custom_event_location" invisible="not x_custom_event_visible"/>
+                <field name="x_custom_event_source_so_id"
+                       invisible="not x_custom_event_source_so_id"/>
+            </field>
+            <xpath expr="//header" position="inside">
+                <button name="action_custom_event_apply_analytic"
+                        type="object"
+                        string="Tag Event"
+                        invisible="not x_custom_event_visible"
+                        help="Write this event's analytic account on every order line that has none."/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

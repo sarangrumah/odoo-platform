@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class SaleOrder(models.Model):
-    _inherit = "sale.order"
+    _name = "sale.order"
+    _inherit = ["sale.order", "custom.arka.event.mixin"]
 
     x_custom_show_date = fields.Date(
         string="Show Date",
@@ -130,4 +132,184 @@ class SaleOrder(models.Model):
         # Harmless when the company flag is off: the field just carries over;
         # only the due-date anchoring (account.move) is gated on the flag.
         values["x_custom_show_date"] = self.x_custom_show_date
+        # The event travels with the invoice so a bill/invoice raised without a
+        # source document can still be matched to its event by hand.
+        values["x_custom_event_name"] = self.x_custom_event_name
+        values["x_custom_event_location"] = self.x_custom_event_location
         return values
+
+    # ------------------------------------------------------------------
+    # Analytic (event) tagging
+    # ------------------------------------------------------------------
+    def _custom_event_taggable_lines(self):
+        self.ensure_one()
+        # Down-payment lines are excluded: the down-payment invoice and the
+        # deduction line on the settlement net to zero, and they post to a
+        # liability account, not to the event's revenue.
+        return self.order_line.filtered(lambda line: not line.display_type and not line.is_downpayment)
+
+    def action_confirm(self):
+        # BEFORE super(), not after: prd_arkaaim runs with "Auto Lock Confirmed
+        # Sales Orders" on, so by the time super() returns the order is locked
+        # and core refuses any write to its lines ("It is forbidden to modify
+        # the following fields in a locked order"). Tagging while the order is
+        # still a draft avoids that entirely.
+        for order in self:
+            order._custom_event_apply_analytic()
+        return super().action_confirm()
+
+    # ------------------------------------------------------------------
+    # Intercompany purchase order raised from this sale (ARKA -> AIM)
+    # ------------------------------------------------------------------
+    x_custom_event_po_ids = fields.One2many(
+        "purchase.order",
+        "x_custom_event_source_so_id",
+        string="Purchase Orders",
+        readonly=True,
+    )
+    x_custom_event_po_count = fields.Integer(compute="_compute_x_custom_event_po_count")
+    x_custom_ic_purchase_available = fields.Boolean(
+        compute="_compute_x_custom_ic_purchase_available",
+        help="Technical helper: True when an intercompany rule lets this "
+        "company raise a purchase order on its sister company. Drives the "
+        "visibility of the 'Buat PO ke Sister Company' button.",
+    )
+
+    @api.depends("x_custom_event_po_ids")
+    def _compute_x_custom_event_po_count(self):
+        for order in self:
+            order.x_custom_event_po_count = len(order.x_custom_event_po_ids)
+
+    @api.depends("company_id")
+    def _compute_x_custom_ic_purchase_available(self):
+        for order in self:
+            order.x_custom_ic_purchase_available = bool(order._custom_ic_purchase_rule())
+
+    def _custom_ic_purchase_rule(self):
+        """The intercompany rule that says who this company buys the show from.
+
+        Reuses ``custom_intercompany_procurement``'s rule rather than adding a
+        second piece of configuration: the rule that already mirrors ARKA's PO
+        into an AIM sales order is exactly the one that names the supplier.
+        """
+        self.ensure_one()
+        if not self.company_id:
+            return self.env["account.intercompany.rule"]
+        return (
+            self.env["account.intercompany.rule"]
+            .sudo()
+            .search(
+                [
+                    ("active", "=", True),
+                    ("mirror_purchase_order", "=", True),
+                    ("company_from_id", "=", self.company_id.id),
+                ],
+                limit=1,
+            )
+        )
+
+    def action_custom_create_ic_purchase_order(self):
+        """Raise the purchase order on the sister company from this sale.
+
+        The buyer used to retype the event into a fresh PO's header note, which
+        is where "OPERRATIONAL DRONE SHOW - DANONE BALI" came from. Here the
+        event, the show date and the ordered lines come straight off the sale,
+        so ARKA's sale, ARKA's purchase and AIM's mirrored sale all say the
+        same thing.
+
+        The PO is left in DRAFT on purpose: prices towards the sister company
+        are not the customer's prices, so a buyer still reviews them. Confirming
+        it then triggers the existing intercompany mirror into AIM.
+        """
+        self.ensure_one()
+        rule = self._custom_ic_purchase_rule()
+        if not rule:
+            raise UserError(
+                _(
+                    "No intercompany rule lets %s raise a purchase order on a "
+                    "sister company. Configure one under Accounting ▸ "
+                    "Intercompany Rules with 'Mirror Purchase Order' ticked.",
+                    self.company_id.display_name,
+                )
+            )
+        vendor = rule.company_to_id.partner_id
+        if not vendor:
+            raise UserError(_("The sister company %s has no contact record.", rule.company_to_id.display_name))
+
+        order_lines = []
+        for line in self.order_line:
+            if line.is_downpayment:
+                # A down payment is a payment schedule, not something to buy.
+                continue
+            if line.display_type:
+                order_lines.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "display_type": line.display_type,
+                            "name": line.name,
+                            "sequence": line.sequence,
+                            "product_qty": 0.0,
+                            "price_unit": 0.0,
+                        },
+                    )
+                )
+                continue
+            if not line.product_id:
+                continue
+            order_lines.append(
+                (
+                    0,
+                    0,
+                    {
+                        "product_id": line.product_id.id,
+                        "product_qty": line.product_uom_qty,
+                        "product_uom_id": line.product_uom_id.id,
+                        "sequence": line.sequence,
+                        # name / price_unit / taxes / date_planned are left to
+                        # the core computes, which read the vendor's own
+                        # pricelist and supplier info. Copying the customer
+                        # price here would book AIM's cost at ARKA's margin.
+                    },
+                )
+            )
+        if not any(vals[2].get("product_id") for vals in order_lines):
+            raise UserError(_("This order has no product line to purchase."))
+
+        purchase = (
+            self.env["purchase.order"]
+            .with_company(self.company_id)
+            .create(
+                {
+                    "partner_id": vendor.id,
+                    "company_id": self.company_id.id,
+                    "origin": self.name,
+                    "x_custom_event_source_so_id": self.id,
+                    "x_custom_show_date": self.x_custom_show_date,
+                    "x_custom_event_name": self.x_custom_event_name,
+                    "x_custom_event_location": self.x_custom_event_location,
+                    "order_line": order_lines,
+                }
+            )
+        )
+        purchase._custom_event_apply_analytic()
+        purchase._custom_warn_products_the_sister_cannot_sell(rule.company_to_id)
+        self.message_post(body=_("Purchase order %s raised on %s for this event.", purchase.name, vendor.display_name))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Purchase Order"),
+            "res_model": "purchase.order",
+            "res_id": purchase.id,
+            "view_mode": "form",
+        }
+
+    def action_custom_view_event_purchase_orders(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Purchase Orders"),
+            "res_model": "purchase.order",
+            "domain": [("id", "in", self.x_custom_event_po_ids.ids)],
+            "view_mode": "list,form",
+        }

@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-06-09T00:00:00Z
 generator: hand-authored
 module: custom_arka_show_date
-manifest_version: 19.0.1.6.0
+manifest_version: 19.0.1.7.0
 ---
 
 # custom_arka_show_date
@@ -75,8 +75,91 @@ Draft and cancelled down payments mirror core's own states
 formatted `dd/mm/YYYY` explicitly, not through `format_date`, because the string
 also reaches the coretax import file.
 
+## Event on the Buying Leg (1.7+)
+`purchase.order` captures the same `x_custom_show_date` / `x_custom_event_name`
+/ `x_custom_event_location`, hands them to the vendor bill through
+`_prepare_invoice()`, and — where `custom_intercompany_procurement` mirrors the
+PO into the sister company — writes them onto the mirrored sales order by
+overriding `_custom_create_ic_mirror_so()`. Before this the event reached the
+selling company only as free text in the header note ("MERDEKA RUN - MONAS",
+"OPERRATIONAL DRONE SHOW - DANONE BALI"), which is why AIM could not report on
+it: in prd_arkaaim exactly 1 of 12 ARKA vendor bills and 0 of 11 AIM vendor
+bills carried a show date, so the cost side of the per-Show P&L was empty.
+
+## Purchase Order Raised From the Sale (1.7+)
+`sale.order.action_custom_create_ic_purchase_order()` creates a **draft**
+purchase order on the sister company named by the intercompany rule
+(`account.intercompany.rule` with `mirror_purchase_order`, `company_from_id` =
+this company), carrying the event, the show date and the ordered lines, and
+links back through `purchase.order.x_custom_event_source_so_id`. Confirming that
+draft then fires the existing PO → SO mirror, so one sale produces the whole
+chain: **ARKA sale → ARKA purchase → AIM sale**, all naming one event.
+
+Two deliberate choices:
+- **Draft, not confirmed.** The sister company's price is not the customer's
+  price, so a buyer reviews it. Line `price_unit` / `name` / taxes are left to
+  the core computes (supplier info), NOT copied from the sale — copying would
+  book AIM's cost at ARKA's margin.
+- **A separate link field.** `custom_intercompany_procurement` already declares
+  `purchase.order.x_custom_ic_source_so_id`, but its mirror guard returns early
+  when that field is set (`_custom_run_ic_po_mirror`). Reusing it would silently
+  stop the PO from mirroring into AIM — the opposite of the point. Hence
+  `x_custom_event_source_so_id`.
+
+## Analytic Account per Event (1.7+)
+`custom.arka.event.mixin` (models/arka_event_mixin.py) is inherited by
+`sale.order`, `purchase.order` and `account.move`. It concatenates the event,
+its location and the show date into one label —
+`Soekarno Cup - Stadion Gelora Bung Tomo Surabaya - 24.08.26` — and resolves it
+to a single `account.analytic.account` in the **Event** plan
+(`data/analytic_plan.xml`, xmlid `analytic_plan_arka_event`), created on first
+use.
+
+- Matching is on `account.analytic.account.x_custom_event_key`, a normalised
+  (whitespace-collapsed, upper-cased) copy of the label with a UNIQUE
+  constraint — NOT on `name`, which is a translatable jsonb column, and not on
+  what the user typed, because they retype spacing and case.
+- The account is created with **`company_id = False`** on purpose: a
+  company-scoped account would split one show into ARKA-revenue and AIM-cost
+  halves. Shared analytic accounts are the only cross-company key Odoo offers,
+  and they are what makes a consolidated P&L per event possible.
+- Confirmation stamps `{account_id: 100}` on lines that carry **no**
+  distribution (`sale.order.action_confirm`, `purchase.order.button_confirm`);
+  a "Tag Event" button does the same for a bill with no source document. A
+  distribution an operator split by hand is never overwritten.
+- Gated on `res.company.x_custom_event_tracking_enabled` — deliberately NOT on
+  `x_custom_show_date_enabled`, which makes the show date required on sales
+  orders and re-anchors due dates; enabling that on AIM would block every AIM
+  order without a show. The event flag makes nothing required and moves no due
+  date, so it is safe on both sister companies — which it must be.
+
+## Profit & Loss per Event (1.7+)
+`custom.report.profit.loss.event` (`profit_loss_event`) is the analytic reading
+of the same statement: it inherits the *branch* variant untouched — which
+already pivots per analytic account over `analytic_distribution` — and only
+points `_branch_plan()` at the Event plan and renames the residual column to
+**Unassigned**. Two "View/Export by Event" buttons are added to the shared P&L
+wizard.
+
+Against the older *per Show* variant: that one keys on
+`account.move.x_custom_show_date`, so two shows on one night collapse into one
+column and an untagged overhead has nowhere to go. Per Event separates them and
+accepts anything an operator can tag. Both remain, and both are screen + XLSX
+only. `profit_loss_event` is registered in `REPORT_MODEL_MAP` (models/__init__)
+— no QWeb router branch, which is correct for a dynamic-column report.
+
 ## Key Models
-- `res.company` (inherited) — `x_custom_show_date_enabled` (Boolean gate flag).
+- `custom.arka.event.mixin` (AbstractModel) — event label, analytic account
+  resolution, distribution stamping. Carries no fields: the three event fields
+  are declared per model because their attributes differ (the order tracks and
+  copies them, the journal entry does not).
+- `res.company` (inherited) — `x_custom_show_date_enabled`,
+  `x_custom_event_tracking_enabled` (two independent gate flags).
+- `purchase.order` (inherited + mixin) — event fields,
+  `x_custom_event_source_so_id`. Overrides `_prepare_invoice`,
+  `_custom_create_ic_mirror_so`, `button_confirm`.
+- `account.analytic.account` (inherited) — `x_custom_event_key` + UNIQUE.
+- `custom.report.profit.loss.event` — P&L pivoted per event analytic account.
 - `sale.order` (inherited) — `x_custom_show_date` (Date),
   `x_custom_show_date_required` (computed view-driver). Overrides
   `_confirmation_error_message`, `_prepare_invoice`.
@@ -105,12 +188,31 @@ also reaches the coretax import file.
 - `account.payment.term._compute_terms(date_ref, *args, **kwargs)` — consumes
   the `arka_show_date_ref` context key.
 
+## Configuration Needed Before Any of This Does Anything
+1. Settings ▸ Companies ▸ "Show Date & Event": tick **Enable Event Tracking**
+   on BOTH sister companies (ARKA and AIM). Show Date stays ARKA-only.
+2. An active `account.intercompany.rule` with `mirror_purchase_order` and
+   `company_from_id` = ARKA is what the "Buat PO ke Sister Company" button
+   reads to know the vendor; prd_arkaaim already has exactly one.
+Until step 1, the module behaves exactly as 1.6.0 did.
+
 ## Gating & Scope
 ARKA-only via the `res.company` flag (NOT name, NOT install). Customer invoices
 only (`out_invoice`); vendor bills unaffected. Safe on multi-company / multi-
 tenant DBs.
 
 ## Tests
+`tests/test_event_chain.py` (`AccountTestInvoicingCommon`, two companies + an
+intercompany rule): event onto the vendor bill and the customer invoice; the
+label concatenation and what it skips; one account per event, shared across
+companies, resilient to retyped case/spacing, distinct per show date;
+stamping on sale/purchase confirm; a hand-split distribution surviving a
+confirm; the gate keeping everything inert; the "Tag Event" button touching
+only `display_type == 'product'` lines; the PO raised from the sale (event,
+lines, back-link, tagging, and that it does NOT inherit the customer price);
+the mirrored AIM order carrying the event fields and landing on the same
+analytic account; the per-Event P&L columns.
+
 `tests/test_show_date.py` (`AccountTestInvoicingCommon`): propagation SO→invoice,
 required-only-when-flag-on, due date anchored to show date (show+30, not
 invoice+30), and flag-off falls back to invoice-date anchoring.

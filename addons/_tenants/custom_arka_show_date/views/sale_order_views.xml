@@ -18,6 +18,23 @@
                        invisible="not x_custom_show_date_required"
                        placeholder="DP 50%"/>
             </field>
+            <xpath expr="//header" position="inside">
+                <field name="x_custom_ic_purchase_available" invisible="1"/>
+                <button name="action_custom_create_ic_purchase_order"
+                        type="object"
+                        string="Buat PO ke Sister Company"
+                        invisible="not x_custom_ic_purchase_available or state in ('cancel',)"
+                        help="Raise a draft purchase order on the sister company, carrying this order's event, show date and lines."/>
+            </xpath>
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_custom_view_event_purchase_orders"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-shopping-cart"
+                        invisible="x_custom_event_po_count == 0">
+                    <field name="x_custom_event_po_count" widget="statinfo" string="Purchase"/>
+                </button>
+            </xpath>
         </field>
     </record>
 </odoo>

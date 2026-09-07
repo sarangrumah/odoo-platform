@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- noupdate: once the client renames the plan or reorders it, an upgrade
+         of this module must not reset their work. -->
+    <data noupdate="1">
+        <record id="analytic_plan_arka_event" model="account.analytic.plan">
+            <field name="name">Event</field>
+            <field name="description">One analytic account per drone show: "&lt;event&gt; - &lt;location&gt; - &lt;dd.mm.yy&gt;". Accounts are created automatically from the event data on the sales order, the purchase order and the bill, and are shared across companies so ARKA revenue and AIM cost meet on one event.</field>
+        </record>
+    </data>
+</odoo>
