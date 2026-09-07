@@ -1,0 +1,47 @@
+# ============================================================
+# Overlay node PPOB / PPS — single tenant, tanpa cockpit/orchestrator.
+#
+# Pakai bersama base compose, dan SELALU sebut service-nya eksplisit
+# supaya service lain di base (hub-portal, storefront, cockpit, dst)
+# tidak ikut naik:
+#
+#   docker compose -f docker-compose.yml \
+#                  -f deploy/ppob-node/docker-compose.ppob.yml \
+#                  up -d postgres redis odoo
+# ============================================================
+
+services:
+
+  postgres:
+    ports:
+      # Loopback saja — DBA masuk lewat SSH tunnel, bukan LAN.
+      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-16379}:6379"
+
+  odoo:
+    environment:
+      # Node ini melayani SATU database. Kombinasi LIST_DB=False +
+      # DBFILTER=^ppob$$ inilah yang membuat publikasi port di bawah aman:
+      # tidak ada database selector, dan hanya satu DB yang bisa dipilih.
+      # Jangan longgarkan salah satunya tanpa menaruh reverse proxy di depan.
+      LIST_DB: ${LIST_DB:-False}
+      DBFILTER: ${DBFILTER:-^ppob$$}
+      PROXY_MODE: ${PROXY_MODE:-False}
+      WORKERS: ${WORKERS:-4}
+      # Oracle EVShop H2H (custom_ppob_oracle_bridge) — kosong = bridge idle.
+      PPOB_ORACLE_DSN: ${PPOB_ORACLE_DSN:-}
+      PPOB_ORACLE_USER: ${PPOB_ORACLE_USER:-}
+      PPOB_ORACLE_PASSWORD: ${PPOB_ORACLE_PASSWORD:-}
+    # !override — WAJIB. Tanpa ini compose MENGGABUNG daftar ports, jadi
+    # 127.0.0.1:8069 dari base ikut terbawa bersama 0.0.0.0:8069 di sini dan
+    # container gagal start dengan "address already in use".
+    ports: !override
+      # Base compose sengaja mengikat 8069 ke 127.0.0.1 karena host itu
+      # menjalankan list_db=true + dbfilter=^.*$$ (semua tenant terlihat).
+      # Di node PPOB kondisinya beda (lihat env di atas), jadi port ini
+      # dibuka ke LAN. Ubah ke 127.0.0.1 kalau nanti dipasang nginx/Caddy.
+      - "${ODOO_LAN_BIND:-0.0.0.0}:${ODOO_HTTP_PORT:-18069}:8069"
+      - "${ODOO_LAN_BIND:-0.0.0.0}:${ODOO_LONGPOLL_PORT:-18072}:8072"
