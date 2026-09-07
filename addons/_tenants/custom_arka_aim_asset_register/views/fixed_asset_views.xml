@@ -7,19 +7,23 @@
         <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_form"/>
         <field name="arch" type="xml">
             <field name="location_id" position="after">
-                <field name="serial_number"/>
+                <field name="serial_number" placeholder="Physical serial on the unit"/>
                 <field name="source_group"/>
                 <field name="source_desc"/>
             </field>
         </field>
     </record>
 
+    <!--
+      The serial is the number people read off the unit, so it sits next to the
+      asset code rather than at the far end of the row.
+    -->
     <record id="view_fixed_asset_list_aim_serial" model="ir.ui.view">
-        <field name="name">custom.fixed.asset.list.aim.serial</field>
         <field name="model">custom.fixed.asset</field>
+        <field name="name">custom.fixed.asset.list.aim.serial</field>
         <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_list"/>
         <field name="arch" type="xml">
-            <field name="location_id" position="after">
+            <field name="code" position="after">
                 <field name="serial_number" optional="show"/>
             </field>
         </field>
@@ -30,9 +34,33 @@
         <field name="model">custom.fixed.asset</field>
         <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_search"/>
         <field name="arch" type="xml">
+            <!--
+              Typing a serial into the plain search box has to find the unit. The
+              default first field is Code, so widen it to cover serial and name
+              instead of leaving the serial buried in the dropdown.
+            -->
+            <field name="code" position="attributes">
+                <attribute name="string">Asset / Serial</attribute>
+                <attribute name="filter_domain">
+                    ['|', '|', ('serial_number', 'ilike', self), ('code', 'ilike', self), ('name', 'ilike', self)]
+                </attribute>
+            </field>
+            <!-- ...and keep an explicit serial-only entry for an exact lookup. -->
             <field name="code" position="after">
                 <field name="serial_number"/>
             </field>
+            <filter name="pooled_assets" position="after">
+                <separator/>
+                <!--
+                  Named ``*_physical_serial``: custom_asset_stock_link already
+                  contributes a ``no_serial`` filter to this same search view,
+                  and that one is about the stock lot, not the printed serial.
+                -->
+                <filter name="has_physical_serial" string="With Serial Number"
+                        domain="[('serial_number', '!=', False)]"/>
+                <filter name="no_physical_serial" string="Without Serial Number"
+                        domain="[('serial_number', '=', False)]"/>
+            </filter>
         </field>
     </record>
 </odoo>

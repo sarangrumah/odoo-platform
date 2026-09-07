@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA-AIM Drone Fixed-Asset Register",
-    "version": "19.0.2.0.0",
+    "version": "19.0.2.1.0",
     "summary": "Per-unit fixed-asset subledger for ARKA/AIM, built from the client's "
     "begbal sheet and reconciled to the 31-May-2026 opening-balance GL.",
     "description": """
@@ -31,8 +31,16 @@ rebuild a database that already has a register, run
 ``scripts/tenants/arkaaim/rebuild_asset_register.py`` (deletes the old register
 first -- deliberate and backed up, never done by the install hook).
 
+Serial numbers: the begbal sheet carries no serial column, so ``serial_number``
+is loaded separately from ``data/asset_serials.csv`` (built by
+``tools/build_arkaaim_asset_serials.py``) -- 3,100 physical serials for the
+batteries and drones, blank for the 490 units that carry none. It must never
+echo the asset code. Rewritten on every upgrade, but only where the value is
+blank or is a copy of the code.
+
 Superseded source: the PO-derived register (``data/aim_asset_register.csv``,
-uniform 30-Jan-2025 acquisition date) is kept for reference only.
+uniform 30-Jan-2025 acquisition date) is kept for reference only -- it is now
+also the only surviving source of the physical serials.
 
 TENANT-SCOPED: install only on the ARKA-AIM databases.
 """,
