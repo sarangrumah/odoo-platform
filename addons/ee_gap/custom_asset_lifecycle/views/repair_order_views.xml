@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Inherits the core view rather than the custom_repairs one: view
+         inheritance cannot select a group by its string, and the groups
+         custom_repairs adds carry no name to anchor on. -->
+    <record id="view_repair_order_form_lifecycle" model="ir.ui.view">
+        <field name="name">repair.order.form.lifecycle</field>
+        <field name="model">repair.order</field>
+        <field name="inherit_id" ref="repair.view_repair_order_form"/>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Asset Lifecycle">
+                    <group>
+                        <field name="x_fixed_asset_id"/>
+                        <field name="x_repair_channel" widget="radio"/>
+                    </group>
+                    <group>
+                        <field name="x_repair_vendor_id"
+                               required="x_repair_channel == 'third_party'"
+                               invisible="x_repair_channel != 'third_party'"/>
+                        <field name="x_warranty_claim_ref"
+                               required="x_repair_channel == 'warranty'"
+                               invisible="x_repair_channel != 'warranty'"/>
+                        <field name="x_warranty_claim_date"
+                               invisible="x_repair_channel != 'warranty'"/>
+                        <field name="x_warranty_expiry_date"
+                               invisible="x_repair_channel != 'warranty'"/>
+                        <field name="x_is_warranty" invisible="1"/>
+                    </group>
+                    <div colspan="2" class="text-muted"
+                         invisible="x_repair_channel != 'warranty'">
+                        A warranty claim costs the company nothing, so it is excluded
+                        from the unit's lifetime repair cost.
+                    </div>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_repair_order_list_lifecycle" model="ir.ui.view">
+        <field name="name">repair.order.list.lifecycle</field>
+        <field name="model">repair.order</field>
+        <field name="inherit_id" ref="repair.view_repair_order_tree"/>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <field name="x_fixed_asset_id" optional="show"/>
+                <field name="x_repair_channel" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_maintenance_equipment_form_lifecycle" model="ir.ui.view">
+        <field name="name">maintenance.equipment.form.lifecycle</field>
+        <field name="model">maintenance.equipment</field>
+        <field name="inherit_id" ref="maintenance.hr_equipment_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_fixed_asset" type="object"
+                        class="oe_stat_button" icon="fa-cube"
+                        invisible="not fixed_asset_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Fixed Asset</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//field[@name='serial_no']" position="after">
+                <field name="fixed_asset_id" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

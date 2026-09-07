@@ -123,6 +123,12 @@ class CustomFixedAsset(models.Model):
             return assets
 
         positions = {}
+        # Sum per (lot, location) and only then discard the non-positive ones.
+        # Filtering ``quantity > 0`` inside the domain instead reads a single +1
+        # quant row while ignoring a -1 sitting beside it in the same location,
+        # and reports the unit as being somewhere it is not. Not hypothetical: a
+        # badly-sourced picking leaves exactly that pattern, and it had 2,572 of
+        # the 3,590 ARKA-AIM units showing in the wrong warehouse.
         groups = (
             self.env["stock.quant"]
             .sudo()
@@ -130,13 +136,14 @@ class CustomFixedAsset(models.Model):
                 domain=[
                     ("lot_id", "in", assets.lot_id.ids),
                     ("location_id.usage", "in", ("internal", "transit")),
-                    ("quantity", ">", 0),
                 ],
                 groupby=["lot_id", "location_id"],
                 aggregates=["quantity:sum"],
             )
         )
         for lot, location, qty in groups:
+            if qty <= 0:
+                continue
             current = positions.get(lot.id)
             # A serial should sit in exactly one place. If the data says
             # otherwise, report the location holding the most.

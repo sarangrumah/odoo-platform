@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-07T23:32:02+00:00",
+  "generated_at": "2026-09-07T23:56:34+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "7ab36fe",
+    "commit": "e8d036e",
     "branch": "feat/arka-event-chain"
   },
   "buckets": [
@@ -234,8 +234,13 @@
       "depends": 7,
       "public": false,
       "last_change": "2026-09-08",
-      "change_count": 10,
+      "change_count": 11,
       "changes": [
+        {
+          "sha": "a1c1a2d",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): buy the Sewa product when the Jasa product is sold"
+        },
         {
           "sha": "d4dc5cc",
           "date": "2026-09-08",
@@ -270,11 +275,6 @@
           "sha": "c526074",
           "date": "2026-07-17",
           "subject": "style: ruff-format four files that were formatted at the wrong line length"
-        },
-        {
-          "sha": "0e89d2c",
-          "date": "2026-07-17",
-          "subject": "feat(reports,arka): port /opt-only runtime work onto feat/industry-packs"
         }
       ]
     },
@@ -2002,10 +2002,23 @@
       ]
     },
     {
+      "module": "custom_asset_lifecycle",
+      "bucket": "ee_gap",
+      "name": "Custom Asset Lifecycle",
+      "version": "19.0.1.0.0",
+      "summary": "Damage / missing / repair / replacement lifecycle on top of the fixed-asset register, with the history attached to each serial",
+      "category": "Accounting/Accounting",
+      "depends": 5,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
+    },
+    {
       "module": "custom_asset_stock_link",
       "bucket": "ee_gap",
       "name": "Custom Asset Stock Link",
-      "version": "19.0.1.1.0",
+      "version": "19.0.1.2.0",
       "summary": "Materialise existing fixed assets into inventory as serial numbers so each unit can be located, moved and rented -- without any stock valuation GL impact",
       "category": "Inventory/Inventory",
       "depends": 5,
@@ -4660,7 +4673,7 @@
       "module": "custom_service_receipt",
       "bucket": "ee_gap",
       "name": "Custom Service Receipt",
-      "version": "19.0.0.1.0",
+      "version": "19.0.0.2.0",
       "summary": "Receive purchased services on a goods receipt, so billing is gated by an accepted quantity",
       "category": "Inventory/Purchase",
       "depends": 1,

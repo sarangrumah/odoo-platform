@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_fixed_asset_form_lifecycle" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.form.lifecycle</field>
+        <field name="model">custom.fixed.asset</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_report_damage_wizard" type="object"
+                        string="Report Damage"
+                        invisible="state != 'running' or condition in ('damaged','in_repair','missing','written_off')"/>
+                <button name="action_open_report_missing_wizard" type="object"
+                        string="Report Missing"
+                        invisible="state != 'running' or condition in ('missing','written_off')"/>
+                <button name="action_return_to_service" type="object"
+                        string="Return To Service" class="oe_highlight"
+                        invisible="condition not in ('damaged','in_repair','repaired','missing')"
+                        confirm="Bring this unit back to its home location and mark it serviceable?"/>
+                <button name="action_open_writeoff_wizard" type="object"
+                        string="Write Off"
+                        invisible="state != 'running' or condition != 'missing'"/>
+                <button name="action_open_replacement_wizard" type="object"
+                        string="Register Replacement"
+                        invisible="condition not in ('missing','written_off','damaged') or replaced_by_asset_id"/>
+            </xpath>
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_repairs" type="object"
+                        class="oe_stat_button" icon="fa-wrench"
+                        invisible="repair_count == 0">
+                    <field name="repair_count" widget="statinfo" string="Repairs"/>
+                </button>
+                <button name="action_view_condition_log" type="object"
+                        class="oe_stat_button" icon="fa-history"
+                        invisible="condition_log_count == 0">
+                    <field name="condition_log_count" widget="statinfo" string="Events"/>
+                </button>
+            </xpath>
+
+            <xpath expr="//div[hasclass('oe_title')]" position="before">
+                <widget name="web_ribbon" title="Missing" bg_color="text-bg-danger"
+                        invisible="condition != 'missing'"/>
+                <widget name="web_ribbon" title="Damaged" bg_color="text-bg-warning"
+                        invisible="condition != 'damaged'"/>
+                <widget name="web_ribbon" title="Under Repair" bg_color="text-bg-info"
+                        invisible="condition != 'in_repair'"/>
+            </xpath>
+
+            <xpath expr="//notebook" position="before">
+                <group string="Condition">
+                    <group>
+                        <field name="condition"/>
+                        <field name="condition_changed_on"/>
+                        <field name="condition_changed_by"/>
+                        <field name="equipment_id"/>
+                    </group>
+                    <group>
+                        <field name="open_repair_id"
+                               invisible="not open_repair_id"/>
+                        <field name="repair_cost_total"
+                               invisible="repair_count == 0"/>
+                        <field name="missing_reported_on"
+                               invisible="not missing_reported_on"/>
+                        <field name="missing_reference"
+                               invisible="not missing_reference"/>
+                        <field name="repair_count" invisible="1"/>
+                        <field name="condition_log_count" invisible="1"/>
+                    </group>
+                    <field name="condition_note" colspan="2"
+                           invisible="not condition_note"/>
+                </group>
+                <group string="Replacement"
+                       invisible="not replaces_asset_id and not replaced_by_asset_id">
+                    <group>
+                        <field name="replaces_asset_id" readonly="1"/>
+                        <field name="replacement_reason"
+                               invisible="not replaces_asset_id"/>
+                        <field name="replacement_claim_ref"
+                               invisible="not replaces_asset_id"/>
+                    </group>
+                    <group>
+                        <field name="replaced_by_asset_id" readonly="1"
+                               invisible="not replaced_by_asset_id"/>
+                        <field name="replacement_move_id" readonly="1"
+                               invisible="not replacement_move_id"/>
+                        <field name="is_replacement" invisible="1"/>
+                    </group>
+                </group>
+            </xpath>
+
+            <xpath expr="//page[last()]" position="after">
+                <page string="Condition History"
+                      invisible="condition_log_count == 0">
+                    <field name="condition_log_ids" readonly="1">
+                        <list>
+                            <field name="event_date"/>
+                            <field name="event_type"/>
+                            <field name="condition_from"/>
+                            <field name="condition_to"/>
+                            <field name="reference"/>
+                            <field name="description"/>
+                            <field name="location_id"/>
+                            <field name="repair_order_id"/>
+                            <field name="user_id"/>
+                        </list>
+                    </field>
+                </page>
+                <page string="Repairs" invisible="repair_count == 0">
+                    <field name="repair_order_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="schedule_date"/>
+                            <field name="x_repair_channel"/>
+                            <field name="x_repair_vendor_id"/>
+                            <field name="x_warranty_claim_ref"/>
+                            <field name="x_sla_status"/>
+                            <field name="x_total_repair_cost"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_fixed_asset_list_lifecycle" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.list.lifecycle</field>
+        <field name="model">custom.fixed.asset</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_list"/>
+        <field name="arch" type="xml">
+            <field name="state" position="before">
+                <field name="condition" optional="show"/>
+                <field name="repair_cost_total" optional="hide"/>
+                <field name="is_replacement" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_fixed_asset_search_lifecycle" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.search.lifecycle</field>
+        <field name="model">custom.fixed.asset</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_search"/>
+        <field name="arch" type="xml">
+            <field name="location_id" position="after">
+                <field name="condition"/>
+                <field name="equipment_id"/>
+                <field name="missing_reference"/>
+            </field>
+            <filter name="state_disposed" position="after">
+                <separator/>
+                <filter name="condition_damaged" string="Damaged"
+                        domain="[('condition', '=', 'damaged')]"/>
+                <filter name="condition_in_repair" string="Under Repair"
+                        domain="[('condition', '=', 'in_repair')]"/>
+                <filter name="condition_repaired" string="Repaired - Awaiting Return"
+                        domain="[('condition', '=', 'repaired')]"/>
+                <filter name="condition_missing" string="Missing"
+                        domain="[('condition', '=', 'missing')]"/>
+                <filter name="condition_unserviceable" string="Not Serviceable"
+                        domain="[('condition', 'not in', ('ok',))]"/>
+                <separator/>
+                <filter name="is_replacement" string="Replacement Units"
+                        domain="[('is_replacement', '=', True)]"/>
+                <filter name="no_equipment" string="No Equipment Card"
+                        domain="[('equipment_id', '=', False)]"/>
+            </filter>
+            <filter name="group_location" position="after">
+                <filter name="group_condition" string="Condition"
+                        context="{'group_by': 'condition'}"/>
+            </filter>
+        </field>
+    </record>
+
+    <record id="action_fixed_asset_unserviceable" model="ir.actions.act_window">
+        <field name="name">Damaged &amp; Missing Assets</field>
+        <field name="res_model">custom.fixed.asset</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('condition', 'not in', ('ok',))]</field>
+        <field name="context">{'search_default_group_condition': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Every unit is serviceable.</p>
+            <p>Assets reported damaged, under repair, missing or written off show up here.</p>
+        </field>
+    </record>
+</odoo>
