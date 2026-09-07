@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-07T23:04:56+00:00",
+  "generated_at": "2026-09-07T23:19:16+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "74dc1ab",
-    "branch": "HEAD"
+    "commit": "d4dc5cc",
+    "branch": "feat/arka-event-chain"
   },
   "buckets": [
     {
@@ -166,9 +166,15 @@
       "category": "Tenants/ARKA-AIM",
       "depends": 5,
       "public": false,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-09-08",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "e4d5c4c",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): Trade / Non-Trade purchases and Transfer to Asset from a Non-Trade receipt (#220)"
+        }
+      ]
     },
     {
       "module": "custom_arka_aim_seed",
@@ -222,14 +228,19 @@
       "module": "custom_arka_show_date",
       "bucket": "_tenants",
       "name": "ARKA Show Date",
-      "version": "19.0.1.6.0",
-      "summary": "Show-date, event and DP fields on quotation/SO/customer invoice, with payment terms anchored to the show date. PT ARKA only.",
+      "version": "19.0.1.7.0",
+      "summary": "Show-date and event on the whole sale-to-purchase chain, one analytic account per event, and a PO raised on the sister company straight from the sale. PT ARKA / AIM only.",
       "category": "Tenants/ARKA-AIM",
-      "depends": 4,
+      "depends": 7,
       "public": false,
-      "last_change": "2026-09-04",
-      "change_count": 9,
+      "last_change": "2026-09-08",
+      "change_count": 10,
       "changes": [
+        {
+          "sha": "d4dc5cc",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): carry the event from the customer sale through to AIM, and give it an analytic account"
+        },
         {
           "sha": "2546f07",
           "date": "2026-09-04",
@@ -264,11 +275,6 @@
           "sha": "0e89d2c",
           "date": "2026-07-17",
           "subject": "feat(reports,arka): port /opt-only runtime work onto feat/industry-packs"
-        },
-        {
-          "sha": "9984c97",
-          "date": "2026-07-07",
-          "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         }
       ]
     },
@@ -1956,8 +1962,13 @@
       "depends": 5,
       "public": true,
       "last_change": "2026-09-08",
-      "change_count": 6,
+      "change_count": 7,
       "changes": [
+        {
+          "sha": "e4d5c4c",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): Trade / Non-Trade purchases and Transfer to Asset from a Non-Trade receipt (#220)"
+        },
         {
           "sha": "74dc1ab",
           "date": "2026-09-08",
