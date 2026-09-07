@@ -1,7 +1,7 @@
 ---
 status: authored
 module: custom_asset_stock_link
-manifest_version: 19.0.1.1.0
+manifest_version: 19.0.1.2.0
 ---
 
 # custom_asset_stock_link
@@ -106,6 +106,19 @@ location's mapped stock location as the destination (stable across the loan,
 unlike the unit's current position).
 
 ## Gotchas
+
+**A serial's position is the net per location, not the largest positive quant
+row.** Up to 19.0.1.1.0 `_sync_stock_from_lots` filtered `quantity > 0` inside
+the query, so a `+1` quant was read while a `-1` sitting beside it in the same
+location was ignored — reporting the unit somewhere it was not. A badly-sourced
+picking leaves exactly that pattern, and it had **2,572 of the 3,590 ARKA-AIM
+units showing in `ARKA/Stock` when they were really in `WH/RUKO GUDANG PALEM`**.
+19.0.1.2.0 sums per (lot, location) first and discards the non-positive sums
+afterwards. Existing databases need a resync to pick up the corrected positions
+— the nightly cron gets there in batches of 2,000, or
+`scripts/tenants/arkaaim/setup_asset_lifecycle.py` does the whole register at
+once.
+
 
 - Materialisation is **idempotent per asset**: anything already carrying a
   `lot_id` is skipped, and `custom.fixed.asset` has `UNIQUE(lot_id)` from

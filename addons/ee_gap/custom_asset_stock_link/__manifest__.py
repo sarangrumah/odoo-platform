@@ -44,7 +44,7 @@ product or destination location would value the stock.
 """,
     "author": "Custom Platform",
     "category": "Inventory/Inventory",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.2.0",
     "license": "LGPL-3",
     "depends": [
         "stock",

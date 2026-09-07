@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_asset_report_missing_wizard_form" model="ir.ui.view">
+        <field name="name">custom.asset.report.missing.wizard.form</field>
+        <field name="model">custom.asset.report.missing.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Report Missing">
+                <div class="alert alert-warning" role="alert">
+                    Reporting a unit missing does not remove it from the books. It keeps
+                    depreciating until Finance derecognises it, which is the separate
+                    Write Off step.
+                </div>
+                <group>
+                    <group>
+                        <field name="event_date"/>
+                        <field name="reference" placeholder="BAP / incident report no."/>
+                        <field name="asset_count" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="move_serial"/>
+                        <field name="missing_location_id"
+                               invisible="not move_serial"/>
+                        <field name="without_serial_count" readonly="1"
+                               invisible="without_serial_count == 0"
+                               string="Units Without A Serial (skipped)"/>
+                        <field name="open_writeoff"/>
+                    </group>
+                </group>
+                <group string="Assets">
+                    <field name="asset_ids" nolabel="1">
+                        <list create="false">
+                            <field name="code"/>
+                            <field name="name"/>
+                            <field name="serial_number"/>
+                            <field name="condition"/>
+                            <field name="net_book_value"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                </group>
+                <group string="Circumstances">
+                    <field name="description" nolabel="1"
+                           placeholder="When and where the unit was last accounted for, and what has been done to find it..."/>
+                </group>
+                <footer>
+                    <button name="action_report_missing" type="object"
+                            string="Report Missing" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
