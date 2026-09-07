@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_purchase_order_form_arka_type" model="ir.ui.view">
+        <field name="name">purchase.order.form.arka.type</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <!-- Read-only once the order is numbered: the stream picked the
+                     number, so changing it afterwards would leave a PO/T order
+                     sitting in the Non-Trade stream (and vice versa). -->
+                <field name="l10n_purchase_type"
+                       widget="radio"
+                       options="{'horizontal': True}"
+                       readonly="state not in ('draft', 'sent')"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_purchase_order_tree_arka_type" model="ir.ui.view">
+        <field name="name">purchase.order.list.arka.type</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_view_tree"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="l10n_purchase_type" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_purchase_order_search_arka_type" model="ir.ui.view">
+        <field name="name">purchase.order.search.arka.type</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.view_purchase_order_filter"/>
+        <field name="arch" type="xml">
+            <filter name="my_purchases" position="before">
+                <filter string="Trade" name="arka_trade"
+                        domain="[('l10n_purchase_type', '=', 'trade')]"/>
+                <filter string="Non-Trade" name="arka_non_trade"
+                        domain="[('l10n_purchase_type', '=', 'non_trade')]"/>
+                <separator/>
+            </filter>
+            <group position="inside">
+                <filter string="Purchase Type" name="group_arka_purchase_type"
+                        context="{'group_by': 'l10n_purchase_type'}"/>
+            </group>
+        </field>
+    </record>
+
+    <!-- The Purchase Orders action and the RFQ action use DIFFERENT search views
+         (purchase_order_view_search vs view_purchase_order_filter). Both need the
+         stream filters, or the split is invisible on exactly the list where a
+         buyer looks for it. -->
+    <record id="view_purchase_order_view_search_arka_type" model="ir.ui.view">
+        <field name="name">purchase.order.select.arka.type</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_view_search"/>
+        <field name="arch" type="xml">
+            <filter name="my_Orders" position="before">
+                <filter string="Trade" name="arka_trade"
+                        domain="[('l10n_purchase_type', '=', 'trade')]"/>
+                <filter string="Non-Trade" name="arka_non_trade"
+                        domain="[('l10n_purchase_type', '=', 'non_trade')]"/>
+                <separator/>
+            </filter>
+            <group position="inside">
+                <filter string="Purchase Type" name="group_arka_purchase_type"
+                        domain="[]" context="{'group_by': 'l10n_purchase_type'}"/>
+            </group>
+        </field>
+    </record>
+</odoo>

@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-08-30T00:00:00Z
 generator: claude-code
 module: custom_asset_from_receipt
-manifest_version: 19.0.0.3.0
+manifest_version: 19.0.0.4.0
 ---
 
 # custom_asset_from_receipt
@@ -50,10 +50,13 @@ Bridge from inventory to the fixed-asset register: a validated goods receipt bec
 - `stock.picking.action_open_asset_conversion_wizard()` — done + incoming only.
 - `custom.asset.conversion.wizard._populate_lines()` / `action_confirm()` / `action_select_all()` / `action_deselect_all()`.
 - `stock.picking.action_view_fixed_assets()` / `purchase.order.action_view_fixed_assets()`.
+- `custom.asset.conversion.wizard._asset_conversion_mode_for(product)` — **extension point** (19.0.0.4.0). Which mode `product` converts in on *this* receipt, or `False` to skip it. Defaults to the product's own `_asset_conversion_mode()`; override it to capitalise on a property of the receipt rather than of the product.
+- `custom.asset.conversion.wizard._default_asset_group(line)` — **extension point** (19.0.0.4.0). Last-resort asset group, consulted only after the wizard override and the product's own group. Empty by default.
 
 ## Integration Points
 - **Depends on:** `stock`, `purchase`, `account`, `custom_accounting_asset`, `custom_rental`.
 - **Extended by:** `custom_asset_stock_link` (opposite direction).
+- **Extended by:** `custom_arka_aim_purchase_type` (Non-Trade receipts, ARKA-AIM tenant).
 - **Cross-vertical:** generic; in production it is installed on `prd_arkaaim` + `trn_arkaaim` (drone register).
 
 ## Gotchas
@@ -62,6 +65,7 @@ Bridge from inventory to the fixed-asset register: a validated goods receipt bec
 - **Serial mode still requires the serials to be assigned on the receipt** — move lines without a `lot_id` are skipped silently, so a partially-serialised receipt converts only what is serialised.
 - **`is_rental_asset` and `is_fixed_asset` are independent flags** — `is_fixed_asset` wins when both are set, so a product flagged both with `asset_tracking_mode = quantity` will NOT create rental assets.
 - **A service is refused outright** — `_populate_lines` asks `product._can_be_fixed_asset()` *before* reading the conversion mode, and a `type == 'service'` product is skipped whatever its master says. The check sits ahead of the mode lookup on purpose: a tenant override may capitalise on a criterion of the *receipt* rather than of the product (ARKA-AIM offers every unconfigured line of a Non-Trade receipt), and services now reach receipts at all via `custom_service_receipt`.
+- **The two extension points exist for tenant rules.** `custom_arka_aim_purchase_type` overrides `_asset_conversion_mode_for` so that every line of a Non-Trade goods receipt is offered pooled, and `_default_asset_group` so an unflagged opex product still lands in a group. Keep both hooks: bypassing them by copying `_populate_lines` into a tenant module would fork ~60 lines of pooling logic.
 - **Conversion does not touch stock valuation** — the assets are an accounting-side subledger; nothing here posts a journal entry. Capitalisation is whatever the PO/bill posted.
 
 ## Out of Scope
