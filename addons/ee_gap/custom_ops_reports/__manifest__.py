@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom Operational Reports",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "summary": "Operational reports for the AIM drone fleet — asset opname, "
     "event movement, spare parts, maintenance health, repair history.",
     "description": """

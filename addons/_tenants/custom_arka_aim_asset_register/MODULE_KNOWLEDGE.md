@@ -38,6 +38,59 @@ depreciation posts, and this module posts none at install (see below).
 | listing-only (no PO price) | 9 | Hub Transmitter 3, Swarm GPS 3, Tripod GPS&RTK 3 → **zero-value, flagged** |
 | **register rows** | **3,329** | 3,196 listing + 133 PO-only |
 
+## Serial numbers (`serial_number`)
+
+**What it must contain:** the physical serial printed on the unit — `24041700035`
+for a battery, `W31-20240517-1165` for a drone — *not* the client asset code
+(`AS0000868545`). Invoicing ▸ Asset ▸ Fixed Asset shows this column and the plain
+search box searches it (see below).
+
+**Why it used to show the asset code.** The register in production is built from
+the begbal `Aset Tetap` sheet, which has a `Kode Aset` column and **no serial
+column at all** — so `hooks.load_register` never wrote a serial. What filled it
+was `custom_asset_stock_link`'s materialise-into-stock wizard, which back-filled
+`serial_number = asset.code` so the opname report had something to join on. Result
+on `prd_arkaaim`: 3,590 of 3,590 serials were an exact copy of the code. That
+back-fill is gone; the wizard now writes only `lot_id` / `product_id`, and the
+report follows the FKs (`rental.asset.fixed_asset_id`, `custom.fixed.asset.lot_id`)
+instead of matching serial strings.
+
+**Where the real serials come from.** Only the superseded PO-derived register
+`data/aim_asset_register.csv` still holds them: 1,600 batteries + 1,500 drones =
+**3,100 serials**; the other 490 units (spares, tripods, support items) genuinely
+have none and stay blank. The source workbook `Listing Asset - odoo.xlsx` is no
+longer on the server.
+
+**The pairing is positional, not evidence.** The two sources share **no join key**.
+Their per-product counts match exactly (1,600/1,600, 1,500/1,500), so
+`tools/build_arkaaim_asset_serials.py` pairs them by position within a product
+group, in each file's own row order, into `data/asset_serials.csv` (`code,serial_number`).
+Deterministic and reproducible, but **arbitrary per unit** — the population and the
+values are right, the code↔serial pairing is not. Decided with the client on
+8-Sep-2026 in preference to leaving the column blank. Replace
+`data/asset_serials.csv` wholesale the day a real `Kode Aset → Serial` mapping
+arrives; no code changes needed.
+
+**Not unique.** The client's own listing repeats **8** battery serials
+(`24031100559`, `24031100561`, `24031100581`, `24031100583`, `24031100613`,
+`24031100725`, `240415000076`, `2024011301625`), so there is no uniqueness
+constraint on the field — only an index.
+
+**Loading.** `hooks.load_serial_numbers` runs from `data/seed_functions.xml` on
+every `-u`, so a database still echoing the code heals itself. It writes a serial
+only when the current value is blank or equals the asset code, and clears a
+code-echo on a unit that has no serial in the listing — a serial a human typed is
+never touched.
+
+**Searching.** `_rec_names_search = ["name", "code", "serial_number"]` makes any
+m2o picker find a unit by its serial, and the search view widens the default
+`code` field to `serial_number | code | name` so typing a serial into the plain
+search box works. Beware the two "serial" concepts in this search view:
+`serial_number` (printed on the unit) and `lot_id`, labelled **Stock Serial/Lot**,
+which is the `stock.lot` named after the asset code. That is also why the filters
+here are `has_physical_serial` / `no_physical_serial` — `custom_asset_stock_link`
+already contributes a `no_serial` filter about the lot.
+
 ## How the begbal depreciation is modelled
 
 The base model has no "opening accumulated depreciation" field. We use the fact
@@ -71,13 +124,30 @@ variances trace to the single **+34,976,845** PO-vs-GL cost gap:
 | accum depreciation | 6,786,277,059 | 6,776,493,895 | +9,783,164 (25%) |
 | net book value | 20,358,831,177 | 20,333,637,496 | +25,193,681 (75%) |
 
-Verify with `scripts/tenants/arkaaim/verify_asset_register.py`. The GL is **not**
-adjusted — the variance is surfaced for Finance.
+Verify with `scripts/tenants/arkaaim/rebuild_asset_register.py` in dry-run mode
+(the `verify_asset_register.py` this file used to point at was never committed).
+The GL is **not** adjusted — the variance is surfaced for Finance.
+
+## Inventory side
+
+The register is accounting-only: `lot_id` and `product_id` are null on every
+row as loaded. To also track where each unit physically is and which drone is
+free to rent, run
+`scripts/tenants/arkaaim/materialize_assets_to_stock.py` — it drives
+`custom_asset_stock_link`'s wizard to give each asset a serial-tracked
+zero-cost product, a `stock.lot` named after the asset code, one unit of stock
+in `WH/RUKO GUDANG PALEM` (AIM) or `WH-01/Stock` (ARKA), and a `rental.asset`.
+
+No journal entry is posted: the fleet is already capitalised here, so the stock
+side must stay at zero value. The script asserts a zero `account.move` delta and
+the wizard refuses to run if anything would value the stock. Check the result
+with `scripts/tenants/arkaaim/verify_asset_stock_link.py`.
 
 ## Idempotency
 
 - `data/seed_functions.xml` re-runs `_seed_aim_asset_register` on every `-u`
-  (upsert group + location, non-destructive).
+  (upsert group + location, non-destructive) and `_seed_aim_asset_serials`
+  (rewrite blank / code-echo serials from `data/asset_serials.csv`).
 - `post_init_hook` **skips the whole register load** if any AIM
   `custom.fixed.asset` already exists → safe to re-run / upgrade.
 - Company resolved by NAME → portable across the clone/prod databases.
@@ -88,6 +158,8 @@ adjusted — the variance is surfaced for Finance.
 - **9** listing-only units (no PO price) — value source?
 - **133** PO-only spares — capitalise as assets (current) or expense/inventory?
 - Confirm the 48-month life, the 12-months-elapsed (25%) accum, and `DEP_START`.
+- **Serial ↔ asset-code pairing is positional** (see above). A real mapping from
+  the client replaces `data/asset_serials.csv` and nothing else.
 
 ## Related
 

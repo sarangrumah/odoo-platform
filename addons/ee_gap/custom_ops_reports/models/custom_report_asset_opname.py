@@ -3,21 +3,26 @@
 
 One row per fixed-asset unit (``custom.fixed.asset``), enriched best-effort with:
 
-* **Operational state** — matched from ``rental.asset.state`` by serial number
-  (available / on_rent / maintenance / retired).
+* **Operational state** — ``rental.asset.state`` (available / on_rent /
+  maintenance / retired) of the rental unit linked to this asset.
 * **Condition** — the ``condition`` (good / damaged / partial) on the most
-  recent ``custom.bast.line`` whose lot serial matches the unit's serial.
+  recent ``custom.bast.line`` for the asset's serial/lot.
 
-Both enrichments are keyed on the serial string because there is no hard FK from
-the accounting asset register to the rental/BAST records; units with no match
-show a blank operational state / condition. This is a snapshot (no period).
+Both enrichments follow the hard FKs contributed by ``custom_asset_from_receipt``
+(``custom.fixed.asset.lot_id`` and ``.rental_asset_ids``) when they are present.
+They used to be matched on the ``serial_number`` *string* instead, which only
+worked while every unit's serial was a copy of its asset code; once the register
+carries real physical serials — many units have none at all — a string join
+silently drops rows. The string match survives only as a fallback for a database
+that has no link module installed. Units with no match show a blank operational
+state / condition. This is a snapshot (no period).
 
 ``custom.fixed.asset.serial_number`` is contributed by the ARKA tenant module
 ``custom_arka_aim_asset_register``, not by the generic asset app. This report
 does not depend on that tenant module — depending on it would drag ARKA's
 3,329-unit data seed into any database that merely wanted the report — so the
-serial is read only when the field is present, and the enrichment degrades to
-blank when it is not.
+serial is displayed only when the field is present, and the column is blank when
+it is not.
 """
 
 from odoo import models
@@ -44,30 +49,49 @@ class CustomReportAssetOpname(models.AbstractModel):
             {"header": "Condition", "field": "condition", "kind": "text", "width": 12},
         ]
 
-    def _serial_to_op_state(self, company_ids):
-        """{serial_number: rental.asset.state} for units carrying a serial."""
-        out = {}
-        assets = self.env["rental.asset"].search(
-            [("serial_number", "!=", False), ("company_id", "in", company_ids + [False])]
-        )
-        for asset in assets:
-            out.setdefault(asset.serial_number, asset.state)
-        return out
+    def _asset_to_op_state(self, assets, company_ids):
+        """{fixed asset id: rental.asset.state}, followed through the FK.
 
-    def _serial_to_condition(self, company_ids):
-        """{lot serial: latest custom.bast.line.condition}. The most recent BAST
-        line (by document date) for a given serial wins."""
-        out = {}
-        # Newest first so the first write per serial is the latest condition.
-        lines = self.env["custom.bast.line"].search(
-            [("lot_id", "!=", False)],
-            order="id desc",
-        )
-        for line in lines:
-            serial = line.lot_id.name
-            if serial and serial not in out:
-                out[serial] = line.condition
-        return out
+        Falls back to matching ``rental.asset.serial_number`` against the
+        register's serial when the linking module is not installed.
+        """
+        Rental = self.env["rental.asset"]
+        if "fixed_asset_id" in Rental._fields:
+            rentals = Rental.search(
+                [
+                    ("fixed_asset_id", "in", assets.ids),
+                    ("company_id", "in", company_ids + [False]),
+                ]
+            )
+            return {rental.fixed_asset_id.id: rental.state for rental in rentals}
+
+        if "serial_number" not in assets._fields:
+            return {}
+        by_serial = {}
+        for rental in Rental.search([("serial_number", "!=", False), ("company_id", "in", company_ids + [False])]):
+            by_serial.setdefault(rental.serial_number, rental.state)
+        return {
+            asset.id: by_serial[asset.serial_number]
+            for asset in assets
+            if asset.serial_number and asset.serial_number in by_serial
+        }
+
+    def _asset_to_condition(self, assets):
+        """{fixed asset id: latest custom.bast.line.condition}, via the lot FK.
+
+        The newest BAST line (highest id) for a lot wins. Without the lot FK the
+        register cannot be tied to a BAST at all, so the column stays blank.
+        """
+        if "lot_id" not in assets._fields:
+            return {}
+        lot_ids = [asset.lot_id.id for asset in assets if asset.lot_id]
+        if not lot_ids:
+            return {}
+        by_lot = {}
+        # Newest first so the first write per lot is the latest condition.
+        for line in self.env["custom.bast.line"].search([("lot_id", "in", lot_ids)], order="id desc"):
+            by_lot.setdefault(line.lot_id.id, line.condition)
+        return {asset.id: by_lot[asset.lot_id.id] for asset in assets if asset.lot_id and asset.lot_id.id in by_lot}
 
     def _has_serial(self):
         """The serial lives on a tenant module; it may simply not be there."""
@@ -84,18 +108,18 @@ class CustomReportAssetOpname(models.AbstractModel):
             domain.append(("state", "=", filters["state"]))
 
         has_serial = self._has_serial()
-        op_by_serial = self._serial_to_op_state(company_ids) if has_serial else {}
-        cond_by_serial = self._serial_to_condition(company_ids) if has_serial else {}
 
         state_labels = dict(self.env["custom.fixed.asset"]._fields["state"]._description_selection(self.env))
 
         assets = self.env["custom.fixed.asset"].search(domain, order="code")
+        op_by_asset = self._asset_to_op_state(assets, company_ids)
+        cond_by_asset = self._asset_to_condition(assets)
         lines = []
         n_good = n_damaged = n_on_rent = 0
         for idx, asset in enumerate(assets, start=1):
             serial = (asset.serial_number or "") if has_serial else ""
-            op_state = op_by_serial.get(serial, "")
-            condition = cond_by_serial.get(serial, "")
+            op_state = op_by_asset.get(asset.id, "")
+            condition = cond_by_asset.get(asset.id, "")
             if condition == "good":
                 n_good += 1
             elif condition == "damaged":
