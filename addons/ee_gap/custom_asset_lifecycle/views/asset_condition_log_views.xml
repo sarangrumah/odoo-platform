@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_asset_condition_log_list" model="ir.ui.view">
+        <field name="name">custom.asset.condition.log.list</field>
+        <field name="model">custom.asset.condition.log</field>
+        <field name="arch" type="xml">
+            <list string="Condition Events" create="false"
+                  decoration-danger="event_type in ('missing','write_off')"
+                  decoration-warning="event_type == 'damage'"
+                  decoration-success="event_type in ('return_service','found','repair_done')">
+                <field name="event_date"/>
+                <field name="asset_code"/>
+                <field name="asset_id"/>
+                <field name="serial_number" optional="show"/>
+                <field name="event_type"/>
+                <field name="condition_from" optional="hide"/>
+                <field name="condition_to"/>
+                <field name="reference" optional="show"/>
+                <field name="location_id" optional="hide"/>
+                <field name="repair_order_id" optional="hide"/>
+                <field name="replacement_asset_id" optional="hide"/>
+                <field name="move_id" optional="hide"/>
+                <field name="user_id" optional="hide"/>
+                <field name="company_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_asset_condition_log_form" model="ir.ui.view">
+        <field name="name">custom.asset.condition.log.form</field>
+        <field name="model">custom.asset.condition.log</field>
+        <field name="arch" type="xml">
+            <form string="Condition Event" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group string="Event">
+                            <field name="event_date"/>
+                            <field name="event_type"/>
+                            <field name="condition_from"/>
+                            <field name="condition_to"/>
+                            <field name="user_id"/>
+                            <field name="reference"/>
+                        </group>
+                        <group string="Unit">
+                            <field name="asset_id"/>
+                            <field name="asset_code"/>
+                            <field name="serial_number"/>
+                            <field name="lot_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group string="Linked Documents">
+                        <field name="picking_id"/>
+                        <field name="location_id"/>
+                        <field name="repair_order_id"/>
+                        <field name="maintenance_request_id"/>
+                        <field name="replacement_asset_id"/>
+                        <field name="move_id"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_asset_condition_log_search" model="ir.ui.view">
+        <field name="name">custom.asset.condition.log.search</field>
+        <field name="model">custom.asset.condition.log</field>
+        <field name="arch" type="xml">
+            <search string="Condition Events">
+                <field name="asset_id"/>
+                <field name="asset_code"/>
+                <field name="serial_number"/>
+                <field name="reference"/>
+                <field name="event_type"/>
+                <filter name="event_damage" string="Damage"
+                        domain="[('event_type', '=', 'damage')]"/>
+                <filter name="event_missing" string="Missing"
+                        domain="[('event_type', '=', 'missing')]"/>
+                <filter name="event_repair" string="Repair"
+                        domain="[('event_type', 'in', ('repair_start','repair_done'))]"/>
+                <filter name="event_writeoff" string="Write-Off"
+                        domain="[('event_type', '=', 'write_off')]"/>
+                <filter name="event_replaced" string="Replacement"
+                        domain="[('event_type', '=', 'replaced')]"/>
+                <separator/>
+                <filter name="this_year" string="This Year"
+                        domain="[('event_date', '&gt;=', (context_today() + relativedelta(month=1, day=1)).strftime('%Y-%m-%d'))]"/>
+                <filter name="group_event_type" string="Event Type"
+                        context="{'group_by': 'event_type'}"/>
+                <filter name="group_asset" string="Asset"
+                        context="{'group_by': 'asset_id'}"/>
+                <filter name="group_month" string="Month"
+                        context="{'group_by': 'event_date:month'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_asset_condition_log" model="ir.actions.act_window">
+        <field name="name">Asset Condition History</field>
+        <field name="res_model">custom.asset.condition.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No condition events yet.</p>
+            <p>Damage, loss, repair and replacement events appear here as they are
+               reported from the asset register.</p>
+        </field>
+    </record>
+</odoo>

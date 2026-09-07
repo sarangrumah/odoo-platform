@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_asset_replacement_wizard_form" model="ir.ui.view">
+        <field name="name">custom.asset.replacement.wizard.form</field>
+        <field name="model">custom.asset.replacement.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Register Replacement Asset">
+                <div class="alert alert-info" role="alert">
+                    The replacement becomes company property, so it is capitalised at
+                    fair market value with the credit going to compensation income.
+                    Derecognising the unit it replaces is a separate step - use Write Off
+                    on that asset.
+                </div>
+                <group>
+                    <group string="Replaces">
+                        <field name="replaced_asset_id"/>
+                        <field name="replaced_condition"/>
+                        <field name="replaced_state"/>
+                        <field name="replaced_net_book_value"/>
+                        <field name="replacement_reason"/>
+                        <field name="claim_ref" placeholder="Client claim / correspondence ref."/>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="company_id" invisible="1"/>
+                    </group>
+                    <group string="New Unit">
+                        <field name="name"/>
+                        <field name="code" placeholder="Leave empty for the next sequence number"/>
+                        <field name="serial_number"/>
+                        <field name="acquisition_date"/>
+                        <field name="market_value"/>
+                        <field name="useful_life_months"/>
+                    </group>
+                </group>
+                <group>
+                    <group string="Assignment">
+                        <field name="group_id"/>
+                        <field name="location_id"/>
+                        <field name="custodian_id"/>
+                        <field name="confirm_asset"/>
+                    </group>
+                    <group string="Acquisition Entry">
+                        <field name="post_journal_entry"/>
+                        <field name="income_account_id"
+                               invisible="not post_journal_entry"
+                               required="post_journal_entry"/>
+                        <field name="journal_id"
+                               invisible="not post_journal_entry"/>
+                    </group>
+                </group>
+                <div class="alert alert-warning" role="alert"
+                     invisible="post_journal_entry">
+                    The register posts no acquisition entry of its own. With this
+                    unticked, the asset register will grow while the general ledger
+                    stands still - only do this if the entry has already been booked
+                    by hand.
+                </div>
+                <footer>
+                    <button name="action_register" type="object"
+                            string="Register Replacement" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

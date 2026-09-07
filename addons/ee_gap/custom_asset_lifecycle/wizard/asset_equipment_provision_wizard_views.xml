@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_asset_equipment_provision_wizard_form" model="ir.ui.view">
+        <field name="name">custom.asset.equipment.provision.wizard.form</field>
+        <field name="model">custom.asset.equipment.provision.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Create Equipment Cards">
+                <div class="alert alert-info" role="alert">
+                    An equipment card is what failure and repair history hangs off. Without
+                    one, a repair order has nothing to record against and the unit's history
+                    never accumulates. Assets that already have a card are skipped.
+                </div>
+                <group>
+                    <field name="category_id"/>
+                    <field name="pending_count" readonly="1" string="Cards To Create"/>
+                    <field name="existing_count" readonly="1" string="Already Have One"/>
+                </group>
+                <group string="Assets">
+                    <field name="asset_ids" nolabel="1">
+                        <list create="false">
+                            <field name="code"/>
+                            <field name="name"/>
+                            <field name="serial_number"/>
+                            <field name="equipment_id"/>
+                        </list>
+                    </field>
+                </group>
+                <footer>
+                    <button name="action_provision" type="object"
+                            string="Create Cards" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_asset_equipment_provision_wizard" model="ir.actions.act_window">
+        <field name="name">Create Equipment Cards</field>
+        <field name="res_model">custom.asset.equipment.provision.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
