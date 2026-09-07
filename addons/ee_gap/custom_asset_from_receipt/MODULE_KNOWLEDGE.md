@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-08-30T00:00:00Z
 generator: claude-code
 module: custom_asset_from_receipt
-manifest_version: 19.0.0.2.0
+manifest_version: 19.0.0.3.0
 ---
 
 # custom_asset_from_receipt
@@ -61,6 +61,7 @@ Bridge from inventory to the fixed-asset register: a validated goods receipt bec
 - **Pooled aggregation keys on (product, purchase line)** — two PO lines for the same product on one receipt deliberately produce two assets, because their unit costs may differ. A receipt with no PO behind it falls back to `standard_price`, which is 0.0 on a product nobody has costed: check the wizard's `unit_cost` before confirming.
 - **Serial mode still requires the serials to be assigned on the receipt** — move lines without a `lot_id` are skipped silently, so a partially-serialised receipt converts only what is serialised.
 - **`is_rental_asset` and `is_fixed_asset` are independent flags** — `is_fixed_asset` wins when both are set, so a product flagged both with `asset_tracking_mode = quantity` will NOT create rental assets.
+- **A service is refused outright** — `_populate_lines` asks `product._can_be_fixed_asset()` *before* reading the conversion mode, and a `type == 'service'` product is skipped whatever its master says. The check sits ahead of the mode lookup on purpose: a tenant override may capitalise on a criterion of the *receipt* rather than of the product (ARKA-AIM offers every unconfigured line of a Non-Trade receipt), and services now reach receipts at all via `custom_service_receipt`.
 - **Conversion does not touch stock valuation** — the assets are an accounting-side subledger; nothing here posts a journal entry. Capitalisation is whatever the PO/bill posted.
 
 ## Out of Scope

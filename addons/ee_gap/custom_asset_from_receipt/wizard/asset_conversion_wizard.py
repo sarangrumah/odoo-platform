@@ -41,6 +41,13 @@ class AssetConversionWizard(models.TransientModel):
         pooled = {}
         for ml in self.picking_id.move_line_ids:
             product = ml.product_id
+            # Asked of the product itself, before its conversion mode is read: a
+            # tenant override may capitalise on a criterion of the *receipt* and
+            # answer for a product it was never asked about, and services now
+            # reach receipts at all (``custom_service_receipt``). Nothing that
+            # cannot be an asset may get as far as being offered as one.
+            if not product._can_be_fixed_asset():
+                continue
             mode = product._asset_conversion_mode()
             if not mode:
                 continue

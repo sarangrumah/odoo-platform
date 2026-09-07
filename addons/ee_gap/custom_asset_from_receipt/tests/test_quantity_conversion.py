@@ -171,3 +171,53 @@ class TestPooledAssetConversion(TransactionCase):
         # not a wall.
         assets[0].with_context(allow_serial_merge=True)._merge_assets_into_pool(assets[1:])
         self.assertAlmostEqual(assets[0].quantity, 2.0, places=2)
+
+    def test_05_a_service_is_never_offered_as_an_asset(self):
+        """Services reach receipts now (``custom_service_receipt``); they are
+        still not things that can be capitalised."""
+        service = self.env["product.product"].create(
+            {
+                "name": "Drone Show Operational - Manpower",
+                "type": "service",
+                # Flagged as hard as a product master can be: the guard must hold
+                # regardless, because the register is a subledger of things.
+                "is_fixed_asset": True,
+                "asset_tracking_mode": "quantity",
+                "asset_group_id": self.group.id,
+            }
+        )
+        self.assertFalse(service._can_be_fixed_asset())
+
+        supplier = self.env.ref("stock.stock_location_suppliers")
+        dest = self.warehouse.lot_stock_id
+        picking = self.env["stock.picking"].create(
+            {
+                "picking_type_id": self.warehouse.in_type_id.id,
+                "location_id": supplier.id,
+                "location_dest_id": dest.id,
+                "move_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": product.id,
+                            "product_uom_qty": qty,
+                            "location_id": supplier.id,
+                            "location_dest_id": dest.id,
+                        },
+                    )
+                    for product, qty in ((self.product, 5.0), (service, 1.0))
+                ],
+            }
+        )
+        picking.action_confirm()
+        for move in picking.move_ids:
+            move.quantity = move.product_uom_qty
+            move.picked = True
+        picking.button_validate()
+        self.assertEqual(picking.state, "done")
+        self.assertEqual(picking.move_ids.product_id, self.product | service)
+
+        wizard = self.env["custom.asset.conversion.wizard"].create({"picking_id": picking.id})
+        wizard._populate_lines()
+        self.assertEqual(wizard.line_ids.product_id, self.product, "only the good may be capitalised")
