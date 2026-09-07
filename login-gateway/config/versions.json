@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-07T22:53:21+00:00",
+  "generated_at": "2026-09-07T23:04:56+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "8c3f352",
+    "commit": "74dc1ab",
     "branch": "HEAD"
   },
   "buckets": [
@@ -156,6 +156,19 @@
           "subject": "feat(arka_aim): opening balances seed module (31 May 2026)"
         }
       ]
+    },
+    {
+      "module": "custom_arka_aim_purchase_type",
+      "bucket": "_tenants",
+      "name": "ARKA-AIM Trade / Non-Trade Purchases",
+      "version": "19.0.1.0.1",
+      "summary": "Trade vs Non-Trade purchase stream for ARKA-AIM: own PO numbering, AP / GR-IR account routing, and Transfer to Asset on a Non-Trade goods receipt.",
+      "category": "Tenants/ARKA-AIM",
+      "depends": 5,
+      "public": false,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
     },
     {
       "module": "custom_arka_aim_seed",
@@ -1937,14 +1950,19 @@
       "module": "custom_asset_from_receipt",
       "bucket": "ee_gap",
       "name": "Custom Asset From Receipt",
-      "version": "19.0.0.3.0",
+      "version": "19.0.0.4.0",
       "summary": "Convert received goods into Fixed Assets from the receipt — one asset per serial number, or one pooled asset for the received quantity",
       "category": "Inventory/Inventory",
       "depends": 5,
       "public": true,
-      "last_change": "2026-08-30",
-      "change_count": 5,
+      "last_change": "2026-09-08",
+      "change_count": 6,
       "changes": [
+        {
+          "sha": "74dc1ab",
+          "date": "2026-09-08",
+          "subject": "feat(purchase): receive a service on a goods receipt (#219)"
+        },
         {
           "sha": "cde92d6",
           "date": "2026-08-30",
@@ -4636,9 +4654,15 @@
       "category": "Inventory/Purchase",
       "depends": 1,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-09-08",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "74dc1ab",
+          "date": "2026-09-08",
+          "subject": "feat(purchase): receive a service on a goods receipt (#219)"
+        }
+      ]
     },
     {
       "module": "custom_sign",

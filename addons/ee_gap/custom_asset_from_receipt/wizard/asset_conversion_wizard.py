@@ -29,6 +29,25 @@ class AssetConversionWizard(models.TransientModel):
     )
 
     # ------------------------------------------------------------------
+    # Extension points
+    # ------------------------------------------------------------------
+    def _asset_conversion_mode_for(self, product):
+        """Conversion mode for ``product`` on this receipt, or ``False`` to skip.
+
+        Defaults to the product's own configuration. Overridden by tenant modules
+        that capitalise on a criterion of the *receipt* rather than of the product
+        — e.g. ARKA-AIM offers every line of a Non-Trade goods receipt.
+        """
+        self.ensure_one()
+        return product._asset_conversion_mode()
+
+    def _default_asset_group(self, line):
+        """Last-resort asset group when neither the wizard override nor the
+        product carries one. Empty recordset by default."""
+        self.ensure_one()
+        return self.env["custom.fixed.asset.group"].browse()
+
+    # ------------------------------------------------------------------
     # Populate lines from picking move_line_ids
     # ------------------------------------------------------------------
     def _populate_lines(self):
@@ -48,7 +67,7 @@ class AssetConversionWizard(models.TransientModel):
             # cannot be an asset may get as far as being offered as one.
             if not product._can_be_fixed_asset():
                 continue
-            mode = product._asset_conversion_mode()
+            mode = self._asset_conversion_mode_for(product)
             if not mode:
                 continue
             if ml.quantity <= 0:
@@ -152,7 +171,9 @@ class AssetConversionWizard(models.TransientModel):
         if not lines:
             raise UserError(_("No lines selected for conversion."))
         for line in lines:
-            group = self.asset_group_id or line.product_id.product_tmpl_id.asset_group_id
+            group = (
+                self.asset_group_id or line.product_id.product_tmpl_id.asset_group_id or self._default_asset_group(line)
+            )
             if not group:
                 raise UserError(
                     _('Product "%s" has no Asset Group. Set one on the product or in the wizard override.')
