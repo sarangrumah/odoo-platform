@@ -153,3 +153,37 @@ class TestServiceReceipt(PurchaseTestCommon):
         self.assertEqual(po.order_line.qty_to_invoice, 2.0)
         bill = self._create_bill(purchase_order=po)
         self.assertEqual(bill.invoice_line_ids.quantity, 2.0)
+
+    # ------------------------------------------------------------------
+    # Flagging a product must not disturb orders already in flight
+    # ------------------------------------------------------------------
+    def test_flagging_leaves_a_confirmed_line_alone(self):
+        """The regression that mattered on prd_arkaaim.
+
+        Five Manpower lines and one Insurance line were confirmed and part-billed
+        with a hand-typed received quantity and no receipt behind them. Flagging
+        the product recomputes every line that ever used it -- and taking those
+        over would zero the typed quantity, leaving three orders unbillable and
+        three billed for more than they had received.
+        """
+        po = self._create_purchase(self.plain_service, quantity=1.0)
+        po.order_line.qty_received = 1.0
+        self.assertEqual(po.order_line.qty_received_method, "manual")
+        self.assertFalse(po.order_line.move_ids)
+
+        self.plain_service.receive_on_gr = True
+
+        self.assertEqual(po.order_line.qty_received_method, "manual")
+        self.assertEqual(po.order_line.qty_received, 1.0, "a typed quantity must survive")
+        self.assertEqual(po.order_line.qty_to_invoice, 1.0, "the order must stay billable")
+
+    def test_flagging_takes_over_a_line_that_has_a_receipt(self):
+        """A confirmed line that DOES have a receipt is a different case: the
+        moves can answer for the quantity, so they should."""
+        self.plain_service.receive_on_gr = True
+        po = self._create_purchase(self.plain_service, quantity=2.0)
+        self.assertEqual(po.order_line.qty_received_method, "stock_moves")
+        self.assertTrue(po.order_line.move_ids)
+
+        self._receive(po)
+        self.assertEqual(po.order_line.qty_received, 2.0)
