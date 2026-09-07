@@ -27,11 +27,28 @@ class PurchaseOrderLine(models.Model):
     # ------------------------------------------------------------------
     # Re-declaring @api.depends REPLACES the inherited set, so the base triggers
     # are relisted here alongside the flag that now feeds the same compute.
-    @api.depends("product_id", "product_id.type", "product_id.receive_on_gr")
+    @api.depends(
+        "product_id",
+        "product_id.type",
+        "product_id.receive_on_gr",
+        "order_id.state",
+        "move_ids",
+    )
     def _compute_qty_received_method(self):
         super()._compute_qty_received_method()
         for line in self:
-            if line._is_service_receipt_line():
+            if not line._is_service_receipt_line():
+                continue
+            # Only take the received quantity over where a receipt can actually
+            # supply it. Flagging a product recomputes every line that ever used
+            # it, confirmed orders included -- and a line confirmed before the
+            # flag existed has no receipt and can never be given one, because
+            # core only builds them at confirmation. Switching it would zero a
+            # quantity somebody typed, leaving the order unbillable, or
+            # bill-negative where it was already invoiced. Core takes the same
+            # care: purchase_stock's own install hook recomputes every order
+            # EXCEPT the confirmed ones.
+            if line.order_id.state in ("draft", "sent") or line.move_ids:
                 line.qty_received_method = "stock_moves"
 
     # ------------------------------------------------------------------

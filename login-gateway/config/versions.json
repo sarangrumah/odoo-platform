@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-07T23:20:14+00:00",
+  "generated_at": "2026-09-07T23:42:59+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "16e7fe0",
-    "branch": "feat/asset-lifecycle-v2"
+    "commit": "9db6512",
+    "branch": "HEAD"
   },
   "buckets": [
     {
@@ -4684,7 +4684,7 @@
       "module": "custom_service_receipt",
       "bucket": "ee_gap",
       "name": "Custom Service Receipt",
-      "version": "19.0.0.1.0",
+      "version": "19.0.0.2.0",
       "summary": "Receive purchased services on a goods receipt, so billing is gated by an accepted quantity",
       "category": "Inventory/Purchase",
       "depends": 1,
