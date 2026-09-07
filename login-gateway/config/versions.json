@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-07T23:04:56+00:00",
+  "generated_at": "2026-09-07T23:20:14+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "74dc1ab",
-    "branch": "HEAD"
+    "commit": "16e7fe0",
+    "branch": "feat/asset-lifecycle-v2"
   },
   "buckets": [
     {
@@ -166,9 +166,15 @@
       "category": "Tenants/ARKA-AIM",
       "depends": 5,
       "public": false,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-09-08",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "e4d5c4c",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): Trade / Non-Trade purchases and Transfer to Asset from a Non-Trade receipt (#220)"
+        }
+      ]
     },
     {
       "module": "custom_arka_aim_seed",
@@ -1956,8 +1962,13 @@
       "depends": 5,
       "public": true,
       "last_change": "2026-09-08",
-      "change_count": 6,
+      "change_count": 7,
       "changes": [
+        {
+          "sha": "e4d5c4c",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): Trade / Non-Trade purchases and Transfer to Asset from a Non-Trade receipt (#220)"
+        },
         {
           "sha": "74dc1ab",
           "date": "2026-09-08",
@@ -1991,17 +2002,41 @@
       ]
     },
     {
-      "module": "custom_asset_stock_link",
+      "module": "custom_asset_lifecycle",
       "bucket": "ee_gap",
-      "name": "Custom Asset Stock Link",
-      "version": "19.0.1.1.0",
-      "summary": "Materialise existing fixed assets into inventory as serial numbers so each unit can be located, moved and rented -- without any stock valuation GL impact",
-      "category": "Inventory/Inventory",
+      "name": "Custom Asset Lifecycle",
+      "version": "19.0.1.0.0",
+      "summary": "Damage / missing / repair / replacement lifecycle on top of the fixed-asset register, with the history attached to each serial",
+      "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
       "last_change": "2026-09-08",
       "change_count": 1,
       "changes": [
+        {
+          "sha": "16e7fe0",
+          "date": "2026-09-08",
+          "subject": "feat(assets): damage, missing, repair and replacement lifecycle on the register"
+        }
+      ]
+    },
+    {
+      "module": "custom_asset_stock_link",
+      "bucket": "ee_gap",
+      "name": "Custom Asset Stock Link",
+      "version": "19.0.1.2.0",
+      "summary": "Materialise existing fixed assets into inventory as serial numbers so each unit can be located, moved and rented -- without any stock valuation GL impact",
+      "category": "Inventory/Inventory",
+      "depends": 5,
+      "public": true,
+      "last_change": "2026-09-08",
+      "change_count": 2,
+      "changes": [
+        {
+          "sha": "c1ef37b",
+          "date": "2026-09-08",
+          "subject": "fix(assets): read a serial's physical position from the net, not the largest quant"
+        },
         {
           "sha": "8c3f352",
           "date": "2026-09-08",
