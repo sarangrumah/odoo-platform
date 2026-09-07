@@ -33,7 +33,7 @@ Inert until a product is flagged, so it is safe to install anywhere.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Inventory/Purchase",
-    "version": "19.0.0.1.0",
+    "version": "19.0.0.2.0",
     "license": "LGPL-3",
     "depends": ["purchase_stock"],
     "capability_tags": ["purchase", "inventory", "three-way-match"],

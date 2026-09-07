@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-09-08T00:00:00Z
 generator: claude-code
 module: custom_service_receipt
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_service_receipt
@@ -67,6 +67,27 @@ Why this is safe on the stock and accounting side, all verified in core:
   `stock.move.line` (`[('type','!=','service')]`) are **field-level UI domains
   only**, not constraints; widening them by exactly the flag is enough to let a
   warehouse user add a flagged service to a transfer by hand.
+
+## Flagging a product that already has orders in flight
+`_compute_qty_received_method` recomputes **every line that ever used the product**,
+confirmed orders included. Taking those over is destructive: a line confirmed
+before the flag existed has no receipt and can never be given one, because core
+only builds receipts at confirmation. Switching it would zero a hand-typed
+`qty_received`, leaving the order unbillable — or bill-negative where it was
+already invoiced.
+
+So the override only claims a line when a receipt can actually answer for it:
+`order_id.state in ('draft', 'sent')` **or** the line already has `move_ids`.
+Core takes the same care — `purchase_stock._update_qty_received_method()`
+recomputes every order *except* the confirmed ones.
+
+Two things the flag still changes on live orders, by design and unavoidably:
+- **`purchase_method` moves to `receive`.** A line already billed on ordered
+  quantities with nothing received goes to `qty_to_invoice = -1`. That is the
+  policy change surfacing an inconsistency, not a bug — record the receipt or
+  the received quantity first.
+- **A confirmed line that already has an open receipt stops being billable until
+  that receipt is validated.** That is the whole point of the module.
 
 ## Configuration
 On the product (Purchase tab, next to the control policy): tick **Receive on
