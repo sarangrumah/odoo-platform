@@ -10,7 +10,7 @@ sells the show to the customer and buys it from its sister) and the seller
 from datetime import date
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests import tagged
 
 
@@ -312,3 +312,53 @@ class TestArkaEventChain(AccountTestInvoicingCommon):
         self.assertFalse(
             any("cannot put them on the mirrored" in (body or "") for body in purchase.message_ids.mapped("body"))
         )
+
+    # ------------------------------------------------------------------
+    # Sale product vs purchase product ("Jasa" sold, "Sewa" bought)
+    # ------------------------------------------------------------------
+    def _rental_twin(self):
+        return self.env["product.product"].create(
+            {"name": "Sewa Drone Show 250 Unit", "type": "service", "purchase_ok": True}
+        )
+
+    def test_purchase_order_carries_the_paired_product(self):
+        rental = self._rental_twin()
+        self.product.product_tmpl_id.x_custom_ic_purchase_product_id = rental
+        sale = self._sale()
+        action = sale.action_custom_create_ic_purchase_order()
+        purchase = self.env["purchase.order"].browse(action["res_id"])
+        self.assertEqual(purchase.order_line.product_id, rental)
+        # The sale still sells what it sold.
+        self.assertEqual(sale.order_line.product_id, self.product)
+
+    def test_quantities_and_the_event_survive_the_swap(self):
+        rental = self._rental_twin()
+        self.product.product_tmpl_id.x_custom_ic_purchase_product_id = rental
+        sale = self._sale()
+        action = sale.action_custom_create_ic_purchase_order()
+        purchase = self.env["purchase.order"].browse(action["res_id"])
+        self.assertEqual(purchase.order_line.product_qty, 2)
+        self.assertEqual(purchase.order_line.product_uom_id, rental.uom_id)
+        self.assertEqual(purchase.x_custom_event_name, "Soekarno Cup")
+        account = self._account_of(sale)
+        self.assertEqual(purchase.order_line.analytic_distribution, {str(account.id): 100.0})
+
+    def test_an_unpaired_product_is_still_bought_as_itself(self):
+        sale = self._sale()
+        action = sale.action_custom_create_ic_purchase_order()
+        purchase = self.env["purchase.order"].browse(action["res_id"])
+        self.assertEqual(purchase.order_line.product_id, self.product)
+
+    def test_a_product_cannot_be_purchased_as_itself(self):
+        with self.assertRaises(ValidationError):
+            self.product.product_tmpl_id.x_custom_ic_purchase_product_id = self.product
+
+    def test_the_pairing_is_resolved_one_hop_only(self):
+        """A -> B -> C must buy B, never walk on to C."""
+        middle = self._rental_twin()
+        far = self.env["product.product"].create(
+            {"name": "Sewa Something Else", "type": "service", "purchase_ok": True}
+        )
+        middle.product_tmpl_id.x_custom_ic_purchase_product_id = far
+        self.product.product_tmpl_id.x_custom_ic_purchase_product_id = middle
+        self.assertEqual(self.product._custom_ic_purchase_product(), middle)

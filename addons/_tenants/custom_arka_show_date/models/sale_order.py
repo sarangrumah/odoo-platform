@@ -258,14 +258,24 @@ class SaleOrder(models.Model):
                 continue
             if not line.product_id:
                 continue
+            # ARKA sells "Jasa Drone Show 250 Unit" and buys "Sewa Drone Show
+            # 250 Unit" for it. Where that pairing is recorded on the product,
+            # the purchase order carries what is actually bought; otherwise it
+            # carries what was sold.
+            purchased = line.product_id._custom_ic_purchase_product()
             order_lines.append(
                 (
                     0,
                     0,
                     {
-                        "product_id": line.product_id.id,
+                        "product_id": purchased.id,
                         "product_qty": line.product_uom_qty,
-                        "product_uom_id": line.product_uom_id.id,
+                        # The substitute brings its own unit of measure: the
+                        # sold and the bought product need not be counted the
+                        # same way, and a foreign UoM is rejected outright.
+                        "product_uom_id": (
+                            line.product_uom_id.id if purchased == line.product_id else purchased.uom_id.id
+                        ),
                         "sequence": line.sequence,
                         # name / price_unit / taxes / date_planned are left to
                         # the core computes, which read the vendor's own

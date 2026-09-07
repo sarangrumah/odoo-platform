@@ -1,5 +1,6 @@
 from . import arka_event_mixin
 from . import account_analytic_account
+from . import product_template
 from . import res_company
 from . import sale_order
 from . import purchase_order

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-07T23:19:16+00:00",
+  "generated_at": "2026-09-07T23:32:02+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "d4dc5cc",
+    "commit": "7ab36fe",
     "branch": "feat/arka-event-chain"
   },
   "buckets": [
@@ -228,7 +228,7 @@
       "module": "custom_arka_show_date",
       "bucket": "_tenants",
       "name": "ARKA Show Date",
-      "version": "19.0.1.7.0",
+      "version": "19.0.1.8.0",
       "summary": "Show-date and event on the whole sale-to-purchase chain, one analytic account per event, and a PO raised on the sister company straight from the sale. PT ARKA / AIM only.",
       "category": "Tenants/ARKA-AIM",
       "depends": 7,

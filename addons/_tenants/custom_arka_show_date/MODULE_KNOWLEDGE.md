@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-06-09T00:00:00Z
 generator: hand-authored
 module: custom_arka_show_date
-manifest_version: 19.0.1.7.0
+manifest_version: 19.0.1.8.0
 ---
 
 # custom_arka_show_date
@@ -106,6 +106,38 @@ Two deliberate choices:
   stop the PO from mirroring into AIM — the opposite of the point. Hence
   `x_custom_event_source_so_id`.
 
+## Sale Product vs Purchase Product (1.8+)
+The client runs two catalogues for one show: the customer order carries the
+*Jasa* service ARKA sells, the purchase order on AIM carries the matching *Sewa*
+rental AIM invoices back.
+
+    Jasa Drone Show 250 Unit   (sold)   ->   Sewa Drone Show 250 Unit   (bought)
+
+`product.template.x_custom_ic_purchase_product_id` ("Purchased As", shown next
+to Purchase-ok on the product form) records the pairing, and
+`action_custom_create_ic_purchase_order()` swaps the product when it builds the
+purchase line — carrying the substitute's own UoM, since the two sides need not
+be counted the same way. Resolution is **one hop only** (`product.product.
+_custom_ic_purchase_product()`): a chain would walk the buyer to a product
+nobody chose and a cycle would hang. An unpaired product is still bought as
+itself, so the field is optional everywhere.
+
+Odoo has no native sale-to-purchase substitution — `product.supplierinfo` prices
+a product from a vendor, it does not replace it — which is why this is a field
+and not a configuration of something existing.
+
+Side effect worth knowing: the *Sewa* products carry vendor pricing, so a paired
+line arrives on the purchase order **with a price**, where an unpaired one
+arrives at 0.
+
+`scripts/tenants/arkaaim/map_sale_to_purchase_products.py` fills the field from
+the names already in the DB, matching on the **unit count** rather than the
+words — the client writes the rental side three ways ("Sewa Drone Show 1500
+Unit", "Sewa Drone 1000 Unit", "Sewa Drone 500 Unit") and only the number is
+stable. It refuses to guess: no number, no counterpart, or more than one
+candidate is reported and left for a human. Existing pairings are never
+overwritten.
+
 ## Analytic Account per Event (1.7+)
 `custom.arka.event.mixin` (models/arka_event_mixin.py) is inherited by
 `sale.order`, `purchase.order` and `account.move`. It concatenates the event,
@@ -159,6 +191,8 @@ only. `profit_loss_event` is registered in `REPORT_MODEL_MAP` (models/__init__)
   `x_custom_event_source_so_id`. Overrides `_prepare_invoice`,
   `_custom_create_ic_mirror_so`, `button_confirm`.
 - `account.analytic.account` (inherited) — `x_custom_event_key` + UNIQUE.
+- `product.template` / `product.product` (inherited) —
+  `x_custom_ic_purchase_product_id` + `_custom_ic_purchase_product()`.
 - `custom.report.profit.loss.event` — P&L pivoted per event analytic account.
 - `sale.order` (inherited) — `x_custom_show_date` (Date),
   `x_custom_show_date_required` (computed view-driver). Overrides
@@ -211,7 +245,9 @@ confirm; the gate keeping everything inert; the "Tag Event" button touching
 only `display_type == 'product'` lines; the PO raised from the sale (event,
 lines, back-link, tagging, and that it does NOT inherit the customer price);
 the mirrored AIM order carrying the event fields and landing on the same
-analytic account; the per-Event P&L columns.
+analytic account; the per-Event P&L columns; and the sale→purchase product
+pairing — swapped on the purchase order, quantities and event intact, one hop
+only, unpaired products bought as themselves, no self-pairing.
 
 `tests/test_show_date.py` (`AccountTestInvoicingCommon`): propagation SO→invoice,
 required-only-when-flag-on, due date anchored to show date (show+30, not

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA Show Date",
-    "version": "19.0.1.7.0",
+    "version": "19.0.1.8.0",
     "summary": "Show-date and event on the whole sale-to-purchase chain, one "
     "analytic account per event, and a PO raised on the sister company "
     "straight from the sale. PT ARKA / AIM only.",
@@ -85,6 +85,20 @@ not the customer's price. Confirming the draft then triggers the existing PO ->
 SO mirror, so one sale produces the whole chain: ARKA sale -> ARKA purchase ->
 AIM sale, all naming the same event.
 
+Sale product vs purchase product
+--------------------------------
+The client keeps two catalogues for one show: the customer order carries the
+*Jasa* product ARKA sells, the purchase order on AIM carries the matching *Sewa*
+rental. ``product.template.x_custom_ic_purchase_product_id`` ("Purchased As")
+records that pairing, and the generated purchase order swaps the product::
+
+    Jasa Drone Show 250 Unit  (sold)  ->  Sewa Drone Show 250 Unit  (bought)
+
+Odoo has no native sale-to-purchase substitution — ``product.supplierinfo``
+prices a product from a vendor, it does not replace it. Resolution is one hop
+only and falls back to the product itself, so an unpaired product still buys as
+itself.
+
 Analytic account per event
 --------------------------
 For companies with ``res.company.x_custom_event_tracking_enabled``, sales
@@ -134,6 +148,7 @@ module is inert.
         "data/analytic_plan.xml",
         "views/res_company_views.xml",
         "views/sale_order_views.xml",
+        "views/product_views.xml",
         "views/purchase_order_views.xml",
         "views/account_move_views.xml",
         "views/profit_loss_wizard_views.xml",
