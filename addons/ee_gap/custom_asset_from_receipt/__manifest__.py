@@ -19,7 +19,7 @@ are fine in this mode — no serial numbers required.
 """,
     "author": "Custom Platform",
     "category": "Inventory/Inventory",
-    "version": "19.0.0.2.0",
+    "version": "19.0.0.3.0",
     "license": "LGPL-3",
     "depends": [
         "stock",

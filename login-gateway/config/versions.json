@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-07T22:45:01+00:00",
+  "generated_at": "2026-09-07T22:53:21+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "effee9d",
+    "commit": "8c3f352",
     "branch": "HEAD"
   },
   "buckets": [
@@ -1937,7 +1937,7 @@
       "module": "custom_asset_from_receipt",
       "bucket": "ee_gap",
       "name": "Custom Asset From Receipt",
-      "version": "19.0.0.2.0",
+      "version": "19.0.0.3.0",
       "summary": "Convert received goods into Fixed Assets from the receipt — one asset per serial number, or one pooled asset for the received quantity",
       "category": "Inventory/Inventory",
       "depends": 5,
@@ -1981,9 +1981,15 @@
       "category": "Inventory/Inventory",
       "depends": 5,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-09-08",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "8c3f352",
+          "date": "2026-09-08",
+          "subject": "feat(assets): track a fixed asset as a serial in the warehouse, at zero value (#218)"
+        }
+      ]
     },
     {
       "module": "custom_attendance",
@@ -4620,6 +4626,19 @@
           "subject": "feat(retail-import): X-Store vs Odoo reconciliation report"
         }
       ]
+    },
+    {
+      "module": "custom_service_receipt",
+      "bucket": "ee_gap",
+      "name": "Custom Service Receipt",
+      "version": "19.0.0.1.0",
+      "summary": "Receive purchased services on a goods receipt, so billing is gated by an accepted quantity",
+      "category": "Inventory/Purchase",
+      "depends": 1,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
     },
     {
       "module": "custom_sign",
