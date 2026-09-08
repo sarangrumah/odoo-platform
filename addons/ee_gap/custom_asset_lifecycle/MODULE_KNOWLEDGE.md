@@ -1,7 +1,7 @@
 ---
 status: authored
 module: custom_asset_lifecycle
-manifest_version: 19.0.1.0.0
+manifest_version: 19.0.1.1.0
 ---
 
 # custom_asset_lifecycle
@@ -125,6 +125,16 @@ which fails the bulk provisioning partway through the fleet. The asset code is
 unique per company and is already what each unit's `stock.lot` is named. The
 physical serial goes into the note and `partner_ref`.
 
+**Destinations must belong to the asset's own company.** Warehouse codes are not
+unique across companies, so resolving `DMG` by code alone hands company 1's damage
+warehouse to company 2 — which is exactly what the first production run of
+`setup_asset_lifecycle.py` did to PT Aero Reksa Kreasi Angkasa. Stock then refuses
+the transfer with a generic company-inconsistency error, in front of an operator
+reporting a broken unit. Since 19.0.1.1.0 a constraint on `res.company` rejects the
+configuration outright, the wizards name both companies if it happens anyway, and
+the script resolves per company and creates a location for a company that has no
+warehouse of its own.
+
 **Moving a serial posts nothing.** These units are already capitalised. They
 live in the *Fixed Assets (Non-Valuated)* category at zero cost, so none of the
 three conditions in `stock_account`'s `_should_create_account_move()` can be
@@ -156,7 +166,7 @@ them, because write-offs and replacements refuse to post without them.
 
 ## Tests
 
-`tests/test_asset_lifecycle.py` — 20 tests. Notably: depreciation continues
+`tests/test_asset_lifecycle.py` — 23 tests. Notably: depreciation continues
 through damage and repair; a write-off closes the condition and stops it;
 replacement posts the acquisition entry at fair value and gives the new unit a
 full life; warranty is excluded from lifetime cost; a serial with an offsetting

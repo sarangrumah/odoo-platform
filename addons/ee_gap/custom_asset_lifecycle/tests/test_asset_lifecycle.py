@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -581,3 +581,50 @@ class TestAssetLifecycle(TransactionCase):
         self.assertNotEqual(first.equipment_id.serial_no, second.equipment_id.serial_no)
         self.assertIn("24041700035", first.equipment_id.note or "")
         self.assertEqual(first.equipment_id.partner_ref, "24041700035")
+
+    # ------------------------------------------------------------------
+    # Cross-company configuration
+    # ------------------------------------------------------------------
+    def test_a_location_of_another_company_is_refused_at_configuration_time(self):
+        """Warehouse codes are not unique across companies.
+
+        A setup script resolving "DMG" by code alone hands company 1's damage
+        warehouse to company 2, and stock then refuses the transfer in front of
+        an operator reporting a broken unit. Catch it where it is fixable.
+        """
+        other = self.env["res.company"].create({"name": "Other Co For Locations"})
+        other_warehouse = self.env["stock.warehouse"].search([("company_id", "=", other.id)], limit=1)
+        self.assertTrue(other_warehouse, "A new company gets a warehouse of its own")
+        with self.assertRaises(ValidationError):
+            self.company.asset_damage_location_id = other_warehouse.lot_stock_id
+        with self.assertRaises(ValidationError):
+            self.company.asset_missing_location_id = other_warehouse.lot_stock_id
+
+    def test_a_shared_location_is_still_allowed(self):
+        # No company: the guard must let it through. There is no shared root
+        # location in this database, so the location is created at the top level.
+        shared = self.env["stock.location"].create(
+            {"name": "Shared Damage", "usage": "internal", "company_id": False}
+        )
+        self.company.asset_damage_location_id = shared
+        self.assertEqual(self.company.asset_damage_location_id, shared)
+
+    def test_reporting_against_another_company_location_names_both_companies(self):
+        """If it is misconfigured anyway, the error must say what to fix."""
+        other = self.env["res.company"].create({"name": "Other Co For Reports"})
+        other_warehouse = self.env["stock.warehouse"].search([("company_id", "=", other.id)], limit=1)
+        asset = self._make_asset()
+        wizard = self.env["custom.asset.report.damage.wizard"].create(
+            {
+                "asset_ids": [(6, 0, asset.ids)],
+                "description": "Cross-company destination",
+                "move_serial": True,
+                "create_repair": False,
+                "damage_location_id": other_warehouse.lot_stock_id.id,
+            }
+        )
+        with self.assertRaises(UserError) as caught:
+            wizard.action_report_damage()
+        message = str(caught.exception)
+        self.assertIn(self.company.name, message)
+        self.assertIn(other.name, message)

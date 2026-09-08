@@ -60,7 +60,7 @@ failure and repair history of a physical unit is readable from its asset card.
 """,
     "author": "Custom Platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "license": "LGPL-3",
     "depends": [
         "custom_accounting_asset",
