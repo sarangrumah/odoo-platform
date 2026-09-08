@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -581,3 +581,188 @@ class TestAssetLifecycle(TransactionCase):
         self.assertNotEqual(first.equipment_id.serial_no, second.equipment_id.serial_no)
         self.assertIn("24041700035", first.equipment_id.note or "")
         self.assertEqual(first.equipment_id.partner_ref, "24041700035")
+
+    # ------------------------------------------------------------------
+    # Cross-company configuration
+    # ------------------------------------------------------------------
+    def test_a_location_of_another_company_is_refused_at_configuration_time(self):
+        """Warehouse codes are not unique across companies.
+
+        A setup script resolving "DMG" by code alone hands company 1's damage
+        warehouse to company 2, and stock then refuses the transfer in front of
+        an operator reporting a broken unit. Catch it where it is fixable.
+        """
+        other = self.env["res.company"].create({"name": "Other Co For Locations"})
+        other_warehouse = self.env["stock.warehouse"].search([("company_id", "=", other.id)], limit=1)
+        self.assertTrue(other_warehouse, "A new company gets a warehouse of its own")
+        with self.assertRaises(ValidationError):
+            self.company.asset_damage_location_id = other_warehouse.lot_stock_id
+        with self.assertRaises(ValidationError):
+            self.company.asset_missing_location_id = other_warehouse.lot_stock_id
+
+    def test_a_shared_location_is_still_allowed(self):
+        # No company: the guard must let it through. There is no shared root
+        # location in this database, so the location is created at the top level.
+        shared = self.env["stock.location"].create({"name": "Shared Damage", "usage": "internal", "company_id": False})
+        self.company.asset_damage_location_id = shared
+        self.assertEqual(self.company.asset_damage_location_id, shared)
+
+    def test_reporting_against_another_company_location_names_both_companies(self):
+        """If it is misconfigured anyway, the error must say what to fix."""
+        other = self.env["res.company"].create({"name": "Other Co For Reports"})
+        other_warehouse = self.env["stock.warehouse"].search([("company_id", "=", other.id)], limit=1)
+        asset = self._make_asset()
+        wizard = self.env["custom.asset.report.damage.wizard"].create(
+            {
+                "asset_ids": [(6, 0, asset.ids)],
+                "description": "Cross-company destination",
+                "move_serial": True,
+                "create_repair": False,
+                "damage_location_id": other_warehouse.lot_stock_id.id,
+            }
+        )
+        with self.assertRaises(UserError) as caught:
+            wizard.action_report_damage()
+        message = str(caught.exception)
+        self.assertIn(self.company.name, message)
+        self.assertIn(other.name, message)
+
+    def test_each_asset_goes_to_its_own_company_location(self):
+        """A default drawn from the active company must not follow assets around.
+
+        The reporting wizards used to default their destination from
+        ``self.env.company``. Select an asset of another company -- which is what
+        a two-company register makes easy -- and that default was pinned onto it,
+        and stock cannot transfer across companies. Resolve per asset instead.
+        """
+        other = self.env["res.company"].create({"name": "Second Co Assets"})
+        other_warehouse = self.env["stock.warehouse"].search([("company_id", "=", other.id)], limit=1)
+        other_damage = self.env["stock.location"].create(
+            {
+                "name": "Second Damage",
+                "usage": "internal",
+                "location_id": other_warehouse.view_location_id.id,
+                "company_id": other.id,
+            }
+        )
+        other.asset_damage_location_id = other_damage
+
+        mine_warehouse = self.env["stock.warehouse"].search([("company_id", "=", self.company.id)], limit=1)
+        my_damage = self.env["stock.location"].create(
+            {
+                "name": "Mine Damage",
+                "usage": "internal",
+                "location_id": mine_warehouse.view_location_id.id,
+            }
+        )
+        self.company.asset_damage_location_id = my_damage
+
+        mine = self._make_asset("Mine")
+        theirs = self._make_asset("Theirs")
+        theirs.write({"state": "draft", "company_id": other.id})
+
+        wizard = self.env["custom.asset.report.damage.wizard"].create(
+            {
+                "asset_ids": [(6, 0, (mine | theirs).ids)],
+                "description": "Two companies at once",
+                "move_serial": False,
+                "create_repair": False,
+            }
+        )
+        self.assertFalse(
+            wizard.damage_location_id,
+            "The wizard must not pin the active company's location onto the selection",
+        )
+        self.assertEqual(wizard._destination_location(mine), my_damage)
+        self.assertEqual(wizard._destination_location(theirs), other_damage)
+        wizard.action_report_damage()
+        self.assertEqual(mine.condition, "damaged")
+        self.assertEqual(theirs.condition, "damaged")
+
+    def test_a_unit_returns_to_where_it_actually_was(self):
+        """Not to a configured default -- to the shelf it came off.
+
+        A fleet spread over several locations has no single "home", and the
+        accounting asset location is not always mapped to a warehouse one. The
+        condition event records the origin before the unit moves, which is the
+        only place that knows it once the unit is sitting in the damage
+        warehouse.
+        """
+        warehouse = self.env["stock.warehouse"].search([("company_id", "=", self.company.id)], limit=1)
+        view = warehouse.view_location_id
+        shelf = self.env["stock.location"].create({"name": "Odd Shelf", "usage": "internal", "location_id": view.id})
+        damage_location = self.env["stock.location"].create(
+            {"name": "Damage Home Test", "usage": "internal", "location_id": view.id}
+        )
+        self.company.asset_damage_location_id = damage_location
+
+        asset = self._make_asset()
+        self._materialise(asset, shelf)
+        self.assertFalse(
+            asset.location_id.stock_location_id,
+            "No accounting mapping: the origin is the only thing that knows",
+        )
+
+        self.env["custom.asset.report.damage.wizard"].create(
+            {
+                "asset_ids": [(6, 0, asset.ids)],
+                "description": "Broken on the odd shelf",
+                "move_serial": True,
+                "create_repair": False,
+            }
+        ).action_report_damage()
+        asset.invalidate_recordset()
+        self.assertEqual(asset.stock_location_id, damage_location)
+
+        log = asset.condition_log_ids.filtered(lambda line: line.event_type == "damage")
+        self.assertEqual(log.from_location_id, shelf, "The origin must be recorded")
+
+        asset.action_return_to_service()
+        asset.invalidate_recordset()
+        self.assertEqual(asset.condition, "ok")
+        self.assertEqual(asset.stock_location_id, shelf, "It must go back to the shelf it came off")
+
+    def test_the_fallback_home_is_the_fleet_warehouse_not_the_first_one(self):
+        """ "The company's warehouse" is not a single thing.
+
+        PT Aero Inovasi Media has four, all on sequence 10, so an unordered
+        search resolves by id -- and two of the four are the damage and lost
+        warehouses, the last place a returning unit should be sent. Ask the
+        register which one actually holds the fleet.
+
+        Asserted against whatever the register says rather than a fixed
+        location, because this suite runs against a restored production
+        database whose fleet dwarfs anything the test creates.
+        """
+        decoy = self.env["stock.warehouse"].create(
+            {"name": "Decoy Warehouse", "code": "DCY", "company_id": self.company.id}
+        )
+        self.assertTrue(decoy.lot_stock_id)
+
+        groups = self.env["custom.fixed.asset"]._read_group(
+            domain=[
+                ("company_id", "=", self.company.id),
+                ("stock_location_id", "!=", False),
+                ("condition", "=", "ok"),
+            ],
+            groupby=["stock_location_id"],
+            aggregates=["__count"],
+        )
+        self.assertTrue(groups, "The register must place at least one unit somewhere")
+        busiest = sorted(groups, key=lambda pair: pair[1], reverse=True)[0][0]
+
+        orphan = self._make_asset("Orphan")
+        self.assertFalse(
+            orphan.location_id.stock_location_id,
+            "No accounting mapping, so the fallback is what answers",
+        )
+        self.assertEqual(
+            orphan._fleet_home_location(),
+            busiest,
+            "The fallback must follow the fleet",
+        )
+        self.assertNotEqual(
+            orphan._fleet_home_location(),
+            decoy.lot_stock_id,
+            "and must never be a warehouse that holds none of it",
+        )

@@ -74,6 +74,14 @@ class CustomAssetConditionLog(models.Model):
         string="Moved To",
         ondelete="set null",
     )
+    from_location_id = fields.Many2one(
+        comodel_name="stock.location",
+        string="Moved From",
+        ondelete="set null",
+        help="Where the unit was before this event. This is what Return To "
+        "Service sends it back to -- more reliable than any configured default, "
+        "because it is where the unit actually was.",
+    )
     move_id = fields.Many2one(
         comodel_name="account.move",
         string="Journal Entry",

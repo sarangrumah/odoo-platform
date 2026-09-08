@@ -48,6 +48,8 @@ Environment:
     BATCH=500            units per commit
     DAMAGE_WH=DMG        warehouse code holding the damage location
     MISSING_WH=WH/LM     warehouse code holding the lost/missing location
+    DAMAGE_FALLBACK=...  location name created for a company with no damage warehouse
+    MISSING_FALLBACK=... location name created for a company with no lost warehouse
     LOSS_ACCOUNT=...     account code debited for the NBV of a written-off unit
     INCOME_ACCOUNT=...   account code credited at fair value for a replacement
     REPLACEMENT_JOURNAL=MISC,JM  journal codes to try, first match per company
@@ -64,6 +66,8 @@ DO_RESYNC = os.environ.get("RESYNC", "1") == "1"
 BATCH = int(os.environ.get("BATCH", "500"))
 DAMAGE_WH = os.environ.get("DAMAGE_WH", "DMG")
 MISSING_WH = os.environ.get("MISSING_WH", "WH/LM")
+DAMAGE_FALLBACK = os.environ.get("DAMAGE_FALLBACK", "Damaged Assets")
+MISSING_FALLBACK = os.environ.get("MISSING_FALLBACK", "Lost Assets")
 LOSS_ACCOUNT = os.environ.get("LOSS_ACCOUNT", "7701000000")
 INCOME_ACCOUNT = os.environ.get("INCOME_ACCOUNT", "7609000000")
 REPLACEMENT_JOURNALS = [
@@ -105,18 +109,78 @@ def journal_for(env, company):
     return env["account.journal"]
 
 
-def warehouse_stock_location(env, code):
-    warehouse = env["stock.warehouse"].search([("code", "=", code)], limit=1)
-    if not warehouse:
-        _logger.warning("no warehouse with code %r -- skipping", code)
+def warehouse_stock_location(env, code, company):
+    """Resolve a warehouse code **within one company**.
+
+    Warehouse codes are not unique across companies, so resolving ``DMG`` without
+    a company filter hands PT Aero Inovasi Media's damage warehouse to PT Aero
+    Reksa Kreasi Angkasa -- and a stock transfer between two companies' locations
+    is refused at validation time, in front of an operator reporting a broken
+    drone. That is not hypothetical: this script did exactly that on its first
+    production run.
+    """
+    warehouse = env["stock.warehouse"].search([("code", "=", code), ("company_id", "=", company.id)], limit=1)
+    if warehouse:
+        return warehouse.lot_stock_id
+    return env["stock.location"]
+
+
+def fleet_parent_location(env, company):
+    """The view location of the warehouse this company's fleet actually lives in.
+
+    Not ``search([("company_id", "=", ...)], limit=1)``: PT Aero Inovasi Media has
+    four warehouses, all on sequence 10, so that resolves by id -- and two of the
+    four are the damage and lost warehouses. Same class of assumption as the
+    cross-company bug this script exists to repair, answered the same way: from
+    the register.
+    """
+    groups = env["custom.fixed.asset"]._read_group(
+        domain=[("company_id", "=", company.id), ("stock_location_id", "!=", False)],
+        groupby=["stock_location_id"],
+        aggregates=["__count"],
+    )
+    if groups:
+        busiest = sorted(groups, key=lambda pair: pair[1], reverse=True)[0][0]
+        if busiest.warehouse_id:
+            return busiest.warehouse_id.view_location_id
+    warehouse = env["stock.warehouse"].search([("company_id", "=", company.id)], limit=1, order="sequence, id")
+    return warehouse.view_location_id if warehouse else env["stock.location"]
+
+
+def ensure_child_location(env, company, name):
+    """A company without its own damage/lost warehouse gets a location instead.
+
+    Cheaper than a warehouse -- no sequences, picking types or rules -- and all
+    these units need is somewhere of their own company to sit.
+    """
+    parent = fleet_parent_location(env, company)
+    if not parent:
+        _logger.warning("%s has no warehouse -- cannot place %r", company.name, name)
         return env["stock.location"]
-    return warehouse.lot_stock_id
+    existing = env["stock.location"].search([("name", "=", name), ("location_id", "=", parent.id)], limit=1)
+    if existing:
+        return existing
+    _logger.info("%s: creating location %s/%s", company.name, parent.complete_name, name)
+    return env["stock.location"].create(
+        {
+            "name": name,
+            "usage": "internal",
+            "location_id": parent.id,
+            "company_id": company.id,
+        }
+    )
+
+
+def lifecycle_location(env, company, code, fallback_name):
+    """The company's own warehouse for this purpose, or a location we make."""
+    location = warehouse_stock_location(env, code, company)
+    if location:
+        return location
+    return ensure_child_location(env, company, fallback_name)
 
 
 def configure_companies(env):
     section("company configuration")
-    damage = warehouse_stock_location(env, DAMAGE_WH)
-    missing = warehouse_stock_location(env, MISSING_WH)
     category = env["maintenance.equipment.category"].search([("name", "=", EQUIPMENT_CATEGORY)], limit=1)
     if not category:
         category = env["maintenance.equipment.category"].create({"name": EQUIPMENT_CATEGORY})
@@ -124,10 +188,34 @@ def configure_companies(env):
 
     companies = env["custom.fixed.asset"].search([]).company_id
     for company in companies:
+        damage = lifecycle_location(env, company, DAMAGE_WH, DAMAGE_FALLBACK)
+        missing = lifecycle_location(env, company, MISSING_WH, MISSING_FALLBACK)
+
         vals = {}
-        if damage and not company.asset_damage_location_id:
+        # Repoint anything that currently sits in another company's warehouse --
+        # that configuration cannot complete a transfer, so leaving it in place
+        # is not "already configured", it is broken.
+        current_damage = company.asset_damage_location_id
+        current_missing = company.asset_missing_location_id
+        if damage and (not current_damage or (current_damage.company_id and current_damage.company_id != company)):
+            if current_damage and current_damage.company_id != company:
+                _logger.warning(
+                    "%s: damage location %s belongs to %s -- repointing to %s",
+                    company.name,
+                    current_damage.complete_name,
+                    current_damage.company_id.name,
+                    damage.complete_name,
+                )
             vals["asset_damage_location_id"] = damage.id
-        if missing and not company.asset_missing_location_id:
+        if missing and (not current_missing or (current_missing.company_id and current_missing.company_id != company)):
+            if current_missing and current_missing.company_id != company:
+                _logger.warning(
+                    "%s: lost/missing location %s belongs to %s -- repointing to %s",
+                    company.name,
+                    current_missing.complete_name,
+                    current_missing.company_id.name,
+                    missing.complete_name,
+                )
             vals["asset_missing_location_id"] = missing.id
         if not company.asset_equipment_category_id:
             vals["asset_equipment_category_id"] = category.id

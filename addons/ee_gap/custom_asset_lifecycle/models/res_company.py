@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class ResCompany(models.Model):
@@ -41,3 +42,37 @@ class ResCompany(models.Model):
         string="Asset Equipment Category",
         help="Default maintenance category for equipment cards created from the register.",
     )
+
+    @api.constrains(
+        "asset_damage_location_id",
+        "asset_missing_location_id",
+    )
+    def _check_lifecycle_locations_company(self):
+        """A location belonging to another company cannot receive these units.
+
+        Odoo refuses the transfer at validation time with a company-inconsistency
+        error, which is safe but arrives at the worst possible moment -- the
+        operator is mid-report on a broken unit. Worse, it is easy to configure by
+        accident: warehouse codes are unique across companies, so a setup script
+        that resolves ``DMG`` by code happily hands company 1's damage warehouse
+        to company 2. That is exactly what happened on prd_arkaaim.
+        """
+        for company in self:
+            for field, label in (
+                ("asset_damage_location_id", _("Asset Damage Location")),
+                ("asset_missing_location_id", _("Asset Lost/Missing Location")),
+            ):
+                location = company[field]
+                if location and location.company_id and location.company_id != company:
+                    raise ValidationError(
+                        _(
+                            "%(label)s %(location)s belongs to %(owner)s, but you are "
+                            "configuring %(company)s. Units cannot be transferred "
+                            "across companies, so pick a location of "
+                            "%(company)s -- or a shared one.",
+                            label=label,
+                            location=location.complete_name,
+                            owner=location.company_id.name,
+                            company=company.name,
+                        )
+                    )

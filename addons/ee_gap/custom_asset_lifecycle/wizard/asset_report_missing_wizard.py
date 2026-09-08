@@ -12,8 +12,10 @@ class AssetReportMissingWizard(models.TransientModel):
         comodel_name="stock.location",
         string="Lost/Missing Location",
         domain="[('usage', '=', 'internal')]",
-        default=lambda self: self.env.company.asset_missing_location_id,
-        help="Leave empty to use the company's configured lost/missing location.",
+        help="Leave empty to use each asset's own company configuration. "
+        "Deliberately not defaulted: a default drawn from the active company "
+        "would be pinned onto assets of a different one, and a location cannot "
+        "receive units across companies.",
     )
     reference = fields.Char(
         string="Report Reference (BAP)",
