@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-08-05T00:00:00Z
 generator: claude-code-handwritten
 module: custom_coretax_export
-manifest_version: 19.0.1.7.0
+manifest_version: 19.0.1.8.0
 ---
 
 # custom_coretax_export
@@ -112,18 +112,32 @@ On `custom.coretax.fk.builder`:
   by hand or copied from an earlier one keeps the flag but loses `sale_line_ids` — which is the
   shape every ARKA-AIM faktur is in, and why reading the order line alone reported a real faktur
   uang muka as an ordinary sale.
-- **A settlement faktur reports its down payment in the FK record, never as an OF row.** Odoo
-  puts the already-invoiced down payment on the final invoice as a negative line (`is_downpayment`
-  with a negative `price_subtotal`); exporting it as an item produced `JUMLAH_BARANG` -1 and
-  negative amounts, which the Coretax importer rejects. `_is_dp_deduction()` lifts that line out
-  of the OF rows into `NOMOR_FAKTUR_UM_SEBELUMNYA` + `UANG_MUKA_DPP`/`_DPP_LAIN`/`_PPN`, so the
-  OF rows and `JUMLAH_*` stay the **gross** price and what is still owed is the difference.
-  The number reported is `x_custom_nsfp` on the down-payment invoice — the nomor faktur pajak
-  Coretax assigned it, not its Odoo sequence — and the export is refused by name when it is
-  blank: an empty `NOMOR_FAKTUR_UM_SEBELUMNYA` beside a non-zero `UANG_MUKA_PPN` is a file
-  Coretax accepts and files wrongly. `_coretax_fk_downpayment_invoices()` finds the earlier
-  faktur through the sale order when the link survives, otherwise through the shared
-  `invoice_origin`.
+- **A settlement faktur reports only what is left to pay; the down payment is netted off, not
+  referenced.** Odoo puts the already-invoiced down payment on the final invoice as a negative
+  line (`is_downpayment` with a negative `price_subtotal`); exporting it as an item produced
+  `JUMLAH_BARANG` -1 and negative amounts, which the Coretax importer rejects. `_is_dp_deduction()`
+  lifts that line out of the OF rows and `_coretax_fk_net_factor()` turns it into the share of the
+  price still being billed, which scales `HARGA_SATUAN`, the gross and the tax base together. So a
+  300 juta sale prepaid 50% exports as a **150 juta** faktur whose `JUMLAH_DPP`/`JUMLAH_PPN` equal
+  the invoice's own `amount_untaxed`/`amount_tax`, and `NOMOR_FAKTUR_UM_SEBELUMNYA` plus every
+  `UANG_MUKA_*` column stay empty — the down payment was already reported on a faktur of its own,
+  and the client's tax team files the two separately.
+  - **Scaled, not discounted.** Writing the gross in `HARGA_TOTAL` and the deduction in `DISKON`
+    would also tie, but it tells Coretax the customer got a 50% discount they never got.
+  - **This reverses 19.0.1.7.0**, which reported the gross and deducted through `UANG_MUKA_*`
+    (the shape DJP's own template documents). Both are defensible filings; the client chose
+    separate fakturs. A settlement fully covered by its deduction bills nothing and is refused
+    by name, and the down-payment faktur's `x_custom_nsfp` is no longer a precondition for
+    exporting the settlement.
+- **`NAMA` on an OF row is the line description, not `product_id.name`.** ARKA closes each line
+  description with the event, its venue and the show date, and that block — not the product name —
+  is what the tax team reconciles the faktur against. `_item_name()` flattens the description to a
+  single line (one XLSX cell; an embedded newline is not safe) and falls back to the product name
+  when there is none. When the description carries no event but the invoice header does,
+  `_coretax_fk_event_parts()` appends `Event …, Lokasi …, dd.mm.yy` from `x_custom_event_name` /
+  `x_custom_event_location` / `x_custom_show_date`, read through `_fields` so this module keeps no
+  dependency on `custom_arka_show_date`. The date alone is never appended: on an invoice
+  `x_custom_show_date` may have been moved to anchor the payment terms.
 - **Only `out_invoice` is exported.** Credit notes are not FK records — they belong to Faktur
   Pengganti or Retur Masukan, which have their own paths.
 - **"Tidak ada faktur ... yang cocok" is almost always the company, not the period.** Both

@@ -57,16 +57,30 @@ a selection straddling two periods still stamps each FK row correctly.
 
 Down payments
 -------------
-A sale part-billed in advance is two fakturs to DJP: one for the down payment,
-then a settlement faktur that reports the **full** price in its OF rows and
-subtracts the earlier one through ``NOMOR_FAKTUR_UM_SEBELUMNYA`` and the
-``UANG_MUKA_*`` columns. Odoo models the same thing as a negative line on the
-final invoice; exporting that line as an OF item produced negative quantities
-and amounts, which the Coretax importer rejects. The deduction line is now
-lifted out of the OF rows and into the FK record, and the number reported is
-``x_custom_nsfp`` on the down-payment invoice — the nomor faktur pajak Coretax
-assigned it, not its Odoo sequence. An export is refused, by name, when that
-number is missing.
+A sale part-billed in advance is two **independent** fakturs: one issued for the
+down payment when it is received, and a settlement faktur for what is left to
+pay. Odoo models the settlement as the full price plus a negative down-payment
+line; exporting that line as an OF item produced negative quantities and amounts,
+which the Coretax importer rejects.
+
+The deduction is therefore netted off the item rows — unit price, gross and tax
+base alike — rather than reported in the FK record's ``UANG_MUKA_*`` block. So a
+300 juta sale prepaid 50% settles on a **150 juta** faktur whose ``JUMLAH_DPP``
+and ``JUMLAH_PPN`` equal the invoice's own ``amount_untaxed`` and ``amount_tax``,
+the two fakturs together still add up to the contract, and the settlement faktur
+carries no reference to the earlier one: ``NOMOR_FAKTUR_UM_SEBELUMNYA`` and every
+``UANG_MUKA_*`` column stay empty. A settlement whose deduction swallows the
+whole invoice bills nothing at all, and is refused by name.
+
+Nama Barang/Jasa
+----------------
+The OF ``NAMA`` cell is the invoice line's own description, flattened to one line
+— not ``product_id.name``. ARKA appends the event, its venue and the show date to
+each line description, and that block is what the tax team reconciles the faktur
+against; taking the product name dropped it. When the description carries no
+event but the invoice header does (a faktur raised by hand), the header's event
+and venue are appended instead. The header fields are read through ``_fields``,
+so the module stays independent of the tenant module that adds them.
 
 Discounts, rounding, and the FK↔OF tie
 --------------------------------------
@@ -114,7 +128,7 @@ e-Faktur Keluaran and Retur Masukan are not blocked on it.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Localizations",
-    "version": "19.0.1.7.0",
+    "version": "19.0.1.8.0",
     "license": "LGPL-3",
     "depends": [
         "custom_tax_id",
