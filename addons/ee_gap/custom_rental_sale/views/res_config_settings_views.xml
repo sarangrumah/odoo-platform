@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_deployment" model="ir.ui.view">
+        <field name="name">res.config.settings.deployment</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='pricing_setting_container']" position="after">
+                <block title="Deployments" id="deployment_settings">
+                    <setting string="Create Deployments From Sales Orders"
+                             help="Confirming a sales order that names a deployment product also creates the dispatch document for the units behind it. Off by default.">
+                        <field name="deployment_auto_create"/>
+                    </setting>
+                    <setting string="Deployment Source Location"
+                             help="Where dispatched units are picked from. Set it to the location the fleet actually lives in — picking from the wrong one books negative quants and leaves the units where they were.">
+                        <field name="deployment_source_location_id"/>
+                    </setting>
+                    <setting string="On-Deployment Location"
+                             help="Internal location the units sit in while they are out at an event.">
+                        <field name="deployment_location_id"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>
