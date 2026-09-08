@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """Down payments in the FK record.
 
-Two things used to go wrong. FG_UANG_MUKA was hard-coded '0', so a faktur uang
-muka went to Coretax looking like an ordinary sale. And a settlement faktur
-exported its down-payment deduction as an OF item row with quantity -1 and
-negative amounts, instead of reporting it in the FK record's UANG_MUKA_* block.
+FG_UANG_MUKA used to be hard-coded '0', so a faktur uang muka went to Coretax
+looking like an ordinary sale.
+
+The deduction Odoo puts on the settlement invoice used to be exported as an OF
+item row with quantity -1 and negative amounts, which the importer rejects. It
+is now netted off the item rows: the down payment carries a faktur of its own,
+so the settlement faktur reports only what is left to pay and says nothing about
+the earlier faktur. A 300 juta sale prepaid 50% therefore settles on a 150 juta
+faktur, not on a 300 juta one with a 150 juta UANG_MUKA_* deduction.
 """
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
@@ -20,8 +25,11 @@ FK_UANG_MUKA_DPP = 24
 FK_UANG_MUKA_DPP_LAIN = 25
 FK_UANG_MUKA_PPN = 26
 
+OF_NAMA = 3
+OF_HARGA_SATUAN = 5
 OF_JUMLAH_BARANG = 6
 OF_HARGA_TOTAL = 7
+OF_DISKON = 8
 OF_DPP = 10
 
 
@@ -142,7 +150,7 @@ class TestCoretaxUangMuka(AccountTestInvoicingCommon):
         _advance, final = self._settled()
         self.assertEqual(self._fk_flag(final), "0")
 
-    # ------------------------------------------------- settlement UANG_MUKA_*
+    # ----------------------------------------------- settlement nets the DP
 
     def test_settlement_has_no_negative_of_row(self):
         """The deduction is a ledger device, not an item sold. Coretax rejects a
@@ -155,31 +163,67 @@ class TestCoretaxUangMuka(AccountTestInvoicingCommon):
             self.assertGreaterEqual(row[OF_HARGA_TOTAL], 0)
             self.assertGreaterEqual(row[OF_DPP], 0)
 
-    def test_settlement_reports_gross_and_deducts_in_fk(self):
-        """OF rows carry the full price; the down payment is subtracted through
-        the FK block, and the two still tie to what is left to pay."""
+    def test_settlement_reports_what_is_left_to_pay(self):
+        """The faktur is the invoice: 300 juta prepaid 50% settles at 150 juta,
+        in the FK totals and in the OF row alike."""
         advance, final = self._settled()
         fk_row, of_rows = self._rows(final)
+        self.assertEqual(fk_row[FK_JUMLAH_DPP], final.amount_untaxed)
+        self.assertEqual(fk_row[FK_JUMLAH_PPN], final.amount_tax)
         self.assertEqual(fk_row[FK_JUMLAH_DPP], sum(r[OF_DPP] for r in of_rows))
-        self.assertEqual(fk_row[FK_UANG_MUKA_DPP], advance.amount_untaxed)
-        self.assertEqual(fk_row[FK_UANG_MUKA_PPN], advance.amount_tax)
-        self.assertEqual(fk_row[FK_JUMLAH_PPN] - fk_row[FK_UANG_MUKA_PPN], final.amount_tax)
-        self.assertEqual(fk_row[FK_JUMLAH_DPP] - fk_row[FK_UANG_MUKA_DPP], final.amount_untaxed)
+        self.assertEqual(fk_row[FK_JUMLAH_DPP], self.price - advance.amount_untaxed)
 
-    def test_settlement_carries_the_previous_faktur_number(self):
+    def test_settlement_row_reads_as_a_price_not_a_discount(self):
+        """Netting must shrink HARGA_SATUAN and HARGA_TOTAL with the base — left
+        at the gross they would turn the prepayment into a 50% discount."""
+        _advance, final = self._settled()
+        _fk_row, of_rows = self._rows(final)
+        row = of_rows[0]
+        self.assertEqual(row[OF_DISKON], 0)
+        self.assertEqual(row[OF_HARGA_TOTAL], final.amount_untaxed)
+        self.assertEqual(row[OF_HARGA_SATUAN] * row[OF_JUMLAH_BARANG], final.amount_untaxed)
+
+    def test_settlement_says_nothing_about_the_earlier_faktur(self):
+        """The down payment was reported on its own faktur; repeating it here
+        would file it twice."""
         advance, final = self._settled(nsfp="0400026002695334")
         fk_row, _of_rows = self._rows(final)
-        self.assertEqual(fk_row[FK_NOMOR_FAKTUR_UM], "0400026002695334")
         self.assertTrue(advance.x_custom_has_faktur_pajak)
+        self.assertEqual(fk_row[FK_NOMOR_FAKTUR_UM], "")
+        self.assertEqual(fk_row[FK_UANG_MUKA_DPP], 0)
+        self.assertEqual(fk_row[FK_UANG_MUKA_DPP_LAIN], 0)
+        self.assertEqual(fk_row[FK_UANG_MUKA_PPN], 0)
 
-    def test_settlement_without_a_faktur_number_is_refused(self):
-        """An empty NOMOR_FAKTUR_UM_SEBELUMNYA beside a non-zero UANG_MUKA_PPN is
-        a file Coretax accepts and files wrongly — refuse it by name instead."""
+    def test_settlement_without_a_faktur_number_still_exports(self):
+        """Nothing on the settlement faktur refers to the down-payment faktur,
+        so its NSFP is no longer a precondition for exporting the settlement."""
         advance, final = self._settled()
         advance.x_custom_nsfp = False
+        fk_row, _of_rows = self._rows(final)
+        self.assertEqual(fk_row[FK_JUMLAH_DPP], final.amount_untaxed)
+
+    def test_fully_deducted_settlement_is_refused(self):
+        """A settlement that bills nothing is not a faktur. Refuse it by name
+        rather than emit a zero FK record Coretax would bounce."""
+        order = self._order()
+        advance = self._downpayment_invoice(order)
+        advance.invoice_date = "2026-07-03"
+        advance.action_post()
+        wizard = (
+            self.env["sale.advance.payment.inv"]
+            .sudo()
+            .with_context(active_ids=order.ids, active_model="sale.order")
+            .create({"advance_payment_method": "delivered"})
+        )
+        final = wizard._create_invoices(order)
+        deduction = final.invoice_line_ids.filtered(lambda l: l.display_type == "product" and l.price_subtotal < 0)
+        items = final.invoice_line_ids.filtered(lambda l: l.display_type == "product") - deduction
+        deduction.price_unit = sum(items.mapped("price_subtotal"))
+        final.invoice_date = "2026-08-21"
+        final.action_post()
         with self.assertRaises(UserError) as caught:
             self.builder._coretax_fk_rows(final, company=self.company)
-        self.assertIn(advance.name, str(caught.exception))
+        self.assertIn(final.name, str(caught.exception))
 
     def test_ordinary_invoice_leaves_the_uang_muka_block_empty(self):
         invoice = (
@@ -202,16 +246,15 @@ class TestCoretaxUangMuka(AccountTestInvoicingCommon):
         self.assertEqual(fk_row[FK_UANG_MUKA_DPP_LAIN], 0)
         self.assertEqual(fk_row[FK_UANG_MUKA_PPN], 0)
 
-    def test_hand_built_deduction_without_an_order_link_still_resolves(self):
+    def test_hand_built_deduction_is_still_netted_off(self):
         """ARKA-AIM's fakturs carry is_downpayment but no sale_line_ids — the
-        invoice_origin they share is what ties settlement to down payment."""
-        advance, final = self._settled()
+        deduction has to be recognised from the line's own flag."""
+        _advance, final = self._settled()
         final.button_draft()
         deduction = final.invoice_line_ids.filtered(lambda l: l.display_type == "product" and l.price_subtotal < 0)
         self.assertTrue(deduction)
         deduction.sale_line_ids = [(5, 0, 0)]
-        final.invoice_origin = advance.invoice_origin
         final.action_post()
         fk_row, of_rows = self._rows(final)
-        self.assertEqual(fk_row[FK_NOMOR_FAKTUR_UM], advance.x_custom_nsfp)
         self.assertEqual(len(of_rows), 1)
+        self.assertEqual(fk_row[FK_JUMLAH_DPP], final.amount_untaxed)

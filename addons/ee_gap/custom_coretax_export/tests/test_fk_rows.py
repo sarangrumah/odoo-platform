@@ -10,6 +10,7 @@ from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 from odoo.tests import tagged
 
 # Column offsets, so an assertion reads as the column it checks.
+OF_NAMA = 3
 OF_HARGA_SATUAN = 5
 OF_JUMLAH_BARANG = 6
 OF_HARGA_TOTAL = 7
@@ -264,3 +265,45 @@ class TestCoretaxFkRows(AccountTestInvoicingCommon):
         fk_rows, of_rows = self._split(self._rows(invoice))
         self.assertEqual(of_rows[0][OF_CHECK_DPP_LAIN], "Y")
         self.assertEqual(fk_rows[0][FK_KD_JENIS], "04")
+
+    # ------------------------------------------------------------- OF "NAMA"
+
+    def test_nama_carries_the_line_description_not_the_product_name(self):
+        """The event block ARKA appends to the line description — event, venue,
+        show date — is what the tax team reconciles the faktur against, and
+        reading ``product_id.name`` dropped every word of it."""
+        invoice = self._invoice([{"price": 300000000.0}])
+        invoice.invoice_line_ids.name = "Jasa Drone Show 250 Unit\nLokasi Taman Bagawan Bali 07.08.26\n(Pelunasan 50%)"
+        _fk_rows, of_rows = self._split(self._rows(invoice))
+        self.assertEqual(
+            of_rows[0][OF_NAMA],
+            "Jasa Drone Show 250 Unit, Lokasi Taman Bagawan Bali 07.08.26, (Pelunasan 50%)",
+        )
+
+    def test_nama_falls_back_to_the_product_name(self):
+        invoice = self._invoice([{"price": 1000.0}])
+        invoice.invoice_line_ids.name = ""
+        _fk_rows, of_rows = self._split(self._rows(invoice))
+        self.assertEqual(of_rows[0][OF_NAMA], self.product.name)
+
+    def test_event_header_is_appended_when_the_description_lacks_it(self):
+        """A faktur raised by hand carries the event only in the header fields.
+        One raised from a show order already has it in the line, and must not
+        have it repeated."""
+        invoice = self._invoice([{"price": 1000.0}])
+        if "x_custom_event_name" not in invoice._fields:
+            self.skipTest("event tracking (custom_arka_show_date) is not installed")
+        invoice.x_custom_event_name = "Soekarno Cup"
+        invoice.x_custom_event_location = "Stadion Gelora Bung Tomo Surabaya"
+        invoice.invoice_line_ids.name = "Jasa Drone Show 1000 Unit"
+        _fk_rows, of_rows = self._split(self._rows(invoice))
+        self.assertEqual(
+            of_rows[0][OF_NAMA],
+            "Jasa Drone Show 1000 Unit, Event Soekarno Cup, Lokasi Stadion Gelora Bung Tomo Surabaya",
+        )
+
+        invoice.invoice_line_ids.name = (
+            "Jasa Drone Show 1000 Unit, Event Soekarno Cup, Lokasi Stadion Gelora Bung Tomo Surabaya"
+        )
+        _fk_rows, of_rows = self._split(self._rows(invoice))
+        self.assertEqual(of_rows[0][OF_NAMA].count("Soekarno Cup"), 1)
