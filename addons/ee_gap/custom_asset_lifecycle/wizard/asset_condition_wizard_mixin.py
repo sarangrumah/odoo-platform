@@ -68,6 +68,26 @@ class AssetConditionWizardMixin(models.AbstractModel):
     def _destination_location(self, asset):
         raise NotImplementedError
 
+    def _check_destination_company(self, asset, location):
+        """Say which company is wrong here, rather than letting stock say it later.
+
+        Core raises a generic company-inconsistency error deep inside picking
+        validation. Naming the asset and both companies turns a puzzle into an
+        instruction.
+        """
+        if location and location.company_id and location.company_id != asset.company_id:
+            raise UserError(
+                _(
+                    "Asset %(code)s belongs to %(owner)s, but the destination "
+                    "%(location)s belongs to %(other)s. Configure a destination of "
+                    "%(owner)s under Accounting Settings > Asset Lifecycle.",
+                    code=asset.code,
+                    owner=asset.company_id.name,
+                    location=location.complete_name,
+                    other=location.company_id.name,
+                )
+            )
+
     def _apply(self, event_type, condition_to, extra_asset_vals=None):
         """Move the serials, write the condition, append the history rows."""
         self.ensure_one()
@@ -75,6 +95,10 @@ class AssetConditionWizardMixin(models.AbstractModel):
         for asset in self.asset_ids:
             picking = self.env["stock.picking"]
             destination = self._destination_location(asset)
+            self._check_destination_company(asset, destination)
+            # Read the origin before moving: afterwards the unit is in the damage
+            # or lost warehouse and where it came from is unrecoverable.
+            origin = asset._resolve_serial_source_location()
             if self.move_serial and asset.lot_id:
                 picking = asset._move_serial_to(destination, reference=self.reference or asset.code)
             logs |= asset._log_condition_event(
@@ -85,6 +109,7 @@ class AssetConditionWizardMixin(models.AbstractModel):
                 reference=self.reference,
                 picking_id=picking.id or None,
                 location_id=destination.id or None,
+                from_location_id=origin.id or None,
             )
             if extra_asset_vals:
                 asset.write(extra_asset_vals)

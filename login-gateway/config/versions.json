@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-08T00:23:18+00:00",
+  "generated_at": "2026-09-08T00:41:27+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "32873ec",
-    "branch": "feat/arka-event-overhead-allocation"
+    "commit": "00a7efb",
+    "branch": "fix/asset-lifecycle-company-scoping"
   },
   "buckets": [
     {
@@ -234,8 +234,13 @@
       "depends": 7,
       "public": false,
       "last_change": "2026-09-08",
-      "change_count": 10,
+      "change_count": 11,
       "changes": [
+        {
+          "sha": "00a7efb",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): let the client write down how overhead is spread across events (#229)"
+        },
         {
           "sha": "24005d7",
           "date": "2026-09-08",
@@ -270,11 +275,6 @@
           "sha": "c526074",
           "date": "2026-07-17",
           "subject": "style: ruff-format four files that were formatted at the wrong line length"
-        },
-        {
-          "sha": "0e89d2c",
-          "date": "2026-07-17",
-          "subject": "feat(reports,arka): port /opt-only runtime work onto feat/industry-packs"
         }
       ]
     },
@@ -2010,7 +2010,7 @@
       "module": "custom_asset_lifecycle",
       "bucket": "ee_gap",
       "name": "Custom Asset Lifecycle",
-      "version": "19.0.1.0.0",
+      "version": "19.0.1.2.0",
       "summary": "Damage / missing / repair / replacement lifecycle on top of the fixed-asset register, with the history attached to each serial",
       "category": "Accounting/Accounting",
       "depends": 5,

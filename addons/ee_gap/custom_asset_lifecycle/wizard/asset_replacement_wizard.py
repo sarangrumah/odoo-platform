@@ -84,13 +84,13 @@ class AssetReplacementWizard(models.TransientModel):
     income_account_id = fields.Many2one(
         comodel_name="account.account",
         string="Compensation Income Account",
-        default=lambda self: self.env.company.asset_compensation_income_account_id,
+        help="Defaulted from the replaced asset's company, not the active one.",
     )
     journal_id = fields.Many2one(
         comodel_name="account.journal",
         string="Journal",
         domain="[('type', '=', 'general')]",
-        default=lambda self: self.env.company.asset_replacement_journal_id,
+        help="Defaulted from the replaced asset's company, not the active one.",
     )
     confirm_asset = fields.Boolean(
         string="Confirm And Start Depreciating",
@@ -111,6 +111,11 @@ class AssetReplacementWizard(models.TransientModel):
         res.setdefault("custodian_id", asset.custodian_id.id)
         res.setdefault("useful_life_months", asset.useful_life_months or 48)
         res.setdefault("replacement_reason", "missing" if asset.condition in ("missing", "written_off") else "damage")
+        # From the replaced asset's company, never the active one: a replacement
+        # is booked in the books of whoever owned the unit it stands in for.
+        company = asset.company_id
+        res.setdefault("income_account_id", company.asset_compensation_income_account_id.id)
+        res.setdefault("journal_id", company.asset_replacement_journal_id.id)
         return res
 
     # ------------------------------------------------------------------
