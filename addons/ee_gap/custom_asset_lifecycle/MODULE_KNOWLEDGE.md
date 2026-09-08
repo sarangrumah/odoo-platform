@@ -1,7 +1,7 @@
 ---
 status: authored
 module: custom_asset_lifecycle
-manifest_version: 19.0.1.1.0
+manifest_version: 19.0.1.2.0
 ---
 
 # custom_asset_lifecycle
@@ -135,6 +135,21 @@ configuration outright, the wizards name both companies if it happens anyway, an
 the script resolves per company and creates a location for a company that has no
 warehouse of its own.
 
+The wizards also carry **no default destination**. Defaulting from
+`self.env.company` looked harmless and was not: select an asset of another company
+— which a two-company register makes easy — and the active company's location was
+pinned onto it. 19.0.1.2.0 resolves the destination per asset instead, and the
+replacement wizard takes its accounts from the replaced asset's company rather
+than the active one.
+
+**Return To Service goes back to where the unit actually was.** The condition event
+records `from_location_id` before the unit moves, because once it is sitting in the
+damage warehouse nothing else knows where it came from. A fleet spread over several
+locations has no single home, and the accounting asset location is not always mapped
+to a warehouse one — on `prd_arkaaim` the ARKA units have no mapping at all, so
+before 19.0.1.2.0 returning one to service failed with a message about damage
+locations that had nothing to do with the real problem.
+
 **Moving a serial posts nothing.** These units are already capitalised. They
 live in the *Fixed Assets (Non-Valuated)* category at zero cost, so none of the
 three conditions in `stock_account`'s `_should_create_account_move()` can be
@@ -166,7 +181,7 @@ them, because write-offs and replacements refuse to post without them.
 
 ## Tests
 
-`tests/test_asset_lifecycle.py` — 23 tests. Notably: depreciation continues
+`tests/test_asset_lifecycle.py` — 27 tests. Notably: depreciation continues
 through damage and repair; a write-off closes the condition and stops it;
 replacement posts the acquisition entry at fair value and gives the new unit a
 full life; warranty is excluded from lifetime cost; a serial with an offsetting

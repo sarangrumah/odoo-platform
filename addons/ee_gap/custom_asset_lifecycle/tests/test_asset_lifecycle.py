@@ -603,9 +603,7 @@ class TestAssetLifecycle(TransactionCase):
     def test_a_shared_location_is_still_allowed(self):
         # No company: the guard must let it through. There is no shared root
         # location in this database, so the location is created at the top level.
-        shared = self.env["stock.location"].create(
-            {"name": "Shared Damage", "usage": "internal", "company_id": False}
-        )
+        shared = self.env["stock.location"].create({"name": "Shared Damage", "usage": "internal", "company_id": False})
         self.company.asset_damage_location_id = shared
         self.assertEqual(self.company.asset_damage_location_id, shared)
 
@@ -628,3 +626,98 @@ class TestAssetLifecycle(TransactionCase):
         message = str(caught.exception)
         self.assertIn(self.company.name, message)
         self.assertIn(other.name, message)
+
+    def test_each_asset_goes_to_its_own_company_location(self):
+        """A default drawn from the active company must not follow assets around.
+
+        The reporting wizards used to default their destination from
+        ``self.env.company``. Select an asset of another company -- which is what
+        a two-company register makes easy -- and that default was pinned onto it,
+        and stock cannot transfer across companies. Resolve per asset instead.
+        """
+        other = self.env["res.company"].create({"name": "Second Co Assets"})
+        other_warehouse = self.env["stock.warehouse"].search([("company_id", "=", other.id)], limit=1)
+        other_damage = self.env["stock.location"].create(
+            {
+                "name": "Second Damage",
+                "usage": "internal",
+                "location_id": other_warehouse.view_location_id.id,
+                "company_id": other.id,
+            }
+        )
+        other.asset_damage_location_id = other_damage
+
+        mine_warehouse = self.env["stock.warehouse"].search([("company_id", "=", self.company.id)], limit=1)
+        my_damage = self.env["stock.location"].create(
+            {
+                "name": "Mine Damage",
+                "usage": "internal",
+                "location_id": mine_warehouse.view_location_id.id,
+            }
+        )
+        self.company.asset_damage_location_id = my_damage
+
+        mine = self._make_asset("Mine")
+        theirs = self._make_asset("Theirs")
+        theirs.write({"state": "draft", "company_id": other.id})
+
+        wizard = self.env["custom.asset.report.damage.wizard"].create(
+            {
+                "asset_ids": [(6, 0, (mine | theirs).ids)],
+                "description": "Two companies at once",
+                "move_serial": False,
+                "create_repair": False,
+            }
+        )
+        self.assertFalse(
+            wizard.damage_location_id,
+            "The wizard must not pin the active company's location onto the selection",
+        )
+        self.assertEqual(wizard._destination_location(mine), my_damage)
+        self.assertEqual(wizard._destination_location(theirs), other_damage)
+        wizard.action_report_damage()
+        self.assertEqual(mine.condition, "damaged")
+        self.assertEqual(theirs.condition, "damaged")
+
+    def test_a_unit_returns_to_where_it_actually_was(self):
+        """Not to a configured default -- to the shelf it came off.
+
+        A fleet spread over several locations has no single "home", and the
+        accounting asset location is not always mapped to a warehouse one. The
+        condition event records the origin before the unit moves, which is the
+        only place that knows it once the unit is sitting in the damage
+        warehouse.
+        """
+        warehouse = self.env["stock.warehouse"].search([("company_id", "=", self.company.id)], limit=1)
+        view = warehouse.view_location_id
+        shelf = self.env["stock.location"].create({"name": "Odd Shelf", "usage": "internal", "location_id": view.id})
+        damage_location = self.env["stock.location"].create(
+            {"name": "Damage Home Test", "usage": "internal", "location_id": view.id}
+        )
+        self.company.asset_damage_location_id = damage_location
+
+        asset = self._make_asset()
+        self._materialise(asset, shelf)
+        self.assertFalse(
+            asset.location_id.stock_location_id,
+            "No accounting mapping: the origin is the only thing that knows",
+        )
+
+        self.env["custom.asset.report.damage.wizard"].create(
+            {
+                "asset_ids": [(6, 0, asset.ids)],
+                "description": "Broken on the odd shelf",
+                "move_serial": True,
+                "create_repair": False,
+            }
+        ).action_report_damage()
+        asset.invalidate_recordset()
+        self.assertEqual(asset.stock_location_id, damage_location)
+
+        log = asset.condition_log_ids.filtered(lambda line: line.event_type == "damage")
+        self.assertEqual(log.from_location_id, shelf, "The origin must be recorded")
+
+        asset.action_return_to_service()
+        asset.invalidate_recordset()
+        self.assertEqual(asset.condition, "ok")
+        self.assertEqual(asset.stock_location_id, shelf, "It must go back to the shelf it came off")

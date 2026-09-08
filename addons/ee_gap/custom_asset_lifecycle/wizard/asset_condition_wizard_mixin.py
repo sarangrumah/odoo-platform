@@ -96,6 +96,9 @@ class AssetConditionWizardMixin(models.AbstractModel):
             picking = self.env["stock.picking"]
             destination = self._destination_location(asset)
             self._check_destination_company(asset, destination)
+            # Read the origin before moving: afterwards the unit is in the damage
+            # or lost warehouse and where it came from is unrecoverable.
+            origin = asset._resolve_serial_source_location()
             if self.move_serial and asset.lot_id:
                 picking = asset._move_serial_to(destination, reference=self.reference or asset.code)
             logs |= asset._log_condition_event(
@@ -106,6 +109,7 @@ class AssetConditionWizardMixin(models.AbstractModel):
                 reference=self.reference,
                 picking_id=picking.id or None,
                 location_id=destination.id or None,
+                from_location_id=origin.id or None,
             )
             if extra_asset_vals:
                 asset.write(extra_asset_vals)

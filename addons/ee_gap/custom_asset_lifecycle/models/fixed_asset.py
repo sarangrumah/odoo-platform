@@ -226,6 +226,7 @@ class CustomFixedAsset(models.Model):
                 "maintenance_request_id": vals.get("maintenance_request_id"),
                 "picking_id": vals.get("picking_id"),
                 "location_id": vals.get("location_id"),
+                "from_location_id": vals.get("from_location_id"),
                 "move_id": vals.get("move_id"),
                 "replacement_asset_id": vals.get("replacement_asset_id"),
             }
@@ -278,14 +279,27 @@ class CustomFixedAsset(models.Model):
     # Serial movement helpers
     # ------------------------------------------------------------------
     def _home_stock_location(self):
-        """Where a repaired unit goes back to.
+        """Where a repaired or recovered unit goes back to.
 
-        The accounting asset location's stock counterpart is the stable answer;
-        the unit's current position is not, because by the time we ask it is
-        sitting in the damage warehouse.
+        Three answers, best first. The unit's current position is never one of
+        them -- by the time we ask, it is sitting in the damage warehouse.
+
+        1. **Where it actually was.** Recorded on the condition event that took
+           it away. Nothing else knows this as precisely, and it survives a fleet
+           that is spread across several locations.
+        2. The accounting asset location's stock counterpart, where Finance has
+           mapped one.
+        3. The company warehouse's stock location, as a last resort.
         """
         self.ensure_one()
-        return self.location_id.stock_location_id or self.env["stock.location"]
+        origin = self.condition_log_ids.filtered("from_location_id")[:1].from_location_id
+        if origin:
+            return origin
+        mapped = self.location_id.stock_location_id
+        if mapped:
+            return mapped
+        warehouse = self.env["stock.warehouse"].search([("company_id", "=", self.company_id.id)], limit=1)
+        return warehouse.lot_stock_id if warehouse else self.env["stock.location"]
 
     def _resolve_serial_source_location(self):
         """Where the serial *net* sits right now.
@@ -557,13 +571,27 @@ class CustomFixedAsset(models.Model):
                     )
                 )
             event = "found" if asset.condition == "missing" else "return_service"
-            picking = asset._move_serial_to(asset._home_stock_location(), reference=asset.code)
+            home = asset._home_stock_location()
+            if asset.lot_id and not home:
+                raise UserError(
+                    _(
+                        "Nowhere to return asset %(code)s to: it has no recorded "
+                        "origin, its asset location maps to no warehouse location, "
+                        "and %(company)s has no warehouse. Map the asset location "
+                        "or move the serial by hand.",
+                        code=asset.code,
+                        company=asset.company_id.name,
+                    )
+                )
+            source = asset._resolve_serial_source_location()
+            picking = asset._move_serial_to(home, reference=asset.code)
             asset._log_condition_event(
                 event,
                 condition_to="ok",
                 description=_("Returned to service."),
                 picking_id=picking.id if picking else None,
-                location_id=asset._home_stock_location().id or None,
+                location_id=home.id or None,
+                from_location_id=source.id or None,
             )
             rental = asset.rental_asset_id
             if rental and rental.state == "maintenance":

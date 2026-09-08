@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-08T00:10:42+00:00",
+  "generated_at": "2026-09-08T00:37:02+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "a2d1ca6",
+    "commit": "f4e24e4",
     "branch": "feat/asset-lifecycle-v2"
   },
   "buckets": [
@@ -2010,14 +2010,19 @@
       "module": "custom_asset_lifecycle",
       "bucket": "ee_gap",
       "name": "Custom Asset Lifecycle",
-      "version": "19.0.1.1.0",
+      "version": "19.0.1.2.0",
       "summary": "Damage / missing / repair / replacement lifecycle on top of the fixed-asset register, with the history attached to each serial",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
       "last_change": "2026-09-08",
-      "change_count": 1,
+      "change_count": 2,
       "changes": [
+        {
+          "sha": "f4e24e4",
+          "date": "2026-09-08",
+          "subject": "fix(assets): keep lifecycle destinations inside the asset's own company"
+        },
         {
           "sha": "16e7fe0",
           "date": "2026-09-08",

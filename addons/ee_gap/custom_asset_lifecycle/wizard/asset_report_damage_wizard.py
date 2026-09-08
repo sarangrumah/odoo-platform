@@ -14,8 +14,10 @@ class AssetReportDamageWizard(models.TransientModel):
         comodel_name="stock.location",
         string="Damage Location",
         domain="[('usage', '=', 'internal')]",
-        default=lambda self: self.env.company.asset_damage_location_id,
-        help="Leave empty to use the company's configured damage location.",
+        help="Leave empty to use each asset's own company configuration. "
+        "Deliberately not defaulted: a default drawn from the active company "
+        "would be pinned onto assets of a different one, and a location cannot "
+        "receive units across companies.",
     )
     create_repair = fields.Boolean(
         string="Open Repair Order",
