@@ -28,6 +28,13 @@
                     <group>
                         <group>
                             <field name="deployment_product_id"/>
+                            <field name="deployment_reconcilable" invisible="1"/>
+                            <div colspan="2" class="text-warning"
+                                 invisible="not deployment_product_id or deployment_reconcilable">
+                                This product carries no serial numbers, directly or through a
+                                kit. The dispatch will work, but the return check will have
+                                nothing to compare.
+                            </div>
                             <field name="deployment_qty"/>
                             <field name="deployment_spare_qty"/>
                         </group>

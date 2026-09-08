@@ -1,7 +1,7 @@
 ---
 status: authored
 module: custom_rental_sale
-manifest_version: 19.0.1.0.0
+manifest_version: 19.0.1.1.0
 ---
 
 # custom_rental_sale
@@ -49,6 +49,29 @@ leaves a trail instead of an invoice.
 **Units never reach a customer location.** Deployments run in
 `is_internal_loan` mode: Stock → On-Deployment and back, both internal. Nothing
 is delivered and nothing is sold, so no COGS and no valuation journal can result.
+
+## What may be dispatched
+
+The deployment product must be **dispatchable**, which is not the same as
+storable — and the difference is the whole case. ARKA-AIM's
+`Sewa Drone Show 1500 Unit` is a **service** product holding no stock of its own,
+carrying a phantom BOM that explodes into 1,500 serial-tracked drones. A guard
+demanding a storable product would reject the client's own bundle, the primary
+thing this module exists to dispatch.
+
+So the constraint accepts either shape and rejects only what stock genuinely
+cannot send: storable on its own, or a kit with a phantom BOM. A plain service
+with no BOM is refused at the point of choosing it, rather than producing a
+dispatch document whose only move is for a service product — which is what
+happened before 19.0.1.1.0, and was discovered by Ops rather than by whoever
+picked it.
+
+Separately, `deployment_reconcilable` says whether a dispatch will carry serials
+at all — directly, or through the kit's components. When it will not, the form
+warns rather than blocks: a quantity-only dispatch is a legitimate thing to want,
+but `_check_returned_serials` compares dispatched serials against returned ones
+and short-circuits when there are none, so it passes **without comparing
+anything**. That silence is worth one sentence up front.
 
 ## Gotchas
 
@@ -114,7 +137,7 @@ The damage and lost/missing locations come from `custom_asset_lifecycle`
 
 ## Tests
 
-`tests/test_rental_sale.py` — 13 tests. The bridge (a confirmed sale creates a
+`tests/test_rental_sale.py` — 17 tests. The bridge (a confirmed sale creates a
 money-free draft deployment; opting out leaves Sales untouched; a missing
 location notes the order rather than blocking the sale; the window defaults from
 the show date), the guards (a deployment cannot carry a rate, cannot invoice

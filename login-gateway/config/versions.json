@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-08T04:38:22+00:00",
+  "generated_at": "2026-09-08T04:59:19+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "aaf29c82",
-    "branch": "feat/arkaaim-show-cost-chargeout"
+    "commit": "483edde9",
+    "branch": "fix/deployment-product-validation"
   },
   "buckets": [
     {
@@ -242,9 +242,9 @@
       "change_count": 12,
       "changes": [
         {
-          "sha": "aaf29c82",
+          "sha": "483edde9",
           "date": "2026-09-08",
-          "subject": "feat(arkaaim): charge a show's cost out of inventory when its revenue is recognised"
+          "subject": "feat(arkaaim): charge a show's cost out of inventory when its revenue is recognised (#234)"
         },
         {
           "sha": "00a7efb2",
@@ -4440,7 +4440,7 @@
       "module": "custom_rental_sale",
       "bucket": "ee_gap",
       "name": "Custom Rental — Sales Bridge",
-      "version": "19.0.1.0.0",
+      "version": "19.0.1.1.0",
       "summary": "Dispatch the units behind a sales order and reconcile what comes back, without moving the commercial document off Sales",
       "category": "Sales/Rental",
       "depends": 3,

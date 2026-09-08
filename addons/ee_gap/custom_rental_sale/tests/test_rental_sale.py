@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -380,3 +380,89 @@ class TestRentalSaleBridge(TransactionCase):
             self.on_deployment,
             "A serial must be in exactly one place after a dispatch",
         )
+
+    # ------------------------------------------------------------------
+    # What may be dispatched
+    # ------------------------------------------------------------------
+    def test_a_service_with_no_kit_cannot_be_dispatched(self):
+        """The mis-selection this guard exists for.
+
+        Before it, picking a plain service produced a deployment and then a
+        picking whose only move was for a service product -- a dispatch document
+        that moves nothing, discovered by Ops rather than by the person who
+        chose it.
+        """
+        with self.assertRaises(ValidationError):
+            self.env["sale.order"].create(
+                {
+                    "partner_id": self.customer.id,
+                    "order_line": [(0, 0, {"product_id": self.service.id, "product_uom_qty": 1})],
+                    "deployment_product_id": self.service.id,
+                }
+            )
+
+    def test_a_kit_of_storable_components_is_accepted_even_though_it_is_a_service(self):
+        """The rule is dispatchable, not storable, and the difference is the case.
+
+        ARKA-AIM's "Sewa Drone Show 1500 Unit" is a *service* product holding no
+        stock, carrying a phantom BOM that explodes into 1,500 serial-tracked
+        drones. A guard demanding a storable product would reject the client's
+        own bundle -- the primary case this module was built for.
+        """
+        bundle = self.env["product.product"].create({"name": "RS Show Bundle", "type": "service"})
+        self.env["mrp.bom"].create(
+            {
+                "product_tmpl_id": bundle.product_tmpl_id.id,
+                "type": "phantom",
+                "product_qty": 1.0,
+                "bom_line_ids": [(0, 0, {"product_id": self.drone.id, "product_qty": 1500.0})],
+            }
+        )
+        order = self.env["sale.order"].create(
+            {
+                "partner_id": self.customer.id,
+                "order_line": [(0, 0, {"product_id": self.service.id, "product_uom_qty": 1})],
+                "deployment_product_id": bundle.id,
+            }
+        )
+        self.assertEqual(order.deployment_product_id, bundle)
+        self.assertTrue(
+            order.deployment_reconcilable,
+            "A kit of serial-tracked components does yield serials to reconcile",
+        )
+
+    def test_a_storable_product_is_accepted(self):
+        order = self.env["sale.order"].create(
+            {
+                "partner_id": self.customer.id,
+                "order_line": [(0, 0, {"product_id": self.service.id, "product_uom_qty": 1})],
+                "deployment_product_id": self.drone.id,
+            }
+        )
+        self.assertEqual(order.deployment_product_id, self.drone)
+        self.assertTrue(order.deployment_reconcilable)
+
+    def test_a_dispatch_with_no_serials_warns_rather_than_blocks(self):
+        """Quantity-only dispatch is legitimate; silent non-checking is not."""
+        bulk = self.env["product.product"].create(
+            {
+                "name": "RS Bulk Crate",
+                "is_storable": True,
+                "tracking": "none",
+                "categ_id": self.categ.id,
+            }
+        )
+        order = self.env["sale.order"].create(
+            {
+                "partner_id": self.customer.id,
+                "order_line": [(0, 0, {"product_id": self.service.id, "product_uom_qty": 1})],
+                "deployment_product_id": bulk.id,
+            }
+        )
+        self.assertFalse(
+            order.deployment_reconcilable,
+            "Nothing serial-tracked, so the return check would compare nothing",
+        )
+        warning = order._onchange_deployment_product_id()
+        self.assertTrue(warning and "warning" in warning)
+        self.assertIn("no serials", warning["warning"]["title"].lower())
