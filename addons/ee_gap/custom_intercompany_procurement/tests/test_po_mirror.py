@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """What the buyer wrote on the PO has to reach the selling company."""
 
+from unittest.mock import patch
+
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -138,3 +141,32 @@ class TestIcPoMirror(TransactionCase):
             )
         )
         self.assertFalse(self._mirror_of(po))
+
+    # ------------------------------------------------------------------
+    # Auto-confirm
+    # ------------------------------------------------------------------
+    def test_mirror_waits_as_a_quotation_by_default(self):
+        so = self._mirror_of(self._po())
+        self.assertEqual(so.state, "draft")
+
+    def test_auto_confirm_turns_the_mirror_into_a_sales_order(self):
+        self.rule.auto_confirm_mirror_so = True
+        so = self._mirror_of(self._po())
+        self.assertEqual(so.state, "sale")
+
+    def test_failed_auto_confirm_leaves_the_quotation_behind(self):
+        """A confirmation that raises must not cost us the mirror."""
+        self.rule.auto_confirm_mirror_so = True
+
+        def boom(*args, **kwargs):
+            raise UserError("Show date is required.")
+
+        po = self._po()
+        with patch.object(type(self.env["sale.order"]), "action_confirm", boom):
+            so = self._mirror_of(po)
+        self.assertTrue(so, "the mirror itself must survive a failed confirm")
+        self.assertEqual(so.state, "draft")
+        self.assertTrue(
+            any("could not be confirmed" in (m.body or "") for m in po.message_ids),
+            "the buyer has to be told on the PO chatter",
+        )

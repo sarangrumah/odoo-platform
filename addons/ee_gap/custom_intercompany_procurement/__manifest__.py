@@ -4,11 +4,13 @@
     "summary": "Auto-mirror purchase.order + stock.picking antar sister company (Erajaya group pattern)",
     "description": """
 Extends ``account.intercompany.rule`` from ``custom_accounting_full`` with
-two new mirror toggles:
+new mirror toggles:
 
 * ``mirror_purchase_order`` — when PO is confirmed in Company A against a
   partner that represents Company B, a draft sales order is created in
   Company B (and vice-versa).
+* ``auto_confirm_mirror_so`` — confirm that mirror immediately instead of
+  leaving it as a quotation for the receiving company to pick up.
 * ``mirror_picking`` — when an outgoing picking is validated in the
   selling company, a matching incoming picking is created in the
   receiving company.
@@ -18,7 +20,7 @@ PT B (sister company); previously only the GL invoice was mirrored.
 """,
     "author": "Custom Platform",
     "category": "Inventory/Purchase",
-    "version": "19.0.0.2.0",
+    "version": "19.0.0.3.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",

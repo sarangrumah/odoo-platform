@@ -7,8 +7,10 @@ mirroring. Here we add:
 * ``mirror_purchase_order`` — PO confirmed in A → draft SO created in B
 * ``mirror_picking``        — outgoing picking validated in A → incoming
                               picking created in B
+* ``auto_confirm_mirror_so`` — that mirrored SO is confirmed straight away
+                              instead of waiting as a quotation
 
-Both default OFF for safety. Receiving-side journals/warehouses must
+All default OFF for safety. Receiving-side journals/warehouses must
 exist; if not, mirror fails gracefully and posts a chatter note.
 """
 
@@ -40,6 +42,15 @@ class IntercompanyRule(models.Model):
         domain="[('company_id', '=', company_to_id)]",
         help="Default warehouse where mirrored incoming pickings land. "
         "If empty, the first warehouse of the receiving company is used.",
+    )
+    auto_confirm_mirror_so = fields.Boolean(
+        string="Auto-confirm Mirror SO",
+        default=False,
+        help="Confirm the mirrored sales order immediately instead of leaving it "
+        "as a quotation for the receiving company to review. Leave OFF when the "
+        "receiving company still has to price or tax the order by hand; a "
+        "confirmation that fails is reported on the buyer's purchase order and "
+        "leaves the quotation in place.",
     )
     target_sale_journal_id = fields.Many2one(
         "account.journal",
