@@ -39,8 +39,13 @@ which is worse than today. Both columns are summed.
 What it does
 ------------
 
-Per (lot, location): keep the lowest-id row, write it the **sum** of both columns,
-delete the rest. Then delete any row that ends at 0 on both columns -- leaving a
+Per (product, lot, location, package, owner) -- Odoo's own notion of a distinct
+quant, not merely (lot, location): keep the lowest-id row, write it the **sum** of
+both columns, delete the rest. Collapsing on (lot, location) alone would merge two
+genuinely different holdings if one were in a package or under a different owner.
+No such case exists on prd_arkaaim today, which is exactly when a shortcut like
+that gets taken and survives until the data changes -- ``owner_id`` has already
+bitten this platform once, on the Levi's consignment receipts. Then delete any row that ends at 0 on both columns -- leaving a
 zero row simply recreates the thing that gets decremented next time. 11,929 rows
 become 3,590: one per unit, where the unit actually is.
 
@@ -108,6 +113,28 @@ def net_per_lot_ok(env):
     return env.cr.fetchone()[0]
 
 
+def out_of_scope(env):
+    """Asset serials with no internal quant at all.
+
+    ``net_per_lot_ok`` groups internal rows, so a serial sitting entirely in a
+    transit location produces no group and would never trip the net check. It
+    would be silently skipped rather than corrupted -- but silently is the part
+    worth fixing. None exist on prd_arkaaim; say so out loud anyway.
+    """
+    env.cr.execute(
+        """
+        SELECT count(*) FROM custom_fixed_asset a
+        WHERE a.lot_id IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM stock_quant q
+              JOIN stock_location l ON l.id = q.location_id
+              WHERE q.lot_id = a.lot_id AND l.usage = 'internal'
+          )
+        """
+    )
+    return env.cr.fetchone()[0]
+
+
 def repair(env):
     section("before")
     before = snapshot(env)
@@ -119,6 +146,14 @@ def repair(env):
         before["qty"],
         before["reserved"],
     )
+
+    outside = out_of_scope(env)
+    if outside:
+        _logger.warning(
+            "%s asset serial(s) have no quant in an internal location -- they are "
+            "outside this repair and are left alone",
+            outside,
+        )
 
     off_net = net_per_lot_ok(env)
     if off_net:
@@ -134,13 +169,17 @@ def repair(env):
         """
         WITH target AS (
             SELECT q.id, q.lot_id, q.location_id, q.quantity, q.reserved_quantity,
-                   min(q.id) OVER (PARTITION BY q.lot_id, q.location_id) AS keep_id,
-                   sum(q.quantity) OVER (PARTITION BY q.lot_id, q.location_id) AS net_qty,
-                   sum(q.reserved_quantity) OVER (PARTITION BY q.lot_id, q.location_id) AS net_res
+                   min(q.id) OVER w AS keep_id,
+                   sum(q.quantity) OVER w AS net_qty,
+                   sum(q.reserved_quantity) OVER w AS net_res
             FROM stock_quant q
             JOIN stock_location l ON l.id = q.location_id
             WHERE l.usage = 'internal'
               AND q.lot_id IN (SELECT lot_id FROM custom_fixed_asset WHERE lot_id IS NOT NULL)
+            WINDOW w AS (
+                PARTITION BY q.product_id, q.lot_id, q.location_id,
+                             COALESCE(q.package_id, -1), COALESCE(q.owner_id, -1)
+            )
         ),
         updated AS (
             UPDATE stock_quant q
@@ -199,8 +238,9 @@ def repair(env):
         problems.append("total quantity moved from %s to %s" % (before["qty"], after["qty"]))
     if net_per_lot_ok(env):
         problems.append("some serial no longer nets to 1")
-    if after["rows"] != assets:
-        problems.append("%s row(s) for %s asset serial(s)" % (after["rows"], assets))
+    expected = assets - outside
+    if after["rows"] != expected:
+        problems.append("%s row(s) for %s in-scope asset serial(s)" % (after["rows"], expected))
     if problems:
         raise AssertionError("; ".join(problems))
     _logger.info(
