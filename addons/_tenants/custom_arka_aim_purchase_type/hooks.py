@@ -20,14 +20,24 @@ _SEQUENCES = [
     ("non_trade", "arka_aim.purchase_order_nontrade", "ARKA-AIM Purchase Order (Non-Trade)", "PO/NT"),
 ]
 
-# Account codes from the tenant chart. Trade deliberately has no GR/IR: a
-# real-time Trade category keeps its own per-category stock-variation account.
+# Account codes, tried in order, first one present in the company's chart wins.
+# Both streams clear their goods-receipt accrual through a GR/IR account of their
+# own wherever the chart has two, so a Trade and a Non-Trade balance never mix.
+#
+# Two charts are in play. The tenant's Erajaya chart (prd_arkaaim) has the full
+# split. The training database runs the plain Indonesian chart, which has ONE
+# payable and ONE interim-stock account -- there the two streams necessarily
+# share them, which is correct for that chart rather than a fallback: the
+# clearing still nets to zero, it just is not split by stream.
 ACCOUNT_CODES = {
-    "trade": {"payable": "2103100001"},
+    "trade": {
+        "payable": ("2103100001", "21100010"),
+        "grir": ("2103109199", "29000000"),
+    },
     "non_trade": {
-        "payable": "2103300001",
-        "grir": "2103300008",
-        "expense": "7799000000",
+        "payable": ("2103300001", "21100010"),
+        "grir": ("2103300008", "29000000"),
+        "expense": ("7799000000",),
     },
 }
 
@@ -53,8 +63,8 @@ def _upsert_sequence(env, code, name, prefix, company):
     return Seq.create(vals)
 
 
-def _find_account(env, company, code):
-    """Account by (company-dependent) code, resolved for ``company``.
+def _find_account(env, company, codes):
+    """First of ``codes`` that exists in ``company``'s chart, as a record.
 
     Two filters are both needed. ``code`` is company-dependent in Odoo 19, so it
     has to be read in the company's context. And the tenant chart holds one
@@ -64,13 +74,14 @@ def _find_account(env, company, code):
     filter the search would return whichever row came first and happily wire AIM's
     payable onto ARKA's bills.
     """
-    if not code:
-        return env["account.account"].browse()
-    return (
-        env["account.account"]
-        .with_company(company)
-        .search([("code", "=", code), ("company_ids", "in", company.id)], limit=1)
-    )
+    Account = env["account.account"]
+    for code in codes or ():
+        account = Account.with_company(company).search(
+            [("code", "=", code), ("company_ids", "in", company.id)], limit=1
+        )
+        if account:
+            return account
+    return Account.browse()
 
 
 def _ensure_payable(account):

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-08T03:50:32+00:00",
+  "generated_at": "2026-09-08T04:03:03+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "dab8ba97",
-    "branch": "rs-rebuild"
+    "commit": "b24e84de",
+    "branch": "feat/arkaaim-gr-journal"
   },
   "buckets": [
     {
@@ -161,14 +161,24 @@
       "module": "custom_arka_aim_purchase_type",
       "bucket": "_tenants",
       "name": "ARKA-AIM Trade / Non-Trade Purchases",
-      "version": "19.0.1.0.1",
-      "summary": "Trade vs Non-Trade purchase stream for ARKA-AIM: own PO numbering, AP / GR-IR account routing, and Transfer to Asset on a Non-Trade goods receipt.",
+      "version": "19.0.1.2.0",
+      "summary": "Trade vs Non-Trade purchase stream for ARKA-AIM: own PO numbering, the GR/IR journal at goods receipt, AP / GR-IR account routing, and Transfer to Asset on a Non-Trade goods receipt.",
       "category": "Tenants/ARKA-AIM",
       "depends": 5,
       "public": false,
       "last_change": "2026-09-08",
-      "change_count": 1,
+      "change_count": 3,
       "changes": [
+        {
+          "sha": "b24e84de",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): wire the GR/IR accrual to the training chart as well"
+        },
+        {
+          "sha": "1756c37d",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): book the GR/IR accrual when a goods receipt is validated"
+        },
         {
           "sha": "e4d5c4c0",
           "date": "2026-09-08",
@@ -4440,9 +4450,15 @@
       "category": "Sales/Rental",
       "depends": 3,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-09-08",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "f433726b",
+          "date": "2026-09-08",
+          "subject": "feat(rental): dispatch the units behind a sales order, and reconcile what comes back (#227)"
+        }
+      ]
     },
     {
       "module": "custom_repairs",

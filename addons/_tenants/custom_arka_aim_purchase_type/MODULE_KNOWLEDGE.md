@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-09-08T00:00:00Z
 generator: hand-authored
 module: custom_arka_aim_purchase_type
-manifest_version: 19.0.1.0.1
+manifest_version: 19.0.1.2.0
 ---
 
 # custom_arka_aim_purchase_type
@@ -43,7 +43,11 @@ Two separate asks from the tenant, which turn out to be one feature:
 4. `account.move.line._compute_account_id` routes the bill's payment-term line to
    that stream's AP control account, and — where a goods-receipt accrual really
    was booked — its product lines to the stream's GR/IR clearing account.
-5. The goods receipt stores the stream (`stock.picking.l10n_purchase_type`).
+5. The goods receipt stores the stream (`stock.picking.l10n_purchase_type`) and,
+   for a real-time valued category, posts the accrual straight away:
+   `Dr Stock Valuation / Cr GR/IR clearing`. The bill in step 4 then debits the
+   same GR/IR account, so the pair nets to zero and the value received sits on
+   the balance sheet from the receipt date instead of from the invoice date.
 6. On a validated **Non-Trade** receipt, *Convert to Assets* is offered. Every
    received line is listed, pre-selected, as a pooled asset; confirming creates
    one draft `custom.fixed.asset` per line carrying the received quantity and the
@@ -56,6 +60,9 @@ Two separate asks from the tenant, which turn out to be one feature:
 | `purchase.order` | `_arka_next_po_number()` | Draws from the stream sequence; `False` falls back to core |
 | `account.move` | `l10n_purchase_type` | Copied from the PO; hand-settable on a manual bill |
 | `account.move.line` | `_compute_account_id()`, `_arka_grir_account()` | AP / GR-IR / expense-fallback routing |
+| `stock.move` | `_action_done()`, `_arka_post_gr_journal()`, `_arka_post_return_journal()` | Books / releases the GR-IR accrual, idempotent on `ref` |
+| `stock.move` | `_arka_grir_amount()` | Receipt = `move.value`; a return = its share of the receipt it reverses |
+| `arka.purchase.account.map` | `_grir_account()` | The one resolver both the receipt and the bill go through |
 | `stock.picking` | `l10n_purchase_type` (stored), `_arka_is_nontrade_receipt()` | Stream on the receipt |
 | `stock.picking` | `_compute_has_rental_asset_lines()` | Also True on a validated Non-Trade receipt |
 | `arka.purchase.account.map` | `company_id`, `purchase_type`, `payable_account_id`, `grir_account_id`, `expense_account_id` | The wiring, one row per company and stream |
@@ -71,10 +78,29 @@ Seeded idempotently by `post_init_hook` (`hooks.py`), re-run on every upgrade:
   `account.account.code` is company-dependent in Odoo 19 and the ids differ per
   database:
 
+  Each entry is an ordered list of candidate codes; the first one present in the
+  company's chart wins, because the two ARKA-AIM databases run different charts:
+
   | Stream | Payable | GR/IR clearing | Expense fallback |
   |---|---|---|---|
-  | Trade | `2103100001` | *(none — see below)* | *(none)* |
-  | Non-Trade | `2103300001` | `2103300008` | `7799000000` (Other operating expense) |
+  | Trade | `2103100001` / `21100010` | `2103109199` / `29000000` | *(none)* |
+  | Non-Trade | `2103300001` / `21100010` | `2103300008` / `29000000` | `7799000000` |
+
+  `prd_arkaaim` runs the Erajaya chart (first code of each pair) and splits the
+  streams properly. `trn_arkaaim` runs the plain Indonesian chart, which has ONE
+  payable and ONE `29000000 Interim Stock`; there the two streams necessarily
+  share them. That is correct for that chart, not a degraded fallback — the
+  clearing still nets to zero, it simply is not split by stream.
+
+  `post_init_hook` runs on **install only**, so already-installed tenants are
+  seeded by `migrations/19.0.1.1.0/` (the Trade GR/IR account) and
+  `migrations/19.0.1.2.0/` (the second chart's codes).
+
+Booking the GR journal additionally needs, per company: the product category
+real-time valued with a stock valuation account and a stock journal, plus the
+`custom_arka_aim_purchase_type.suppress_gr_journal` parameter left at `"0"`.
+`scripts/tenants/arkaaim/enable_gr_journal.py` is that configuration (preview by
+default) and documents which categories are switched on and why.
 
 Only empty fields are filled, so a hand-corrected mapping survives an upgrade.
 Account **types** are normalised on every run: an AP control account is coerced
@@ -85,16 +111,37 @@ reconcilable.
 company form (Non-Trade Assets tab) once the tenant decides which one it is.
 
 ## Gotchas
-* **Trade deliberately has no GR/IR account in the mapping.** A real-time Trade
-  category keeps its own per-category stock-variation account; the mapping only
-  overrides it for Non-Trade.
-* **The GR/IR routing is inert on ARKA-AIM today.** `_arka_grir_account()`
-  requires a PO-linked line, a goods product, and a `real_time` valued category —
-  the exact condition under which a receipt posts Dr Stock Valuation / Cr Stock
-  Variation. Every ARKA-AIM product category is currently periodic, so bills keep
-  their native account. Routing them to GR/IR without a matching accrual would
-  strand a balance in `2103300008` forever. The mapping is configured so that
-  switching a category to real-time starts working without a code change.
+* **The GR journal is posted by this module, not by core valuation.** Odoo 19
+  takes the receipt's counterpart account from
+  `stock.location.valuation_account_id`, but the Vendors location is SHARED
+  across companies (`company_id` empty) and holds a single account, while
+  ARKA-AIM runs two companies with separate charts and needs a different GR/IR
+  per purchase stream on top of that. One shared field cannot express that, so
+  `stock.move._arka_book_grir_entry` builds the entry. `_should_create_account_move`
+  returns False for vendor moves we book ourselves, so configuring a location
+  account later cannot produce a second entry.
+* **A vendor return is NOT worth `move.value`.** An outgoing move is valued by
+  the cost method — under standard costing that is the product's standard price,
+  which on this tenant is unset. Releasing the accrual at that value would strand
+  the difference in the clearing account forever, so `_arka_grir_amount()` values
+  a return as its share of the receipt it reverses (`origin_returned_move_id`).
+  A return picking also carries no purchase order, so its stream is read from the
+  receipt it reverses.
+* **Both sides of the accrual resolve the account through the same helper**
+  (`arka.purchase.account.map._grir_account`). They cannot be allowed to drift:
+  if the receipt credits one account and the bill debits another, neither ever
+  clears. For the same reason, an unmapped stream books NOTHING rather than
+  falling back to a guessed account.
+* **The bill side gates on "was it actually received", not on product type.**
+  ARKA-AIM receives service-typed products through `custom_service_receipt` and
+  those receipts do raise an accrual, so `_arka_grir_account()` looks for a done
+  move in from a supplier location on the purchase line. A bill raised before the
+  goods arrive has no accrual to relieve and keeps its own account.
+* **A periodic category is untouched.** `real_time` is the switch: it gates the
+  receipt posting and the bill routing alike, so a category can be brought in one
+  at a time. **Fixed Assets (Non-Valuated)** is deliberately left periodic —
+  its drones are capitalised through the asset register, and accruing them as
+  inventory as well would book their value twice.
 * **The tenant chart holds one account record per company under the same code.**
   `2103300001` exists twice — one row owned by AIM, one by ARKA — and the hook runs
   as superuser, where the multi-company record rule does not apply. `_find_account`
@@ -137,6 +184,13 @@ company form (Non-Trade Assets tab) once the tenant decides which one it is.
 hooks this module overrides).
 
 ## Tests
+`tests/test_gr_journal.py` — the receipt posts Dr valuation / Cr GR-IR for the
+purchase value, posting is idempotent, a periodic category / the switch off / an
+unmapped stream / an internal transfer all book nothing, the bill relieves the
+same account and flattens the clearing balance, a bill without a receipt keeps
+its own account, and a vendor return releases the accrued amount rather than the
+standard cost.
+
 `tests/test_purchase_type.py` — separate numbering streams with independent
 monthly counters, bill stream inheritance and payable routing, GR/IR staying
 inert for a periodic category, a Non-Trade receipt offering an unflagged product,
