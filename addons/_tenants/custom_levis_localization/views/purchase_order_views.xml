@@ -9,6 +9,8 @@
             <field name="partner_id" position="after">
                 <field name="l10n_purchase_type" widget="radio" options="{'horizontal': True}"/>
                 <field name="l10n_ou_analytic_display" readonly="1"/>
+                <field name="l10n_dup_sku_ack" invisible="1"/>
+                <field name="l10n_dup_sku_reason" readonly="1" invisible="not l10n_dup_sku_ack"/>
             </field>
         </field>
     </record>

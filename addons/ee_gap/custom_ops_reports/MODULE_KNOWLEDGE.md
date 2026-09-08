@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-16T00:00:00Z
 generator: hand-authored
 module: custom_ops_reports
-manifest_version: 19.0.0.1.0
+manifest_version: 19.0.0.2.0
 ---
 
 # custom_ops_reports
@@ -53,10 +53,14 @@ This module defines no stored fields. The fields it *reads* and that constrain
 the reports:
 
 - `custom.fixed.asset.serial_number` — added by the **tenant** module
-  `custom_arka_aim_asset_register`, not by the generic asset app; it is the only
-  join key back to rental/BAST records. This module does **not** depend on that
-  tenant module, so the field may be absent — `_has_serial()` guards every read
-  and the enrichment degrades to blank.
+  `custom_arka_aim_asset_register`, not by the generic asset app. It is a
+  *display* column: the physical serial printed on the unit, blank on the many
+  units that carry none. This module does **not** depend on that tenant module,
+  so the field may be absent — `_has_serial()` guards every read.
+- `custom.fixed.asset.lot_id` and `.rental_asset_ids` — added by
+  `custom_asset_from_receipt`; these are the **join keys** #15 uses for the
+  operational state and the condition. Also guarded, with a serial-string match
+  as the fallback for a database with no link module.
 - `stock.move.is_loan` — added by `custom_rental`; drives the Rental vs Tool/Loan
   column.
 - `maintenance.request.x_spare_part_ids` — many2many with **no per-part
@@ -96,10 +100,14 @@ contract. Per wizard: `action_view()` (from the mixin) and
   thousands of rows), so they are not registered in the QWeb router in
   `reports/report_common.xml`. Only codes needing a PDF go there — the branch P&L
   is the precedent.
-- **#15's enrichment is best-effort, matched on the serial string.** There is no
-  FK from the accounting asset register to `rental.asset` or to BAST lines, so
-  operational state and condition are looked up by serial and come back blank
-  when nothing matches. Do not read a blank condition as "good".
+- **#15's enrichment is best-effort, and it follows FKs — not the serial.** It
+  used to match `rental.asset` and BAST lines on the `serial_number` *string*,
+  which only ever worked because the materialise-into-stock wizard back-filled
+  every serial with the asset code. Once a register carries real printed serials
+  (and blanks for units that have none), a string join silently drops rows — so
+  the report now goes through `rental.asset.fixed_asset_id` and
+  `custom.fixed.asset.lot_id`. State and condition still come back blank when
+  nothing matches; do not read a blank condition as "good".
 - **The two `x_sla_status` fields are not the same selection.**
   `maintenance.request` uses `ok/warn/breach/done`; `repair.order` uses
   `on_track/at_risk/breached/done`. Never share a label map between #18 and #19.

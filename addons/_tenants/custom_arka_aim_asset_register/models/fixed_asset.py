@@ -30,10 +30,16 @@ class CustomFixedAssetGroup(models.Model):
 class CustomFixedAsset(models.Model):
     _inherit = "custom.fixed.asset"
 
+    # The register is looked up by serial on the floor, so the serial has to be
+    # reachable from the plain search box and from any m2o picker -- not only
+    # from the "Search Serial Number for:" dropdown entry.
+    _rec_names_search = ["name", "code", "serial_number"]
+
     serial_number = fields.Char(
         index=True,
         copy=False,
-        help="Physical serial number from the asset listing (blank for spares/consumables that carry no serial).",
+        help="Physical serial number from the asset listing (blank for spares/consumables that carry no serial). "
+        "Not unique: the client's own listing repeats eight battery serials.",
     )
     source_group = fields.Char(
         string="Source Asset Group",
@@ -43,3 +49,16 @@ class CustomFixedAsset(models.Model):
         string="Source Description",
         help="Asset Description as it appears in the source listing (provenance).",
     )
+
+    @api.model
+    def _seed_aim_asset_serials(self):
+        """Data-hook entry point: (re)write the physical serials on every upgrade.
+
+        Delegates to ``hooks.load_serial_numbers`` (lazy import, as above). It
+        only touches a serial that is blank or a copy of the asset code, so it is
+        idempotent and never clobbers a serial a human corrected by hand.
+        """
+        from ..hooks import load_serial_numbers
+
+        load_serial_numbers(self.env)
+        return True

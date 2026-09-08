@@ -14,6 +14,7 @@ which is the whole reason this table exists.
 """
 
 from collections import defaultdict
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -25,24 +26,66 @@ class LevisBankMidMapWizard(models.TransientModel):
 
     company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company)
     run_id = fields.Many2one("levis.pos.clearing", string="Clearing Run")
-    date_from = fields.Date(required=True)
-    date_to = fields.Date(required=True)
+    date_from = fields.Date(required=True, default=lambda self: self._default_date_from())
+    date_to = fields.Date(required=True, default=lambda self: self._default_date_to())
     journal_ids = fields.Many2many(
         "account.journal",
         string="Bank Journals",
         domain="[('type', '=', 'bank'), ('company_id', '=', company_id)]",
     )
     line_ids = fields.One2many("levis.bank.mid.map.wizard.line", "wizard_id")
-    unmapped_line_count = fields.Integer(compute="_compute_unmapped")
-    unmapped_total = fields.Monetary(compute="_compute_unmapped", currency_field="currency_id")
+    unmapped_line_count = fields.Integer(compute="_compute_unmapped", string="Statement Lines")
+    unmapped_total = fields.Monetary(
+        compute="_compute_unmapped",
+        currency_field="currency_id",
+        string="Bank Amount",
+        help="What the bank actually moved on those statement lines \u2014 the figure "
+        "that ties to the account mutation, net of the acquirer fee.",
+    )
+    unmapped_gross = fields.Monetary(
+        compute="_compute_unmapped",
+        currency_field="currency_id",
+        string="Narrative Gross",
+        help="The takings the narratives claim, before the acquirer fee.",
+    )
+    unmapped_mdr = fields.Monetary(
+        compute="_compute_unmapped",
+        currency_field="currency_id",
+        string="Narrative MDR",
+    )
+    unmapped_gap = fields.Monetary(
+        compute="_compute_unmapped",
+        currency_field="currency_id",
+        string="Unexplained",
+        help="Bank amount minus (gross \u2212 MDR). Anything other than zero means a "
+        "narrative does not add up to the money that moved.",
+    )
     currency_id = fields.Many2one(related="company_id.currency_id")
     scanned = fields.Boolean(default=False)
 
-    @api.depends("line_ids.line_count", "line_ids.total_amount")
+    @api.depends(
+        "line_ids.line_count",
+        "line_ids.total_amount",
+        "line_ids.gross_total",
+        "line_ids.mdr_total",
+        "line_ids.narrative_gap",
+    )
     def _compute_unmapped(self):
         for wizard in self:
             wizard.unmapped_line_count = sum(wizard.line_ids.mapped("line_count"))
             wizard.unmapped_total = sum(wizard.line_ids.mapped("total_amount"))
+            wizard.unmapped_gross = sum(wizard.line_ids.mapped("gross_total"))
+            wizard.unmapped_mdr = sum(wizard.line_ids.mapped("mdr_total"))
+            wizard.unmapped_gap = sum(wizard.line_ids.mapped("narrative_gap"))
+
+    @api.model
+    def _default_date_from(self):
+        """Last month, so the standalone menu entry opens on something real."""
+        return (fields.Date.context_today(self).replace(day=1) - timedelta(days=1)).replace(day=1)
+
+    @api.model
+    def _default_date_to(self):
+        return fields.Date.context_today(self).replace(day=1) - timedelta(days=1)
 
     # ------------------------------------------------------------------
     def action_scan(self):
@@ -65,7 +108,17 @@ class LevisBankMidMapWizard(models.TransientModel):
             ]
         )
         rules_cache = {}
-        buckets = defaultdict(lambda: {"count": 0, "amount": 0.0, "sample": "", "narrative": ""})
+        buckets = defaultdict(
+            lambda: {
+                "count": 0,
+                "amount": 0.0,
+                "gross": 0.0,
+                "mdr": 0.0,
+                "sample": "",
+                "narrative": "",
+                "statement_ids": [],
+            }
+        )
         for statement_line in statement_lines:
             journal = statement_line.journal_id
             if journal.id not in rules_cache:
@@ -90,6 +143,14 @@ class LevisBankMidMapWizard(models.TransientModel):
             bucket = buckets[key]
             bucket["count"] += 1
             bucket["amount"] += statement_line.amount
+            # The narrative's own figures, kept next to the bank's. A group is a
+            # sum over many statement lines while only one narrative is shown as a
+            # sample, so the bank amount on its own cannot be checked against any
+            # single line of the account mutation. Gross and MDR alongside it can:
+            # gross - MDR is what the bank should have moved.
+            bucket["gross"] += parsed["gross"] or 0.0
+            bucket["mdr"] += parsed["mdr"] or 0.0
+            bucket["statement_ids"].append(statement_line.id)
             bucket.setdefault("channels", set()).add(parsed["channel"])
             if not bucket["sample"]:
                 bucket["sample"] = statement_line.payment_ref or ""
@@ -111,6 +172,9 @@ class LevisBankMidMapWizard(models.TransientModel):
                     "channel": self._dominant_channel(bucket.get("channels")),
                     "line_count": bucket["count"],
                     "total_amount": bucket["amount"],
+                    "gross_total": bucket["gross"],
+                    "mdr_total": bucket["mdr"],
+                    "statement_line_ids": [(6, 0, bucket["statement_ids"])],
                     "sample_narrative": bucket["sample"],
                     "analytic_account_id": self._suggest_analytic(bucket["narrative"], analytics).id or False,
                 },
@@ -150,6 +214,9 @@ class LevisBankMidMapWizard(models.TransientModel):
             into = merged[target]
             into["count"] += bucket["count"]
             into["amount"] += bucket["amount"]
+            into["gross"] += bucket.get("gross") or 0.0
+            into["mdr"] += bucket.get("mdr") or 0.0
+            into["statement_ids"] = list(into.get("statement_ids") or ()) + list(bucket.get("statement_ids") or ())
             into.setdefault("channels", set()).update(bucket.get("channels") or ())
             if not into.get("sample"):
                 into["sample"] = bucket.get("sample")
@@ -233,7 +300,7 @@ class LevisBankMidMapWizard(models.TransientModel):
             "res_model": self._name,
             "res_id": self.id,
             "view_mode": "form",
-            "target": "new",
+            "target": "current",
         }
 
 
@@ -266,8 +333,41 @@ class LevisBankMidMapWizardLine(models.TransientModel):
         readonly=True,
     )
     line_count = fields.Integer(string="Statement Lines", readonly=True)
-    total_amount = fields.Monetary(currency_field="currency_id", readonly=True)
-    sample_narrative = fields.Char(readonly=True)
+    total_amount = fields.Monetary(
+        currency_field="currency_id",
+        readonly=True,
+        string="Bank Amount",
+        help="The sum of the account mutation over every statement line in this "
+        "group \u2014 net of the acquirer fee, which is why it is smaller than the "
+        "gross the narratives quote. Open the lines to see them one by one.",
+    )
+    gross_total = fields.Monetary(
+        currency_field="currency_id",
+        readonly=True,
+        string="Narrative Gross",
+        help="What the narratives (TGH) claim was taken, before the fee.",
+    )
+    mdr_total = fields.Monetary(
+        currency_field="currency_id",
+        readonly=True,
+        string="Narrative MDR",
+        help="What the narratives (ADM / DDR) claim the acquirer kept.",
+    )
+    narrative_gap = fields.Monetary(
+        compute="_compute_narrative_gap",
+        currency_field="currency_id",
+        string="Unexplained",
+        help="Bank amount minus (gross \u2212 MDR). Zero means every narrative in "
+        "this group adds up to the money the bank moved. A cash deposit quotes no "
+        "gross at all, so its whole amount shows here \u2014 that is expected.",
+    )
+    statement_line_ids = fields.Many2many(
+        "account.bank.statement.line",
+        string="Bank Lines",
+        readonly=True,
+        help="Every statement line behind this group's totals.",
+    )
+    sample_narrative = fields.Char(readonly=True, string="Sample Narrative")
     analytic_account_id = fields.Many2one(
         "account.analytic.account",
         string="Operating Unit",
@@ -276,6 +376,29 @@ class LevisBankMidMapWizardLine(models.TransientModel):
     )
     warehouse_id = fields.Many2one("stock.warehouse")
     skip = fields.Boolean(help="Leave unmapped for now; the money stays on suspense.")
+
+    @api.depends("total_amount", "gross_total", "mdr_total")
+    def _compute_narrative_gap(self):
+        for line in self:
+            line.narrative_gap = line.total_amount - (line.gross_total - line.mdr_total)
+
+    def action_open_statement_lines(self):
+        """The mutation behind the total, so the figure can be checked line by line.
+
+        A proposal is a sum over a whole period's feed for one merchant id; the
+        sample narrative next to it belongs to exactly one of those lines. Without
+        this the two can never be reconciled by eye, and the total reads as if it
+        disagreed with the bank.
+        """
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Bank Lines \u2014 %s", self.key or self.journal_id.display_name),
+            "res_model": "account.bank.statement.line",
+            "domain": [("id", "in", self.statement_line_ids.ids)],
+            "view_mode": "list,form",
+            "target": "current",
+        }
 
     @api.onchange("warehouse_id")
     def _onchange_warehouse_id(self):

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_pos_config_form_operating_unit" model="ir.ui.view">
+            <field name="name">pos.config.form.operating.unit</field>
+            <field name="model">pos.config</field>
+            <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+            <field name="arch" type="xml">
+                <!-- The base pos.config form shows neither warehouse_id nor
+                     picking_type_id (they live in the settings-style blocks
+                     other modules inject), so anchor on the title field. -->
+                <xpath expr="//div[@id='title']" position="after">
+                    <group>
+                        <field name="operating_unit_id"
+                               groups="custom_operating_unit.group_operating_unit_user"/>
+                    </group>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_operating_unit_form_pos" model="ir.ui.view">
+            <field name="name">operating.unit.form.pos</field>
+            <field name="model">operating.unit</field>
+            <field name="inherit_id" ref="custom_operating_unit_docs.view_operating_unit_form_links"/>
+            <field name="arch" type="xml">
+                <field name="warehouse_id" position="after">
+                    <field name="pos_config_ids" widget="many2many_tags" readonly="1"/>
+                </field>
+            </field>
+        </record>
+    </data>
+</odoo>

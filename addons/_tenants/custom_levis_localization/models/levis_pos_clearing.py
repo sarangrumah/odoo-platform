@@ -23,13 +23,37 @@ client's EBR workbook. Two things make it a feature instead:
   the source of truth, which is also why anything left over is reported as a
   shortfall rather than forced somewhere.
 
+The clearing is written **onto the bank statement line itself**, not into a
+separate entry. Odoo posts a statement line as ``Dr Bank / Cr Suspense`` and
+expects reconciliation to *replace* that suspense leg with what the money
+actually was — which is why the suspense account ships with ``reconcile =
+False`` and can never be matched. Booking the counterpart in its own journal
+entry leaves the suspense leg standing forever: the general ledger comes out
+right, but every statement line stays ``is_reconciled = False`` and Odoo then
+refuses to set a lock date over the period. That is what happened to July 2026
+(2.526 lines). So the legs below go on the statement line's own move:
+
+    Dr Bank                 (unchanged, what the bank paid)
+    Dr MDR Expense          (what the acquirer kept)
+        Cr POS Receivable   (per tender, gross)
+
+and the suspense leg only survives when the settlement is short, by exactly the
+amount nobody could explain.
+
 Three stages, deliberately hard-separated because money moves:
 
 1. ``action_compute`` — builds a summary and **creates nothing**. No journal
    entry, no write to a statement line or a receivable.
-2. ``action_generate_moves`` — creates DRAFT entries for the accountant to read.
-3. ``action_post`` — posts them and reconciles each credit leg with exactly the
-   receivable lines its allocation names.
+2. ``action_generate_moves`` — writes the intended legs to
+   ``levis.pos.clearing.leg`` for the accountant to read. Still **no**
+   accounting: not a draft entry, not a write to a statement line's ledger.
+3. ``action_post`` — applies exactly those legs to the statement lines and
+   reconciles each credit leg with exactly the receivable lines its allocation
+   names.
+
+Stage 2 persists the legs rather than recomputing them at stage 3 on purpose:
+the accountant approves a specific set of numbers, and posting must book that
+set, not whatever a fresh computation would produce days later.
 
 That last point matters. The scripts reconciled per account across all stores,
 which let one store's excess absorb another's shortfall and made per-store
@@ -58,6 +82,17 @@ _EPS = 0.005
 # Above this many identical findings, the diagnostic is aggregated into one row
 # that states the count — never silently shortened.
 _DIAG_DETAIL_CAP = 200
+
+# X70D stages one row per (store, trading day, register, transaction, tender), and
+# X24DN posts that transaction as ``pos.order`` with ``pos_reference`` built from
+# the same four keys. So the receipt numbers behind a settlement can be recovered
+# from the staged rows, which is the one place the per-transaction detail survives:
+# the receivable the settlement consumes is a per-store/day/tender total.
+_X24_TENDER_FOLD = {"OFFLINE_OTHER_CARD": "OFFLINE_OTHER_CREDITCARD"}
+_POS_RECV_PREFIX = "POS Receivable - "
+# How many receipt numbers a cell spells out before it states the count instead.
+_TRANS_REF_CAP_ALLOC = 20
+_TRANS_REF_CAP_LINE = 6
 
 _BLOCKS = [
     ("a", "A Settlement"),
@@ -103,12 +138,19 @@ class LevisPosClearing(models.Model):
     )
     date_from = fields.Date(required=True, default=lambda self: self._default_date_from())
     date_to = fields.Date(required=True, default=lambda self: self._default_date_to())
+    # Nothing is booked here any more — the legs go onto the bank statement
+    # lines. Kept because the column is NOT NULL on installed databases and
+    # ``levis.clearing.config`` still keys configuration creation off a general
+    # journal; dropping it needs a migration, not a field edit.
     journal_id = fields.Many2one(
         "account.journal",
-        string="Clearing Journal",
+        string="General Journal (unused)",
         required=True,
         domain="[('type', '=', 'general'), ('company_id', '=', company_id)]",
         default=lambda self: self._default_journal(),
+        help="Left over from when the clearing booked its own entries. It books "
+        "nothing now: the journal items are written onto the bank statement "
+        "lines themselves.",
     )
     bank_journal_ids = fields.Many2many(
         "account.journal",
@@ -135,11 +177,14 @@ class LevisPosClearing(models.Model):
     )
 
     line_ids = fields.One2many("levis.pos.clearing.line", "run_id", copy=False)
+    leg_ids = fields.One2many("levis.pos.clearing.leg", "run_id", copy=False)
+    receipt_ids = fields.One2many("levis.pos.clearing.receipt", "run_id", copy=False)
     diag_ids = fields.One2many("levis.pos.clearing.diag", "run_id", copy=False)
+    # The bank statement lines' own entries, tagged as this run touched them.
+    # Only filled at posting: there is nothing of ours to look at before that.
     move_ids = fields.One2many("account.move", "levis_pos_clearing_id", readonly=True, copy=False)
     move_count = fields.Integer(compute="_compute_move_count")
-    draft_move_count = fields.Integer(compute="_compute_move_count")
-    posted_move_count = fields.Integer(compute="_compute_move_count")
+    leg_count = fields.Integer(compute="_compute_move_count")
 
     state = fields.Selection(
         [
@@ -247,13 +292,12 @@ class LevisPosClearing(models.Model):
                 )
 
     # Without the depends these stay at whatever they were first read as — posting
-    # the entries would leave "posted: 0" on screen and the header buttons stale.
-    @api.depends("move_ids", "move_ids.state")
+    # would leave "0 entries" on screen and the header buttons stale.
+    @api.depends("move_ids", "leg_ids")
     def _compute_move_count(self):
         for run in self:
             run.move_count = len(run.move_ids)
-            run.draft_move_count = len(run.move_ids.filtered(lambda m: m.state == "draft"))
-            run.posted_move_count = len(run.move_ids.filtered(lambda m: m.state == "posted"))
+            run.leg_count = len(run.leg_ids)
 
     @api.depends(
         "line_ids.gross",
@@ -664,8 +708,97 @@ class LevisPosClearing(models.Model):
         self.diag_ids = [(0, 0, vals) for vals in diag_config + diag_vals]
         self._build_diagnostics(residual)
         self._simulate_balances()
+        # Only the ticks the amount proves. The rest of a trading day is offered
+        # one bank line at a time, when someone actually opens it: a month is
+        # ~36.000 candidate rows and two minutes of work for a question that is
+        # asked line by line.
+        self._generate_receipts(proven_only=True)
         self.state = "computed"
         return True
+
+    # ------------------------------------------------------------------
+    # Candidate receipts — the matching worksheet
+    # ------------------------------------------------------------------
+    def _generate_receipts(self, lines=None, proven_only=False):
+        """Offer every receipt the store rang up that trading day, per bank line.
+
+        Materialised rather than computed because the accountant ticks them: a
+        settlement that pays part of a day cannot be identified by arithmetic
+        (see ``_x24_identify``), so the last word has to be a human's, and a
+        human's answer has to be storable.
+
+        A receipt already ticked — on any line, in any run of this company — is
+        not offered again. That is the whole point of the exclusivity: one
+        transaction is paid once, and once it is claimed it must stop tempting
+        every other statement line that happens to share its trading day.
+        """
+        self.ensure_one()
+        Receipt = self.env["levis.pos.clearing.receipt"]
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        lines = (lines if lines is not None else self.line_ids).filtered(
+            lambda line: line.kind in _SETTLING_KINDS and line.analytic_account_id and line.trans_date
+        )
+        lines.receipt_ids.filtered(lambda receipt: not receipt.matched).unlink()
+        if not lines:
+            return True
+        dates = lines.mapped("trans_date")
+        rows = Alloc._x24_rows(
+            set(lines.mapped("analytic_account_id").ids),
+            min(dates),
+            max(dates),
+            self.company_id,
+        )
+        if not rows:
+            return True
+        claimed = set(Receipt.search([("company_id", "=", self.company_id.id), ("matched", "=", True)]).mapped("ref"))
+        to_create = []
+        for line in lines:
+            day = rows.get((line.analytic_account_id.id, line.trans_date), ())
+            if not day:
+                continue
+            _state, _tender, proven = Alloc._x24_identify(day, round(line.gross, 2))
+            proven = {ref for ref in proven if ref not in claimed}
+            # A line the amount already explains gets only its proven receipts.
+            # Offering it the rest of the day's transactions as well would be
+            # tens of thousands of rows answering a question nobody still has —
+            # and unticking one puts the line back in play, so Refresh
+            # Suggestions hands it the whole day again the moment it matters.
+            settled = proven and abs(round(sum(a for _t, r, a in day if r in proven), 2) - round(line.gross, 2)) <= _EPS
+            for tender, ref, amount in day:
+                tick = ref in proven
+                if ref in claimed or ((settled or proven_only) and not tick):
+                    continue
+                if tick:
+                    claimed.add(ref)
+                to_create.append(
+                    {
+                        "line_id": line.id,
+                        "ref": ref,
+                        "tender": tender,
+                        "trans_date": line.trans_date,
+                        "amount": amount,
+                        "suggested": tick,
+                        "matched": tick,
+                    }
+                )
+        if to_create:
+            # The generator already refuses a claimed receipt and never ticks one
+            # twice, so the per-record release is dead weight here; one statement
+            # afterwards sweeps the candidates a tick has just invalidated.
+            Receipt.with_context(levis_skip_receipt_release=True).create(to_create)
+            Receipt._sweep_claimed(self.company_id)
+        return True
+
+    def action_view_receipts(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Receipt Matching — %s", self.name),
+            "res_model": "levis.pos.clearing.receipt",
+            "view_mode": "list",
+            "domain": [("run_id", "=", self.id)],
+            "context": {"search_default_group_line": 1, "search_default_unmatched": 1, "create": False},
+        }
 
     def _line_from_parsed(
         self, statement_line, parsed, rules, pool, residual, ar_pool, ar_residual, diag_vals, cash_account=None
@@ -1120,18 +1253,20 @@ class LevisPosClearing(models.Model):
         if self.state != "computed":
             raise UserError(_("Compute the summary first — there is nothing reviewed to book."))
         self._assert_period_open()
-        clash = self.env["account.move"].search_count(
+        # The clearing no longer has entries of its own to look for, so the claim
+        # on a statement line is the marker it carries.
+        clash = self.env["account.bank.statement.line"].search_count(
             [
-                ("company_id", "=", self.company_id.id),
-                ("ref", "=like", "%s-%%" % self.period_ref),
-                ("levis_pos_clearing_id", "!=", self.id),
+                ("id", "in", self.line_ids.statement_line_id.ids),
+                ("levis_clearing_line_id", "!=", False),
+                ("levis_clearing_line_id.run_id", "!=", self.id),
             ]
         )
         if clash:
             raise UserError(
                 _(
-                    "%(count)s entries already exist for %(period)s. Cancel or delete "
-                    "them before generating a second set.",
+                    "%(count)s statement line(s) in %(period)s are already claimed by "
+                    "another clearing run. Cancel it before generating a second set.",
                     count=clash,
                     period=self.period_ref,
                 )
@@ -1166,10 +1301,6 @@ class LevisPosClearing(models.Model):
                 )
         return True
 
-    def _move_ref(self, block, date):
-        self.ensure_one()
-        return "%s-%s-%s" % (self.period_ref, block.upper(), date)
-
     def _line_vals(self, account_id, label, balance, analytic):
         return {
             "account_id": account_id,
@@ -1180,39 +1311,42 @@ class LevisPosClearing(models.Model):
         }
 
     def action_generate_moves(self):
+        """Stage 2: write down what stage 3 will book, and book nothing."""
         self.ensure_one()
         self._assert_generatable()
-        config = self.config_id
-        moves = self.env["account.move"]
-        per_key = defaultdict(lambda: self.env["levis.pos.clearing.line"])
+        self.leg_ids.unlink()
+        # Built as one batch: a month of settlements is a few thousand legs, and
+        # creating them one at a time is a few thousand round trips.
+        to_create = []
+        owners = []
         for line in self.line_ids:
-            if line.block in ("a", "b") and line.allocated > _EPS:
-                per_key[(line.block, line.settlement_date)] |= line
-            elif line.block == "c" and abs(line.statement_amount) > _EPS:
-                per_key[("c", line.settlement_date)] |= line
-
-        for (block, date), lines in sorted(per_key.items(), key=lambda item: (item[0][1], item[0][0])):
-            plan = []
-            for line in lines:
-                plan += line._move_line_plan()
-            if not plan:
+            if line.block not in ("a", "b", "c"):
                 continue
-            move = self.env["account.move"].create(
-                {
-                    "move_type": "entry",
-                    "journal_id": self.journal_id.id,
-                    "company_id": self.company_id.id,
-                    "date": date,
-                    "ref": self._move_ref(block, date),
-                    "levis_pos_clearing_id": self.id,
-                    "line_ids": [(0, 0, vals) for _allocs, vals in plan],
-                }
-            )
-            moves |= move
-            lines.write({"move_id": move.id})
-            self._attach_alloc_move_lines(plan, move)
+            if line.block in ("a", "b") and line.allocated <= _EPS:
+                continue
+            if line.block == "c" and abs(line.statement_amount) <= _EPS:
+                continue
+            for sequence, (allocs, role, vals) in enumerate(line._counterpart_plan()):
+                to_create.append(
+                    {
+                        "run_id": self.id,
+                        "line_id": line.id,
+                        "sequence": sequence,
+                        "role": role,
+                        "account_id": vals["account_id"],
+                        "name": vals["name"],
+                        "balance": vals["debit"] - vals["credit"],
+                        "analytic_distribution": vals["analytic_distribution"],
+                    }
+                )
+                owners.append(allocs)
+        legs = self.env["levis.pos.clearing.leg"].create(to_create) if to_create else False
+        # create() returns the records in the order it was given them.
+        for leg, allocs in zip(legs or [], owners):
+            if allocs:
+                allocs.write({"leg_id": leg.id})
 
-        if not moves:
+        if not legs:
             raise UserError(
                 _(
                     "Nothing to book. Either no settlement could be matched to an open "
@@ -1222,33 +1356,6 @@ class LevisPosClearing(models.Model):
             )
         self._mark_statement_lines()
         self.state = "generated"
-        return True
-
-    def _attach_alloc_move_lines(self, plan, move):
-        """Link each allocation to the credit leg that carries it.
-
-        Paired by position, not by looking the leg up afterwards: two stores can
-        legitimately produce a credit on the same account with the same analytic
-        in one entry, and a lookup would hand both allocations the same leg and
-        then over-reconcile it. The move's lines are created in the order of the
-        command list, so walking both in ascending id keeps the pairing exact.
-        """
-        self.ensure_one()
-        created = move.line_ids.sorted(key=lambda aml: aml.id)
-        if len(created) != len(plan):
-            # Something added or merged a line; fall back to no pairing rather than
-            # a wrong one. Stage 3 then reports the allocations as unreconcilable.
-            _logger.warning(
-                "POS clearing %s: entry %s has %s lines for %s planned — allocations left unpaired.",
-                self.name,
-                move.ref,
-                len(created),
-                len(plan),
-            )
-            return False
-        for move_line, (allocs, _vals) in zip(created, plan):
-            if allocs:
-                allocs.write({"move_line_id": move_line.id})
         return True
 
     def _mark_statement_lines(self):
@@ -1264,18 +1371,58 @@ class LevisPosClearing(models.Model):
     def _preflight(self):
         self.ensure_one()
         if self.state != "generated":
-            raise UserError(_("There are no generated draft entries to post."))
+            raise UserError(_("There is no reviewed plan to post — generate it first."))
         self._assert_period_open()
-        drafts = self.move_ids.filtered(lambda m: m.state == "draft")
-        if not drafts:
-            raise UserError(_("No draft entries left — they were posted or deleted elsewhere."))
-        for move in drafts:
-            if not (self.date_from <= move.date <= self.date_to):
-                raise UserError(_("Entry %(ref)s is dated %(date)s, outside the period.", ref=move.ref, date=move.date))
-            imbalance = sum(move.line_ids.mapped("debit")) - sum(move.line_ids.mapped("credit"))
+        if not self.leg_ids:
+            raise UserError(_("The planned legs are gone. Cancel and generate them again."))
+
+        company_currency = self.company_id.currency_id
+        for line in self.leg_ids.line_id:
+            st_line = line.statement_line_id
+            if not (self.date_from <= st_line.date <= self.date_to):
+                raise UserError(
+                    _(
+                        "Statement line %(ref)s is dated %(date)s, outside the period.",
+                        ref=st_line.payment_ref or st_line.id,
+                        date=st_line.date,
+                    )
+                )
+            # Every leg is written in company currency, so a statement line in
+            # anything else would need a rate applied per leg. Refuse rather than
+            # invent one — all six Levi's bank journals are IDR.
+            if st_line.foreign_currency_id or (st_line.currency_id and st_line.currency_id != company_currency):
+                raise UserError(
+                    _(
+                        "Statement line %(ref)s is in %(currency)s. This clearing only books in %(company)s.",
+                        ref=st_line.payment_ref or st_line.id,
+                        currency=(st_line.foreign_currency_id or st_line.currency_id).name,
+                        company=company_currency.name,
+                    )
+                )
+            _liquidity, suspense, other = st_line._seek_for_lines()
+            if not suspense or other:
+                raise UserError(
+                    _(
+                        "Statement line %(ref)s is no longer sitting on suspense — "
+                        "someone reconciled or edited it after this plan was made. "
+                        "Cancel and recompute.",
+                        ref=st_line.payment_ref or st_line.id,
+                    )
+                )
+            planned = sum(self.leg_ids.filtered(lambda leg: leg.line_id == line).mapped("balance"))
+            imbalance = round(planned + st_line.amount, 2)
             if abs(imbalance) > _EPS:
-                raise UserError(_("Entry %(ref)s is out of balance by %(amount)s.", ref=move.ref, amount=imbalance))
-        # The drafts may have waited days. Anything they promised must still be there.
+                raise UserError(
+                    _(
+                        "The legs planned for statement line %(ref)s total %(planned)s "
+                        "against a bank amount of %(amount)s — off by %(diff)s.",
+                        ref=st_line.payment_ref or st_line.id,
+                        planned=planned,
+                        amount=st_line.amount,
+                        diff=imbalance,
+                    )
+                )
+        # The plan may have waited days. Anything it promised must still be there.
         stale = []
         for alloc in self.line_ids.alloc_ids:
             aml = alloc.source_aml_id
@@ -1293,15 +1440,72 @@ class LevisPosClearing(models.Model):
                     entry=stale[0].source_aml_id.move_id.name or stale[0].source_aml_id.id,
                 )
             )
-        return drafts
+        return True
 
     def action_post(self):
         self.ensure_one()
-        drafts = self._preflight()
-        drafts.action_post()
+        self._preflight()
+        self._apply_to_statement_lines()
         self._reconcile_allocations()
         self._snapshot_after()
         self.state = "posted"
+        return True
+
+    def _apply_to_statement_lines(self):
+        """Swap each statement line's suspense leg for the legs planned in stage 2.
+
+        The statement line's entry is already posted — that is normal, Odoo posts
+        it the moment the line is imported, and its own reconciliation does
+        exactly this write (see ``action_undo_reconciliation`` in core). Only the
+        suspense leg is deleted; the liquidity leg is left alone rather than
+        cleared and rebuilt, so nothing recomputes the bank amount or its
+        currency behind our back.
+        """
+        self.ensure_one()
+        company_currency = self.company_id.currency_id
+        for line in self.leg_ids.line_id:
+            st_line = line.statement_line_id
+            legs = self.leg_ids.filtered(lambda leg: leg.line_id == line).sorted(key=lambda leg: leg.sequence)
+            _liquidity, suspense, _other = st_line._seek_for_lines()
+            commands = [(2, suspense.id, 0)] if suspense else []
+            for leg in legs:
+                commands.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "name": leg.name,
+                            "account_id": leg.account_id.id,
+                            "partner_id": st_line.partner_id.id,
+                            "currency_id": company_currency.id,
+                            "amount_currency": leg.balance,
+                            "debit": leg.balance if leg.balance > 0 else 0.0,
+                            "credit": -leg.balance if leg.balance < 0 else 0.0,
+                            "analytic_distribution": leg.analytic_distribution or False,
+                        },
+                    )
+                )
+            st_line.with_context(force_delete=True, skip_readonly_check=True).write({"line_ids": commands})
+            st_line.move_id.levis_pos_clearing_id = self.id
+
+            # Pair each planned leg with the journal item it became, by position:
+            # two stores can legitimately produce the same account, amount and
+            # analytic on one statement line, and looking the leg up afterwards
+            # would hand both allocations the same item and over-reconcile it.
+            created = (st_line.move_id.line_ids - _liquidity).sorted(key=lambda aml: aml.id)
+            if len(created) != len(legs):
+                _logger.warning(
+                    "POS clearing %s: statement line %s has %s new items for %s legs — left unpaired.",
+                    self.name,
+                    st_line.id,
+                    len(created),
+                    len(legs),
+                )
+                continue
+            for aml, leg in zip(created, legs):
+                leg.move_line_id = aml.id
+                if leg.alloc_ids:
+                    leg.alloc_ids.write({"move_line_id": aml.id})
         return True
 
     def _reconcile_allocations(self):
@@ -1357,24 +1561,24 @@ class LevisPosClearing(models.Model):
     # ------------------------------------------------------------------
     def action_cancel(self):
         self.ensure_one()
-        if self.move_ids.filtered(lambda m: m.state != "draft"):
+        if self.state == "posted":
             raise UserError(
                 _(
-                    "Entries of %s are already posted. In Odoo 19 resetting them to draft "
-                    "does not release their reconciliation, so this record cannot undo "
-                    "them — reverse the entries themselves.",
+                    "%s is posted. Its legs live on the bank statement lines now, so "
+                    'undoing it means "Undo Reconciliation" on those lines — this record '
+                    "cannot take the money back on their behalf.",
                     self.name,
                 )
             )
         self.line_ids.mapped("statement_line_id").write({"levis_clearing_line_id": False})
-        self.move_ids.unlink()
+        self.leg_ids.unlink()
         self.state = "cancel"
         return True
 
     def action_reset_to_draft(self):
         self.ensure_one()
-        if self.move_ids:
-            raise UserError(_("Cancel the generated entries first."))
+        if self.leg_ids:
+            raise UserError(_("Cancel the generated plan first."))
         self.state = "draft"
         return True
 
@@ -1383,7 +1587,7 @@ class LevisPosClearing(models.Model):
         action = {
             "type": "ir.actions.act_window",
             "res_model": "account.move",
-            "name": _("Clearing Entries"),
+            "name": _("Statement Entries Cleared"),
             "domain": [("id", "in", self.move_ids.ids)],
             "view_mode": "list,form",
         }
@@ -1401,6 +1605,24 @@ class LevisPosClearing(models.Model):
             "view_mode": "list,form",
         }
 
+    def action_view_lines(self):
+        """The run's settlements as a real list, with the search bar the form cannot have.
+
+        An embedded one2many has no search panel, so on a month of eleven bank
+        journals the Settlements tab is a thousand rows you can only scroll. This
+        is the same records under a normal action: filter to the store, the bank,
+        the tender or the ones still short, and group them.
+        """
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "levis.pos.clearing.line",
+            "name": _("Settlements — %s", self.name),
+            "domain": [("run_id", "=", self.id)],
+            "view_mode": "list,form",
+            "context": {"search_default_group_store": 1},
+        }
+
     def action_open_mapping_wizard(self):
         self.ensure_one()
         return {
@@ -1408,7 +1630,9 @@ class LevisPosClearing(models.Model):
             "res_model": "levis.bank.mid.map.wizard",
             "name": _("Map Unmapped Settlements"),
             "view_mode": "form",
-            "target": "new",
+            # Full page, not a modal: dozens of merchant ids, each needing its
+            # amounts read against a bank statement, do not fit in a dialog.
+            "target": "current",
             "context": {
                 "default_run_id": self.id,
                 "default_date_from": self.date_from,
@@ -1424,6 +1648,10 @@ class LevisPosClearingLine(models.Model):
     _order = "settlement_date, bank_journal_id, id"
 
     run_id = fields.Many2one("levis.pos.clearing", required=True, ondelete="cascade", index=True)
+    # Stored so the settlements can be searched and grouped away from their run's
+    # form, where the parent's state is no longer on screen to read.
+    run_state = fields.Selection(related="run_id.state", store=True, string="Run Status")
+    run_period_ref = fields.Char(related="run_id.period_ref", store=True, string="Period")
     company_id = fields.Many2one(related="run_id.company_id", store=True)
     currency_id = fields.Many2one(related="run_id.currency_id")
     statement_line_id = fields.Many2one("account.bank.statement.line", required=True, ondelete="cascade", index=True)
@@ -1489,7 +1717,75 @@ class LevisPosClearingLine(models.Model):
     )
     note = fields.Text()
     alloc_ids = fields.One2many("levis.pos.clearing.alloc", "line_id", copy=False)
-    move_id = fields.Many2one("account.move", readonly=True, copy=False)
+    leg_ids = fields.One2many("levis.pos.clearing.leg", "line_id", copy=False)
+    # The statement line's own entry — where this clearing's legs are written.
+    move_id = fields.Many2one(related="statement_line_id.move_id", string="Journal Entry")
+    move_name = fields.Char(
+        related="statement_line_id.move_id.name",
+        store=True,
+        string="Bank Entry No.",
+        help="The journal entry number of the bank statement line itself — the "
+        "number to quote when this settlement is looked up in the general ledger.",
+    )
+    x24_match = fields.Selection(
+        [
+            ("exact", "One transaction"),
+            ("batch", "Whole tender batch"),
+            ("ambiguous", "Several possibilities"),
+            ("none", "Not identified"),
+        ],
+        string="Receipt Match",
+        compute="_compute_x24_trans",
+        store=True,
+        help="How the receipts below were established. Only arithmetic counts: one "
+        "transaction of exactly this gross, or one tender whose whole trading day "
+        "sums to it. Anything else is left unnamed — a settlement that pays part of "
+        "a day can be composed many ways, and picking one would be a guess.",
+    )
+    receipt_ids = fields.One2many("levis.pos.clearing.receipt", "line_id", copy=False)
+    x24_trans_refs = fields.Char(
+        string="X24DN Transactions",
+        compute="_compute_matched_receipts",
+        store=True,
+        help="The receipts ticked as making up this bank line. Pre-ticked where the "
+        "amount proves them (see Receipt Match); everything else is the "
+        "accountant's to confirm on the Receipt Matching list.",
+    )
+    x24_trans_count = fields.Integer(
+        string="Receipts",
+        compute="_compute_matched_receipts",
+        store=True,
+    )
+    matched_total = fields.Monetary(
+        compute="_compute_matched_receipts",
+        store=True,
+        currency_field="currency_id",
+        string="Receipts Ticked",
+    )
+    match_gap = fields.Monetary(
+        compute="_compute_matched_receipts",
+        store=True,
+        currency_field="currency_id",
+        string="Still Unmatched",
+        help="Gross minus the receipts ticked. Zero means this bank line is fully accounted for by named transactions.",
+    )
+    x24_tender = fields.Char(
+        string="Tender (evidence)",
+        compute="_compute_x24_trans",
+        store=True,
+        help="The tender those receipts were paid with. The narrative never says "
+        "this — one card MID covers Visa, Mastercard, JCB and Amex alike — so where "
+        "the amount identifies the transaction, this is the only hard evidence of "
+        "which tender receivable the settlement really pays.",
+    )
+    x24_tender_mismatch = fields.Boolean(
+        string="Tender Disagrees",
+        compute="_compute_x24_trans",
+        store=True,
+        help="The receipts name one tender and the allocation credited another. The "
+        "allocation consumes open receivables largest-residual-first, which cannot "
+        "see the tender; this flag is where that guess is contradicted by the money.",
+    )
 
     _stmt_uniq = models.Constraint(
         "unique(run_id, statement_line_id)",
@@ -1514,16 +1810,73 @@ class LevisPosClearingLine(models.Model):
             shortable = line.kind in _SETTLING_KINDS and line.state in ("ok", "short", "mismatch")
             line.short_amount = max(round(line.gross - line.allocated, 2), 0.0) if shortable else 0.0
 
-    def _move_line_plan(self):
-        """The journal legs for this statement line, each with the allocations it pays.
+    @api.depends("receipt_ids.matched", "receipt_ids.amount", "gross")
+    def _compute_matched_receipts(self):
+        """What the accountant has actually confirmed, not what was suggested."""
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        for line in self:
+            matched = line.receipt_ids.filtered("matched").sorted(lambda receipt: receipt.ref)
+            line.x24_trans_count = len(matched)
+            line.x24_trans_refs = Alloc._x24_format_refs(matched.mapped("ref"), _TRANS_REF_CAP_LINE)
+            line.matched_total = round(sum(matched.mapped("amount")), 2)
+            line.match_gap = round(line.gross - line.matched_total, 2) if line.kind in _SETTLING_KINDS else 0.0
 
-        Sign convention: a statement line of amount ``A`` moves the suspense
-        account by ``-A``, so the clearing leg on suspense is always ``+A``. That
-        holds for a settlement coming in and for a sweep going out, which is why
-        blocks A/B and C can share one rule.
+    @api.depends("analytic_account_id", "trans_date", "gross", "kind", "alloc_ids.account_id")
+    def _compute_x24_trans(self):
+        """Name the receipts this bank line proves it paid — or name none.
 
-        Returns ``[(alloc_recordset, line_vals)]``; the recordset is empty for the
-        suspense and MDR legs, which settle nothing.
+        Keyed on the settlement's own gross against the store's trading day, not
+        on the receivable the allocation happened to consume. Those are different
+        claims: the allocation picks by residual and cannot see a tender, so a
+        250.900 settlement can end up crediting the card receivable that holds
+        the day's 16.865.300 — and reading the receipts off *that* made the line
+        look like it had paid ten transactions worth millions.
+        """
+        Alloc = self.env["levis.pos.clearing.alloc"]
+        settling = self.filtered(
+            lambda line: line.kind in _SETTLING_KINDS and line.analytic_account_id and line.trans_date
+        )
+        for line in self - settling:
+            line.x24_match = "none"
+            line.x24_tender = False
+            line.x24_tender_mismatch = False
+        if not settling:
+            return
+        dates = settling.mapped("trans_date")
+        rows = Alloc._x24_rows(
+            set(settling.mapped("analytic_account_id").ids),
+            min(dates),
+            max(dates),
+            settling.company_id[:1] or self.env.company,
+        )
+        for line in settling:
+            state, tender, refs = Alloc._x24_identify(
+                rows.get((line.analytic_account_id.id, line.trans_date), ()), round(line.gross, 2)
+            )
+            line.x24_match = state
+            line.x24_tender = tender or False
+            booked = {Alloc._x24_tender_of_account(alloc.account_id) for alloc in line.alloc_ids}
+            booked.discard(None)
+            line.x24_tender_mismatch = bool(tender and booked and tender not in booked)
+
+    def _counterpart_plan(self):
+        """The legs that replace this statement line's suspense leg.
+
+        Odoo books a statement line of amount ``A`` as ``Dr Bank A / Cr Suspense
+        A``. Clearing it means swapping that ``Cr Suspense A`` for what the money
+        actually was, so the legs here must total ``-A``: the receivables the
+        settlement pays (credit, gross), the fee the acquirer kept (debit), and —
+        only when the settlement is short — whatever is left with no explanation,
+        which stays on suspense.
+
+        That last leg is the whole point of the sign arithmetic. Fully explained
+        settlements end up with no suspense leg at all, and Odoo's own
+        ``_compute_is_reconciled`` then marks the line reconciled without anyone
+        reconciling anything. A short one keeps a suspense leg for exactly the
+        shortfall and stays open, which is the truth about it.
+
+        Returns ``[(alloc_recordset, role, line_vals)]``; the recordset is empty
+        for the MDR, bank and shortfall legs, which settle nothing.
         """
         self.ensure_one()
         run = self.run_id
@@ -1543,8 +1896,7 @@ class LevisPosClearingLine(models.Model):
                     )
                 )
             label = (self.payment_ref or "")[:120] or _("Bank movement %s", self.settlement_date)
-            plan.append((Alloc, run._line_vals(config.suspense_account_id.id, label, self.statement_amount, False)))
-            plan.append((Alloc, run._line_vals(target.id, label, -self.statement_amount, False)))
+            plan.append((Alloc, "bank", run._line_vals(target.id, label, -self.statement_amount, False)))
             return plan
 
         store = self.analytic_account_id.display_name or ""
@@ -1557,6 +1909,7 @@ class LevisPosClearingLine(models.Model):
             plan.append(
                 (
                     allocs,
+                    "receivable",
                     run._line_vals(
                         account_id,
                         _("Settlement %(bank)s %(date)s (%(store)s)", bank=bank, date=source_date, store=store),
@@ -1565,23 +1918,11 @@ class LevisPosClearingLine(models.Model):
                     ),
                 )
             )
-        cash_in = round(self.allocated - self.mdr_booked, 2)
-        if abs(cash_in) > _EPS:
-            plan.append(
-                (
-                    Alloc,
-                    run._line_vals(
-                        config.suspense_account_id.id,
-                        _("Cash in %(bank)s %(date)s (%(store)s)", bank=bank, date=self.settlement_date, store=store),
-                        cash_in,
-                        analytic,
-                    ),
-                )
-            )
         if abs(self.mdr_booked) > _EPS:
             plan.append(
                 (
                     Alloc,
+                    "mdr",
                     run._line_vals(
                         config.mdr_account_id.id,
                         _("MDR %(bank)s %(date)s (%(store)s)", bank=bank, date=self.settlement_date, store=store),
@@ -1590,7 +1931,57 @@ class LevisPosClearingLine(models.Model):
                     ),
                 )
             )
+        # Whatever the legs above do not account for. Computed as the balancing
+        # figure rather than from `short_amount` so that the entry is balanced by
+        # construction: a rounding crumb anywhere above lands here instead of
+        # making the move unpostable.
+        residual = round(-self.statement_amount - sum(vals["debit"] - vals["credit"] for _a, _r, vals in plan), 2)
+        if abs(residual) > _EPS:
+            plan.append(
+                (
+                    Alloc,
+                    "short",
+                    run._line_vals(
+                        config.suspense_account_id.id,
+                        _(
+                            "Unsettled %(bank)s %(date)s (%(store)s)",
+                            bank=bank,
+                            date=self.settlement_date,
+                            store=store,
+                        ),
+                        residual,
+                        analytic,
+                    ),
+                )
+            )
         return plan
+
+    def action_suggest_receipts(self):
+        """Offer this bank line the whole trading day to tick from.
+
+        Per line, on demand: a month holds ~36.000 candidates and generating them
+        all took two minutes, while the question — which transactions make up
+        *this* payment — is always asked about one line at a time. Ticked
+        receipts are left alone; only the suggestions are refreshed, so a receipt
+        freed on another line shows up here the next time this is pressed.
+        """
+        self.ensure_one()
+        if self.run_id.state not in ("computed", "generated"):
+            raise UserError(_("Compute the summary first — there is nothing to match yet."))
+        self.run_id._generate_receipts(lines=self)
+        return True
+
+    def action_open_receipts(self):
+        self.ensure_one()
+        self.action_suggest_receipts()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Receipt Matching — %s", self.move_name or self.payment_ref or ""),
+            "res_model": "levis.pos.clearing.receipt",
+            "view_mode": "list",
+            "domain": [("line_id", "=", self.id)],
+            "context": {"create": False},
+        }
 
     def action_open_statement_line(self):
         self.ensure_one()
@@ -1622,14 +2013,354 @@ class LevisPosClearingAlloc(models.Model):
     )
     source_date = fields.Date(string="Trading Day Used")
     amount = fields.Monetary(currency_field="currency_id")
+    leg_id = fields.Many2one(
+        "levis.pos.clearing.leg",
+        readonly=True,
+        copy=False,
+        ondelete="set null",
+        string="Planned Leg",
+        help="The planned credit leg that pays this receivable. Filled at stage 2.",
+    )
     move_line_id = fields.Many2one(
         "account.move.line",
         readonly=True,
         copy=False,
         string="Clearing Leg",
-        help="The credit leg of the generated entry that pays this receivable. "
-        "Filled at generation and used to reconcile the exact pair.",
+        help="The credit leg written onto the statement line that pays this "
+        "receivable. Filled at posting and used to reconcile the exact pair.",
     )
+
+    @api.model
+    def _x24_tender_of_account(self, account):
+        """The X70D tender an account represents, from its name, or ``None``.
+
+        ``custom_retail_import`` creates one receivable per tender named
+        ``POS Receivable - <TENDER>``; that name is the only link back, since the
+        account carries no tender field.
+        """
+        name = account.with_context(lang="en_US").name or ""
+        if not name.startswith(_POS_RECV_PREFIX):
+            return None
+        return name[len(_POS_RECV_PREFIX) :].strip().upper() or None
+
+    @api.model
+    def _x24_rows(self, ou_ids, date_from, date_to, company):
+        """``{(analytic_id, date): [(tender, receipt, amount)]}`` from staged X70D rows.
+
+        Every tender of the store's trading day, in one query — the caller decides
+        which of them the money actually proves. Silently empty when
+        ``custom_retail_import`` is not installed, when its rows were never staged,
+        or when a store code has no ``pos.config`` external id: the clearing does
+        not depend on any of that, and a missing receipt list must never hold up a
+        settlement.
+        """
+        if not (ou_ids and date_from and date_to) or "retail.import.line" not in self.env:
+            return {}
+        self.env["retail.import.line"].flush_model()
+        self.env.cr.execute(
+            """
+            SELECT ou, trans_date, tender, store, register, transnum, amount
+              FROM (
+                    SELECT w.l10n_ou_analytic_id        AS ou,
+                           -- A staged row may carry an empty transaction date. The
+                           -- CASE is what keeps the cast from ever seeing it: a bare
+                           -- WHERE would be free to run after the cast and blow up.
+                           CASE WHEN r.j ->> 'trans_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                                THEN (r.j ->> 'trans_date')::date END AS trans_date,
+                           upper(r.j ->> 'tender_type') AS tender,
+                           r.j ->> 'store_code'         AS store,
+                           r.j ->> 'register'           AS register,
+                           r.j ->> 'transnum'           AS transnum,
+                           CASE WHEN r.j ->> 'tender_amount' ~ '^-?[0-9]+([.][0-9]+)?$'
+                                THEN (r.j ->> 'tender_amount')::numeric END AS amount
+                      FROM (SELECT l.raw_data_json::json AS j
+                              FROM retail_import_line l
+                              JOIN retail_import_log g ON g.id = l.log_id
+                              JOIN retail_import_profile p ON p.id = g.profile_id
+                             WHERE p.file_type = 'x70d'
+                               AND p.company_id = %s
+                               AND l.raw_data_json IS NOT NULL
+                               AND l.raw_data_json LIKE '{%%') r
+                      JOIN ir_model_data d
+                        ON d.model = 'pos.config'
+                       AND d.name = 'posconfig_' || (r.j ->> 'store_code')
+                      JOIN pos_config c ON c.id = d.res_id
+                      JOIN stock_warehouse w ON w.id = c.warehouse_id
+                     WHERE w.l10n_ou_analytic_id IN %s
+                   ) s
+             WHERE trans_date BETWEEN %s AND %s
+               AND amount IS NOT NULL
+             ORDER BY store, register, transnum
+            """,
+            (company.id, tuple(ou_ids), date_from, date_to),
+        )
+        rows = defaultdict(list)
+        for ou, trans_date, tender, store, register, transnum, amount in self.env.cr.fetchall():
+            tender = _X24_TENDER_FOLD.get(tender, tender)
+            ref = "-".join(part for part in (store, register, transnum) if part)
+            rows[(ou, trans_date)].append((tender, ref, round(float(amount), 2)))
+        return rows
+
+    @api.model
+    def _x24_identify(self, rows, gross):
+        """Which receipts of a trading day this settlement proves it paid.
+
+        Returns ``(state, tender, [receipt])``. Only arithmetic counts as proof:
+
+        * ``exact``  — one transaction of exactly this gross;
+        * ``batch``  — one tender's whole day sums to exactly this gross;
+        * ``ambiguous`` — several of either, all of them listed, none claimed;
+        * ``none``   — nothing adds up, and nothing is named.
+
+        Deliberately no subset search. A settlement of 250.900 out of a day
+        holding 16.865.300 across ten card transactions can be composed many
+        ways, and naming one of them would be a guess wearing a receipt number.
+        Listing the day's whole bucket is worse still: that is what this method
+        replaced, and it read as though a 250.900 line had paid 3 million.
+        """
+        if not rows or not gross:
+            return "none", False, []
+        singles = [(tender, ref) for tender, ref, amount in rows if abs(amount - gross) <= _EPS]
+        if len(singles) == 1:
+            return "exact", singles[0][0], [singles[0][1]]
+        if len(singles) > 1:
+            tenders = {tender for tender, _ref in singles}
+            return "ambiguous", (tenders.pop() if len(tenders) == 1 else False), [ref for _t, ref in singles]
+        buckets = defaultdict(list)
+        totals = defaultdict(float)
+        for tender, ref, amount in rows:
+            buckets[tender].append(ref)
+            totals[tender] = round(totals[tender] + amount, 2)
+        hits = [tender for tender, total in totals.items() if abs(total - gross) <= _EPS]
+        if len(hits) == 1:
+            return "batch", hits[0], buckets[hits[0]]
+        if len(hits) > 1:
+            return "ambiguous", False, [ref for tender in hits for ref in buckets[tender]]
+        return "none", False, []
+
+    @api.model
+    def _x24_format_refs(self, refs, cap):
+        """``a, b, c (+7 more)`` — never a silently shortened list."""
+        if not refs:
+            return False
+        if len(refs) <= cap:
+            return ", ".join(refs)
+        return _("%(refs)s (+%(rest)s more)", refs=", ".join(refs[:cap]), rest=len(refs) - cap)
+
+
+class LevisPosClearingLeg(models.Model):
+    """One journal item the clearing intends to write onto a statement line.
+
+    Stage 2 fills these in and stage 3 books exactly them. Keeping the plan as
+    records rather than recomputing it at posting time is what makes the
+    accountant's review mean something: what was approved is what gets booked,
+    even if the underlying receivables have shifted in the meantime — and if
+    they have, the preflight refuses rather than quietly booking something else.
+    """
+
+    _name = "levis.pos.clearing.leg"
+    _description = "POS Clearing Planned Leg"
+    _order = "line_id, sequence, id"
+
+    run_id = fields.Many2one("levis.pos.clearing", required=True, ondelete="cascade", index=True)
+    line_id = fields.Many2one("levis.pos.clearing.line", required=True, ondelete="cascade", index=True)
+    company_id = fields.Many2one(related="run_id.company_id", store=True)
+    currency_id = fields.Many2one(related="run_id.currency_id")
+    statement_line_id = fields.Many2one(related="line_id.statement_line_id", store=True, string="Statement Line")
+    bank_journal_id = fields.Many2one(related="line_id.bank_journal_id", store=True, string="Bank")
+    settlement_date = fields.Date(related="line_id.settlement_date", store=True)
+    sequence = fields.Integer(default=0)
+    role = fields.Selection(
+        [
+            ("receivable", "POS Receivable"),
+            ("mdr", "MDR Expense"),
+            ("bank", "Sweep / Charge"),
+            ("short", "Left on Suspense"),
+        ],
+        required=True,
+    )
+    account_id = fields.Many2one("account.account", required=True)
+    name = fields.Char()
+    balance = fields.Monetary(currency_field="currency_id", help="Debit when positive, credit when negative.")
+    analytic_distribution = fields.Json()
+    alloc_ids = fields.One2many("levis.pos.clearing.alloc", "leg_id", copy=False)
+    move_line_id = fields.Many2one(
+        "account.move.line",
+        readonly=True,
+        copy=False,
+        string="Journal Item",
+        help="What this leg became once posted onto the statement line.",
+    )
+
+
+class LevisPosClearingReceipt(models.Model):
+    """One X24DN transaction offered to one bank line, with the tick that settles it.
+
+    The clearing can prove which receipts a settlement paid only when the
+    arithmetic is unambiguous — one transaction equal to the gross, or one
+    tender's whole trading day. Roughly half of a month's settlements are
+    neither: they pay part of a day, and a part can be composed many ways. That
+    remainder is precisely the manual work this model exists to hold, so the
+    answer lands on a record with an owner and a date instead of in someone's
+    spreadsheet.
+
+    Ticked rows are exclusive company-wide: a receipt is paid once. The unique
+    index enforces it even against two people ticking at the same moment, and
+    ``write`` clears the same receipt off every other line so it stops being
+    offered where it can no longer belong.
+    """
+
+    _name = "levis.pos.clearing.receipt"
+    _description = "POS Clearing Candidate Receipt"
+    _order = "line_id, trans_date, ref"
+
+    line_id = fields.Many2one("levis.pos.clearing.line", required=True, ondelete="cascade", index=True)
+    run_id = fields.Many2one(related="line_id.run_id", store=True, index=True)
+    company_id = fields.Many2one(related="line_id.company_id", store=True, index=True)
+    currency_id = fields.Many2one(related="line_id.currency_id")
+    statement_line_id = fields.Many2one(related="line_id.statement_line_id", string="Statement Line")
+    bank_journal_id = fields.Many2one(related="line_id.bank_journal_id", string="Bank")
+    move_name = fields.Char(related="line_id.move_name", store=True, string="Bank Entry No.")
+    settlement_date = fields.Date(related="line_id.settlement_date")
+    analytic_account_id = fields.Many2one(related="line_id.analytic_account_id", store=True, string="Operating Unit")
+    ref = fields.Char(
+        string="Transaction No.",
+        required=True,
+        index=True,
+        help="``store-register-transaction`` — the same reference the POS order carries.",
+    )
+    tender = fields.Char(help="The tender X70D recorded for this transaction.")
+    trans_date = fields.Date(string="Trading Day")
+    amount = fields.Monetary(currency_field="currency_id")
+    matched = fields.Boolean(
+        string="Matched",
+        help="This transaction is part of what the bank paid on this line. Ticking "
+        "it removes it from every other statement line's suggestions.",
+    )
+    suggested = fields.Boolean(
+        readonly=True,
+        help="Ticked by the amount itself: this receipt, or its tender's whole "
+        "trading day, equals the settlement exactly.",
+    )
+
+    def init(self):
+        # A partial unique index, which `_sql_constraints` cannot express: only
+        # *ticked* rows are exclusive. Every candidate row is a duplicate of some
+        # other line's candidate by design — that is what being offered means.
+        self.env.cr.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS levis_pos_clearing_receipt_matched_uniq
+                ON levis_pos_clearing_receipt (company_id, ref) WHERE matched
+            """
+        )
+
+    def _assert_unclaimed(self, refs_by_company):
+        """Refuse a second claim on a receipt, before the database has to.
+
+        The partial unique index is the real guarantee — two people ticking at
+        once is exactly what it exists for — but it fires as an integrity error
+        halfway through a flush. Checking first is what turns that into a
+        sentence naming the bank line that already has this transaction.
+        """
+        for company_id, refs in refs_by_company.items():
+            if not refs:
+                continue
+            claimed = (
+                self.search([("company_id", "=", company_id), ("ref", "in", list(refs)), ("matched", "=", True)]) - self
+            )
+            if claimed:
+                raise UserError(
+                    _(
+                        "Transaction %(ref)s is already matched to %(entry)s. One "
+                        "transaction is paid once — untick it there first.",
+                        ref=claimed[0].ref,
+                        entry=claimed[0].move_name or claimed[0].line_id.display_name,
+                    )
+                )
+        return True
+
+    def _release_elsewhere(self):
+        """Drop these receipts from every other line that was still offering them."""
+        matched = self.filtered("matched")
+        if not matched:
+            return True
+        self.search(
+            [
+                ("company_id", "in", matched.company_id.ids),
+                ("ref", "in", matched.mapped("ref")),
+                ("id", "not in", matched.ids),
+            ]
+        ).unlink()
+        return True
+
+    @api.model
+    def _sweep_claimed(self, company):
+        """Delete every candidate whose transaction is ticked on another line.
+
+        One statement instead of a search per receipt: generation creates tens of
+        thousands of rows, and the ORM round trips were most of the wall clock.
+        """
+        self.flush_model()
+        self.env.cr.execute(
+            """
+            DELETE FROM levis_pos_clearing_receipt loose
+                  USING levis_pos_clearing_receipt taken
+                  WHERE loose.company_id = %s
+                    AND NOT loose.matched
+                    AND taken.matched
+                    AND taken.company_id = loose.company_id
+                    AND taken.ref = loose.ref
+            """,
+            (company.id,),
+        )
+        self.invalidate_model()
+        return True
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        Line = self.env["levis.pos.clearing.line"]
+        wanted = defaultdict(set)
+        seen = set()
+        for vals in vals_list:
+            if not vals.get("matched"):
+                continue
+            company = Line.browse(vals.get("line_id")).company_id
+            key = (company.id, vals.get("ref"))
+            if key in seen:
+                raise UserError(_("Transaction %s cannot be matched to two bank lines at once.", vals.get("ref")))
+            seen.add(key)
+            wanted[company.id].add(vals.get("ref"))
+        self._assert_unclaimed(wanted)
+        receipts = super().create(vals_list)
+        if not self.env.context.get("levis_skip_receipt_release"):
+            receipts._release_elsewhere()
+        return receipts
+
+    def write(self, vals):
+        if vals.get("matched"):
+            wanted = defaultdict(set)
+            for receipt in self.filtered(lambda r: not r.matched):
+                wanted[receipt.company_id.id].add(receipt.ref)
+            self._assert_unclaimed(wanted)
+        result = super().write(vals)
+        if vals.get("matched"):
+            self._release_elsewhere()
+        return result
+
+    def action_match(self):
+        self.write({"matched": True})
+        return True
+
+    def action_unmatch(self):
+        """Untick it. It is free again everywhere the next time a line asks.
+
+        Deliberately does not re-offer it across the run here: the suggestions
+        are built per bank line on demand, so the receipt reappears wherever it
+        belongs as soon as that line is opened — without a two-minute sweep of a
+        month's transactions on the way out of a checkbox.
+        """
+        self.write({"matched": False})
+        return True
 
 
 class LevisPosClearingDiag(models.Model):

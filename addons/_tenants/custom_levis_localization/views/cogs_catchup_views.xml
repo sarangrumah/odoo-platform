@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_levis_cogs_catchup_form" model="ir.ui.view">
+        <field name="name">levis.cogs.catchup.form</field>
+        <field name="model">levis.cogs.catchup</field>
+        <field name="arch" type="xml">
+            <form string="COGS Catch-up" create="false" edit="false">
+                <header>
+                    <button name="action_view_move" type="object"
+                            string="View Journal Entry" class="btn-primary"
+                            invisible="not move_id"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="book_date"/>
+                        </group>
+                        <group>
+                            <field name="move_id"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Booked" name="lines">
+                            <field name="line_ids">
+                                <list create="false" edit="false">
+                                    <field name="period_date"/>
+                                    <field name="warehouse_id"/>
+                                    <field name="analytic_account_id"/>
+                                    <field name="product_categ_id"/>
+                                    <field name="expense_account_id"/>
+                                    <field name="valuation_account_id"/>
+                                    <field name="quantity" sum="Qty"/>
+                                    <field name="amount" sum="COGS"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Products" name="charges">
+                            <field name="charge_ids">
+                                <list create="false" edit="false">
+                                    <field name="period_date"/>
+                                    <field name="warehouse_id"/>
+                                    <field name="product_id"/>
+                                    <field name="quantity" sum="Qty"/>
+                                    <field name="amount" sum="COGS"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                    <group class="oe_subtotal_footer oe_right">
+                        <field name="total_cogs" widget="monetary"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_levis_cogs_catchup_list" model="ir.ui.view">
+        <field name="name">levis.cogs.catchup.list</field>
+        <field name="model">levis.cogs.catchup</field>
+        <field name="arch" type="xml">
+            <list string="COGS Catch-up" create="false">
+                <field name="name"/>
+                <field name="book_date"/>
+                <field name="total_cogs" sum="COGS"/>
+                <field name="move_id"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_levis_cogs_catchup" model="ir.actions.act_window">
+        <field name="name">COGS Catch-up</field>
+        <field name="res_model">levis.cogs.catchup</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nothing caught up yet</p>
+            <p>When a goods receipt establishes the cost of a product that was
+               already sold, the cost of those sold units is recognised here as
+               a draft Dr COGS / Cr Inventory entry carrying the selling store's
+               Operating Unit — dated in the month of the sale while that month
+               is still open, in the current month once it is closed.</p>
+            <p>Switch it on with the system parameter
+               <code>custom_levis_localization.cogs_catchup_enabled</code>.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_levis_cogs_catchup"
+              name="COGS Catch-up"
+              parent="account.menu_finance_entries"
+              action="action_levis_cogs_catchup"
+              sequence="92"/>
+
+    <record id="view_company_form_levis_cogs" model="ir.ui.view">
+        <field name="name">res.company.form.levis.cogs</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form"/>
+        <field name="arch" type="xml">
+            <field name="currency_id" position="after">
+                <field name="l10n_cogs_reported_through"/>
+            </field>
+        </field>
+    </record>
+</odoo>

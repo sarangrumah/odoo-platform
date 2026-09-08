@@ -23,8 +23,27 @@
                     accounting date past the lock instead. Post or delete them first
                     if the period is meant to be final.
                 </div>
+                <field name="unreconciled_stmt_count" invisible="1"/>
+                <div class="alert alert-danger" role="alert" invisible="unreconciled_stmt_count == 0">
+                    <field name="unreconciled_stmt_count" nolabel="1" class="oe_inline"/>
+                    bank statement line(s) on or before the Global Lock Date are still
+                    unreconciled. Odoo refuses to set the lock date until every one of
+                    them is reconciled or deleted, so Apply will fail.
+                    <button name="action_show_unreconciled_statement_lines" type="object"
+                            string="Show them" class="btn-link oe_inline"/>
+                </div>
                 <separator string="Current Lock Dates"/>
                 <field name="company_summary" nolabel="1" readonly="1"/>
+                <field name="exception_count" invisible="1"/>
+                <div class="alert alert-warning" role="alert" invisible="exception_count == 0">
+                    <field name="exception_count" nolabel="1" class="oe_inline"/>
+                    lock date exception(s) are active on this company. Odoo enforces the
+                    user's own date, so the people below can still post into the period
+                    these dates close. Setting a new lock date does not remove them —
+                    core re-creates them against the new date.
+                </div>
+                <field name="exception_summary" nolabel="1" readonly="1"
+                       invisible="exception_count == 0"/>
                 <footer>
                     <button name="action_apply" type="object" string="Apply"
                             class="btn-primary" data-hotkey="q"/>

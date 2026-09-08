@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="900" height="560" font-family="Calibri, Carlito, sans-serif">
+  <style>
+    .lbl   { font-size: 14px; fill: #1A2332; }
+    .lbl-w { font-size: 14px; fill: #FFFFFF; }
+    .sm    { font-size: 11.5px; fill: #4A5568; }
+    .sm-w  { font-size: 11.5px; fill: #E8E0E7; }
+    .cap   { font-size: 12px; fill: #714B67; font-weight: bold; letter-spacing: .04em; }
+    .box   { fill: #FFFFFF; stroke: #C9B8C6; stroke-width: 1.4; }
+    .navy  { fill: #1A2332; stroke: #1A2332; }
+    .plum  { fill: #714B67; stroke: #714B67; }
+    .lila  { fill: #E8E0E7; stroke: #C9B8C6; stroke-width: 1.4; }
+    .band  { fill: #F5F2F4; stroke: #E0D6DE; stroke-width: 1; }
+    .arrow { stroke: #714B67; stroke-width: 1.6; fill: none; marker-end: url(#a); }
+    .thin  { stroke: #9AA5B1; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#714B67"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="900" height="560" fill="#FFFFFF"/>
+
+  <!-- users -->
+  <rect class="lila" x="330" y="16" width="240" height="34" rx="17"/>
+  <text class="lbl" x="450" y="38" text-anchor="middle">Pengguna tenant · Operator platform</text>
+  <path class="arrow" d="M450 50 L450 76"/>
+
+  <!-- edge band -->
+  <rect class="band" x="40" y="78" width="820" height="86" rx="8"/>
+  <text class="cap" x="56" y="98">PINTU DEPAN</text>
+  <rect class="navy" x="70" y="106" width="230" height="44" rx="6"/>
+  <text class="lbl-w" x="185" y="126" text-anchor="middle">Caddy — TLS · WAF (Coraza)</text>
+  <text class="sm-w" x="185" y="142" text-anchor="middle">slug sub-domain → X-Tenant-Slug</text>
+  <rect class="navy" x="330" y="106" width="200" height="44" rx="6"/>
+  <text class="lbl-w" x="430" y="126" text-anchor="middle">Gerbang login /signin</text>
+  <text class="sm-w" x="430" y="142" text-anchor="middle">daftar tenant terkurasi</text>
+  <rect class="plum" x="560" y="106" width="240" height="44" rx="6"/>
+  <text class="lbl-w" x="680" y="126" text-anchor="middle">Konsol admin (hub-portal)</text>
+  <text class="sm-w" x="680" y="142" text-anchor="middle">12 halaman · BFF ber-HMAC</text>
+
+  <path class="arrow" d="M185 150 L185 196"/>
+  <path class="arrow" d="M430 150 L430 196"/>
+  <path class="arrow" d="M680 150 L680 196"/>
+
+  <!-- application band -->
+  <rect class="band" x="40" y="198" width="820" height="118" rx="8"/>
+  <text class="cap" x="56" y="218">APLIKASI</text>
+  <rect class="box" x="70" y="228" width="460" height="72" rx="6"/>
+  <text class="lbl" x="300" y="252" text-anchor="middle" font-weight="bold">Odoo 19 Community</text>
+  <text class="sm" x="300" y="272" text-anchor="middle">Modul custom di 8 tingkatan addons</text>
+  <text class="sm" x="300" y="288" text-anchor="middle">core · compliance · ee_gap · verticals · _tenants · control_plane</text>
+  <rect class="box" x="560" y="228" width="240" height="72" rx="6"/>
+  <text class="lbl" x="680" y="252" text-anchor="middle" font-weight="bold">Orkestrator tenant</text>
+  <text class="sm" x="680" y="272" text-anchor="middle">FastAPI · HMAC · penjadwal</text>
+  <text class="sm" x="680" y="288" text-anchor="middle">provision · backup · restore</text>
+  <path class="thin" d="M530 264 L560 264"/>
+
+  <path class="arrow" d="M300 300 L300 348"/>
+  <path class="arrow" d="M680 300 L680 348"/>
+
+  <!-- data band -->
+  <rect class="band" x="40" y="350" width="820" height="96" rx="8"/>
+  <text class="cap" x="56" y="370">DATA</text>
+  <rect class="box" x="70" y="380" width="290" height="52" rx="6"/>
+  <text class="lbl" x="215" y="400" text-anchor="middle" font-weight="bold">PostgreSQL — satu klaster</text>
+  <text class="sm" x="215" y="418" text-anchor="middle">satu basis data per tenant</text>
+  <rect class="box" x="382" y="380" width="150" height="52" rx="6"/>
+  <text class="lbl" x="457" y="400" text-anchor="middle" font-weight="bold">Redis</text>
+  <text class="sm" x="457" y="418" text-anchor="middle">nonce replay · cache</text>
+  <rect class="box" x="554" y="380" width="150" height="52" rx="6"/>
+  <text class="lbl" x="629" y="400" text-anchor="middle" font-weight="bold">MinIO</text>
+  <text class="sm" x="629" y="418" text-anchor="middle">objek · cadangan</text>
+  <rect class="box" x="726" y="380" width="104" height="52" rx="6"/>
+  <text class="lbl" x="778" y="400" text-anchor="middle" font-weight="bold">Registry</text>
+  <text class="sm" x="778" y="418" text-anchor="middle">tenant_registry</text>
+
+  <!-- external -->
+  <rect class="band" x="40" y="460" width="820" height="80" rx="8"/>
+  <text class="cap" x="56" y="480">INTEGRASI KELUAR — satu kontrak HMAC</text>
+  <text class="sm" x="70" y="502">SAP S/4HANA (lewat jembatan Kafka) · Coretax DJP &amp; Pajakku · ESB Core (F&amp;B) · MDM HUB retail</text>
+  <text class="sm" x="70" y="522">Bank H2H &amp; Virtual Account · Midtrans / Xendit / DOKU · WhatsApp Cloud API · Keycloak · AI gateway</text>
+</svg>

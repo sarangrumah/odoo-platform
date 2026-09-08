@@ -1610,3 +1610,307 @@ class TestCustomReports(TransactionCase):
         table = self.env["custom.report.aged.payable"].get_report_table(options, {"aging_detail": True})
         self.assertTrue(table["columns"])
         self.assertEqual(table["lines"][-1]["type"], "grand_total")
+
+    # ------------------------------------------------------------------
+    # 23) Purchase register: Trade / Non-Trade split.
+    #     ``account.move.l10n_purchase_type`` belongs to the tenant module
+    #     custom_levis_localization, which this addon must not depend on, so
+    #     the column and the filter are gated on the field being present.
+    #     Both branches are asserted here — CI runs the "absent" one.
+    # ------------------------------------------------------------------
+    def _mk_bill(self, price, ptype=None):
+        j_purchase = self.env["account.journal"].search(
+            [("type", "=", "purchase"), ("company_id", "=", self.company.id)], limit=1
+        ) or self.Journal.create(
+            {"name": "Purchases Reg", "code": "BLLR", "type": "purchase", "company_id": self.company.id}
+        )
+        vals = {
+            "move_type": "in_invoice",
+            "journal_id": j_purchase.id,
+            "partner_id": self.partner_b.id,
+            "invoice_date": date.today(),
+            "date": date.today(),
+            "company_id": self.company.id,
+            "invoice_line_ids": [
+                Command.create(
+                    {
+                        "name": "Barang",
+                        "quantity": 1.0,
+                        "price_unit": price,
+                        "account_id": self.acc_expense.id,
+                        "tax_ids": [Command.clear()],
+                    }
+                )
+            ],
+        }
+        if ptype and "l10n_purchase_type" in self.Move._fields:
+            vals["l10n_purchase_type"] = ptype
+        bill = self.Move.create(vals)
+        bill.action_post()
+        return bill
+
+    def _purchase_options(self, **extra):
+        return {
+            "date_from": date.today().replace(month=1, day=1),
+            "date_to": date.today(),
+            "company_ids": [self.company.id],
+            "posted_only": True,
+            **extra,
+        }
+
+    def test_purchase_register_purchase_type_split(self):
+        report = self.env["custom.report.purchase"]
+        self._mk_bill(1000.0, "trade")
+        self._mk_bill(400.0, "non_trade")
+
+        headers = [c["header"] for c in report._xlsx_columns()]
+        available = report._purchase_type_available()
+        self.assertEqual("Type" in headers, available)
+
+        lines = report._build_lines(self._purchase_options())
+        self.assertEqual(lines[-1]["type"], "grand_total")
+        self.assertAlmostEqual(lines[-1]["untaxed"], 1400.0, places=2)
+
+        if not available:
+            # Without the tenant field the filter is inert, never empty.
+            inert = report._build_lines(self._purchase_options(purchase_type="trade"))
+            self.assertAlmostEqual(inert[-1]["untaxed"], 1400.0, places=2)
+            return
+
+        trade = report._build_lines(self._purchase_options(purchase_type="trade"))
+        self.assertAlmostEqual(trade[-1]["untaxed"], 1000.0, places=2)
+        non_trade = report._build_lines(self._purchase_options(purchase_type="non_trade"))
+        self.assertAlmostEqual(non_trade[-1]["untaxed"], 400.0, places=2)
+
+        grouped = report._build_lines(self._purchase_options(group_by="purchase_type"))
+        subtotals = {line["ptype"]: line["untaxed"] for line in grouped if line.get("type") == "subtotal"}
+        self.assertEqual(
+            {"Subtotal: Trade": 1000.0, "Subtotal: Non-Trade": 400.0},
+            {k: round(v, 2) for k, v in subtotals.items()},
+        )
+
+    def test_purchase_wizard_filter_flows_through(self):
+        wizard = self.env["custom.report.purchase.wizard"].create({"purchase_type": "non_trade"})
+        self.assertEqual(wizard._build_filters()["purchase_type"], "non_trade")
+        self.assertEqual(
+            wizard.show_purchase_type,
+            "l10n_purchase_type" in self.Move._fields,
+        )
+
+    # ------------------------------------------------------------------
+    # PPN Keluaran Digunggung (PKP Pedagang Eceran)
+    # ------------------------------------------------------------------
+    def _post_retail_sale(self, amount, tax, when=None):
+        """A POS-shaped sale: a journal entry, no customer invoice."""
+        when = when or date.today()
+        # One cash account for every retail sale in a test: ``_mk_account``
+        # would trip Odoo's unique-code constraint on the second call.
+        # ``account.account.code`` is company-dependent in Odoo 19 and the model
+        # has no ``company_id`` — search it under the company, and create only
+        # once so the unique-code constraint is not tripped on a second sale.
+        acc_cash = self.Account.with_company(self.company).search(
+            [("code", "=", "11190")], limit=1
+        ) or self._mk_account("11190", "Kas Toko", "asset_current")
+        move = self.Move.create(
+            {
+                "move_type": "entry",
+                "journal_id": self.j_sale.id,
+                "date": when,
+                "company_id": self.company.id,
+                # Only the base and the cash side: Odoo derives the tax line
+                # from ``tax_ids`` itself. Writing one by hand as well leaves
+                # the entry unbalanced by exactly the PPN.
+                "line_ids": [
+                    Command.create(
+                        {
+                            "name": "Penjualan eceran",
+                            "account_id": self.acc_revenue.id,
+                            "credit": amount,
+                            "tax_ids": [Command.set([tax.id])],
+                        }
+                    ),
+                    Command.create(
+                        {
+                            "name": "Kas",
+                            "account_id": acc_cash.id,
+                            "debit": amount * (1 + tax.amount / 100.0),
+                        }
+                    ),
+                ],
+            }
+        )
+        move.action_post()
+        return move
+
+    def test_ppn_digunggung_presents_11_percent_as_12_on_nilai_lain(self):
+        acc_ppn_out = self._mk_account("21201", "PPN Keluaran Eceran", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Eceran 11%", "sale", acc_ppn_out)
+        self._post_retail_sale(1_200_000.0, ppn)
+
+        lines = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
+        masa = [l for l in lines if l.get("type") == "subtotal"]
+        self.assertEqual(len(masa), 1, "One tax period expected.")
+        # Harga jual stays whole; the presented base is 11/12 of it and the
+        # tariff is the statutory 12 — the PPN rupiah is unchanged at 11%.
+        self.assertAlmostEqual(masa[0]["dpp_penuh"], 1_200_000.0, places=2)
+        self.assertAlmostEqual(masa[0]["dpp_lain"], 1_100_000.0, places=2)
+        self.assertEqual(masa[0]["tarif"], 12.0)
+        self.assertAlmostEqual(masa[0]["ppn"], 132_000.0, places=2)
+        self.assertAlmostEqual(masa[0]["dpp_lain"] * 0.12, masa[0]["ppn"], places=2)
+
+    def test_ppn_digunggung_excludes_customer_invoices(self):
+        """An invoiced sale belongs to the per-faktur report, never here."""
+        acc_ppn_out = self._mk_account("21202", "PPN Keluaran FK", "liability_current")
+        ppn = self._mk_ppn_tax("PPN FK 11%", "sale", acc_ppn_out)
+        inv = self.Move.create(
+            {
+                "move_type": "out_invoice",
+                "journal_id": self.j_sale.id,
+                "partner_id": self.partner_a.id,
+                "invoice_date": date.today(),
+                "date": date.today(),
+                "company_id": self.company.id,
+                "invoice_line_ids": [
+                    Command.create(
+                        {
+                            "name": "Barang B",
+                            "quantity": 1.0,
+                            "price_unit": 500_000.0,
+                            "account_id": self.acc_revenue.id,
+                            "tax_ids": [Command.set([ppn.id])],
+                        }
+                    )
+                ],
+            }
+        )
+        inv.action_post()
+        self._post_retail_sale(1_200_000.0, ppn)
+
+        lines = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        # Only the retail sale: 1.200.000 harga jual, never 1.700.000.
+        self.assertAlmostEqual(grand["dpp_penuh"], 1_200_000.0, places=2)
+        self.assertAlmostEqual(grand["ppn"], 132_000.0, places=2)
+
+    def test_ppn_digunggung_daily_detail_follows_the_recap(self):
+        acc_ppn_out = self._mk_account("21203", "PPN Keluaran Harian", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Harian 11%", "sale", acc_ppn_out)
+        today = date.today()
+        self._post_retail_sale(1_200_000.0, ppn, when=today)
+        self._post_retail_sale(600_000.0, ppn, when=today - timedelta(days=1))
+
+        lines = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
+        detail = [l for l in lines if not l.get("type")]
+        self.assertEqual(len(detail), 2, "One line per trading day expected.")
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(sum(d["ppn"] for d in detail), grand["ppn"], places=2)
+        self.assertAlmostEqual(grand["dpp_penuh"], 1_800_000.0, places=2)
+
+    def test_ppn_digunggung_registered_in_both_dispatch_registries(self):
+        """Guard against the silent Trial-Balance fallback (19.0.0.9.0)."""
+        from odoo.addons.custom_accounting_reports.models.custom_report_dispatch import REPORT_MODEL_MAP
+
+        self.assertEqual(REPORT_MODEL_MAP.get("ppn_digunggung"), "custom.report.ppn.digunggung")
+        router = self.env.ref("custom_accounting_reports.report_dispatch").arch
+        self.assertIn("report_ppn_digunggung", router)
+
+    # ------------------------------------------------------------------
+    # Rincian PPN Digunggung per transaksi
+    # ------------------------------------------------------------------
+    def test_ppn_digunggung_detail_one_row_per_transaction(self):
+        """Every supply is named, and the rows still add up to the recap."""
+        acc_ppn_out = self._mk_account("21204", "PPN Keluaran Rinci", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Rinci 11%", "sale", acc_ppn_out)
+        today = date.today()
+        first = self._post_retail_sale(1_200_000.0, ppn, when=today)
+        second = self._post_retail_sale(600_000.0, ppn, when=today)
+
+        lines = self.env["custom.report.ppn.digunggung.detail"]._build_lines(self._filters())
+        rows = [l for l in lines if not l.get("type")]
+        self.assertEqual(
+            {row["doc_no"] for row in rows},
+            {first.name, second.name},
+            "Without POS the transaction number is the journal entry's own.",
+        )
+        recap = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
+        recap_total = next(l for l in recap if l.get("type") == "grand_total")
+        detail_total = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(detail_total["ppn"], recap_total["ppn"], places=2)
+        self.assertAlmostEqual(detail_total["dpp_penuh"], recap_total["dpp_penuh"], places=2)
+        self.assertAlmostEqual(detail_total["dpp_lain"], recap_total["dpp_lain"], places=2)
+        # PMK 131 presentation survives one level down.
+        self.assertTrue(all(row["tarif"] == 12.0 for row in rows))
+        self.assertAlmostEqual(sum(row["dpp_lain"] for row in rows) * 0.12, detail_total["ppn"], places=2)
+
+    def test_ppn_digunggung_detail_subtotals_every_masa(self):
+        acc_ppn_out = self._mk_account("21205", "PPN Keluaran Dua Masa", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Dua Masa 11%", "sale", acc_ppn_out)
+        this_masa = date.today().replace(day=15)
+        prev_masa = (this_masa.replace(day=1) - timedelta(days=1)).replace(day=15)
+        self._post_retail_sale(1_200_000.0, ppn, when=this_masa)
+        self._post_retail_sale(600_000.0, ppn, when=prev_masa)
+
+        filters = self._filters()
+        filters["date_from"] = prev_masa.replace(day=1)
+        lines = self.env["custom.report.ppn.digunggung.detail"]._build_lines(filters)
+        subtotals = [l for l in lines if l.get("type") == "subtotal"]
+        self.assertEqual(len(subtotals), 2, "One subtotal per tax period expected.")
+        headers = [l for l in lines if l.get("type") == "header"]
+        self.assertEqual(len(headers), 2)
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(sum(s["ppn"] for s in subtotals), grand["ppn"], places=2)
+
+    def test_ppn_digunggung_detail_excludes_customer_invoices(self):
+        """The invoiced half stays with the per-faktur report, as in the recap."""
+        acc_ppn_out = self._mk_account("21206", "PPN Keluaran Rinci FK", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Rinci FK 11%", "sale", acc_ppn_out)
+        inv = self.Move.create(
+            {
+                "move_type": "out_invoice",
+                "journal_id": self.j_sale.id,
+                "partner_id": self.partner_a.id,
+                "invoice_date": date.today(),
+                "date": date.today(),
+                "company_id": self.company.id,
+                "invoice_line_ids": [
+                    Command.create(
+                        {
+                            "name": "Barang C",
+                            "quantity": 1.0,
+                            "price_unit": 500_000.0,
+                            "account_id": self.acc_revenue.id,
+                            "tax_ids": [Command.set([ppn.id])],
+                        }
+                    )
+                ],
+            }
+        )
+        inv.action_post()
+        self._post_retail_sale(1_200_000.0, ppn)
+
+        lines = self.env["custom.report.ppn.digunggung.detail"]._build_lines(self._filters())
+        self.assertNotIn(inv.name, {l.get("doc_no") for l in lines if not l.get("type")})
+        grand = next(l for l in lines if l.get("type") == "grand_total")
+        self.assertAlmostEqual(grand["dpp_penuh"], 1_200_000.0, places=2)
+
+    def test_ppn_digunggung_detail_registered_in_both_dispatch_registries(self):
+        """Guard against the silent Trial-Balance fallback (19.0.0.9.0)."""
+        from odoo.addons.custom_accounting_reports.models.custom_report_dispatch import REPORT_MODEL_MAP
+
+        self.assertEqual(
+            REPORT_MODEL_MAP.get("ppn_digunggung_detail"),
+            "custom.report.ppn.digunggung.detail",
+        )
+        router = self.env.ref("custom_accounting_reports.report_dispatch").arch
+        self.assertIn("report_ppn_digunggung_detail", router)
+
+    def test_ppn_digunggung_wizard_switches_report_on_context(self):
+        """One wizard, two menus: the context key picks the layout."""
+        wizard = self.env["custom.report.ppn.digunggung.wizard"].create({})
+        self.assertEqual(wizard._report_code_for_view(), "ppn_digunggung")
+        detail = wizard.with_context(ppn_digunggung_detail=1)
+        self.assertEqual(detail._report_code_for_view(), "ppn_digunggung_detail")
+        self.assertEqual(
+            detail.action_view()["params"]["report_code"],
+            "ppn_digunggung_detail",
+        )

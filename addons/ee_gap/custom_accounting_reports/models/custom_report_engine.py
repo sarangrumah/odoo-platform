@@ -172,6 +172,21 @@ class CustomReportEngine(models.AbstractModel):
     # ------------------------------------------------------------------
     # Raw SQL helpers — parameterised, never string-concatenated
     # ------------------------------------------------------------------
+    def _ou_sql_filter(self, alias="aml"):
+        """``(sql_fragment, params)`` restricting a raw query to the user's Operating Units.
+
+        The base implementation is a no-op; ``custom_operating_unit_reports``
+        overrides it.
+
+        This exists because the reports build their own SQL over
+        ``account_move_line``, and **``ir.rule`` does not apply to raw SQL**.
+        Every query here that touches the ledger must splice this in, or a
+        store-scoped user reading a Trial Balance sees every other store's
+        numbers while their list views are correctly filtered — the quietest
+        possible data leak. When adding a query, add the hook with it.
+        """
+        return "", []
+
     def _get_move_lines_query(self, filters):
         """Return ``(query, params)`` selecting move-line rows.
 
@@ -223,6 +238,11 @@ class CustomReportEngine(models.AbstractModel):
         if filters.get("partner_ids"):
             query += " AND aml.partner_id IN %s"
             params.append(tuple(filters["partner_ids"]))
+
+        ou_sql, ou_params = self._ou_sql_filter("aml")
+        if ou_sql:
+            query += ou_sql
+            params.extend(ou_params)
 
         query += " ORDER BY aml.account_id, aml.date, aml.id"
         return query, tuple(params)
@@ -315,6 +335,11 @@ class CustomReportEngine(models.AbstractModel):
                 return {}
             sql += " AND aml.account_id IN %s"
             params.append(tuple(account_ids))
+
+        ou_sql, ou_params = self._ou_sql_filter("aml")
+        if ou_sql:
+            sql += ou_sql
+            params.extend(ou_params)
 
         sql += """
             GROUP BY aml.account_id

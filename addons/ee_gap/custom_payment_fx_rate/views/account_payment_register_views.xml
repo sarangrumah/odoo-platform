@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_account_payment_register_form_fx_rate" model="ir.ui.view">
+        <field name="name">account.payment.register.form.fx.rate</field>
+        <field name="model">account.payment.register</field>
+        <field name="inherit_id" ref="account.view_account_payment_register_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='amount_div']" position="after">
+                <field name="fx_show_rate" invisible="1"/>
+                <field name="fx_foreign_currency_id" invisible="1"/>
+                <field name="fx_expected_rate" invisible="1"/>
+                <label for="manual_currency_rate" invisible="not fx_show_rate"/>
+                <div class="o_row" invisible="not fx_show_rate">
+                    <field name="manual_currency_rate" nolabel="1" class="oe_inline"
+                           widget="monetary" options="{'currency_field': 'company_currency_id'}"/>
+                    <span class="text-muted ms-2"><field name="fx_rate_hint" nolabel="1" readonly="1" class="oe_inline"/></span>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

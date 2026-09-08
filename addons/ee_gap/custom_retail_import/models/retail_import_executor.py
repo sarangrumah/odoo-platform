@@ -47,6 +47,24 @@ _MDM_SIZE_SPLIT = re.compile(r"[\s/xX*\-]+")
 _MDM_INT_FLOAT = re.compile(r"\d+\.0+")
 
 
+class RetailSessionBusy(Exception):
+    """A ``pos.config`` already has a live session that this import must not touch.
+
+    Raised by ``_ri_open_session`` when the session found on the register carries
+    orders, i.e. a real shift is in progress. Callers park that store's rows and
+    carry on with the rest of the file — one busy register must never abort an
+    entire night of sales.
+    """
+
+    def __init__(self, config, session):
+        self.config = config
+        self.session = session
+        super().__init__(
+            f"store {config.display_name}: POS session {session.id} still open with "
+            f"{len(session.order_ids)} order(s) — close that session, then re-run this import"
+        )
+
+
 class RetailImportExecutor(models.AbstractModel):
     _name = "retail.import.executor"
     _description = "Retail Import Executor"
@@ -1797,27 +1815,12 @@ class RetailImportExecutor(models.AbstractModel):
             # One session per config **within the current day batch**: Odoo forbids >1
             # non-closed session per pos.config, so the caller closes a day's sessions
             # before the next day opens its own. ``_pos_close_and_backdate`` then stamps
-            # each closing entry with that day's date.
+            # each closing entry with that day's date. ``_ri_open_session`` adopts a
+            # stray empty session rather than dying on it, and raises
+            # ``RetailSessionBusy`` for a register that is genuinely mid-shift.
             k = cfg.id
             if k not in sess_cache:
-                s = self.env["pos.session"].create({"config_id": cfg.id, "user_id": self.env.uid})
-                # Decision B: imported POS is financial-only and must NOT move stock.
-                # Merchandise is now storable (is_storable=True), so without this the
-                # close would create pickings/stock moves and double-count on-hand
-                # (the X20 snapshot already sets opening quantities). pos.session.create
-                # forces this flag from company config, so override it post-create.
-                if s.update_stock_at_closing:
-                    s.update_stock_at_closing = False
-                if s.state != "opened":
-                    # Proper opening (cash control) so the close can book cash to
-                    # Cash-on-hand instead of Cash Difference Loss.
-                    try:
-                        s.set_opening_control(0, None)
-                    except Exception:
-                        pass
-                    if s.state != "opened":
-                        s.write({"state": "opened"})
-                sess_cache[k] = s
+                sess_cache[k] = self._ri_open_session(cfg)
             return sess_cache[k]
 
         def resolve_product(r):
@@ -2068,8 +2071,14 @@ class RetailImportExecutor(models.AbstractModel):
                 dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
                 order_date = d
                 # Session is created outside the per-order savepoint so a single bad
-                # order does not roll back the shared session.
-                sess = get_session(cfg)
+                # order does not roll back the shared session. A register that is
+                # mid-shift parks only its own rows: the rest of the file still posts.
+                try:
+                    sess = get_session(cfg)
+                except RetailSessionBusy as busy:
+                    fail_rows(rows, str(busy))
+                    skipped += len(rows)
+                    continue
                 try:
                     with self.env.cr.savepoint():
                         order = Order.create(
@@ -2244,6 +2253,54 @@ class RetailImportExecutor(models.AbstractModel):
             for line in session.statement_line_ids:
                 if line.move_id:
                     self._ri_backdate_move(line.move_id, gl_date, tag)
+
+    def _ri_open_session(self, cfg):
+        """Return a usable POS session for ``cfg``, adopting a stray open one.
+
+        Odoo allows at most one non-closed ``pos.session`` per ``pos.config``, so a
+        blind ``create()`` raises ValidationError the moment anybody opens that
+        register in the UI — and since the executor re-raises, ONE stray session used
+        to abort the whole file. That is exactly what happened on 10-Aug-2026 in
+        prd_levis_begbal: an empty session left in ``opening_control`` on one store
+        stopped eight consecutive nights of X24 sales, while the feed still reported
+        ``ok`` and the source files were archived as duplicates.
+
+        An EMPTY stray session is adopted — it holds nothing worth keeping, and the
+        close/backdate step treats it exactly like one we opened ourselves. A session
+        WITH orders belongs to a live shift and is never touched: the caller parks
+        that store's rows via ``RetailSessionBusy`` and imports every other store.
+        """
+        Session = self.env["pos.session"]
+        existing = Session.search([("config_id", "=", cfg.id), ("state", "!=", "closed")], limit=1)
+        if existing:
+            if existing.order_ids:
+                raise RetailSessionBusy(cfg, existing)
+            _logger.info(
+                "adopting stray POS session %s (state=%s) on %s instead of opening a second one",
+                existing.id,
+                existing.state,
+                cfg.display_name,
+            )
+            s = existing
+        else:
+            s = Session.create({"config_id": cfg.id, "user_id": self.env.uid})
+        # Decision B: imported POS is financial-only and must NOT move stock.
+        # Merchandise is storable (is_storable=True), so without this the close would
+        # create pickings/stock moves and double-count on-hand (the X20 snapshot
+        # already sets opening quantities). pos.session.create forces this flag from
+        # company config, so it is overridden post-create.
+        if s.update_stock_at_closing:
+            s.update_stock_at_closing = False
+        if s.state != "opened":
+            # Proper opening (cash control) so the close can book cash to Cash-on-hand
+            # instead of Cash Difference Loss.
+            try:
+                s.set_opening_control(0, None)
+            except Exception:
+                pass
+            if s.state != "opened":
+                s.write({"state": "opened"})
+        return s
 
     def _pos_close_and_backdate(self, sessions, errors, tag):
         """Close each open POS session (cash-control aware) and re-stamp its GL move to
@@ -3475,20 +3532,10 @@ class RetailImportExecutor(models.AbstractModel):
             return cfg_cache[store]
 
         def get_session(cfg):
+            # Same adopt-or-open rule as X24 (see ``_ri_open_session``): imported
+            # refunds are financial-only, no stock move.
             if cfg.id not in sess_cache:
-                s = self.env["pos.session"].create({"config_id": cfg.id, "user_id": self.env.uid})
-                # Decision B: imported refunds are financial-only, no stock move
-                # (matches X24). Override the company-derived flag post-create.
-                if s.update_stock_at_closing:
-                    s.update_stock_at_closing = False
-                if s.state != "opened":
-                    try:
-                        s.set_opening_control(0, None)
-                    except Exception:
-                        pass
-                    if s.state != "opened":
-                        s.write({"state": "opened"})
-                sess_cache[cfg.id] = s
+                sess_cache[cfg.id] = self._ri_open_session(cfg)
             return sess_cache[cfg.id]
 
         def resolve_product(r):
@@ -3644,7 +3691,12 @@ class RetailImportExecutor(models.AbstractModel):
 
                 d = profile._parse_date(date)
                 dt = datetime(d.year, d.month, d.day, 12, 0, 0) if d else datetime.now()
-                sess = get_session(cfg)
+                try:
+                    sess = get_session(cfg)
+                except RetailSessionBusy as busy:
+                    fail_rows(rows, str(busy))
+                    skipped += len(rows)
+                    continue
                 try:
                     with self.env.cr.savepoint():
                         order = Order.create(

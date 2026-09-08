@@ -1,69 +1,101 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- A full page, not a dialog. Mapping a period's merchant ids is a sit-down
+         job over dozens of rows with a bank statement open alongside; a modal gives
+         it eight visible lines and no room for the amounts that prove them. -->
     <record id="view_levis_bank_mid_map_wizard_form" model="ir.ui.view">
         <field name="name">levis.bank.mid.map.wizard.form</field>
         <field name="model">levis.bank.mid.map.wizard</field>
         <field name="arch" type="xml">
             <form string="Map Unmapped Settlements">
-                <group>
-                    <group>
-                        <field name="company_id" groups="base.group_multi_company"/>
-                        <field name="date_from"/>
-                        <field name="date_to"/>
-                    </group>
-                    <group>
-                        <field name="journal_ids" widget="many2many_tags"/>
-                        <field name="run_id" readonly="1" invisible="not run_id"/>
-                        <field name="currency_id" invisible="1"/>
-                        <field name="scanned" invisible="1"/>
-                    </group>
-                </group>
-                <div class="alert alert-info" role="alert" invisible="not scanned">
-                    <field name="unmapped_line_count" class="oe_inline" readonly="1"/>
-                    statement line(s) worth
-                    <field name="unmapped_total" class="oe_inline" readonly="1"/>
-                    have no store. Pick an Operating Unit for each group below —
-                    largest amount first, so a session cut short still covers the
-                    money that matters.
-                    <ul>
-                        <li>A suggestion is only offered when the narrative's store text
-                        overlaps an Operating Unit name. <strong>Check it</strong> — and
-                        note that many do not overlap at all, because the bank prints
-                        abbreviations (<em>LEVIS BIP</em> is Bandung Indah Plaza,
-                        <em>LEVIS GANCIT</em> is Gandaria City). Those are left empty
-                        rather than guessed from initials.</li>
-                        <li>Cash deposits often name only the person who made the
-                        deposit, not the store. That is a perfectly good key — a cashier
-                        deposits for one shop — so map the name. Shorten the
-                        <em>Key</em> to just the distinctive part so next month's
-                        deposits match the same rule.</li>
-                    </ul>
-                    Every rule you create here is permanent: this is a one-off setup,
-                    not monthly work.
-                </div>
-                <field name="line_ids" invisible="not scanned">
-                    <list create="false" delete="false" editable="bottom">
-                        <field name="journal_id" readonly="1"/>
-                        <field name="match_type" readonly="1"/>
-                        <field name="key" readonly="match_type != 'keyword'"/>
-                        <field name="channel" readonly="1"/>
-                        <field name="line_count" readonly="1" sum="Lines"/>
-                        <field name="total_amount" readonly="1" sum="Amount"/>
-                        <field name="sample_narrative" readonly="1"/>
-                        <field name="warehouse_id"/>
-                        <field name="analytic_account_id"/>
-                        <field name="skip"/>
-                        <field name="currency_id" column_invisible="1"/>
-                    </list>
-                </field>
-                <footer>
+                <header>
                     <button name="action_scan" type="object" string="Scan Period"
                             class="btn-primary" invisible="scanned"/>
-                    <button name="action_scan" type="object" string="Re-scan" invisible="not scanned"/>
+                    <button name="action_scan" type="object" string="Re-scan"
+                            invisible="not scanned"/>
                     <button name="action_apply" type="object" string="Create Mappings"
                             class="btn-primary" invisible="not scanned"/>
-                    <button string="Close" class="btn-secondary" special="cancel"/>
-                </footer>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Map Unmapped Settlements</h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                        <group>
+                            <field name="journal_ids" widget="many2many_tags"/>
+                            <field name="run_id" readonly="1" invisible="not run_id"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="scanned" invisible="1"/>
+                        </group>
+                    </group>
+
+                    <group string="What the scan found" invisible="not scanned">
+                        <group>
+                            <field name="unmapped_line_count"/>
+                            <field name="unmapped_total"/>
+                        </group>
+                        <group>
+                            <field name="unmapped_gross"/>
+                            <field name="unmapped_mdr"/>
+                            <field name="unmapped_gap"/>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-info" role="alert" invisible="not scanned">
+                        Pick an Operating Unit for each group below — largest amount
+                        first, so a session cut short still covers the money that matters.
+                        <ul>
+                            <li><strong>Bank Amount</strong> is the sum of the account
+                            mutation over <em>every</em> statement line in the group, net
+                            of the acquirer fee. The <em>Sample Narrative</em> beside it is
+                            one of those lines, not all of them — use
+                            <em>Bank Lines</em> to see them one by one. Gross minus MDR
+                            should equal the bank amount; anything left over shows under
+                            <em>Unexplained</em>, and a cash deposit quotes no gross at
+                            all, so its whole amount lands there by design.</li>
+                            <li>A suggestion is only offered when the narrative's store text
+                            overlaps an Operating Unit name. <strong>Check it</strong> — and
+                            note that many do not overlap at all, because the bank prints
+                            abbreviations (<em>LEVIS BIP</em> is Bandung Indah Plaza,
+                            <em>LEVIS GANCIT</em> is Gandaria City). Those are left empty
+                            rather than guessed from initials.</li>
+                            <li>Cash deposits often name only the person who made the
+                            deposit, not the store. That is a perfectly good key — a cashier
+                            deposits for one shop — so map the name. Shorten the
+                            <em>Key</em> to just the distinctive part so next month's
+                            deposits match the same rule.</li>
+                        </ul>
+                        Every rule you create here is permanent: this is a one-off setup,
+                        not monthly work.
+                    </div>
+                    <field name="line_ids" invisible="not scanned" nolabel="1">
+                        <list create="false" delete="false" editable="bottom">
+                            <field name="journal_id" readonly="1"/>
+                            <field name="match_type" readonly="1"/>
+                            <field name="key" readonly="match_type != 'keyword'"/>
+                            <field name="channel" readonly="1"/>
+                            <field name="line_count" readonly="1" sum="Lines"/>
+                            <field name="total_amount" readonly="1" sum="Bank Amount"/>
+                            <field name="gross_total" readonly="1" sum="Gross" optional="show"/>
+                            <field name="mdr_total" readonly="1" sum="MDR" optional="show"/>
+                            <field name="narrative_gap" readonly="1" sum="Unexplained" optional="hide"/>
+                            <button name="action_open_statement_lines" type="object"
+                                    string="Bank Lines" icon="fa-list"
+                                    title="Show the statement lines behind these totals"/>
+                            <field name="sample_narrative" readonly="1"/>
+                            <field name="warehouse_id"/>
+                            <field name="analytic_account_id"/>
+                            <field name="skip"/>
+                            <field name="statement_line_ids" column_invisible="1"/>
+                            <field name="currency_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                </sheet>
             </form>
         </field>
     </record>
@@ -72,6 +104,6 @@
         <field name="name">Map Unmapped Settlements</field>
         <field name="res_model">levis.bank.mid.map.wizard</field>
         <field name="view_mode">form</field>
-        <field name="target">new</field>
+        <field name="target">current</field>
     </record>
 </odoo>

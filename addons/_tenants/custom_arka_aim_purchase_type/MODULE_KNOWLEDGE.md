@@ -1,0 +1,144 @@
+---
+status: draft
+generated_at: 2026-09-08T00:00:00Z
+generator: hand-authored
+module: custom_arka_aim_purchase_type
+manifest_version: 19.0.1.0.1
+---
+
+# custom_arka_aim_purchase_type
+
+## Purpose
+Splits ARKA-AIM purchasing into a **Trade** stream (goods bought to be sold on)
+and a **Non-Trade** stream (operational and capex spend), and hangs fixed-asset
+capitalisation off the Non-Trade goods receipt. Ports the Levi's
+`custom_levis_localization` feature #9 to the ARKA-AIM tenant, minus the parts
+that are Levi's-only (per-store Operating Unit, store purchase journals, vendor
+bill numbering, the duplicate-SKU gate).
+
+## Why it exists
+Two separate asks from the tenant, which turn out to be one feature:
+
+1. The buyer must declare, on the order, whether a purchase is Trade or
+   Non-Trade. The two streams have different AP control accounts in the chart
+   (`2103100001` vs `2103300001`) and the client wants the distinction visible
+   in the **PO number itself**, not only in a field — a Non-Trade order should
+   be recognisable as such on a printed document.
+2. Capex arrives through Non-Trade purchases. Registering it in the fixed-asset
+   subledger meant re-keying every item by hand into
+   `custom.fixed.asset`. `custom_asset_from_receipt` already converts a receipt
+   into assets, but only for products flagged one by one on their master — which
+   is exactly the step a buyer receiving a one-off waste bin will not have done.
+   The **purchase stream** is the signal that was missing.
+
+## Business Flow
+1. Buyer creates a purchase order and picks **Purchase Type** (radio, default
+   Trade). The field is read-only once the order leaves draft/sent, because the
+   number was already drawn from that stream's counter.
+2. `create()` draws the number from the stream's per-company sequence:
+   `PO/T/ARKA/2026/09/001`, `PO/NT/AIM/2026/09/001`. Two independent counters per
+   company, both resetting monthly.
+3. `_prepare_invoice()` copies the stream onto the vendor bill
+   (`account.move.l10n_purchase_type`, editable on a bill keyed in without a PO).
+4. `account.move.line._compute_account_id` routes the bill's payment-term line to
+   that stream's AP control account, and — where a goods-receipt accrual really
+   was booked — its product lines to the stream's GR/IR clearing account.
+5. The goods receipt stores the stream (`stock.picking.l10n_purchase_type`).
+6. On a validated **Non-Trade** receipt, *Convert to Assets* is offered. Every
+   received line is listed, pre-selected, as a pooled asset; confirming creates
+   one draft `custom.fixed.asset` per line carrying the received quantity and the
+   line value.
+
+## Key Models & Fields
+| Model | Field / method | Note |
+|---|---|---|
+| `purchase.order` | `l10n_purchase_type` | Trade / Non-Trade, required, default Trade, tracked |
+| `purchase.order` | `_arka_next_po_number()` | Draws from the stream sequence; `False` falls back to core |
+| `account.move` | `l10n_purchase_type` | Copied from the PO; hand-settable on a manual bill |
+| `account.move.line` | `_compute_account_id()`, `_arka_grir_account()` | AP / GR-IR / expense-fallback routing |
+| `stock.picking` | `l10n_purchase_type` (stored), `_arka_is_nontrade_receipt()` | Stream on the receipt |
+| `stock.picking` | `_compute_has_rental_asset_lines()` | Also True on a validated Non-Trade receipt |
+| `arka.purchase.account.map` | `company_id`, `purchase_type`, `payable_account_id`, `grir_account_id`, `expense_account_id` | The wiring, one row per company and stream |
+| `res.company` | `x_nontrade_asset_group_id` | Fallback asset group for Non-Trade conversions |
+| `custom.asset.conversion.wizard` | `_asset_conversion_mode_for()`, `_default_asset_group()` | Overrides of the hooks added to `custom_asset_from_receipt` 19.0.0.4.0 |
+
+## Configuration
+Seeded idempotently by `post_init_hook` (`hooks.py`), re-run on every upgrade:
+
+* per-company sequences, gated on `res.company.x_doc_code` — a company without a
+  code keeps core PO numbering, so the module is inert off-tenant;
+* `arka.purchase.account.map` rows resolved **by account code**, because
+  `account.account.code` is company-dependent in Odoo 19 and the ids differ per
+  database:
+
+  | Stream | Payable | GR/IR clearing | Expense fallback |
+  |---|---|---|---|
+  | Trade | `2103100001` | *(none — see below)* | *(none)* |
+  | Non-Trade | `2103300001` | `2103300008` | `7799000000` (Other operating expense) |
+
+Only empty fields are filled, so a hand-corrected mapping survives an upgrade.
+Account **types** are normalised on every run: an AP control account is coerced
+to `liability_payable` + reconcilable, a GR/IR account to `liability_current` +
+reconcilable.
+
+`res.company.x_nontrade_asset_group_id` is **not** seeded — pick the group on the
+company form (Non-Trade Assets tab) once the tenant decides which one it is.
+
+## Gotchas
+* **Trade deliberately has no GR/IR account in the mapping.** A real-time Trade
+  category keeps its own per-category stock-variation account; the mapping only
+  overrides it for Non-Trade.
+* **The GR/IR routing is inert on ARKA-AIM today.** `_arka_grir_account()`
+  requires a PO-linked line, a goods product, and a `real_time` valued category —
+  the exact condition under which a receipt posts Dr Stock Valuation / Cr Stock
+  Variation. Every ARKA-AIM product category is currently periodic, so bills keep
+  their native account. Routing them to GR/IR without a matching accrual would
+  strand a balance in `2103300008` forever. The mapping is configured so that
+  switching a category to real-time starts working without a code change.
+* **The tenant chart holds one account record per company under the same code.**
+  `2103300001` exists twice — one row owned by AIM, one by ARKA — and the hook runs
+  as superuser, where the multi-company record rule does not apply. `_find_account`
+  therefore filters on `company_ids` as well as on the company-dependent `code`;
+  without it the seeding would wire AIM's payable onto ARKA's bills.
+* **The expense fallback only fills an empty account.** A product or category
+  account always wins; the fallback exists so an opex product with no account
+  configured cannot block bill posting outright.
+* **Non-Trade conversion is pooled, never per-serial.** A serial-mode wizard line
+  is silently dropped when the move line carries no lot — which would quietly
+  skip exactly the unflagged lines this module exists to offer. Products that ARE
+  flagged on their master keep their own mode, so a configured per-serial
+  conversion still wins.
+* **Assets are created in draft with no acquisition journal**, exactly like the
+  existing `custom_arka_aim_asset_register`. The register is a subledger; the GL
+  was already moved by the receipt and the vendor bill, and posting an
+  acquisition entry here would double-count. Confirm the asset to build its
+  depreciation schedule.
+* **`_compute_has_rental_asset_lines` re-declares `@api.depends`.** Re-declaring
+  replaces the inherited set, so every base trigger is relisted alongside
+  `l10n_purchase_type`.
+* **`_compute_account_id` carries no `@api.depends` in core** — it is a
+  precompute-at-create field. The override keeps those semantics and just remaps
+  after `super()`; the bill already has its stream at create time because
+  `_prepare_invoice` set it.
+* **`purchase.order` has two search views in play.** The Purchase Orders action
+  uses `purchase.purchase_order_view_search`, the RFQ action uses
+  `purchase.view_purchase_order_filter`. The stream filters are added to BOTH —
+  inheriting only one leaves the split invisible on exactly the list the buyer
+  works from. Same trap on the list side: the action pins
+  `purchase.purchase_order_view_tree`, which is not the model's default list view.
+* Changing the Purchase Type after confirmation is blocked in the view, not by a
+  constraint: the number is already drawn and a `PO/T/...` order sitting in the
+  Non-Trade stream is worse than an unchangeable field.
+
+## Dependencies
+`purchase`, `stock`, `account`, `custom_arka_aim_numbering` (supplies
+`res.company.x_doc_code` and the `x_monthly_reset` `ir.sequence` override),
+`custom_asset_from_receipt` **19.0.0.4.0 or later** (supplies the two extension
+hooks this module overrides).
+
+## Tests
+`tests/test_purchase_type.py` — separate numbering streams with independent
+monthly counters, bill stream inheritance and payable routing, GR/IR staying
+inert for a periodic category, a Non-Trade receipt offering an unflagged product,
+conversion falling back to the company asset group, and a Trade receipt staying
+untouched.

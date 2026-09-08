@@ -33,4 +33,24 @@
         <field name="interval_type">hours</field>
         <field name="active" eval="False"/>
     </record>
+
+    <!-- Stuck-import watchdog. `retail.import.executor.run` commits state='running'
+         before the handler starts, so a handler that raises leaves the row running
+         forever: it reads as "in progress" everywhere AND blocks the SHA256 dedup, so
+         the file can never be re-imported. That combination cost prd_levis_begbal eight
+         nights of X24 sales in Aug-2026 with every status surface still green.
+
+         Hourly and cheap (one indexed state search). Enabled everywhere on purpose:
+         unlike the feed poller this writes no business records, it only tells the truth
+         about a run that is already dead, and turns the row back into something the
+         next poll may retry. Threshold: `retail_import.stuck_hours` (default 6). -->
+    <record id="cron_flag_stuck_retail_imports" model="ir.cron">
+        <field name="name">Retail Import: flag stuck imports</field>
+        <field name="model_id" ref="model_retail_import_log"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_flag_stuck()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
 </odoo>

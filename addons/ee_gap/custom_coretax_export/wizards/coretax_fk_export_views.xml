@@ -19,6 +19,9 @@
                                placeholder="Semua jurnal penjualan"/>
                     </group>
                 </group>
+                <div class="alert alert-warning" role="alert" invisible="preview_count > 0 or not empty_reason">
+                    <field name="empty_reason" nolabel="1" readonly="1"/>
+                </div>
                 <div class="text-muted">
                     <field name="preview_count" class="oe_inline"/> faktur penjualan
                     ter-posting akan masuk ke berkas. Hanya faktur penjualan yang

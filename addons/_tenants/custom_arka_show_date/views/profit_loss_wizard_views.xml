@@ -12,9 +12,13 @@
             <button name="action_view_by_branch" position="after">
                 <button string="View by Show" name="action_view_by_show"
                         type="object" class="btn-secondary"/>
+                <button string="View by Event" name="action_view_by_event"
+                        type="object" class="btn-secondary"/>
             </button>
             <button name="action_export_xlsx_by_branch" position="after">
                 <button string="Export by Show" name="action_export_xlsx_by_show"
+                        type="object" class="btn-secondary"/>
+                <button string="Export by Event" name="action_export_xlsx_by_event"
                         type="object" class="btn-secondary"/>
             </button>
         </field>

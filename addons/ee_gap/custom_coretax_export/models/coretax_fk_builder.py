@@ -18,6 +18,13 @@ guarantees on the values *as literally written*:
 * ``HARGA_TOTAL - DISKON == DPP`` on every OF row;
 * the FK totals equal the sum of the OF column beneath them.
 
+A down payment already invoiced is deliberately not an OF row, easy though it
+would be to emit the one Odoo puts on the settlement invoice: the down payment
+carries a faktur of its own, issued when it was received, so the settlement
+faktur reports only what is still being billed. The deduction is netted off the
+item rows and the settlement faktur says nothing about the earlier one. See
+``_coretax_fk_net_factor``.
+
 Both are about the written cells, not the underlying floats, which is why the
 money columns are rounded to whole rupiah and the residual is absorbed by the
 last OF row. See ``FK_AMOUNT_ROUNDING`` and ``_round_and_plug``.
@@ -32,7 +39,7 @@ import logging
 from odoo import _, models
 from odoo.addons.custom_tax_id.models.uom_inherit import CORETAX_UOM_FALLBACK
 from odoo.exceptions import UserError
-from odoo.tools import float_round
+from odoo.tools import float_compare, float_is_zero, float_round
 
 _logger = logging.getLogger(__name__)
 
@@ -44,6 +51,15 @@ XLSX_MIMETYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.she
 # ``currency.rounding`` would emit decimals Coretax does not accept. Every money
 # cell in the client's reference workbook is a whole rupiah.
 FK_AMOUNT_ROUNDING = 1.0
+
+# PMK 131/2024. The statutory PPN rate is 12%; the 11%-effective rate everyone
+# actually charges is filed as *12% on a "nilai lain" base of 11/12 of the
+# price*, not as a bare 11% tariff — Coretax has no 11% tariff to accept. The
+# arithmetic is exact (12% x 11/12 == 11%), so a line the ledger booked at 11%
+# exports with the identical PPN rupiah; only its presentation changes.
+PMK_131_EFFECTIVE_RATE = 11.0
+PMK_131_STATUTORY_RATE = 12.0
+PMK_131_DPP_FACTOR = 11.0 / 12.0
 
 FK_COLUMNS = (
     "FK",
@@ -143,20 +159,45 @@ class CoretaxFkBuilder(models.AbstractModel):
         return npwp, company.x_custom_nitku_suffix or ""
 
     @staticmethod
-    def _line_vat(line):
+    def _line_vat(line, dpp=None):
         """(dpp, dpp_lain, ppn, tarif_ppn, uses_dpp_lain) for one invoice line.
 
         ``dpp`` is the contractual base; ``dpp_lain`` is the PMK 131/2024 "nilai
-        lain" base the PPN is actually charged on. When no nilai-lain tax
-        applies the two coincide and CHECK_DPP_LAIN is 'N'.
+        lain" base the PPN is actually charged on. It defaults to the line's own
+        ``price_subtotal``; a settlement faktur passes the base already netted of
+        the down payment billed earlier, so the tax rules below are applied to
+        the amount actually being reported (see ``_coretax_fk_net_factor``).
+
+        Three cases, in order:
+
+        * a tax configured as *DPP Nilai Lain* carries its own factor and rate —
+          emitted as configured;
+        * a plain 11% tax is the same PMK 131/2024 arrangement expressed the
+          short way in the ledger, so it is *presented* in the filing form:
+          TARIF_PPN 12 on a DPP_LAIN of 11/12, CHECK_DPP_LAIN 'Y'. The PPN
+          rupiah is unchanged (12% x 11/12 == 11%), so the file still ties to
+          the GL. Emitting a bare 11% tariff instead gets the import rejected —
+          Coretax only knows the statutory 12%;
+        * anything else (12% penuh, 15%, PPnBM rates) is a regular DPP: the two
+          bases coincide and CHECK_DPP_LAIN is 'N'.
         """
-        dpp = line.price_subtotal
+        dpp = line.price_subtotal if dpp is None else dpp
         vat = line.tax_ids.filtered(lambda t: t.amount_type == "percent" and t.amount > 0)[:1]
         if not vat:
             return dpp, 0.0, 0.0, 0.0, False
-        dpp_lain = vat._dpp_adjust(dpp)
-        uses = vat.x_custom_dpp_method == "nilai_lain" and bool(vat.x_custom_dpp_factor)
-        return dpp, dpp_lain, dpp_lain * vat.amount / 100.0, vat.amount, uses
+        if vat.x_custom_dpp_method == "nilai_lain" and vat.x_custom_dpp_factor:
+            dpp_lain = vat._dpp_adjust(dpp)
+            return dpp, dpp_lain, dpp_lain * vat.amount / 100.0, vat.amount, True
+        if float_is_zero(vat.amount - PMK_131_EFFECTIVE_RATE, precision_digits=4):
+            dpp_lain = dpp * PMK_131_DPP_FACTOR
+            return (
+                dpp,
+                dpp_lain,
+                dpp_lain * PMK_131_STATUTORY_RATE / 100.0,
+                PMK_131_STATUTORY_RATE,
+                True,
+            )
+        return dpp, dpp, dpp * vat.amount / 100.0, vat.amount, False
 
     @staticmethod
     def _item_jenis(line):
@@ -179,6 +220,136 @@ class CoretaxFkBuilder(models.AbstractModel):
         if products and all(product.type == "service" for product in products):
             return "Jasa"
         return "Barang"
+
+    @staticmethod
+    def _line_is_downpayment(line):
+        """True for an invoice line that bills or deducts a down payment.
+
+        ``account.move.line.is_downpayment`` is the direct marker and is set on
+        both sides of the arrangement. It is checked first because a line can
+        carry it without any ``sale_line_ids`` at all — an invoice built by hand
+        or copied from an earlier one keeps the flag but loses the order link,
+        which is exactly the shape the ARKA-AIM fakturs are in.
+        """
+        if "is_downpayment" in line._fields and line.is_downpayment:
+            return True
+        if "sale_line_ids" not in line._fields:
+            return False
+        return bool(line.sale_line_ids) and all(sol.is_downpayment for sol in line.sale_line_ids)
+
+    @classmethod
+    def _is_dp_deduction(cls, line):
+        """True for the negative "Down Payments" line a settlement faktur carries.
+
+        Core adds it so the final invoice bills only the remainder. It is a
+        *ledger* device, not an item sold: it is netted off the item rows rather
+        than emitted as an OF row with a negative quantity, which the importer
+        rejects.
+        """
+        if not cls._line_is_downpayment(line):
+            return False
+        rounding = line.currency_id.rounding or 0.01
+        return float_compare(line.price_subtotal, 0.0, precision_rounding=rounding) < 0
+
+    @classmethod
+    def _is_uang_muka(cls, move):
+        """True when this faktur *is* a down payment, for FG_UANG_MUKA.
+
+        Every billed line has to be one: a settlement invoice carries the
+        deducted down payment *alongside* the goods it settles, and that is a
+        regular faktur reporting the remainder — see ``_coretax_fk_net_factor``.
+        """
+        lines = move.invoice_line_ids.filtered(lambda l: l.display_type == "product")
+        if not lines:
+            return False
+        return all(cls._line_is_downpayment(line) and not cls._is_dp_deduction(line) for line in lines)
+
+    def _coretax_fk_net_factor(self, move, items, dp_lines):
+        """The share of the item price a settlement faktur still reports.
+
+        A partly-prepaid sale is filed as two *independent* fakturs: the down
+        payment gets its own faktur when it is received, and the settlement
+        faktur reports only the remainder. So the down payment Odoo deducts on
+        the final invoice is netted off the OF rows here — it is not reported in
+        the FK record's ``UANG_MUKA_*`` block, and the settlement faktur carries
+        no reference to the earlier one.
+
+        The consequence worth stating: ``JUMLAH_DPP`` / ``JUMLAH_PPN`` equal the
+        invoice's own ``amount_untaxed`` / ``amount_tax`` — a 300 juta sale with
+        a 150 juta down payment settles on a 150 juta faktur — and the two
+        fakturs together still add up to the whole contract.
+
+        Returned as a factor rather than an amount so every item line is reduced
+        in proportion to its own share, which keeps HARGA_TOTAL - DISKON == DPP
+        on each row and the FK totals tied to the OF column beneath them.
+        """
+        gross = sum(line.price_subtotal for line in items)
+        deduction = sum(-line.price_subtotal for line in dp_lines)
+        net = gross - deduction
+        if float_compare(net, 0.0, precision_rounding=FK_AMOUNT_ROUNDING) <= 0:
+            # Nothing left to bill: the deduction covers the whole invoice, so
+            # there is no faktur to issue. Refuse by name rather than emit a
+            # zero or negative FK record, which Coretax rejects anyway.
+            raise UserError(
+                _(
+                    "%(faktur)s tidak menyisakan nilai untuk difakturkan: potongan uang muka "
+                    "%(uang_muka)s sama dengan atau melebihi nilai barang/jasa %(barang)s.\n\n"
+                    "Uang muka sudah dilaporkan pada fakturnya sendiri, sehingga faktur "
+                    "pelunasan hanya memuat sisa tagihan.",
+                    faktur=move.display_name or move.name,
+                    uang_muka=deduction,
+                    barang=gross,
+                )
+            )
+        return net / gross
+
+    def _item_name(self, move, line):
+        """NAMA for one OF row: what was sold, with the event it was sold for.
+
+        The invoice line's own description leads, not ``product_id.name``: the
+        event block (event, venue, show date) that ARKA appends to the line is
+        the part the tax team reconciles against, and reading the product name
+        dropped it. A down-payment line carries no product at all, so it always
+        depended on the description anyway.
+
+        The description is flattened to a single line — the cell is one XLSX
+        cell and an embedded newline is not safe in the import file.
+
+        The event is appended from the invoice's own header fields only when the
+        description does not already carry it; those fields exist on tenants
+        that installed the event tracking, and reading them through ``_fields``
+        keeps this module independent of it.
+        """
+        parts = [part.strip() for part in (line.name or "").splitlines()]
+        description = ", ".join(part for part in parts if part) or line.product_id.name or ""
+        event = [part for part in self._coretax_fk_event_parts(move) if part.lower() not in description.lower()]
+        if event:
+            description = ", ".join([description] + event) if description else ", ".join(event)
+        return description
+
+    @staticmethod
+    def _coretax_fk_event_parts(move):
+        """["Event X", "Lokasi Y", "dd.mm.yy"] from the invoice header, or [].
+
+        Empty unless the tenant captures an event *name* or *venue*: a show date
+        on its own says nothing a reader can place, and on an invoice it may
+        have been moved to anchor the payment terms rather than to name the day
+        the show ran.
+        """
+        name = move.x_custom_event_name if "x_custom_event_name" in move._fields else ""
+        location = move.x_custom_event_location if "x_custom_event_location" in move._fields else ""
+        if not name and not location:
+            return []
+        parts = []
+        if name:
+            parts.append("Event %s" % name)
+        if location:
+            parts.append("Lokasi %s" % location)
+        show_date = move.x_custom_show_date if "x_custom_show_date" in move._fields else False
+        if show_date:
+            # dd.mm.yy — the format the client writes in their own samples.
+            parts.append(show_date.strftime("%d.%m.%y"))
+        return parts
 
     @staticmethod
     def _round_and_plug(raw_values, rounding):
@@ -267,6 +438,118 @@ class CoretaxFkBuilder(models.AbstractModel):
 
         return moves.sorted(lambda m: (m.invoice_date, m.name or "")), companies
 
+    # ------------------------------------------------------- empty-selection
+
+    def _coretax_fk_empty_hints(self, date_from, date_to, company, partner_ids=None, journal_ids=None):
+        """Explain an empty FK selection by loosening one filter at a time.
+
+        "Tidak ada data" is almost never an empty month — it is the active
+        company, a draft invoice, or a nota kredit that the user counted on.
+        Each probe keeps the period and drops exactly one condition, so the
+        line that comes back names the filter that actually emptied the set.
+        Record rules already bound every search to the user's allowed
+        companies, so the cross-company probe cannot leak another tenant.
+        """
+        Move = self.env["account.move"]
+        period = [("invoice_date", ">=", date_from), ("invoice_date", "<=", date_to)]
+        posted_sale = period + [("move_type", "=", "out_invoice"), ("state", "=", "posted")]
+        hints = []
+
+        elsewhere = Move._read_group(
+            posted_sale + [("company_id", "!=", company.id)],
+            groupby=["company_id"],
+            aggregates=["__count"],
+        )
+        if elsewhere:
+            per_company = [
+                _("%(name)s (%(count)s faktur)", name=other.display_name, count=count) for other, count in elsewhere
+            ]
+            hints.append(
+                _(
+                    "Ada faktur ter-posting di periode ini, tetapi milik perusahaan lain: "
+                    "%(companies)s. Satu berkas FK hanya memuat satu NPWP — ganti "
+                    "'Perusahaan' di wizard (atau pindah perusahaan aktif), lalu ekspor "
+                    "per perusahaan.",
+                    companies=", ".join(per_company),
+                )
+            )
+
+        in_company = [("company_id", "=", company.id)]
+        unposted = Move.search_count(
+            period + in_company + [("move_type", "=", "out_invoice"), ("state", "!=", "posted")]
+        )
+        if unposted:
+            hints.append(
+                _(
+                    "%(count)s faktur penjualan di periode ini belum ter-posting (draft/batal). "
+                    "Coretax hanya menerima faktur ter-posting — posting dulu, lalu ulangi ekspor.",
+                    count=unposted,
+                )
+            )
+
+        refunds = Move.search_count(period + in_company + [("move_type", "=", "out_refund"), ("state", "=", "posted")])
+        if refunds:
+            hints.append(
+                _(
+                    "%(count)s nota kredit (retur penjualan) ada di periode ini. Nota kredit "
+                    "tidak masuk berkas FK — gunakan template Retur.",
+                    count=refunds,
+                )
+            )
+
+        if partner_ids:
+            loosened = Move.search_count(posted_sale + in_company + self._coretax_journal_domain(journal_ids))
+            if loosened:
+                hints.append(
+                    _(
+                        "Tanpa filter pelanggan ada %(count)s faktur — filter pelanggannya yang terlalu sempit.",
+                        count=loosened,
+                    )
+                )
+        if journal_ids:
+            loosened = Move.search_count(posted_sale + in_company + self._coretax_partner_domain(partner_ids))
+            if loosened:
+                hints.append(
+                    _(
+                        "Tanpa filter jurnal ada %(count)s faktur — filter jurnalnya yang terlalu sempit.",
+                        count=loosened,
+                    )
+                )
+
+        if not hints:
+            # Nothing anywhere in the period: point at the nearest invoice so the
+            # user can see at a glance whether they are off by a month.
+            nearest = Move.search(
+                [("move_type", "=", "out_invoice"), ("state", "=", "posted")] + in_company,
+                order="invoice_date desc",
+                limit=1,
+            )
+            if nearest:
+                hints.append(
+                    _(
+                        "Faktur penjualan ter-posting terakhir di %(company)s bertanggal "
+                        "%(date)s — periksa kembali periode yang dipilih.",
+                        company=company.name,
+                        date=self._fmt_date(nearest.invoice_date),
+                    )
+                )
+            else:
+                hints.append(
+                    _(
+                        "Belum ada satu pun faktur penjualan ter-posting di %(company)s.",
+                        company=company.name,
+                    )
+                )
+        return hints
+
+    @staticmethod
+    def _coretax_partner_domain(partner_ids):
+        return [("partner_id", "child_of", partner_ids.ids)] if partner_ids else []
+
+    @staticmethod
+    def _coretax_journal_domain(journal_ids):
+        return [("journal_id", "in", journal_ids.ids)] if journal_ids else []
+
     # --------------------------------------------------------- row building
 
     def _coretax_fk_rows(self, moves, company=None):
@@ -281,10 +564,15 @@ class CoretaxFkBuilder(models.AbstractModel):
         rows = []
         for move in moves:
             partner = move.partner_id.commercial_partner_id
-            items = move.invoice_line_ids.filtered(lambda l: l.display_type == "product")
+            products = move.invoice_line_ids.filtered(lambda l: l.display_type == "product")
+            # A settlement faktur's down-payment line is netted off the item
+            # rows, never emitted as one — see _coretax_fk_net_factor.
+            dp_lines = products.filtered(self._is_dp_deduction)
+            items = products - dp_lines
             if not items:
                 continue
-            of_rows, totals = self._coretax_fk_of_rows(move, items)
+            factor = self._coretax_fk_net_factor(move, items, dp_lines) if dp_lines else 1.0
+            of_rows, totals = self._coretax_fk_of_rows(move, items, factor)
             rows.append(
                 [
                     "FK",
@@ -300,25 +588,31 @@ class CoretaxFkBuilder(models.AbstractModel):
                     "%02d" % move.invoice_date.month,
                     str(move.invoice_date.year),
                     self._fmt_date(move.invoice_date),
-                    self._digits(partner.x_custom_npwp),
+                    partner._custom_coretax_npwp(),
                     "",  # JENIS_IDENTITAS
                     "",  # NIK_NOMOR_PASSPORT
                     partner.country_id.x_custom_code_alpha3 or "",
                     partner.name or "",
                     partner.email or "",
                     self._partner_address(partner),
-                    partner._custom_coretax_nitku()[-6:] if partner.x_custom_npwp else "",
+                    partner._custom_coretax_nitku()[-6:] if partner._custom_coretax_npwp() else "",
                     totals[0],
                     totals[1],
                     totals[2],
                     0,  # JUMLAH_PPNBM
                     "",  # ID_KETERANGAN_TAMBAHAN
-                    "0",  # FG_UANG_MUKA
-                    "",
-                    0,
-                    0,
-                    0,
-                    0,
+                    # FG_UANG_MUKA marks the faktur that *bills* a down
+                    # payment. A settlement faktur is an ordinary sale reporting
+                    # what is left to pay, so it is not flagged.
+                    "1" if self._is_uang_muka(move) else "0",
+                    # The UANG_MUKA_* block stays empty by design: a down
+                    # payment already carries a faktur of its own, so the
+                    # settlement faktur neither repeats nor references it.
+                    "",  # NOMOR_FAKTUR_UM_SEBELUMNYA
+                    0,  # UANG_MUKA_DPP
+                    0,  # UANG_MUKA_DPP_LAIN
+                    0,  # UANG_MUKA_PPN
+                    0,  # UANG_MUKA_PPNBM
                     # REFERENSI — the invoice number, never the sales order.
                     # ``move.ref`` on a customer invoice carries the source
                     # order / customer reference, which is not what the tax
@@ -335,10 +629,17 @@ class CoretaxFkBuilder(models.AbstractModel):
             rows.extend(of_rows)
         return [FK_COLUMNS, OF_COLUMNS], rows
 
-    def _coretax_fk_of_rows(self, move, items):
-        """(of_rows, [jumlah_dpp, jumlah_dpp_lain, jumlah_ppn]) for one invoice."""
+    def _coretax_fk_of_rows(self, move, items, factor=1.0):
+        """(of_rows, [jumlah_dpp, jumlah_dpp_lain, jumlah_ppn]) for one invoice.
+
+        ``factor`` is 1.0 for an ordinary faktur and the not-yet-billed share of
+        the price on a settlement faktur, where the down payment was already
+        reported on a faktur of its own — see ``_coretax_fk_net_factor``. It
+        scales the unit price and the gross alongside the tax base, so the row
+        stays internally consistent instead of reading as a discount.
+        """
         rounding = FK_AMOUNT_ROUNDING
-        raw = [self._line_vat(line) for line in items]
+        raw = [self._line_vat(line, line.price_subtotal * factor) for line in items]
 
         dpps, jumlah_dpp = self._round_and_plug([r[0] for r in raw], rounding)
         lains, jumlah_lain = self._round_and_plug([r[1] for r in raw], rounding)
@@ -348,7 +649,7 @@ class CoretaxFkBuilder(models.AbstractModel):
         for index, line in enumerate(items):
             tarif, uses = raw[index][3], raw[index][4]
             dpp = dpps[index]
-            harga_total, diskon = self._coretax_fk_gross_and_discount(line, dpp)
+            harga_total, diskon = self._coretax_fk_gross_and_discount(line, dpp, factor)
             of_rows.append(
                 [
                     "OF",
@@ -357,9 +658,9 @@ class CoretaxFkBuilder(models.AbstractModel):
                     # catch-all in CODE_OF_GOODS / CODE_OF_SERVICES, and
                     # what the client's own samples use throughout.
                     "000000",
-                    line.product_id.name or line.name or "",
+                    self._item_name(move, line),
                     line.product_uom_id.x_custom_coretax_code or CORETAX_UOM_FALLBACK,
-                    line.price_unit,
+                    line.price_unit * factor,
                     line.quantity,
                     harga_total,
                     diskon,
@@ -375,7 +676,7 @@ class CoretaxFkBuilder(models.AbstractModel):
         return of_rows, [jumlah_dpp, jumlah_lain, jumlah_ppn]
 
     @staticmethod
-    def _coretax_fk_gross_and_discount(line, dpp):
+    def _coretax_fk_gross_and_discount(line, dpp, factor=1.0):
         """(HARGA_TOTAL, DISKON) such that HARGA_TOTAL - DISKON == DPP exactly.
 
         DJP wants the gross before discount in HARGA_TOTAL and the discount
@@ -395,7 +696,10 @@ class CoretaxFkBuilder(models.AbstractModel):
         if discount and discount < 100.0:
             gross = dpp / (1.0 - discount / 100.0)
         else:
-            gross = line.price_unit * line.quantity
+            # ``factor`` nets an already-invoiced down payment off this line;
+            # the gross has to shrink with the base, or the deduction would read
+            # as a discount the customer never got.
+            gross = line.price_unit * line.quantity * factor
         harga_total = float_round(gross, precision_rounding=FK_AMOUNT_ROUNDING)
         diskon = harga_total - dpp
         if diskon < 0:

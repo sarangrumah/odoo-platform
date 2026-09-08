@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_company_form_arka_purchase_type" model="ir.ui.view">
+        <field name="name">res.company.form.arka.purchase.type</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Non-Trade Assets" name="arka_nontrade_assets">
+                    <group>
+                        <field name="x_nontrade_asset_group_id"/>
+                    </group>
+                    <p class="text-muted">
+                        Applied to fixed assets created from a Non-Trade goods receipt when
+                        neither the conversion wizard nor the product carries an asset group.
+                    </p>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

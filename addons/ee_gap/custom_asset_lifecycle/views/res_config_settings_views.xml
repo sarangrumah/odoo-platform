@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_asset_lifecycle_config_settings" model="ir.ui.view">
+        <field name="name">res.config.settings.asset.lifecycle</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='analytic']" position="after">
+                <block title="Asset Lifecycle" id="asset_lifecycle_settings"
+                       groups="custom_accounting_asset.group_asset_manager">
+                    <setting string="Damage Location"
+                             help="Where a serial is transferred when its unit is reported damaged.">
+                        <field name="asset_damage_location_id"/>
+                    </setting>
+                    <setting string="Lost/Missing Location"
+                             help="Where a serial is transferred when its unit is reported missing, so it stops counting as available on-hand stock.">
+                        <field name="asset_missing_location_id"/>
+                    </setting>
+                    <setting string="Asset Loss Account"
+                             help="Debited for the net book value of a written-off unit.">
+                        <field name="asset_loss_account_id"/>
+                    </setting>
+                    <setting string="Compensation Income Account"
+                             help="Credited at fair value when a client hands over a replacement unit that becomes company property.">
+                        <field name="asset_compensation_income_account_id"/>
+                    </setting>
+                    <setting string="Replacement Journal"
+                             help="Journal for the acquisition entry of a replacement unit.">
+                        <field name="asset_replacement_journal_id"/>
+                    </setting>
+                    <setting string="Equipment Category"
+                             help="Default maintenance category for equipment cards created from the register.">
+                        <field name="asset_equipment_category_id"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>

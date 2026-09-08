@@ -39,5 +39,40 @@
             <field name="key">custom_levis_localization.categ_reclass_clearing_account_code</field>
             <field name="value"></field>
         </record>
+        <!--
+          COGS catch-up on goods receipt (models/cogs_catchup.py).
+
+            "0" (default) -> off; COGS is recognised only by the monthly
+                             Periodic COGS run.
+            "1"           -> on; validating a vendor receipt recognises the
+                             COGS of whatever was already sold of the products
+                             on that receipt, as a DRAFT entry dated in the
+                             month of the sale while that month is still open,
+                             or on today's date once it is closed.
+        -->
+        <record id="param_cogs_catchup_enabled" model="ir.config_parameter">
+            <field name="key">custom_levis_localization.cogs_catchup_enabled</field>
+            <field name="value">0</field>
+        </record>
+        <!--
+          How far back the catch-up may reach, as a date. Empty (default) means
+          the first day of the booking month — deliberately narrow, because the
+          June and July 2026 COGS were booked by hand and by COGS/2026/0001
+          WITHOUT leaving levis.cogs.charge rows behind, so a catch-up reaching
+          into those months would charge their cost a second time. Set a date
+          only after checking that the months it opens up carry no COGS yet.
+        -->
+        <record id="param_cogs_catchup_start" model="ir.config_parameter">
+            <field name="key">custom_levis_localization.cogs_catchup_start</field>
+            <field name="value"></field>
+        </record>
+        <!--
+          Journal CODE for the catch-up entries. Empty -> the company's stock
+          journal, then any general journal.
+        -->
+        <record id="param_cogs_catchup_journal_code" model="ir.config_parameter">
+            <field name="key">custom_levis_localization.cogs_catchup_journal_code</field>
+            <field name="value"></field>
+        </record>
     </data>
 </odoo>

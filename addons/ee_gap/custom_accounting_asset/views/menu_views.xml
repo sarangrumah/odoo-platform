@@ -17,6 +17,10 @@
               parent="menu_assets_root" sequence="18"
               action="action_fixed_asset_revaluation"/>
 
+    <menuitem id="menu_assets_partial_disposals" name="Partial Retirements"
+              parent="menu_assets_root" sequence="19"
+              action="action_fixed_asset_partial_disposal"/>
+
     <menuitem id="menu_assets_register_report" name="Asset Register"
               parent="menu_assets_root" sequence="20"
               action="action_asset_register_wizard"/>

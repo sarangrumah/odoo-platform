@@ -9,4 +9,13 @@
     -->
     <function model="custom.fixed.asset.group"
               name="_seed_aim_asset_register"/>
+
+    <!--
+      Write the physical serial onto each unit from data/asset_serials.csv. Runs
+      on every upgrade so a database whose Serial Number column still echoes the
+      asset code (what the materialise-into-stock wizard used to write) heals
+      itself. Only blank / code-echo serials are touched.
+    -->
+    <function model="custom.fixed.asset"
+              name="_seed_aim_asset_serials"/>
 </odoo>

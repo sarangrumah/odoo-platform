@@ -1,0 +1,223 @@
+# -*- coding: utf-8 -*-
+from odoo.tests import tagged
+from odoo.tests.common import TransactionCase
+
+
+@tagged("post_install", "-at_install")
+class TestPooledAssetConversion(TransactionCase):
+    """5 waste bins received on one line become ONE asset carrying quantity 5."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.company = cls.env.company
+        Account = cls.env["account.account"]
+        cls.asset_account = Account.create(
+            {
+                "name": "FA - Equipment (conv)",
+                "code": "150120",
+                "account_type": "asset_fixed",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.accum_account = Account.create(
+            {
+                "name": "FA - Accum. Depreciation (conv)",
+                "code": "150920",
+                "account_type": "asset_fixed",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        cls.expense_account = Account.create(
+            {
+                "name": "Depreciation Expense (conv)",
+                "code": "610120",
+                "account_type": "expense",
+                "company_ids": [(6, 0, [cls.company.id])],
+            }
+        )
+        Journal = cls.env["account.journal"]
+        cls.journal = Journal.search(
+            [("type", "=", "general"), ("company_id", "=", cls.company.id)], limit=1
+        ) or Journal.create({"name": "Misc", "code": "MISCC", "type": "general", "company_id": cls.company.id})
+        cls.group = cls.env["custom.fixed.asset.group"].create(
+            {
+                "name": "Bins (conv)",
+                "code": "BINC",
+                "default_useful_life_months": 10,
+                "default_asset_account_id": cls.asset_account.id,
+                "default_depreciation_account_id": cls.accum_account.id,
+                "default_expense_account_id": cls.expense_account.id,
+                "default_journal_id": cls.journal.id,
+            }
+        )
+        cls.warehouse = cls.env["stock.warehouse"].search([("company_id", "=", cls.company.id)], limit=1)
+        cls.product = cls.env["product.product"].create(
+            {
+                "name": "Waste bin 60L",
+                "is_storable": True,
+                "standard_price": 1000.0,
+                "is_fixed_asset": True,
+                "asset_tracking_mode": "quantity",
+                "asset_group_id": cls.group.id,
+            }
+        )
+
+    def _receive(self, quantity=5.0):
+        picking = self.env["stock.picking"].create(
+            {
+                "picking_type_id": self.warehouse.in_type_id.id,
+                "location_id": self.env.ref("stock.stock_location_suppliers").id,
+                "location_dest_id": self.warehouse.lot_stock_id.id,
+                "move_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            # Odoo 19 dropped stock.move.name.
+                            "product_id": self.product.id,
+                            "product_uom_qty": quantity,
+                            "location_id": self.env.ref("stock.stock_location_suppliers").id,
+                            "location_dest_id": self.warehouse.lot_stock_id.id,
+                        },
+                    )
+                ],
+            }
+        )
+        picking.action_confirm()
+        for move in picking.move_ids:
+            move.quantity = quantity
+            move.picked = True
+        picking.button_validate()
+        return picking
+
+    def test_01_untracked_product_is_allowed_in_pooled_mode(self):
+        # The per-serial mode demands lot/serial tracking; the pooled one does not.
+        self.assertEqual(self.product.product_tmpl_id._asset_conversion_mode(), "quantity")
+        self.assertEqual(self.product.tracking, "none")
+
+    def test_02_receipt_converts_to_one_pooled_asset(self):
+        picking = self._receive(5.0)
+        self.assertTrue(picking.has_rental_asset_lines)
+        wizard = self.env["custom.asset.conversion.wizard"].create({"picking_id": picking.id})
+        wizard._populate_lines()
+        self.assertEqual(len(wizard.line_ids), 1)
+        line = wizard.line_ids
+        self.assertEqual(line.conversion_mode, "quantity")
+        self.assertFalse(line.lot_id)
+        self.assertAlmostEqual(line.quantity, 5.0, places=2)
+        self.assertAlmostEqual(line.unit_cost, 1000.0, places=2)
+        self.assertAlmostEqual(line.subtotal, 5000.0, places=2)
+
+        wizard.action_confirm()
+        assets = self.env["custom.fixed.asset"].search([("picking_id", "=", picking.id)])
+        self.assertEqual(len(assets), 1)
+        self.assertAlmostEqual(assets.quantity, 5.0, places=2)
+        self.assertAlmostEqual(assets.original_quantity, 5.0, places=2)
+        self.assertAlmostEqual(assets.acquisition_value, 5000.0, places=2)
+        self.assertAlmostEqual(assets.unit_acquisition_value, 1000.0, places=2)
+        self.assertTrue(assets.is_quantity_asset)
+        self.assertFalse(assets.rental_asset_ids)
+
+    def test_03_conversion_is_idempotent(self):
+        picking = self._receive(5.0)
+        wizard = self.env["custom.asset.conversion.wizard"].create({"picking_id": picking.id})
+        wizard._populate_lines()
+        wizard.action_confirm()
+
+        again = self.env["custom.asset.conversion.wizard"].create({"picking_id": picking.id})
+        again._populate_lines()
+        self.assertTrue(again.line_ids.existing_asset_id)
+        self.assertFalse(again.line_ids.selected)
+        # And a full retirement round-trip still leaves exactly one asset.
+        self.assertEqual(len(self.env["custom.fixed.asset"].search([("picking_id", "=", picking.id)])), 1)
+
+    def test_04_serial_linked_assets_are_never_pooled(self):
+        """The lot is what the stock quant and the rental unit hang off."""
+        from odoo.exceptions import UserError
+
+        group = self.group
+        serial_product = self.env["product.product"].create(
+            {
+                "name": "Drone X",
+                "is_storable": True,
+                "tracking": "serial",
+                "standard_price": 5000.0,
+                "is_rental_asset": True,
+                "asset_group_id": group.id,
+            }
+        )
+        Asset = self.env["custom.fixed.asset"]
+        assets = Asset
+        for i in range(2):
+            lot = self.env["stock.lot"].create({"name": "SN-POOL-%s" % i, "product_id": serial_product.id})
+            assets |= Asset.create(
+                {
+                    "name": "Drone X",
+                    "group_id": group.id,
+                    "acquisition_value": 5000.0,
+                    "product_id": serial_product.id,
+                    "lot_id": lot.id,
+                    "useful_life_months": 10,
+                    "asset_account_id": self.asset_account.id,
+                    "depreciation_account_id": self.accum_account.id,
+                    "expense_account_id": self.expense_account.id,
+                    "journal_id": self.journal.id,
+                }
+            )
+        with self.assertRaises(UserError):
+            assets[0]._merge_assets_into_pool(assets[1:])
+        # Explicitly overridden, it goes through -- the guard is a safety net,
+        # not a wall.
+        assets[0].with_context(allow_serial_merge=True)._merge_assets_into_pool(assets[1:])
+        self.assertAlmostEqual(assets[0].quantity, 2.0, places=2)
+
+    def test_05_a_service_is_never_offered_as_an_asset(self):
+        """Services reach receipts now (``custom_service_receipt``); they are
+        still not things that can be capitalised."""
+        service = self.env["product.product"].create(
+            {
+                "name": "Drone Show Operational - Manpower",
+                "type": "service",
+                # Flagged as hard as a product master can be: the guard must hold
+                # regardless, because the register is a subledger of things.
+                "is_fixed_asset": True,
+                "asset_tracking_mode": "quantity",
+                "asset_group_id": self.group.id,
+            }
+        )
+        self.assertFalse(service._can_be_fixed_asset())
+
+        supplier = self.env.ref("stock.stock_location_suppliers")
+        dest = self.warehouse.lot_stock_id
+        picking = self.env["stock.picking"].create(
+            {
+                "picking_type_id": self.warehouse.in_type_id.id,
+                "location_id": supplier.id,
+                "location_dest_id": dest.id,
+                "move_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": product.id,
+                            "product_uom_qty": qty,
+                            "location_id": supplier.id,
+                            "location_dest_id": dest.id,
+                        },
+                    )
+                    for product, qty in ((self.product, 5.0), (service, 1.0))
+                ],
+            }
+        )
+        picking.action_confirm()
+        for move in picking.move_ids:
+            move.quantity = move.product_uom_qty
+            move.picked = True
+        picking.button_validate()
+        self.assertEqual(picking.state, "done")
+        self.assertEqual(picking.move_ids.product_id, self.product | service)
+
+        wizard = self.env["custom.asset.conversion.wizard"].create({"picking_id": picking.id})
+        wizard._populate_lines()
+        self.assertEqual(wizard.line_ids.product_id, self.product, "only the good may be capitalised")

@@ -101,8 +101,30 @@ class PurchaseOrder(models.Model):
             raise ValueError(_("No warehouse in receiving company '%s'.") % target_company.name)
 
         order_lines = []
+        product_line_count = 0
         skipped_physical = self.env["product.product"]
         for pol in self.order_line:
+            # Section / note lines carry no product. Copy them through as the
+            # same kind of line instead of letting them fall into the product
+            # branch, where they would become a product-less line the buyer
+            # never wrote — or be dropped entirely under an asset-loan rule.
+            if pol.display_type:
+                order_lines.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "display_type": pol.display_type,
+                            "name": pol.name,
+                            "sequence": pol.sequence,
+                            # A display line must carry no product and no
+                            # amounts, or the SO line constraint rejects it.
+                            "product_uom_qty": 0.0,
+                            "price_unit": 0.0,
+                        },
+                    )
+                )
+                continue
             # For asset-loan rules, only the service line may cross intercompany.
             # A physical (non-service) product must never become an SO delivery
             # line — that would post COGS and derecognise the fixed asset. The
@@ -110,6 +132,7 @@ class PurchaseOrder(models.Model):
             if rule.spawn_rental_loan and pol.product_id.type != "service":
                 skipped_physical |= pol.product_id
                 continue
+            product_line_count += 1
             order_lines.append(
                 (
                     0,
@@ -117,6 +140,7 @@ class PurchaseOrder(models.Model):
                     {
                         "product_id": pol.product_id.id,
                         "name": pol.name,
+                        "sequence": pol.sequence,
                         "product_uom_qty": pol.product_qty,
                         "product_uom_id": pol.product_uom_id.id,
                         "price_unit": pol.price_unit,
@@ -133,7 +157,7 @@ class PurchaseOrder(models.Model):
                 )
                 % ", ".join(skipped_physical.mapped("display_name"))
             )
-        if not order_lines:
+        if not product_line_count:
             raise ValueError(
                 _("No service line to mirror on PO %s. An asset-loan PO must carry the loan service product.")
                 % (self.name or self.id)
@@ -150,6 +174,10 @@ class PurchaseOrder(models.Model):
                     "warehouse_id": warehouse.id,
                     "origin": _("IC mirror of %s/%s") % (self.company_id.name, self.name or self.id),
                     "client_order_ref": self.name,
+                    # The buyer's header note is where the event lives ("MERDEKA
+                    # RUN - MONAS"). Without it the selling company receives an
+                    # order with no idea what it is for.
+                    "note": self.note,
                     "x_custom_ic_source_po_id": self.id,
                     "x_custom_ic_rule_id": rule.id,
                     "order_line": order_lines,

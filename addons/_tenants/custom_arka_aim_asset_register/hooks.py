@@ -43,6 +43,7 @@ _logger = logging.getLogger(__name__)
 MODULE = "custom_arka_aim_asset_register"
 REGISTERED_CSV = "data/asset_register_registered.csv"
 UNREGISTERED_CSV = "data/asset_register_unregistered.csv"
+SERIALS_CSV = "data/asset_serials.csv"
 
 AIM_COMPANY = "PT Aero Inovasi Media"
 ARKA_COMPANY = "PT Aero Reksa Kreasi Angkasa"
@@ -163,6 +164,48 @@ def seed_group_and_location(env):
     return seeded, location
 
 
+def load_serial_numbers(env):
+    """Write the physical serial onto every register unit that has one.
+
+    ``data/asset_serials.csv`` (built by ``tools/build_arkaaim_asset_serials.py``)
+    maps the begbal ``Kode Aset`` to the serial from the client's asset listing.
+    Only 3,100 of the 3,590 units carry a serial at all -- the spares and support
+    items genuinely have none, and their ``serial_number`` must stay blank rather
+    than echo the asset code.
+
+    Overwrites a serial only when it is blank or is merely a copy of the asset
+    code (what ``custom_asset_stock_link``'s materialise wizard used to write).
+    A serial a human actually typed is left alone. Idempotent.
+    """
+    by_code = {row["code"]: row["serial_number"].strip() for row in _read_csv(SERIALS_CSV)}
+    Asset = env["custom.fixed.asset"].with_context(active_test=False)
+    assets = Asset.search([("code", "in", list(by_code))])
+    updated = 0
+    for asset in assets:
+        serial = by_code.get(asset.code)
+        if not serial or asset.serial_number == serial:
+            continue
+        if asset.serial_number and asset.serial_number != asset.code:
+            _logger.info(
+                "%s: %s keeps its existing serial %r (not the code) -> left alone",
+                MODULE,
+                asset.code,
+                asset.serial_number,
+            )
+            continue
+        asset.serial_number = serial
+        updated += 1
+
+    # Units with no serial in the listing must not carry the asset code either.
+    echoes = Asset.search([("serial_number", "!=", False)]).filtered(
+        lambda asset: asset.serial_number == asset.code and asset.code not in by_code
+    )
+    if echoes:
+        echoes.serial_number = False
+    _logger.info("%s: serials -> %s written, %s code-echoes cleared", MODULE, updated, len(echoes))
+    return updated, len(echoes)
+
+
 def _elapsed_months(start, until=POSTED_THROUGH):
     """Number of monthly depreciation lines dated on/before `until`."""
     if start > until:
@@ -259,8 +302,10 @@ def post_init_hook(env):
     seed_group_and_location(env)
     if env["custom.fixed.asset"].with_context(active_test=False).search_count([]):
         _logger.info("%s: fixed assets already exist -> skip register load (idempotent)", MODULE)
+        load_serial_numbers(env)
         return
     created, seeded_lines = load_register(env, read_register_rows())
+    load_serial_numbers(env)
     _logger.info(
         "%s: created %s assets, seeded %s already-charged depreciation lines",
         MODULE,

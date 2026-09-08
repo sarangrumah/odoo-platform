@@ -63,6 +63,31 @@ class TestBankNarrative(TransactionCase):
         self.assertEqual(parsed["trans_date"], date(2026, 7, 9))
         self.assertEqual(parsed["confidence"], "exact")
 
+    def test_bca_nfc_is_a_settlement_on_a_card_channel(self):
+        """Contactless: the debit row shape with NFC where TGH would be.
+
+        Both real examples from prd_levis_begbal July 2026. The second one is
+        padded with runs of spaces, which is how the feed actually prints it.
+        """
+        for ref, gross in (
+            ("KR OTOMATIS TANGGAL :11/07 MID : 885004648615 LEVIS GANCIT NFC: 875925.00 DDR: 0.00", 875925.00),
+            (
+                "KR OTOMATIS TANGGAL :28/07 MID : 885004608391  LEVIS PIM 2 NFC:     649900.00  DDR:          0.00",
+                649900.00,
+            ),
+        ):
+            parsed = self.parse(self.bca, ref, gross)
+            self.assertEqual(parsed["kind"], "settlement", ref)
+            self.assertEqual(parsed["gross"], gross)
+            self.assertEqual(parsed["mdr"], 0.0)
+            # gross - mdr must equal what the bank moved, or the caller reports a
+            # mismatch and the line is not booked.
+            self.assertEqual(parsed["gross"] - parsed["mdr"], gross)
+            self.assertTrue(parsed["mid"])
+            # Not "other": an unrecognised channel would be allowed to settle the
+            # CASH receivable, which a card settlement must never do.
+            self.assertIn(parsed["channel"], ("debit", "credit", "qris"))
+
     def test_bca_bare_day_month_rolls_back_a_year(self):
         """A December trading day on a January statement is last year's."""
         parsed = self.parse(

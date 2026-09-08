@@ -12,14 +12,23 @@ On ``purchase.order``:
 On ``purchase.order.line`` the store's Operating-Unit analytic account is merged
 into ``analytic_distribution`` so it flows to the bill lines (core
 ``_related_analytic_distribution``) and the stock/anglo entries.
+
+Also here: the duplicate-SKU gate on ``button_confirm``. A garment size IS its own
+variant, and a PO sheet whose product column was copied down orders the same size
+several times over -- which is then received, in good faith, as four pieces of size
+25 when the box holds 25/26/27/28. Nothing downstream can catch it: the receipt
+inherits its products from the PO (``stock_move._check_levis_receipt_line_from_po``),
+so by then the wrong size is already the truth. See
+``wizard/levis_po_dup_sku_wizard.py``.
 """
 
+from collections import Counter
 from datetime import datetime, timedelta
 
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 TRADE_SEQ = "purchase.order.levis.trade"
 NONTRADE_SEQ = "purchase.order.levis.nontrade"
@@ -55,6 +64,85 @@ class PurchaseOrder(models.Model):
         "This is what gets stamped on every PO line; pick the store's Receipt "
         "operation type in Deliver To to book the purchase on that store.",
     )
+
+    l10n_dup_sku_ack = fields.Boolean(
+        string="Duplicate SKU Acknowledged",
+        copy=False,
+        tracking=True,
+        help="Set when somebody confirmed, in writing, that the repeated SKU on this "
+        "order is deliberate. Cleared again whenever the order goes back to draft or "
+        "a line changes product.",
+    )
+    l10n_dup_sku_reason = fields.Char(
+        string="Duplicate SKU Reason",
+        copy=False,
+        help="Why the same SKU legitimately appears more than once on this order.",
+    )
+
+    # ------------------------------------------------------------------
+    # Duplicate-SKU gate (one size ordered twice is nearly always a copied cell)
+    # ------------------------------------------------------------------
+    def _levis_duplicate_sku_products(self):
+        """Products that appear on more than one line of this order.
+
+        Returned in line order so the wizard reads the same way as the order the
+        buyer is looking at.
+        """
+        self.ensure_one()
+        lines = self.order_line.filtered(lambda l: not l.display_type and l.product_id)
+        # ``mapped`` de-duplicates a recordset, so count over the raw line ids.
+        counts = Counter(line.product_id.id for line in lines)
+        dup_ids = [pid for pid, n in counts.items() if n > 1]
+        if not dup_ids:
+            return self.env["product.product"].browse()
+        seen, ordered = set(), []
+        for line in lines:
+            pid = line.product_id.id
+            if pid in dup_ids and pid not in seen:
+                seen.add(pid)
+                ordered.append(pid)
+        return self.env["product.product"].browse(ordered)
+
+    def _levis_open_dup_sku_wizard(self):
+        """Full-screen confirmation listing the repeats and the sizes NOT ordered."""
+        self.ensure_one()
+        wizard = self.env["levis.po.dup.sku.wizard"]._levis_build_for_order(self)
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("SKU ganda pada pesanan ini"),
+            "res_model": "levis.po.dup.sku.wizard",
+            "res_id": wizard.id,
+            "view_mode": "form",
+            # ``views`` is not optional: the web client maps over it, and an action
+            # dict without it fails in doAction long before the dialog is drawn.
+            "views": [(False, "form")],
+            "target": "new",
+        }
+
+    def button_confirm(self):
+        pending = self.filtered(
+            lambda o: o.state in ("draft", "sent") and not o.l10n_dup_sku_ack and o._levis_duplicate_sku_products()
+        )
+        if pending:
+            if len(self) > 1:
+                # A batch confirm cannot stop on one order and continue with the rest
+                # without half-confirming the selection, so it stops on all of them.
+                raise UserError(
+                    _(
+                        "Pesanan berikut memuat SKU yang sama lebih dari satu kali dan "
+                        "harus dikonfirmasi satu per satu:\n%(orders)s",
+                        orders="\n".join("- %s" % name for name in pending.mapped("name")),
+                    )
+                )
+            return pending._levis_open_dup_sku_wizard()
+        return super().button_confirm()
+
+    def button_draft(self):
+        res = super().button_draft()
+        # The acknowledgement covered the lines as they were; back in draft they are
+        # about to change, so it has to be earned again.
+        self.filtered("l10n_dup_sku_ack").write({"l10n_dup_sku_ack": False, "l10n_dup_sku_reason": False})
+        return res
 
     # ------------------------------------------------------------------
     # Operating Unit (store) analytic
@@ -141,6 +229,46 @@ class PurchaseOrder(models.Model):
 
 class PurchaseOrderLine(models.Model):
     _inherit = "purchase.order.line"
+
+    # ------------------------------------------------------------------
+    # Keep the duplicate-SKU acknowledgement honest
+    # ------------------------------------------------------------------
+    _DUP_ACK_TRIGGERS = ("product_id", "product_qty")
+
+    def _levis_clear_dup_sku_ack(self):
+        """Drop the acknowledgement on any draft order whose lines just moved.
+
+        Skipped while the confirmation wizard is driving ``button_confirm``: core
+        touches the lines on its way to ``purchase`` state, and the acknowledgement
+        it is acting on must survive that.
+        """
+        if self.env.context.get("levis_dup_sku_confirming"):
+            return
+        orders = self.order_id.filtered(lambda o: o.l10n_dup_sku_ack and o.state in ("draft", "sent"))
+        if orders:
+            orders.write({"l10n_dup_sku_ack": False, "l10n_dup_sku_reason": False})
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        lines = super().create(vals_list)
+        lines._levis_clear_dup_sku_ack()
+        return lines
+
+    def write(self, vals):
+        res = super().write(vals)
+        if any(field in vals for field in self._DUP_ACK_TRIGGERS):
+            self._levis_clear_dup_sku_ack()
+        return res
+
+    def unlink(self):
+        orders = self.order_id
+        res = super().unlink()
+        if self.env.context.get("levis_dup_sku_confirming"):
+            return res
+        orders.filtered(lambda o: o.l10n_dup_sku_ack and o.state in ("draft", "sent")).write(
+            {"l10n_dup_sku_ack": False, "l10n_dup_sku_reason": False}
+        )
+        return res
 
     # ------------------------------------------------------------------
     # Quantity / Unit Price column swap in uploads

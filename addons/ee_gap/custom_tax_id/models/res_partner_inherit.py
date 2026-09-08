@@ -39,7 +39,9 @@ class ResPartner(models.Model):
 
     x_custom_npwp = fields.Char(
         string="NPWP",
-        help="Nomor Pokok Wajib Pajak. 15-digit legacy or 16-digit (NIK-based, post-2024).",
+        help="Nomor Pokok Wajib Pajak. Satu nomor dengan Tax ID (vat): mengubah "
+        "salah satunya memperbarui yang lain, dan disimpan dalam format 16 digit "
+        "(NPWP 15 digit lama diberi awalan '0').",
     )
     x_custom_nik = fields.Char(
         string="NIK (Custom)",
@@ -87,6 +89,56 @@ class ResPartner(models.Model):
         help="Penghasilan Tidak Kena Pajak status. Required by the Bupot PPh 21 export.",
     )
 
+    # ------------------------------------------------------------ npwp / vat
+
+    @staticmethod
+    def _npwp_digits(value):
+        return re.sub(r"[ .\-]", "", value or "")
+
+    @api.model
+    def _npwp_normalize(self, value):
+        """The 16-digit form DJP expects, or '' when this is not an NPWP.
+
+        Since 2024 every NPWP is 16 digits; a legacy 15-digit number converts by
+        prefixing '0'. Anything else — a foreign VAT number, a half-typed value —
+        comes back empty so it is never mirrored onto the NPWP field.
+        """
+        digits = self._npwp_digits(value)
+        if NPWP_15_RE.match(digits):
+            return "0" + digits
+        return digits if NPWP_16_RE.match(digits) else ""
+
+    def _npwp_sync_vals(self, vals):
+        """Keep ``vat`` and ``x_custom_npwp`` one number, not two.
+
+        They are two labels for the same DJP identity, and every Coretax export
+        reads ``x_custom_npwp`` while the standard partner form edits ``vat`` —
+        so an operator correcting the Tax ID used to leave the exports emitting
+        the stale number. ``vat`` is the master: when a write touches both, it
+        wins; otherwise whichever side was written propagates to the other.
+        """
+        if "vat" in vals:
+            source = vals["vat"]
+        elif "x_custom_npwp" in vals:
+            source = vals["x_custom_npwp"]
+        else:
+            return vals
+        vals = dict(vals)
+        npwp = self._npwp_normalize(source)
+        if npwp:
+            vals["vat"] = vals["x_custom_npwp"] = npwp
+        elif not self._npwp_digits(source):
+            # Cleared on one side clears the other.
+            vals["vat"] = vals["x_custom_npwp"] = False
+        return vals
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        return super().create([self._npwp_sync_vals(vals) for vals in vals_list])
+
+    def write(self, vals):
+        return super().write(self._npwp_sync_vals(vals))
+
     @api.depends("x_custom_npwp")
     def _compute_nitku_display(self):
         for rec in self:
@@ -98,6 +150,15 @@ class ResPartner(models.Model):
         help="The value the Coretax exports will actually emit.",
     )
 
+    def _custom_coretax_npwp(self):
+        """The NPWP every Coretax/e-Faktur export should emit for this partner.
+
+        Prefers the dedicated field, falls back to the Tax ID, and always hands
+        back the 16-digit form.
+        """
+        self.ensure_one()
+        return self._npwp_normalize(self.x_custom_npwp) or self._npwp_normalize(self.vat)
+
     def _custom_coretax_nitku(self):
         """NITKU as Coretax wants it: explicit value, else NPWP + '000000'.
 
@@ -108,10 +169,8 @@ class ResPartner(models.Model):
         self.ensure_one()
         if self.x_custom_nitku:
             return self.x_custom_nitku
-        npwp = (self.x_custom_npwp or "").replace(".", "").replace("-", "")
-        if NPWP_16_RE.match(npwp):
-            return npwp + "000000"
-        return ""
+        npwp = self._custom_coretax_npwp()
+        return npwp + "000000" if npwp else ""
 
     @api.depends("x_custom_npwp")
     def _compute_npwp_status(self):

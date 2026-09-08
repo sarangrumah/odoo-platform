@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Own privilege. Groups that share one privilege are rendered as a
+             single pick-one dropdown on the user form, so reusing another
+             module's privilege makes saving a user silently drop that module's
+             group. The category is what keeps the selectors grouped together. -->
+        <record id="res_groups_privilege_role_manager" model="res.groups.privilege">
+            <field name="name">Role Manager</field>
+            <field name="sequence">105</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+        </record>
+
+        <!-- Managing roles means being able to grant any group in the system,
+             so this group is deliberately for administrators only and is NOT
+             implied by any business role in the seed catalogue. -->
+        <record id="group_role_manager" model="res.groups">
+            <field name="name">Role Manager / Administrator</field>
+            <field name="privilege_id" ref="res_groups_privilege_role_manager"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_erp_manager'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+            <field name="comment">Create security roles and assign them to users.</field>
+        </record>
+
+    </data>
+</odoo>

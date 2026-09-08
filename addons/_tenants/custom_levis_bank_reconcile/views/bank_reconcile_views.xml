@@ -99,6 +99,7 @@
                             <field name="journal_id" readonly="1"/>
                             <field name="date" readonly="1"/>
                             <field name="levis_trans_date" readonly="1" invisible="not levis_trans_date"/>
+                            <field name="levis_bank_ref" readonly="1" invisible="not levis_bank_ref"/>
                             <field name="partner_id" readonly="1"/>
                             <field name="levis_narrative_kind" readonly="1" invisible="not levis_is_tender"/>
                             <field name="levis_channel" readonly="1" invisible="not levis_is_tender"/>
@@ -121,6 +122,7 @@
                             <field name="selected" widget="boolean_toggle"/>
                             <field name="date"/>
                             <field name="move_name"/>
+                            <field name="levis_transaction_ref"/>
                             <field name="account_id"/>
                             <field name="levis_ou_analytic_id"/>
                             <field name="partner_id" optional="hide"/>
@@ -140,6 +142,20 @@
                     </group>
                 </sheet>
             </form>
+        </field>
+    </record>
+
+    <!-- The generic dialog is still reachable (auto-match review, other menus):
+         it gets the transaction number too, so the two screens identify a
+         journal item the same way. -->
+    <record id="view_custom_bank_reconcile_wizard_form_levis" model="ir.ui.view">
+        <field name="name">custom.bank.reconcile.wizard.form.levis</field>
+        <field name="model">custom.bank.reconcile.wizard</field>
+        <field name="inherit_id" ref="custom_account_reconcile.view_custom_bank_reconcile_wizard_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='candidate_ids']/list/field[@name='move_name']" position="after">
+                <field name="levis_transaction_ref"/>
+            </xpath>
         </field>
     </record>
 

@@ -373,3 +373,79 @@ class TestBankReconcileTender(AccountTestInvoicingCommon):
             cash._get_auto_match_candidate(),
             "a deposit is a sum of days — it must not be auto-matched on one coincidence",
         )
+
+    # ------------------------------------------------------------------
+    # Nothing dated after the money moved
+    # ------------------------------------------------------------------
+    def test_a_sale_after_the_bank_date_is_not_offered(self):
+        day = date(2026, 7, 8)
+        before = self._posrec(self.tender_card, self.store_one, day, 1_000_000.0)
+        after = self._posrec(self.tender_card, self.store_one, date(2026, 7, 10), 1_000_000.0)
+        line = self._statement(day, 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, day))
+
+        candidates = line._get_match_candidates()
+        self.assertIn(before, candidates)
+        self.assertNotIn(after, candidates, "the bank cannot have paid for a sale that had not happened yet")
+        self.assertEqual(line._levis_day_window()[1], day)
+
+    def test_search_more_still_stops_at_the_bank_date(self):
+        day = date(2026, 7, 8)
+        after = self._posrec(self.tender_card, self.store_one, date(2026, 7, 20), 1_000_000.0)
+        line = self._statement(day, 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, day))
+
+        self.assertNotIn(after, line._get_match_candidates(relax=True))
+        wizard = self._wizard(line)
+        wizard.action_search_more()
+        self.assertNotIn(after, wizard.candidate_ids.mapped("aml_id"))
+
+    def test_the_ceiling_holds_for_lines_this_module_does_not_recognise(self):
+        day = date(2026, 7, 8)
+        later = self._posrec(self.ar, self.store_two, date(2026, 7, 15), 990_000.0)
+        line = self._statement(day, 990_000.0, self._settlement_ref(MID_UNMAPPED, 1_000_000.0, 10_000.0, day))
+        wizard = self._wizard(line)
+        self.assertFalse(wizard.levis_is_tender)
+        self.assertNotIn(later, wizard.candidate_ids.mapped("aml_id"))
+
+    # ------------------------------------------------------------------
+    # The transaction number of each candidate
+    # ------------------------------------------------------------------
+    def test_candidate_rows_carry_the_transaction_number(self):
+        day = date(2026, 7, 8)
+        aml = self._posrec(self.tender_card, self.store_one, day, 1_000_000.0)
+        line = self._statement(day, 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, day))
+        wizard = self._wizard(line)
+        row = wizard.candidate_ids.filtered(lambda c: c.aml_id == aml)
+
+        self.assertEqual(row.levis_transaction_ref, aml.move_id.ref)
+        self.assertNotEqual(row.levis_transaction_ref, row.move_name, "the entry name is not a transaction number")
+
+    def test_transaction_number_falls_back_to_the_entry_when_nothing_else_exists(self):
+        day = date(2026, 7, 8)
+        aml = self._posrec(self.tender_card, self.store_one, day, 1_000_000.0)
+        aml.move_id.write({"ref": False})
+        self.assertEqual(aml.levis_transaction_ref, aml.move_id.name)
+
+    def test_an_invoice_shows_its_payment_reference(self):
+        # Built by hand rather than through ``init_invoice``: the tenant's own
+        # invoice form pulls in views this test user may not read, and what is
+        # under test is the reference, not the form.
+        invoice = self.env["account.move"].create(
+            {
+                "move_type": "out_invoice",
+                "partner_id": self.partner_a.id,
+                "invoice_date": date(2026, 7, 1),
+                "date": date(2026, 7, 1),
+                "payment_reference": "INV-TRX-0099",
+                "invoice_line_ids": [
+                    Command.create({"name": "Goods", "quantity": 1, "price_unit": 500_000.0, "tax_ids": []})
+                ],
+            }
+        )
+        invoice.action_post()
+        receivable = invoice.line_ids.filtered(lambda aml: aml.account_id.account_type == "asset_receivable")
+        self.assertEqual(receivable.levis_transaction_ref, "INV-TRX-0099")
+
+    def test_the_bank_transaction_number_reaches_the_matching_screen(self):
+        day = date(2026, 7, 8)
+        line = self._statement(day, 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0, day))
+        self.assertEqual(self._wizard(line).levis_bank_ref, line.ref)

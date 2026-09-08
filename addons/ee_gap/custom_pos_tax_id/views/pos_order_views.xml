@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Surface the buyer's NPWP on the back-office POS order form, so the
+         tax team can tell at a glance which orders can become an e-Faktur. -->
+    <record id="view_pos_order_form_tax_id" model="ir.ui.view">
+        <field name="name">pos.order.form.tax.id</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="x_custom_partner_npwp" readonly="1"
+                       string="NPWP Pembeli"
+                       invisible="not partner_id"/>
+            </field>
+        </field>
+    </record>
+</odoo>

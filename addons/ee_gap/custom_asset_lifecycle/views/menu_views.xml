@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_assets_unserviceable" name="Damaged &amp; Missing"
+              parent="custom_accounting_asset.menu_assets_root" sequence="12"
+              action="action_fixed_asset_unserviceable"/>
+
+    <menuitem id="menu_assets_condition_log" name="Condition History"
+              parent="custom_accounting_asset.menu_assets_root" sequence="13"
+              action="action_asset_condition_log"/>
+
+    <menuitem id="menu_assets_equipment_provision" name="Equipment Cards"
+              parent="custom_accounting_asset.menu_assets_config" sequence="30"
+              action="action_asset_equipment_provision_wizard"/>
+</odoo>

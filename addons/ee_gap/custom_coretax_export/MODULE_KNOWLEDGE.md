@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-08-05T00:00:00Z
 generator: claude-code-handwritten
 module: custom_coretax_export
-manifest_version: 19.0.1.3.0
+manifest_version: 19.0.1.8.0
 ---
 
 # custom_coretax_export
@@ -99,8 +99,60 @@ On `custom.coretax.fk.builder`:
 - **`_render` deliberately does not use `custom.report.engine`.** The engine prefixes a
   title/company/period banner and formats numbers for humans; a DJP import file must start
   its header on row 1 and carry raw values.
+- **A plain 11% tax is exported as 12% on a DPP Nilai Lain of 11/12, never as an 11% tariff.**
+  Coretax knows only the statutory 12% rate; the 11%-effective rate is the PMK 131/2024 nilai-lain
+  arrangement, which `l10n_id` books the short way as a bare 11% tax (its "12% (Non-Luxury Good)"
+  is rated `amount=11.0`). So `_line_vat` translates: `TARIF_PPN` 12, `DPP_LAIN` 11/12 of DPP,
+  `CHECK_DPP_LAIN` 'Y', and the FK gets `KD_JENIS_TRANSAKSI` 04. The rupiah is untouched —
+  12% × 11/12 == 11% exactly — so the file still ties to the GL. A tax explicitly configured
+  `x_custom_dpp_method = nilai_lain` keeps its own factor and rate and is not second-guessed.
+- **`FG_UANG_MUKA` is derived, not hard-coded.** `_is_uang_muka()` marks the faktur that *bills*
+  a down payment: every product line has to be one. `_line_is_downpayment()` reads the line's own
+  `is_downpayment` first and only then the originating sale order line, because an invoice built
+  by hand or copied from an earlier one keeps the flag but loses `sale_line_ids` — which is the
+  shape every ARKA-AIM faktur is in, and why reading the order line alone reported a real faktur
+  uang muka as an ordinary sale.
+- **A settlement faktur reports only what is left to pay; the down payment is netted off, not
+  referenced.** Odoo puts the already-invoiced down payment on the final invoice as a negative
+  line (`is_downpayment` with a negative `price_subtotal`); exporting it as an item produced
+  `JUMLAH_BARANG` -1 and negative amounts, which the Coretax importer rejects. `_is_dp_deduction()`
+  lifts that line out of the OF rows and `_coretax_fk_net_factor()` turns it into the share of the
+  price still being billed, which scales `HARGA_SATUAN`, the gross and the tax base together. So a
+  300 juta sale prepaid 50% exports as a **150 juta** faktur whose `JUMLAH_DPP`/`JUMLAH_PPN` equal
+  the invoice's own `amount_untaxed`/`amount_tax`, and `NOMOR_FAKTUR_UM_SEBELUMNYA` plus every
+  `UANG_MUKA_*` column stay empty — the down payment was already reported on a faktur of its own,
+  and the client's tax team files the two separately.
+  - **Scaled, not discounted.** Writing the gross in `HARGA_TOTAL` and the deduction in `DISKON`
+    would also tie, but it tells Coretax the customer got a 50% discount they never got.
+  - **This reverses 19.0.1.7.0**, which reported the gross and deducted through `UANG_MUKA_*`
+    (the shape DJP's own template documents). Both are defensible filings; the client chose
+    separate fakturs. A settlement fully covered by its deduction bills nothing and is refused
+    by name, and the down-payment faktur's `x_custom_nsfp` is no longer a precondition for
+    exporting the settlement.
+- **`NAMA` on an OF row is the line description, not `product_id.name`.** ARKA closes each line
+  description with the event, its venue and the show date, and that block — not the product name —
+  is what the tax team reconciles the faktur against. `_item_name()` flattens the description to a
+  single line (one XLSX cell; an embedded newline is not safe) and falls back to the product name
+  when there is none. When the description carries no event but the invoice header does,
+  `_coretax_fk_event_parts()` appends `Event …, Lokasi …, dd.mm.yy` from `x_custom_event_name` /
+  `x_custom_event_location` / `x_custom_show_date`, read through `_fields` so this module keeps no
+  dependency on `custom_arka_show_date`. The date alone is never appended: on an invoice
+  `x_custom_show_date` may have been moved to anchor the payment terms.
 - **Only `out_invoice` is exported.** Credit notes are not FK records — they belong to Faktur
   Pengganti or Retur Masukan, which have their own paths.
+- **"Tidak ada faktur ... yang cocok" is almost always the company, not the period.** Both
+  wizards export one NPWP at a time and default `company_id` to the active company, so a
+  group user sitting on the holding company sees an empty July while the invoices sit in a
+  sibling company. `_coretax_fk_empty_hints()` (builder mixin) reruns the search with one
+  filter dropped at a time — other companies, unposted invoices, credit notes, the
+  partner/journal filters — and both the wizard banner (`empty_reason`) and the `UserError`
+  quote the result. Add a probe there, not in the wizards, so all entry points inherit it.
+- **`REFERENSI` on an FK row is `move.name`, never `move.ref`.** On a customer invoice
+  `ref` holds the source order / customer reference — in the Levi's flows, the sales-order
+  number — so the old `move.ref or move.name` shipped the SO and the invoice number never
+  appeared in the column the tax team reconciles the upload against. The bupot layouts keep
+  `move.ref` on purpose: their reference document is a vendor bill, where `ref` really is
+  the counterparty's invoice number.
 - **`ir.actions.server` uses `group_ids`, not `groups_id`,** on Odoo 19. In XML data the
   rename fails as a bare `ParseError` that names no field.
 

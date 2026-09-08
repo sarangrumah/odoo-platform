@@ -320,6 +320,48 @@ class RentalOrder(models.Model):
         loc_dst = ptype.default_location_dest_id
         return ptype, loc_src, loc_dst
 
+    def _stock_move_vals(self, product, qty, loc_src, loc_dst, is_loan=False, uom=None):
+        """One stock.move vals tuple for ``product`` moving ``qty``.
+
+        Split out of ``_create_stock_picking`` so subclasses can reuse the
+        exact same move shape when they build a different set of moves.
+        """
+        self.ensure_one()
+        name = product.display_name
+        if is_loan:
+            name = "[LOAN] " + name
+        return (
+            0,
+            0,
+            {
+                # Odoo 19 dropped stock.move.name; the picking label lives
+                # on description_picking now.
+                "description_picking": name,
+                "product_id": product.id,
+                "product_uom_qty": float(qty),
+                "product_uom": (uom or product.uom_id).id,
+                "location_id": loc_src.id,
+                "location_dest_id": loc_dst.id,
+                "company_id": self.company_id.id,
+                "is_loan": is_loan,
+            },
+        )
+
+    def _prepare_move_vals_list(self, product, loc_src, loc_dst):
+        """Return the move vals tuples for one pickup/return picking.
+
+        Default: one move for the main rental qty, plus a second move flagged
+        ``is_loan`` when ``loan_qty > 0``. Overridden by
+        ``custom_rental_bom_explosion`` to emit one move per exploded BOM
+        component instead, so a bundle rented as a single line still moves
+        (and returns) every physical unit it is made of.
+        """
+        self.ensure_one()
+        moves = [self._stock_move_vals(product, self.qty or 1, loc_src, loc_dst, is_loan=False)]
+        if self.loan_qty and self.loan_qty > 0:
+            moves.append(self._stock_move_vals(product, self.loan_qty, loc_src, loc_dst, is_loan=True))
+        return moves
+
     def _create_stock_picking(self, direction):
         """direction: 'outgoing' (confirm) or 'incoming' (return).
 
@@ -337,28 +379,9 @@ class RentalOrder(models.Model):
         if not ptype or not (loc_src and loc_dst):
             return False
 
-        def _move(qty, is_loan):
-            name = product.display_name
-            if is_loan:
-                name = "[LOAN] " + name
-            return (
-                0,
-                0,
-                {
-                    "name": name,
-                    "product_id": product.id,
-                    "product_uom_qty": float(qty),
-                    "product_uom": product.uom_id.id,
-                    "location_id": loc_src.id,
-                    "location_dest_id": loc_dst.id,
-                    "company_id": self.company_id.id,
-                    "is_loan": is_loan,
-                },
-            )
-
-        moves = [_move(self.qty or 1, False)]
-        if self.loan_qty and self.loan_qty > 0:
-            moves.append(_move(self.loan_qty, True))
+        moves = self._prepare_move_vals_list(product, loc_src, loc_dst)
+        if not moves:
+            return False
 
         vals = {
             "picking_type_id": ptype.id,
@@ -403,11 +426,13 @@ class RentalOrder(models.Model):
     def _check_returned_serials(self):
         """For serial-tracked units, the exact serials dispatched at pickup must
         come back in the return picking. Catches substituted/missing units that a
-        pure quantity check would miss. No-op for non-serial (bulk) products."""
+        pure quantity check would miss. No-op when nothing serial went out.
+
+        The gate is the serials actually dispatched, not the tracking flag of the
+        rented product: a bundle rented as one non-tracked kit line still moves
+        serial-tracked components, and those must be reconciled on return.
+        """
         self.ensure_one()
-        product = self._resolve_rental_product()
-        if not product or product.tracking != "serial":
-            return
         if not (self.pickup_picking_id and self.return_picking_id):
             return
         out_serials = set(self.pickup_picking_id.move_line_ids.lot_id.ids)

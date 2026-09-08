@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- The flag sits next to the control policy it travels with: ticking it
+         forces "On received quantities", so the two belong in the same block. -->
+    <record id="view_product_template_service_receipt" model="ir.ui.view">
+        <field name="name">product.template.form.service.receipt</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="purchase.view_product_supplier_inherit"/>
+        <field name="arch" type="xml">
+            <field name="purchase_method" position="after">
+                <field name="receive_on_gr" invisible="type != 'service'"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

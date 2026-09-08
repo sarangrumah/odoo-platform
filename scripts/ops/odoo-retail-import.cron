@@ -1,0 +1,13 @@
+# Verify that the retail import pipeline actually moved data last night.
+# Install as /etc/cron.d/odoo-retail-import (root:root, mode 0644).
+#
+# 05:30 WIB: the mail ingest lands at ~02:47 and the feeds import right behind it,
+# so by 05:30 a night that worked has finished and a night that broke has finished
+# breaking -- while there is still a working morning left to fix it in.
+#
+# Read-only. Its whole job is to notice the failure mode that leaves every other
+# surface green: files arriving, feed status ok, cron firing, and no sales booked.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+30 5 * * * root /opt/odoo-platform/scripts/ops/retail_import_check.sh >> /var/log/odoo-retail-import-check.log 2>&1

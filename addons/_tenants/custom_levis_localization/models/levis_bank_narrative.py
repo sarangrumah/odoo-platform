@@ -11,10 +11,12 @@ clearing needs:
                 TGH:00023226564.00 ADM:00000260192.00
     BCA QRIS    KR OTOMATIS TANGGAL :09/07 MID : 885004608375 ...
                 QR : 40021190.00 DDR: 0.00
+    BCA NFC     KR OTOMATIS TANGGAL :11/07 MID : 885004648615 LEVIS GANCIT
+                NFC: 875925.00 DDR: 0.00
     BRI         OnUs 1 260707 001999632288 LEVIS PONDOK
                 AMT:2.301.775,00MDR:23.018,00
 
-``TGH``/``QR``/``AMT`` is the gross billed to the acquirer, ``DDR``/``ADM``/``MDR``
+``TGH``/``QR``/``NFC``/``AMT`` is the gross billed to the acquirer, ``DDR``/``ADM``/``MDR``
 the fee it withheld, and the money that actually landed is the difference. The
 old host script could not use this: it took MDR from the client's monthly bank
 sheet and had to spread it across a store's settlement dates pro-rata, because
@@ -48,7 +50,10 @@ from odoo import api, models
 _BCA_MID = re.compile(r"MID\s*:?\s*(\d+)")
 # "TANGGAL :09/07" — the transaction date, present on QRIS and on some card rows.
 _BCA_TANGGAL = re.compile(r"TANGGAL\s*:?\s*(\d{1,2})\s*/\s*(\d{1,2})")
-_BCA_GROSS = re.compile(r"(?:TGH|QR)\s*:?\s*([\d.,]+)")
+# NFC is a contactless card settlement. It is the debit feed's row shape with a
+# different gross marker — same "KR OTOMATIS", same MID, same DDR fee field — so
+# it needs nothing beyond being recognised here.
+_BCA_GROSS = re.compile(r"(?:TGH|QR|NFC)\s*:?\s*([\d.,]+)")
 _BCA_FEE = re.compile(r"(?:DDR|ADM)\s*:?\s*([\d.,]+)")
 
 # --- BRI ------------------------------------------------------------------
@@ -192,6 +197,13 @@ class LevisBankNarrative(models.AbstractModel):
             elif "KARTU KREDIT" in upper:
                 channel = "credit"
             else:
+                # Includes NFC, which falls here deliberately. Contactless says how
+                # the card was presented, not whether it was debit or credit, and
+                # the narrative does not say. "debit" is what the feed it arrived on
+                # means, and the choice carries no accounting weight: clearing pools
+                # debit, credit and QRIS over the same card receivables. What does
+                # matter is that it lands in a card channel at all — an unrecognised
+                # one would be allowed to settle the CASH receivable.
                 channel = "debit"
             tanggal = _BCA_TANGGAL.search(upper)
             trans_date = self._day_month_date(tanggal.group(1), tanggal.group(2), statement_date) if tanggal else None

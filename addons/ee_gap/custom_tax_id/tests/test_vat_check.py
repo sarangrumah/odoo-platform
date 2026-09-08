@@ -39,7 +39,8 @@ class TestVatCheckId(TransactionCase):
 
     def test_partner_save_with_rejected_npwp(self):
         # The original report: this exact value raised ValidationError via
-        # base_vat. With the override it must persist on the `vat` field.
+        # base_vat. With the override it must persist on the `vat` field —
+        # normalised to the 16-digit form DJP has required since 2024.
         p = self.Partner.create(
             {
                 "name": "PT Aero Reksa Kreasi Angkasa",
@@ -48,9 +49,9 @@ class TestVatCheckId(TransactionCase):
                 "vat": "015556667008000",
             }
         )
-        self.assertEqual(p.vat, "015556667008000")
+        self.assertEqual(p.vat, "0015556667008000")
 
     def test_partner_write_with_rejected_npwp(self):
         p = self.Partner.create({"name": "Test Partner", "country_id": self.id_country.id})
         p.write({"vat": "015556667008000"})
-        self.assertEqual(p.vat, "015556667008000")
+        self.assertEqual(p.vat, "0015556667008000")

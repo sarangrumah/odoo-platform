@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 562" width="900" height="562" font-family="Calibri, Carlito, sans-serif">
+<style>
+ .lbl{font-size:13.5px;fill:#1A2332}
+ .hd{font-size:12px;fill:#1A2332;font-weight:bold}
+ .num{font-size:13px;fill:#714B67;font-weight:bold}
+ .sm{font-size:11px;fill:#4A5568}
+ .cap{font-size:11.5px;fill:#714B67;font-weight:bold;letter-spacing:.05em}
+ .bar{fill:#714B67}
+ .bar2{fill:#C9B8C6}
+ .cell{fill:#FFFFFF;stroke:#E0D6DE;stroke-width:1}
+ .alt{fill:#F5F2F4;stroke:#E0D6DE;stroke-width:1}
+ .own{font-size:14px;fill:#714B67;font-weight:bold}
+ .cfg{font-size:14px;fill:#9AA5B1}
+</style>
+<rect x="0" y="0" width="900" height="562" fill="#FFFFFF"/>
+<text class="cap" x="40" y="30">MODUL PER DOMAIN FUNGSIONAL</text>
+<text class="sm" x="40" y="52">Batang penuh = modul berlaku umum. Batang muda = khusus brand, platform, atau pihak ketiga.</text>
+<text class="lbl" x="40" y="93">Keuangan & Akuntansi</text>
+<rect class="bar" x="330" y="81" width="220" height="16" rx="2"/>
+<rect class="bar2" x="550" y="81" width="80" height="16" rx="2"/>
+<text class="num" x="640" y="94">30  (22 umum · 8 lainnya)</text>
+<text class="lbl" x="40" y="127">Gudang & Inventori</text>
+<rect class="bar" x="330" y="115" width="170" height="16" rx="2"/>
+<text class="num" x="510" y="128">17</text>
+<text class="lbl" x="40" y="161">Integrasi & Fondasi Platform</text>
+<rect class="bar" x="330" y="149" width="110" height="16" rx="2"/>
+<rect class="bar2" x="440" y="149" width="50" height="16" rx="2"/>
+<text class="num" x="500" y="162">16  (11 umum · 5 lainnya)</text>
+<text class="lbl" x="40" y="195">Layanan, Proyek & Sewa</text>
+<rect class="bar" x="330" y="183" width="140" height="16" rx="2"/>
+<rect class="bar2" x="470" y="183" width="10" height="16" rx="2"/>
+<text class="num" x="490" y="196">15  (14 umum · 1 lainnya)</text>
+<text class="lbl" x="40" y="229">Vertikal Industri</text>
+<rect class="bar" x="330" y="217" width="140" height="16" rx="2"/>
+<text class="num" x="480" y="230">14</text>
+<text class="lbl" x="40" y="263">SDM & Payroll</text>
+<rect class="bar" x="330" y="251" width="130" height="16" rx="2"/>
+<text class="num" x="470" y="264">13</text>
+<text class="lbl" x="40" y="297">Pemasaran & Komunikasi</text>
+<rect class="bar" x="330" y="285" width="120" height="16" rx="2"/>
+<text class="num" x="460" y="298">12</text>
+<text class="lbl" x="40" y="331">Penjualan, Retail & POS</text>
+<rect class="bar" x="330" y="319" width="100" height="16" rx="2"/>
+<rect class="bar2" x="430" y="319" width="10" height="16" rx="2"/>
+<text class="num" x="450" y="332">11  (10 umum · 1 lainnya)</text>
+<text class="lbl" x="40" y="365">Produktivitas & AI</text>
+<rect class="bar" x="330" y="353" width="100" height="16" rx="2"/>
+<text class="num" x="440" y="366">10</text>
+<text class="lbl" x="40" y="399">Administrasi Platform & Odoo-as-a-Service</text>
+<rect class="bar" x="330" y="387" width="0" height="16" rx="2"/>
+<rect class="bar2" x="330" y="387" width="70" height="16" rx="2"/>
+<text class="num" x="410" y="400">7  (0 umum · 7 lainnya)</text>
+<text class="lbl" x="40" y="433">Perpajakan Indonesia</text>
+<rect class="bar" x="330" y="421" width="60" height="16" rx="2"/>
+<text class="num" x="400" y="434">6</text>
+<text class="lbl" x="40" y="467">Kepatuhan Data (UU PDP) & Audit</text>
+<rect class="bar" x="330" y="455" width="60" height="16" rx="2"/>
+<text class="num" x="400" y="468">6</text>
+<text class="lbl" x="40" y="501">Manufaktur, Kualitas & Pemeliharaan</text>
+<rect class="bar" x="330" y="489" width="50" height="16" rx="2"/>
+<text class="num" x="390" y="502">5</text>
+<text class="sm" x="40" y="538">Total 162 modul. Dihasilkan otomatis dari repositori — angka pada diagram ini tidak dipelihara manual.</text>
+</svg>

@@ -326,3 +326,55 @@ services:
       ODOO_MGMT_CONTAINER: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-odoo-mgmt
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # File Browser — the web UI over /srv/sftp-share/files, used to hand
+  # documents to clients (the catalogue lives there; see publish.sh).
+  #
+  # This service existed on the host for months as a hand-typed `docker run`
+  # with no definition anywhere in the repo: a rebuild of the host would have
+  # lost it, and nobody could have said how it had been configured. What is
+  # below is that container, transcribed, plus the fix for why it spent two
+  # weeks reporting `unhealthy`.
+  #
+  # It reports healthy only if BOTH of these hold:
+  #
+  #   * FB_PORT / FB_ADDRESS are set. The image's /healthcheck.sh otherwise
+  #     digs the port out of /config/settings.json, and with an empty result
+  #     calls `wget: bad port ''` and fails forever.
+  #   * /config is writable by the runtime uid. The entrypoint seeds
+  #     settings.json there on boot; when it cannot, the file never appears —
+  #     which is what emptied the port above. The host directory must be
+  #     owned by 1002:1002 (sftpshare), the same uid the share itself uses:
+  #
+  #         mkdir -p data/filebrowser-config
+  #         chown 1002:1002 data/filebrowser-config
+  #
+  # Runs as sftpshare so files it writes into the share carry the ownership
+  # the SFTP chroot expects, rather than root's.
+  filebrowser:
+    image: filebrowser/filebrowser:v2
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-filebrowser
+    restart: unless-stopped
+    user: "1002:1002"
+    command:
+      - -d
+      - /db/filebrowser.db
+      - -r
+      - /srv
+      - -b
+      - /files
+      - -a
+      - 0.0.0.0
+      - -p
+      - "80"
+    environment:
+      UID: "1000"
+      GID: "1000"
+      FB_PORT: "80"
+      FB_ADDRESS: localhost
+    volumes:
+      - /srv/sftp-share/files:/srv
+      - ./data/filebrowser:/db
+      - ./data/filebrowser-config:/config
+    networks:
+      - odoo-net

@@ -25,6 +25,8 @@ from __future__ import annotations
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
+from odoo.tools import html_escape
+from odoo.tools.misc import format_date
 
 
 LOCK_FIELDS = (
@@ -79,9 +81,19 @@ class AccountLockDateWizard(models.TransientModel):
         string="Draft Entries in Locked Period",
         compute="_compute_draft_move_count",
     )
+    unreconciled_stmt_count = fields.Integer(
+        string="Unreconciled Statement Lines",
+        compute="_compute_unreconciled_stmt_count",
+    )
     company_summary = fields.Html(
         string="Current Lock Dates",
         compute="_compute_company_summary",
+        sanitize=False,
+    )
+    exception_count = fields.Integer(compute="_compute_exception_summary")
+    exception_summary = fields.Html(
+        string="Users Exempt From These Dates",
+        compute="_compute_exception_summary",
         sanitize=False,
     )
 
@@ -105,6 +117,104 @@ class AccountLockDateWizard(models.TransientModel):
                     ("state", "=", "draft"),
                     ("date", "<=", wiz.fiscalyear_lock_date),
                 ]
+            )
+
+    @api.depends("company_id", "fiscalyear_lock_date")
+    def _compute_unreconciled_stmt_count(self):
+        """Pre-flight the check core runs inside ``res.company.write``.
+
+        Core raises a RedirectWarning for these, which is a dead end: the user
+        has already filled the form in and gets bounced out of it. Counting them
+        up front lets the wizard say so before Apply is pressed.
+        """
+        Line = self.env["account.bank.statement.line"]
+        for wiz in self:
+            if not wiz.company_id or not wiz.fiscalyear_lock_date:
+                wiz.unreconciled_stmt_count = 0
+                continue
+            domain = wiz.company_id._get_unreconciled_statement_lines_domain(wiz.fiscalyear_lock_date)
+            wiz.unreconciled_stmt_count = Line.search_count(domain)
+
+    def action_show_unreconciled_statement_lines(self):
+        self.ensure_one()
+        domain = self.company_id._get_unreconciled_statement_lines_domain(self.fiscalyear_lock_date)
+        return {
+            "name": _("Unreconciled Transactions"),
+            "type": "ir.actions.act_window",
+            "res_model": "account.bank.statement.line",
+            "view_mode": "list,form",
+            "views": [(False, "list"), (False, "form")],
+            "domain": domain,
+            "context": {"create": False},
+        }
+
+    @api.depends("company_id")
+    def _compute_exception_summary(self):
+        """List the ``account.lock_exception`` rows that outrank the dates above.
+
+        A lock date is not the last word: core enforces
+        ``_get_user_lock_date()``, which lets an exception lower the date for one
+        user — or for everyone, when it carries no user. Neither the company form
+        nor this wizard used to show them, so a period could read as closed while
+        named people were still free to post into it. Measured on prd_levis_begbal
+        on 12-Aug-2026: the company said 31-Jul while six users sat at 31-May.
+
+        Writing a new lock date does not clear these. Core re-creates every active
+        exception against the new company date, so they survive a close and keep
+        their old, lower date.
+        """
+        Exception_ = self.env["account.lock_exception"]
+        field_labels = {
+            "fiscalyear_lock_date": _("Global"),
+            "tax_lock_date": _("Tax"),
+            "sale_lock_date": _("Sales"),
+            "purchase_lock_date": _("Purchase"),
+        }
+        for wiz in self:
+            if not wiz.company_id:
+                wiz.exception_count = 0
+                wiz.exception_summary = False
+                continue
+            exceptions = Exception_.search(
+                [("company_id", "=", wiz.company_id.id), ("state", "in", ["active"])],
+                order="user_id, lock_date_field",
+            )
+            wiz.exception_count = len(exceptions)
+            if not exceptions:
+                wiz.exception_summary = False
+                continue
+            rows = []
+            for exc in exceptions:
+                # No user means the exception applies to everyone, and no end
+                # datetime means it never expires. Both are the cases worth
+                # shouting about, so they are the ones set in bold.
+                who = html_escape(exc.user_id.display_name) if exc.user_id else "<b>%s</b>" % _("EVERYONE")
+                until = format_date(self.env, exc.end_datetime) if exc.end_datetime else "<b>%s</b>" % _("never")
+                # reason is free text a user typed: escaped, because this column
+                # is rendered with sanitize=False.
+                rows.append(
+                    "<tr><td>%s</td><td>%s</td><td class='text-end'>%s</td>"
+                    "<td class='text-end'>%s</td><td>%s</td></tr>"
+                    % (
+                        who,
+                        field_labels.get(exc.lock_date_field, exc.lock_date_field or ""),
+                        format_date(self.env, exc.lock_date) if exc.lock_date else "—",
+                        until,
+                        html_escape(exc.reason or ""),
+                    )
+                )
+            wiz.exception_summary = (
+                "<table class='table table-sm o_list_table'><thead><tr>"
+                "<th>%s</th><th>%s</th><th class='text-end'>%s</th>"
+                "<th class='text-end'>%s</th><th>%s</th></tr></thead><tbody>%s</tbody></table>"
+                % (
+                    _("User"),
+                    _("Lock Date"),
+                    _("Their Date"),
+                    _("Expires"),
+                    _("Reason"),
+                    "".join(rows),
+                )
             )
 
     @api.depends("company_id")

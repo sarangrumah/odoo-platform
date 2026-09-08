@@ -53,3 +53,28 @@ class ProfitLossWizardShow(models.TransientModel):
             .with_context(**self._show_context_extra())
             ._xlsx_action(options, filename)
         )
+
+    def action_view_by_event(self):
+        """The analytic reading of the same period: one column per event."""
+        self.ensure_one()
+        title = self.env["custom.report.profit.loss.event"]._report_title
+        return {
+            "type": "ir.actions.client",
+            "tag": "custom_report_table",
+            "name": title,
+            "params": {
+                "report_code": "profit_loss_event",
+                "options": self._report_options(),
+                "title": title,
+            },
+        }
+
+    def action_export_xlsx_by_event(self):
+        self.ensure_one()
+        options = {
+            **self._build_filters(),
+            "date_from": self.date_from.isoformat(),
+            "date_to": self.date_to.isoformat(),
+        }
+        filename = "Profit_Loss_by_Event_%s_%s.xlsx" % (self.date_from, self.date_to)
+        return self.env["custom.report.profit.loss.event"]._xlsx_action(options, filename)

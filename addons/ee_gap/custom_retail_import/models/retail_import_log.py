@@ -9,9 +9,13 @@ queue_job, so we track ``job_uuid`` and per-stage record counters.
 from __future__ import annotations
 
 import hashlib
+import logging
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class RetailImportLog(models.Model):
@@ -136,6 +140,52 @@ class RetailImportLog(models.Model):
             [("file_hash", "=", file_hash), ("state", "in", ("imported", "partial", "running"))],
             limit=1,
         )
+
+    def _cron_flag_stuck(self):
+        """Flip long-``running`` imports to ``failed`` so a dead run stops looking alive.
+
+        ``retail.import.executor.run`` commits ``state='running'`` before the handler
+        starts, so a handler that raises (or a worker that is killed) leaves the row
+        running forever. That row then reads as "in progress" on every screen AND is
+        matched by ``find_duplicate``, so the same file can never be re-imported —
+        which is how prd_levis_begbal lost 10..17-Aug-2026 in silence.
+
+        The threshold is ``retail_import.stuck_hours`` (default 6). It has to clear the
+        longest legitimate run: the X101 material master takes ~10 minutes, so 6 hours
+        is two orders of magnitude of headroom and still catches the same night.
+        Flagging is what makes the failure both visible and RECOVERABLE — once the row
+        is ``failed`` the dedup guard lets the next poll retry the file on its own.
+        """
+        icp = self.env["ir.config_parameter"].sudo()
+        try:
+            hours = float(icp.get_param("retail_import.stuck_hours", "6") or 6)
+        except (TypeError, ValueError):
+            hours = 6.0
+        now = fields.Datetime.now()
+        cutoff = now - timedelta(hours=hours)
+        # Age is judged on started_at, falling back to imported_at: a row that died
+        # between create() and the first write has no started_at, and skipping it would
+        # leave exactly the rows that failed earliest stuck the longest.
+        stuck = (
+            self.sudo()
+            .search([("state", "=", "running")])
+            .filtered(lambda l: (l.started_at or l.imported_at or now) < cutoff)
+        )
+        for log in stuck:
+            msg = _(
+                "Import stalled: still 'running' %(h)s hours after it started. The process "
+                "that owned it is gone (server log has the traceback). Marked failed so the "
+                "file can be imported again."
+            ) % {"h": int(hours)}
+            _logger.error(
+                "STUCK retail import: log %s (%s, profile %s) running since %s — marking failed",
+                log.id,
+                log.filename or "?",
+                log.profile_id.name or "?",
+                log.started_at or log.imported_at,
+            )
+            log.write({"state": "failed", "error_message": msg, "finished_at": fields.Datetime.now()})
+        return len(stuck)
 
     def store_source(self, file_b64, filename):
         """Persist the uploaded file as an ir.attachment for audit."""

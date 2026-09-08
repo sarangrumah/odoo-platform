@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Own privilege: groups sharing one are rendered as a single
+             pick-one dropdown on the user form, so reusing another module's
+             privilege makes saving a user silently drop that module's group.
+             The shared category keeps the selectors next to each other. -->
+        <record id="res_groups_privilege_operating_unit" model="res.groups.privilege">
+            <field name="name">Operating Unit</field>
+            <field name="sequence">110</field>
+            <field name="category_id" ref="custom_core.module_category_custom_platform"/>
+        </record>
+
+        <record id="group_operating_unit_user" model="res.groups">
+            <field name="name">Operating Unit / User</field>
+            <field name="privilege_id" ref="res_groups_privilege_operating_unit"/>
+            <field name="comment">See the Operating Unit field and browse the units you are assigned to.</field>
+        </record>
+
+        <!-- The head-office posture, made explicit. A user with no unit
+             assigned is already unrestricted; this group says "keep seeing
+             everything even after units are assigned to you". -->
+        <record id="group_operating_unit_all" model="res.groups">
+            <field name="name">Operating Unit / All Units</field>
+            <field name="privilege_id" ref="res_groups_privilege_operating_unit"/>
+            <field name="implied_ids" eval="[(4, ref('group_operating_unit_user'))]"/>
+            <field name="comment">Sees data of every Operating Unit regardless of assignment.</field>
+        </record>
+
+        <record id="group_operating_unit_manager" model="res.groups">
+            <field name="name">Operating Unit / Manager</field>
+            <field name="privilege_id" ref="res_groups_privilege_operating_unit"/>
+            <field name="implied_ids" eval="[(4, ref('group_operating_unit_all'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+            <field name="comment">Create Operating Units and assign users to them.</field>
+        </record>
+
+    </data>
+</odoo>

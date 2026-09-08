@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- A dialog on purpose: this interrupts a confirm, and the decision is one
+         sentence long. The list underneath is what makes the decision possible. -->
+    <record id="view_levis_po_dup_sku_wizard_form" model="ir.ui.view">
+        <field name="name">levis.po.dup.sku.wizard.form</field>
+        <field name="model">levis.po.dup.sku.wizard</field>
+        <field name="arch" type="xml">
+            <form string="SKU ganda pada pesanan ini">
+                <div class="alert alert-warning" role="alert">
+                    Pesanan <field name="order_name" class="oe_inline" readonly="1"/> memuat
+                    <b>SKU yang sama pada lebih dari satu baris</b>. Tiap ukuran adalah SKU
+                    tersendiri, jadi pola ini biasanya berarti kolom produk tersalin turun di
+                    file upload — dan barang akan diterima persis seperti yang tertulis di sini.
+                    <br/>
+                    Periksa kolom <b>Varian lain yang TIDAK dipesan</b>: kalau ukuran yang Anda
+                    maksud ada di sana, batalkan dan perbaiki barisnya.
+                </div>
+                <group>
+                    <field name="partner_id" readonly="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="order_id" invisible="1"/>
+                </group>
+                <field name="line_ids" readonly="1">
+                    <list create="false" delete="false">
+                        <field name="product_id"/>
+                        <field name="default_code"/>
+                        <field name="variant_label"/>
+                        <field name="occurrences"/>
+                        <field name="product_qty"/>
+                        <field name="price_unit"/>
+                        <field name="sibling_label"/>
+                    </list>
+                </field>
+                <group>
+                    <field name="reason" required="1" placeholder="mis. dua tanggal kirim untuk SKU yang sama"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object" class="btn-primary"
+                            string="Benar, konfirmasi pesanan"/>
+                    <button string="Batal, saya perbaiki dulu" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

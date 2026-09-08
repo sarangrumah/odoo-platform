@@ -28,7 +28,10 @@ This module implements five specific requirements for the Levi's tenant: HS Code
 ## Key Models
 - `levis.inventory.reconciliation` — Manages periodic inventory reconciliations, computing differences between GL balances and actual stock values and producing a DRAFT `account.move`.
 - `levis.inventory.reconciliation.line` — One line per stock-valuation account, holding the GL balance, stock value, and computed difference.
-- `stock.move` — Overrides to skip GL journal entries on vendor goods-receipt moves.
+- `stock.move` — Overrides to skip GL journal entries on vendor goods-receipt moves, and to trigger the COGS catch-up when a receipt reveals a cost.
+- `levis.cogs.run` — Periodic COGS per Operating Unit: quantity sold x unit cost, aggregated per (store, product category), as a DRAFT entry.
+- `levis.cogs.catchup` / `levis.cogs.catchup.line` — COGS recognised at goods receipt for units already sold (feature 16).
+- `levis.cogs.charge` — Ledger of COGS already recognised per (product, store, sale month); read and written by BOTH mechanisms above, which is what keeps a unit from being charged twice.
 - `stock.picking` — Overrides to validate receipt quantities against demand quantities.
 
 ## Important Fields
@@ -186,6 +189,7 @@ narrative, so `levis.bank.narrative` reads them straight off `payment_ref`:
 | BCA debit | `KR OTOMATIS MID : <mid> <STORE> TGH: n DDR: n` | `TGH` | `DDR` |
 | BCA credit | `KARTU KREDIT MID:<mid> <STORE> TGH:0000n ADM:0000n` | `TGH` | `ADM` |
 | BCA QRIS | `KR OTOMATIS TANGGAL :dd/mm MID : <mid> ... QR : n DDR: n` | `QR` | `DDR` |
+| BCA NFC | `KR OTOMATIS TANGGAL :dd/mm MID : <mid> <STORE> NFC: n DDR: n` | `NFC` | `DDR` |
 | BRI | `OnUs|OffUs|QRIS* 1 YYMMDD <tid> <STORE> AMT:n,00MDR:n,00` | `AMT` | `MDR` |
 
 Measured on prd_levis_begbal July 2026 (2 535 lines): 2 073 settlements,
@@ -194,18 +198,91 @@ Measured on prd_levis_begbal July 2026 (2 535 lines): 2 073 settlements,
 strict improvement on the scripts, which had to spread a monthly per-store MDR
 pro-rata because the workbook and the ledger were on different grains.
 
+`NFC` was added to that table in 19.0.1.31.0, from two of those 12 unrecognised
+lines. Contactless says how the card was presented, not whether it was debit or
+credit, and the narrative does not say — so it parses as `debit`, which is the
+feed it arrives on. That choice carries no accounting weight, because clearing
+pools debit, credit and QRIS over the same card receivables; what matters is
+that it resolves to a *card* channel at all, since an unrecognised one keeps the
+unrestricted pool and may settle the CASH receivable. Both observed rows carry
+`DDR: 0.00`, so contactless is fee-free here or billed elsewhere.
+
 **Why the tender split is discovered, not read.** One card MID covers Visa,
 Mastercard, JCB and Amex alike, and `levis.mdr.bin` is empty, so nothing states
 which of the ten receivable accounts a settlement pays. `_allocate` consumes that
 store's open debits for the trading day, largest residual first, and reports the
 remainder as a shortfall rather than forcing it somewhere.
 
+**The clearing is written onto the bank statement line itself** (since
+19.0.1.30.0). Odoo books a statement line as `Dr Bank / Cr Suspense` and expects
+reconciliation to *replace* the suspense leg — that is why the suspense account
+ships with `reconcile = False` and can never be matched. Booking the counterpart
+in a separate entry leaves the suspense leg standing forever: the ledger comes
+out right, but every statement line stays `is_reconciled = False` and Odoo then
+refuses a lock date over the period. July 2026 is the proof — 2 526 lines, GL
+flat (suspense nets to zero against 757 `EBR-CLR-JULI-2026-*` legs), lock date
+blocked. So `_counterpart_plan` produces the legs that *replace* the suspense
+leg:
+
+    Dr Bank                 (untouched, what the bank paid)
+    Dr MDR Expense          (prorated to what was actually matched)
+        Cr POS Receivable   (per tender, gross)
+
+and a suspense leg survives only when the settlement is short, carrying exactly
+the amount nobody could explain. Fully explained lines end up with no suspense
+leg and Odoo's own `_compute_is_reconciled` marks them reconciled — no
+reconciliation call, no flag flipped on the chart of accounts.
+
+Watch the arithmetic on a short line: the residual is the *balancing* figure, not
+`short_amount`. A settlement of gross 1 000 000 / fee 10 000 / bank 990 000 that
+only finds 400 000 of open receivable is short 600 000 **gross**, but books
+400 000 receivable and 4 000 prorated fee, so 594 000 stays on suspense. The
+6 000 difference is fee on a settlement that, as far as the open receivables go,
+never happened.
+
 **Three stages, hard-separated.** `action_compute` builds the summary and creates
 *nothing* (verified on the clone: `account.move` count 38 822 before and after);
-`action_generate_moves` writes DRAFT entries; `action_post` posts and reconciles.
-No cron, no auto-post, and `action_compute` never generates.
+`action_generate_moves` writes the intended journal items to
+`levis.pos.clearing.leg` and still touches no accounting; `action_post` applies
+exactly those legs to the statement lines and reconciles. Stage 2 persists the
+plan rather than letting stage 3 recompute it, so the accountant approves a
+specific set of numbers and posting books that set — and if the underlying
+receivables moved in between, `_preflight` refuses instead of quietly booking
+something else. No cron, no auto-post, and `action_compute` never generates.
 
-**Key models.** `levis.pos.clearing` (+ `.line` per statement line, `.alloc` per
+**The settlements are searchable away from the run form (19.0.1.39.0).** The
+Settlements tab is a `one2many`, and an embedded `one2many` has no search panel —
+a month across eleven bank journals is a thousand rows you can only scroll.
+`action_view_lines` ("Search Settlements" in the header, plus an *Invoicing ▸
+POS Settlements* menu over every run) opens the same records under a normal
+action with `view_levis_pos_clearing_line_search`: filter by store, bank, tender,
+merchant id, narrative or X24DN transaction number; group by any of them. The
+line's `run_state` and `run_period_ref` are stored relateds added for exactly
+this — a filter on a non-stored field returns nothing rather than failing. The
+settlement form moved out of the tab into a top-level
+`view_levis_pos_clearing_line_form` so the row popup and the standalone list are
+the same screen; receipt ticking there is gated on `run_state`, which the tab used
+to get for free from the parent's state.
+
+**The mapping wizard is a full page, and its totals prove themselves
+(19.0.1.39.0).** A proposal is one merchant id summed over a whole period, while
+the *Sample Narrative* beside it belongs to exactly one of those statement lines —
+so the amount reads as though it disagreed with the account mutation and the
+berita transfer. Three things fix that, and none of them is a different sum:
+`gross_total` and `mdr_total` carry the narratives' own figures next to the bank's
+(gross − MDR is what the bank moved, and `narrative_gap` shows anything left
+over — a cash deposit quotes no gross, so its whole amount lands there by
+design), and `statement_line_ids` holds the lines behind the total with a
+*Bank Lines* button to open them. The wizard opens `target="current"`, not a
+dialog: dozens of ids each needing their amounts read against a statement do not
+fit in a modal, so the buttons live in a `<header>` rather than a `<footer>`.
+
+**Undo is per statement line.** Once posted, the legs live on the bank entries,
+so `action_cancel` refuses; reversing means Odoo's own "Undo Reconciliation" on
+the lines concerned.
+
+**Key models.** `levis.pos.clearing` (+ `.line` per statement line, `.leg` per
+planned journal item, `.alloc` per
 consumed receivable, `.diag` for findings), `levis.clearing.config` (accounts, one
 row per company, seeded by code from `models/setup.py:seed_clearing_config`),
 `levis.bank.mid.map` (MID/TID/keyword → Operating Unit), `levis.bank.narrative`
@@ -222,6 +299,63 @@ compute depends on the narrative, the amount and the journal's format — **not*
 history; `action_levis_reread_narrative()` (via `add_to_compute`, so the ORM owns
 the write) re-reads the lines Finance chooses. `custom_levis_bank_reconcile`
 builds the interactive matching wizard on exactly these fields.
+
+**The receipt numbers behind a settlement are recovered, and only where the
+money proves them.** The receivable a settlement consumes is an X70D transfer
+line — one per store, per trading day, per tender — so it carries no receipt
+number at all. The staged X70D rows do (`retail.import.line.raw_data_json`:
+`store_code`, `register`, `transnum`, `tender_type`, `tender_amount`), and X24DN
+posts the same keys as `pos.order.pos_reference` (`store-register-transaction`).
+`_x24_rows` joins them to the Operating Unit through `ir.model.data`
+(`posconfig_<store>`) → `pos.config` → `stock.warehouse.l10n_ou_analytic_id`.
+
+`_x24_identify` then matches on **arithmetic only**: one transaction equal to the
+settlement's gross (`exact`), or one tender whose whole trading day sums to it
+(`batch`); several of either is `ambiguous` and lists them all without claiming
+one; anything else is `none` and names nothing. There is deliberately **no subset
+search** — a 250.900 settlement out of a day holding 16.865.300 across ten card
+transactions can be composed many ways. Reading the receipts off the *allocated*
+receivable (the first cut of this feature, 19.0.1.36.0) was worse still: the
+allocation picks by residual and cannot see a tender, so that 250.900 line listed
+the day's ten card receipts and read as though it had paid millions.
+
+Where the match lands, it yields the one thing the narrative can never say: the
+**tender**. `x24_tender` records it and `x24_tender_mismatch` flags the lines
+where the allocation credited a different tender receivable — 377 of 1.420
+identified settlements on prd_levis_begbal's August run. That is a real
+divergence between evidence and `_allocate`'s largest-residual guess, not a
+display bug. `custom_retail_import` stays a non-dependency: without it the
+columns are simply empty and clearing is unaffected.
+`levis.pos.clearing.line.move_name` is the statement line's own entry number.
+
+Gotcha: some staged rows carry an empty `trans_date`/`tender_amount`, so both
+casts live inside a `CASE` — a bare `WHERE` is free to run after the cast and
+dies with `invalid input syntax for type date`.
+
+**The matching worksheet: `levis.pos.clearing.receipt`.** Roughly half a month's
+settlements pay *part* of a trading day, which no arithmetic can decompose (see
+`_x24_identify`), so the last word is a human's and has to be storable. One row =
+one X24DN transaction offered to one bank line, with a `matched` tick.
+
+* **Generated per line, on demand.** `action_suggest_receipts` builds one bank
+  line's candidates (~0,6 s, ~20 rows). Generating a whole month up front was
+  36.000 rows and **143 seconds** — a button no web worker survives — for a
+  question that is always asked one line at a time. `action_compute` therefore
+  writes only the ticks the amount proves (947 rows, ~4 s on prd_levis_begbal).
+* **A tick is exclusive company-wide.** A partial unique index
+  (`levis_pos_clearing_receipt_matched_uniq ... WHERE matched`) is the guarantee —
+  `_sql_constraints` cannot express "only ticked rows are unique", and every
+  candidate row is a duplicate of some other line's candidate by design.
+  `_assert_unclaimed` checks first so the user gets a sentence naming the bank
+  line that already holds the transaction, not an integrity error mid-flush;
+  `_release_elsewhere` (per record) and `_sweep_claimed` (one DELETE, used by the
+  generator) then take the receipt off every other line.
+* **Unticking does not sweep the run.** The receipt is free the moment it is
+  unticked; it reappears wherever it belongs the next time that line is opened.
+* Refreshing a line rebuilds only its *unticked* suggestions — an answer already
+  given is never undone by asking the question again.
+* `matched_total` / `match_gap` on the line are what has been confirmed and what
+  is still unexplained; `x24_trans_refs` follows the ticks, not the evidence.
 
 **Two rules may never claim one terminal.** `_check_no_colliding_rule` refuses a
 mapping that would compete with an existing one, comparing through the resolver's own
@@ -244,6 +378,99 @@ because M sorts before O, and the two name different stores.
 `scripts/tenants/levis/96_setup_pos_clearing.py` does the same for a database
 that already has the module. The MID mapping is deliberately not seeded — see the
 gotcha below.
+
+## Feature 16 — COGS catch-up on goods receipt (`levis.cogs.catchup`)
+
+Levi's sells before it buys, so a unit usually leaves the store while its product
+still has no cost. Odoo 19 cannot repair that afterwards — `stock.move.value` is
+written once in `_action_done` and `_run_fifo_vacuum` is gone, so an outgoing move
+made against empty stock is worth zero for ever. `levis.cogs.run` answers this once
+a month; this feature answers it *as the cost arrives*.
+
+**Trigger.** `stock.move._action_done` → `_levis_cogs_catchup()`, for vendor
+receipts only (`location_id.usage == "supplier"`), gated by the system parameter
+`custom_levis_localization.cogs_catchup_enabled` (default `0`). A failure is caught
+and logged: it must never block a transfer, because the cost is picked up by the
+next receipt or by the monthly run anyway.
+
+**What it charges.** Only the products on that receipt, only what is still
+outstanding, and the *whole* outstanding quantity — ten sold against four received
+still charges ten, because the cost is known now. Cost basis is the receipt's own
+`purchase_line_id.price_unit` net of tax (`compute_all`, since this tenant's POs are
+tax-included), converted to company currency, with `standard_price` as the fallback.
+That is the basis the June/July 2026 reconciliation proved right; `standard_price`
+alone understated July by Rp 252 m.
+
+**Where it books.** `Dr COGS-<category> / Cr Inventories-<category>` with the
+*selling* store's OU analytic on both legs — the store that sold, not the one that
+received. The entry is DRAFT and grouped per booking date, so a day of receipts
+produces one entry rather than one per picking. The booking date is the end of the
+month the sale happened in while that month is open, and today once it is closed;
+"closed" is the latest of `fiscalyear_lock_date`, `hard_lock_date` and the new
+company field `l10n_cogs_reported_through`, because Levi's policy is that a period
+already reported to the client does not move even when nothing technically locks it
+(see the platform memory on closed periods). Lock *exceptions* are ignored on
+purpose: they exist to let one correction through, not to reopen a month for cost.
+
+**The ledger is the real output.** Every charge is written to `levis.cogs.charge`
+as (product, warehouse, sale month, qty, amount, source). `levis.cogs.run._detail()`
+subtracts it before booking, and records its own charges when it generates, so the
+two mechanisms can never charge the same unit twice — whichever learns the cost
+first recognises it and the other stays quiet.
+
+**Window.** By default only the booking month is examined. This is deliberate:
+June and July 2026 COGS were booked by hand and by `COGS/2026/0001` *without*
+leaving `levis.cogs.charge` rows, so a catch-up reaching into them would charge
+their cost a second time. `custom_levis_localization.cogs_catchup_start` widens the
+window — only after checking that the months it opens carry no COGS yet.
+
+Journal: `custom_levis_localization.cogs_catchup_journal_code`, falling back to the
+company stock journal and then any general journal. UI at Accounting > Accounting >
+COGS Catch-up (read-only; the entry is edited as a normal draft journal entry).
+
+## Feature 17 — Duplicate-SKU gate on purchase orders
+
+A garment size is not an attribute of the thing ordered, it **is** the thing ordered:
+each size is its own `product.product` with its own PROD SKU. So a PO sheet whose
+product column was copied down in Excel produces four perfectly valid lines that all
+ask for size 25 — and nothing downstream can catch it, because the receipt inherits
+its products from the order (feature #6, `_check_levis_receipt_line_from_po`). The
+mistake surfaces only when the carton is opened and holds 25, 26, 27 and 28.
+
+Confirming an order whose lines repeat a product therefore opens
+`levis.po.dup.sku.wizard` instead of confirming. It lists each repeated SKU with its
+Size/Inseam values, how many lines carry it, the total quantity — and **the variants
+of the same template that are NOT on this order**, which is the line that gives the
+mistake away. A reason is mandatory; on confirm it is written to
+`purchase.order.l10n_dup_sku_reason`, `l10n_dup_sku_ack` is set, the wizard posts a
+chatter message naming the SKUs and the reason, and `button_confirm` is called again.
+
+Deliberate design decisions:
+- **A wizard, not a constraint.** Ordering the same SKU twice is legitimate (two
+  delivery dates, two prices). The `_check_levis_qty_price_swap` treatment — a hard
+  `ValidationError` — would break real orders. What was missing is a moment where a
+  person looks and says yes.
+- **Not an onchange either**: `base_import` never runs onchanges, and the upload is
+  exactly where this mistake is made. The gate sits on `button_confirm`, which every
+  path (UI, import, script) has to pass.
+- **The acknowledgement is per line-up, not per order.** It is cleared by
+  `button_draft` and by any create/write/unlink on the lines that touches
+  `product_id` or `product_qty`, so it can never be earned on one set of lines and
+  spent on another. The wizard passes `levis_dup_sku_confirming` in the context so
+  core's own writes during confirm do not wipe the acknowledgement it just set.
+- **Batch confirm refuses rather than half-confirms**: selecting several orders and
+  confirming raises a `UserError` naming the offenders, because an action window can
+  only be returned for one of them.
+- `reason` is required **in the view only** — the wizard record is created before the
+  user has typed anything, so a required column would refuse to open it.
+
+Finding the orders that predate the gate:
+`scripts/tenants/levis/103_report_po_duplicate_sku.py` (SELECT-only) lists every PO
+with a repeated SKU together with the receipt, the `GR-VAL:<move_id>` valuation
+entries and the vendor bill — the three facts that decide whether the correction is
+"cancel the receipt and fix the order" or a full return. On `prd_levis_begbal`
+(4-Sep-2026) it found 8 (PO, SKU) pairs over 5 orders of Aug-2026, all received and
+billed; `005DS0000025` ×4 lines on `PO/T/EBR/2026/08/00336` is the reported case.
 
 ## Gotchas
 - **Never `_inherit "product.value"` from this module.** Doing so pulls
@@ -305,6 +532,12 @@ gotcha below.
   and REF Invoice Vendor columns showed no bill at all until 19.0.1.25.1. The failure is
   invisible in the PDF — it looks like a filled-in column.
 
+- **Search views here take no `<group string="Group By">`.** Odoo 19's
+  `base/rng/common.rng` defines `group` with no `string` attribute and `field`
+  children only, so wrapping group-by filters in one fails view validation with
+  `RELAXNG_ERR_INVALIDATTR` *and* a misleading `Element search has extra content:
+  field` on the line above. Group-by filters go flat after a `<separator/>`,
+  which is what the receipt search view already did.
 - **`account.bank.statement.line` has no SQL `date` column.** It is delegated from
   `account.move` via `_inherits`, so an ORM domain on `date` works but raw SQL must
   join `move_id` — `select sl.date ...` fails with `column sl.date does not exist`.
@@ -327,22 +560,38 @@ gotcha below.
   Channel is deliberately *not* part of that key: the same MID carries debit and
   QRIS, and the rule answers "which store", not "which tender".
 - **The bank suspense account `1103000002` is `reconcile = False`,** and all six
-  bank journals use it as their `suspense_account_id`. So the clearing entry's
-  `Dr suspense` is the mirror of the statement line's credit and the two net out on
-  the *balance* — they are never matched, and statement lines stay
-  `is_reconciled = False` forever. Two consequences: the bank-rec widget will never
-  match them, and **Odoo core refuses to set `fiscalyear_lock_date` over any period
-  containing them** ("There are still unreconciled bank statement lines in the
-  period you want to lock"). That is why consumption is tracked by an explicit
-  marker (`levis_clearing_line_id`) rather than by reconciliation.
+  bank journals use it as their `suspense_account_id`. That is not a Levi's
+  misconfiguration — it is what `chart_template.py` ships, on every tenant here,
+  because Odoo never matches a suspense leg, it *replaces* it. Booking the
+  counterpart in its own entry therefore nets the balance to zero while leaving
+  every statement line `is_reconciled = False` forever, and **Odoo core then
+  refuses to set `fiscalyear_lock_date` over the period** ("There are still
+  unreconciled bank statement lines in the period you want to lock"). That is the
+  July 2026 situation and the reason the design changed in 19.0.1.30.0. Do not
+  "fix" it by flipping the flag: that makes the six bank journals behave unlike
+  every other Odoo database and still needs a bulk match to mean anything.
+  Consumption is *additionally* tracked by an explicit marker
+  (`levis_clearing_line_id`), which is what a second run reads.
 - **The marker is written at generation, never at compute.** Previewing a period
   must leave the database untouched, so a second run only becomes blind to July's
   settlements once the first run has actually produced drafts.
 - **Allocations are paired to journal legs by position, not by lookup.** Two stores
   can produce a credit on the same account with the same analytic inside one entry;
   looking the leg up afterwards would hand both allocations the same line and then
-  over-reconcile it. `_attach_alloc_move_lines` zips the created lines (ascending
-  id) against the plan and refuses to pair at all if the counts differ.
+  over-reconcile it. `_apply_to_statement_lines` zips the newly created items
+  (ascending id) against the planned legs and refuses to pair at all if the counts
+  differ.
+- **Writing to a posted statement-line entry is normal, not a hack.** Odoo posts
+  the entry the moment the line is imported, and core's own
+  `action_undo_reconciliation` rewrites `line_ids` on it with
+  `force_delete=True, skip_readonly_check=True`. `_apply_to_statement_lines` uses
+  the same context but only *deletes the suspense leg* instead of clearing
+  everything, so nothing recomputes the bank amount or its currency behind our
+  back. It refuses outright when the line no longer sits on suspense — somebody
+  reconciled it by hand after the plan was approved.
+- **Legs are booked in company currency only.** `_preflight` refuses a statement
+  line with a `foreign_currency_id`, rather than inventing a per-leg rate. All six
+  Levi's bank journals are IDR.
 - **`short_amount` excludes unmapped lines.** "This store had nothing open" and "we
   do not know the store" are different problems with different fixes; conflating
   them inflated the shortfall figure by ~4.3 bn on the first real run.

@@ -120,7 +120,7 @@ class TestLoanUnitFlow(TransactionCase):
         loan = moves.filtered("is_loan")
         self.assertEqual(main.product_uom_qty, 400.0)
         self.assertEqual(loan.product_uom_qty, 100.0)
-        self.assertTrue(loan.name.startswith("[LOAN]"))
+        self.assertTrue(loan.description_picking.startswith("[LOAN]"))
 
     def test_bulk_mode_no_loan_creates_single_move(self):
         if not self.env["stock.picking.type"].search([("code", "=", "outgoing")], limit=1):

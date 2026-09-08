@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_users_form_operating_unit" model="ir.ui.view">
+            <field name="name">res.users.form.operating.unit</field>
+            <field name="model">res.users</field>
+            <field name="inherit_id" ref="base.view_users_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//notebook" position="inside">
+                    <page string="Operating Units" name="operating_units"
+                          groups="custom_operating_unit.group_operating_unit_manager">
+                        <div class="alert alert-info" role="alert">
+                            A user with no unit assigned sees <b>every</b> unit's data.
+                            Assign units to restrict them; assigning an area covers all its stores.
+                        </div>
+                        <group>
+                            <group>
+                                <field name="ou_all_access"/>
+                                <field name="default_operating_unit_id"
+                                       domain="[('id', 'in', operating_unit_ids)]"
+                                       invisible="not operating_unit_ids"/>
+                            </group>
+                            <group>
+                                <field name="ou_is_scoped" string="Currently restricted" readonly="1"/>
+                            </group>
+                        </group>
+                        <field name="operating_unit_ids" widget="many2many_tags"
+                               options="{'no_quick_create': True}"
+                               readonly="ou_all_access"/>
+                        <separator string="Units this user may see"/>
+                        <field name="ou_allowed_ids" widget="many2many_tags" readonly="1"
+                               invisible="not ou_is_scoped"/>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_arka_purchase_type" model="ir.ui.view">
+        <field name="name">stock.picking.form.arka.purchase.type</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="l10n_purchase_type" invisible="not l10n_purchase_type"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="vpicktree_arka_purchase_type" model="ir.ui.view">
+        <field name="name">stock.picking.list.arka.purchase.type</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="l10n_purchase_type" optional="hide"/>
+            </field>
+        </field>
+    </record>
+</odoo>

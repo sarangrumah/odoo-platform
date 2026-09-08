@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_operating_unit_form_levis" model="ir.ui.view">
+            <field name="name">operating.unit.form.levis</field>
+            <field name="model">operating.unit</field>
+            <field name="inherit_id" ref="custom_operating_unit_docs.view_operating_unit_form_links"/>
+            <field name="arch" type="xml">
+                <field name="warehouse_id" position="after">
+                    <field name="l10n_levis_store_code"/>
+                </field>
+            </field>
+        </record>
+    </data>
+</odoo>
