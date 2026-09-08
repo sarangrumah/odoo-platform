@@ -789,6 +789,180 @@ services:
         limits:
           memory: 256m
 
+  # Levi's sales dashboard. Unlike vas-pmo and the storefront it does not talk
+  # to Odoo at all: it reads prd_levis_begbal directly as `cockpit_ro`, a role
+  # whose sessions Postgres itself forces read-only and which pg_hba only lets
+  # reach that one database. Aggregating 52k POS lines across six dimensions is
+  # far cheaper in SQL than through the ORM.
+  #
+  # Requires the cockpit_ro pg_hba entries — see sales-cockpit/README.md. The
+  # container starts fine without them and answers 503 on /cockpit/api/health.
+  sales-cockpit:
+    build:
+      context: ./sales-cockpit
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-sales-cockpit:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-sales-cockpit
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=64m,mode=1777
+      - /app/.next/cache:rw,size=64m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      # Next's standalone server binds to $HOSTNAME, which docker sets to the
+      # container id. Without this it listens on that name only and the
+      # healthcheck (127.0.0.1) is refused.
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      COCKPIT_DB_HOST: ${COCKPIT_DB_HOST:-postgres}
+      COCKPIT_DB_PORT: ${COCKPIT_DB_PORT:-5432}
+      COCKPIT_DB_NAME: ${COCKPIT_DB_NAME:-prd_levis_begbal}
+      COCKPIT_DB_USER: ${COCKPIT_DB_USER:-cockpit_ro}
+      # Read-only role; still a production credential, so it stays in .env.
+      COCKPIT_DB_PASSWORD: ${COCKPIT_DB_PASSWORD}
+      COCKPIT_DB_POOL_MAX: ${COCKPIT_DB_POOL_MAX:-8}
+      # Login is Odoo's own. Must be odoo-front — the public `odoo` runs
+      # dbfilter ^%d$$ and answers "Database not found" for this tenant.
+      COCKPIT_ODOO_URL: ${COCKPIT_ODOO_URL:-http://odoo-front:8069}
+      COCKPIT_SESSION_SECRET: ${COCKPIT_SESSION_SECRET}
+      COCKPIT_SESSION_TTL: ${COCKPIT_SESSION_TTL:-43200}
+      # The assistant. Its deterministic skill catalogue needs nothing here;
+      # these two only enable the Claude fallback for questions the catalogue
+      # cannot place. Leave COCKPIT_AGENT_URL empty and the widget still works,
+      # unmatched questions simply get an honest refusal.
+      COCKPIT_AGENT_URL: ${COCKPIT_AGENT_URL:-}
+      COCKPIT_AGENT_SECRET: ${COCKPIT_AGENT_SECRET:-}
+    ports:
+      # Loopback only, on purpose: there is no authentication yet, and this port
+      # would otherwise serve every store's revenue to anything on the LAN.
+      # Reach it over an SSH tunnel, the way odoo-mgmt is reached. Drop the
+      # 127.0.0.1 prefix once the Odoo-backed login lands.
+      - "127.0.0.1:${SALES_COCKPIT_PORT:-18130}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/cockpit/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # The assistant's escalation path. Holds NO database credentials: it reaches
+  # prd_levis_begbal only through the cockpit's HMAC-signed skill endpoint,
+  # which accepts a catalogued skill name and validated arguments — never SQL.
+  cockpit-agent:
+    build:
+      context: ./cockpit-agent
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-cockpit-agent:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-cockpit-agent
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=16m,mode=1777
+    depends_on:
+      sales-cockpit:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      NODE_ENV: production
+      # Must carry the cockpit's basePath.
+      COCKPIT_URL: ${COCKPIT_URL:-http://sales-cockpit:8080/cockpit}
+      COCKPIT_AGENT_SECRET: ${COCKPIT_AGENT_SECRET}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      COCKPIT_AGENT_MODEL: ${COCKPIT_AGENT_MODEL:-claude-opus-5}
+      COCKPIT_AGENT_EFFORT: ${COCKPIT_AGENT_EFFORT:-low}
+    ports:
+      # Loopback only, and deliberately absent from the Caddyfile: the cockpit
+      # is the sole caller, over the compose network.
+      - "127.0.0.1:${COCKPIT_AGENT_PORT:-18131}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # Levi's Finance & Accounting dashboard. Same arrangement as sales-cockpit —
+  # reads prd_levis_begbal directly, login goes through Odoo — but with its own
+  # Postgres role, `finance_ro`. The two grant lists are deliberately separate:
+  # this one reaches the ledger, the bank statements and the POS clearing runs,
+  # and that reach has no business hanging off a sales dashboard's credential.
+  #
+  # Requires the finance_ro pg_hba entries — see finance-cockpit/README.md. The
+  # container starts fine without them and answers 503 on /finance/api/health.
+  finance-cockpit:
+    build:
+      context: ./finance-cockpit
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-finance-cockpit:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo19-platform}-finance-cockpit
+    <<: [*restart-policy, *default-logging]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=64m,mode=1777
+      - /app/.next/cache:rw,size=64m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      # Next's standalone server binds to $HOSTNAME, which docker sets to the
+      # container id. Without this it listens on that name only and the
+      # healthcheck (127.0.0.1) is refused.
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      FINANCE_DB_HOST: ${FINANCE_DB_HOST:-postgres}
+      FINANCE_DB_PORT: ${FINANCE_DB_PORT:-5432}
+      FINANCE_DB_NAME: ${FINANCE_DB_NAME:-prd_levis_begbal}
+      FINANCE_DB_USER: ${FINANCE_DB_USER:-finance_ro}
+      # Read-only role; still a production credential, so it stays in .env.
+      FINANCE_DB_PASSWORD: ${FINANCE_DB_PASSWORD}
+      FINANCE_DB_POOL_MAX: ${FINANCE_DB_POOL_MAX:-8}
+      # Login is Odoo's own. Must be odoo-front — the public `odoo` runs
+      # dbfilter ^%d$$ and answers "Database not found" for this tenant.
+      FINANCE_ODOO_URL: ${FINANCE_ODOO_URL:-http://odoo-front:8069}
+      FINANCE_SESSION_SECRET: ${FINANCE_SESSION_SECRET}
+      FINANCE_SESSION_TTL: ${FINANCE_SESSION_TTL:-43200}
+    ports:
+      # Loopback only, like sales-cockpit: Caddy is the only front door, and
+      # this port would otherwise serve the whole ledger to anything on the LAN.
+      - "127.0.0.1:${FINANCE_COCKPIT_PORT:-18132}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/finance/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [odoo-net]
+    deploy:
+      resources:
+        limits:
+          # Larger than sales-cockpit: netting one GR/IR account holds ~59k
+          # rows in memory for the moment it takes to run.
+          memory: 768m
+
 networks:
   odoo-net:
     driver: bridge

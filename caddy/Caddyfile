@@ -357,6 +357,28 @@
 		reverse_proxy vas-pmo:8080
 	}
 
+	# Levi's sales dashboard. Same arrangement as vaspmo above: Next.js is built
+	# with basePath=/cockpit, so it expects the prefix — `handle`, not
+	# `handle_path`. One matcher per handle block; two makes ingress crash-loop.
+	# The app authenticates against Odoo itself (prd_levis_begbal, via
+	# odoo-front) and gates every route on a signed httpOnly session, so the
+	# stop-gap basic_auth that guarded this route on 14-Aug is gone. Only
+	# /cockpit/api/health is public, and it reports no business figures.
+	handle /cockpit* {
+		reverse_proxy sales-cockpit:8080
+	}
+
+	# Levi's Finance & Accounting dashboard. Same arrangement as /cockpit above:
+	# basePath=/finance, so `handle`, not `handle_path`. One matcher per handle
+	# block — two makes ingress crash-loop.
+	#
+	# It authenticates against Odoo (prd_levis_begbal, via odoo-front) and gates
+	# every route on a signed httpOnly session. Only /finance/api/health is
+	# public, and it reports `SELECT 1`, not a figure.
+	handle /finance* {
+		reverse_proxy finance-cockpit:8080
+	}
+
 	# File Browser web UI for the /srv/sftp-share/files drop zone. The
 	# container runs with base path `-b /files`, so keep the prefix (use
 	# `handle`, not `handle_path`). Login-gated; used for client file hand-off.
