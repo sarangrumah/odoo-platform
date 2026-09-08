@@ -48,7 +48,7 @@ class AccountMoveLine(models.Model):
                     # product/category account always wins.
                     line.account_id = mapping.expense_account_id.id
 
-    def _arka_grir_account(self, mapping):
+    def _arka_grir_account(self, mapping=None):
         """GR/IR clearing account this bill line must debit, if any.
 
         Only a line that has a matching goods-receipt accrual may be routed to
@@ -57,21 +57,30 @@ class AccountMoveLine(models.Model):
         * the line comes from a purchase order -- a bill keyed in by hand never
           booked a receipt accrual, and re-routing it would also clobber the
           expense account the user picked;
-        * the product is goods, not a service (a service moves no stock); and
+        * that order line was actually received -- it has a done move in from a
+          supplier location. This is the receipt's own condition rather than a
+          product-type test, because ARKA-AIM receives service-typed products
+          through ``custom_service_receipt`` and those receipts do book an
+          accrual; and
         * its category is ``real_time`` valued, which is the exact condition under
-          which the receipt posts Dr Stock Valuation / Cr Stock Variation.
+          which the receipt posts Dr Stock Valuation / Cr GR-IR.
 
-        Every ARKA-AIM product category is periodic today, so this returns empty
-        and bills keep their native account. It starts working by itself if a
-        category is switched to real-time valuation.
+        A periodic category returns empty and the bill keeps its native account.
         """
         self.ensure_one()
-        if not self.purchase_line_id or self.product_id.type != "consu":
+        if not self.purchase_line_id:
+            return self.env["account.account"].browse()
+        received = self.purchase_line_id.move_ids.filtered(
+            lambda m: m.state == "done" and m.location_id.usage == "supplier"
+        )
+        if not received:
             return self.env["account.account"].browse()
         categ = self.product_id.categ_id.with_company(self.move_id.company_id)
         if categ.property_valuation != "real_time":
             return self.env["account.account"].browse()
-        # Mirror the receipt's own account choice: the mapping's GR/IR when set
-        # (Non-Trade), else the category's stock-variation account (Trade keeps
-        # its per-category GR/IR).
-        return mapping.grir_account_id or categ.account_stock_variation_id
+        # Mirror the receipt's own account choice exactly -- same helper, same
+        # arguments -- so the bill always relieves the account the receipt
+        # credited.
+        return self.env["arka.purchase.account.map"]._grir_account(
+            self.move_id.company_id, self.move_id.l10n_purchase_type, categ
+        )

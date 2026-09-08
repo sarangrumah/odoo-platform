@@ -69,6 +69,29 @@ class ArkaPurchaseAccountMap(models.Model):
             )
 
     @api.model
+    def _grir_account(self, company, purchase_type, categ=None):
+        """GR/IR clearing account for one company / purchase stream.
+
+        Single source of truth for BOTH sides of the accrual -- the goods
+        receipt credits it (``stock.move._arka_book_grir_entry``) and the vendor
+        bill debits it (``account.move.line._arka_grir_account``) -- so the two
+        can never drift apart and leave a dangling balance.
+
+        The mapping row wins. Failing that, the account configured as the
+        stock-variation counterpart of the category's own valuation account is
+        used (``account.account.account_stock_variation_id``, core in this
+        build), which lets a category carry its own GR/IR without a mapping row.
+        Empty when neither is configured -- callers then book nothing rather
+        than guess an account.
+        """
+        mapping = self._get_map(company, purchase_type)
+        if mapping and mapping.grir_account_id:
+            return mapping.grir_account_id
+        if categ:
+            return categ.with_company(company).property_stock_valuation_account_id.account_stock_variation_id
+        return self.env["account.account"].browse()
+
+    @api.model
     def _get_map(self, company, purchase_type):
         """Mapping row for ``company``/``purchase_type``, or an empty recordset."""
         if not company or not purchase_type:

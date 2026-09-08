@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Goods-Receipt (GR/IR) journal switch for the ARKA-AIM tenant.
+
+        "0" (default) -> validating a vendor goods receipt posts
+                         Dr Stock Valuation / Cr GR/IR clearing, and the vendor
+                         bill relieves the same GR/IR account.
+        "1"           -> periodic behaviour: no journal at receipt, the bill
+                         posts straight to expense / AP.
+
+      Posting is additionally gated on the product category being real-time
+      valued, so switching this to "0" cannot surprise a periodic category.
+
+      noupdate="1" so a value changed by an administrator survives upgrades.
+      Editable at Settings > Technical > System Parameters.
+    -->
+    <data noupdate="1">
+        <record id="param_suppress_gr_journal" model="ir.config_parameter">
+            <field name="key">custom_arka_aim_purchase_type.suppress_gr_journal</field>
+            <field name="value">0</field>
+        </record>
+    </data>
+</odoo>

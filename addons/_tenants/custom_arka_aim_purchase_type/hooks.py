@@ -20,10 +20,14 @@ _SEQUENCES = [
     ("non_trade", "arka_aim.purchase_order_nontrade", "ARKA-AIM Purchase Order (Non-Trade)", "PO/NT"),
 ]
 
-# Account codes from the tenant chart. Trade deliberately has no GR/IR: a
-# real-time Trade category keeps its own per-category stock-variation account.
+# Account codes from the tenant chart. Both streams clear their goods-receipt
+# accrual through a GR/IR account of their own, so a Trade and a Non-Trade
+# balance never mix in the same clearing account.
 ACCOUNT_CODES = {
-    "trade": {"payable": "2103100001"},
+    "trade": {
+        "payable": "2103100001",
+        "grir": "2103109199",
+    },
     "non_trade": {
         "payable": "2103300001",
         "grir": "2103300008",

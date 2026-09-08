@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-08T03:50:32+00:00",
+  "generated_at": "2026-09-08T04:01:39+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "dab8ba97",
-    "branch": "rs-rebuild"
+    "commit": "f433726",
+    "branch": "HEAD"
   },
   "buckets": [
     {
@@ -63,27 +63,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "effee9da",
+          "sha": "effee9d",
           "date": "2026-09-08",
           "subject": "feat(arkaaim): put the real serial in Serial Number, and let people search it (#217)"
         },
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "a5065c73",
+          "sha": "a5065c7",
           "date": "2026-08-04",
           "subject": "feat(arka_aim): post the opening balance as detail and rebuild the asset register"
         },
         {
-          "sha": "c5260748",
+          "sha": "c526074",
           "date": "2026-07-17",
           "subject": "style: ruff-format four files that were formatted at the wrong line length"
         },
         {
-          "sha": "0e89d2c6",
+          "sha": "0e89d2c",
           "date": "2026-07-17",
           "subject": "feat(reports,arka): port /opt-only runtime work onto feat/industry-packs"
         }
@@ -102,12 +102,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "3b2f15d9",
+          "sha": "3b2f15d",
           "date": "2026-07-09",
           "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         },
         {
-          "sha": "facac613",
+          "sha": "facac61",
           "date": "2026-07-05",
           "subject": "feat(retail_import): reconcile Phase-5 X24 posting from /opt runtime + arkaaim numbering"
         }
@@ -126,32 +126,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "a5065c73",
+          "sha": "a5065c7",
           "date": "2026-08-04",
           "subject": "feat(arka_aim): post the opening balance as detail and rebuild the asset register"
         },
         {
-          "sha": "9984c97e",
+          "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         },
         {
-          "sha": "6697d1f4",
+          "sha": "6697d1f",
           "date": "2026-07-02",
           "subject": "docs(modules): correct MODULE_KNOWLEDGE.md drafts against source"
         },
         {
-          "sha": "a2fe99da",
+          "sha": "a2fe99d",
           "date": "2026-07-02",
           "subject": "docs(modules): regenerate MODULE_KNOWLEDGE.md for 7 drifted modules"
         },
         {
-          "sha": "a3266c58",
+          "sha": "a3266c5",
           "date": "2026-07-01",
           "subject": "feat(arka_aim): opening balances seed module (31 May 2026)"
         }
@@ -161,8 +161,8 @@
       "module": "custom_arka_aim_purchase_type",
       "bucket": "_tenants",
       "name": "ARKA-AIM Trade / Non-Trade Purchases",
-      "version": "19.0.1.0.1",
-      "summary": "Trade vs Non-Trade purchase stream for ARKA-AIM: own PO numbering, AP / GR-IR account routing, and Transfer to Asset on a Non-Trade goods receipt.",
+      "version": "19.0.1.1.0",
+      "summary": "Trade vs Non-Trade purchase stream for ARKA-AIM: own PO numbering, the GR/IR journal at goods receipt, AP / GR-IR account routing, and Transfer to Asset on a Non-Trade goods receipt.",
       "category": "Tenants/ARKA-AIM",
       "depends": 5,
       "public": false,
@@ -170,7 +170,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "e4d5c4c0",
+          "sha": "e4d5c4c",
           "date": "2026-09-08",
           "subject": "feat(arkaaim): Trade / Non-Trade purchases and Transfer to Asset from a Non-Trade receipt (#220)"
         }
@@ -189,12 +189,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "e0ab0685",
+          "sha": "e0ab068",
           "date": "2026-05-28",
           "subject": "feat(tenants): arka_aim_seed addon + era_busana provisioning + apply_updates.sh"
         }
@@ -213,12 +213,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "4390666b",
+          "sha": "4390666",
           "date": "2026-08-04",
           "subject": "feat(arkaaim): show the CNY residual and rate in the Register Payment popup"
         }
@@ -237,42 +237,42 @@
       "change_count": 11,
       "changes": [
         {
-          "sha": "00a7efb2",
+          "sha": "00a7efb",
           "date": "2026-09-08",
           "subject": "feat(arkaaim): let the client write down how overhead is spread across events (#229)"
         },
         {
-          "sha": "24005d7f",
+          "sha": "24005d7",
           "date": "2026-09-08",
           "subject": "feat(arkaaim): carry the event from the customer sale through to AIM, with an analytic account per event (#221)"
         },
         {
-          "sha": "2546f070",
+          "sha": "2546f07",
           "date": "2026-09-04",
           "subject": "feat(arka): label the settlement down-payment deduction line (#209)"
         },
         {
-          "sha": "827b1154",
+          "sha": "827b115",
           "date": "2026-08-05",
           "subject": "feat(arka): carry event detail onto the down-payment invoice line"
         },
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "f3456302",
+          "sha": "f345630",
           "date": "2026-08-04",
           "subject": "feat(arka): label DP invoice lines with the products, not \"Down payment\""
         },
         {
-          "sha": "2b1b0968",
+          "sha": "2b1b096",
           "date": "2026-07-21",
           "subject": "feat(arkaaim): event description block on SO lines + product name & bank on PDFs"
         },
         {
-          "sha": "c5260748",
+          "sha": "c526074",
           "date": "2026-07-17",
           "subject": "style: ruff-format four files that were formatted at the wrong line length"
         }
@@ -291,22 +291,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "62b4b5db",
+          "sha": "62b4b5d",
           "date": "2026-08-18",
           "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
         },
         {
-          "sha": "3b2f15d9",
+          "sha": "3b2f15d",
           "date": "2026-07-09",
           "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         },
         {
-          "sha": "b34767af",
+          "sha": "b34767a",
           "date": "2026-07-04",
           "subject": "feat(levis): FA 6-category seed, Journal Scrap batch, MDR & BIN config"
         },
         {
-          "sha": "237cd9f8",
+          "sha": "237cd9f",
           "date": "2026-07-03",
           "subject": "feat(levis): payment vouchers + journal billing + fixed-asset revaluation accounts"
         }
@@ -325,17 +325,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "889ce243",
+          "sha": "889ce24",
           "date": "2026-08-28",
           "subject": "feat(levis): prove a settlement against the receipts it paid (#198)"
         },
         {
-          "sha": "49c9eff9",
+          "sha": "49c9eff",
           "date": "2026-08-11",
           "subject": "feat(levis): give bank matching a full page instead of a modal (#134)"
         },
         {
-          "sha": "36924078",
+          "sha": "3692407",
           "date": "2026-08-11",
           "subject": "feat(levis): match a bank settlement to one store's POS tenders, net of MDR (#131)"
         }
@@ -354,12 +354,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "816c9463",
+          "sha": "816c946",
           "date": "2026-08-04",
           "subject": "feat(levis): gate product category changes behind Finance approval"
         }
@@ -378,42 +378,42 @@
       "change_count": 53,
       "changes": [
         {
-          "sha": "17200d43",
+          "sha": "17200d4",
           "date": "2026-09-04",
           "subject": "feat(levis): make a repeated SKU on a purchase order say so out loud (#211)"
         },
         {
-          "sha": "9742a004",
+          "sha": "9742a00",
           "date": "2026-09-04",
           "subject": "feat(levis): recognise COGS when a goods receipt reveals the cost (#210)"
         },
         {
-          "sha": "889ce243",
+          "sha": "889ce24",
           "date": "2026-08-28",
           "subject": "feat(levis): prove a settlement against the receipts it paid (#198)"
         },
         {
-          "sha": "e0f5965d",
+          "sha": "e0f5965",
           "date": "2026-08-19",
           "subject": "feat(levis): the payment voucher names every bill it settles, with the amount applied to each (#184)"
         },
         {
-          "sha": "2653a4b8",
+          "sha": "2653a4b",
           "date": "2026-08-18",
           "subject": "feat(levis): batch menengah sheet after-go-live — filter status bill, kolom store, daftar bill di payment, jurnal sales return (#176)"
         },
         {
-          "sha": "62b4b5db",
+          "sha": "62b4b5d",
           "date": "2026-08-18",
           "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
         },
         {
-          "sha": "5021153b",
+          "sha": "5021153",
           "date": "2026-08-13",
           "subject": "feat(levis): read NFC settlements off the BCA narrative (#168)"
         },
         {
-          "sha": "d45b75b6",
+          "sha": "d45b75b",
           "date": "2026-08-12",
           "subject": "feat(levis): clear the POS receivable on the statement line, not beside it (#167)"
         }
@@ -432,12 +432,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "e0b4ddf9",
+          "sha": "e0b4ddf",
           "date": "2026-08-12",
           "subject": "fix(levis): link the store cash journal, not just the purchase one (#160)"
         },
         {
-          "sha": "c854c713",
+          "sha": "c854c71",
           "date": "2026-08-11",
           "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
@@ -456,42 +456,42 @@
       "change_count": 19,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "64b3a4c3",
+          "sha": "64b3a4c",
           "date": "2026-08-04",
           "subject": "fix(manifests): restore the Notes heading broken by the RST sweep"
         },
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "17279130",
+          "sha": "1727913",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "9984c97e",
+          "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         }
@@ -510,42 +510,42 @@
       "change_count": 12,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "6df1c664",
+          "sha": "6df1c66",
           "date": "2026-06-10",
           "subject": "fix(reports): unambiguous Indonesian long date format (e.g. \"9 Juni 2026\")"
         },
         {
-          "sha": "3f21e158",
+          "sha": "3f21e15",
           "date": "2026-06-10",
           "subject": "fix(reports): table-based layout for wkhtmltopdf PDF reports"
         },
         {
-          "sha": "a53c59ee",
+          "sha": "a53c59e",
           "date": "2026-05-23",
           "subject": "fix(addons): drop top-level `from . import tests` (Odoo 19 anti-pattern) (#22)"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         }
@@ -564,42 +564,42 @@
       "change_count": 15,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "c5260748",
+          "sha": "c526074",
           "date": "2026-07-17",
           "subject": "style: ruff-format four files that were formatted at the wrong line length"
         },
         {
-          "sha": "0e89d2c6",
+          "sha": "0e89d2c",
           "date": "2026-07-17",
           "subject": "feat(reports,arka): port /opt-only runtime work onto feat/industry-packs"
         },
         {
-          "sha": "3f3c749c",
+          "sha": "3f3c749",
           "date": "2026-07-08",
           "subject": "fix(sast): use rule-level semgrep exclusions (nosemgrep not honored by CI agent) (#52)"
         },
         {
-          "sha": "03a07f36",
+          "sha": "03a07f3",
           "date": "2026-07-07",
           "subject": "fix(sast): retune custom semgrep rules — clear the 316 sast-python findings (#51)"
         },
         {
-          "sha": "dab7f37e",
+          "sha": "dab7f37",
           "date": "2026-07-07",
           "subject": "fix(pdp): stop audit INSERT from poisoning business txns + heal stale schema (#45)"
         }
@@ -618,42 +618,42 @@
       "change_count": 10,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "7665d3ef",
+          "sha": "7665d3e",
           "date": "2026-05-22",
           "subject": "ci/lint: apply pre-commit mechanical fixes (trailing-whitespace + EOF newlines)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "c86cb45a",
+          "sha": "c86cb45",
           "date": "2026-05-19",
           "subject": "Tax & PDP compliance: PMK-131 seed, Bupot Unifikasi, PPh23 withholding engine, PDP masking expansion"
         }
@@ -672,42 +672,42 @@
       "change_count": 10,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "c86cb45a",
+          "sha": "c86cb45",
           "date": "2026-05-19",
           "subject": "Tax & PDP compliance: PMK-131 seed, Bupot Unifikasi, PPh23 withholding engine, PDP masking expansion"
         }
@@ -726,42 +726,42 @@
       "change_count": 8,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "c86cb45a",
+          "sha": "c86cb45",
           "date": "2026-05-19",
           "subject": "Tax & PDP compliance: PMK-131 seed, Bupot Unifikasi, PPh23 withholding engine, PDP masking expansion"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -780,42 +780,42 @@
       "change_count": 15,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "447eba34",
+          "sha": "447eba3",
           "date": "2026-06-11",
           "subject": "fix(custom_pdp_masking): make masked fields editable + fix reveal RPC"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "3bcc087d",
+          "sha": "3bcc087",
           "date": "2026-05-28",
           "subject": "feat(custom_pdp_masking): partner masking view + registry hook tightening"
         },
         {
-          "sha": "a53c59ee",
+          "sha": "a53c59e",
           "date": "2026-05-23",
           "subject": "fix(addons): drop top-level `from . import tests` (Odoo 19 anti-pattern) (#22)"
         }
@@ -834,42 +834,42 @@
       "change_count": 9,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "c86cb45a",
+          "sha": "c86cb45",
           "date": "2026-05-19",
           "subject": "Tax & PDP compliance: PMK-131 seed, Bupot Unifikasi, PPh23 withholding engine, PDP masking expansion"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         }
@@ -888,42 +888,42 @@
       "change_count": 9,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "962c0b75",
+          "sha": "962c0b7",
           "date": "2026-05-23",
           "subject": "fix(addons): declare 2 more missing comodel deps (audit sweep) (#24)"
         },
         {
-          "sha": "a53c59ee",
+          "sha": "a53c59e",
           "date": "2026-05-23",
           "subject": "fix(addons): drop top-level `from . import tests` (Odoo 19 anti-pattern) (#22)"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "fafb8bab",
+          "sha": "fafb8ba",
           "date": "2026-05-22",
           "subject": "modules: Odoo 19 compat patches across accounting + witholding"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -942,27 +942,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "e2f69753",
+          "sha": "e2f6975",
           "date": "2026-07-30",
           "subject": "feat(ppob): Digiflazz biller adapter, SLA targets & throughput, Eraspace architecture revision"
         },
         {
-          "sha": "8f2cb320",
+          "sha": "8f2cb32",
           "date": "2026-07-30",
           "subject": "feat(vas-pmo): project & task management for the Product Owner VAS team"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "56b0408d",
+          "sha": "56b0408",
           "date": "2026-07-22",
           "subject": "feat(hub_console): register the ESB modules in the F&B industry pack"
         },
         {
-          "sha": "03327708",
+          "sha": "0332770",
           "date": "2026-07-16",
           "subject": "refactor(scaffolding): group modules and docs by tier and project"
         }
@@ -981,17 +981,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "03327708",
+          "sha": "0332770",
           "date": "2026-07-16",
           "subject": "refactor(scaffolding): group modules and docs by tier and project"
         }
@@ -1010,12 +1010,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "2212615b",
+          "sha": "2212615",
           "date": "2026-08-04",
           "subject": "feat(provisioning): install custom_currency_nbsp on every new tenant"
         },
         {
-          "sha": "03327708",
+          "sha": "0332770",
           "date": "2026-07-16",
           "subject": "refactor(scaffolding): group modules and docs by tier and project"
         }
@@ -1034,12 +1034,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "03327708",
+          "sha": "0332770",
           "date": "2026-07-16",
           "subject": "refactor(scaffolding): group modules and docs by tier and project"
         }
@@ -1058,42 +1058,42 @@
       "change_count": 11,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "17279130",
+          "sha": "1727913",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         }
@@ -1112,42 +1112,42 @@
       "change_count": 14,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "17279130",
+          "sha": "1727913",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "731251ec",
+          "sha": "731251e",
           "date": "2026-05-29",
           "subject": "fix(addons): add missing app icons + retie Custom Platform settings to custom_core"
         },
         {
-          "sha": "c56e78fe",
+          "sha": "c56e78f",
           "date": "2026-05-28",
           "subject": "feat(custom_ai_bridge): expand provider config in res.config.settings"
         }
@@ -1166,42 +1166,42 @@
       "change_count": 18,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "17279130",
+          "sha": "1727913",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         }
@@ -1220,42 +1220,42 @@
       "change_count": 12,
       "changes": [
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "17279130",
+          "sha": "1727913",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "07bdd147",
+          "sha": "07bdd14",
           "date": "2026-07-27",
           "subject": "feat(retail_import): MDM product-master REST API + X24DN pending-SKU replay"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "731251ec",
+          "sha": "731251e",
           "date": "2026-05-29",
           "subject": "fix(addons): add missing app icons + retie Custom Platform settings to custom_core"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         }
@@ -1274,7 +1274,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "7f108093",
+          "sha": "7f10809",
           "date": "2026-08-04",
           "subject": "fix(reports): drop NBSP from money, add BOM to CSV exports"
         }
@@ -1293,42 +1293,42 @@
       "change_count": 13,
       "changes": [
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "aa8ee199",
+          "sha": "aa8ee19",
           "date": "2026-07-17",
           "subject": "fix(hht_bridge): ship the Set polyfill the shell's own code depends on"
         },
         {
-          "sha": "fa6654ab",
+          "sha": "fa6654a",
           "date": "2026-07-17",
           "subject": "feat(hht_bridge): POST shell boot failures to the server"
         },
         {
-          "sha": "63e57085",
+          "sha": "63e5708",
           "date": "2026-07-17",
           "subject": "fix(hht_bridge): stop the service worker pinning a stale shell, and make boot failures legible"
         },
         {
-          "sha": "674dfe1b",
+          "sha": "674dfe1",
           "date": "2026-07-17",
           "subject": "fix(hht_bridge): boot the PWA shell at /hht/ instead of a blank screen"
         },
         {
-          "sha": "e72f5301",
+          "sha": "e72f530",
           "date": "2026-06-12",
           "subject": "feat: multi-barcode per variant (alternate GTINs), one shared inventory"
         },
         {
-          "sha": "9714b5bc",
+          "sha": "9714b5b",
           "date": "2026-05-23",
           "subject": "fix(addons): add missing custom_super_admin dep to 2 modules (#23)"
         }
@@ -1347,12 +1347,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "28717825",
+          "sha": "2871782",
           "date": "2026-05-28",
           "subject": "feat(custom_home_console): new module for hub portal landing"
         }
@@ -1371,7 +1371,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "c854c713",
+          "sha": "c854c71",
           "date": "2026-08-11",
           "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
@@ -1390,22 +1390,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "9984c97e",
+          "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         },
         {
-          "sha": "3969e436",
+          "sha": "3969e43",
           "date": "2026-06-12",
           "subject": "feat(custom_product_barcode): Alternate Barcodes tab on product variant form"
         },
         {
-          "sha": "93ea9ff9",
+          "sha": "93ea9ff",
           "date": "2026-06-12",
           "subject": "fix(custom_product_barcode): use models.Constraint (Odoo 19) for (product_id,barcode) unique"
         },
         {
-          "sha": "e72f5301",
+          "sha": "e72f530",
           "date": "2026-06-12",
           "subject": "feat: multi-barcode per variant (alternate GTINs), one shared inventory"
         }
@@ -1424,7 +1424,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "c854c713",
+          "sha": "c854c71",
           "date": "2026-08-11",
           "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
@@ -1443,7 +1443,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "49f5ee4c",
+          "sha": "49f5ee4",
           "date": "2026-06-02",
           "subject": "fix(bast): real sequence + working SO/rental BAST generation (#28)"
         }
@@ -1462,12 +1462,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "cabe1970",
+          "sha": "cabe197",
           "date": "2026-07-17",
           "subject": "fix(sast): silence four semgrep findings that are contract or false positive"
         },
         {
-          "sha": "03327708",
+          "sha": "0332770",
           "date": "2026-07-16",
           "subject": "refactor(scaffolding): group modules and docs by tier and project"
         }
@@ -1486,17 +1486,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "7e9d66bd",
+          "sha": "7e9d66b",
           "date": "2026-07-24",
           "subject": "fix(ee_gap): green CI for accounting trio (lint, sast, knowledge)"
         },
         {
-          "sha": "0f30ea01",
+          "sha": "0f30ea0",
           "date": "2026-07-24",
           "subject": "feat(ee_gap): accounting EE-gap trio — reconcile UI, batch payments, deferred entries"
         }
@@ -1515,12 +1515,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "7e9d66bd",
+          "sha": "7e9d66b",
           "date": "2026-07-24",
           "subject": "fix(ee_gap): green CI for accounting trio (lint, sast, knowledge)"
         },
         {
-          "sha": "0f30ea01",
+          "sha": "0f30ea0",
           "date": "2026-07-24",
           "subject": "feat(ee_gap): accounting EE-gap trio — reconcile UI, batch payments, deferred entries"
         }
@@ -1539,22 +1539,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "5ebc32fe",
+          "sha": "5ebc32f",
           "date": "2026-08-11",
           "subject": "docs(levis): July 2026 clearing — posting path, decision workbooks, reconciliation guards (#127)"
         },
         {
-          "sha": "36924078",
+          "sha": "3692407",
           "date": "2026-08-11",
           "subject": "feat(levis): match a bank settlement to one store's POS tenders, net of MDR (#131)"
         },
         {
-          "sha": "7e9d66bd",
+          "sha": "7e9d66b",
           "date": "2026-07-24",
           "subject": "fix(ee_gap): green CI for accounting trio (lint, sast, knowledge)"
         },
         {
-          "sha": "0f30ea01",
+          "sha": "0f30ea0",
           "date": "2026-07-24",
           "subject": "feat(ee_gap): accounting EE-gap trio — reconcile UI, batch payments, deferred entries"
         }
@@ -1573,42 +1573,42 @@
       "change_count": 25,
       "changes": [
         {
-          "sha": "cde92d68",
+          "sha": "cde92d6",
           "date": "2026-08-30",
           "subject": "feat(assets): gabungkan aset per-unit lama menjadi satu aset berjumlah (#204)"
         },
         {
-          "sha": "c9c500ff",
+          "sha": "c9c500f",
           "date": "2026-08-30",
           "subject": "feat(assets): satu nomor aset untuk banyak unit, dan cara mengeluarkan yang rusak (#203)"
         },
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "d1c89520",
+          "sha": "d1c8952",
           "date": "2026-07-30",
           "subject": "feat(assets): book one monthly depreciation entry instead of one per asset"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "3b2f15d9",
+          "sha": "3b2f15d",
           "date": "2026-07-09",
           "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         },
         {
-          "sha": "9984c97e",
+          "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         }
@@ -1627,42 +1627,42 @@
       "change_count": 18,
       "changes": [
         {
-          "sha": "3871ab47",
+          "sha": "3871ab4",
           "date": "2026-08-13",
           "subject": "feat(accounting): show the lock exceptions that outrank the lock dates (#169)"
         },
         {
-          "sha": "926e2c7f",
+          "sha": "926e2c7",
           "date": "2026-08-12",
           "subject": "fix(accounting): give the lock-date warning a button that actually opens (#166)"
         },
         {
-          "sha": "d63a9032",
+          "sha": "d63a903",
           "date": "2026-08-05",
           "subject": "feat(accounting): Lock Dates wizard, and stop the XStore report leaking to non-POS tenants"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "745825f5",
+          "sha": "745825f",
           "date": "2026-07-21",
           "subject": "feat(tax): DJP Coretax import-file exporter (e-Faktur FK/OF, Retur, Bupot)"
         },
         {
-          "sha": "17667f76",
+          "sha": "17667f7",
           "date": "2026-07-04",
           "subject": "feat(accounting): block duplicate bill reference at save, not only confirm"
         },
         {
-          "sha": "d5d2ad20",
+          "sha": "d5d2ad2",
           "date": "2026-07-03",
           "subject": "feat(tax): Indonesian tax reports — Bupot, Faktur Pajak, SPT PPN, Coretax submission"
         },
         {
-          "sha": "2c0ca58e",
+          "sha": "2c0ca58",
           "date": "2026-05-28",
           "subject": "feat(custom_accounting_full): PSAK template data + new accounting addons"
         }
@@ -1681,42 +1681,42 @@
       "change_count": 8,
       "changes": [
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "7665d3ef",
+          "sha": "7665d3e",
           "date": "2026-05-22",
           "subject": "ci/lint: apply pre-commit mechanical fixes (trailing-whitespace + EOF newlines)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "fafb8bab",
+          "sha": "fafb8ba",
           "date": "2026-05-22",
           "subject": "modules: Odoo 19 compat patches across accounting + witholding"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "124861a9",
+          "sha": "124861a",
           "date": "2026-05-19",
           "subject": "Add financial modules: fixed assets, recurring journal, reports engine; extend accounting_full"
         }
@@ -1735,42 +1735,42 @@
       "change_count": 53,
       "changes": [
         {
-          "sha": "bde8a4e8",
+          "sha": "bde8a4e",
           "date": "2026-08-26",
           "subject": "feat(reports): rincian PPN Keluaran Digunggung sampai nomor transaksi (#195)"
         },
         {
-          "sha": "3e7fdd6f",
+          "sha": "3e7fdd6",
           "date": "2026-08-20",
           "subject": "feat(reports): rekap PPN Keluaran Digunggung untuk PKP Pedagang Eceran (#190)"
         },
         {
-          "sha": "49c8f74f",
+          "sha": "49c8f74",
           "date": "2026-08-19",
           "subject": "feat(reports): split the Purchase Register into Trade and Non-Trade (#183)"
         },
         {
-          "sha": "c854c713",
+          "sha": "c854c71",
           "date": "2026-08-11",
           "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         },
         {
-          "sha": "53afaa51",
+          "sha": "53afaa5",
           "date": "2026-08-05",
           "subject": "fix(reports): pin the XStore menu so an upgrade cannot un-archive it"
         },
         {
-          "sha": "c4822199",
+          "sha": "c482219",
           "date": "2026-08-05",
           "subject": "docs(reports): explain AR Aging Export in MODULE_KNOWLEDGE"
         },
         {
-          "sha": "4fc65aa5",
+          "sha": "4fc65aa",
           "date": "2026-08-05",
           "subject": "feat(reports): AR Aging Export with day-precise overdue buckets"
         },
         {
-          "sha": "d63a9032",
+          "sha": "d63a903",
           "date": "2026-08-05",
           "subject": "feat(accounting): Lock Dates wizard, and stop the XStore report leaking to non-POS tenants"
         }
@@ -1789,22 +1789,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "03327708",
+          "sha": "0332770",
           "date": "2026-07-16",
           "subject": "refactor(scaffolding): group modules and docs by tier and project"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         }
@@ -1823,32 +1823,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "268c1463",
+          "sha": "268c146",
           "date": "2026-05-22",
           "subject": "custom_ai_features: update MODULE_KNOWLEDGE.md for 0.1.1"
         },
         {
-          "sha": "df886f07",
+          "sha": "df886f0",
           "date": "2026-05-22",
           "subject": "custom_ai_features: restore Ask AI cog actions + grant AI groups to internal users"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         }
@@ -1867,32 +1867,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -1911,42 +1911,42 @@
       "change_count": 11,
       "changes": [
         {
-          "sha": "4d4422c2",
+          "sha": "4d4422c",
           "date": "2026-07-29",
           "subject": "fix(approval-engine): purchase.order.line UoM field is product_uom_id"
         },
         {
-          "sha": "4c7de137",
+          "sha": "4c7de13",
           "date": "2026-07-29",
           "subject": "fix(approval-engine): res.groups.users is user_ids on Odoo 19"
         },
         {
-          "sha": "9984c97e",
+          "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         },
         {
-          "sha": "5c1e7cd0",
+          "sha": "5c1e7cd",
           "date": "2026-06-10",
           "subject": "chore(ee_gap,compliance): commit pre-existing working-tree changes"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "ee0368f8",
+          "sha": "ee0368f",
           "date": "2026-05-22",
           "subject": "Fix P3 residuals: 22 more tests pass, only 1 PO-gate residual remaining"
         }
@@ -1965,42 +1965,42 @@
       "change_count": 8,
       "changes": [
         {
-          "sha": "6d80f0d6",
+          "sha": "6d80f0d",
           "date": "2026-09-08",
           "subject": "docs(assets): say why the service guard sits where it sits (#223)"
         },
         {
-          "sha": "e4d5c4c0",
+          "sha": "e4d5c4c",
           "date": "2026-09-08",
           "subject": "feat(arkaaim): Trade / Non-Trade purchases and Transfer to Asset from a Non-Trade receipt (#220)"
         },
         {
-          "sha": "74dc1ab4",
+          "sha": "74dc1ab",
           "date": "2026-09-08",
           "subject": "feat(purchase): receive a service on a goods receipt (#219)"
         },
         {
-          "sha": "cde92d68",
+          "sha": "cde92d6",
           "date": "2026-08-30",
           "subject": "feat(assets): gabungkan aset per-unit lama menjadi satu aset berjumlah (#204)"
         },
         {
-          "sha": "c9c500ff",
+          "sha": "c9c500f",
           "date": "2026-08-30",
           "subject": "feat(assets): satu nomor aset untuk banyak unit, dan cara mengeluarkan yang rusak (#203)"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "2c0ca58e",
+          "sha": "2c0ca58",
           "date": "2026-05-28",
           "subject": "feat(custom_accounting_full): PSAK template data + new accounting addons"
         }
@@ -2019,12 +2019,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "dab8ba97",
+          "sha": "dab8ba9",
           "date": "2026-09-08",
           "subject": "fix(assets): keep lifecycle destinations inside the asset's own company (#232)"
         },
         {
-          "sha": "d158ebe7",
+          "sha": "d158ebe",
           "date": "2026-09-08",
           "subject": "feat(assets): damage, missing, repair and replacement lifecycle on the fixed-asset register (#222)"
         }
@@ -2043,12 +2043,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "d158ebe7",
+          "sha": "d158ebe",
           "date": "2026-09-08",
           "subject": "feat(assets): damage, missing, repair and replacement lifecycle on the fixed-asset register (#222)"
         },
         {
-          "sha": "8c3f352a",
+          "sha": "8c3f352",
           "date": "2026-09-08",
           "subject": "feat(assets): track a fixed asset as a serial in the warehouse, at zero value (#218)"
         }
@@ -2067,37 +2067,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "660a2d85",
+          "sha": "660a2d8",
           "date": "2026-07-08",
           "subject": "feat(sast): enforce p/python + p/owasp-top-ten; drive all 59 findings to 0 (#53)"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2116,42 +2116,42 @@
       "change_count": 9,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "f3bc8db5",
+          "sha": "f3bc8db",
           "date": "2026-07-25",
           "subject": "feat(bank_import): XLS/XLSX support + 3 bank formats + accounting date follows transaction date"
         },
         {
-          "sha": "e41f2a88",
+          "sha": "e41f2a8",
           "date": "2026-07-24",
           "subject": "fix(bank_import): accept DD/MM/YYYY dates in BCA corporate CSV variant"
         },
         {
-          "sha": "96280c06",
+          "sha": "96280c0",
           "date": "2026-07-24",
           "subject": "feat(bank_import): auto-detect BCA corporate (KlikBCA Bisnis) CSV (#67)"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2170,42 +2170,42 @@
       "change_count": 10,
       "changes": [
         {
-          "sha": "1fd93a41",
+          "sha": "1fd93a4",
           "date": "2026-07-22",
           "subject": "style: clear the branch's repo-wide ruff debt; refresh two WMS knowledge files"
         },
         {
-          "sha": "8ed5e9d3",
+          "sha": "8ed5e9d",
           "date": "2026-07-22",
           "subject": "style(wms): apply ruff 0.15.14 format + drop an unused import"
         },
         {
-          "sha": "f59e37da",
+          "sha": "f59e37d",
           "date": "2026-07-22",
           "subject": "feat(wms): rewire putaway onto native Odoo 19 slotting + inbound QC, docs, host integration"
         },
         {
-          "sha": "e72f5301",
+          "sha": "e72f530",
           "date": "2026-06-12",
           "subject": "feat: multi-barcode per variant (alternate GTINs), one shared inventory"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         }
@@ -2224,42 +2224,42 @@
       "change_count": 11,
       "changes": [
         {
-          "sha": "32873ec7",
+          "sha": "32873ec",
           "date": "2026-09-08",
           "subject": "fix(efaktur): file the down payment and the settlement as separate fakturs (#228)"
         },
         {
-          "sha": "24c3f7c7",
+          "sha": "24c3f7c",
           "date": "2026-09-04",
           "subject": "fix(coretax): report a deducted down payment in the FK block, not as a negative OF row (#213)"
         },
         {
-          "sha": "c402dc4e",
+          "sha": "c402dc4",
           "date": "2026-08-19",
           "subject": "fix(coretax): FK REFERENSI carries the invoice number, not the sales order (#189)"
         },
         {
-          "sha": "af714e70",
+          "sha": "af714e7",
           "date": "2026-08-19",
           "subject": "fix(coretax): flag a faktur uang muka as one instead of hard-coding FG_UANG_MUKA to 0 (#187)"
         },
         {
-          "sha": "c8248721",
+          "sha": "c824872",
           "date": "2026-08-19",
           "subject": "feat(coretax): file a plain 11% PPN as 12% on a nilai-lain base, and keep vat/NPWP one number (#185)"
         },
         {
-          "sha": "ca44af50",
+          "sha": "ca44af5",
           "date": "2026-08-19",
           "subject": "fix(coretax): say which company the missing faktur are actually in (#180)"
         },
         {
-          "sha": "43281e24",
+          "sha": "43281e2",
           "date": "2026-08-05",
           "subject": "feat(coretax): export e-Faktur Keluaran (FK/OF) per invoice and per selection (#95)"
         },
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         }
@@ -2278,22 +2278,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         }
@@ -2312,37 +2312,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2361,37 +2361,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "e6cd9dfb",
+          "sha": "e6cd9df",
           "date": "2026-05-28",
           "subject": "chore(custom_dashboards, custom_hub_console): menu + AI usage view tweaks"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2410,27 +2410,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2449,32 +2449,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "1da4d76b",
+          "sha": "1da4d76",
           "date": "2026-05-24",
           "subject": "feat(custom_documents): add Download button on document form"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -2493,22 +2493,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2527,27 +2527,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2566,32 +2566,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2610,7 +2610,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "eaff5532",
+          "sha": "eaff553",
           "date": "2026-07-29",
           "subject": "feat(efn): ESB Core connector + F&B stock ops vertical"
         }
@@ -2629,32 +2629,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "2f567f24",
+          "sha": "2f567f2",
           "date": "2026-05-23",
           "subject": "fix(addons): wire up dead model files + complete PSAK COA template (#25)"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2673,22 +2673,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2707,42 +2707,42 @@
       "change_count": 10,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "285e01aa",
+          "sha": "285e01a",
           "date": "2026-07-29",
           "subject": "fix(expenses): actually seed the mileage product"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "5c1e7cd0",
+          "sha": "5c1e7cd",
           "date": "2026-06-10",
           "subject": "chore(ee_gap,compliance): commit pre-existing working-tree changes"
         },
         {
-          "sha": "c85338ef",
+          "sha": "c85338e",
           "date": "2026-05-28",
           "subject": "feat(custom_expenses): seed mileage expense product"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         }
@@ -2761,32 +2761,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -2805,22 +2805,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "3b2f15d9",
+          "sha": "3b2f15d",
           "date": "2026-07-09",
           "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         },
         {
-          "sha": "062d173c",
+          "sha": "062d173",
           "date": "2026-07-03",
           "subject": "feat(finance-portal): SAP engagement layer + budget control + SAP/HRIS bridge + Keycloak SSO"
         }
@@ -2839,27 +2839,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "bd73d999",
+          "sha": "bd73d99",
           "date": "2026-07-29",
           "subject": "fix(finance-portal): drop expand/string from search view group-by"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "3b2f15d9",
+          "sha": "3b2f15d",
           "date": "2026-07-09",
           "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         },
         {
-          "sha": "062d173c",
+          "sha": "062d173",
           "date": "2026-07-03",
           "subject": "feat(finance-portal): SAP engagement layer + budget control + SAP/HRIS bridge + Keycloak SSO"
         }
@@ -2878,17 +2878,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "bd73d999",
+          "sha": "bd73d99",
           "date": "2026-07-29",
           "subject": "fix(finance-portal): drop expand/string from search view group-by"
         },
         {
-          "sha": "3b2f15d9",
+          "sha": "3b2f15d",
           "date": "2026-07-09",
           "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         },
         {
-          "sha": "062d173c",
+          "sha": "062d173",
           "date": "2026-07-03",
           "subject": "feat(finance-portal): SAP engagement layer + budget control + SAP/HRIS bridge + Keycloak SSO"
         }
@@ -2907,12 +2907,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "c854c713",
+          "sha": "c854c71",
           "date": "2026-08-11",
           "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         },
         {
-          "sha": "062d173c",
+          "sha": "062d173",
           "date": "2026-07-03",
           "subject": "feat(finance-portal): SAP engagement layer + budget control + SAP/HRIS bridge + Keycloak SSO"
         }
@@ -2931,27 +2931,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -2970,37 +2970,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "2f567f24",
+          "sha": "2f567f2",
           "date": "2026-05-23",
           "subject": "fix(addons): wire up dead model files + complete PSAK COA template (#25)"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -3019,22 +3019,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -3053,37 +3053,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -3102,27 +3102,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -3141,37 +3141,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "5c1e7cd0",
+          "sha": "5c1e7cd",
           "date": "2026-06-10",
           "subject": "chore(ee_gap,compliance): commit pre-existing working-tree changes"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -3190,42 +3190,42 @@
       "change_count": 9,
       "changes": [
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "fe5db7a8",
+          "sha": "fe5db7a",
           "date": "2026-05-21",
           "subject": "Fix P0-P2 demo-blocking test failures (Odoo 19 port residuals)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         }
@@ -3244,27 +3244,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -3283,22 +3283,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "3d24bf00",
+          "sha": "3d24bf0",
           "date": "2026-07-09",
           "subject": "fix(security): don't log the HC API's error text; drop stray shebang"
         },
         {
-          "sha": "3b2f15d9",
+          "sha": "3b2f15d",
           "date": "2026-07-09",
           "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         },
         {
-          "sha": "b510e46f",
+          "sha": "b510e46",
           "date": "2026-07-09",
           "subject": "fix(security): stop logging NIK in clear text; run finance-sap-bridge non-root"
         },
         {
-          "sha": "88ca59a7",
+          "sha": "88ca59a",
           "date": "2026-07-03",
           "subject": "feat(auth): Keycloak SSO for Odoo login + HR employee sync"
         }
@@ -3317,42 +3317,42 @@
       "change_count": 8,
       "changes": [
         {
-          "sha": "b20428a6",
+          "sha": "b20428a",
           "date": "2026-09-02",
           "subject": "fix(intercompany): carry the PO header note and section lines to the mirrored SO (#206)"
         },
         {
-          "sha": "61d1a7a9",
+          "sha": "61d1a7a",
           "date": "2026-07-29",
           "subject": "fix(intercompany): Odoo 19 field names on the mirrored SO line"
         },
         {
-          "sha": "9984c97e",
+          "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         },
         {
-          "sha": "6697d1f4",
+          "sha": "6697d1f",
           "date": "2026-07-02",
           "subject": "docs(modules): correct MODULE_KNOWLEDGE.md drafts against source"
         },
         {
-          "sha": "a2fe99da",
+          "sha": "a2fe99d",
           "date": "2026-07-02",
           "subject": "docs(modules): regenerate MODULE_KNOWLEDGE.md for 7 drifted modules"
         },
         {
-          "sha": "d55bc0eb",
+          "sha": "d55bc0e",
           "date": "2026-07-01",
           "subject": "feat(rental,intercompany): drone asset-loan flow via existing modules"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "2c0ca58e",
+          "sha": "2c0ca58",
           "date": "2026-05-28",
           "subject": "feat(custom_accounting_full): PSAK template data + new accounting addons"
         }
@@ -3371,27 +3371,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -3410,32 +3410,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "a53c59ee",
+          "sha": "a53c59e",
           "date": "2026-05-23",
           "subject": "fix(addons): drop top-level `from . import tests` (Odoo 19 anti-pattern) (#22)"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -3454,37 +3454,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "a53c59ee",
+          "sha": "a53c59e",
           "date": "2026-05-23",
           "subject": "fix(addons): drop top-level `from . import tests` (Odoo 19 anti-pattern) (#22)"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -3503,27 +3503,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -3542,37 +3542,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -3591,32 +3591,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -3635,32 +3635,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -3679,7 +3679,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "c854c713",
+          "sha": "c854c71",
           "date": "2026-08-11",
           "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
@@ -3698,7 +3698,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "c854c713",
+          "sha": "c854c71",
           "date": "2026-08-11",
           "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
@@ -3717,7 +3717,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "c854c713",
+          "sha": "c854c71",
           "date": "2026-08-11",
           "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
@@ -3736,12 +3736,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "effee9da",
+          "sha": "effee9d",
           "date": "2026-09-08",
           "subject": "feat(arkaaim): put the real serial in Serial Number, and let people search it (#217)"
         },
         {
-          "sha": "0e89d2c6",
+          "sha": "0e89d2c",
           "date": "2026-07-17",
           "subject": "feat(reports,arka): port /opt-only runtime work onto feat/industry-packs"
         }
@@ -3760,12 +3760,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "d0ba82e5",
+          "sha": "d0ba82e",
           "date": "2026-08-04",
           "subject": "feat(account): allow admin fees when paying several bills at once (#83)"
         },
         {
-          "sha": "73b07a41",
+          "sha": "73b07a4",
           "date": "2026-08-04",
           "subject": "feat(account): multi-COA admin fees on the Register Payment wizard (#73)"
         }
@@ -3784,7 +3784,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "eea3d868",
+          "sha": "eea3d86",
           "date": "2026-09-04",
           "subject": "feat(payment): type the dealt exchange rate on a payment (#214)"
         }
@@ -3803,42 +3803,42 @@
       "change_count": 8,
       "changes": [
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "660a2d85",
+          "sha": "660a2d8",
           "date": "2026-07-08",
           "subject": "feat(sast): enforce p/python + p/owasp-top-ten; drive all 59 findings to 0 (#53)"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "2f567f24",
+          "sha": "2f567f2",
           "date": "2026-05-23",
           "subject": "fix(addons): wire up dead model files + complete PSAK COA template (#25)"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -3857,7 +3857,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "0443e8c7",
+          "sha": "0443e8c",
           "date": "2026-08-10",
           "subject": "fix(arkaaim): unblock AIM payments and close the finance config gaps behind it (#117)"
         }
@@ -3876,7 +3876,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "0443e8c7",
+          "sha": "0443e8c",
           "date": "2026-08-10",
           "subject": "fix(arkaaim): unblock AIM payments and close the finance config gaps behind it (#117)"
         }
@@ -3895,37 +3895,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "39684f1f",
+          "sha": "39684f1",
           "date": "2026-08-05",
           "subject": "feat(cash-advance): advance types, ceilings, multi-currency, Kartu Uang Muka"
         },
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "1fd93a41",
+          "sha": "1fd93a4",
           "date": "2026-07-22",
           "subject": "style: clear the branch's repo-wide ruff debt; refresh two WMS knowledge files"
         },
         {
-          "sha": "8e871b23",
+          "sha": "8e871b2",
           "date": "2026-07-21",
           "subject": "feat(petty_cash): grant 'Petty Cash / User' to every internal user"
         },
         {
-          "sha": "708b338b",
+          "sha": "708b338",
           "date": "2026-07-21",
           "subject": "feat(petty_cash): identify employee via a dedicated 'Employee' analytic plan"
         },
         {
-          "sha": "dba97acd",
+          "sha": "dba97ac",
           "date": "2026-07-21",
           "subject": "feat(petty_cash): add custom_petty_cash advance→realization→settlement module"
         }
@@ -3944,27 +3944,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -3983,27 +3983,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "3b2f15d9",
+          "sha": "3b2f15d",
           "date": "2026-07-09",
           "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         },
         {
-          "sha": "7453249e",
+          "sha": "7453249",
           "date": "2026-07-04",
           "subject": "feat(po-return): draft return pickings, RTV valuation journal, fix admin-fee install"
         },
         {
-          "sha": "8ccd3aef",
+          "sha": "8ccd3ae",
           "date": "2026-07-03",
           "subject": "feat(purchase): quantity-driven vendor returns with FIFO allocation (custom_po_return)"
         }
@@ -4022,22 +4022,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -4056,7 +4056,7 @@
       "change_count": 1,
       "changes": [
         {
-          "sha": "59addf2f",
+          "sha": "59addf2",
           "date": "2026-08-20",
           "subject": "feat(pos): syarat identitas pembeli sebelum POS order boleh di-invoice (#191)"
         }
@@ -4075,17 +4075,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "7ef00719",
+          "sha": "7ef0071",
           "date": "2026-08-04",
           "subject": "fix(security): clear semgrep — reject NaN quantities, drop %-format SQL"
         },
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "8f2cb320",
+          "sha": "8f2cb32",
           "date": "2026-07-30",
           "subject": "feat(vas-pmo): project & task management for the Product Owner VAS team"
         }
@@ -4104,12 +4104,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "8f2cb320",
+          "sha": "8f2cb32",
           "date": "2026-07-30",
           "subject": "feat(vas-pmo): project & task management for the Product Owner VAS team"
         }
@@ -4128,12 +4128,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "8f2cb320",
+          "sha": "8f2cb32",
           "date": "2026-07-30",
           "subject": "feat(vas-pmo): project & task management for the Product Owner VAS team"
         }
@@ -4152,22 +4152,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "2c5a07d7",
+          "sha": "2c5a07d",
           "date": "2026-08-05",
           "subject": "chore(opt): preserve uncommitted VAS PMO stage work from the deploy checkout (#102)"
         },
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "17279130",
+          "sha": "1727913",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "8f2cb320",
+          "sha": "8f2cb32",
           "date": "2026-07-30",
           "subject": "feat(vas-pmo): project & task management for the Product Owner VAS team"
         }
@@ -4186,37 +4186,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "0dd6d1a1",
+          "sha": "0dd6d1a",
           "date": "2026-05-19",
           "subject": "Vertical-derived hub extensions + bank import"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -4235,17 +4235,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "993f333b",
+          "sha": "993f333",
           "date": "2026-05-28",
           "subject": "fix(queue_job): ship channel_root so dependents can ref it"
         },
         {
-          "sha": "2c0ca58e",
+          "sha": "2c0ca58",
           "date": "2026-05-28",
           "subject": "feat(custom_accounting_full): PSAK template data + new accounting addons"
         }
@@ -4264,32 +4264,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "660a2d85",
+          "sha": "660a2d8",
           "date": "2026-07-08",
           "subject": "feat(sast): enforce p/python + p/owasp-top-ten; drive all 59 findings to 0 (#53)"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -4308,42 +4308,42 @@
       "change_count": 21,
       "changes": [
         {
-          "sha": "34a196dc",
+          "sha": "34a196d",
           "date": "2026-09-02",
           "subject": "feat(rental): explode a kit BOM into stock moves and BAST lines (#205)"
         },
         {
-          "sha": "7e9d66bd",
+          "sha": "7e9d66b",
           "date": "2026-07-24",
           "subject": "fix(ee_gap): green CI for accounting trio (lint, sast, knowledge)"
         },
         {
-          "sha": "7e9bbde0",
+          "sha": "7e9bbde",
           "date": "2026-07-23",
           "subject": "fix(custom_rental): use type=\"jsonrpc\" on the portal sign route"
         },
         {
-          "sha": "9984c97e",
+          "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         },
         {
-          "sha": "461f12e3",
+          "sha": "461f12e",
           "date": "2026-07-04",
           "subject": "chore: doc note on non-trade expense fallback + module version bumps"
         },
         {
-          "sha": "35fed09a",
+          "sha": "35fed09",
           "date": "2026-07-02",
           "subject": "fix(modules): wire up 3 broken/missing crons"
         },
         {
-          "sha": "6697d1f4",
+          "sha": "6697d1f",
           "date": "2026-07-02",
           "subject": "docs(modules): correct MODULE_KNOWLEDGE.md drafts against source"
         },
         {
-          "sha": "a2fe99da",
+          "sha": "a2fe99d",
           "date": "2026-07-02",
           "subject": "docs(modules): regenerate MODULE_KNOWLEDGE.md for 7 drifted modules"
         }
@@ -4362,17 +4362,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "34a196dc",
+          "sha": "34a196d",
           "date": "2026-09-02",
           "subject": "feat(rental): explode a kit BOM into stock moves and BAST lines (#205)"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "385ac7ed",
+          "sha": "385ac7e",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): add custom_rental sibling addons (bom_explosion, invoicing, quality_hook)"
         }
@@ -4391,17 +4391,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "731251ec",
+          "sha": "731251e",
           "date": "2026-05-29",
           "subject": "fix(addons): add missing app icons + retie Custom Platform settings to custom_core"
         },
         {
-          "sha": "385ac7ed",
+          "sha": "385ac7e",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): add custom_rental sibling addons (bom_explosion, invoicing, quality_hook)"
         }
@@ -4420,12 +4420,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "385ac7ed",
+          "sha": "385ac7e",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): add custom_rental sibling addons (bom_explosion, invoicing, quality_hook)"
         }
@@ -4440,9 +4440,15 @@
       "category": "Sales/Rental",
       "depends": 3,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-09-08",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "f433726",
+          "date": "2026-09-08",
+          "subject": "feat(rental): dispatch the units behind a sales order, and reconcile what comes back (#227)"
+        }
+      ]
     },
     {
       "module": "custom_repairs",
@@ -4457,42 +4463,42 @@
       "change_count": 10,
       "changes": [
         {
-          "sha": "3f3c749c",
+          "sha": "3f3c749",
           "date": "2026-07-08",
           "subject": "fix(sast): use rule-level semgrep exclusions (nosemgrep not honored by CI agent) (#52)"
         },
         {
-          "sha": "03a07f36",
+          "sha": "03a07f3",
           "date": "2026-07-07",
           "subject": "fix(sast): retune custom semgrep rules — clear the 316 sast-python findings (#51)"
         },
         {
-          "sha": "9984c97e",
+          "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         },
         {
-          "sha": "70b62f88",
+          "sha": "70b62f8",
           "date": "2026-07-01",
           "subject": "feat(custom_repairs): reorient to internal asset maintenance"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "2f567f24",
+          "sha": "2f567f2",
           "date": "2026-05-23",
           "subject": "fix(addons): wire up dead model files + complete PSAK COA template (#25)"
         },
         {
-          "sha": "962c0b75",
+          "sha": "962c0b7",
           "date": "2026-05-23",
           "subject": "fix(addons): declare 2 more missing comodel deps (audit sweep) (#24)"
         }
@@ -4511,42 +4517,42 @@
       "change_count": 11,
       "changes": [
         {
-          "sha": "d25ae734",
+          "sha": "d25ae73",
           "date": "2026-08-05",
           "subject": "feat(reports): bank-account band and signer label on the invoice PDF (#96)"
         },
         {
-          "sha": "7845d90a",
+          "sha": "7845d90",
           "date": "2026-08-04",
           "subject": "fix(reports): keep charset and CSS inside <main> so ¥ is not mojibake"
         },
         {
-          "sha": "fa11ba58",
+          "sha": "fa11ba5",
           "date": "2026-08-04",
           "subject": "fix(journal-voucher): show GL codes and foreign-currency amounts"
         },
         {
-          "sha": "2b1b0968",
+          "sha": "2b1b096",
           "date": "2026-07-21",
           "subject": "feat(arkaaim): event description block on SO lines + product name & bank on PDFs"
         },
         {
-          "sha": "c2c2b9c7",
+          "sha": "c2c2b9c",
           "date": "2026-07-05",
           "subject": "perf(reports): self-contained PDF wrappers + per-company letterhead"
         },
         {
-          "sha": "19d745c3",
+          "sha": "19d745c",
           "date": "2026-06-26",
           "subject": "fix(report_templates): speed up SO PDF, add customer sig, fix newline display"
         },
         {
-          "sha": "e84a5b08",
+          "sha": "e84a5b0",
           "date": "2026-06-10",
           "subject": "feat(accounting_reports): 7 accounting-team report needs (Excel + PDF)"
         },
         {
-          "sha": "6df1c664",
+          "sha": "6df1c66",
           "date": "2026-06-10",
           "subject": "fix(reports): unambiguous Indonesian long date format (e.g. \"9 Juni 2026\")"
         }
@@ -4565,42 +4571,42 @@
       "change_count": 57,
       "changes": [
         {
-          "sha": "ceaae479",
+          "sha": "ceaae47",
           "date": "2026-08-18",
           "subject": "fix(retail): one open POS session must not silence a whole night of sales (#170)"
         },
         {
-          "sha": "5bb46bb4",
+          "sha": "5bb46bb",
           "date": "2026-08-10",
           "subject": "fix(retail-import): stop a half size from failing the whole X101 upload (#119)"
         },
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "7e450884",
+          "sha": "7e45088",
           "date": "2026-08-03",
           "subject": "feat(retail_import): X101 repricing opt-in, dual-code lookup, import-log timing"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "4429d6a0",
+          "sha": "4429d6a",
           "date": "2026-07-27",
           "subject": "fix(mdm_api): make the endpoint survive having no user, and stop leaking a lock"
         }
@@ -4619,22 +4625,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "9eca8e98",
+          "sha": "9eca8e9",
           "date": "2026-07-27",
           "subject": "fix(mdm_api): refuse non-finite numbers in the payload"
         },
         {
-          "sha": "a290f7ea",
+          "sha": "a290f7e",
           "date": "2026-07-27",
           "subject": "feat(mdm_api): separate UAT from production, and let the endpoint name itself"
         },
         {
-          "sha": "4429d6a0",
+          "sha": "4429d6a",
           "date": "2026-07-27",
           "subject": "fix(mdm_api): make the endpoint survive having no user, and stop leaking a lock"
         },
         {
-          "sha": "07bdd147",
+          "sha": "07bdd14",
           "date": "2026-07-27",
           "subject": "feat(retail_import): MDM product-master REST API + X24DN pending-SKU replay"
         }
@@ -4653,27 +4659,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "2653a4b8",
+          "sha": "2653a4b",
           "date": "2026-08-18",
           "subject": "feat(levis): batch menengah sheet after-go-live — filter status bill, kolom store, daftar bill di payment, jurnal sales return (#176)"
         },
         {
-          "sha": "3fd30e84",
+          "sha": "3fd30e8",
           "date": "2026-08-05",
           "subject": "docs(retail_import_pos): add the missing MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "d63a9032",
+          "sha": "d63a903",
           "date": "2026-08-05",
           "subject": "feat(accounting): Lock Dates wizard, and stop the XStore report leaking to non-POS tenants"
         },
         {
-          "sha": "871d69e1",
+          "sha": "871d69e",
           "date": "2026-07-10",
           "subject": "feat(retail-import): date each X24DN journal to its own trading day and store"
         },
         {
-          "sha": "d9639974",
+          "sha": "d963997",
           "date": "2026-07-09",
           "subject": "feat(retail-import): book X24DN's own tax, and split return/discount by category"
         }
@@ -4692,12 +4698,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "7ef00719",
+          "sha": "7ef0071",
           "date": "2026-08-04",
           "subject": "fix(security): clear semgrep — reject NaN quantities, drop %-format SQL"
         },
         {
-          "sha": "d445b449",
+          "sha": "d445b44",
           "date": "2026-08-04",
           "subject": "feat(retail-import): X-Store vs Odoo reconciliation report"
         }
@@ -4716,12 +4722,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "d69ce4f1",
+          "sha": "d69ce4f",
           "date": "2026-09-08",
           "subject": "fix(purchase): do not claim a service line that was confirmed before the flag (#225)"
         },
         {
-          "sha": "74dc1ab4",
+          "sha": "74dc1ab",
           "date": "2026-09-08",
           "subject": "feat(purchase): receive a service on a goods receipt (#219)"
         }
@@ -4740,32 +4746,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -4784,32 +4790,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "2f567f24",
+          "sha": "2f567f2",
           "date": "2026-05-23",
           "subject": "fix(addons): wire up dead model files + complete PSAK COA template (#25)"
         },
         {
-          "sha": "6a743250",
+          "sha": "6a74325",
           "date": "2026-05-23",
           "subject": "security: clear CodeQL alert backlog — 18 → 0 (closes #20) (#21)"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -4828,32 +4834,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -4872,32 +4878,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "7f108093",
+          "sha": "7f10809",
           "date": "2026-08-04",
           "subject": "fix(reports): drop NBSP from money, add BOM to CSV exports"
         },
         {
-          "sha": "660a2d85",
+          "sha": "660a2d8",
           "date": "2026-07-08",
           "subject": "feat(sast): enforce p/python + p/owasp-top-ten; drive all 59 findings to 0 (#53)"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -4916,17 +4922,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "a966aae7",
+          "sha": "a966aae",
           "date": "2026-08-03",
           "subject": "docs(stock_report_fix): record why the retired patch is still load-bearing"
         },
         {
-          "sha": "84ca07fe",
+          "sha": "84ca07f",
           "date": "2026-06-08",
           "subject": "fix(hub): make industry-packs branch actually installable on a fresh DB"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         }
@@ -4945,12 +4951,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         }
@@ -4969,42 +4975,42 @@
       "change_count": 27,
       "changes": [
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "8b34bf7c",
+          "sha": "8b34bf7",
           "date": "2026-05-28",
           "subject": "feat(custom_studio_lite): add description assets (icon + screenshots)"
         },
         {
-          "sha": "32b6c782",
+          "sha": "32b6c78",
           "date": "2026-05-24",
           "subject": "fix(custom_studio_lite): default anchor must be inside a <group>"
         },
         {
-          "sha": "c2bdcf94",
+          "sha": "c2bdcf9",
           "date": "2026-05-24",
           "subject": "fix(custom_studio_lite): placement uses selected field + cascade orphan ops + Reset"
         },
         {
-          "sha": "9718343c",
+          "sha": "9718343",
           "date": "2026-05-24",
           "subject": "fix(custom_studio_lite): atomic field-create-and-place RPC"
         },
         {
-          "sha": "82d2227f",
+          "sha": "82d2227",
           "date": "2026-05-24",
           "subject": "feat(custom_studio_lite): let Studio hide widget-rendered fields too"
         },
         {
-          "sha": "20e10106",
+          "sha": "20e1010",
           "date": "2026-05-24",
           "subject": "fix(custom_studio_lite): bust view cache after overlay edits"
         },
         {
-          "sha": "0ad03106",
+          "sha": "0ad0310",
           "date": "2026-05-24",
           "subject": "fix(custom_studio_lite): bind this in delete/move overlay handlers"
         }
@@ -5023,37 +5029,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -5072,32 +5078,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "7f108093",
+          "sha": "7f10809",
           "date": "2026-08-04",
           "subject": "fix(reports): drop NBSP from money, add BOM to CSV exports"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -5116,42 +5122,42 @@
       "change_count": 22,
       "changes": [
         {
-          "sha": "c8248721",
+          "sha": "c824872",
           "date": "2026-08-19",
           "subject": "feat(coretax): file a plain 11% PPN as 12% on a nilai-lain base, and keep vat/NPWP one number (#185)"
         },
         {
-          "sha": "294f94d0",
+          "sha": "294f94d",
           "date": "2026-08-19",
           "subject": "fix(tax): a reset to draft must not retype the PPN and PPh the operator entered (#178)"
         },
         {
-          "sha": "62b4b5db",
+          "sha": "62b4b5d",
           "date": "2026-08-18",
           "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
         },
         {
-          "sha": "635bde36",
+          "sha": "635bde3",
           "date": "2026-08-04",
           "subject": "fix(coretax): require NPWP Penandatangan only where the layout carries it"
         },
         {
-          "sha": "45b5f784",
+          "sha": "45b5f78",
           "date": "2026-07-30",
           "subject": "fix(tax): show PPh booked outside the engine; keep keterangan on reset to draft"
         },
         {
-          "sha": "8b4f8989",
+          "sha": "8b4f898",
           "date": "2026-07-24",
           "subject": "feat(custom_tax_id): configurable journal for the PPh withholding entry (T2.7)"
         },
         {
-          "sha": "81daf3c7",
+          "sha": "81daf3c",
           "date": "2026-07-24",
           "subject": "fix(custom_tax_id): skip PPh withholding on lines with native negative PPh tax"
         },
         {
-          "sha": "1fd93a41",
+          "sha": "1fd93a4",
           "date": "2026-07-22",
           "subject": "style: clear the branch's repo-wide ruff debt; refresh two WMS knowledge files"
         }
@@ -5170,32 +5176,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "5c1e7cd0",
+          "sha": "5c1e7cd",
           "date": "2026-06-10",
           "subject": "chore(ee_gap,compliance): commit pre-existing working-tree changes"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -5214,22 +5220,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -5248,27 +5254,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "7c8222ff",
+          "sha": "7c8222f",
           "date": "2026-05-17",
           "subject": "Phase 2 + EE-gap tier 3 + AI features showcase"
         },
         {
-          "sha": "83e30d86",
+          "sha": "83e30d8",
           "date": "2026-05-16",
           "subject": "Initial commit: Odoo 19 Platform foundation + phase 1/2/3A complete"
         }
@@ -5287,42 +5293,42 @@
       "change_count": 13,
       "changes": [
         {
-          "sha": "8a11b0c5",
+          "sha": "8a11b0c",
           "date": "2026-08-04",
           "subject": "fix(whatsapp): res.partner.mobile is gone in Odoo 19 — route every read through a helper (#91)"
         },
         {
-          "sha": "b04bd809",
+          "sha": "b04bd80",
           "date": "2026-08-04",
           "subject": "fix(whatsapp): stop logging the recipient number and message text in sandbox (#88)"
         },
         {
-          "sha": "985b7260",
+          "sha": "985b726",
           "date": "2026-06-11",
           "subject": "Re-home custom module menus out of generic \"Custom\" app"
         },
         {
-          "sha": "cfb2e5fd",
+          "sha": "cfb2e5f",
           "date": "2026-06-02",
           "subject": "feat: Gentlewoman headless storefront + 3D PDP, AI shopper & platform stability fixes (#30)"
         },
         {
-          "sha": "00466195",
+          "sha": "0046619",
           "date": "2026-05-29",
           "subject": "feat(custom_whatsapp): Baileys connection pre-fill + per-account AI draft"
         },
         {
-          "sha": "f167df9a",
+          "sha": "f167df9",
           "date": "2026-05-28",
           "subject": "feat(ee_gap): bulk module description/static assets"
         },
         {
-          "sha": "9441ca69",
+          "sha": "9441ca6",
           "date": "2026-05-24",
           "subject": "chore(custom_whatsapp): bump version to 19.0.0.3.0 for Baileys"
         },
         {
-          "sha": "6448a6b7",
+          "sha": "6448a6b",
           "date": "2026-05-24",
           "subject": "style: apply ruff format to Baileys + Studio additions"
         }
@@ -5341,42 +5347,42 @@
       "change_count": 9,
       "changes": [
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "c8ebd44f",
+          "sha": "c8ebd44",
           "date": "2026-07-28",
           "subject": "feat(wms): category-based POC scenario + barcoded PDF/XLSX reporting"
         },
         {
-          "sha": "f54de205",
+          "sha": "f54de20",
           "date": "2026-07-22",
           "subject": "fix(cycle_count): actually reconcile the variance when posting an adjustment"
         },
         {
-          "sha": "11e6eb77",
+          "sha": "11e6eb7",
           "date": "2026-05-28",
           "subject": "fix(custom_wms_cycle_count, custom_wms_putaway): add missing data/__init__.py"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "7665d3ef",
+          "sha": "7665d3e",
           "date": "2026-05-22",
           "subject": "ci/lint: apply pre-commit mechanical fixes (trailing-whitespace + EOF newlines)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
@@ -5395,17 +5401,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "c8ebd44f",
+          "sha": "c8ebd44",
           "date": "2026-07-28",
           "subject": "feat(wms): category-based POC scenario + barcoded PDF/XLSX reporting"
         },
         {
-          "sha": "8ed5e9d3",
+          "sha": "8ed5e9d",
           "date": "2026-07-22",
           "subject": "style(wms): apply ruff 0.15.14 format + drop an unused import"
         },
         {
-          "sha": "f59e37da",
+          "sha": "f59e37d",
           "date": "2026-07-22",
           "subject": "feat(wms): rewire putaway onto native Odoo 19 slotting + inbound QC, docs, host integration"
         }
@@ -5424,32 +5430,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "7ef00719",
+          "sha": "7ef0071",
           "date": "2026-08-04",
           "subject": "fix(security): clear semgrep — reject NaN quantities, drop %-format SQL"
         },
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "8380ac54",
+          "sha": "8380ac5",
           "date": "2026-07-28",
           "subject": "fix(wms-hht): the scan box never reached the active screen"
         },
         {
-          "sha": "0207fa91",
+          "sha": "0207fa9",
           "date": "2026-07-28",
           "subject": "fix(wms-hht): make a scan on the list screens find the document"
         },
         {
-          "sha": "ba0e73f3",
+          "sha": "ba0e73f",
           "date": "2026-07-27",
           "subject": "fix(wms-hht): stale scan prompt, bin2bin serialisation, endpoint smoke tests"
         },
         {
-          "sha": "611008a3",
+          "sha": "611008a",
           "date": "2026-07-27",
           "subject": "feat(wms): task-driven handheld app — sidebar shell, package scan, real stock moves"
         }
@@ -5468,17 +5474,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "8ed5e9d3",
+          "sha": "8ed5e9d",
           "date": "2026-07-22",
           "subject": "style(wms): apply ruff 0.15.14 format + drop an unused import"
         },
         {
-          "sha": "f59e37da",
+          "sha": "f59e37d",
           "date": "2026-07-22",
           "subject": "feat(wms): rewire putaway onto native Odoo 19 slotting + inbound QC, docs, host integration"
         }
@@ -5497,17 +5503,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "8ed5e9d3",
+          "sha": "8ed5e9d",
           "date": "2026-07-22",
           "subject": "style(wms): apply ruff 0.15.14 format + drop an unused import"
         },
         {
-          "sha": "f59e37da",
+          "sha": "f59e37d",
           "date": "2026-07-22",
           "subject": "feat(wms): rewire putaway onto native Odoo 19 slotting + inbound QC, docs, host integration"
         }
@@ -5526,42 +5532,42 @@
       "change_count": 12,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "e207367f",
+          "sha": "e207367",
           "date": "2026-07-29",
           "subject": "fix(wms): stop the putaway suggestion default logging a translation warning"
         },
         {
-          "sha": "4dd5b3f1",
+          "sha": "4dd5b3f",
           "date": "2026-07-29",
           "subject": "feat(wms): rank put-away bins for a scanned product with no transfer"
         },
         {
-          "sha": "8ed5e9d3",
+          "sha": "8ed5e9d",
           "date": "2026-07-22",
           "subject": "style(wms): apply ruff 0.15.14 format + drop an unused import"
         },
         {
-          "sha": "f59e37da",
+          "sha": "f59e37d",
           "date": "2026-07-22",
           "subject": "feat(wms): rewire putaway onto native Odoo 19 slotting + inbound QC, docs, host integration"
         },
         {
-          "sha": "11e6eb77",
+          "sha": "11e6eb7",
           "date": "2026-05-28",
           "subject": "fix(custom_wms_cycle_count, custom_wms_putaway): add missing data/__init__.py"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         }
@@ -5580,17 +5586,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "a66f9e70",
+          "sha": "a66f9e7",
           "date": "2026-07-27",
           "subject": "style: ruff-format the WMS receiving/demo files; drop an unused import"
         },
         {
-          "sha": "a03f2976",
+          "sha": "a03f297",
           "date": "2026-07-27",
           "subject": "feat(wms): demo_wms parity with rnd_wms + 15-point scenario test (3 defects fixed)"
         },
         {
-          "sha": "11a21a7d",
+          "sha": "11a21a7",
           "date": "2026-07-25",
           "subject": "feat(wms): receiving extensions — GS1 expiry write-through, supplier batch, receipt template import"
         }
@@ -5609,27 +5615,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "c8ebd44f",
+          "sha": "c8ebd44",
           "date": "2026-07-28",
           "subject": "feat(wms): category-based POC scenario + barcoded PDF/XLSX reporting"
         },
         {
-          "sha": "a03f2976",
+          "sha": "a03f297",
           "date": "2026-07-27",
           "subject": "feat(wms): demo_wms parity with rnd_wms + 15-point scenario test (3 defects fixed)"
         },
         {
-          "sha": "bb52e582",
+          "sha": "bb52e58",
           "date": "2026-07-24",
           "subject": "style: ruff-format wms_reports test; defer knowledge regen"
         },
         {
-          "sha": "22c4f147",
+          "sha": "22c4f14",
           "date": "2026-07-24",
           "subject": "feat(wms): reporting pack — purchase return, stock summary, stock take, spot check, transfer"
         }
@@ -5648,12 +5654,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "227845e3",
+          "sha": "227845e",
           "date": "2026-08-04",
           "subject": "feat(wms): SAP-style two-dimensional putaway (storage type x section)"
         }
@@ -5672,42 +5678,42 @@
       "change_count": 15,
       "changes": [
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "a03f2976",
+          "sha": "a03f297",
           "date": "2026-07-27",
           "subject": "feat(wms): demo_wms parity with rnd_wms + 15-point scenario test (3 defects fixed)"
         },
         {
-          "sha": "1fd93a41",
+          "sha": "1fd93a4",
           "date": "2026-07-22",
           "subject": "style: clear the branch's repo-wide ruff debt; refresh two WMS knowledge files"
         },
         {
-          "sha": "f59e37da",
+          "sha": "f59e37d",
           "date": "2026-07-22",
           "subject": "feat(wms): rewire putaway onto native Odoo 19 slotting + inbound QC, docs, host integration"
         },
         {
-          "sha": "cd0b0a88",
+          "sha": "cd0b0a8",
           "date": "2026-07-17",
           "subject": "fix(wms_to_engine): repair materialize() and the TO sequence on Odoo 19"
         },
         {
-          "sha": "461f12e3",
+          "sha": "461f12e",
           "date": "2026-07-04",
           "subject": "chore: doc note on non-trade expense fallback + module version bumps"
         },
         {
-          "sha": "35fed09a",
+          "sha": "35fed09",
           "date": "2026-07-02",
           "subject": "fix(modules): wire up 3 broken/missing crons"
         },
         {
-          "sha": "6697d1f4",
+          "sha": "6697d1f",
           "date": "2026-07-02",
           "subject": "docs(modules): correct MODULE_KNOWLEDGE.md drafts against source"
         }
@@ -5726,22 +5732,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "b6c1aa69",
+          "sha": "b6c1aa6",
           "date": "2026-07-14",
           "subject": "feat(reports): on-screen table view, GL Analysis pivot, per-branch P&L + EBR account-group alignment"
         },
         {
-          "sha": "9984c97e",
+          "sha": "9984c97",
           "date": "2026-07-07",
           "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         },
         {
-          "sha": "c8b2d50f",
+          "sha": "c8b2d50",
           "date": "2026-06-11",
           "subject": "fix(l10n_erajaya): set country='id' so template resolves to Indonesia"
         },
         {
-          "sha": "d471899a",
+          "sha": "d471899",
           "date": "2026-06-11",
           "subject": "feat(l10n_erajaya): selectable Indonesian chart-template localization for Erajaya"
         }
@@ -5760,12 +5766,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "fe6243c6",
+          "sha": "fe6243c",
           "date": "2026-05-28",
           "subject": "chore(l10n_id_psak_custom): manifest update"
         },
         {
-          "sha": "10a06c95",
+          "sha": "10a06c9",
           "date": "2026-05-24",
           "subject": "refactor(addons): extract PSAK template to l10n_id_psak_custom for discoverability (#27)"
         }
@@ -5784,42 +5790,42 @@
       "change_count": 19,
       "changes": [
         {
-          "sha": "e381374d",
+          "sha": "e381374",
           "date": "2026-08-04",
           "subject": "fix(brd): route type='json' -> 'jsonrpc', deprecated in Odoo 19"
         },
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "cde1aebb",
+          "sha": "cde1aeb",
           "date": "2026-07-29",
           "subject": "fix(ops): res.groups.users is user_ids on Odoo 19"
         },
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "03327708",
+          "sha": "0332770",
           "date": "2026-07-16",
           "subject": "refactor(scaffolding): group modules and docs by tier and project"
         },
         {
-          "sha": "9714b5bc",
+          "sha": "9714b5b",
           "date": "2026-05-23",
           "subject": "fix(addons): add missing custom_super_admin dep to 2 modules (#23)"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "7665d3ef",
+          "sha": "7665d3e",
           "date": "2026-05-22",
           "subject": "ci/lint: apply pre-commit mechanical fixes (trailing-whitespace + EOF newlines)"
         }
@@ -5838,32 +5844,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "e53f9da8",
+          "sha": "e53f9da",
           "date": "2026-05-20",
           "subject": "Add demo seed + friendly config-required handlers + vault file:// fallback (Track O)"
         },
         {
-          "sha": "0cf88676",
+          "sha": "0cf8867",
           "date": "2026-05-20",
           "subject": "Fix cross-module forward refs and Odoo 19 incompatibilities"
         },
         {
-          "sha": "616d53e3",
+          "sha": "616d53e",
           "date": "2026-05-20",
           "subject": "Add custom_dev_cycle module with GitHub/GitLab webhook integration (Track H)"
         }
@@ -5882,37 +5888,37 @@
       "change_count": 7,
       "changes": [
         {
-          "sha": "4704e07d",
+          "sha": "4704e07",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
         },
         {
-          "sha": "cde1aebb",
+          "sha": "cde1aeb",
           "date": "2026-07-29",
           "subject": "fix(ops): res.groups.users is user_ids on Odoo 19"
         },
         {
-          "sha": "3506aa59",
+          "sha": "3506aa5",
           "date": "2026-05-23",
           "subject": "ci/lint: clear ruff + bandit backlog — lint job fully green (closes #6) (#19)"
         },
         {
-          "sha": "7665d3ef",
+          "sha": "7665d3e",
           "date": "2026-05-22",
           "subject": "ci/lint: apply pre-commit mechanical fixes (trailing-whitespace + EOF newlines)"
         },
         {
-          "sha": "0432fb48",
+          "sha": "0432fb4",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
         },
         {
-          "sha": "358f7db1",
+          "sha": "358f7db",
           "date": "2026-05-21",
           "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         },
         {
-          "sha": "024b98fd",
+          "sha": "024b98f",
           "date": "2026-05-19",
           "subject": "Add WMS modules, ops monitoring, BRD analyzer, hub console"
         }
@@ -5931,12 +5937,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "24446ab6",
+          "sha": "24446ab",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
         },
         {
-          "sha": "eaff5532",
+          "sha": "eaff553",
           "date": "2026-07-29",
           "subject": "feat(efn): ESB Core connector + F&B stock ops vertical"
         }
@@ -5955,27 +5961,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "41feab42",
+          "sha": "41feab4",
           "date": "2026-08-04",
           "subject": "test(digiflazz): pin the fixed-suffix signatures as known-answer vectors"
         },
         {
-          "sha": "7ef00719",
+          "sha": "7ef0071",
           "date": "2026-08-04",
           "subject": "fix(security): clear semgrep — reject NaN quantities, drop %-format SQL"
         },
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "a25b01e7",
+          "sha": "a25b01e",
           "date": "2026-08-04",
           "subject": "docs(ppob): fix the RST that docutils rejects in two manifests"
         },
         {
-          "sha": "e2f69753",
+          "sha": "e2f6975",
           "date": "2026-07-30",
           "subject": "feat(ppob): Digiflazz biller adapter, SLA targets & throughput, Eraspace architecture revision"
         }
@@ -5994,12 +6000,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }
@@ -6018,32 +6024,32 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "5cb822f6",
+          "sha": "5cb822f",
           "date": "2026-08-03",
           "subject": "docs: record the per-module privilege in each MODULE_KNOWLEDGE.md"
         },
         {
-          "sha": "fdacc397",
+          "sha": "fdacc39",
           "date": "2026-08-03",
           "subject": "fix(security): give every custom module its own res.groups.privilege"
         },
         {
-          "sha": "e2f69753",
+          "sha": "e2f6975",
           "date": "2026-07-30",
           "subject": "feat(ppob): Digiflazz biller adapter, SLA targets & throughput, Eraspace architecture revision"
         },
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }
@@ -6062,12 +6068,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }
@@ -6086,17 +6092,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "47b1fcb4",
+          "sha": "47b1fcb",
           "date": "2026-07-17",
           "subject": "fix(lint): restore the warehouse-jds ruff ignore and fix two PPOB defects"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }
@@ -6115,27 +6121,27 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "85600343",
+          "sha": "8560034",
           "date": "2026-08-04",
           "subject": "docs(manifests): fix the RST that docutils rejects in module descriptions"
         },
         {
-          "sha": "cabe1970",
+          "sha": "cabe197",
           "date": "2026-07-17",
           "subject": "fix(sast): silence four semgrep findings that are contract or false positive"
         },
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "47b1fcb4",
+          "sha": "47b1fcb",
           "date": "2026-07-17",
           "subject": "fix(lint): restore the warehouse-jds ruff ignore and fix two PPOB defects"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }
@@ -6154,12 +6160,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }
@@ -6178,12 +6184,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }
@@ -6202,22 +6208,22 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "e2f69753",
+          "sha": "e2f6975",
           "date": "2026-07-30",
           "subject": "feat(ppob): Digiflazz biller adapter, SLA targets & throughput, Eraspace architecture revision"
         },
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }
@@ -6236,17 +6242,17 @@
       "change_count": 3,
       "changes": [
         {
-          "sha": "f5d8d58b",
+          "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
         },
         {
-          "sha": "a25b01e7",
+          "sha": "a25b01e",
           "date": "2026-08-04",
           "subject": "docs(ppob): fix the RST that docutils rejects in two manifests"
         },
         {
-          "sha": "e2f69753",
+          "sha": "e2f6975",
           "date": "2026-07-30",
           "subject": "feat(ppob): Digiflazz biller adapter, SLA targets & throughput, Eraspace architecture revision"
         }
@@ -6265,12 +6271,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }
@@ -6289,12 +6295,12 @@
       "change_count": 2,
       "changes": [
         {
-          "sha": "4d809493",
+          "sha": "4d80949",
           "date": "2026-07-17",
           "subject": "style: ruff-format sweep over the PPOB and ee_gap code"
         },
         {
-          "sha": "5dc6e68b",
+          "sha": "5dc6e68",
           "date": "2026-07-16",
           "subject": "feat(ppob): port PPOB vertical suite from rnd-ppob to Odoo 19"
         }

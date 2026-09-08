@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA-AIM Trade / Non-Trade Purchases",
-    "version": "19.0.1.0.1",
+    "version": "19.0.1.1.0",
     "summary": "Trade vs Non-Trade purchase stream for ARKA-AIM: own PO numbering, "
-    "AP / GR-IR account routing, and Transfer to Asset on a Non-Trade goods receipt.",
+    "the GR/IR journal at goods receipt, AP / GR-IR account routing, and "
+    "Transfer to Asset on a Non-Trade goods receipt.",
     "description": """
 ARKA-AIM Trade / Non-Trade Purchases
 ====================================
@@ -29,15 +30,30 @@ by the buyer on the order. It drives:
   Trade/Non-Trade Accounts)::
 
       Trade      2103100001  Trade Payables - Third parties
+                 2103109199  GR/IR clearing - Trade Payables - Third P - Others
       Non-Trade  2103300001  Non trade payable - Third parties
                  2103300008  GR/IR clearing - Non Trade Payables - Third Parties
                  6120010001  default expense fallback
 
-  The GR/IR routing on bill *product* lines only fires for PO-linked lines whose
-  product category is ``real_time`` valued -- i.e. only where a goods-receipt
-  accrual was actually booked. Every ARKA-AIM category is periodic today, so the
-  mapping is configured and inert; it starts working the day a category is
-  switched to real-time valuation, without a code change.
+GR/IR journal at goods receipt
+------------------------------
+Validating a vendor receipt of a real-time valued category books the accrual
+immediately, so the value received is on the balance sheet from the receipt date
+rather than from the invoice date::
+
+      Goods receipt   Dr Stock Valuation        Cr GR/IR clearing
+      Vendor bill     Dr GR/IR clearing         Cr Accounts Payable
+      ------------------------------------------------------------
+      net effect      Dr Stock Valuation        Cr Accounts Payable
+
+A vendor return reverses it for the amount that was accrued. Both sides resolve
+the account through the same mapping, per company and per stream, so the clearing
+account always nets to zero. Entries are idempotent on their ``ref``
+(``ARKA-GR-VAL:<move id>``).
+
+``real_time`` on the product category is the switch, category by category; the
+parameter ``custom_arka_aim_purchase_type.suppress_gr_journal`` ("1") turns the
+whole thing back off. See ``scripts/tenants/arkaaim/enable_gr_journal.py``.
 * **Receipts** -- ``stock.picking.l10n_purchase_type`` is carried from the source
   PO (stored, so it is filterable and groupable).
 
@@ -73,6 +89,7 @@ TENANT-SCOPED: install only on the ARKA-AIM databases (prd_arkaaim, trn_arkaaim)
     "capability_tags": ["purchasing", "accounting", "fixed-assets"],
     "data": [
         "security/ir.model.access.csv",
+        "data/config_parameters.xml",
         "views/purchase_account_map_views.xml",
         "views/res_company_views.xml",
         "views/purchase_order_views.xml",
