@@ -16,6 +16,15 @@ class AccountAnalyticAccount(models.Model):
         "analytic accounts that are not events.",
     )
 
+    x_custom_event_show_date = fields.Date(
+        string="Show Date",
+        index="btree_not_null",
+        copy=False,
+        help="The show this event account stands for. Kept as a real date, not "
+        "parsed back out of the name, so a period can be selected reliably — "
+        "the overhead allocation picks the events of a period by this field.",
+    )
+
     # One event, one analytic account — the whole cross-company P&L rests on
     # that. NULL keys are exempt (Postgres), so ordinary analytic accounts and
     # the other plans are untouched.

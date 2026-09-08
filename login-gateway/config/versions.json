@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-08T00:10:51+00:00",
+  "generated_at": "2026-09-08T00:23:18+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "24005d7",
-    "branch": "feat/efaktur-separate-dp-settlement"
+    "commit": "32873ec",
+    "branch": "feat/arka-event-overhead-allocation"
   },
   "buckets": [
     {
@@ -228,7 +228,7 @@
       "module": "custom_arka_show_date",
       "bucket": "_tenants",
       "name": "ARKA Show Date",
-      "version": "19.0.1.8.0",
+      "version": "19.0.1.9.0",
       "summary": "Show-date and event on the whole sale-to-purchase chain, one analytic account per event, and a PO raised on the sister company straight from the sale. PT ARKA / AIM only.",
       "category": "Tenants/ARKA-AIM",
       "depends": 7,
@@ -2215,9 +2215,14 @@
       "category": "Accounting/Localizations",
       "depends": 3,
       "public": true,
-      "last_change": "2026-09-04",
-      "change_count": 10,
+      "last_change": "2026-09-08",
+      "change_count": 11,
       "changes": [
+        {
+          "sha": "32873ec",
+          "date": "2026-09-08",
+          "subject": "fix(efaktur): file the down payment and the settlement as separate fakturs (#228)"
+        },
         {
           "sha": "24c3f7c",
           "date": "2026-09-04",
@@ -2252,11 +2257,6 @@
           "sha": "f5d8d58",
           "date": "2026-08-04",
           "subject": "style: satisfy pre-commit across the branch"
-        },
-        {
-          "sha": "635bde3",
-          "date": "2026-08-04",
-          "subject": "fix(coretax): require NPWP Penandatangan only where the layout carries it"
         }
       ]
     },

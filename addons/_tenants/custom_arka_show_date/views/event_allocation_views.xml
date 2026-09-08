@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_event_allocation_form" model="ir.ui.view">
+        <field name="name">custom.arka.event.allocation.form</field>
+        <field name="model">custom.arka.event.allocation</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_compute" type="object" string="Compute Split"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_apply" type="object" string="Apply"
+                            class="btn-primary" invisible="state != 'draft' or not line_ids"
+                            confirm="This writes an analytic distribution on every matching overhead line. It moves no money and can be reset. Continue?"/>
+                    <button name="action_reset" type="object" string="Reset"
+                            invisible="state != 'applied'"
+                            confirm="This takes back exactly the distributions this allocation wrote. Continue?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,applied"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_allocated_lines" type="object"
+                                class="oe_stat_button" icon="fa-list"
+                                invisible="allocated_line_count == 0">
+                            <field name="allocated_line_count" widget="statinfo" string="Allocated"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Overhead August 2026"/></h1>
+                    </div>
+                    <group>
+                        <group string="Period">
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="What counts as overhead">
+                            <field name="journal_ids" widget="many2many_tags"
+                                   readonly="state != 'draft'"/>
+                            <field name="account_ids" widget="many2many_tags"
+                                   domain="[('account_type', 'like', 'expense%')]"
+                                   readonly="state != 'draft'"/>
+                            <field name="source_line_count"/>
+                            <field name="source_amount"/>
+                        </group>
+                    </group>
+                    <group string="How it is divided">
+                        <field name="basis" readonly="state != 'draft'"/>
+                    </group>
+                    <field name="line_ids" readonly="state != 'draft'">
+                        <list editable="bottom">
+                            <field name="analytic_account_id" readonly="parent.basis != 'manual'"/>
+                            <field name="basis_amount" readonly="1"/>
+                            <field name="percentage"/>
+                            <field name="currency_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                    <div class="text-muted">
+                        Percentages always add up to 100. No amount is moved and no entry is
+                        posted: the split is written as an analytic distribution on the
+                        overhead lines, which is what the Profit &amp; Loss per Event reads.
+                        Lines a document already attributed are never touched.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_event_allocation_list" model="ir.ui.view">
+        <field name="name">custom.arka.event.allocation.list</field>
+        <field name="model">custom.arka.event.allocation</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="basis"/>
+                <field name="allocated_line_count" string="Lines"/>
+                <field name="allocated_amount"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'applied'" decoration-info="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_event_allocation" model="ir.actions.act_window">
+        <field name="name">Event Overhead Allocation</field>
+        <field name="res_model">custom.arka.event.allocation</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Spread overhead across the events of a period</p>
+            <p>
+                Payroll, tax and general-journal costs belong to no single show, so the
+                Profit &amp; Loss per Event leaves them in Unassigned. Write down the rule
+                you want — the period, which journals count as overhead, and whether the
+                split follows revenue, direct cost or equal shares — then compute it, look
+                at it, and apply it. Nothing is posted and it can be reset.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_event_allocation"
+              name="Event Overhead Allocation"
+              parent="account.menu_finance_entries"
+              action="action_event_allocation"
+              sequence="90"
+              groups="account.group_account_manager"/>
+</odoo>
