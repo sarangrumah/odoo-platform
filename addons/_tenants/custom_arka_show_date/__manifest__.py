@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA Show Date",
-    "version": "19.0.1.9.0",
+    "version": "19.0.1.10.0",
     "summary": "Show-date and event on the whole sale-to-purchase chain, one "
     "analytic account per event, and a PO raised on the sister company "
     "straight from the sale. PT ARKA / AIM only.",
@@ -163,6 +163,7 @@ module is inert.
     "data": [
         "security/ir.model.access.csv",
         "data/analytic_plan.xml",
+        "data/config_parameters.xml",
         "views/res_company_views.xml",
         "views/sale_order_views.xml",
         "views/product_views.xml",
