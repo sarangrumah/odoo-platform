@@ -41,4 +41,3 @@ export function classifyBucket(due: string | null, asOf: string): BucketCode {
   }
   return "d_over_365";
 }
-

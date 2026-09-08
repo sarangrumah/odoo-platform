@@ -48,4 +48,8 @@ ignore = [
 # imports (E402) over module structure; that's fine for throwaway tooling.
 "scripts/gentlewoman/seed_shopper_taxonomy.py" = ["F821"]
 "scripts/tenants/**" = ["F821", "E731", "E402"]
+# Same story for the cockpits' one-off seeding scripts: they are fed to
+# `odoo shell`, which injects `env` into the namespace.
+"sales-cockpit/scripts/**" = ["F821", "E731", "E402"]
+"finance-cockpit/scripts/**" = ["F821", "E731", "E402"]
 "docs/projects/warehouse-jds/**" = ["F821", "E731", "E402"]
