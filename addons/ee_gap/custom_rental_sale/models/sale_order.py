@@ -10,7 +10,7 @@ exactly as it did before this module existed.
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 class SaleOrder(models.Model):
@@ -45,12 +45,113 @@ class SaleOrder(models.Model):
         copy=False,
         help="Leave empty to use the company's configured on-deployment location.",
     )
+    deployment_reconcilable = fields.Boolean(
+        compute="_compute_deployment_reconcilable",
+        help="Whether a dispatch of this product will actually move serial numbers. "
+        "Without them the return check has nothing to compare and passes silently.",
+    )
     deployment_ids = fields.One2many(
         comodel_name="rental.order",
         inverse_name="sale_order_id",
         string="Deployments",
     )
     deployment_count = fields.Integer(compute="_compute_deployment_count")
+
+    # ------------------------------------------------------------------
+    # What may be dispatched
+    # ------------------------------------------------------------------
+    def _deployment_phantom_bom(self, product):
+        """The kit BOM behind a product, or empty.
+
+        ``custom_rental_bom_explosion`` is a soft dependency -- the bridge works
+        without it -- so this looks the BOM up itself rather than calling into
+        that module, and tolerates mrp being absent entirely.
+        """
+        if not product or "mrp.bom" not in self.env:
+            return False
+        return (
+            self.env["mrp.bom"]
+            .sudo()
+            .search(
+                [("product_tmpl_id", "=", product.product_tmpl_id.id), ("type", "=", "phantom")],
+                limit=1,
+            )
+        )
+
+    def _deployment_dispatchable(self, product):
+        """Can stock actually send this out?
+
+        Two shapes are legitimate and the second is the one that matters here.
+        A storable product moves on its own. A **kit** does not: ARKA-AIM's
+        "Sewa Drone Show 1500 Unit" is a *service* product with no stock of its
+        own, carrying a phantom BOM that explodes into 1,500 serial-tracked
+        drones. Requiring the deployment product to be storable would reject the
+        client's actual bundle -- the primary case this module was built for.
+        """
+        if not product:
+            return True
+        if product.is_storable:
+            return True
+        return bool(self._deployment_phantom_bom(product))
+
+    @api.constrains("deployment_product_id")
+    def _check_deployment_product_dispatchable(self):
+        for order in self:
+            product = order.deployment_product_id
+            if order._deployment_dispatchable(product):
+                continue
+            raise ValidationError(
+                _(
+                    "%(product)s cannot be dispatched: it holds no stock of its own "
+                    "and has no kit (phantom BOM) to explode into. Pick a storable "
+                    "product, or a bundle whose components are storable.",
+                    product=product.display_name,
+                )
+            )
+
+    @api.depends("deployment_product_id")
+    def _compute_deployment_reconcilable(self):
+        """Serial-tracked directly, or a kit with serial-tracked components."""
+        for order in self:
+            product = order.deployment_product_id
+            if not product:
+                order.deployment_reconcilable = False
+                continue
+            if product.tracking == "serial":
+                order.deployment_reconcilable = True
+                continue
+            bom = order._deployment_phantom_bom(product)
+            order.deployment_reconcilable = bool(
+                bom and any(line.product_id.tracking == "serial" for line in bom.bom_line_ids)
+            )
+
+    @api.onchange("deployment_product_id")
+    def _onchange_deployment_product_id(self):
+        """Warn when a dispatch would carry no serials at all.
+
+        Not an error -- a quantity-only dispatch is a legitimate thing to want.
+        But the return check compares the serials that went out against the ones
+        that came back, and with none of either it passes without comparing
+        anything. That silence is worth one sentence up front.
+        """
+        self.ensure_one()
+        product = self.deployment_product_id
+        if not product or not self._deployment_dispatchable(product):
+            return
+        if self.deployment_reconcilable:
+            return
+        return {
+            "warning": {
+                "title": _("No serials to reconcile"),
+                "message": _(
+                    "%(product)s is not serial-tracked and is not a kit of "
+                    "serial-tracked components. The dispatch will work, but the "
+                    "return check will have no serials to compare and will pass "
+                    "without checking anything.",
+                    product=product.display_name,
+                ),
+            }
+        }
 
     @api.depends("deployment_ids")
     def _compute_deployment_count(self):
