@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-09-08T00:00:00Z
 generator: hand-authored
 module: custom_arka_aim_purchase_type
-manifest_version: 19.0.1.1.0
+manifest_version: 19.0.1.2.0
 ---
 
 # custom_arka_aim_purchase_type
@@ -78,13 +78,23 @@ Seeded idempotently by `post_init_hook` (`hooks.py`), re-run on every upgrade:
   `account.account.code` is company-dependent in Odoo 19 and the ids differ per
   database:
 
+  Each entry is an ordered list of candidate codes; the first one present in the
+  company's chart wins, because the two ARKA-AIM databases run different charts:
+
   | Stream | Payable | GR/IR clearing | Expense fallback |
   |---|---|---|---|
-  | Trade | `2103100001` | `2103109199` (GR/IR clearing-Tr Pay-Third P-Others) | *(none)* |
-  | Non-Trade | `2103300001` | `2103300008` | `7799000000` (Other operating expense) |
+  | Trade | `2103100001` / `21100010` | `2103109199` / `29000000` | *(none)* |
+  | Non-Trade | `2103300001` / `21100010` | `2103300008` / `29000000` | `7799000000` |
 
-  `post_init_hook` runs on **install only**, so the Trade GR/IR account is seeded
-  into already-installed tenants by `migrations/19.0.1.1.0/post-migration.py`.
+  `prd_arkaaim` runs the Erajaya chart (first code of each pair) and splits the
+  streams properly. `trn_arkaaim` runs the plain Indonesian chart, which has ONE
+  payable and ONE `29000000 Interim Stock`; there the two streams necessarily
+  share them. That is correct for that chart, not a degraded fallback — the
+  clearing still nets to zero, it simply is not split by stream.
+
+  `post_init_hook` runs on **install only**, so already-installed tenants are
+  seeded by `migrations/19.0.1.1.0/` (the Trade GR/IR account) and
+  `migrations/19.0.1.2.0/` (the second chart's codes).
 
 Booking the GR journal additionally needs, per company: the product category
 real-time valued with a stock valuation account and a stock journal, plus the

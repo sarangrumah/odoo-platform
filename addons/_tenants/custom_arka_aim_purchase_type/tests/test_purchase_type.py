@@ -100,13 +100,25 @@ class TestArkaPurchaseType(TransactionCase):
         payable_line = bill.line_ids.filtered(lambda l: l.display_type == "payment_term")
         self.assertEqual(payable_line.account_id, mapping.payable_account_id)
 
-    def test_trade_and_nontrade_payables_differ(self):
+    def test_each_stream_gets_the_payable_its_chart_offers(self):
+        """Each stream is wired to the first of ITS candidate codes that the
+        company's chart actually holds.
+
+        Asserting the two simply differ would be wrong: the Erajaya chart
+        (prd_arkaaim) has a Trade and a Non-Trade AP control account and the
+        streams must not share one, but the plain Indonesian chart
+        (trn_arkaaim) has a single `21100010 Account Payable`, where sharing it
+        is the only correct answer -- there the split lives in the numbering and
+        the reporting, not in an account that does not exist.
+        """
+        from ..hooks import ACCOUNT_CODES, _find_account
+
         Map = self.env["arka.purchase.account.map"]
-        trade_map = Map._get_map(self.company, "trade")
-        nt_map = Map._get_map(self.company, "non_trade")
-        if not (trade_map.payable_account_id and nt_map.payable_account_id):
-            self.skipTest("Trade/Non-Trade payable accounts not present in this chart of accounts")
-        self.assertNotEqual(trade_map.payable_account_id, nt_map.payable_account_id)
+        for ptype, codes in ACCOUNT_CODES.items():
+            expected = _find_account(self.env, self.company, codes["payable"])
+            if not expected:
+                continue
+            self.assertEqual(Map._get_map(self.company, ptype).payable_account_id, expected)
 
     def test_grir_routing_is_inert_for_periodic_categories(self):
         """A periodic category books no receipt accrual, so the bill keeps its

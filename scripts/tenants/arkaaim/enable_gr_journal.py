@@ -18,7 +18,7 @@ WHAT IT WRITES
 Per ARKA-AIM company (``x_doc_code`` set), for each category in ``CATEGORIES``:
 
 * ``property_valuation``                    -> ``real_time``
-* ``property_stock_valuation_account_id``   -> ``INVENTORY_CODE`` of that company
+* ``property_stock_valuation_account_id``   -> ``INVENTORY_CODES`` of that company
   (on AIM this replaces ``110100 Stock Valuation``, a leftover of the generic
   CoA template that is not part of the Erajaya chart the tenant actually uses,
   and which no entry has ever been booked to)
@@ -43,6 +43,11 @@ receipt yet and is included so it behaves the same the day it does.
 **Fixed Assets (Non-Valuated)** is deliberately left periodic. The drones in it
 are capitalised through the fixed-asset register from the receipt and the bill;
 raising an inventory accrual for them as well would book their value twice.
+**Drone Unit** on trn_arkaaim is the same category under another name and is left
+out for the same reason -- it holds that database's largest receipts
+(Rp 10,68 M), so switching it on is the one change here that would really move
+the books. **Drone Sparepart** IS switched on: spare parts are ordinary stock.
+Plain **Services** stays periodic on both.
 
 COST METHOD IS NOT TOUCHED
 --------------------------
@@ -69,8 +74,17 @@ Defaults to PREVIEW (nothing written). Set COMMIT = True to persist.
 
 # ----- knobs -------------------------------------------------------------
 COMMIT = False  # True to persist
-CATEGORIES = ("Goods", "Expenses", "Services / Exhibition")
-INVENTORY_CODE = "1113100099"  # Inventory-Others -- the debit side of the accrual
+# Category names across BOTH ARKA-AIM charts; one that is not in this database is
+# reported and skipped, so the same script serves prd and trn.
+CATEGORIES = (
+    "Goods",  # both
+    "Expenses",  # both
+    "Services / Exhibition",  # prd_arkaaim (a child of "Services")
+    "Drone Sparepart",  # trn_arkaaim
+)
+# Inventory account codes, tried in order -- first one in the company's chart
+# wins. prd_arkaaim runs the Erajaya chart, trn_arkaaim the plain Indonesian one.
+INVENTORY_CODES = ("1113100099", "11300180")
 JOURNAL_CODE = "STJ"  # Inventory Valuation
 PARAM_KEY = "custom_arka_aim_purchase_type.suppress_gr_journal"
 PARAM_VALUE = "0"  # "0" = post the GR journal, "1" = periodic
@@ -97,13 +111,17 @@ blocked = []
 for company in companies:
     print("\n--- company %s — %s" % (company.id, company.name))
 
-    inventory = Account.with_company(company).search(
-        [("code", "=", INVENTORY_CODE), ("company_ids", "in", company.id)], limit=1
-    )
+    inventory = Account.browse()
+    for code in INVENTORY_CODES:
+        inventory = Account.with_company(company).search(
+            [("code", "=", code), ("company_ids", "in", company.id)], limit=1
+        )
+        if inventory:
+            break
     journal = Journal.search([("code", "=", JOURNAL_CODE), ("company_id", "=", company.id)], limit=1)
     if not inventory:
-        blocked.append("company %s: no account %s in its chart" % (company.id, INVENTORY_CODE))
-        print("    !! inventory account %s NOT FOUND — company skipped" % INVENTORY_CODE)
+        blocked.append("company %s: none of %s in its chart" % (company.id, ", ".join(INVENTORY_CODES)))
+        print("    !! no inventory account (%s) — company skipped" % ", ".join(INVENTORY_CODES))
         continue
     if not journal:
         blocked.append("company %s: no %s journal" % (company.id, JOURNAL_CODE))
@@ -135,8 +153,8 @@ for company in companies:
             [("name", "=", name)], limit=1
         )
         if not categ:
-            blocked.append("category %r not found" % name)
-            print("    !! category %r NOT FOUND" % name)
+            # Expected: the two charts do not carry the same category names.
+            print("    - %-24s not in this database" % name)
             continue
         categ = categ.with_company(company)
         before = (

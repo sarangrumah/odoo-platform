@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA-AIM Trade / Non-Trade Purchases",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.2.0",
     "summary": "Trade vs Non-Trade purchase stream for ARKA-AIM: own PO numbering, "
     "the GR/IR journal at goods receipt, AP / GR-IR account routing, and "
     "Transfer to Asset on a Non-Trade goods receipt.",
