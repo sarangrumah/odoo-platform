@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_rental_order_form_deployment" model="ir.ui.view">
+        <field name="name">rental.order.form.deployment</field>
+        <field name="model">rental.order</field>
+        <field name="inherit_id" ref="custom_rental.view_rental_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="sale_order_id" readonly="1"
+                       invisible="not sale_order_id"/>
+                <field name="sale_client_ref"
+                       invisible="not sale_client_ref"/>
+                <field name="is_deployment" invisible="1"/>
+            </xpath>
+            <xpath expr="//header" position="inside">
+                <button name="action_open_return_reconcile_wizard" type="object"
+                        string="Reconcile Return"
+                        invisible="state != 'returned'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_rental_order_list_deployment" model="ir.ui.view">
+        <field name="name">rental.order.list.deployment</field>
+        <field name="model">rental.order</field>
+        <field name="inherit_id" ref="custom_rental.view_rental_order_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <field name="sale_order_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

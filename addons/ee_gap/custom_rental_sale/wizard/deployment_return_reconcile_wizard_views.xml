@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_deployment_return_reconcile_wizard_form" model="ir.ui.view">
+        <field name="name">custom.rental.return.reconcile.wizard.form</field>
+        <field name="model">custom.rental.return.reconcile.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reconcile Return">
+                <div class="alert alert-info" role="alert">
+                    Only the units that did not come back the way they went out are
+                    listed. Everything else returned normally and needs no decision.
+                    Confirming books these against the asset register — missing units
+                    keep depreciating until Finance writes them off.
+                </div>
+                <group>
+                    <group>
+                        <field name="rental_order_id"/>
+                        <field name="sale_order_id"/>
+                        <field name="event_date"/>
+                    </group>
+                    <group>
+                        <field name="reference" placeholder="BAP / incident report no."/>
+                        <field name="missing_count"/>
+                        <field name="missing_value"/>
+                        <field name="damaged_count"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                </group>
+                <group string="Did Not Come Back" invisible="not line_ids">
+                    <field name="line_ids" nolabel="1">
+                        <list editable="bottom" create="false">
+                            <field name="lot_id" readonly="1"/>
+                            <field name="asset_code"/>
+                            <field name="serial_number"/>
+                            <field name="asset_id" readonly="1" optional="hide"/>
+                            <field name="net_book_value"/>
+                            <field name="outcome"/>
+                            <field name="note"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                </group>
+                <group string="Came Back Damaged">
+                    <field name="damaged_lot_ids" nolabel="1" widget="many2many_tags"
+                           placeholder="Scan or pick the serials that returned broken..."/>
+                </group>
+                <group string="Repair">
+                    <group>
+                        <field name="open_repair"/>
+                    </group>
+                    <group>
+                        <field name="repair_channel" invisible="not open_repair"/>
+                    </group>
+                </group>
+                <group string="Unexpected Serials" invisible="not unexpected_lot_ids">
+                    <div colspan="2" class="text-muted">
+                        These came back but never went out. That is a dispatch or
+                        scanning error rather than a loss, so this wizard does not
+                        book them — chase them separately.
+                    </div>
+                    <field name="unexpected_lot_ids" nolabel="1" widget="many2many_tags"/>
+                </group>
+                <group string="What Happened">
+                    <field name="description" nolabel="1"
+                           placeholder="Circumstances at the event: what was lost or broken, and how..."/>
+                </group>
+                <footer>
+                    <button name="action_reconcile" type="object"
+                            string="Book Against The Register" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

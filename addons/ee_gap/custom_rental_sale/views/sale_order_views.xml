@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_deployment" model="ir.ui.view">
+        <field name="name">sale.order.form.deployment</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_deployments" type="object"
+                        class="oe_stat_button" icon="fa-truck"
+                        invisible="deployment_count == 0">
+                    <field name="deployment_count" widget="statinfo" string="Deployments"/>
+                </button>
+            </xpath>
+            <xpath expr="//header" position="inside">
+                <button name="action_create_deployment" type="object"
+                        string="Create Deployment"
+                        invisible="state not in ('sale','done') or not deployment_product_id or deployment_count &gt; 0"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Deployment" name="deployment">
+                    <div class="alert alert-info" role="alert">
+                        The units physically dispatched for this order. They move inside
+                        the company's own warehouses and never reach a customer location,
+                        so nothing here touches revenue or stock valuation — this order
+                        remains what bills the customer.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="deployment_product_id"/>
+                            <field name="deployment_qty"/>
+                            <field name="deployment_spare_qty"/>
+                        </group>
+                        <group>
+                            <field name="deployment_start"/>
+                            <field name="deployment_end"/>
+                            <field name="deployment_location_id"/>
+                        </group>
+                    </group>
+                    <field name="deployment_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="product_id"/>
+                            <field name="qty"/>
+                            <field name="loan_qty"/>
+                            <field name="pickup_dt"/>
+                            <field name="return_dt_expected"/>
+                            <field name="return_dt_actual"/>
+                            <field name="on_loan_location_id"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
