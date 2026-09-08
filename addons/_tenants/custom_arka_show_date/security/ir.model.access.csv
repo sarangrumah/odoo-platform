@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_event_allocation_manager,custom.arka.event.allocation.manager,model_custom_arka_event_allocation,account.group_account_manager,1,1,1,1
+access_event_allocation_user,custom.arka.event.allocation.user,model_custom_arka_event_allocation,account.group_account_user,1,0,0,0
+access_event_allocation_line_manager,custom.arka.event.allocation.line.manager,model_custom_arka_event_allocation_line,account.group_account_manager,1,1,1,1
+access_event_allocation_line_user,custom.arka.event.allocation.line.user,model_custom_arka_event_allocation_line,account.group_account_user,1,0,0,0

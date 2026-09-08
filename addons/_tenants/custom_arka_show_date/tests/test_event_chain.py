@@ -28,7 +28,15 @@ class TestArkaEventChain(AccountTestInvoicingCommon):
 
         cls.product = cls.product_a
         cls.product.write({"purchase_ok": True, "sale_ok": True})
-        cls.show = date(2026, 8, 24)
+        # March 2026 on purpose. The event analytic account is shared across
+        # companies (company_id = False), so a test running against a clone of a
+        # tenant DB sees that tenant's real events too: "Soekarno Cup" on
+        # 2026-08-24 exists in prd_arkaaim, and a test dated there would resolve
+        # to the client's own account and join the client's events in any
+        # period-based allocation. A date no real show falls on keeps the
+        # fixture to itself. It stays in the PAST because action_post() posts
+        # softly — a future-dated invoice would quietly stay in draft.
+        cls.show = date(2026, 3, 10)
 
         cls.warehouse = cls.env["stock.warehouse"].search([("company_id", "=", cls.seller.id)], limit=1)
         cls.rule = (
@@ -97,12 +105,12 @@ class TestArkaEventChain(AccountTestInvoicingCommon):
     def test_label_concatenates_event_location_and_date(self):
         self.assertEqual(
             self._sale()._custom_event_label(),
-            "Soekarno Cup - Stadion Gelora Bung Tomo Surabaya - 24.08.26",
+            "Soekarno Cup - Stadion Gelora Bung Tomo Surabaya - 10.03.26",
         )
 
     def test_label_skips_what_was_not_filled_in(self):
         order = self._sale(x_custom_event_location=False)
-        self.assertEqual(order._custom_event_label(), "Soekarno Cup - 24.08.26")
+        self.assertEqual(order._custom_event_label(), "Soekarno Cup - 10.03.26")
 
     def test_document_without_event_data_has_no_analytic_account(self):
         order = self._sale(x_custom_show_date=False, x_custom_event_name=False, x_custom_event_location=False)
@@ -362,3 +370,167 @@ class TestArkaEventChain(AccountTestInvoicingCommon):
         middle.product_tmpl_id.x_custom_ic_purchase_product_id = far
         self.product.product_tmpl_id.x_custom_ic_purchase_product_id = middle
         self.assertEqual(self.product._custom_ic_purchase_product(), middle)
+
+    # ------------------------------------------------------------------
+    # Overhead allocation
+    # ------------------------------------------------------------------
+    def _overhead_bill(self, amount=100.0, ref="Payroll"):
+        """A posted expense with nothing tying it to a show."""
+        bill = (
+            self.env["account.move"]
+            .with_company(self.buyer)
+            .sudo()
+            .create(
+                {
+                    "move_type": "in_invoice",
+                    "partner_id": self.partner_a.id,
+                    "invoice_date": self.show,
+                    "date": self.show,
+                    "ref": ref,
+                    "invoice_line_ids": [(0, 0, {"product_id": self.product.id, "quantity": 1, "price_unit": amount})],
+                }
+            )
+        )
+        bill.action_post()
+        return bill
+
+    def _post_revenue(self, event_account, amount):
+        """Revenue booked straight onto an event, as the event chain would."""
+        invoice = (
+            self.env["account.move"]
+            .with_company(self.buyer)
+            .sudo()
+            .create(
+                {
+                    "move_type": "out_invoice",
+                    "partner_id": self.partner_a.id,
+                    "invoice_date": self.show,
+                    "date": self.show,
+                    "invoice_line_ids": [
+                        (
+                            0,
+                            0,
+                            {
+                                "product_id": self.product.id,
+                                "quantity": 1,
+                                "price_unit": amount,
+                                "analytic_distribution": {str(event_account.id): 100.0},
+                            },
+                        )
+                    ],
+                }
+            )
+        )
+        invoice.action_post()
+        return invoice
+
+    def _allocation(self, **overrides):
+        vals = {
+            "name": "Overhead test",
+            "company_id": self.buyer.id,
+            "date_from": self.show.replace(day=1),
+            "date_to": self.show,
+            "basis": "equal",
+        }
+        vals.update(overrides)
+        return self.env["custom.arka.event.allocation"].sudo().create(vals)
+
+    def _two_events(self):
+        first = self._sale()._custom_event_analytic_account()
+        second = self._sale(x_custom_event_name="Second Show")._custom_event_analytic_account()
+        return first, second
+
+    def _assert_period_holds_only(self, allocation, events):
+        """Guard the fixture: the period must contain our events and no others.
+
+        Event analytic accounts are shared across companies, so a clone of a
+        tenant database brings that tenant's shows along. If one ever lands in
+        the test period, the split changes and the failure should say why.
+        """
+        self.assertEqual(
+            set(allocation._events().ids),
+            set(events.ids if hasattr(events, "ids") else [event.id for event in events]),
+            "another event fell into the test period",
+        )
+
+    def test_equal_basis_splits_overhead_between_the_events_of_the_period(self):
+        first, second = self._two_events()
+        bill = self._overhead_bill()
+        allocation = self._allocation()
+        self._assert_period_holds_only(allocation, [first, second])
+        allocation.action_compute()
+        self.assertEqual(sum(allocation.line_ids.mapped("percentage")), 100.0)
+        allocation.action_apply()
+        line = bill.line_ids.filtered(lambda aml: aml.display_type == "product")
+        self.assertEqual(line.analytic_distribution, {str(first.id): 50.0, str(second.id): 50.0})
+        self.assertEqual(line.x_custom_event_allocation_id, allocation)
+        self.assertEqual(allocation.state, "applied")
+
+    def test_percentages_always_add_up_to_one_hundred(self):
+        """Three events cannot be split into three clean thirds."""
+        first = self._sale()._custom_event_analytic_account()
+        second = self._sale(x_custom_event_name="Second Show")._custom_event_analytic_account()
+        third = self._sale(x_custom_event_name="Third Show")._custom_event_analytic_account()
+        self._overhead_bill()
+        allocation = self._allocation()
+        self._assert_period_holds_only(allocation, [first, second, third])
+        allocation.action_compute()
+        self.assertEqual(len(allocation.line_ids), 3)
+        self.assertEqual(sum(allocation.line_ids.mapped("percentage")), 100.0)
+
+    def test_reset_takes_back_exactly_what_it_wrote(self):
+        self._two_events()
+        bill = self._overhead_bill()
+        allocation = self._allocation()
+        allocation.action_compute()
+        allocation.action_apply()
+        allocation.action_reset()
+        line = bill.line_ids.filtered(lambda aml: aml.display_type == "product")
+        self.assertFalse(line.analytic_distribution)
+        self.assertFalse(line.x_custom_event_allocation_id)
+        self.assertEqual(allocation.state, "draft")
+
+    def test_a_line_a_document_already_attributed_is_never_touched(self):
+        first, _second = self._two_events()
+        bill = self._overhead_bill()
+        line = bill.line_ids.filtered(lambda aml: aml.display_type == "product")
+        line.analytic_distribution = {str(first.id): 100.0}
+        allocation = self._allocation()
+        allocation.action_compute()
+        with self.assertRaises(UserError):
+            allocation.action_apply()  # nothing left to allocate
+        self.assertEqual(line.analytic_distribution, {str(first.id): 100.0})
+        self.assertFalse(line.x_custom_event_allocation_id)
+
+    def test_revenue_basis_follows_what_each_event_earned(self):
+        first, second = self._two_events()
+        # Two thirds of the revenue on the first event, one third on the second.
+        self._post_revenue(first, 2000.0)
+        self._post_revenue(second, 1000.0)
+        self._overhead_bill()
+        allocation = self._allocation(basis="revenue")
+        allocation.action_compute()
+        shares = {line.analytic_account_id: line.percentage for line in allocation.line_ids}
+        self.assertAlmostEqual(shares[first], 66.67, places=2)
+        self.assertAlmostEqual(shares[second], 33.33, places=2)
+
+    def test_a_period_with_no_event_refuses_rather_than_guesses(self):
+        self._overhead_bill()
+        allocation = self._allocation(date_from="2020-01-01", date_to="2020-01-31")
+        with self.assertRaises(UserError):
+            allocation.action_compute()
+
+    def test_allocated_cost_never_becomes_the_basis_of_the_next_allocation(self):
+        """Otherwise a second run would feed on the first one's output."""
+        first, second = self._two_events()
+        self._post_revenue(first, 1000.0)
+        self._post_revenue(second, 1000.0)
+        self._overhead_bill(amount=500.0)
+        allocation = self._allocation(basis="equal")
+        allocation.action_compute()
+        allocation.action_apply()
+        second_run = self._allocation(name="Second run", basis="direct_cost")
+        weights = second_run._basis_amounts(second_run._events())
+        allocated = self.env["account.move.line"].search([("x_custom_event_allocation_id", "=", allocation.id)])
+        self.assertTrue(allocated, "the first run should have allocated something")
+        self.assertEqual(set(weights.values()), {0.0}, "allocated cost leaked into the basis")

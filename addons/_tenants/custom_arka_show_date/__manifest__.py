@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA Show Date",
-    "version": "19.0.1.8.0",
+    "version": "19.0.1.9.0",
     "summary": "Show-date and event on the whole sale-to-purchase chain, one "
     "analytic account per event, and a PO raised on the sister company "
     "straight from the sale. PT ARKA / AIM only.",
@@ -122,6 +122,22 @@ dates, so enabling it on AIM would block AIM orders that have no show. Event
 tracking makes nothing required and moves no due date, so it is safe on both
 sister companies.
 
+Overhead allocation
+-------------------
+Payroll, tax, insurance and the general journal belong to no single show, so
+they sit in the Unassigned column and make every event look better than it was.
+``custom.arka.event.allocation`` lets the client write the rule down — period,
+which journals and accounts count as overhead, and whether the split follows
+event revenue, directly attributed cost, equal shares, or percentages typed by
+hand — then compute it, read it, and apply it.
+
+The split is written as an ``analytic_distribution`` carrying a percentage per
+event, which the Profit & Loss per Event already weights by. No amount moves, no
+account changes, nothing is re-posted. Lines a document already attributed are
+never touched, only posted expense lines are eligible, and every line written
+carries ``x_custom_event_allocation_id`` so Reset puts back exactly what that run
+changed.
+
 TENANT-SCOPED: built for the PT ARKA company on the aimarka tenant DBs
 (uat_aimarka, rnd_aimarka, prd_EAL_ArkaAim). The behaviour is gated by the
 ``res.company`` boolean flag, NOT by company name and NOT merely by install, so
@@ -145,12 +161,14 @@ module is inert.
         "custom_intercompany_procurement",
     ],
     "data": [
+        "security/ir.model.access.csv",
         "data/analytic_plan.xml",
         "views/res_company_views.xml",
         "views/sale_order_views.xml",
         "views/product_views.xml",
         "views/purchase_order_views.xml",
         "views/account_move_views.xml",
+        "views/event_allocation_views.xml",
         "views/profit_loss_wizard_views.xml",
     ],
     "installable": True,

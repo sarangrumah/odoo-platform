@@ -109,6 +109,11 @@ class CustomArkaEventMixin(models.AbstractModel):
         if account:
             if not account.active:
                 account.active = True
+            # Self-healing: accounts created before 1.9.0 have no show date, and
+            # the overhead allocation selects the events of a period by it.
+            _name, _location, show_date = self._custom_event_values()
+            if show_date and not account.x_custom_event_show_date:
+                account.x_custom_event_show_date = show_date
             return account
         if not create:
             return Account.browse()
@@ -123,6 +128,7 @@ class CustomArkaEventMixin(models.AbstractModel):
                 # have to meet on the same analytic account.
                 "company_id": False,
                 "x_custom_event_key": key,
+                "x_custom_event_show_date": self._custom_event_values()[2],
             }
         )
 

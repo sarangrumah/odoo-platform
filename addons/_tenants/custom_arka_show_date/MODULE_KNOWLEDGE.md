@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-06-09T00:00:00Z
 generator: hand-authored
 module: custom_arka_show_date
-manifest_version: 19.0.1.8.0
+manifest_version: 19.0.1.9.0
 ---
 
 # custom_arka_show_date
@@ -165,6 +165,44 @@ use.
   order without a show. The event flag makes nothing required and moves no due
   date, so it is safe on both sister companies — which it must be.
 
+## Overhead Allocation (1.9+)
+Payroll, PPh, insurance and the general journal belong to no single show — in
+prd_arkaaim about 630 journal items — so they sit in **Unassigned** and make
+every event look better than it was. `custom.arka.event.allocation` lets the
+client write the rule down instead of hard-coding a policy: period, which
+journals and accounts count as overhead, and a basis (share of event revenue,
+share of directly attributed cost, equal shares, or percentages typed by hand).
+Compute shows the split before anything is written; Apply writes it; Reset takes
+it back.
+
+Design points that matter:
+- **No journal entry.** The split is written as an `analytic_distribution`
+  carrying a percentage per event, and the branch-report SQL already weights by
+  `kv.value / 100`, so one Rp 100 juta line can read as 60 + 40 juta across two
+  columns. No amount moves and nothing is re-posted.
+- **Direct attribution wins.** Only lines with NO distribution are eligible;
+  overhead is by definition what no document claimed.
+- **Expense accounts only** — allocating a bank or payable line to a show is
+  meaningless.
+- **`account.move.line.x_custom_event_allocation_id`** records which run wrote a
+  line, which is what makes Reset exact and what keeps allocated cost OUT of the
+  basis of the next allocation (otherwise a second run feeds on the first's
+  output and never converges).
+- **Posted lines only**; an allocation is a period-close activity.
+- Percentages are largest-remainder rounded to two decimals so they sum to
+  exactly 100 — a naive round leaves 99.99 and silently loses overhead.
+
+`account.analytic.account.x_custom_event_show_date` (1.9+) is how the events of
+a period are selected; parsing the date back out of the name would be exactly
+the fragility the field avoids. It is set on creation, self-healed whenever a
+document resolves its event, and backfilled by
+`migrations/19.0.1.9.0/post-migration.py`.
+
+**Reality check on prd_arkaaim (Aug-2026):** only one event carries attributed
+revenue and one carries attributed cost, so *revenue* gives Soekarno Cup 100%
+and *direct cost* gives HUT RI 81 100%. Until direct attribution is broader,
+*equal* is the only basis that says anything. Choosing is the client's call.
+
 ## Profit & Loss per Event (1.7+)
 `custom.report.profit.loss.event` (`profit_loss_event`) is the analytic reading
 of the same statement: it inherits the *branch* variant untouched — which
@@ -194,6 +232,9 @@ only. `profit_loss_event` is registered in `REPORT_MODEL_MAP` (models/__init__)
 - `product.template` / `product.product` (inherited) —
   `x_custom_ic_purchase_product_id` + `_custom_ic_purchase_product()`.
 - `custom.report.profit.loss.event` — P&L pivoted per event analytic account.
+- `custom.arka.event.allocation` / `.line` — overhead allocation rule and its
+  per-event share; `account.move.line.x_custom_event_allocation_id` records
+  and reverses what a run wrote.
 - `sale.order` (inherited) — `x_custom_show_date` (Date),
   `x_custom_show_date_required` (computed view-driver). Overrides
   `_confirmation_error_message`, `_prepare_invoice`.
@@ -247,7 +288,17 @@ lines, back-link, tagging, and that it does NOT inherit the customer price);
 the mirrored AIM order carrying the event fields and landing on the same
 analytic account; the per-Event P&L columns; and the sale→purchase product
 pairing — swapped on the purchase order, quantities and event intact, one hop
-only, unpaired products bought as themselves, no self-pairing.
+only, unpaired products bought as themselves, no self-pairing; and the overhead
+allocation — equal split, percentages summing to 100 on an awkward three-way,
+exact reset, an already-attributed line never touched, revenue basis following
+what each event earned, a period with no event refusing rather than guessing,
+and allocated cost never becoming the basis of the next run.
+
+The fixture's show date is in **March 2026** deliberately: event analytic
+accounts are shared across companies, so a test run against a clone of a tenant
+DB would otherwise resolve to that tenant's real "Soekarno Cup" and drag the
+client's events into any period-based allocation. It stays in the past because
+`action_post()` posts softly and a future-dated invoice would quietly stay draft.
 
 `tests/test_show_date.py` (`AccountTestInvoicingCommon`): propagation SO→invoice,
 required-only-when-flag-on, due date anchored to show date (show+30, not
