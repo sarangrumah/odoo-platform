@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- "Purchased As" belongs next to the vendor pricing: it answers the same
+         question (what does buying this actually mean) and the buyer who
+         maintains supplier info is the one who maintains this. -->
+    <record id="view_product_template_form_arka_purchase_pair" model="ir.ui.view">
+        <field name="name">product.template.form.arka.purchase.pair</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <field name="purchase_ok" position="after">
+                <field name="x_custom_ic_purchase_product_id"
+                       invisible="not sale_ok"
+                       options="{'no_create': True}"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_product_template_list_arka_purchase_pair" model="ir.ui.view">
+        <field name="name">product.template.list.arka.purchase.pair</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_tree_view"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="x_custom_ic_purchase_product_id" optional="hide"/>
+            </field>
+        </field>
+    </record>
+</odoo>

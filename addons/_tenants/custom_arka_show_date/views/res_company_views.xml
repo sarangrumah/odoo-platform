@@ -6,9 +6,10 @@
         <field name="inherit_id" ref="base.view_company_form"/>
         <field name="arch" type="xml">
             <xpath expr="//notebook" position="inside">
-                <page string="Show Date" name="arka_show_date">
+                <page string="Show Date &amp; Event" name="arka_show_date">
                     <group>
                         <field name="x_custom_show_date_enabled"/>
+                        <field name="x_custom_event_tracking_enabled"/>
                     </group>
                 </page>
             </xpath>

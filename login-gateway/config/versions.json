@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-07T23:42:59+00:00",
+  "generated_at": "2026-09-07T23:56:34+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "9db6512",
-    "branch": "HEAD"
+    "commit": "e8d036e",
+    "branch": "feat/arka-event-chain"
   },
   "buckets": [
     {
@@ -228,14 +228,24 @@
       "module": "custom_arka_show_date",
       "bucket": "_tenants",
       "name": "ARKA Show Date",
-      "version": "19.0.1.6.0",
-      "summary": "Show-date, event and DP fields on quotation/SO/customer invoice, with payment terms anchored to the show date. PT ARKA only.",
+      "version": "19.0.1.8.0",
+      "summary": "Show-date and event on the whole sale-to-purchase chain, one analytic account per event, and a PO raised on the sister company straight from the sale. PT ARKA / AIM only.",
       "category": "Tenants/ARKA-AIM",
-      "depends": 4,
+      "depends": 7,
       "public": false,
-      "last_change": "2026-09-04",
-      "change_count": 9,
+      "last_change": "2026-09-08",
+      "change_count": 11,
       "changes": [
+        {
+          "sha": "a1c1a2d",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): buy the Sewa product when the Jasa product is sold"
+        },
+        {
+          "sha": "d4dc5cc",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): carry the event from the customer sale through to AIM, and give it an analytic account"
+        },
         {
           "sha": "2546f07",
           "date": "2026-09-04",
@@ -265,16 +275,6 @@
           "sha": "c526074",
           "date": "2026-07-17",
           "subject": "style: ruff-format four files that were formatted at the wrong line length"
-        },
-        {
-          "sha": "0e89d2c",
-          "date": "2026-07-17",
-          "subject": "feat(reports,arka): port /opt-only runtime work onto feat/industry-packs"
-        },
-        {
-          "sha": "9984c97",
-          "date": "2026-07-07",
-          "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         }
       ]
     },
@@ -2010,15 +2010,9 @@
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
-      "last_change": "2026-09-08",
-      "change_count": 1,
-      "changes": [
-        {
-          "sha": "16e7fe0",
-          "date": "2026-09-08",
-          "subject": "feat(assets): damage, missing, repair and replacement lifecycle on the register"
-        }
-      ]
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
     },
     {
       "module": "custom_asset_stock_link",
@@ -2030,13 +2024,8 @@
       "depends": 5,
       "public": true,
       "last_change": "2026-09-08",
-      "change_count": 2,
+      "change_count": 1,
       "changes": [
-        {
-          "sha": "c1ef37b",
-          "date": "2026-09-08",
-          "subject": "fix(assets): read a serial's physical position from the net, not the largest quant"
-        },
         {
           "sha": "8c3f352",
           "date": "2026-09-08",

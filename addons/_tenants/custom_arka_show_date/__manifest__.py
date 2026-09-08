@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 {
     "name": "ARKA Show Date",
-    "version": "19.0.1.6.0",
-    "summary": "Show-date, event and DP fields on quotation/SO/customer invoice, "
-    "with payment terms anchored to the show date. PT ARKA only.",
+    "version": "19.0.1.8.0",
+    "summary": "Show-date and event on the whole sale-to-purchase chain, one "
+    "analytic account per event, and a PO raised on the sister company "
+    "straight from the sale. PT ARKA / AIM only.",
     "description": """
 ARKA Show Date
 ==============
@@ -64,6 +65,63 @@ down-payment invoice::
     Jasa Drone Show 1000 Unit, Event Soekarno Cup, Lokasi Stadion Gelora Bung
     Tomo Surabaya, 24.08.26 (Uang Muka ref: INV/ARKA/2026/08/002 tgl 14/08/2026)
 
+Event on the buying leg
+-----------------------
+The purchase order captures the same ``x_custom_show_date`` /
+``x_custom_event_name`` / ``x_custom_event_location``, hands them to the vendor
+bill through ``_prepare_invoice``, and — where
+``custom_intercompany_procurement`` mirrors the PO into the sister company —
+writes them onto the mirrored sales order. Before this the event reached the
+selling company only as free text in the header note ("MERDEKA RUN - MONAS"),
+so it could not be reported on and could not be trusted.
+
+Purchase order raised from the sale
+-----------------------------------
+``sale.order.action_custom_create_ic_purchase_order()`` creates a DRAFT purchase
+order on the sister company named by the intercompany rule, carrying the event,
+the show date and the ordered lines. Prices are left to the vendor's own supplier
+info rather than copied from the customer order — the sister company's price is
+not the customer's price. Confirming the draft then triggers the existing PO ->
+SO mirror, so one sale produces the whole chain: ARKA sale -> ARKA purchase ->
+AIM sale, all naming the same event.
+
+Sale product vs purchase product
+--------------------------------
+The client keeps two catalogues for one show: the customer order carries the
+*Jasa* product ARKA sells, the purchase order on AIM carries the matching *Sewa*
+rental. ``product.template.x_custom_ic_purchase_product_id`` ("Purchased As")
+records that pairing, and the generated purchase order swaps the product::
+
+    Jasa Drone Show 250 Unit  (sold)  ->  Sewa Drone Show 250 Unit  (bought)
+
+Odoo has no native sale-to-purchase substitution — ``product.supplierinfo``
+prices a product from a vendor, it does not replace it. Resolution is one hop
+only and falls back to the product itself, so an unpaired product still buys as
+itself.
+
+Analytic account per event
+--------------------------
+For companies with ``res.company.x_custom_event_tracking_enabled``, sales
+orders, purchase orders and journal entries resolve their event to a single
+analytic account in the "Event" plan, named by concatenating the event, its
+location and the show date::
+
+    Soekarno Cup - Stadion Gelora Bung Tomo Surabaya - 24.08.26
+
+The account is created on first use, matched on a normalised key so retyped
+spacing and capitalisation still land on one account, and is created WITHOUT a
+company so ARKA's revenue and AIM's cost for the same show meet on it — which is
+what makes a cross-company Profit & Loss per event possible. Order confirmation
+stamps the distribution on lines that carry none; a "Tag Event" button does the
+same for a bill that has no source document. Lines an operator has already
+split across events by hand are never overwritten.
+
+This gate is deliberately NOT ``x_custom_show_date_enabled``: that flag makes
+the show date required on sales orders and re-anchors customer-invoice due
+dates, so enabling it on AIM would block AIM orders that have no show. Event
+tracking makes nothing required and moves no due date, so it is safe on both
+sister companies.
+
 TENANT-SCOPED: built for the PT ARKA company on the aimarka tenant DBs
 (uat_aimarka, rnd_aimarka, prd_EAL_ArkaAim). The behaviour is gated by the
 ``res.company`` boolean flag, NOT by company name and NOT merely by install, so
@@ -74,10 +132,24 @@ module is inert.
     "author": "Platform",
     "website": "https://example.com/custom-platform",
     "category": "Tenants/ARKA-AIM",
-    "depends": ["sale_management", "account", "custom_core", "custom_accounting_reports"],
+    "depends": [
+        "sale_management",
+        "purchase",
+        "account",
+        "analytic",
+        "custom_core",
+        "custom_accounting_reports",
+        # The SO -> PO button and the event carry-over into the sister
+        # company's mirrored order both build on this module's
+        # account.intercompany.rule and its PO -> SO mirror.
+        "custom_intercompany_procurement",
+    ],
     "data": [
+        "data/analytic_plan.xml",
         "views/res_company_views.xml",
         "views/sale_order_views.xml",
+        "views/product_views.xml",
+        "views/purchase_order_views.xml",
         "views/account_move_views.xml",
         "views/profit_loss_wizard_views.xml",
     ],
