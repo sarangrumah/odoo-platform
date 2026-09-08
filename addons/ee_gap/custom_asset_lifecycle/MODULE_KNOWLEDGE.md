@@ -142,6 +142,13 @@ pinned onto it. 19.0.1.2.0 resolves the destination per asset instead, and the
 replacement wizard takes its accounts from the replaced asset's company rather
 than the active one.
 
+**"The company's warehouse" is not a single thing.** PT Aero Inovasi Media has
+four, all on sequence 10, so `search([...], limit=1)` resolves by id — and two of
+the four are the damage and lost warehouses, the last place a returning unit
+should be sent. Anywhere a warehouse has to be guessed, the register is asked
+which one actually holds the fleet, and an explicitly ordered search is only the
+last resort.
+
 **Return To Service goes back to where the unit actually was.** The condition event
 records `from_location_id` before the unit moves, because once it is sitting in the
 damage warehouse nothing else knows where it came from. A fleet spread over several
@@ -181,7 +188,7 @@ them, because write-offs and replacements refuse to post without them.
 
 ## Tests
 
-`tests/test_asset_lifecycle.py` — 27 tests. Notably: depreciation continues
+`tests/test_asset_lifecycle.py` — 28 tests. Notably: depreciation continues
 through damage and repair; a write-off closes the condition and stops it;
 replacement posts the acquisition entry at fair value and gives the new unit a
 full life; warranty is excluded from lifetime cost; a serial with an offsetting

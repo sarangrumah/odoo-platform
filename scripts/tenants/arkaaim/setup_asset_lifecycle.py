@@ -125,17 +125,38 @@ def warehouse_stock_location(env, code, company):
     return env["stock.location"]
 
 
+def fleet_parent_location(env, company):
+    """The view location of the warehouse this company's fleet actually lives in.
+
+    Not ``search([("company_id", "=", ...)], limit=1)``: PT Aero Inovasi Media has
+    four warehouses, all on sequence 10, so that resolves by id -- and two of the
+    four are the damage and lost warehouses. Same class of assumption as the
+    cross-company bug this script exists to repair, answered the same way: from
+    the register.
+    """
+    groups = env["custom.fixed.asset"]._read_group(
+        domain=[("company_id", "=", company.id), ("stock_location_id", "!=", False)],
+        groupby=["stock_location_id"],
+        aggregates=["__count"],
+    )
+    if groups:
+        busiest = sorted(groups, key=lambda pair: pair[1], reverse=True)[0][0]
+        if busiest.warehouse_id:
+            return busiest.warehouse_id.view_location_id
+    warehouse = env["stock.warehouse"].search([("company_id", "=", company.id)], limit=1, order="sequence, id")
+    return warehouse.view_location_id if warehouse else env["stock.location"]
+
+
 def ensure_child_location(env, company, name):
     """A company without its own damage/lost warehouse gets a location instead.
 
     Cheaper than a warehouse -- no sequences, picking types or rules -- and all
     these units need is somewhere of their own company to sit.
     """
-    warehouse = env["stock.warehouse"].search([("company_id", "=", company.id)], limit=1)
-    if not warehouse:
+    parent = fleet_parent_location(env, company)
+    if not parent:
         _logger.warning("%s has no warehouse -- cannot place %r", company.name, name)
         return env["stock.location"]
-    parent = warehouse.view_location_id
     existing = env["stock.location"].search([("name", "=", name), ("location_id", "=", parent.id)], limit=1)
     if existing:
         return existing

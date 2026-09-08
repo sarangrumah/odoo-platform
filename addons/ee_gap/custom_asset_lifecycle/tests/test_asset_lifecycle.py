@@ -721,3 +721,48 @@ class TestAssetLifecycle(TransactionCase):
         asset.invalidate_recordset()
         self.assertEqual(asset.condition, "ok")
         self.assertEqual(asset.stock_location_id, shelf, "It must go back to the shelf it came off")
+
+    def test_the_fallback_home_is_the_fleet_warehouse_not_the_first_one(self):
+        """ "The company's warehouse" is not a single thing.
+
+        PT Aero Inovasi Media has four, all on sequence 10, so an unordered
+        search resolves by id -- and two of the four are the damage and lost
+        warehouses, the last place a returning unit should be sent. Ask the
+        register which one actually holds the fleet.
+
+        Asserted against whatever the register says rather than a fixed
+        location, because this suite runs against a restored production
+        database whose fleet dwarfs anything the test creates.
+        """
+        decoy = self.env["stock.warehouse"].create(
+            {"name": "Decoy Warehouse", "code": "DCY", "company_id": self.company.id}
+        )
+        self.assertTrue(decoy.lot_stock_id)
+
+        groups = self.env["custom.fixed.asset"]._read_group(
+            domain=[
+                ("company_id", "=", self.company.id),
+                ("stock_location_id", "!=", False),
+                ("condition", "=", "ok"),
+            ],
+            groupby=["stock_location_id"],
+            aggregates=["__count"],
+        )
+        self.assertTrue(groups, "The register must place at least one unit somewhere")
+        busiest = sorted(groups, key=lambda pair: pair[1], reverse=True)[0][0]
+
+        orphan = self._make_asset("Orphan")
+        self.assertFalse(
+            orphan.location_id.stock_location_id,
+            "No accounting mapping, so the fallback is what answers",
+        )
+        self.assertEqual(
+            orphan._fleet_home_location(),
+            busiest,
+            "The fallback must follow the fleet",
+        )
+        self.assertNotEqual(
+            orphan._fleet_home_location(),
+            decoy.lot_stock_id,
+            "and must never be a warehouse that holds none of it",
+        )

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-08T00:41:27+00:00",
+  "generated_at": "2026-09-08T00:55:24+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "00a7efb",
+    "commit": "15daf04",
     "branch": "fix/asset-lifecycle-company-scoping"
   },
   "buckets": [
@@ -2016,8 +2016,13 @@
       "depends": 5,
       "public": true,
       "last_change": "2026-09-08",
-      "change_count": 1,
+      "change_count": 2,
       "changes": [
+        {
+          "sha": "15daf04",
+          "date": "2026-09-08",
+          "subject": "fix(assets): keep lifecycle destinations inside the asset's own company"
+        },
         {
           "sha": "d158ebe",
           "date": "2026-09-08",

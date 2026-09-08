@@ -298,7 +298,35 @@ class CustomFixedAsset(models.Model):
         mapped = self.location_id.stock_location_id
         if mapped:
             return mapped
-        warehouse = self.env["stock.warehouse"].search([("company_id", "=", self.company_id.id)], limit=1)
+        return self._fleet_home_location()
+
+    def _fleet_home_location(self):
+        """Last resort: wherever the rest of this company's fleet lives.
+
+        Picking "the company's warehouse" with an unordered ``search(limit=1)``
+        is the same class of assumption as the cross-company bug: PT Aero Inovasi
+        Media has four warehouses, all on sequence 10, so the winner is decided by
+        id -- and two of the four are the damage and lost warehouses, which is the
+        last place a returning unit should be sent.
+
+        Ask the register instead. Only reached when the unit has no recorded
+        origin and its asset location maps to no warehouse location.
+        """
+        self.ensure_one()
+        groups = self.sudo()._read_group(
+            domain=[
+                ("company_id", "=", self.company_id.id),
+                ("stock_location_id", "!=", False),
+                ("condition", "=", "ok"),
+            ],
+            groupby=["stock_location_id"],
+            aggregates=["__count"],
+        )
+        if groups:
+            return sorted(groups, key=lambda pair: pair[1], reverse=True)[0][0]
+        warehouse = self.env["stock.warehouse"].search(
+            [("company_id", "=", self.company_id.id)], limit=1, order="sequence, id"
+        )
         return warehouse.lot_stock_id if warehouse else self.env["stock.location"]
 
     def _resolve_serial_source_location(self):
