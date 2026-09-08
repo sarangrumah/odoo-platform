@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-08T04:03:03+00:00",
+  "generated_at": "2026-09-08T04:38:22+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "b24e84de",
-    "branch": "feat/arkaaim-gr-journal"
+    "commit": "aaf29c82",
+    "branch": "feat/arkaaim-show-cost-chargeout"
   },
   "buckets": [
     {
@@ -167,17 +167,12 @@
       "depends": 5,
       "public": false,
       "last_change": "2026-09-08",
-      "change_count": 3,
+      "change_count": 2,
       "changes": [
         {
-          "sha": "b24e84de",
+          "sha": "9d1572e6",
           "date": "2026-09-08",
-          "subject": "feat(arkaaim): wire the GR/IR accrual to the training chart as well"
-        },
-        {
-          "sha": "1756c37d",
-          "date": "2026-09-08",
-          "subject": "feat(arkaaim): book the GR/IR accrual when a goods receipt is validated"
+          "subject": "feat(arkaaim): book the GR/IR accrual when a goods receipt is validated (#230)"
         },
         {
           "sha": "e4d5c4c0",
@@ -238,14 +233,19 @@
       "module": "custom_arka_show_date",
       "bucket": "_tenants",
       "name": "ARKA Show Date",
-      "version": "19.0.1.9.0",
+      "version": "19.0.1.10.0",
       "summary": "Show-date and event on the whole sale-to-purchase chain, one analytic account per event, and a PO raised on the sister company straight from the sale. PT ARKA / AIM only.",
       "category": "Tenants/ARKA-AIM",
       "depends": 7,
       "public": false,
       "last_change": "2026-09-08",
-      "change_count": 11,
+      "change_count": 12,
       "changes": [
+        {
+          "sha": "aaf29c82",
+          "date": "2026-09-08",
+          "subject": "feat(arkaaim): charge a show's cost out of inventory when its revenue is recognised"
+        },
         {
           "sha": "00a7efb2",
           "date": "2026-09-08",
@@ -280,11 +280,6 @@
           "sha": "2b1b0968",
           "date": "2026-07-21",
           "subject": "feat(arkaaim): event description block on SO lines + product name & bank on PDFs"
-        },
-        {
-          "sha": "c5260748",
-          "date": "2026-07-17",
-          "subject": "style: ruff-format four files that were formatted at the wrong line length"
         }
       ]
     },

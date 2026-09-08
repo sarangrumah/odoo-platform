@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      Expense account CODES the show-cost charge-out debits, comma-separated and
+      tried in order, resolved per company. Used when the product categories
+      behind an inventory account do not agree on an expense account of their
+      own — on ARKA-AIM most carry none.
+
+        6199000000  COGS-Others          (Erajaya chart, prd_arkaaim)
+        51000010    Cost of Goods Sold   (plain Indonesian chart, trn_arkaaim)
+
+      noupdate="1" so a value changed by an administrator survives upgrades.
+      Editable at Settings > Technical > System Parameters.
+    -->
+    <data noupdate="1">
+        <record id="param_event_chargeout_expense_codes" model="ir.config_parameter">
+            <field name="key">custom_arka_show_date.event_chargeout_expense_codes</field>
+            <field name="value">6199000000,51000010</field>
+        </record>
+    </data>
+</odoo>

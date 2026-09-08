@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-06-09T00:00:00Z
 generator: hand-authored
 module: custom_arka_show_date
-manifest_version: 19.0.1.9.0
+manifest_version: 19.0.1.10.0
 ---
 
 # custom_arka_show_date
@@ -203,6 +203,52 @@ revenue and one carries attributed cost, so *revenue* gives Soekarno Cup 100%
 and *direct cost* gives HUT RI 81 100%. Until direct attribution is broader,
 *equal* is the only basis that says anything. Choosing is the client's call.
 
+## Show-Cost Charge-Out (1.10+)
+Since `custom_arka_aim_purchase_type` 19.0.1.1.0, a goods receipt of a show's
+operating cost books `Dr Inventory-Others / Cr GR-IR`. That is right when the
+goods arrive and wrong once the show is over: the cost of a performed, invoiced
+show is not an asset. Left alone the inventory account would grow by every show
+ARKA ever runs, and the P&L per Event would report revenue against no cost.
+
+`models/event_chargeout.py` moves it out **when the event's revenue is
+recognised** — the client's choice, so cost meets revenue in the same period.
+At ARKA a down payment is booked to a liability account and recognises nothing,
+so the first entry that credits an income account for an event IS its revenue.
+
+The hook is on `account.move._post` and reads the events the posted moves touch,
+which covers both directions with one rule — *an event whose revenue is
+recognised carries no inventory*:
+
+* the customer invoice posts → everything accrued for that show is charged out;
+* a goods receipt posts LATE, after the invoice → its own posting re-checks the
+  event, finds the revenue recognised, and charges that cost out at once instead
+  of stranding it.
+
+It posts, per company and per inventory account, in the stock journal, dated on
+the move that triggered it, with the event's distribution on **both** legs:
+
+    Dr Cost of Goods Sold      Cr Inventory-Others
+
+**No state is kept, deliberately.** Every run recomputes what is still on the
+inventory accounts for that event, and credits those same accounts — so the
+balance falls to zero by construction. Re-running charges nothing twice, a late
+cost is picked up in full, a reversal reappears as a balance to charge again,
+and there is no register to drift out of step with the ledger.
+
+Accounts are not configured twice: the inventory accounts ARE the valuation
+accounts of the real-time categories, so the same `real_time` switch that turns
+the GR journal on turns this on, category by category. The expense account is
+the categories' own where the categories sharing an inventory account agree on
+one; they usually do not (on ARKA-AIM most carry none), so the fallback is the
+first code in `custom_arka_show_date.event_chargeout_expense_codes`
+(`6199000000` Erajaya, `51000010` plain Indonesian chart), resolved per company.
+
+`scripts/tenants/arkaaim/report_event_chargeout.py` shows, per event, what is
+in inventory, what revenue is recognised and what would move — and with
+`COMMIT = True` charges out the events already recognised. That is the catch-up
+for shows invoiced *before* the feature existed, which have no posting left to
+trigger them; entries are dated today, so no closed period is reopened.
+
 ## Profit & Loss per Event (1.7+)
 `custom.report.profit.loss.event` (`profit_loss_event`) is the analytic reading
 of the same statement: it inherits the *branch* variant untouched — which
@@ -235,6 +281,10 @@ only. `profit_loss_event` is registered in `REPORT_MODEL_MAP` (models/__init__)
 - `custom.arka.event.allocation` / `.line` — overhead allocation rule and its
   per-event share; `account.move.line.x_custom_event_allocation_id` records
   and reverses what a run wrote.
+- `account.analytic.account` (inherited, `event_chargeout.py`) —
+  `_custom_event_amounts()`, `_custom_event_revenue_recognised()`,
+  `_custom_event_inventory_accounts()`, `_custom_event_chargeout()`: the
+  show-cost charge-out. `account.move._post` is the trigger.
 - `sale.order` (inherited) — `x_custom_show_date` (Date),
   `x_custom_show_date_required` (computed view-driver). Overrides
   `_confirmation_error_message`, `_prepare_invoice`.
@@ -293,6 +343,13 @@ allocation — equal split, percentages summing to 100 on an awkward three-way,
 exact reset, an already-attributed line never touched, revenue basis following
 what each event earned, a period with no event refusing rather than guessing,
 and allocated cost never becoming the basis of the next run.
+
+`tests/test_event_chargeout.py` — the cost stays in inventory until the show is
+invoiced; invoicing moves it to expense, in the period of the revenue, with the
+event on both legs; a second invoice charges nothing twice; a cost arriving after
+the invoice charges itself out at once; only this event's share of a split line
+moves; the company gate keeps it inert; a negative balance is never charged back
+into inventory; and an event with no inventory posts nothing.
 
 The fixture's show date is in **March 2026** deliberately: event analytic
 accounts are shared across companies, so a test run against a clone of a tenant

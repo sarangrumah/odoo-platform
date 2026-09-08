@@ -5,6 +5,7 @@ from . import res_company
 from . import sale_order
 from . import purchase_order
 from . import event_allocation
+from . import event_chargeout
 from . import sale_order_line
 from . import sale_make_invoice_advance
 from . import account_move
