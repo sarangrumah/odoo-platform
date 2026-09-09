@@ -108,17 +108,17 @@
                     <tr>
                         <th>Tanggal</th><th>No. Dokumen</th><th>No. Dok Jurnal</th>
                         <th>Lawan Transaksi</th><th>NPWP</th><th>Produk</th><th>COA Expense</th>
-                        <th>Kategori PPh</th><th class="text-end">DPP</th><th class="text-end">Nilai PPN</th>
+                        <th>Kode Objek</th><th>Kategori PPh</th><th class="text-end">DPP</th><th class="text-end">Nilai PPN</th>
                         <th>Status</th><th class="text-end">PPh Dipotong</th>
                     </tr>
                 </thead>
                 <tbody>
                     <t t-foreach="lines" t-as="line">
                         <tr t-if="line.get('type') == 'note'">
-                            <td colspan="12" class="text-muted fst-italic" t-esc="line.get('doc_no')"/>
+                            <td colspan="13" class="text-muted fst-italic" t-esc="line.get('doc_no')"/>
                         </tr>
                         <tr t-elif="line.get('type') == 'grand_total'" class="table-dark fw-bold">
-                            <td colspan="8" t-esc="line.get('partner') or 'TOTAL'"/>
+                            <td colspan="9" t-esc="line.get('partner') or 'TOTAL'"/>
                             <td class="text-end"><span t-esc="line.get('dpp')" t-options="{'widget':'monetary','display_currency':currency}"/></td>
                             <td class="text-end"><span t-esc="line.get('ppn')" t-options="{'widget':'monetary','display_currency':currency}"/></td>
                             <td/>
@@ -132,6 +132,7 @@
                             <td t-esc="line.get('npwp')"/>
                             <td t-esc="line.get('product')"/>
                             <td t-esc="line.get('coa_expense')"/>
+                            <td t-esc="line.get('kode_objek')"/>
                             <td t-esc="line.get('kategori')"/>
                             <td class="text-end"><span t-esc="line.get('dpp')" t-options="{'widget':'monetary','display_currency':currency}"/></td>
                             <td class="text-end"><span t-esc="line.get('ppn')" t-options="{'widget':'monetary','display_currency':currency}"/></td>

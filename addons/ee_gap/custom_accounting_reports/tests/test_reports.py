@@ -1112,6 +1112,16 @@ class TestCustomReports(TransactionCase):
                 "tax_amount": 20.0,
             }
         )
+        # The recap only counts a withholding line once the engine has booked
+        # its "Pemotongan PPh" entry, so the fixture has to book one too —
+        # without it the line is reported as an orphan and the total stays 0.
+        if "x_custom_withholding_move_id" in move._fields:
+            pemotongan = self._post_move(
+                [(self.acc_pay, 20.0, 0.0), (acc_pph, 0.0, 20.0)],
+                partner=self.partner_b,
+                ref="Pemotongan PPh",
+            )
+            move.x_custom_withholding_move_id = pemotongan.id
         lines = rep._build_lines(filters)
         grand = next(l for l in lines if l.get("type") == "grand_total")
         self.assertAlmostEqual(grand["pph"], 20.0, places=2)
@@ -1121,6 +1131,78 @@ class TestCustomReports(TransactionCase):
             ),
             "The jenis penghasilan (category) must appear on detail rows.",
         )
+
+    def test_pph_withholding_kode_objek_from_bill_line(self):
+        """Kode Objek picked on the expense line must reach the recap.
+
+        The operator sets it on the line being expensed while the PPh lands on
+        the tax line, so the report has to walk back from the tax line to its
+        base lines. Reading the picker off the tax line yielded a blank column.
+        """
+        AML = self.env["account.move.line"]
+        if "tax.withholding.rule" not in self.env or "x_custom_withholding_category_id" not in AML._fields:
+            self.skipTest("custom_tax_id (withholding picker) not installed")
+        acc_pph = self._mk_account("21291", "Hutang PPh 4(2)", "liability_current")
+        cat = self.env["tax.withholding.category"].create(
+            {
+                "name": "Persewaan Tanah dan/atau Bangunan",
+                "code": "SEWA-TEST",
+                "pph_kind": "pph_4_2",
+                "bupot_object_code": "28-403-02",
+            }
+        )
+        self.env["tax.withholding.rule"].create(
+            {
+                "name": "PPh 4(2) Sewa Test",
+                "category_id": cat.id,
+                "tarif": 10.0,
+                "account_id": acc_pph.id,
+                "company_id": self.company.id,
+            }
+        )
+        # Native PPh tax on the bill line — stored with a negative rate.
+        tax = self._mk_ppn_tax("PPh 4(2) Final (10%)", "purchase", acc_pph, amount=-10.0)
+        j_purchase = self.Journal.create(
+            {"name": "Purchases WHT", "code": "BLL9", "type": "purchase", "company_id": self.company.id}
+        )
+        bill = self.Move.create(
+            {
+                "move_type": "in_invoice",
+                "journal_id": j_purchase.id,
+                "partner_id": self.partner_b.id,
+                "invoice_date": date.today(),
+                "date": date.today(),
+                "company_id": self.company.id,
+                "invoice_line_ids": [
+                    Command.create(
+                        {
+                            "name": "Sewa ruko",
+                            "quantity": 1.0,
+                            "price_unit": 1000.0,
+                            "account_id": self.acc_expense.id,
+                            "tax_ids": [Command.set([tax.id])],
+                            "x_custom_withholding_category_id": cat.id,
+                        }
+                    )
+                ],
+            }
+        )
+        bill.action_post()
+
+        lines = self.env["custom.report.pph.withholding"]._build_lines(self._filters(pph_kind="all"))
+        row = next(
+            (
+                l
+                for l in lines
+                if l.get("type") not in ("grand_total", "subtotal", "note") and l.get("doc_no") == bill.name
+            ),
+            None,
+        )
+        self.assertIsNotNone(row, "The bill withheld through a native PPh tax must be listed.")
+        self.assertEqual(row["kode_objek"], "28-403-02")
+        self.assertEqual(row["jenis_penghasilan"], "Persewaan Tanah dan/atau Bangunan")
+        self.assertAlmostEqual(row["dpp"], 1000.0, places=2)
+        self.assertAlmostEqual(row["pph"], 100.0, places=2)
 
     def test_nsfp_monitoring(self):
         acc_ppn_out = self._mk_account("21280", "PPN Keluaran NSFP", "liability_current")
