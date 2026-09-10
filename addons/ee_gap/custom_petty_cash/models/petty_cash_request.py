@@ -30,7 +30,14 @@ from datetime import timedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+from .petty_cash_type import FLOAT_KINDS, KIND_CLAIM, KIND_INITIAL, KIND_REALIZATION
+
 DEFAULT_OU_PLAN = "Operating Unit"
+
+# States in which a request's money is spoken for. A Realisasi reservation
+# starts at *draft* on purpose: the store must not be able to queue up several
+# drafts that each look affordable in isolation.
+FLOAT_OPEN_STATES = ("draft", "to_approve", "approved", "disbursed", "in_realization")
 
 
 class PettyCashRequest(models.Model):
@@ -106,13 +113,13 @@ class PettyCashRequest(models.Model):
     line_ids = fields.One2many(
         "petty.cash.request.line",
         "request_id",
-        string="Estimate Breakdown",
+        string="Detail Lines",
     )
     amount_requested = fields.Monetary(
         string="Amount Requested",
         currency_field="currency_id",
         tracking=True,
-        help="Amount the employee is asking for. When an estimate breakdown is entered it must match this total.",
+        help="Amount the employee is asking for. When detail lines are entered they must add up to this total.",
     )
     realization_deadline = fields.Date(
         string="Realization Deadline",
@@ -172,6 +179,38 @@ class PettyCashRequest(models.Model):
         copy=False,
     )
     is_overdue = fields.Boolean(compute="_compute_is_overdue", search="_search_is_overdue")
+
+    # ------------------------------------------------------------------
+    # Store float (0.6.0) — only meaningful for the pc_* kinds
+    # ------------------------------------------------------------------
+    float_id = fields.Many2one(
+        "petty.cash.float",
+        string="Store Float",
+        compute="_compute_float_id",
+        store=True,
+        index=True,
+        readonly=True,
+        help="The Operating Unit's petty cash float this request draws on. "
+        "Resolved from the company + Operating Unit; the float itself is only "
+        "created by an explicit Finance action.",
+    )
+    amount_float_granted = fields.Monetary(
+        string="Float Granted",
+        currency_field="company_currency_id",
+        compute="_compute_float_amounts",
+        store=True,
+        help="What this request adds to the store's float — the approved amount "
+        "of a 'Petty Cash Awal' request, zero for anything else.",
+    )
+    amount_float_consumed = fields.Monetary(
+        string="Float Reserved",
+        currency_field="company_currency_id",
+        compute="_compute_float_amounts",
+        store=True,
+        help="What this request currently takes out of the store's float: the "
+        "requested amount less whatever has already been realized. Counted from "
+        "draft, and released entirely once the request is settled or cancelled.",
+    )
 
     # ------------------------------------------------------------------
     # Computes
@@ -261,6 +300,138 @@ class PettyCashRequest(models.Model):
         if (operator == "=" and value) or (operator == "!=" and not value):
             return overdue_domain
         return ["!", "&"] + overdue_domain[:1] + overdue_domain[1:]
+
+    # ------------------------------------------------------------------
+    # Store float
+    # ------------------------------------------------------------------
+    @api.depends("company_id", "l10n_ou_analytic_id", "advance_type_kind")
+    def _compute_float_id(self):
+        """Look the OU's float up — never create one.
+
+        A compute that created records would spawn a float every time an
+        employee opened a blank request form, so creation is left to
+        ``action_approve`` on a Petty Cash Awal request and to the Finance
+        Configuration screen.
+        """
+        Float = self.env["petty.cash.float"]
+        for rec in self:
+            if rec.advance_type_kind in FLOAT_KINDS and rec.l10n_ou_analytic_id and rec.company_id:
+                rec.float_id = Float._pc_get_float(rec.company_id, rec.l10n_ou_analytic_id)
+            else:
+                rec.float_id = False
+
+    @api.depends("advance_type_kind", "state", "amount_requested", "amount_realized", "currency_id", "request_date")
+    def _compute_float_amounts(self):
+        for rec in self:
+            granted = consumed = 0.0
+            kind = rec.advance_type_kind
+            # A *settled* Petty Cash Awal means the store handed the float back,
+            # so it stops granting — which is why "settled" is absent here.
+            if kind == KIND_INITIAL and rec.state in ("approved", "disbursed", "in_realization"):
+                granted = rec._pc_conv(rec.amount_requested, rec.request_date)
+            elif kind == KIND_REALIZATION and rec.state in FLOAT_OPEN_STATES:
+                # "Saldo pulih sesuai nilai yang direalisasikan": every rupiah
+                # realized frees a rupiah of the reservation immediately. The
+                # unrealized remainder stays reserved until Finance settles or
+                # cancels the request.
+                outstanding = rec.amount_requested - rec.amount_realized
+                consumed = max(0.0, rec._pc_conv(outstanding, rec.request_date))
+            rec.amount_float_granted = granted
+            rec.amount_float_consumed = consumed
+
+    def _pc_float_plafon(self):
+        """Ceiling for a Petty Cash Awal request in this OU."""
+        self.ensure_one()
+        if self.float_id:
+            return self.float_id.amount_plafon
+        return self.env["petty.cash.float"]._default_plafon()
+
+    def _pc_float_available(self):
+        """The store's available balance, excluding this request's own reservation."""
+        self.ensure_one()
+        pc_float = self.float_id
+        if not pc_float:
+            return 0.0
+        mine = self.amount_float_consumed if self.id else 0.0
+        return pc_float.amount_available + mine
+
+    @api.constrains("advance_type_id", "l10n_ou_analytic_id", "amount_requested", "state", "company_id")
+    def _check_store_float(self):
+        """Gate the store float. Runs from draft — that is the whole point.
+
+        ``pc_claim`` is deliberately exempt: a Claim *is* the escape hatch for a
+        spend the float cannot cover, so checking it against the float would
+        make the type useless.
+        """
+        currency = self.env.company.currency_id
+        for rec in self:
+            kind = rec.advance_type_kind
+            if kind not in FLOAT_KINDS or rec.state in ("settled", "cancelled"):
+                continue
+            if not rec.l10n_ou_analytic_id:
+                raise UserError(
+                    _(
+                        "Request %(name)s is of type %(type)s — pick the Operating Unit (store) it belongs to first.",
+                        name=rec.name,
+                        type=rec.advance_type_id.name,
+                    )
+                )
+            company_currency = rec.company_id.currency_id or currency
+            amount = rec._pc_conv(rec.amount_requested, rec.request_date)
+            if kind == KIND_INITIAL:
+                plafon = rec._pc_float_plafon()
+                granted_elsewhere = sum(
+                    peer.amount_float_granted
+                    for peer in rec._pc_float_peers()
+                    if peer.advance_type_kind == KIND_INITIAL
+                )
+                if plafon and company_currency.compare_amounts(granted_elsewhere + amount, plafon) > 0:
+                    raise UserError(
+                        _(
+                            "Initial petty cash for %(ou)s is capped at %(plafon)s "
+                            "(already granted: %(granted)s). Finance can raise the "
+                            "plafon on the store's float.",
+                            ou=rec.l10n_ou_analytic_id.display_name,
+                            plafon=rec._pc_money(plafon),
+                            granted=rec._pc_money(granted_elsewhere),
+                        )
+                    )
+            elif kind == KIND_REALIZATION:
+                if not rec.float_id or company_currency.is_zero(rec.float_id.amount_granted):
+                    raise UserError(
+                        _(
+                            "%(ou)s has no petty cash float yet. Submit and get an "
+                            "approved 'Petty Cash Awal' request for this store before "
+                            "raising a Realisasi.",
+                            ou=rec.l10n_ou_analytic_id.display_name,
+                        )
+                    )
+                available = rec._pc_float_available()
+                if company_currency.compare_amounts(amount, available) > 0:
+                    raise UserError(
+                        _(
+                            "%(ou)s only has %(available)s left of its petty cash "
+                            "float; this request asks for %(amount)s. Realize an open "
+                            "request to free the balance, or raise a Claim instead.",
+                            ou=rec.l10n_ou_analytic_id.display_name,
+                            available=rec._pc_money(available),
+                            amount=rec._pc_money(amount),
+                        )
+                    )
+
+    def _pc_float_peers(self):
+        """Other requests drawing on the same store float."""
+        self.ensure_one()
+        if not self.l10n_ou_analytic_id:
+            return self.browse()
+        return self.search(
+            [
+                ("id", "!=", self.id or 0),
+                ("company_id", "=", self.company_id.id),
+                ("l10n_ou_analytic_id", "=", self.l10n_ou_analytic_id.id),
+                ("advance_type_kind", "in", list(FLOAT_KINDS)),
+            ]
+        )
 
     # ------------------------------------------------------------------
     # Helpers
@@ -501,7 +672,7 @@ class PettyCashRequest(models.Model):
                 if not rec.currency_id.is_zero(total - rec.amount_requested):
                     raise UserError(
                         _(
-                            "The estimate breakdown (%(bd)s) does not match the requested amount (%(req)s).",
+                            "The detail lines (%(bd)s) do not add up to the requested amount (%(req)s).",
                             bd=total,
                             req=rec.amount_requested,
                         )
@@ -663,8 +834,28 @@ class PettyCashRequest(models.Model):
             if rec.state not in ("to_approve", "draft"):
                 raise UserError(_("Only requests awaiting approval can be approved."))
             rec._approval_check_required()
+            if rec.advance_type_kind == KIND_INITIAL and rec.l10n_ou_analytic_id:
+                # First approved Petty Cash Awal for the store materialises its
+                # float. Done here, on an explicit Finance action, rather than
+                # in the compute — see petty_cash_float.__doc__.
+                self.env["petty.cash.float"]._pc_get_float(rec.company_id, rec.l10n_ou_analytic_id, create=True)
+                # The float did not exist when float_id was last computed, and
+                # creating it is not a dependency change the ORM can see.
+                rec._compute_float_id()
             rec.state = "approved"
             rec.message_post(body=_("Approved."), subtype_xmlid="mail.mt_note")
+        return True
+
+    def action_refuse(self):
+        """Finance rejects the request outright (as opposed to sending it back)."""
+        for rec in self:
+            if rec.state in ("settled", "cancelled"):
+                raise UserError(_("%s is already closed.") % rec.name)
+            if rec.move_ids.filtered(lambda m: m.state == "posted"):
+                raise UserError(_("This request already has posted journal entries. Reverse them before refusing."))
+            rec.action_cancel_approval()
+            rec.state = "cancelled"
+            rec.message_post(body=_("Refused by Finance."), subtype_xmlid="mail.mt_note")
         return True
 
     def action_reject(self):
@@ -789,10 +980,27 @@ class PettyCashRequest(models.Model):
     # ------------------------------------------------------------------
     # Realization
     # ------------------------------------------------------------------
+    def _pc_realizable_states(self):
+        """States from which a realization may be recorded.
+
+        A Realisasi request draws on cash the store already holds, so there is
+        no Bank-Out step to wait for: the employee accounts for the spend as
+        soon as Finance approves. Every other kind still has to be disbursed
+        first.
+        """
+        self.ensure_one()
+        if self.advance_type_kind in (KIND_REALIZATION, KIND_CLAIM):
+            return ("approved", "disbursed", "in_realization")
+        return ("disbursed", "in_realization")
+
     def action_open_realization(self):
         self.ensure_one()
-        if self.state not in ("disbursed", "in_realization"):
-            raise UserError(_("Disburse the request before recording a realization."))
+        if self.state not in self._pc_realizable_states():
+            raise UserError(
+                _("Approve the request before recording a realization.")
+                if self.advance_type_kind in (KIND_REALIZATION, KIND_CLAIM)
+                else _("Disburse the request before recording a realization.")
+            )
         return {
             "type": "ir.actions.act_window",
             "name": _("New Realization"),
@@ -809,7 +1017,9 @@ class PettyCashRequest(models.Model):
     def _on_realization_posted(self):
         """Called by a realization when it posts — flip to in_realization."""
         for rec in self:
-            if rec.state == "disbursed":
+            if rec.state == "disbursed" or (
+                rec.state == "approved" and rec.advance_type_kind in (KIND_REALIZATION, KIND_CLAIM)
+            ):
                 rec.state = "in_realization"
 
     # ------------------------------------------------------------------
@@ -901,6 +1111,8 @@ class PettyCashRequest(models.Model):
 
     def action_settle(self):
         self.ensure_one()
+        if self.advance_type_kind in (KIND_REALIZATION, KIND_CLAIM):
+            return self._settle_float_request()
         if self.state not in ("disbursed", "in_realization"):
             raise UserError(_("Only disbursed requests can be settled."))
         if not self.currency_id.is_zero(self.amount_outstanding):
@@ -931,6 +1143,43 @@ class PettyCashRequest(models.Model):
                 self._pc_tag_exchange_moves(result)
         self.state = "settled"
         self.message_post(body=_("Settled — advance cleared."), subtype_xmlid="mail.mt_note")
+        return True
+
+    def action_close_release(self):
+        """Header button for the Realisasi / Claim kinds — same as Settle.
+
+        A separate method rather than a second ``action_settle`` button so the
+        two buttons in the form header stay distinguishable.
+        """
+        self.ensure_one()
+        return self.action_settle()
+
+    def _settle_float_request(self):
+        """Close a Realisasi / Claim request and release its reservation.
+
+        These requests never receive a Bank-Out, so there is no advance balance
+        to reconcile to zero: the money was already sitting in the store's
+        float. Closing one drops ``amount_float_consumed`` to zero, which hands
+        any unrealized remainder back to the store's available balance — the
+        cash for it never left the drawer.
+        """
+        self.ensure_one()
+        if self.state not in ("approved", "disbursed", "in_realization"):
+            raise UserError(_("Only an approved request can be closed."))
+        if self.realization_ids.filtered(lambda r: r.state in ("draft", "submitted")):
+            raise UserError(_("Post or cancel the pending realizations on %s first.") % self.name)
+        unrealized = self.amount_requested - self.amount_realized
+        self.state = "settled"
+        if not self.currency_id.is_zero(unrealized):
+            self.message_post(
+                body=_(
+                    "Closed — %(amt)s was never realized and has been released back to the store's petty cash balance.",
+                    amt=self._pc_money(self._pc_conv(unrealized, self.request_date)),
+                ),
+                subtype_xmlid="mail.mt_note",
+            )
+        else:
+            self.message_post(body=_("Closed — fully realized."), subtype_xmlid="mail.mt_note")
         return True
 
     def _pc_tag_exchange_moves(self, reconcile_result):

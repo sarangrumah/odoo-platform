@@ -17,8 +17,15 @@ employees on Odoo 19 Community:
 0. **Jenis uang muka** — each ``petty.cash.type`` maps a kind of advance
    (Cash Advance, Petty Cash, Travel…) to its own advance account, journals
    and ceilings, per company.
+0b. **Saldo petty cash per toko** — every Operating Unit holds a revolving
+   float (``petty.cash.float``), granted by a **Petty Cash Awal** request up
+   to a plafon Finance sets (1.000.000 by default). Each spend goes through a
+   **Realisasi** request, which reserves against that balance from the moment
+   it is drafted and is refused once the store runs dry; realizing it restores
+   exactly what was realized. A **Claim** is the escape hatch for a spend the
+   float cannot cover and bypasses the check.
 1. **Pengajuan** — an employee requests an advance for an Operating Unit
-   (``petty.cash.request``), optionally broken down into estimate lines.
+   (``petty.cash.request``), optionally itemised into detail lines.
 2. **Review & Approval** — Finance reviews; approval routes through the
    generic ``custom_approval_engine`` matrix (multi-tier, delegation, SLA).
 3. **Pencairan (Bank Out)** — Finance disburses the approved amount, booking
@@ -33,6 +40,10 @@ employees on Odoo 19 Community:
 5. **Pengembalian / Top-up** — leftover cash is returned to the bank, or a
    shortfall is topped up, until the employee advance nets to zero and the
    request is settled (advance lines auto-reconciled).
+5b. **Review Finance** — a review queue with inline approve / send-back and a
+   batch wizard that records the refusal reason, per-store float monitoring,
+   and an outstanding pivot broken down by Operating Unit. Plus a dashboard
+   over list / kanban / pivot / graph with search, filters and native export.
 6. **Monitoring** — kanban/list dashboards by state, plus three reports on the
    ``custom_accounting_reports`` engine (PDF / XLSX / on-screen table): the
    **Kartu Uang Muka** movement card, the per-employee **Outstanding** ledger
@@ -56,7 +67,7 @@ Part of the Custom Platform — multi-tenant Odoo 19 for Indonesian SMB.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.5.0",
+    "version": "19.0.0.6.2",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -72,6 +83,9 @@ Part of the Custom Platform — multi-tenant Odoo 19 for Indonesian SMB.
     "capability_tags": [
         "cash-advance",
         "petty-cash",
+        "store-float",
+        "finance-review",
+        "dashboard",
         "employee-advance",
         "multi-currency",
         "approval-workflow",
@@ -86,8 +100,10 @@ Part of the Custom Platform — multi-tenant Odoo 19 for Indonesian SMB.
         "data/mail_template_data.xml",
         "data/ir_cron_data.xml",
         "views/petty_cash_type_views.xml",
+        "views/petty_cash_float_views.xml",
         "views/petty_cash_request_views.xml",
         "views/petty_cash_realization_views.xml",
+        "views/petty_cash_review_views.xml",
         "views/report_views.xml",
         "views/res_config_settings_views.xml",
         "reports/petty_cash_templates.xml",

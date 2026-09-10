@@ -67,7 +67,7 @@
                                     </tr>
                                 </table>
                                 <div t-if="doc.line_ids" style="margin-top:12px;">
-                                    <strong>Estimate Breakdown</strong>
+                                    <strong>Detail Lines</strong>
                                     <table class="box" style="margin-top:4px;">
                                         <thead>
                                             <tr><th>Description</th><th>Account</th><th class="text-end">Amount</th></tr>
