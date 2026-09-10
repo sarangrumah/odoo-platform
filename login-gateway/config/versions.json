@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-08T04:59:19+00:00",
+  "generated_at": "2026-09-10T10:52:47+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "483edde9",
-    "branch": "fix/deployment-product-validation"
+    "commit": "8e913038",
+    "branch": "fix/asset-group-defaults-follow-group"
   },
   "buckets": [
     {
@@ -1569,7 +1569,7 @@
       "module": "custom_accounting_asset",
       "bucket": "ee_gap",
       "name": "Custom Accounting - Fixed Assets",
-      "version": "19.0.0.7.0",
+      "version": "19.0.0.8.0",
       "summary": "Fixed asset register with depreciation schedule, monthly posting cron, and disposal workflow",
       "category": "Accounting/Accounting",
       "depends": 5,
@@ -4446,8 +4446,13 @@
       "depends": 3,
       "public": true,
       "last_change": "2026-09-08",
-      "change_count": 1,
+      "change_count": 2,
       "changes": [
+        {
+          "sha": "69b3800b",
+          "date": "2026-09-08",
+          "subject": "fix(rental): refuse a deployment product that stock cannot dispatch (#235)"
+        },
         {
           "sha": "f433726b",
           "date": "2026-09-08",

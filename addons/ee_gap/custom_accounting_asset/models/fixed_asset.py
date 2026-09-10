@@ -9,12 +9,33 @@ from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
+# How each depreciation line date is derived from the posting anchor. Kept at
+# module level so the field selection and ``_default_depreciation_date_mode``
+# read the same list.
+DEPRECIATION_DATE_MODES = [
+    ("specific", "Specific date (same day as posting date)"),
+    ("next_month", "Specific date, next month"),
+    ("end_following_month", "End of the following month"),
+    ("end_acquisition_month", "End of the acquisition month"),
+]
+
 
 class CustomFixedAsset(models.Model):
     _name = "custom.fixed.asset"
     _description = "Custom Fixed Asset"
     _inherit = ["mail.thread", "mail.activity.mixin", "pdp.audited.mixin"]
     _order = "code, id"
+
+    # (asset field, matching default on custom.fixed.asset.group). Every one of
+    # these follows the group unless it was overridden by hand -- see
+    # ``_onchange_group_id`` and ``_apply_group_defaults_to_vals``.
+    _GROUP_DEFAULTS = (
+        ("useful_life_months", "default_useful_life_months"),
+        ("asset_account_id", "default_asset_account_id"),
+        ("depreciation_account_id", "default_depreciation_account_id"),
+        ("expense_account_id", "default_expense_account_id"),
+        ("journal_id", "default_journal_id"),
+    )
 
     name = fields.Char(required=True, tracking=True)
     code = fields.Char(
@@ -65,13 +86,9 @@ class CustomFixedAsset(models.Model):
         "Falls back to the acquisition date when left empty.",
     )
     depreciation_date_mode = fields.Selection(
-        selection=[
-            ("specific", "Specific date (same day as posting date)"),
-            ("next_month", "Specific date, next month"),
-            ("end_following_month", "End of the following month"),
-        ],
+        selection=DEPRECIATION_DATE_MODES,
         string="Depreciation Date Rule",
-        default="next_month",
+        default=lambda self: self._default_depreciation_date_mode(),
         required=True,
         help="How each depreciation line date is derived from the posting date.",
     )
@@ -385,6 +402,49 @@ class CustomFixedAsset(models.Model):
                 raise ValidationError(_("Declining factor must be strictly positive."))
 
     # ------------------------------------------------------------------
+    # Defaults
+    # ------------------------------------------------------------------
+    @api.model
+    def _default_depreciation_date_mode(self):
+        """Tenant-level default for the depreciation date rule.
+
+        ``end_acquisition_month`` exists in the selection but is deliberately
+        OFF everywhere: the running registers (ARKA-AIM 3,590 assets, Levi's
+        148 lines already posted) are in the shape their accountants signed off
+        on, and flipping the global default would re-date them. A tenant that
+        wants it sets ``custom_accounting_asset.default_depreciation_date_mode``
+        to the mode it wants for *new* assets; unset means ``next_month``.
+        """
+        allowed = {code for code, _label in DEPRECIATION_DATE_MODES}
+        param = (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param("custom_accounting_asset.default_depreciation_date_mode", "next_month")
+        )
+        param = str(param or "").strip()
+        return param if param in allowed else "next_month"
+
+    def _apply_group_defaults_to_vals(self, vals):
+        """Seed the group's defaults into ``vals`` for keys the caller omitted.
+
+        Only used on ``create``, so that an import or an RPC call behaves like
+        the form. A key that is present wins even when its value is falsy --
+        an explicit zero is a decision, not an omission.
+        """
+        group_id = vals.get("group_id")
+        if not group_id:
+            return vals
+        group = self.env["custom.fixed.asset.group"].browse(group_id)
+        for fname, gname in self._GROUP_DEFAULTS:
+            if fname in vals:
+                continue
+            value = group[gname]
+            if not value:
+                continue
+            vals[fname] = value.id if self._fields[fname].type == "many2one" else value
+        return vals
+
+    # ------------------------------------------------------------------
     # On-change: pull defaults from group
     # ------------------------------------------------------------------
     @api.onchange("acquisition_date")
@@ -393,22 +453,62 @@ class CustomFixedAsset(models.Model):
             if asset.acquisition_date and not asset.posting_date:
                 asset.posting_date = asset.acquisition_date
 
+    def _group_defaults_source(self):
+        """The group whose defaults are currently sitting on this record.
+
+        For a saved asset ``_origin`` still carries the group as it was before
+        the user picked a new one. On an unsaved form the user may flip the
+        group twice before saving and ``_origin.group_id`` is then empty; in
+        that case the account fields written by the previous pass are themselves
+        the fingerprint of the group that wrote them, so the group is recovered
+        by matching on all four at once. A record whose accounts were touched by
+        hand matches nothing and is therefore left alone -- which is the
+        conservative outcome.
+        """
+        self.ensure_one()
+        if self._origin.group_id:
+            return self._origin.group_id
+        Group = self.env["custom.fixed.asset.group"]
+        relational = [(f, g) for f, g in self._GROUP_DEFAULTS if self._fields[f].type == "many2one"]
+        if not any(self[fname].id for fname, _gname in relational):
+            return Group.browse()
+        domain = [(gname, "=", self[fname].id or False) for fname, gname in relational]
+        return Group.search(domain, limit=1)
+
     @api.onchange("group_id")
     def _onchange_group_id(self):
+        """Make the group's defaults *follow* the group instead of only seeding it.
+
+        The old guard was ``if group_default and not current``, i.e. "fill in
+        when empty". That never fired for ``useful_life_months`` at all (the
+        field default is applied before the onchange runs, so it is never empty)
+        and it froze the four accounts on the first group ever picked, so
+        changing the group left the asset booking to the old COA -- including
+        every future depreciation entry, which reads the accounts off the asset
+        header.
+
+        The rule now is: a value that still follows the previous group, is still
+        the field default, or is empty moves with the group; a value someone
+        typed by hand stays put. That protects the deliberate overrides on the
+        register (410 of ARKA-AIM's 3,590 assets run a useful life that differs
+        from their group's default).
+        """
         for asset in self:
-            if not asset.group_id:
-                continue
             grp = asset.group_id
-            if grp.default_useful_life_months and not asset.useful_life_months:
-                asset.useful_life_months = grp.default_useful_life_months
-            if grp.default_asset_account_id and not asset.asset_account_id:
-                asset.asset_account_id = grp.default_asset_account_id
-            if grp.default_depreciation_account_id and not asset.depreciation_account_id:
-                asset.depreciation_account_id = grp.default_depreciation_account_id
-            if grp.default_expense_account_id and not asset.expense_account_id:
-                asset.expense_account_id = grp.default_expense_account_id
-            if grp.default_journal_id and not asset.journal_id:
-                asset.journal_id = grp.default_journal_id
+            if not grp:
+                continue
+            prev = asset._group_defaults_source()
+            for fname, gname in self._GROUP_DEFAULTS:
+                new_value = grp[gname]
+                if not new_value:
+                    # The group has no opinion on this field -- keep what is there.
+                    continue
+                current = asset[fname]
+                field_default = asset._fields[fname].default
+                is_field_default = bool(field_default) and current == field_default(asset)
+                follows_prev = bool(prev) and current == prev[gname]
+                if not current or follows_prev or is_field_default:
+                    asset[fname] = new_value
 
     # ------------------------------------------------------------------
     # Computes
@@ -505,6 +605,11 @@ class CustomFixedAsset(models.Model):
         if mode == "end_following_month":
             # Last day of the month that follows the anchor by ``seq_number`` months.
             return start + relativedelta(months=seq_number, day=31)
+        if mode == "end_acquisition_month":
+            # Line 1 lands on the last day of the acquisition month itself, then
+            # the last day of each following month. Same arithmetic as
+            # ``end_following_month`` evaluated one ordinal earlier.
+            return start + relativedelta(months=seq_number - 1, day=31)
         # next_month (default) — one month after the anchor for line 1.
         return start + relativedelta(months=seq_number)
 
@@ -519,6 +624,21 @@ class CustomFixedAsset(models.Model):
         base = self._depreciable_base()
         months = self.useful_life_months
         if months <= 0 or base <= 0:
+            return
+
+        # Schedules loaded with a 0-based sequence are one ordinal behind what
+        # ``_depreciation_date_for`` expects (60 FA-OFFC assets in
+        # prd_levis_begbal were restamped from 0, with their August line already
+        # posted). Rebuilding them off the ordinal arithmetic below would
+        # re-issue a line on a date that is already posted, so leave them in the
+        # shape they were loaded in -- which is the shape Accounting signed off.
+        sequences = self.depreciation_line_ids.mapped("sequence")
+        if sequences and min(sequences) == 0:
+            _logger.info(
+                "Asset %s carries a 0-based loaded schedule; rebuild skipped to "
+                "avoid duplicating an already-posted line.",
+                self.code,
+            )
             return
 
         # Drop unposted lines so we can rebuild from current parameters. Reversed
@@ -1078,6 +1198,10 @@ class CustomFixedAsset(models.Model):
             # only ever move ``quantity`` down from there.
             if not vals.get("original_quantity"):
                 vals["original_quantity"] = vals.get("quantity", 1.0)
+            # Cascade the group defaults so an import or an API call lands on the
+            # same values the form would have produced. Keyed on the key being
+            # absent, not on the value being falsy: an explicit zero is a choice.
+            self._apply_group_defaults_to_vals(vals)
         return super().create(vals_list)
 
     def write(self, vals):
