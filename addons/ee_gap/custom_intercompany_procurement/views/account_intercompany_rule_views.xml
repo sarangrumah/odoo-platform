@@ -7,6 +7,8 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='auto_validate']" position="after">
                 <field name="mirror_purchase_order"/>
+                <field name="auto_confirm_mirror_so"
+                       invisible="not mirror_purchase_order"/>
                 <field name="mirror_picking"/>
                 <field name="target_warehouse_id"/>
                 <field name="target_sale_journal_id"/>

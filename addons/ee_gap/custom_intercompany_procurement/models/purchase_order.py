@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Mirror PO confirmation as a draft SO in the receiving sister company."""
+"""Mirror PO confirmation as an SO in the receiving sister company.
+
+The mirror lands as a quotation unless the intercompany rule asks for
+``auto_confirm_mirror_so``, in which case it is confirmed on the spot.
+"""
 
 from __future__ import annotations
 
@@ -69,6 +73,46 @@ class PurchaseOrder(models.Model):
                 self.id,
                 {"rule": rule.name, "mirror_so": so.id, "mirror_company": rule.company_to_id.name},
             )
+            if rule.auto_confirm_mirror_so:
+                self._custom_confirm_ic_mirror_so(so, rule)
+
+    def _custom_confirm_ic_mirror_so(self, so, rule):
+        """Confirm the mirror straight away, but never lose it if that fails.
+
+        The link is already written by the caller, so a confirmation that
+        raises (a missing show date, a lock date, an unpriced line) leaves a
+        usable quotation behind instead of rolling the mirror back. The buyer
+        finds out on the PO chatter — the receiving company would otherwise be
+        the only one who could notice.
+        """
+        self.ensure_one()
+        try:
+            with self.env.cr.savepoint():
+                so.with_company(rule.company_to_id).sudo().action_confirm()
+        except Exception as e:
+            _logger.exception("IC mirror SO auto-confirm failed for %s: %s", so.id, e)
+            self.message_post(
+                body=_(
+                    "Intercompany mirror %(so)s was created but could not be confirmed "
+                    "automatically: %(error)s. It is waiting as a quotation in %(company)s.",
+                    so=so.display_name,
+                    error=e,
+                    company=rule.company_to_id.name,
+                )
+            )
+            return
+        self._pdp_audit_write(
+            "ic_po_mirror_confirmed",
+            self.id,
+            {"rule": rule.name, "mirror_so": so.id, "mirror_company": rule.company_to_id.name},
+        )
+        self.message_post(
+            body=_(
+                "Intercompany mirror %(so)s confirmed automatically in %(company)s.",
+                so=so.display_name,
+                company=rule.company_to_id.name,
+            )
+        )
 
     def _custom_find_ic_po_rule(self):
         self.ensure_one()
