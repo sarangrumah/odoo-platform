@@ -33,6 +33,7 @@ class CustomReportPphEqualisasi(models.AbstractModel):
             {"header": "NPWP", "field": "npwp", "kind": "text", "width": 20},
             {"header": "Produk", "field": "product", "kind": "text", "width": 24},
             {"header": "COA Expense", "field": "coa_expense", "kind": "text", "width": 30},
+            {"header": "Kode Objek Pajak", "field": "kode_objek", "kind": "text", "width": 16},
             {"header": "Kategori PPh", "field": "kategori", "kind": "text", "width": 22},
             {"header": "DPP", "field": "dpp", "kind": "number", "width": 18},
             {"header": "Nilai PPN", "field": "ppn", "kind": "number", "width": 18},
@@ -168,6 +169,7 @@ class CustomReportPphEqualisasi(models.AbstractModel):
                     "coa_expense": (
                         ("%s %s" % (self._account_code(exp_acc), exp_acc.name or "")).strip() if exp_acc else ""
                     ),
+                    "kode_objek": (category.bupot_object_code or category.code or "") if category else "",
                     "kategori": kategori,
                     "dpp": dpp,
                     "ppn": ppn,

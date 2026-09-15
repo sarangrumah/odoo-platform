@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-10T10:52:47+00:00",
+  "generated_at": "2026-09-15T23:26:54+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "8e913038",
-    "branch": "fix/asset-group-defaults-follow-group"
+    "commit": "4963508e",
+    "branch": "t00-238"
   },
   "buckets": [
     {
@@ -1574,9 +1574,14 @@
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
-      "last_change": "2026-08-30",
-      "change_count": 25,
+      "last_change": "2026-09-10",
+      "change_count": 26,
       "changes": [
+        {
+          "sha": "1f5ed466",
+          "date": "2026-09-10",
+          "subject": "fix(assets): make the group's defaults follow the group, not just seed it (#239)"
+        },
         {
           "sha": "cde92d68",
           "date": "2026-08-30",
@@ -1611,11 +1616,6 @@
           "sha": "3b2f15d9",
           "date": "2026-07-09",
           "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
-        },
-        {
-          "sha": "9984c97e",
-          "date": "2026-07-07",
-          "subject": "chore(lint): make the lint CI check green [knowledge-deferred] (#48)"
         }
       ]
     },
@@ -1731,14 +1731,19 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.24.0",
+      "version": "19.0.0.25.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 4,
       "public": true,
-      "last_change": "2026-08-26",
-      "change_count": 53,
+      "last_change": "2026-09-09",
+      "change_count": 54,
       "changes": [
+        {
+          "sha": "4963508e",
+          "date": "2026-09-09",
+          "subject": "fix(reports): read Kode Objek PPh from the expense line, not the tax line"
+        },
         {
           "sha": "bde8a4e8",
           "date": "2026-08-26",
@@ -1773,11 +1778,6 @@
           "sha": "4fc65aa5",
           "date": "2026-08-05",
           "subject": "feat(reports): AR Aging Export with day-precise overdue buckets"
-        },
-        {
-          "sha": "d63a9032",
-          "date": "2026-08-05",
-          "subject": "feat(accounting): Lock Dates wizard, and stop the XStore report leaking to non-POS tenants"
         }
       ]
     },

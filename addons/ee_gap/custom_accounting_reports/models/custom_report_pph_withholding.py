@@ -81,6 +81,54 @@ class CustomReportPphWithholding(models.AbstractModel):
             mapping.setdefault(rule.account_id.id, kind)
         return mapping
 
+    def _tax_base_splits(self, tax_line):
+        """Base lines behind a PPh tax line, grouped by their Kode Objek PPh.
+
+        The operator picks the kode objek on the *expense* line
+        (``x_custom_withholding_category_id``) while the PPh itself lands on the
+        tax line, so the recap has to walk back from the tax line to the lines it
+        was computed on — reading the picker off the tax line always yielded a
+        blank Kode Objek Pajak.
+
+        Uncategorised base lines are kept as a group of their own so a bill that
+        is only partly keyed still splits DPP and PPh proportionally instead of
+        loading everything onto the one line that happens to carry a picker.
+        Returns [] when nothing on the entry carries a picker, so the caller can
+        fall back to a single unsplit row.
+        """
+        if not tax_line.tax_line_id:
+            return []
+        if "x_custom_withholding_category_id" not in self.env["account.move.line"]._fields:
+            return []
+        tax = tax_line.tax_line_id
+        groups = {}
+        for base in tax_line.move_id.line_ids:
+            if base.tax_line_id or tax not in base.tax_ids:
+                continue
+            category = base.x_custom_withholding_category_id
+            entry = groups.setdefault(
+                category.id or 0,
+                {"category": category, "base": 0.0, "account": base.account_id},
+            )
+            entry["base"] += abs(base.balance)
+        if not any(g["category"] for g in groups.values()):
+            return []
+        return [g for g in groups.values() if g["base"]]
+
+    def _move_category(self, move):
+        """Any Kode Objek PPh picked on the entry, for rows without a tax line.
+
+        A manual "Pemotongan PPh" journal entry has no tax line to walk back
+        from, but the operator may still have keyed the kode objek on one of its
+        lines.
+        """
+        if "x_custom_withholding_category_id" not in self.env["account.move.line"]._fields:
+            return False
+        for line in move.line_ids:
+            if line.x_custom_withholding_category_id:
+                return line.x_custom_withholding_category_id
+        return False
+
     def _manual_pph_rows(self, filters):
         """Rows for PPh that never produced an ``account.move.withholding.line``.
 
@@ -155,33 +203,68 @@ class CustomReportPphWithholding(models.AbstractModel):
                 tarif = 0.0
                 jenis = ml.name or ""
 
-            category = self._opt(ml, "x_custom_withholding_category_id", False)
-            # Largest debit line of the same entry is the expense being withheld.
+            # Largest debit line of the same entry is the expense being withheld,
+            # used whenever the split below cannot name a better account.
             exp = move.line_ids.filtered(lambda l: l.debit > 0 and l.id != ml.id).sorted("debit", reverse=True)[:1]
-            coa_expense = ""
-            if exp and exp.account_id:
-                coa_expense = ("%s %s" % (self._account_code(exp.account_id), exp.account_id.name or "")).strip()
+            fallback_account = exp.account_id if exp else False
+
+            # One row per Kode Objek Pajak keyed on the bill; a single row with
+            # whatever the entry itself carries when there is nothing to split.
+            splits = []
+            groups = self._tax_base_splits(ml)
+            total_base = sum(g["base"] for g in groups)
+            if groups and total_base:
+                left_dpp, left_pph = dpp, pph
+                for idx, group in enumerate(groups):
+                    last = idx == len(groups) - 1
+                    ratio = group["base"] / total_base
+                    splits.append(
+                        {
+                            "category": group["category"],
+                            "account": group["account"] or fallback_account,
+                            "dpp": left_dpp if last else round(dpp * ratio, 2),
+                            "pph": left_pph if last else round(pph * ratio, 2),
+                        }
+                    )
+                    left_dpp -= splits[-1]["dpp"]
+                    left_pph -= splits[-1]["pph"]
+            else:
+                splits.append(
+                    {
+                        "category": self._opt(ml, "x_custom_withholding_category_id", False)
+                        or self._move_category(move),
+                        "account": fallback_account,
+                        "dpp": dpp,
+                        "pph": pph,
+                    }
+                )
 
             kind = acct_kinds.get(ml.account_id.id) or ""
-            buckets.setdefault(kind, []).append(
-                {
-                    "date": move.date or move.invoice_date,
-                    "doc_no": move.name or "",
-                    "journal_no": move.name or "",
-                    "invoice_no": move.ref or "",
-                    "invoice_date": move.invoice_date,
-                    "npwp": self._opt(partner, "x_custom_npwp") or self._opt(partner, "vat"),
-                    "partner": partner.display_name or "",
-                    "kode_objek": (category.bupot_object_code or category.code or "") if category else "",
-                    "jenis_pph": _PPH_LABEL.get(kind, kind or ""),
-                    "jenis_penghasilan": category.name if category else jenis,
-                    "coa_expense": coa_expense,
-                    "sumber": sumber,
-                    "dpp": dpp,
-                    "tarif": tarif,
-                    "pph": pph,
-                }
-            )
+            for split in splits:
+                category = split["category"]
+                account = split["account"]
+                coa_expense = ""
+                if account:
+                    coa_expense = ("%s %s" % (self._account_code(account), account.name or "")).strip()
+                buckets.setdefault(kind, []).append(
+                    {
+                        "date": move.date or move.invoice_date,
+                        "doc_no": move.name or "",
+                        "journal_no": move.name or "",
+                        "invoice_no": move.ref or "",
+                        "invoice_date": move.invoice_date,
+                        "npwp": self._opt(partner, "x_custom_npwp") or self._opt(partner, "vat"),
+                        "partner": partner.display_name or "",
+                        "kode_objek": (category.bupot_object_code or category.code or "") if category else "",
+                        "jenis_pph": _PPH_LABEL.get(kind, kind or ""),
+                        "jenis_penghasilan": category.name if category else jenis,
+                        "coa_expense": coa_expense,
+                        "sumber": sumber,
+                        "dpp": split["dpp"],
+                        "tarif": tarif,
+                        "pph": split["pph"],
+                    }
+                )
         return buckets
 
     def _build_lines(self, filters):
