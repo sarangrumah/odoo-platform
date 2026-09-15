@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-15T23:38:58+00:00",
+  "generated_at": "2026-09-15T23:46:55+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "97ade13b",
-    "branch": "t00-197"
+    "commit": "3b5671fa",
+    "branch": "t00-192"
   },
   "buckets": [
     {
@@ -1750,14 +1750,19 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.26.0",
+      "version": "19.0.0.26.1",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 4,
       "public": true,
       "last_change": "2026-09-16",
-      "change_count": 54,
+      "change_count": 55,
       "changes": [
+        {
+          "sha": "3b5671fa",
+          "date": "2026-09-16",
+          "subject": "feat(reports): remember column widths on the on-screen report tables too (#240)"
+        },
         {
           "sha": "e808bf53",
           "date": "2026-09-16",
@@ -1792,11 +1797,6 @@
           "sha": "c4822199",
           "date": "2026-08-05",
           "subject": "docs(reports): explain AR Aging Export in MODULE_KNOWLEDGE"
-        },
-        {
-          "sha": "4fc65aa5",
-          "date": "2026-08-05",
-          "subject": "feat(reports): AR Aging Export with day-precise overdue buckets"
         }
       ]
     },

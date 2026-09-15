@@ -37,6 +37,28 @@ class PurchaseWizard(models.TransientModel):
     )
     posted_only = fields.Boolean(default=True)
 
+    # Levi's sheet #25/#30: the register is pulled per receiving period, so the
+    # goods-receipt date drives the window by default. Lines with no purchase
+    # order behind them (services, non-trade) fall back to their bill date.
+    date_basis = fields.Selection(
+        [
+            ("gr", "Tanggal GR (Goods Receipt)"),
+            ("bill", "Tanggal Bill"),
+        ],
+        string="Periode Berdasarkan",
+        default="gr",
+        required=True,
+        help="Tanggal GR: baris ditarik menurut penerimaan barang pertama dari "
+        "baris PO-nya. Baris tanpa PO (jasa, non-trade) tetap memakai tanggal bill.",
+    )
+    show_gr = fields.Boolean(compute="_compute_show_gr")
+
+    @api.depends_context("uid")
+    def _compute_show_gr(self):
+        available = self.env["custom.report.purchase"]._gr_available()
+        for wizard in self:
+            wizard.show_gr = available
+
     # Trade / Non-Trade stream (Levi's feature #9). The underlying
     # ``account.move.l10n_purchase_type`` comes from the tenant module
     # custom_levis_localization; on databases without it the filter is hidden
@@ -73,6 +95,7 @@ class PurchaseWizard(models.TransientModel):
             "group_by": self.group_by,
             "posted_only": self.posted_only,
             "purchase_type": self.purchase_type,
+            "date_basis": self.date_basis if self.show_gr else "bill",
         }
 
     def action_print(self):
