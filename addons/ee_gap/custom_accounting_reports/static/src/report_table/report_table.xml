@@ -28,17 +28,22 @@
                 <i class="fa fa-spin fa-circle-o-notch fa-2x"/>
             </div>
             <div t-else="" class="table-responsive">
-                <table class="table table-sm table-hover o_report_table">
+                <table class="table table-sm table-hover o_report_table o-ux-resizableTable" t-ref="table">
                     <thead>
                         <tr>
                             <th t-foreach="state.columns" t-as="col" t-key="col.field"
                                 class="o_report_th"
+                                t-att-data-name="col.field"
                                 t-att-class="{ 'text-end': col.kind === 'number' }"
                                 style="cursor: pointer"
                                 t-on-click="() => this.onSort(col)">
                                 <t t-esc="col.header"/>
                                 <i t-if="state.sortField === col.field"
                                    t-att-class="state.sortDir === 1 ? 'fa fa-caret-up ms-1' : 'fa fa-caret-down ms-1'"/>
+                                <span class="o-ux-resizeGrip"
+                                      title="Drag to resize, double-click to reset"
+                                      t-on-pointerdown.stop.prevent="this.columnWidths.onStartResize"
+                                      t-on-dblclick.stop="this.columnWidths.resetWidths"/>
                             </th>
                         </tr>
                     </thead>

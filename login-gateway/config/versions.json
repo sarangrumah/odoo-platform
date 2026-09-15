@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-15T23:34:07+00:00",
+  "generated_at": "2026-09-15T23:38:58+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "e808bf53",
-    "branch": "t00-196"
+    "commit": "97ade13b",
+    "branch": "t00-197"
   },
   "buckets": [
     {
@@ -1463,9 +1463,15 @@
       "category": "Custom Platform/Technical/UX",
       "depends": 3,
       "public": true,
-      "last_change": "",
-      "change_count": 0,
-      "changes": []
+      "last_change": "2026-09-16",
+      "change_count": 1,
+      "changes": [
+        {
+          "sha": "97ade13b",
+          "date": "2026-09-16",
+          "subject": "feat(ux): remember column widths on the user, and let the chatter fold away (#196)"
+        }
+      ]
     },
     {
       "module": "authenticate_keycloak",
@@ -1744,7 +1750,7 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.25.0",
+      "version": "19.0.0.26.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 4,
