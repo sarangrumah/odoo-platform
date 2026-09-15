@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T07:43:22Z
 generator: bootstrap-v1
 module: custom_accounting_reports
-manifest_version: 19.0.0.22.0
+manifest_version: 19.0.0.25.1
 ---
 
 # custom_accounting_reports
@@ -33,6 +33,7 @@ All report models are `AbstractModel`s that inherit `custom.report.engine` (the 
 - `custom.report.aged.receivable` — Aged Receivable; `custom.report.aged.payable` inherits it.
 - `custom.report.ar.aging.export` — AR Aging Export. Inherits `custom.report.aged.receivable` for its open-line query, but replaces the layout: one **flat** row per open receivable line carrying the commercial trail (customer PO / SO / DO), the tax split (DPP / PPN / Full), the settlement figures (Original / Paid / Outstanding) and fifteen *overdue-day* buckets (`<= 0`, then 1…7 day by day, `8-14`, `15-30`, `31-60`, `61-90`, `91-120`, `121-360`, `> 360`). Reached from the **AR Aging Export** menu, which opens the Aged Receivable wizard with `ar_aging_export` in the context.
 - `custom.report.advance` — Uang Muka / Down-Payment ledger (auto-detects advance accounts).
+- `custom.report.gl.open.items` — GL Open Items / Outstanding. Every unsettled line on a reconcilable account **as of** a cut-off date (residual rebuilt from `account.partial.reconcile.max_date`, so a settlement after the cut-off does not shrink it), then netted FIFO per account/partner/currency — plus a second pass letting partnerless rows offset across partners, because GR/IR books its credits without a partner. The wizard's `layout` picks the level: `summary` (per account), `summary_partner` (per account + counterparty) or `detail` (every open line); on screen the summary rows are clickable and walk one level down each click.
 - `custom.report.sales` — Sales report.
 - `custom.report.tax` — Tax report (PPN / PPh subtotals; cross-references Coretax).
 - `custom.report.ppn.digunggung` — **Rekap PPN Keluaran Digunggung (PKP Pedagang Eceran).** Output VAT riding on **non-invoice** moves (POS journal entries), which is what a retail tenant actually has: `custom.report.faktur.pajak` and the FK/OF export are both keyed on `out_invoice` and show nothing. Emits a per-masa recap (the SPT 1111 figure) followed by a per-day, per-Operating-Unit detail. Presents an 11% tax PMK 131-style — statutory 12% on a DPP Nilai Lain of 11/12 — matching `custom_coretax_export`'s FK rows; the PPN rupiah is unchanged so it still ties to the GL.
@@ -104,6 +105,7 @@ Report models are AbstractModels and generally have no stored fields; user input
 - **The detail is measured against the ledger, and any gap is printed.** Odoo rounds tax per struk while the report restates the masa in one go, so the detail can miss the GL by a few rupiah. A `Selisih pembulatan vs GL` note line appears under the masa when it does — never absorbed into a subtotal. On `prd_levis_begbal` Jun-2026 (4.372 struk, Rp 619.692.565) the two agree exactly.
 - **Output VAT is split across exactly two reports, by buyer identity.** Invoiced sales (`out_invoice`/`out_refund`) belong to `custom.report.faktur.pajak` + the FK export; everything else — retail, buyer not identified — belongs to `custom.report.ppn.digunggung`, whose domain excludes those two move types on purpose. Widen either side and the masa is double-counted; narrow both and PPN disappears from the working papers with the GL still balanced.
 - **Never bucket a P&L by `account_type` alone.** Indonesian charts type every cost-of-sales account plain `expense` (not `expense_direct_cost`), so a type-based split reports COGS as zero, files `income_other` under Revenue, and drops `expense_other` entirely. Section membership comes from the account-code prefix via `account.group`.
+- **GL Open Items drills into itself, and the counterparty filter runs *after* the netting.** Narrowing the query to one partner would skip the partnerless-offset pass and print a bigger remainder than the summary promised, so `focus_partner_id` filters the netted rows (`_focus_partner`), while `account_ids` may be pushed into the query — netting never crosses accounts. The chain is served by `report_dispatch.get_report_drilldown_action(report_code, options, params)` → the report's `_report_drilldown_action`, fed by `drilldown_params` on the row; it is **not** gated by `custom_accounting_reports.drilldown_enabled`, which only guards the link into the General Ledger.
 - `account.account.group_id` is **computed, not stored** in Odoo 19 (resolved from the code prefix). It cannot appear in a SQL join or an ORM domain — read it off a browsed recordset, as `_account_groups` does.
 - `account.group` rows are company-scoped; `account.analytic.plan` is not, but its accounts are. Both are filtered against the active companies.
 - This module ships to every tenant. Adding a field or a `TransientModel` forces an `-u` on **all** databases that have it installed, or their General Ledger wizard breaks and their autovacuum cron logs errors. Prefer context keys and buttons on existing wizards.
@@ -120,7 +122,6 @@ Report models are AbstractModels and generally have no stored fields; user input
 - **`AR Aging Export` is a second aging report on purpose, not a duplicate.** `custom.report.aged.receivable` answers "how old is my AR" in seven wide buckets; `custom.report.ar.aging.export` (which inherits it) is Finance's per-document collection worklist — one row per open receivable line with the commercial trail (customer PO / SO / DO), the DPP/PPN split, original/paid/outstanding, and **fifteen** overdue buckets whose edges come from Finance's own workbook (day-by-day for the first week, then widening). Do not "simplify" the two into one.
 - **It reuses the Aged Receivable wizard rather than shipping its own.** This addon is installed on every tenant, so a new `TransientModel` would force an `-u` across all of them. The menu points at the same wizard with `{'ar_aging_export': 1}` in the context, and the view swaps the buttons on that key. Its `date_from` is pinned to 1970 — an aging worklist is as-of-a-date, not a period.
 - **The Purchase Register splits Trade / Non-Trade defensively.** `account.move.l10n_purchase_type` is added by the tenant module `custom_levis_localization`, which this addon must not depend on, so `custom.report.purchase._purchase_type_available()` gates the `Type` column, the `purchase_type` wizard filter (hidden through the non-stored `show_purchase_type` compute) and the `By Trade / Non-Trade` grouping. On a tenant without the field the report renders exactly as before. Blank streams are resolved from the reversed entry, then the source PO line, before being reported as `Unclassified` — credit notes created with "Reverse" carry no stream of their own.
-- **Kode Objek PPh lives on the expense line, never on the tax line.** The operator picks `x_custom_withholding_category_id` on the line being expensed, while the PPh lands on a tax line of its own, so `custom.report.pph.withholding._tax_base_splits` walks back from the tax line to the base lines that carry that tax and reads the category there. Reading it off the tax line leaves the Kode Objek column blank for every bill withheld through a native PPh tax — which is how Levi's books almost all of them, since the engine skips lines that already carry a PPh tax. When one tax line covers several kode objek, DPP and PPh are split proportionally over the base lines (uncategorised lines form their own group) so the recap still ties out to the Hutang PPh ledger.
 - **A new report code must be registered in TWO places.** `REPORT_MODEL_MAP` in `models/custom_report_dispatch.py` *and* the `t-elif` chain in `reports/report_common.xml`. Miss the first and the code silently falls back to Trial Balance; miss the second and the PDF renders empty.
 - **`Sales Detail (XStore X24DN)` is archived on tenants without POS.** It reads `pos.order.line` and the `ri_src_*` columns `custom_retail_import_pos` adds, so on ARKA-AIM — which runs the importer without `point_of_sale` on purpose — it could only ever render empty. The menu cannot be gated declaratively (`groups="point_of_sale...."` would need a dependency this module must not have), so `hooks.sync_pos_only_menus` resolves `active` at install/upgrade, and `custom_retail_import_pos`'s own `post_init_hook` re-shows it if POS arrives later. Add any further POS-only menu to `hooks.POS_ONLY_MENUS`.
 - **This module's groups sit on its own `custom_accounting_reports.res_groups_privilege_accounting_reports` privilege** ("Accounting Reports") — Odoo 19 renders every group sharing one `res.groups.privilege` as a single pick-one dropdown on the user form, so a privilege shared across modules makes saving a user silently drop the other modules' groups. The privilege carries `custom_core.module_category_custom_platform`, so the selector still appears alongside the other custom modules. Do not point new groups at `custom_core.res_groups_privilege_custom_platform`.
@@ -128,3 +129,17 @@ Report models are AbstractModels and generally have no stored fields; user input
 ## Out of Scope
 - No real-time reporting or live data updates; reports are computed on demand from posted/existing move lines.
 - No direct integration with external tax-filing systems (the tax report only cross-references Coretax data).
+
+## Column widths on the on-screen tables (0.25.0)
+`ReportTable` now remembers its column widths per user, per report, via
+`useResizableColumnWidths` from `custom_web_layout_memory` (a new dependency).
+Each `<th>` carries `data-name="<field>"` and a `.o-ux-resizeGrip`; drag to
+resize, double-click the grip to reset. Widths are stored under
+`report:<report_code>|<hash of the column fields>` — folding the column set
+into the key matters because the same report run with different options can
+come back with a different column list, and widths measured against one set
+mean nothing against another.
+
+`onSort` bails out while `columnWidths.resizing` is true: the click that closes
+a drag lands on the header, so without that guard every resize would also
+re-sort the report.
