@@ -64,6 +64,56 @@ def post_init_hook(env):
         company.write(co_vals)
         _logger.info("ARKA seed: company defaults set: %s", list(co_vals))
 
+    # 1b. Re-stamp the auto-created pricelists to their company's currency.
+    #
+    # `product` creates the "Default" pricelist (product.list0) at install time
+    # in whatever the base currency then is — USD on a fresh DB. This module
+    # depends on `product`, so that pricelist already exists by the time step 1
+    # above flips the company to IDR, and nothing else ever re-stamps it.
+    #
+    # That matters because sale.order takes its currency from the pricelist,
+    # not the company (sale/models/sale_order.py::_compute_currency_id ->
+    # `pricelist_id.currency_id or company_id.currency_id`), so a stale USD
+    # pricelist silently stamps every sales order USD. On prd_arkaaim that
+    # produced a draft invoice of Rp 120.000.000 worth Rp 2,13 triliun in the
+    # ledger. See scripts/tenants/arkaaim/fix_pricelist_currency.py, which
+    # repairs databases created before this block existed.
+    #
+    # Every company is covered, not just base.main_company: ARKA-AIM runs two.
+    # An empty pricelist is pure currency, so re-stamping is lossless; one that
+    # already carries price rules is left alone, since changing its currency
+    # would reprice them.
+    Pricelist = env["product.pricelist"].sudo()
+    for target in env["res.company"].sudo().search([]):
+        if not target.currency_id:
+            continue
+        stale = Pricelist.with_company(target).search(
+            [
+                ("company_id", "=", target.id),
+                ("currency_id", "!=", target.currency_id.id),
+            ]
+        )
+        for pricelist in stale:
+            if pricelist.item_ids:
+                _logger.warning(
+                    "ARKA seed: pricelist %s (company %s) is %s not %s but carries %d price "
+                    "rule(s); left alone to avoid repricing them",
+                    pricelist.id,
+                    target.id,
+                    pricelist.currency_id.name,
+                    target.currency_id.name,
+                    len(pricelist.item_ids),
+                )
+                continue
+            _logger.info(
+                "ARKA seed: pricelist %s (company %s): %s -> %s",
+                pricelist.id,
+                target.id,
+                pricelist.currency_id.name,
+                target.currency_id.name,
+            )
+            pricelist.currency_id = target.currency_id.id
+
     # 2. Default partner receivable/payable via ir.default (covers company_dependent fields)
     IrDefault = env["ir.default"].sudo()
     if accounts["default_receivable"]:

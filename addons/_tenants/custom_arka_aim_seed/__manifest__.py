@@ -1,6 +1,6 @@
 {
     "name": "ARKA-AIM Chart of Accounts Seed",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "summary": "Tenant-specific CoA, taxes, and fiscal positions for erp_dev_aimarka.",
     "description": """
 ARKA-AIM Chart of Accounts seed.

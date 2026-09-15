@@ -185,6 +185,71 @@ for company_id, state, count in rows:
 env.cr.execute("SELECT COUNT(*) FROM account_bank_statement_line")
 print("\n[7] Bank statement lines: %d" % env.cr.fetchone()[0])
 
+# A pricelist whose currency differs from its company's silently overrides it:
+# sale.order takes its currency from the pricelist, not the company. On
+# prd_arkaaim that stamped every AIM order USD and inflated one draft invoice
+# from Rp 120 juta to Rp 2,13 triliun in company currency. Nothing in the UI
+# shows the two side by side, so it is printed here.
+print("\n[8] Pricelist currency vs company currency")
+for company in companies:
+    lists = env["product.pricelist"].sudo().with_company(company).search([("company_id", "=", company.id)], order="id")
+    if not lists:
+        print("    company %s (%s): no own pricelist" % (company.id, company.name))
+    for pricelist in lists:
+        flag = "OK  " if pricelist.currency_id == company.currency_id else "MISMATCH"
+        print(
+            "    %-8s company %s  pricelist %-3s %-24s %s vs company %s%s"
+            % (
+                flag,
+                company.id,
+                pricelist.id,
+                pricelist.display_name,
+                pricelist.currency_id.name,
+                company.currency_id.name,
+                "  (%d price rule(s))" % len(pricelist.item_ids) if pricelist.item_ids else "",
+            )
+        )
+
+    bad = (
+        env["sale.order"]
+        .sudo()
+        .search_count(
+            [
+                ("company_id", "=", company.id),
+                ("currency_id", "!=", company.currency_id.id),
+            ]
+        )
+    )
+    print(
+        "    %-8s company %s  sale orders not in %s: %d"
+        % ("OK  " if not bad else "MISMATCH", company.id, company.currency_id.name, bad)
+    )
+
+# Draft moves sitting on an archived account cannot be written or posted at all
+# ("The account ... is archived."), which freezes the invoice with no hint why.
+print("\n[9] Draft moves on an archived account")
+stale = (
+    env["account.move"]
+    .sudo()
+    .search([("state", "=", "draft")])
+    .filtered(lambda m: any(l.account_id and not l.account_id.active for l in m.line_ids))
+)
+if not stale:
+    print("    none")
+for move in stale:
+    for line in move.line_ids.filtered(lambda l: l.account_id and not l.account_id.active):
+        print(
+            "    move %-5s %-22s company %s  line %s on archived %s (%s)"
+            % (
+                move.id,
+                move.name or "(no number)",
+                move.company_id.id,
+                line.id,
+                line.account_id.code,
+                line.account_id.display_name,
+            )
+        )
+
 env.cr.rollback()
 print("\n" + "=" * 96)
 print("Read-only — rolled back.")
