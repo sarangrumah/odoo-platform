@@ -3,7 +3,7 @@ status: draft
 generated_at: 2026-07-02T07:54:45Z
 generator: bootstrap-v1
 module: custom_intercompany_procurement
-manifest_version: 19.0.0.2.0
+manifest_version: 19.0.0.3.0
 ---
 
 # custom_intercompany_procurement
@@ -16,6 +16,7 @@ This module automates the mirroring of purchase orders and stock pickings betwee
    - A purchase order (PO) is confirmed in the issuing company (`purchase.order.button_confirm`).
    - The module resolves the receiving company from the PO partner's `commercial_partner_id` and searches for an active intercompany rule with `mirror_purchase_order = True`.
    - If found, it creates a draft sales order (SO) in the receiving company (`with_company`, `sudo`).
+   - If the rule has `auto_confirm_mirror_so`, that SO is confirmed on the spot (`_custom_confirm_ic_mirror_so`); the confirm runs in its own savepoint, so a failure (missing show date, lock date, unpriced line) leaves the quotation in place and reports itself on the buyer's PO chatter instead of rolling the mirror back.
 
 2. **Stock Picking Validation:**
    - An outgoing stock picking is validated in the issuing company (hook on `stock.picking._action_done`).
@@ -28,7 +29,7 @@ This module automates the mirroring of purchase orders and stock pickings betwee
 
 ## Key Models
 - **account.intercompany.rule** (`_inherit`) — Extends the base rule from `custom_accounting_full` with procurement-side toggles and asset-loan spawn configuration.
-- **purchase.order** (`_inherit = ["purchase.order", "pdp.audited.mixin"]`) — On `button_confirm`, runs `_custom_run_ic_po_mirror` → `_custom_create_ic_mirror_so` to spawn the mirror SO in the receiving company. Audit classification `"financial"`.
+- **purchase.order** (`_inherit = ["purchase.order", "pdp.audited.mixin"]`) — On `button_confirm`, runs `_custom_run_ic_po_mirror` → `_custom_create_ic_mirror_so` to spawn the mirror SO in the receiving company, then optionally `_custom_confirm_ic_mirror_so`. Audit classification `"financial"`; audit events `ic_po_mirror_created` and `ic_po_mirror_confirmed`.
 - **stock.picking** (`_inherit = ["stock.picking", "pdp.audited.mixin"]`) — On `_action_done`, runs `_custom_run_ic_picking_mirror` → `_custom_create_ic_mirror_picking` to spawn the incoming mirror picking. Audit classification `"internal"`.
 - **sale.order** (`_inherit`) — Holds mirror back-references and asset-loan logic; on `action_confirm` spawns the event-cycle asset loan.
 - **rental.order** (`_inherit`) — Links back to the source intercompany SO (`sale_order_id`) and tags the loan cycle (`loan_type`).
@@ -36,6 +37,7 @@ This module automates the mirroring of purchase orders and stock pickings betwee
 ## Important Fields
 ### account.intercompany.rule
 - **mirror_purchase_order** (Boolean, default `False`): enable PO → SO mirroring.
+- **auto_confirm_mirror_so** (Boolean, default `False`): confirm the mirrored SO immediately instead of leaving it as a quotation. Only meaningful with `mirror_purchase_order`; hidden in the form otherwise. Leave OFF when the receiving company still has to price or tax the order by hand — the mirror copies the PO price and deliberately carries **no** taxes.
 - **mirror_picking** (Boolean, default `False`): enable outgoing → incoming picking mirroring.
 - **target_warehouse_id** (Many2one `stock.warehouse`): receiving warehouse for mirrored pickings/SO; if empty, the first warehouse of the receiving company is used.
 - **target_sale_journal_id** (Many2one `account.journal`): **(Reserved) Future** — declared but never read by any code.
