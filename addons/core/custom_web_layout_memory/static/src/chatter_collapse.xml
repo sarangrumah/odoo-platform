@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+    <!--
+        Appended at the end of the topbar rather than inserted at its front:
+        the first children of the topbar form a t-if/t-else pair (the search
+        input versus the buttons) and slipping an element between them would
+        break the chain.
+    -->
+    <t t-name="custom_web_layout_memory.ChatterCollapse"
+       t-inherit="mail.Chatter" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('o-mail-Chatter-topbar')]" position="inside">
+            <button t-if="canCollapseChatter"
+                    class="o-ux-chatterToggle btn btn-link text-action px-1 d-print-none"
+                    t-att-class="{
+                        'o-ux-chatterCollapsed': layoutMemoryState.collapsed,
+                        'my-2': !props.compactHeight,
+                    }"
+                    t-att-title="layoutMemoryState.collapsed ? 'Show the message log' : 'Hide the message log'"
+                    t-att-aria-expanded="layoutMemoryState.collapsed ? 'false' : 'true'"
+                    t-on-click="toggleChatterCollapsed">
+                <i class="oi oi-fw"
+                   t-att-class="layoutMemoryState.collapsed ? 'oi-chevron-left' : 'oi-chevron-right'"
+                   role="img"/>
+            </button>
+        </xpath>
+    </t>
+
+</templates>

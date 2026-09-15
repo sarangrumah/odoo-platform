@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-15T23:26:54+00:00",
+  "generated_at": "2026-09-15T23:34:07+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "4963508e",
-    "branch": "t00-238"
+    "commit": "e808bf53",
+    "branch": "t00-196"
   },
   "buckets": [
     {
@@ -1455,6 +1455,19 @@
       ]
     },
     {
+      "module": "custom_web_layout_memory",
+      "bucket": "core",
+      "name": "Backend Layout Memory",
+      "version": "19.0.1.3.0",
+      "summary": "Remember list column widths per user and let the chatter be folded away",
+      "category": "Custom Platform/Technical/UX",
+      "depends": 3,
+      "public": true,
+      "last_change": "",
+      "change_count": 0,
+      "changes": []
+    },
+    {
       "module": "authenticate_keycloak",
       "bucket": "ee_gap",
       "name": "Auth Keycloak — Authorization Code Flow",
@@ -1736,13 +1749,13 @@
       "category": "Accounting/Accounting",
       "depends": 4,
       "public": true,
-      "last_change": "2026-09-09",
+      "last_change": "2026-09-16",
       "change_count": 54,
       "changes": [
         {
-          "sha": "4963508e",
-          "date": "2026-09-09",
-          "subject": "fix(reports): read Kode Objek PPh from the expense line, not the tax line"
+          "sha": "e808bf53",
+          "date": "2026-09-16",
+          "subject": "fix(reports): read Kode Objek PPh from the expense line, not the tax line (#238)"
         },
         {
           "sha": "bde8a4e8",
