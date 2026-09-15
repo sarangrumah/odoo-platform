@@ -27,6 +27,17 @@ class GlOpenItemsWizard(models.TransientModel):
         domain=[("reconcile", "=", True)],
         help="Kosongkan untuk semua akun yang bisa direkonsiliasi.",
     )
+    layout = fields.Selection(
+        [
+            ("summary", "Ringkas per Akun"),
+            ("summary_partner", "Ringkas per Akun + Lawan Transaksi"),
+            ("detail", "Detail per Baris"),
+        ],
+        string="Tampilan",
+        default="summary",
+        required=True,
+        help=("Ringkasan bisa diklik di layar untuk turun satu tingkat: akun → lawan transaksi → baris terbuka."),
+    )
     account_type_filter = fields.Selection(
         [
             ("all", "Semua akun rekonsiliasi"),
@@ -56,6 +67,7 @@ class GlOpenItemsWizard(models.TransientModel):
     def _build_filters(self):
         self.ensure_one()
         return {
+            "layout": self.layout,
             "date_from": self.date_from,
             "date_to": self.date_to,
             "company_ids": self.company_ids.ids or self.env.companies.ids,
@@ -72,6 +84,11 @@ class GlOpenItemsWizard(models.TransientModel):
             options["date_from"] = self.date_from.isoformat()
         return options
 
+    def _report_context_extra(self):
+        # ``_xlsx_columns`` never sees the filters, so the layout has to reach
+        # the report through the context as well.
+        return {"open_items_layout": self.layout}
+
     def action_print(self):
         self.ensure_one()
         data = {
@@ -84,4 +101,5 @@ class GlOpenItemsWizard(models.TransientModel):
     def action_export_xlsx(self):
         self.ensure_one()
         filename = "GL_Open_Items_%s.xlsx" % self.date_to
-        return self.env["custom.report.gl.open.items"]._xlsx_action(self._report_options(), filename)
+        report = self.env["custom.report.gl.open.items"].with_context(**self._report_context_extra())
+        return report._xlsx_action(self._report_options(), filename)

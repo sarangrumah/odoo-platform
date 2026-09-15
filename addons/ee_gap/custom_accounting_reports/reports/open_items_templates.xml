@@ -4,7 +4,54 @@
         <!-- ============ GL Open Items / Outstanding Balance ============ -->
         <template id="report_gl_open_items">
             <t t-call="custom_accounting_reports.report_header"/>
-            <table class="table table-sm table-bordered">
+            <t t-set="layout" t-value="options.get('layout') or 'detail'"/>
+            <!-- Ringkasan: satu baris per akun (atau per akun + lawan transaksi). -->
+            <table t-if="layout != 'detail'" class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Akun</th>
+                        <th t-if="layout == 'summary_partner'">Lawan Transaksi</th>
+                        <th class="text-end">Jml Baris</th>
+                        <th>Tertua</th>
+                        <th class="text-end">Umur Terlama (hari)</th>
+                        <th class="text-end">Debit</th>
+                        <th class="text-end">Kredit</th>
+                        <th class="text-end">Outstanding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-set="span" t-value="7 if layout == 'summary_partner' else 6"/>
+                    <t t-foreach="lines" t-as="line">
+                        <tr t-if="line.get('type') == 'note'">
+                            <td t-att-colspan="span + 1" class="text-muted fst-italic" t-esc="line.get('account')"/>
+                        </tr>
+                        <tr t-elif="line.get('type') in ('subtotal', 'grand_total')"
+                            t-att-class="'table-dark fw-bold' if line.get('type') == 'grand_total' else 'table-light fw-bold'">
+                            <td t-att-colspan="span" t-esc="line.get('account')"/>
+                            <td class="text-end">
+                                <span t-esc="line.get('outstanding')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                        </tr>
+                        <tr t-else="">
+                            <td t-esc="line.get('account')"/>
+                            <td t-if="layout == 'summary_partner'" t-esc="line.get('partner')"/>
+                            <td class="text-end" t-esc="line.get('item_count')"/>
+                            <td t-esc="line.get('date')" t-options="{'widget': 'date'}"/>
+                            <td class="text-end" t-esc="line.get('age')"/>
+                            <td class="text-end">
+                                <span t-esc="line.get('debit')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="line.get('credit')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="line.get('outstanding')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                        </tr>
+                    </t>
+                </tbody>
+            </table>
+            <table t-else="" class="table table-sm table-bordered">
                 <thead class="table-light">
                     <tr>
                         <th>Akun</th>

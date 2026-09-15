@@ -42,6 +42,7 @@ REPORT_MODEL_MAP = {
     "bill_payment": "custom.report.bill.payment",
     "tax": "custom.report.tax",
     "faktur_pajak": "custom.report.faktur.pajak",
+    "report_vat": "custom.report.vat",
     "bupot": "custom.report.bupot",
     "spt_ppn": "custom.report.spt.ppn",
     "pph_withholding": "custom.report.pph.withholding",
@@ -119,6 +120,17 @@ class CustomReportDispatch(models.AbstractModel):
         the report's :py:meth:`~custom.report.engine.get_report_table`
         payload (columns + display rows)."""
         return self._report_model(report_code).get_report_table(options, context_extra)
+
+    @api.model
+    def get_report_drilldown_action(self, report_code, options=None, params=None):
+        """Drill *within* a report: hand the click back to the report itself.
+
+        Used by rows carrying ``drilldown_params`` (GL Open Items' account →
+        counterparty → lines chain), as opposed to
+        :py:meth:`get_drilldown_action`, which always lands in the General
+        Ledger.
+        """
+        return self._report_model(report_code)._report_drilldown_action(options, params)
 
     @api.model
     def _opening_period(self, date_from, company):
