@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-15T23:46:55+00:00",
+  "generated_at": "2026-09-15T23:53:03+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "3b5671fa",
-    "branch": "t00-192"
+    "commit": "efcf2c75",
+    "branch": "t00-177"
   },
   "buckets": [
     {
@@ -1750,14 +1750,19 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.26.1",
+      "version": "19.0.0.27.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
-      "depends": 4,
+      "depends": 5,
       "public": true,
       "last_change": "2026-09-16",
-      "change_count": 55,
+      "change_count": 56,
       "changes": [
+        {
+          "sha": "efcf2c75",
+          "date": "2026-09-16",
+          "subject": "feat(reports): Purchase Register per goods-receipt period + faktur pajak on Import PPN Masukan (#192)"
+        },
         {
           "sha": "3b5671fa",
           "date": "2026-09-16",
@@ -1792,11 +1797,6 @@
           "sha": "53afaa51",
           "date": "2026-08-05",
           "subject": "fix(reports): pin the XStore menu so an upgrade cannot un-archive it"
-        },
-        {
-          "sha": "c4822199",
-          "date": "2026-08-05",
-          "subject": "docs(reports): explain AR Aging Export in MODULE_KNOWLEDGE"
         }
       ]
     },

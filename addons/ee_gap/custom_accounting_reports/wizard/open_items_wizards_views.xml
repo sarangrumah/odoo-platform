@@ -11,6 +11,7 @@
                         <field name="date_to"/>
                         <field name="date_from"/>
                         <field name="account_type_filter"/>
+                        <field name="layout"/>
                     </group>
                     <group>
                         <field name="company_ids" widget="many2many_tags"/>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <template id="report_vat">
+            <t t-call="custom_accounting_reports.report_header"/>
+            <table class="table table-sm table-bordered" style="font-size: 9px;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Kode Perkiraan</th>
+                        <th>Nama</th>
+                        <th>No Bukti #</th>
+                        <th>No. Trans #</th>
+                        <th>Tanggal</th>
+                        <th>Tipe Transaksi</th>
+                        <th>Keterangan</th>
+                        <th class="text-end">Debit</th>
+                        <th class="text-end">Kredit</th>
+                        <th class="text-end">Saldo Akhir</th>
+                        <th>No Referensi</th>
+                        <th>No Faktur Pajak</th>
+                        <th>Nama Pemasok</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-foreach="lines" t-as="line">
+                        <tr t-if="line.get('type') == 'grand_total'"
+                            class="table-dark fw-bold">
+                            <td colspan="7" t-esc="line.get('label') or 'TOTAL'"/>
+                            <td class="text-end">
+                                <span t-esc="line.get('debit')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="line.get('credit')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td colspan="4"/>
+                        </tr>
+                        <tr t-else="">
+                            <td t-esc="line.get('account_code')"/>
+                            <td t-esc="line.get('account_name')"/>
+                            <td t-esc="line.get('doc_no')"/>
+                            <td t-esc="line.get('trans_no')"/>
+                            <td t-esc="line.get('date')" t-options="{'widget': 'date'}"/>
+                            <td t-esc="line.get('tipe')"/>
+                            <td t-esc="line.get('label')"/>
+                            <td class="text-end">
+                                <span t-esc="line.get('debit')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="line.get('credit')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="line.get('balance')"
+                                      t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </td>
+                            <td t-esc="line.get('reference')"/>
+                            <td t-esc="line.get('faktur')"/>
+                            <td t-esc="line.get('partner')"/>
+                        </tr>
+                    </t>
+                </tbody>
+            </table>
+        </template>
+    </data>
+</odoo>

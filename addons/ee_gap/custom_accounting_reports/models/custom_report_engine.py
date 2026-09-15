@@ -23,6 +23,7 @@ import logging
 from datetime import date, timedelta
 
 from odoo import _, models
+from odoo.exceptions import UserError
 from odoo.tools.misc import format_date
 
 _logger = logging.getLogger(__name__)
@@ -652,6 +653,16 @@ class CustomReportEngine(models.AbstractModel):
             "lines": report._flatten_for_screen(ctx.get("lines", []), columns),
         }
 
+    def _report_drilldown_action(self, options, params):
+        """Open the level below the clicked row, for reports that drill into
+        themselves. Default: no such level.
+
+        Reports override this to return an ``ir.actions.client`` (usually the
+        same ``custom_report_table`` tag with narrower options). ``params`` is
+        whatever the row put in ``drilldown_params``.
+        """
+        raise UserError(_("This report has no drill-down."))
+
     def _first_text_field(self, columns):
         """The first non-numeric/non-date column field — where a total
         row's ``label`` is rendered when it has no account field."""
@@ -696,6 +707,13 @@ class CustomReportEngine(models.AbstractModel):
         # ormcached, so testing the gate per row is cheap.
         if line.get("account_id") and self._drilldown_enabled():
             row["account_id"] = line["account_id"]
+        # A report that drills into *itself* (GL Open Items: account →
+        # counterparty → lines) carries what the next level needs here. It is
+        # not gated by ``_drilldown_enabled``: that gate exists for the link
+        # into the General Ledger, while this one only re-runs the report the
+        # user is already looking at.
+        if line.get("drilldown_params"):
+            row["drilldown_params"] = line["drilldown_params"]
         return row
 
     def _flatten_for_screen(self, lines, columns):

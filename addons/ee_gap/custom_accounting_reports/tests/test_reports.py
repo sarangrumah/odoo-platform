@@ -1112,16 +1112,6 @@ class TestCustomReports(TransactionCase):
                 "tax_amount": 20.0,
             }
         )
-        # The recap only counts a withholding line once the engine has booked
-        # its "Pemotongan PPh" entry, so the fixture has to book one too —
-        # without it the line is reported as an orphan and the total stays 0.
-        if "x_custom_withholding_move_id" in move._fields:
-            pemotongan = self._post_move(
-                [(self.acc_pay, 20.0, 0.0), (acc_pph, 0.0, 20.0)],
-                partner=self.partner_b,
-                ref="Pemotongan PPh",
-            )
-            move.x_custom_withholding_move_id = pemotongan.id
         lines = rep._build_lines(filters)
         grand = next(l for l in lines if l.get("type") == "grand_total")
         self.assertAlmostEqual(grand["pph"], 20.0, places=2)
@@ -1131,78 +1121,6 @@ class TestCustomReports(TransactionCase):
             ),
             "The jenis penghasilan (category) must appear on detail rows.",
         )
-
-    def test_pph_withholding_kode_objek_from_bill_line(self):
-        """Kode Objek picked on the expense line must reach the recap.
-
-        The operator sets it on the line being expensed while the PPh lands on
-        the tax line, so the report has to walk back from the tax line to its
-        base lines. Reading the picker off the tax line yielded a blank column.
-        """
-        AML = self.env["account.move.line"]
-        if "tax.withholding.rule" not in self.env or "x_custom_withholding_category_id" not in AML._fields:
-            self.skipTest("custom_tax_id (withholding picker) not installed")
-        acc_pph = self._mk_account("21291", "Hutang PPh 4(2)", "liability_current")
-        cat = self.env["tax.withholding.category"].create(
-            {
-                "name": "Persewaan Tanah dan/atau Bangunan",
-                "code": "SEWA-TEST",
-                "pph_kind": "pph_4_2",
-                "bupot_object_code": "28-403-02",
-            }
-        )
-        self.env["tax.withholding.rule"].create(
-            {
-                "name": "PPh 4(2) Sewa Test",
-                "category_id": cat.id,
-                "tarif": 10.0,
-                "account_id": acc_pph.id,
-                "company_id": self.company.id,
-            }
-        )
-        # Native PPh tax on the bill line — stored with a negative rate.
-        tax = self._mk_ppn_tax("PPh 4(2) Final (10%)", "purchase", acc_pph, amount=-10.0)
-        j_purchase = self.Journal.create(
-            {"name": "Purchases WHT", "code": "BLL9", "type": "purchase", "company_id": self.company.id}
-        )
-        bill = self.Move.create(
-            {
-                "move_type": "in_invoice",
-                "journal_id": j_purchase.id,
-                "partner_id": self.partner_b.id,
-                "invoice_date": date.today(),
-                "date": date.today(),
-                "company_id": self.company.id,
-                "invoice_line_ids": [
-                    Command.create(
-                        {
-                            "name": "Sewa ruko",
-                            "quantity": 1.0,
-                            "price_unit": 1000.0,
-                            "account_id": self.acc_expense.id,
-                            "tax_ids": [Command.set([tax.id])],
-                            "x_custom_withholding_category_id": cat.id,
-                        }
-                    )
-                ],
-            }
-        )
-        bill.action_post()
-
-        lines = self.env["custom.report.pph.withholding"]._build_lines(self._filters(pph_kind="all"))
-        row = next(
-            (
-                l
-                for l in lines
-                if l.get("type") not in ("grand_total", "subtotal", "note") and l.get("doc_no") == bill.name
-            ),
-            None,
-        )
-        self.assertIsNotNone(row, "The bill withheld through a native PPh tax must be listed.")
-        self.assertEqual(row["kode_objek"], "28-403-02")
-        self.assertEqual(row["jenis_penghasilan"], "Persewaan Tanah dan/atau Bangunan")
-        self.assertAlmostEqual(row["dpp"], 1000.0, places=2)
-        self.assertAlmostEqual(row["pph"], 100.0, places=2)
 
     def test_nsfp_monitoring(self):
         acc_ppn_out = self._mk_account("21280", "PPN Keluaran NSFP", "liability_current")
@@ -1694,6 +1612,98 @@ class TestCustomReports(TransactionCase):
         self.assertEqual(table["lines"][-1]["type"], "grand_total")
 
     # ------------------------------------------------------------------
+    # Report VAT — the PPN ledger (go-live sheet item 2).
+    # ------------------------------------------------------------------
+    def test_report_vat_ledger(self):
+        """VAT accounts are discovered from tax repartition, PPh is excluded,
+        and the running balance walks the lines it is printed against.
+        """
+        today = date.today()
+        acc_vat_out = self._mk_account("21251", "VAT Out Ledger", "liability_current")
+        acc_pph = self._mk_account("21261", "PPh 23 Ledger", "liability_current")
+        ppn = self._mk_ppn_tax("PPN Ledger 11%", "sale", acc_vat_out)
+        self._mk_ppn_tax("PPh 23 Ledger 2%", "purchase", acc_pph, amount=2.0)
+
+        for price in (1000.0, 2000.0):
+            self.Move.create(
+                {
+                    "move_type": "out_invoice",
+                    "journal_id": self.j_sale.id,
+                    "partner_id": self.partner_a.id,
+                    "invoice_date": today,
+                    "date": today,
+                    "company_id": self.company.id,
+                    "invoice_line_ids": [
+                        Command.create(
+                            {
+                                "name": "Jasa Drone",
+                                "quantity": 1.0,
+                                "price_unit": price,
+                                "account_id": self.acc_revenue.id,
+                                "tax_ids": [Command.set([ppn.id])],
+                            }
+                        )
+                    ],
+                }
+            ).action_post()
+
+        report = self.env["custom.report.vat"]
+
+        vat_ids = report._vat_account_ids([self.company.id], "both")
+        self.assertIn(acc_vat_out.id, vat_ids, "A PPN account must be discovered.")
+        self.assertNotIn(
+            acc_pph.id,
+            vat_ids,
+            "A tax named 'PPh ...' is withholding — its account is not a VAT account.",
+        )
+
+        lines = report._build_lines(self._filters())
+        body = [ln for ln in lines if ln.get("type") != "grand_total"]
+        self.assertTrue(body, "The ledger must return the posted PPN lines.")
+        self.assertTrue(
+            all(ln["account_id"] in vat_ids for ln in body),
+            "Only VAT accounts may appear.",
+        )
+        self.assertTrue(
+            any(ln["tipe"] == "Faktur Penjualan" for ln in body),
+            "move_type must be mapped to the Indonesian transaction label.",
+        )
+
+        # Running balance must equal the cumulative movement, per account.
+        running = {}
+        for ln in body:
+            running[ln["account_id"]] = running.get(ln["account_id"], 0.0) + ln["debit"] - ln["credit"]
+            self.assertAlmostEqual(
+                ln["balance"],
+                running[ln["account_id"]],
+                2,
+                "Saldo Akhir must walk the lines it is printed beside.",
+            )
+
+        grand = next((ln for ln in lines if ln.get("type") == "grand_total"), None)
+        self.assertIsNotNone(grand, "Report VAT must emit a grand_total.")
+        self.assertAlmostEqual(grand["credit"], sum(ln["credit"] for ln in body), 2)
+
+        # A narrower side must not widen the account set.
+        keluaran = report._vat_account_ids([self.company.id], "keluaran")
+        self.assertIn(acc_vat_out.id, keluaran)
+        masukan = report._vat_account_ids([self.company.id], "masukan")
+        self.assertNotIn(acc_vat_out.id, masukan)
+
+    def test_report_vat_screen_table(self):
+        """The report must be reachable through the shared screen contract."""
+        options = {
+            "date_from": "1970-01-01",
+            "date_to": date.today().isoformat(),
+            "company_ids": [self.company.id],
+            "posted_only": True,
+        }
+        table = self.env["custom.report.vat"].get_report_table(options)
+        headers = [c["header"] for c in table["columns"]]
+        self.assertEqual(headers[0], "Kode Perkiraan")
+        self.assertIn("No Faktur Pajak", headers)
+
+    # ------------------------------------------------------------------
     # 23) Purchase register: Trade / Non-Trade split.
     #     ``account.move.l10n_purchase_type`` belongs to the tenant module
     #     custom_levis_localization, which this addon must not depend on, so
@@ -1847,219 +1857,321 @@ class TestCustomReports(TransactionCase):
         )
 
     # ------------------------------------------------------------------
-    # PPN Keluaran Digunggung (PKP Pedagang Eceran)
+    # GL Open Items: netting + as-of residual
     # ------------------------------------------------------------------
-    def _post_retail_sale(self, amount, tax, when=None):
-        """A POS-shaped sale: a journal entry, no customer invoice."""
-        when = when or date.today()
-        # One cash account for every retail sale in a test: ``_mk_account``
-        # would trip Odoo's unique-code constraint on the second call.
-        # ``account.account.code`` is company-dependent in Odoo 19 and the model
-        # has no ``company_id`` — search it under the company, and create only
-        # once so the unique-code constraint is not tripped on a second sale.
-        acc_cash = self.Account.with_company(self.company).search(
-            [("code", "=", "11190")], limit=1
-        ) or self._mk_account("11190", "Kas Toko", "asset_current")
-        move = self.Move.create(
-            {
-                "move_type": "entry",
-                "journal_id": self.j_sale.id,
-                "date": when,
-                "company_id": self.company.id,
-                # Only the base and the cash side: Odoo derives the tax line
-                # from ``tax_ids`` itself. Writing one by hand as well leaves
-                # the entry unbalanced by exactly the PPN.
-                "line_ids": [
-                    Command.create(
-                        {
-                            "name": "Penjualan eceran",
-                            "account_id": self.acc_revenue.id,
-                            "credit": amount,
-                            "tax_ids": [Command.set([tax.id])],
-                        }
-                    ),
-                    Command.create(
-                        {
-                            "name": "Kas",
-                            "account_id": acc_cash.id,
-                            "debit": amount * (1 + tax.amount / 100.0),
-                        }
-                    ),
-                ],
-            }
-        )
-        move.action_post()
-        return move
+    def _gl_open_items(self, **overrides):
+        options = {
+            "date_from": None,
+            "date_to": date.today(),
+            "company_ids": [self.company.id],
+            "partner_ids": [],
+            "account_ids": [],
+            "account_types": [],
+        }
+        options.update(overrides)
+        return self.env["custom.report.gl.open.items"]._build_lines(options)
 
-    def test_ppn_digunggung_presents_11_percent_as_12_on_nilai_lain(self):
-        acc_ppn_out = self._mk_account("21201", "PPN Keluaran Eceran", "liability_current")
-        ppn = self._mk_ppn_tax("PPN Eceran 11%", "sale", acc_ppn_out)
-        self._post_retail_sale(1_200_000.0, ppn)
+    def _mk_clearing_account(self, code, name):
+        account = self._mk_account(code, name, "asset_current")
+        account.reconcile = True
+        return account
 
-        lines = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
-        masa = [l for l in lines if l.get("type") == "subtotal"]
-        self.assertEqual(len(masa), 1, "One tax period expected.")
-        # Harga jual stays whole; the presented base is 11/12 of it and the
-        # tariff is the statutory 12 — the PPN rupiah is unchanged at 11%.
-        self.assertAlmostEqual(masa[0]["dpp_penuh"], 1_200_000.0, places=2)
-        self.assertAlmostEqual(masa[0]["dpp_lain"], 1_100_000.0, places=2)
-        self.assertEqual(masa[0]["tarif"], 12.0)
-        self.assertAlmostEqual(masa[0]["ppn"], 132_000.0, places=2)
-        self.assertAlmostEqual(masa[0]["dpp_lain"] * 0.12, masa[0]["ppn"], places=2)
+    def test_gl_open_items_nets_offsetting_lines(self):
+        """Debit and credit that cancel drop out even when never reconciled.
 
-    def test_ppn_digunggung_excludes_customer_invoices(self):
-        """An invoiced sale belongs to the per-faktur report, never here."""
-        acc_ppn_out = self._mk_account("21202", "PPN Keluaran FK", "liability_current")
-        ppn = self._mk_ppn_tax("PPN FK 11%", "sale", acc_ppn_out)
-        inv = self.Move.create(
-            {
-                "move_type": "out_invoice",
-                "journal_id": self.j_sale.id,
-                "partner_id": self.partner_a.id,
-                "invoice_date": date.today(),
-                "date": date.today(),
-                "company_id": self.company.id,
-                "invoice_line_ids": [
-                    Command.create(
-                        {
-                            "name": "Barang B",
-                            "quantity": 1.0,
-                            "price_unit": 500_000.0,
-                            "account_id": self.acc_revenue.id,
-                            "tax_ids": [Command.set([ppn.id])],
-                        }
-                    )
-                ],
-            }
-        )
-        inv.action_post()
-        self._post_retail_sale(1_200_000.0, ppn)
-
-        lines = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
-        grand = next(l for l in lines if l.get("type") == "grand_total")
-        # Only the retail sale: 1.200.000 harga jual, never 1.700.000.
-        self.assertAlmostEqual(grand["dpp_penuh"], 1_200_000.0, places=2)
-        self.assertAlmostEqual(grand["ppn"], 132_000.0, places=2)
-
-    def test_ppn_digunggung_daily_detail_follows_the_recap(self):
-        acc_ppn_out = self._mk_account("21203", "PPN Keluaran Harian", "liability_current")
-        ppn = self._mk_ppn_tax("PPN Harian 11%", "sale", acc_ppn_out)
+        GR/IR and POS suspense are settled by the counter-journal, not by
+        ``account.partial.reconcile``, so the ledger still calls both legs open.
+        Only the part that is genuinely still outstanding may be printed.
+        """
         today = date.today()
-        self._post_retail_sale(1_200_000.0, ppn, when=today)
-        self._post_retail_sale(600_000.0, ppn, when=today - timedelta(days=1))
+        clearing = self._mk_clearing_account("13010", "GR/IR Clearing")
+        self._post_move(
+            [(clearing, 1000.0, 0.0), (self.acc_revenue, 0.0, 1000.0)],
+            dt=today - timedelta(days=30),
+            ref="GR-1",
+        )
+        self._post_move(
+            [(clearing, 0.0, 1000.0), (self.acc_cash, 1000.0, 0.0)],
+            dt=today - timedelta(days=20),
+            ref="BILL-1",
+        )
+        self._post_move(
+            [(clearing, 500.0, 0.0), (self.acc_cash, 0.0, 500.0)],
+            dt=today - timedelta(days=10),
+            ref="GR-2",
+        )
+        self._post_move(
+            [(clearing, 0.0, 200.0), (self.acc_cash, 200.0, 0.0)],
+            dt=today - timedelta(days=5),
+            ref="BILL-2",
+        )
 
-        lines = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
-        detail = [l for l in lines if not l.get("type")]
-        self.assertEqual(len(detail), 2, "One line per trading day expected.")
-        grand = next(l for l in lines if l.get("type") == "grand_total")
-        self.assertAlmostEqual(sum(d["ppn"] for d in detail), grand["ppn"], places=2)
-        self.assertAlmostEqual(grand["dpp_penuh"], 1_800_000.0, places=2)
+        lines = self._gl_open_items(account_ids=[clearing.id])
+        details = [ln for ln in lines if not ln.get("type")]
 
-    def test_ppn_digunggung_registered_in_both_dispatch_registries(self):
-        """Guard against the silent Trial-Balance fallback (19.0.0.9.0)."""
-        from odoo.addons.custom_accounting_reports.models.custom_report_dispatch import REPORT_MODEL_MAP
+        # GR-1/BILL-1 cancel exactly and are gone; GR-2 survives with the 200
+        # of BILL-2 taken off it, and BILL-2 itself is fully consumed.
+        self.assertEqual([ln["reference"] for ln in details], ["GR-2"])
+        self.assertAlmostEqual(details[0]["outstanding"], 300.0, places=2)
+        # Debit/Kredit keep the ledger amount so the row stays traceable.
+        self.assertAlmostEqual(details[0]["debit"], 500.0, places=2)
+        self.assertAlmostEqual(lines[-1]["outstanding"], 300.0, places=2)
 
-        self.assertEqual(REPORT_MODEL_MAP.get("ppn_digunggung"), "custom.report.ppn.digunggung")
-        router = self.env.ref("custom_accounting_reports.report_dispatch").arch
-        self.assertIn("report_ppn_digunggung", router)
-
-    # ------------------------------------------------------------------
-    # Rincian PPN Digunggung per transaksi
-    # ------------------------------------------------------------------
-    def test_ppn_digunggung_detail_one_row_per_transaction(self):
-        """Every supply is named, and the rows still add up to the recap."""
-        acc_ppn_out = self._mk_account("21204", "PPN Keluaran Rinci", "liability_current")
-        ppn = self._mk_ppn_tax("PPN Rinci 11%", "sale", acc_ppn_out)
+    def test_gl_open_items_nets_per_partner(self):
+        """A debit and a credit of different partners never cancel."""
         today = date.today()
-        first = self._post_retail_sale(1_200_000.0, ppn, when=today)
-        second = self._post_retail_sale(600_000.0, ppn, when=today)
+        clearing = self._mk_clearing_account("13020", "Advance Clearing")
+        self._post_move(
+            [(clearing, 700.0, 0.0), (self.acc_cash, 0.0, 700.0)],
+            dt=today - timedelta(days=9),
+            partner=self.partner_a,
+            ref="ADV-A",
+        )
+        self._post_move(
+            [(clearing, 0.0, 700.0), (self.acc_cash, 700.0, 0.0)],
+            dt=today - timedelta(days=8),
+            partner=self.partner_b,
+            ref="ADV-B",
+        )
 
-        lines = self.env["custom.report.ppn.digunggung.detail"]._build_lines(self._filters())
-        rows = [l for l in lines if not l.get("type")]
+        details = [ln for ln in self._gl_open_items(account_ids=[clearing.id]) if not ln.get("type")]
         self.assertEqual(
-            {row["doc_no"] for row in rows},
-            {first.name, second.name},
-            "Without POS the transaction number is the journal entry's own.",
+            sorted((ln["reference"], round(ln["outstanding"], 2)) for ln in details),
+            [("ADV-A", 700.0), ("ADV-B", -700.0)],
         )
-        recap = self.env["custom.report.ppn.digunggung"]._build_lines(self._filters())
-        recap_total = next(l for l in recap if l.get("type") == "grand_total")
-        detail_total = next(l for l in lines if l.get("type") == "grand_total")
-        self.assertAlmostEqual(detail_total["ppn"], recap_total["ppn"], places=2)
-        self.assertAlmostEqual(detail_total["dpp_penuh"], recap_total["dpp_penuh"], places=2)
-        self.assertAlmostEqual(detail_total["dpp_lain"], recap_total["dpp_lain"], places=2)
-        # PMK 131 presentation survives one level down.
-        self.assertTrue(all(row["tarif"] == 12.0 for row in rows))
-        self.assertAlmostEqual(sum(row["dpp_lain"] for row in rows) * 0.12, detail_total["ppn"], places=2)
 
-    def test_ppn_digunggung_detail_subtotals_every_masa(self):
-        acc_ppn_out = self._mk_account("21205", "PPN Keluaran Dua Masa", "liability_current")
-        ppn = self._mk_ppn_tax("PPN Dua Masa 11%", "sale", acc_ppn_out)
-        this_masa = date.today().replace(day=15)
-        prev_masa = (this_masa.replace(day=1) - timedelta(days=1)).replace(day=15)
-        self._post_retail_sale(1_200_000.0, ppn, when=this_masa)
-        self._post_retail_sale(600_000.0, ppn, when=prev_masa)
-
-        filters = self._filters()
-        filters["date_from"] = prev_masa.replace(day=1)
-        lines = self.env["custom.report.ppn.digunggung.detail"]._build_lines(filters)
-        subtotals = [l for l in lines if l.get("type") == "subtotal"]
-        self.assertEqual(len(subtotals), 2, "One subtotal per tax period expected.")
-        headers = [l for l in lines if l.get("type") == "header"]
-        self.assertEqual(len(headers), 2)
-        grand = next(l for l in lines if l.get("type") == "grand_total")
-        self.assertAlmostEqual(sum(s["ppn"] for s in subtotals), grand["ppn"], places=2)
-
-    def test_ppn_digunggung_detail_excludes_customer_invoices(self):
-        """The invoiced half stays with the per-faktur report, as in the recap."""
-        acc_ppn_out = self._mk_account("21206", "PPN Keluaran Rinci FK", "liability_current")
-        ppn = self._mk_ppn_tax("PPN Rinci FK 11%", "sale", acc_ppn_out)
-        inv = self.Move.create(
-            {
-                "move_type": "out_invoice",
-                "journal_id": self.j_sale.id,
-                "partner_id": self.partner_a.id,
-                "invoice_date": date.today(),
-                "date": date.today(),
-                "company_id": self.company.id,
-                "invoice_line_ids": [
-                    Command.create(
-                        {
-                            "name": "Barang C",
-                            "quantity": 1.0,
-                            "price_unit": 500_000.0,
-                            "account_id": self.acc_revenue.id,
-                            "tax_ids": [Command.set([ppn.id])],
-                        }
-                    )
-                ],
-            }
+    def test_gl_open_items_ignores_settlement_after_cutoff(self):
+        """Paid tomorrow is still outstanding on a report drawn today."""
+        today = date.today()
+        invoice = self._post_move(
+            [(self.acc_recv, 1000.0, 0.0), (self.acc_revenue, 0.0, 1000.0)],
+            dt=today - timedelta(days=10),
+            partner=self.partner_a,
+            ref="INV-1",
         )
-        inv.action_post()
-        self._post_retail_sale(1_200_000.0, ppn)
+        payment = self._post_move(
+            [(self.acc_recv, 0.0, 1000.0), (self.acc_cash, 1000.0, 0.0)],
+            dt=today + timedelta(days=1),
+            partner=self.partner_a,
+            ref="PAY-1",
+        )
+        recv_lines = (invoice.line_ids + payment.line_ids).filtered(lambda ml: ml.account_id == self.acc_recv)
+        recv_lines.reconcile()
+        self.assertTrue(all(recv_lines.mapped("reconciled")))
 
-        lines = self.env["custom.report.ppn.digunggung.detail"]._build_lines(self._filters())
-        self.assertNotIn(inv.name, {l.get("doc_no") for l in lines if not l.get("type")})
-        grand = next(l for l in lines if l.get("type") == "grand_total")
-        self.assertAlmostEqual(grand["dpp_penuh"], 1_200_000.0, places=2)
+        details = [ln for ln in self._gl_open_items(account_ids=[self.acc_recv.id]) if not ln.get("type")]
+        self.assertEqual([ln["reference"] for ln in details], ["INV-1"])
+        self.assertAlmostEqual(details[0]["outstanding"], 1000.0, places=2)
 
-    def test_ppn_digunggung_detail_registered_in_both_dispatch_registries(self):
-        """Guard against the silent Trial-Balance fallback (19.0.0.9.0)."""
-        from odoo.addons.custom_accounting_reports.models.custom_report_dispatch import REPORT_MODEL_MAP
+        # Drawn after the payment date, nothing is left open.
+        later = [
+            ln
+            for ln in self._gl_open_items(account_ids=[self.acc_recv.id], date_to=today + timedelta(days=2))
+            if not ln.get("type")
+        ]
+        self.assertFalse(later)
 
+    def test_gl_open_items_counts_settlement_outside_the_date_filter(self):
+        """A settlement is real even when "Dari Tanggal" hides the other leg."""
+        today = date.today()
+        invoice = self._post_move(
+            [(self.acc_recv, 400.0, 0.0), (self.acc_revenue, 0.0, 400.0)],
+            dt=today - timedelta(days=40),
+            partner=self.partner_b,
+            ref="INV-OLD",
+        )
+        payment = self._post_move(
+            [(self.acc_recv, 0.0, 400.0), (self.acc_cash, 400.0, 0.0)],
+            dt=today - timedelta(days=3),
+            partner=self.partner_b,
+            ref="PAY-OLD",
+        )
+        (invoice.line_ids + payment.line_ids).filtered(lambda ml: ml.account_id == self.acc_recv).reconcile()
+
+        details = [
+            ln
+            for ln in self._gl_open_items(account_ids=[self.acc_recv.id], date_from=today - timedelta(days=7))
+            if not ln.get("type")
+        ]
+        self.assertFalse(details)
+
+    def test_gl_open_items_nets_partnerless_across_partners(self):
+        """GR/IR: the receipt credit has no partner, the bill debit has one."""
+        today = date.today()
+        clearing = self._mk_clearing_account("13030", "GR/IR Clearing Vendor")
+        self._post_move(
+            [(clearing, 0.0, 900.0), (self.acc_cash, 900.0, 0.0)],
+            dt=today - timedelta(days=12),
+            ref="GR-VAL",
+        )
+        self._post_move(
+            [(clearing, 900.0, 0.0), (self.acc_cash, 0.0, 900.0)],
+            dt=today - timedelta(days=6),
+            partner=self.partner_a,
+            ref="BILL",
+        )
+        self._post_move(
+            [(clearing, 250.0, 0.0), (self.acc_cash, 0.0, 250.0)],
+            dt=today - timedelta(days=2),
+            partner=self.partner_a,
+            ref="BILL-EXTRA",
+        )
+
+        details = [ln for ln in self._gl_open_items(account_ids=[clearing.id]) if not ln.get("type")]
+        self.assertEqual([ln["reference"] for ln in details], ["BILL-EXTRA"])
+        self.assertAlmostEqual(details[0]["outstanding"], 250.0, places=2)
+
+    def test_gl_open_items_drops_the_account_that_nets_away(self):
+        """No detail rows left means no subtotal line either."""
+        today = date.today()
+        clearing = self._mk_clearing_account("13040", "Suspense Clearing")
+        self._post_move(
+            [(clearing, 300.0, 0.0), (self.acc_cash, 0.0, 300.0)],
+            dt=today - timedelta(days=4),
+            ref="IN",
+        )
+        self._post_move(
+            [(clearing, 0.0, 300.0), (self.acc_cash, 300.0, 0.0)],
+            dt=today - timedelta(days=3),
+            ref="OUT",
+        )
+
+        lines = self._gl_open_items(account_ids=[clearing.id])
+        self.assertEqual([ln.get("type") for ln in lines], ["note", "grand_total"])
+        self.assertAlmostEqual(lines[-1]["outstanding"], 0.0, places=2)
+
+    # ------------------------------------------------------------------
+    # GL Open Items: summary levels + drill-down
+    # ------------------------------------------------------------------
+    def _open_items_fixture(self):
+        """One clearing account left open by two partners and by nobody."""
+        today = date.today()
+        clearing = self._mk_clearing_account("13050", "Open Items Clearing")
+        self._post_move(
+            [(clearing, 400.0, 0.0), (self.acc_cash, 0.0, 400.0)],
+            dt=today - timedelta(days=40),
+            partner=self.partner_a,
+            ref="A-1",
+        )
+        self._post_move(
+            [(clearing, 150.0, 0.0), (self.acc_cash, 0.0, 150.0)],
+            dt=today - timedelta(days=20),
+            partner=self.partner_a,
+            ref="A-2",
+        )
+        self._post_move(
+            [(clearing, 250.0, 0.0), (self.acc_cash, 0.0, 250.0)],
+            dt=today - timedelta(days=10),
+            partner=self.partner_b,
+            ref="B-1",
+        )
+        return clearing
+
+    def test_gl_open_items_summary_ties_to_the_detail(self):
+        """The account summary is the detail of that account, collapsed."""
+        clearing = self._open_items_fixture()
+        detail = [ln for ln in self._gl_open_items(account_ids=[clearing.id]) if not ln.get("type")]
+        summary = self._gl_open_items(account_ids=[clearing.id], layout="summary")
+        rows = [ln for ln in summary if not ln.get("type")]
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["item_count"], len(detail))
+        self.assertAlmostEqual(row["outstanding"], sum(ln["outstanding"] for ln in detail), places=2)
+        self.assertAlmostEqual(row["debit"], sum(ln["debit"] for ln in detail), places=2)
+        # Oldest open item + the age of that oldest item.
+        self.assertEqual(row["date"], min(ln["date"] for ln in detail))
+        self.assertEqual(row["age"], max(ln["age"] for ln in detail))
+        self.assertEqual(row["drilldown_params"], {"account_id": clearing.id})
+        self.assertAlmostEqual(summary[-1]["outstanding"], 800.0, places=2)
+
+    def test_gl_open_items_summary_columns_follow_the_layout(self):
+        """Screen/Excel columns are the summary's, not the detail's."""
+        report = self.env["custom.report.gl.open.items"]
+        fields_of = lambda layout: [  # noqa: E731
+            col["field"] for col in report.with_context(open_items_layout=layout)._xlsx_columns()
+        ]
         self.assertEqual(
-            REPORT_MODEL_MAP.get("ppn_digunggung_detail"),
-            "custom.report.ppn.digunggung.detail",
+            fields_of("summary"),
+            ["account", "item_count", "date", "age", "debit", "credit", "outstanding"],
         )
-        router = self.env.ref("custom_accounting_reports.report_dispatch").arch
-        self.assertIn("report_ppn_digunggung_detail", router)
+        self.assertIn("partner", fields_of("summary_partner"))
+        self.assertIn("doc_no", fields_of("detail"))
 
-    def test_ppn_digunggung_wizard_switches_report_on_context(self):
-        """One wizard, two menus: the context key picks the layout."""
-        wizard = self.env["custom.report.ppn.digunggung.wizard"].create({})
-        self.assertEqual(wizard._report_code_for_view(), "ppn_digunggung")
-        detail = wizard.with_context(ppn_digunggung_detail=1)
-        self.assertEqual(detail._report_code_for_view(), "ppn_digunggung_detail")
+    def test_gl_open_items_summary_per_partner_and_drilldown(self):
+        """Account + counterparty rows carry the way down to their lines."""
+        clearing = self._open_items_fixture()
+        lines = self._gl_open_items(account_ids=[clearing.id], layout="summary_partner")
+        rows = [ln for ln in lines if not ln.get("type")]
+
+        self.assertEqual([r["partner"] for r in rows], ["Customer A", "Customer B"])
+        self.assertAlmostEqual(rows[0]["outstanding"], 550.0, places=2)
+        self.assertEqual(rows[0]["item_count"], 2)
         self.assertEqual(
-            detail.action_view()["params"]["report_code"],
-            "ppn_digunggung_detail",
+            rows[0]["drilldown_params"],
+            {"account_id": clearing.id, "focus_partner_id": self.partner_a.id},
         )
+        # Two counterparties on one account earn a subtotal; the grand total
+        # still matches the account summary.
+        self.assertEqual([ln.get("type") for ln in lines][-2:], ["subtotal", "grand_total"])
+        self.assertAlmostEqual(lines[-1]["outstanding"], 800.0, places=2)
+
+    def test_gl_open_items_drilldown_walks_one_level_down(self):
+        """Clicking a summary row re-runs this report, narrowed."""
+        clearing = self._open_items_fixture()
+        report = self.env["custom.report.gl.open.items"]
+        options = {"date_to": date.today().isoformat(), "layout": "summary"}
+
+        action = report._report_drilldown_action(options, {"account_id": clearing.id})
+        params = action["params"]
+        self.assertEqual(action["tag"], "custom_report_table")
+        self.assertEqual(params["report_code"], "gl_open_items")
+        self.assertEqual(params["options"]["layout"], "summary_partner")
+        self.assertEqual(params["options"]["account_ids"], [clearing.id])
+        self.assertEqual(params["context_extra"], {"open_items_layout": "summary_partner"})
+
+        deeper = report._report_drilldown_action(
+            params["options"], {"account_id": clearing.id, "focus_partner_id": self.partner_a.id}
+        )
+        self.assertEqual(deeper["params"]["options"]["layout"], "detail")
+        self.assertEqual(deeper["params"]["options"]["focus_partner_id"], self.partner_a.id)
+
+        detail_options = dict(deeper["params"]["options"], company_ids=[self.company.id], date_to=date.today())
+        rows = [ln for ln in report._build_lines(detail_options) if not ln.get("type")]
+        self.assertEqual([r["reference"] for r in rows], ["A-1", "A-2"])
+
+        # The detail level has nothing left to open.
+        with self.assertRaises(UserError):
+            report._report_drilldown_action(deeper["params"]["options"], {"account_id": clearing.id})
+
+    def test_gl_open_items_focus_partner_keeps_the_netting(self):
+        """Drilling into a partner must not resurrect what netted away.
+
+        The partnerless GR credit offsets the vendor's bill debit across
+        partners; narrowing the *query* to that vendor would skip that pass and
+        print the full bill as open. The filter therefore runs after netting.
+        """
+        today = date.today()
+        clearing = self._mk_clearing_account("13060", "GR/IR Focus")
+        self._post_move(
+            [(clearing, 0.0, 600.0), (self.acc_cash, 600.0, 0.0)],
+            dt=today - timedelta(days=15),
+            ref="GR-NOPARTNER",
+        )
+        self._post_move(
+            [(clearing, 600.0, 0.0), (self.acc_cash, 0.0, 600.0)],
+            dt=today - timedelta(days=7),
+            partner=self.partner_a,
+            ref="BILL-A",
+        )
+        self._post_move(
+            [(clearing, 100.0, 0.0), (self.acc_cash, 0.0, 100.0)],
+            dt=today - timedelta(days=3),
+            partner=self.partner_a,
+            ref="BILL-A2",
+        )
+
+        focused = self._gl_open_items(account_ids=[clearing.id], focus_partner_id=self.partner_a.id)
+        rows = [ln for ln in focused if not ln.get("type")]
+        self.assertEqual([r["reference"] for r in rows], ["BILL-A2"])
+        self.assertAlmostEqual(focused[-1]["outstanding"], 100.0, places=2)
