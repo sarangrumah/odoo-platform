@@ -6,14 +6,21 @@
             <p t-if="purchase_type_label" class="fw-bold">
                 Purchase Type: <span t-esc="purchase_type_label"/>
             </p>
+            <p t-if="show_gr" class="fw-bold">
+                Periode Berdasarkan: <span t-esc="date_basis_label"/>
+            </p>
             <table class="table table-sm table-bordered">
                 <thead class="table-light">
                     <tr>
-                        <th>Date</th>
+                        <th t-if="show_gr">Tgl GR</th>
+                        <th t-if="show_gr">No. GR</th>
+                        <th t-if="show_gr">Tgl Bill</th>
+                        <th t-if="not show_gr">Date</th>
                         <th>Bill No</th>
                         <th t-if="show_ptype">Type</th>
                         <th>Vendor</th>
-                        <th>Product</th>
+                        <th>Item Code</th>
+                        <th>Item Name</th>
                         <th class="text-end">Qty</th>
                         <th class="text-end">Untaxed</th>
                         <th class="text-end">Tax</th>
@@ -23,10 +30,14 @@
                 <tbody>
                     <tr t-foreach="lines" t-as="line"
                         t-att-class="'fw-bold table-secondary' if line.get('type') in ('subtotal', 'grand_total') else ''">
-                        <td t-esc="line.get('date')"/>
+                        <td t-if="show_gr" t-esc="line.get('gr_date')"/>
+                        <td t-if="show_gr" t-esc="line.get('gr_no')"/>
+                        <td t-if="show_gr" t-esc="line.get('bill_date')"/>
+                        <td t-if="not show_gr" t-esc="line.get('date')"/>
                         <td t-esc="line.get('invoice_no')"/>
                         <td t-if="show_ptype" t-esc="line.get('ptype')"/>
                         <td t-esc="line.get('vendor')"/>
+                        <td t-esc="line.get('item_code')"/>
                         <td t-esc="line.get('product')"/>
                         <td class="text-end" t-esc="line.get('quantity')"/>
                         <td class="text-end">

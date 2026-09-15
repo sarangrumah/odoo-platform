@@ -128,6 +128,8 @@
                         <th>No. Dok. Jurnal</th>
                         <th>Tgl Invoice</th>
                         <th>No. Invoice</th>
+                        <th>Tgl Faktur Pajak</th>
+                        <th>No. Faktur Pajak</th>
                         <th class="text-end">Nilai DPP</th>
                         <th class="text-end">Nilai PPN</th>
                     </tr>
@@ -135,10 +137,10 @@
                 <tbody>
                     <t t-foreach="lines" t-as="line">
                         <tr t-if="line.get('type') == 'note'">
-                            <td colspan="8" class="text-muted fst-italic" t-esc="line.get('partner')"/>
+                            <td colspan="10" class="text-muted fst-italic" t-esc="line.get('partner')"/>
                         </tr>
                         <tr t-elif="line.get('type') == 'grand_total'" class="table-dark fw-bold">
-                            <td colspan="6" t-esc="line.get('partner') or 'TOTAL'"/>
+                            <td colspan="8" t-esc="line.get('partner') or 'TOTAL'"/>
                             <td class="text-end">
                                 <span t-esc="line.get('dpp')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
                             </td>
@@ -153,6 +155,8 @@
                             <td t-esc="line.get('journal_no')"/>
                             <td t-esc="line.get('invoice_date')" t-options="{'widget': 'date'}"/>
                             <td t-esc="line.get('invoice_no')"/>
+                            <td t-esc="line.get('faktur_date')" t-options="{'widget': 'date'}"/>
+                            <td t-esc="line.get('faktur_no')"/>
                             <td class="text-end">
                                 <span t-esc="line.get('dpp')" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
                             </td>
