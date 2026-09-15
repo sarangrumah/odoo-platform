@@ -47,13 +47,27 @@ method line of a journal so nothing silently falls back.
     bank) from bank-IN journals (per-bank clearing account); ARKA has not split
     its journals, and that split can be done later if reconciliation needs it.
 
-SCOPE — COMPANY 1 ONLY, BY DEFAULT
-----------------------------------
-Company 2 already has 5 posted payments routed through Outstanding Receipts /
-Outstanding Payments. Flipping it to direct-to-bank now would leave those two
-accounts holding a balance under one policy and everything after the cutover
-under another. So this script touches company 1 only. Set ``INCLUDE_ARKA = True``
-if Accounting explicitly wants company 2 converted too.
+SCOPE — BOTH COMPANIES SINCE 2026-08-18
+---------------------------------------
+Company 1 was converted first. Company 2 was deliberately left alone at the
+time, because it already had posted payments routed through Outstanding
+Receipts / Outstanding Payments and flipping mid-stream leaves those accounts
+holding a balance under one policy and everything after the cutover under
+another.
+
+**Company 2 was converted on 2026-08-18** on the client's request (sheet
+"[ARKA AIM] List Issue After Go Live" item 25 — see
+``docs/projects/arka-aim/ISSUE_SHEET_AUG2026_STATUS.md``). 18 method lines on
+BNK1 / BNK2 / CSH / PCPAY. ``INCLUDE_ARKA`` now defaults to True so a re-run
+keeps company 2 configured rather than silently skipping it.
+
+    !! THE PRE-CUTOVER BALANCE IS STILL THERE. 1103000004 Outstanding Payments
+    holds Rp 320.052.945 credit across 7 unreconciled lines from the 6 payments
+    posted before the cutover. This script does NOT move them — it only changes
+    where NEW payments post. Until Accounting reclasses those lines to the bank
+    account, ARKA's bank GL is overstated by that amount and 1103000004 keeps a
+    permanent balance. Those payments are posted, in periods the client may have
+    already reported, so the reclass is an Accounting decision, not a script.
 
 PETTY CASH JOURNALS
 -------------------
@@ -90,7 +104,7 @@ Defaults to PREVIEW (nothing written). Set COMMIT = True to persist.
 
 # ----- knobs -------------------------------------------------------------
 COMMIT = False  # True to persist
-INCLUDE_ARKA = False  # True to convert company 2 (ARKA) to direct-to-bank too
+INCLUDE_ARKA = True  # company 2 (ARKA) converted 2026-08-18; keep True so re-runs hold
 AIM_COMPANY_ID = 1
 ARKA_COMPANY_ID = 2
 # Payment methods to offer on every bank journal, when the method is installed.
