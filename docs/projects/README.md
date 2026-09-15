@@ -10,8 +10,8 @@ single customer asked for it.
 | [`arka-aim/`](arka-aim/) | ARKA AIM — drone rental & show | `prd_arkaaim`, `trn_arkaaim`, dev `erp_dev_aimarka` | `addons/_tenants/custom_arka_*` |
 | [`levis/`](levis/) | Era Busana Retailindo (Levi's) — retail, **live** | `prd_levis_begbal`, `rnd_levis` | `addons/_tenants/custom_levis_*` |
 | [`ppob/`](ppob/) | PPOB / PPS (Erajaya, Eraspace) | — | `addons/verticals/custom_ppob_*` |
+| [`ppob-implementation/`](ppob-implementation/) | Generic PPOB delivery package (PID/BRD/FSD/TSD/Architecture + mandays), PPS addendum | `rnd_ppob` | none (documents `verticals/custom_ppob_*`) |
 | [`warehouse-jds/`](warehouse-jds/) | JDS — warehouse management | — | none (uses `ee_gap/custom_wms_*`, `core/custom_hht_bridge`) |
-| [`wms-implementation/`](wms-implementation/) | Generic WMS delivery package (PID/BRD/FSD/TSD/Architecture + mandays), JDS addendum | — | none (documents `ee_gap/custom_wms_*`) |
 | [`gentlewoman/`](gentlewoman/) | GentleWoman — retail fashion, **pre-implementation** | — | none yet |
 | [`finance-portal/`](finance-portal/) | Finance Portal (Erajaya) | — | none (uses `ee_gap/custom_finance_portal*`) |
 | [`efn-esb/`](efn-esb/) | EFN (Erajaya F&B) — ESB Core integration, **pre-pilot** | dev `rnd_esb` | `verticals/custom_fnb_stock_ops` (engine in `ee_gap/custom_esb_connector`) |
