@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ================= X70D transactions (read-only view model) ========= -->
+    <record id="view_levis_pos_x70d_txn_list" model="ir.ui.view">
+        <field name="name">levis.pos.x70d.txn.list</field>
+        <field name="model">levis.pos.x70d.txn</field>
+        <field name="arch" type="xml">
+            <list string="X70D Transactions" create="false" delete="false" edit="false">
+                <field name="trans_date"/>
+                <field name="ref"/>
+                <field name="tender"/>
+                <field name="store_code" optional="hide"/>
+                <field name="register" optional="hide"/>
+                <field name="transnum" optional="hide"/>
+                <field name="analytic_account_id" optional="hide"/>
+                <field name="amount" sum="Total"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_x70d_txn_search" model="ir.ui.view">
+        <field name="name">levis.pos.x70d.txn.search</field>
+        <field name="model">levis.pos.x70d.txn</field>
+        <field name="arch" type="xml">
+            <search string="X70D Transactions">
+                <field name="ref"/>
+                <field name="tender"/>
+                <field name="analytic_account_id"/>
+                <field name="trans_date"/>
+                <filter name="group_tender" string="Tender" context="{'group_by': 'tender'}"/>
+                <filter name="group_day" string="Trading Day" context="{'group_by': 'trans_date'}"/>
+                <filter name="group_store" string="Store Operating Unit"
+                        context="{'group_by': 'analytic_account_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_pos_x70d_txn" model="ir.actions.act_window">
+        <field name="name">X70D Transactions</field>
+        <field name="res_model">levis.pos.x70d.txn</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_group_store': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No X70D rows staged</p>
+            <p>Every tender line the retail import staged from the X70D feed, resolved
+               to its store operating unit. Read-only: this is the feed, not a record.</p>
+        </field>
+    </record>
+
+    <!-- ================= Store settlement day ============================= -->
+    <record id="view_levis_pos_clearing_store_day_list" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.store.day.list</field>
+        <field name="model">levis.pos.clearing.store.day</field>
+        <field name="arch" type="xml">
+            <list string="Store Settlement Reconcile" create="false" delete="false"
+                  decoration-success="is_balanced"
+                  decoration-warning="not is_balanced and x70d_count &gt; 0"
+                  decoration-danger="x70d_count == 0">
+                <field name="analytic_account_id" optional="show"/>
+                <field name="settlement_date"/>
+                <field name="trading_date" optional="show"/>
+                <field name="line_count" string="Bank Lines" optional="hide"/>
+                <field name="statement_total" sum="Statement"/>
+                <field name="mdr_total" sum="MDR" optional="show"/>
+                <field name="gross_total" sum="Gross"/>
+                <field name="x70d_cash_total" sum="Cash" optional="hide"/>
+                <field name="x70d_card_total" sum="Card" optional="hide"/>
+                <field name="x70d_total" sum="X70D (H-1)"/>
+                <field name="x70d_count" string="Txns" optional="show"/>
+                <field name="variance" sum="Difference"
+                       decoration-danger="variance != 0"/>
+                <field name="variance_bank" sum="Difference (bank)" optional="hide"/>
+                <field name="short_total" sum="Short" optional="hide"/>
+                <field name="other_total" sum="Other" optional="hide"/>
+                <field name="run_id" optional="hide"/>
+                <field name="is_balanced" column_invisible="1"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_store_day_form" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.store.day.form</field>
+        <field name="model">levis.pos.clearing.store.day</field>
+        <field name="arch" type="xml">
+            <form string="Store Settlement Day" create="false" edit="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"/>
+                    <button name="action_open_lines" type="object" string="Statement Lines"/>
+                    <button name="action_open_x70d" type="object" string="X70D Transactions"/>
+                    <button name="action_open_run" type="object" string="Open Run"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="analytic_account_id" readonly="1"/></h1>
+                        <h3 class="text-muted">
+                            money in <field name="settlement_date" class="oe_inline"/>
+                            · sales of <field name="trading_date" class="oe_inline"/>
+                        </h3>
+                    </div>
+                    <div class="alert alert-success" role="alert" invisible="not is_balanced">
+                        Gross received equals the tenders this store rang up on the trading day.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="is_balanced or x70d_count == 0">
+                        Gross received differs from the trading day's tenders by
+                        <field name="variance" class="oe_inline" widget="monetary"/>.
+                        A settlement may legitimately draw on more than one trading day, and cash
+                        stays in the till until it is deposited — so read this against the tender
+                        breakdown below before calling it a loss.
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="x70d_count != 0">
+                        No X70D transaction was staged for this store on
+                        <field name="trading_date" class="oe_inline"/>. Either the feed for that day
+                        never arrived, or the store code has no POS configuration — nothing can be
+                        compared until it does.
+                    </div>
+                    <group>
+                        <group string="Money In (H)">
+                            <field name="statement_total"/>
+                            <field name="mdr_total"/>
+                            <field name="gross_total"/>
+                            <field name="other_total" invisible="other_total == 0"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="is_balanced" invisible="1"/>
+                            <field name="x70d_count" invisible="1"/>
+                        </group>
+                        <group string="Store Tenders (H-1)">
+                            <field name="x70d_total"/>
+                            <field name="x70d_card_total"/>
+                            <field name="x70d_cash_total"/>
+                            <field name="x70d_count"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Difference">
+                            <field name="variance"/>
+                            <field name="variance_bank"/>
+                        </group>
+                        <group string="Cleared">
+                            <field name="allocated_total"/>
+                            <field name="short_total"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Per Tender" name="tenders">
+                            <field name="tender_ids" readonly="1">
+                                <list create="false" delete="false" decoration-danger="variance != 0">
+                                    <field name="tender"/>
+                                    <field name="x70d_count" string="Transactions"/>
+                                    <field name="x70d_amount" sum="X70D"/>
+                                    <field name="booked_amount" sum="Cleared"/>
+                                    <field name="variance" sum="Difference"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Statement Lines (H)" name="lines">
+                            <field name="line_ids" readonly="1">
+                                <list create="false" delete="false"
+                                      decoration-success="state == 'ok'"
+                                      decoration-warning="state == 'short'"
+                                      decoration-danger="state in ('unmapped', 'unparsed')">
+                                    <field name="move_name" string="Bank Entry"/>
+                                    <field name="payment_ref" optional="hide"/>
+                                    <field name="kind"/>
+                                    <field name="channel" optional="hide"/>
+                                    <field name="mid_key" string="MID" optional="show"/>
+                                    <field name="statement_amount" sum="Statement"/>
+                                    <field name="mdr" sum="MDR"/>
+                                    <field name="gross" sum="Gross"/>
+                                    <field name="x24_match" string="Receipt Match" optional="show"/>
+                                    <field name="x24_trans_refs" string="Transactions" optional="show"/>
+                                    <field name="short_amount" sum="Short" optional="show"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="X70D Transactions (H-1)" name="x70d">
+                            <field name="x70d_txn_ids" readonly="1"
+                                   context="{'default_order': 'tender'}">
+                                <list create="false" delete="false" edit="false">
+                                    <field name="ref" string="Transaction No."/>
+                                    <field name="tender"/>
+                                    <field name="trans_date"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_store_day_search" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.store.day.search</field>
+        <field name="model">levis.pos.clearing.store.day</field>
+        <field name="arch" type="xml">
+            <search string="Store Settlement Reconcile">
+                <field name="analytic_account_id" string="Store Operating Unit"/>
+                <field name="settlement_date"/>
+                <field name="trading_date"/>
+                <field name="run_id"/>
+                <filter name="has_difference" string="Has Difference"
+                        domain="[('is_balanced', '=', False)]"/>
+                <filter name="no_x70d" string="No X70D Rows" domain="[('x70d_count', '=', 0)]"/>
+                <filter name="has_short" string="Has Shortfall" domain="[('short_total', '!=', 0)]"/>
+                <separator/>
+                <filter name="tallies" string="Tallies" domain="[('is_balanced', '=', True)]"/>
+                <separator/>
+                <filter name="period" string="Settlement Date" date="settlement_date"/>
+                <separator/>
+                <filter name="group_store" string="Store Operating Unit"
+                        context="{'group_by': 'analytic_account_id'}"/>
+                <filter name="group_date" string="Settlement Date"
+                        context="{'group_by': 'settlement_date'}"/>
+                <filter name="group_run" string="Run" context="{'group_by': 'run_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_pos_clearing_store_day" model="ir.actions.act_window">
+        <field name="name">Store Settlement Reconcile</field>
+        <field name="res_model">levis.pos.clearing.store.day</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_group_store': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nothing to reconcile yet</p>
+            <p>One row per store per settlement date: what the bank paid on the day,
+               against every tender that store rang up on the trading day before it,
+               cash included. Open a row to see the two sides line by line.</p>
+            <p>Rows appear when a POS clearing run computes its summary.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_levis_pos_clearing_store_day"
+              name="Store Settlement Reconcile"
+              parent="account.menu_finance_entries"
+              action="action_levis_pos_clearing_store_day"
+              sequence="94"/>
+</odoo>

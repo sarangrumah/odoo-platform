@@ -6,6 +6,12 @@ The vendor bill's payable (payment-term) line account is computed by core
 the purchase stream carried on the bill (``account.move.l10n_purchase_type``):
 Trade Payables vs Non-Trade payable. The accounts come from the per-company
 ``levis.purchase.account.map`` so no hard ids leak into code.
+
+The stream alone does not decide the account: the EBR chart splits AP again by
+counterparty, third party vs **related party** (in-group companies such as PT
+Sinar Eka Selaras). Vendors flagged ``l10n_related_party`` take the mapping's
+related-party account; before that flag existed every Erajaya-group bill landed
+on the third-party control account no matter what the vendor master said.
 """
 
 from odoo import api, fields, models
@@ -71,9 +77,11 @@ class AccountMoveLine(models.Model):
             if not mapping:
                 continue
             if line.display_type == "payment_term":
-                # Route the AP control account per stream (trade vs non-trade).
-                if mapping.payable_account_id:
-                    line.account_id = mapping.payable_account_id.id
+                # Route the AP control account per stream (trade vs non-trade)
+                # and per counterparty (third vs related party).
+                payable = self._levis_stream_payable(mapping, move)
+                if payable:
+                    line.account_id = payable.id
             elif line.display_type == "product":
                 # Storable, real-time products booked a GR/IR accrual on receipt
                 #   Dr Stock Valuation / Cr Stock Variation (GR/IR)
@@ -110,3 +118,27 @@ class AccountMoveLine(models.Model):
                     # line has no account yet, so a configured product/category
                     # account always wins.
                     line.account_id = mapping.expense_account_id.id
+
+    # ------------------------------------------------------------------
+    # Related-party AP routing
+    # ------------------------------------------------------------------
+    @api.model
+    def _levis_stream_payable(self, mapping, move):
+        """AP control account for ``move``: stream x counterparty.
+
+        The EBR chart splits AP four ways — trade/non-trade (the purchase
+        stream, carried on the bill) crossed with third/related party (a
+        property of the *vendor*, flagged as ``l10n_related_party`` on the
+        contact). Related parties are in-group companies such as PT Sinar Eka
+        Selaras; before this split every Erajaya-group bill silently landed on
+        the third-party control account, whatever the vendor master said.
+
+        Falls back to the stream's ordinary payable when the related-party
+        account is not configured, so an unconfigured company keeps working.
+        """
+        # The AP account follows the COMMERCIAL partner, like core
+        # ``_compute_account_id`` does: an invoicing child bills to its parent.
+        partner = move.commercial_partner_id
+        if partner.l10n_related_party and mapping.related_payable_account_id:
+            return mapping.related_payable_account_id
+        return mapping.payable_account_id

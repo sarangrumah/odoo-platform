@@ -9,8 +9,14 @@ def post_init_hook(env):
     Idempotent; runs only on fresh install. Already-installed Levi's DBs are
     provisioned by ``scripts/tenants/levis/40_setup_trade_ou.py``.
     """
-    from .models.setup import seed_bank_journals, seed_clearing_config, seed_trade_ou
+    from .models.setup import (
+        seed_bank_journals,
+        seed_clearing_config,
+        seed_store_codes,
+        seed_trade_ou,
+    )
 
     seed_trade_ou(env)
     seed_bank_journals(env)
     seed_clearing_config(env)
+    seed_store_codes(env)
