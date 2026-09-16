@@ -73,3 +73,40 @@ next upgrade.
   `custom_accounting_asset`.
 - The opening asset register and per-unit subledger — see the ARKA-AIM modules.
 - Creating the accounts themselves; the chart is `l10n_erajaya`'s job.
+
+## Operating Unit on an asset
+
+`l10n_ou_analytic_id` (`models/fixed_asset.py`) is a many2one onto the **Operating Unit**
+analytic plan that reads and writes `custom.fixed.asset.analytic_distribution` underneath it.
+Sheet #24 (remark 07/09) asked for a field to fill in at acquisition; #57 asked for the
+distribution to reach the depreciation journal. The base module does the second half, this
+field does the first.
+
+* **The distribution stays the source of truth.** Setting the OU writes `{id: 100}`; clearing
+  it clears the distribution; shares belonging to *other* analytic plans are left alone.
+* **It reads back only an unambiguous OU.** An asset split 60/40 across two stores, or one
+  whose distribution came from an import, shows the field empty rather than naming one of the
+  two — showing either would be a lie the user would then save back.
+* **The raw `analytic_distribution` stays on the form** (base module) for exactly those cases.
+* A company with no "Operating Unit" plan still opens an asset form; every lookup is defensive.
+
+## FA-LVA is seeded, and it is not misconfigured
+
+`ERAJAYA_ASSET_GROUP_SEED` carries **13** rows: 6 owned, 6 right-of-use, and `FA-LVA`.
+
+The LVA row looks wrong and is not. Confirmed by Accounting on 16-Sep-2026 (sheet #52): an LVA
+is acquired straight to **1116100009 Prepaid - Office supplies** and then depreciated in full,
+in the month of acquisition, to whichever expense account suits the item. So cost and
+accumulated deliberately point at the same prepaid account, and `useful_life` is deliberately
+`1`. The expense account is deliberately **empty** — #52 asks for it per asset, and the 88 live
+LVAs charging 7211002000 are that choice being exercised.
+
+It is seeded because the group was created by hand on the tenant and would not survive a
+rebuild. Adding it cannot disturb production: the upsert is keyed on `(code, company_id)` and
+only fills fields that are still **empty**.
+
+**The journal test is the useful life, not the expense account.** A group that depreciates needs
+the `DEPRE` journal or `action_confirm()` raises on every asset created from it. FA-LVA
+depreciates yet has no group-level expense account, so keying the journal off the account (as
+this seed used to) would leave it journal-less on a rebuild — while the live group has DEPRE,
+set by hand. Land, at life 0, is the only kind that genuinely needs no journal.

@@ -339,7 +339,7 @@ class CustomFixedAssetPartialDisposalWizard(models.TransientModel):
                     code=asset.code,
                     qty=self.quantity,
                 ),
-                "line_ids": lines,
+                "line_ids": asset._stamp_analytic(lines, asset.analytic_distribution),
             }
         )
         move.action_post()

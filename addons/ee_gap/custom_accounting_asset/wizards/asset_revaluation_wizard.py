@@ -251,7 +251,7 @@ class CustomFixedAssetRevaluationWizard(models.TransientModel):
                 "journal_id": journal.id,
                 "company_id": asset.company_id.id,
                 "ref": _("Revaluation %(code)s", code=asset.code),
-                "line_ids": lines,
+                "line_ids": asset._stamp_analytic(lines, asset.analytic_distribution),
             }
         )
         move.action_post()
