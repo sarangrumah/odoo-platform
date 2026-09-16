@@ -13,6 +13,7 @@ declarative and never crashes on a DB where a field is absent.
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timedelta
 
@@ -21,6 +22,12 @@ from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models
 
 from .terbilang import terbilang_id
+
+_logger = logging.getLogger(__name__)
+
+# Auto-reconcile the GR/IR accrual when a vendor bill is posted. Default ON;
+# ``0`` stops it instantly without a redeploy, which is the rollback.
+GRIR_AUTO_PARAM = "custom_levis_localization.grir_auto_reconcile"
 
 BILL_TRADE_SEQ = "account.move.levis.bill.trade"
 BILL_NONTRADE_SEQ = "account.move.levis.bill.nontrade"
@@ -72,6 +79,115 @@ class AccountMove(models.Model):
     # draw from our own ir.sequence, exactly like the PO numbering. On DBs where
     # the tenant sequences are absent, or for moves without a purchase type
     # (customer invoices, manual entries), core numbering is used unchanged.
+    # ------------------------------------------------------------------
+    # GR/IR auto-reconciliation on bill posting  (sheet row #42)
+    # ------------------------------------------------------------------
+    # A goods receipt books Dr Stock Valuation / Cr GR/IR, and the vendor bill
+    # debits that same GR/IR account. Routing was already correct; what never
+    # happened is the reconciliation, so the clearing account kept both legs
+    # for ever and GL Open Items grew without bound (68,345 lines by Sep-2026).
+    #
+    # **Netting per (account, purchase order line), never pair-by-pair.** The
+    # obvious design -- match each bill line to "its" GR leg with a rounding
+    # tolerance -- cannot work on this data. Across all 42,922 posted GR/IR bill
+    # lines in prd_levis_begbal only 41 % agree within Rp 0,02; 25,187 do not
+    # match at all, 15,198 of them by more than Rp 1.000, totalling
+    # Rp 2,52 miliar. Two reasons, both structural rather than arithmetic:
+    # partial receipts mean one PO line carries several receipts against one
+    # bill line, and the receipt is valued net of recoverable tax while the bill
+    # is not. ``purchase.order.line`` is the only honest key, and receiving and
+    # billing are both many-to-one against it.
+    #
+    # So: gather every GR/IR leg of the bill and every GR/IR leg of every
+    # goods-receipt entry on the same PO lines, and reconcile the whole group.
+    # Odoo nets the group and leaves one residual line -- which is the true
+    # not-yet-billed position, and exactly what #42 asks the clearing account to
+    # show.
+
+    def _levis_grir_auto_enabled(self):
+        param = self.env["ir.config_parameter"].sudo().get_param(GRIR_AUTO_PARAM, "1")
+        return str(param).strip().lower() in ("1", "true", "yes")
+
+    def _levis_gr_entry_lines(self, purchase_lines, account, refund):
+        """Every GR/IR leg booked by goods receipts on ``purchase_lines``.
+
+        Receipts are found through ``stock.move.purchase_line_id`` and their
+        entries through the ``GR-VAL:``/``GR-RET-VAL:`` ref the receipt side
+        stamps per stock move. A credit note nets against the **return**
+        entries, not the receipt ones -- matching an RTV against the original
+        receipt would net two unrelated positions.
+        """
+        StockMove = self.env["stock.move"]
+        moves = StockMove.search([("purchase_line_id", "in", purchase_lines.ids), ("state", "=", "done")])
+        if not moves:
+            return self.env["account.move.line"].browse()
+        template = StockMove._RET_JOURNAL_REF if refund else StockMove._GR_JOURNAL_REF
+        refs = [template % move.id for move in moves]
+        entries = self.env["account.move"].search(
+            [("ref", "in", refs), ("state", "=", "posted"), ("company_id", "=", self.company_id.id)]
+        )
+        return entries.line_ids.filtered(lambda line: line.account_id == account and not line.reconciled)
+
+    def _levis_reconcile_grir(self):
+        """Net each bill's GR/IR legs against the receipts behind them."""
+        bills = self.filtered(lambda move: move.move_type in ("in_invoice", "in_refund"))
+        if not bills or self.env.context.get("levis_skip_grir_reconcile"):
+            return
+        # One parameter read for the batch, not one per bill.
+        if not self._levis_grir_auto_enabled():
+            return
+        for move in bills:
+            try:
+                move._levis_reconcile_grir_one()
+            except Exception:  # noqa: BLE001 - posting must never fail for this
+                # Same contract as the COGS catch-up: the bill is already
+                # posted and correct; a clearing entry that did not net is a
+                # follow-up, not a reason to refuse the document.
+                _logger.warning(
+                    "GR/IR auto-reconcile failed for %s in %s; the bill is unaffected.",
+                    move.name or move.id,
+                    move.company_id.display_name,
+                    exc_info=True,
+                )
+
+    def _levis_reconcile_grir_one(self):
+        self.ensure_one()
+        refund = self.move_type == "in_refund"
+        buckets = {}
+        for line in self.line_ids:
+            if line.reconciled or not line.purchase_line_id:
+                continue
+            account = line._levis_grir_account()
+            # Only a line actually sitting on its GR/IR account: a line routed
+            # elsewhere by hand, or before the routing existed, is not ours.
+            if not account or line.account_id != account:
+                continue
+            if not account.reconcile:
+                continue
+            buckets.setdefault(account, self.env["purchase.order.line"].browse())
+            buckets[account] |= line.purchase_line_id
+
+        for account, purchase_lines in buckets.items():
+            bill_legs = self.line_ids.filtered(
+                lambda line, a=account, p=purchase_lines: (
+                    line.account_id == a and line.purchase_line_id in p and not line.reconciled
+                )
+            )
+            gr_legs = self._levis_gr_entry_lines(purchase_lines, account, refund)
+            group = bill_legs | gr_legs
+            # One side alone nets nothing: a bill with no receipt behind it, or
+            # a receipt already fully billed.
+            if not bill_legs or not gr_legs:
+                continue
+            if not group.filtered(lambda line: line.debit) or not group.filtered(lambda line: line.credit):
+                continue
+            group.reconcile()
+
+    def _post(self, soft=True):
+        posted = super()._post(soft=soft)
+        posted._levis_reconcile_grir()
+        return posted
+
     def _levis_wants_bill_number(self):
         self.ensure_one()
         return self.move_type in ("in_invoice", "in_refund") and bool(self.l10n_purchase_type)

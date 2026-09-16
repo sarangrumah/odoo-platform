@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-16T04:29:53+00:00",
+  "generated_at": "2026-09-16T23:54:03+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "18e48a40",
-    "branch": "feat/asset-register-columns-daterange"
+    "commit": "cd6de952",
+    "branch": "feat/grir-auto-reconcile-on-bill-post"
   },
   "buckets": [
     {
@@ -379,14 +379,19 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.51.0",
+      "version": "19.0.1.52.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
       "public": false,
       "last_change": "2026-09-16",
-      "change_count": 54,
+      "change_count": 55,
       "changes": [
+        {
+          "sha": "cd6de952",
+          "date": "2026-09-16",
+          "subject": "feat(levis): net the GR/IR accrual when the vendor bill is posted"
+        },
         {
           "sha": "58ac20f9",
           "date": "2026-09-16",
@@ -421,11 +426,6 @@
           "sha": "62b4b5db",
           "date": "2026-08-18",
           "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
-        },
-        {
-          "sha": "5021153b",
-          "date": "2026-08-13",
-          "subject": "feat(levis): read NFC settlements off the BCA narrative (#168)"
         }
       ]
     },
@@ -1598,9 +1598,14 @@
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
-      "last_change": "2026-09-16",
-      "change_count": 27,
+      "last_change": "2026-09-17",
+      "change_count": 28,
       "changes": [
+        {
+          "sha": "a3b291a8",
+          "date": "2026-09-17",
+          "subject": "feat(assets): asset register on a date range, with its accounts and posted basis (#246)"
+        },
         {
           "sha": "18e48a40",
           "date": "2026-09-16",
@@ -1635,11 +1640,6 @@
           "sha": "4704e07d",
           "date": "2026-07-29",
           "subject": "fix: convert every _sql_constraints to models.Constraint"
-        },
-        {
-          "sha": "24446ab6",
-          "date": "2026-07-29",
-          "subject": "refactor: use env._ for translated field defaults repo-wide"
         }
       ]
     },

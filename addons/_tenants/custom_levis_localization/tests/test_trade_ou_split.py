@@ -362,6 +362,137 @@ class TestTradeOuSplit(AccountTestInvoicingCommon):
         self.assertAlmostEqual(self._grir_balance(self.grir_nontrade), 0.0, places=2)
 
     # ------------------------------------------------------------------
+    # 10. GR/IR auto-reconciliation on bill posting (sheet row #42)
+    # ------------------------------------------------------------------
+    def _grir_open(self, account):
+        """Unreconciled lines left on a GR/IR account."""
+        return self.env["account.move.line"].search(
+            [
+                ("account_id", "=", account.id),
+                ("parent_state", "=", "posted"),
+                ("reconciled", "=", False),
+            ]
+        )
+
+    def test_10a_bill_reconciles_the_receipt_it_settles(self):
+        """Routing was already right; what never happened is the matching."""
+        po = self._trade_po_received()
+        self.assertTrue(self._grir_open(self.grir_trade), "receipt leaves the accrual open")
+
+        bill = self._bill(po)
+        prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
+        self.assertEqual(prod_line.account_id, self.grir_trade)
+        self.assertTrue(prod_line.reconciled, "the bill's GR/IR leg must be matched")
+        self.assertFalse(
+            self._grir_open(self.grir_trade),
+            "nothing is left open once the receipt is fully billed",
+        )
+
+    def test_10b_partial_receipts_net_as_a_group(self):
+        """One PO line, three receipts, one bill.
+
+        This is why the matching nets per (account, PO line) instead of pairing
+        lines: there is no one-to-one link to pair on.
+        """
+        po = self._make_po("trade", qty=9)
+        po.button_confirm()
+        picking = po.picking_ids
+        picking.action_assign()
+        # Receive 3 of 9, then the backorders.
+        for move in picking.move_ids:
+            move.quantity = 3.0
+            move.picked = True
+        action = picking.button_validate()
+        if isinstance(action, dict) and action.get("res_model") == "stock.backorder.confirmation":
+            # Odoo 19 hands the wizard its picking through the action context,
+            # not as an existing record -- there is no ``res_id`` to browse.
+            wizard = self.env[action["res_model"]].with_context(**action.get("context", {})).create({})
+            wizard.process()
+        for backorder in po.picking_ids - picking:
+            backorder.action_assign()
+            for move in backorder.move_ids:
+                move.quantity = move.product_uom_qty
+                move.picked = True
+            backorder.button_validate()
+
+        receipts = self.env["stock.move"].search(
+            [("purchase_line_id", "in", po.order_line.ids), ("state", "=", "done")]
+        )
+        self.assertGreater(len(receipts), 1, "fixture must produce more than one receipt")
+
+        bill = self._bill(po)
+        self.assertFalse(
+            self._grir_open(self.grir_trade),
+            "the group nets even though no single receipt matches the bill line",
+        )
+        self.assertTrue(bill.line_ids.filtered(lambda l: l.account_id == self.grir_trade).reconciled)
+
+    def test_10c_switch_off_stops_it(self):
+        """The rollback is a parameter, not a redeploy."""
+        self.env["ir.config_parameter"].sudo().set_param("custom_levis_localization.grir_auto_reconcile", "0")
+        bill = self._bill(self._trade_po_received())
+        prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
+        self.assertEqual(prod_line.account_id, self.grir_trade, "routing is unaffected")
+        self.assertFalse(prod_line.reconciled, "but nothing is matched")
+        self.assertTrue(self._grir_open(self.grir_trade))
+
+    def test_10d_manual_bill_without_a_receipt_is_left_alone(self):
+        """A bill with no goods receipt behind it has nothing to net against,
+        and must not be dragged onto the clearing account."""
+        bill = self.env["account.move"].create(
+            {
+                "move_type": "in_invoice",
+                "partner_id": self.vendor.id,
+                "l10n_purchase_type": "trade",
+                "invoice_date": fields.Date.context_today(self.env["account.move"]),
+                "invoice_line_ids": [
+                    Command.create(
+                        {
+                            "product_id": self.product.id,
+                            "quantity": 2.0,
+                            "price_unit": 100.0,
+                        }
+                    )
+                ],
+            }
+        )
+        bill.action_post()
+        prod_line = bill.line_ids.filtered(lambda l: l.display_type == "product")
+        self.assertNotEqual(
+            prod_line.account_id,
+            self.grir_trade,
+            "no receipt means no accrual to clear — keep the expense account",
+        )
+
+    def test_10e_imported_line_with_an_account_is_re_routed(self):
+        """``_compute_account_id`` is a precompute: a create that supplies
+        ``account_id`` skips routing entirely, which is what the bill importer
+        does. The re-route is the other half of #42."""
+        po = self._trade_po_received()
+        po.action_create_invoice()
+        bill = po.invoice_ids
+        line = bill.line_ids.filtered(lambda l: l.display_type == "product")
+        po_line = line.purchase_line_id
+
+        # Simulate the importer: a fresh line carrying an expense account.
+        imported = self.env["account.move.line"].create(
+            {
+                "move_id": bill.id,
+                "product_id": self.product.id,
+                "purchase_line_id": po_line.id,
+                "account_id": self.nt_expense.id,
+                "quantity": 1.0,
+                "price_unit": 100.0,
+                "display_type": "product",
+            }
+        )
+        self.assertEqual(
+            imported.account_id,
+            self.grir_trade,
+            "a PO-linked product line belongs on GR/IR however it was created",
+        )
+
+    # ------------------------------------------------------------------
     # 11. Vendor-bill numbering: BILL/T/EBR (trade) vs BILL/NT/EBR (non-trade),
     #     monthly reset, independent counters. (Finance-AP #8 / Accounting #16)
     # ------------------------------------------------------------------

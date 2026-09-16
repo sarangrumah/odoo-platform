@@ -1125,3 +1125,51 @@ Before APPLY: dump, then dry-run on a clone and compare its count against the
 - This module does not cover inventory adjustments, backorders, or handling of internal transfers and manufacturing receipts. These functionalities are left to the core Odoo stock management processes.
 - The GL-skip behavior focuses solely on vendor goods receipts; customer returns and outbound shipments keep posting normally.
 - The payment vouchers and receipts are limited to vendor and customer payments; other types of financial transactions (e.g., intercompany) are not covered.
+
+## Feature 22 — GR/IR auto-reconciliation when a vendor bill is posted
+
+A goods receipt books `Dr Stock Valuation / Cr GR/IR` and the vendor bill debits that same GR/IR
+account, so the accrual is *routed* to net. What never happened is the matching: nothing ever
+called `reconcile()`, so both legs sat on the clearing account for ever and GL Open Items grew
+without bound — 68,345 open lines by Sep-2026. Sheet row #42 reports the symptom.
+
+**It nets per `(account, purchase order line)`, never pair-by-pair, and that is not a style
+choice.** Matching each bill line to "its" GR leg with a rounding tolerance cannot work on this
+data. Across all 42,922 posted GR/IR bill lines in `prd_levis_begbal` only **41 %** agree within
+Rp 0,02; 25,187 do not match at all, 15,198 of them by more than Rp 1.000, totalling
+**Rp 2,52 miliar**. Two structural reasons, neither arithmetic:
+
+* **Partial receipts.** `BILL/T/EBR/2026/08/00224` has 200 lines against 200 PO lines and
+  **600** done stock moves — three receipts per line. There is no pair to make.
+* **Different bases.** The receipt is valued net of recoverable tax (`stock.move.value`); the
+  bill line is not. `BILL/T/EBR/2026/08/00064` joins 1:1 and still differs by Rp 22,7 jt.
+
+So `account.move._post()` gathers every GR/IR leg of the bill and every GR/IR leg of every
+goods-receipt entry on the same PO lines, and reconciles the whole group. Odoo nets it and leaves
+one residual — which *is* the not-yet-billed position, and exactly what #42 asks the clearing
+account to show. On the bill above: Rp 382.589.826 credited by receipts against Rp 172.337.759
+debited by the bill, leaving Rp 210.252.067 genuinely unbilled.
+
+Receipts are found through `stock.move.purchase_line_id` and their entries through the
+`GR-VAL:` / `GR-RET-VAL:` ref stamped per stock move. **A credit note nets against the return
+entries, not the receipt ones** — matching an RTV against the original receipt would net two
+unrelated positions.
+
+**`account.move.line._levis_grir_account()` is the single definition of "is this a GR/IR leg".**
+Two callers need the same answer — `_compute_account_id` routes the line at create, this feature
+recognises it again at post — and two copies of five gates would drift silently: a line routed to
+GR/IR but not recognised at post simply never nets. The gates are documented on the method.
+
+Switched by `custom_levis_localization.grir_auto_reconcile` (default `1`); `0` stops it instantly,
+which is the rollback. Context key `levis_skip_grir_reconcile` for callers that must opt out.
+Failure is caught and logged — the bill is already posted and correct, and a clearing entry that
+did not net is a follow-up, not a reason to refuse the document (same contract as the COGS
+catch-up).
+
+**The importer needed the other half.** `_compute_account_id` is a *precompute* with no
+`@api.depends`, so a create that supplies `account_id` skips routing entirely — which is what the
+bill importer does, and why imported bills kept landing on COGS while the accrual stayed open.
+`account.move.line.create()` now re-applies the routing, narrowly: only a draft bill line with a
+PO link where every other gate already agrees, and it derives `l10n_purchase_type` from the order
+when the importer left it blank. A hand-picked expense account on a line with no purchase order is
+never touched.

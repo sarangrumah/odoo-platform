@@ -54,6 +54,97 @@ class AccountMoveLine(models.Model):
     # the bill at create time (via ``purchase.order._prepare_invoice``), so the
     # precompute pass sees it. We keep the same (dependency-free) semantics and
     # just remap the payable after ``super()``.
+    @api.model_create_multi
+    def create(self, vals_list):
+        lines = super().create(vals_list)
+        lines._levis_reroute_imported_grir()
+        return lines
+
+    def _levis_reroute_imported_grir(self):
+        """Re-apply GR/IR routing to lines that arrived with an account already set.
+
+        ``_compute_account_id`` is a **precompute** field with no
+        ``@api.depends`` (see the comment above it). A create that supplies
+        ``account_id`` therefore skips the routing entirely — which is exactly
+        what the bill importer does, and why imported bills kept landing on
+        COGS/expense while the GR/IR accrual stayed open. Row #42 reports the
+        symptom; this is the other half of it.
+
+        Deliberately narrow: a line is re-routed only when it has a PO link and
+        every other gate already agrees it belongs on GR/IR. A hand-picked
+        expense account on a line with no purchase order is never touched.
+        """
+        # Cheapest gate first: this runs on EVERY account.move.line create in
+        # the database, and the overwhelming majority carry no purchase order.
+        candidates = self.filtered(lambda line: line.display_type == "product" and line.purchase_line_id)
+        if not candidates:
+            return
+        suppress = (
+            self.env["ir.config_parameter"].sudo().get_param("custom_levis_localization.suppress_gr_journal", "0")
+        )
+        if str(suppress).strip().lower() not in ("0", "false", "", "none"):
+            return
+        for line in candidates:
+            move = line.move_id
+            if move.move_type not in ("in_invoice", "in_refund") or move.state != "draft":
+                continue
+            # An importer that never set the stream leaves the mapping
+            # unresolvable, so take it from the order the line already points at.
+            if not move.l10n_purchase_type:
+                ptype = line.purchase_line_id.order_id.l10n_purchase_type
+                if ptype:
+                    move.l10n_purchase_type = ptype
+            account = line._levis_grir_account()
+            if account and line.account_id != account:
+                line.account_id = account.id
+
+    def _levis_grir_account(self, mapping=None):
+        """The GR/IR account this bill line belongs on, or an empty recordset.
+
+        Extracted because **two** callers must agree on the answer:
+        ``_compute_account_id`` routes the line here when the bill is created,
+        and ``account.move._levis_reconcile_grir`` has to recognise the same
+        line again when the bill is posted. Two copies of five gates would
+        drift, and the failure would be silent — a line routed to GR/IR but not
+        recognised at post simply never nets.
+
+        The gates, and why each one is load-bearing:
+
+        * a vendor bill or credit note, with ``l10n_purchase_type`` set and a
+          stream mapping — without those there is no GR/IR account to speak of;
+        * a **product** line linked to a ``purchase_line_id``: a hand-made bill
+          posted no GR accrual, so routing it here would strand the clearing
+          account;
+        * ``product_id.type == "consu"`` — services carry no stock move;
+        * the category valued ``real_time`` in this company. **Not**
+          ``is_storable``: the imported Levi's catalogue is entirely
+          ``consu`` / ``is_storable = False`` and still real-time valued, so an
+          ``is_storable`` gate never fires and the accrual never nets.
+
+        The caller checks the suppress switch: in periodic mode the accrual is
+        trued up by Inventory Reconciliation, not per bill.
+        """
+        self.ensure_one()
+        move = self.move_id
+        if move.move_type not in ("in_invoice", "in_refund"):
+            return self.env["account.account"].browse()
+        if self.display_type != "product":
+            return self.env["account.account"].browse()
+        if not self.purchase_line_id or self.product_id.type != "consu":
+            return self.env["account.account"].browse()
+        if mapping is None:
+            ptype = move.l10n_purchase_type
+            mapping = self.env["levis.purchase.account.map"]._get_map(move.company_id, ptype) if ptype else None
+        if not mapping:
+            return self.env["account.account"].browse()
+        categ = self.product_id.categ_id.with_company(move.company_id)
+        if categ.property_valuation != "real_time":
+            return self.env["account.account"].browse()
+        # Mirror the receipt's own choice exactly (stock_move.py::
+        # _levis_book_valuation_entry): the mapping supplies the non-trade
+        # GR/IR account, trade keeps its per-category stock-variation account.
+        return mapping.grir_account_id or categ.account_stock_variation_id
+
     def _compute_account_id(self):
         super()._compute_account_id()
         AccountMap = self.env["levis.purchase.account.map"]
@@ -105,10 +196,8 @@ class AccountMoveLine(models.Model):
                 # to GR/IR would leave the clearing account un-netted and would
                 # clobber the user's hand-picked expense account. Manual bills
                 # therefore keep AP-payable routing + numbering only.
-                if gr_accrual_active and line.purchase_line_id and line.product_id.type == "consu":
-                    categ = line.product_id.categ_id.with_company(move.company_id)
-                    if categ.property_valuation == "real_time":
-                        grir_acc = mapping.grir_account_id or categ.account_stock_variation_id
+                if gr_accrual_active:
+                    grir_acc = line._levis_grir_account(mapping)
                 if grir_acc:
                     line.account_id = grir_acc.id
                 elif not line.account_id and mapping.expense_account_id:
