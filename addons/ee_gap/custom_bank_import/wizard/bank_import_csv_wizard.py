@@ -14,6 +14,7 @@ _logger = logging.getLogger(__name__)
 
 class BankImportCsvWizard(models.TransientModel):
     _name = "custom.bank.import.csv.wizard"
+    _inherit = ["custom.bank.import.dedup"]
     _description = "Bank Statement CSV Import Wizard"
 
     journal_id = fields.Many2one("account.journal", required=True, domain=[("type", "=", "bank")])
@@ -101,6 +102,35 @@ class BankImportCsvWizard(models.TransientModel):
                     )
                 )
 
+        # Drop the transactions this journal already holds. Counted, not merely
+        # matched — see custom.bank.import.dedup for why the difference matters.
+        lines, duplicates = self._split_already_imported(
+            [
+                (
+                    self._dedup_key(ln["date"], ln["ref"] or ln.get("partner_hint") or "/", ln["amount"]),
+                    ln,
+                )
+                for ln in lines
+            ]
+        )
+
+        if not lines:
+            # Every row was already here. Say so plainly: creating an empty
+            # statement would read as a successful import of nothing, and the
+            # operator would upload again tomorrow.
+            raise UserError(
+                _(
+                    "Nothing to import — all %(count)s transactions in this file are "
+                    "already on %(journal)s for %(first)s to %(last)s.\n\n"
+                    "This is the expected result when a bank export overlaps one "
+                    "already loaded. Nothing was changed.",
+                    count=len(duplicates),
+                    journal=self.journal_id.display_name,
+                    first=min(ln["date"] for ln in duplicates),
+                    last=max(ln["date"] for ln in duplicates),
+                )
+            )
+
         Statement = self.env["account.bank.statement"]
         StatementLine = self.env["account.bank.statement.line"]
         statement = Statement.create(
@@ -145,6 +175,7 @@ class BankImportCsvWizard(models.TransientModel):
                 "line_count": len(line_vals),
                 "error_count": len(errors),
                 "state": state,
+                "duplicate_count": len(duplicates),
                 "raw_payload": "; ".join(f"row {n}: {e}" for n, e in errors[:200]) if errors else False,
             }
         )

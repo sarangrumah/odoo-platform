@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-16T00:26:55+00:00",
+  "generated_at": "2026-09-16T00:31:17+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "f4853a77",
-    "branch": "t00-194"
+    "commit": "e711c780",
+    "branch": "t00-208"
   },
   "buckets": [
     {
@@ -2131,7 +2131,7 @@
       "module": "custom_bank_import",
       "bucket": "ee_gap",
       "name": "Custom Bank Import",
-      "version": "19.0.0.3.0",
+      "version": "19.0.0.6.0",
       "summary": "CSV template-based bank statement import + H2H bank API adapter framework",
       "category": "Accounting/Bank",
       "depends": 4,
@@ -3915,9 +3915,14 @@
       "category": "Accounting/Accounting",
       "depends": 9,
       "public": true,
-      "last_change": "2026-08-05",
-      "change_count": 7,
+      "last_change": "2026-09-16",
+      "change_count": 8,
       "changes": [
+        {
+          "sha": "e711c780",
+          "date": "2026-09-16",
+          "subject": "feat(pettycash): record the store float and the third-party payout that production runs (#194)"
+        },
         {
           "sha": "39684f1f",
           "date": "2026-08-05",
