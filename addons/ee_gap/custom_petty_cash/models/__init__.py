@@ -5,6 +5,7 @@ from . import hr_employee
 from . import hr_job
 from . import account_move
 from . import petty_cash_type
+from . import petty_cash_float
 from . import petty_cash_request
 from . import petty_cash_request_line
 from . import petty_cash_realization

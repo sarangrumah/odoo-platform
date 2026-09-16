@@ -12,3 +12,6 @@ access_petty_cash_aging_wizard,petty.cash.aging.wizard,model_petty_cash_aging_wi
 access_petty_cash_statement_wizard,petty.cash.statement.wizard,model_petty_cash_statement_wizard,group_petty_cash_user,1,1,1,1
 access_petty_cash_type_user,petty.cash.type.user,model_petty_cash_type,group_petty_cash_user,1,0,0,0
 access_petty_cash_type_finance,petty.cash.type.finance,model_petty_cash_type,group_petty_cash_finance,1,1,1,1
+access_petty_cash_float_user,petty.cash.float.user,model_petty_cash_float,group_petty_cash_user,1,0,0,0
+access_petty_cash_float_finance,petty.cash.float.finance,model_petty_cash_float,group_petty_cash_finance,1,1,1,1
+access_petty_cash_review_wizard,petty.cash.review.wizard,model_petty_cash_review_wizard,group_petty_cash_finance,1,1,1,1
