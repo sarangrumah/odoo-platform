@@ -272,7 +272,7 @@ class CustomFixedAssetDisposalWizard(models.TransientModel):
                 "journal_id": asset.journal_id.id,
                 "company_id": asset.company_id.id,
                 "ref": _("Disposal %(code)s", code=asset.code),
-                "line_ids": lines,
+                "line_ids": asset._stamp_analytic(lines, asset.analytic_distribution),
             }
         )
         move.action_post()

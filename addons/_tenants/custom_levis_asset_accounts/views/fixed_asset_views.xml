@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Operating Unit on the asset, beside the accounts it drives.
+         The raw analytic_distribution stays on the form (base module) for the
+         cases this field deliberately cannot express: an asset split across
+         two stores, or a second analytic plan. -->
+    <record id="view_fixed_asset_form_ou" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.form.operating.unit</field>
+        <field name="model">custom.fixed.asset</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_form"/>
+        <field name="arch" type="xml">
+            <field name="journal_id" position="after">
+                <field name="l10n_ou_analytic_id"
+                       options="{'no_create': True, 'no_open': True}"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_fixed_asset_list_ou" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.list.operating.unit</field>
+        <field name="model">custom.fixed.asset</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_list"/>
+        <field name="arch" type="xml">
+            <field name="state" position="before">
+                <field name="l10n_ou_analytic_id" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_fixed_asset_search_ou" model="ir.ui.view">
+        <field name="name">custom.fixed.asset.search.operating.unit</field>
+        <field name="model">custom.fixed.asset</field>
+        <field name="inherit_id" ref="custom_accounting_asset.view_fixed_asset_search"/>
+        <field name="arch" type="xml">
+            <field name="custodian_id" position="after">
+                <field name="l10n_ou_analytic_id"/>
+            </field>
+            <filter name="group_location" position="after">
+                <filter name="group_ou" string="Operating Unit"
+                        context="{'group_by':'l10n_ou_analytic_id'}"/>
+            </filter>
+        </field>
+    </record>
+</odoo>

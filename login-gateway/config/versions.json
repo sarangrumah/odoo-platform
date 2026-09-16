@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-16T00:48:58+00:00",
+  "generated_at": "2026-09-16T01:36:12+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "d58d9f4e",
-    "branch": "feat/aged-as-of-and-ap-aging-export"
+    "commit": "1b4f3498",
+    "branch": "feat/asset-operating-unit-analytic"
   },
   "buckets": [
     {
@@ -287,14 +287,19 @@
       "module": "custom_levis_asset_accounts",
       "bucket": "_tenants",
       "name": "Levi's Fixed Asset Revaluation Accounts",
-      "version": "19.0.2.1.0",
+      "version": "19.0.2.2.0",
       "summary": "Seed the 6 EBR fixed-asset categories and wire IAS 16 revaluation account defaults onto fixed-asset groups by resolving Erajaya chart codes per company.",
       "category": "Tenants/Levis",
       "depends": 1,
       "public": false,
-      "last_change": "2026-08-18",
-      "change_count": 4,
+      "last_change": "2026-09-16",
+      "change_count": 5,
       "changes": [
+        {
+          "sha": "1b4f3498",
+          "date": "2026-09-16",
+          "subject": "feat(assets): carry the Operating Unit from the asset onto every entry it writes"
+        },
         {
           "sha": "62b4b5db",
           "date": "2026-08-18",
@@ -1588,14 +1593,19 @@
       "module": "custom_accounting_asset",
       "bucket": "ee_gap",
       "name": "Custom Accounting - Fixed Assets",
-      "version": "19.0.0.8.0",
+      "version": "19.0.0.9.0",
       "summary": "Fixed asset register with depreciation schedule, monthly posting cron, and disposal workflow",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
-      "last_change": "2026-09-10",
-      "change_count": 26,
+      "last_change": "2026-09-16",
+      "change_count": 27,
       "changes": [
+        {
+          "sha": "1b4f3498",
+          "date": "2026-09-16",
+          "subject": "feat(assets): carry the Operating Unit from the asset onto every entry it writes"
+        },
         {
           "sha": "1f5ed466",
           "date": "2026-09-10",
@@ -1630,11 +1640,6 @@
           "sha": "24446ab6",
           "date": "2026-07-29",
           "subject": "refactor: use env._ for translated field defaults repo-wide"
-        },
-        {
-          "sha": "3b2f15d9",
-          "date": "2026-07-09",
-          "subject": "chore(lint): ruff-format sweep; ignore odoo-shell globals under docs/wms"
         }
       ]
     },
@@ -1756,17 +1761,12 @@
       "depends": 5,
       "public": true,
       "last_change": "2026-09-16",
-      "change_count": 59,
+      "change_count": 58,
       "changes": [
         {
-          "sha": "d58d9f4e",
+          "sha": "6d3f17c6",
           "date": "2026-09-16",
-          "subject": "feat(reports): AP Aging Export, and only count a match whose counterpart is posted"
-        },
-        {
-          "sha": "0aeb569d",
-          "date": "2026-08-07",
-          "subject": "fix(reports): age payable/receivable at the cut-off date, not today"
+          "subject": "feat(reports): age payable/receivable at the cut-off date, and add AP Aging Export (#241)"
         },
         {
           "sha": "f4853a77",
@@ -1797,6 +1797,11 @@
           "sha": "3e7fdd6f",
           "date": "2026-08-20",
           "subject": "feat(reports): rekap PPN Keluaran Digunggung untuk PKP Pedagang Eceran (#190)"
+        },
+        {
+          "sha": "49c8f74f",
+          "date": "2026-08-19",
+          "subject": "feat(reports): split the Purchase Register into Trade and Non-Trade (#183)"
         }
       ]
     },

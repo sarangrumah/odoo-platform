@@ -23,7 +23,7 @@ DEPRECIATION_DATE_MODES = [
 class CustomFixedAsset(models.Model):
     _name = "custom.fixed.asset"
     _description = "Custom Fixed Asset"
-    _inherit = ["mail.thread", "mail.activity.mixin", "pdp.audited.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "pdp.audited.mixin", "analytic.mixin"]
     _order = "code, id"
 
     # (asset field, matching default on custom.fixed.asset.group). Every one of
@@ -1039,6 +1039,40 @@ class CustomFixedAsset(models.Model):
     # ------------------------------------------------------------------
     # Posting due depreciation lines
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Analytic distribution — carried from the asset onto every entry it makes
+    # ------------------------------------------------------------------
+    def _analytic_distribution_key(self):
+        """A hashable form of ``analytic_distribution``, for grouping keys.
+
+        ``analytic_distribution`` is a Json dict and dicts cannot be hashed, so
+        the depreciation bucket key needs this instead. Sorted, so two assets
+        carrying the same distribution written in a different order still land
+        in the same bucket.
+        """
+        self.ensure_one()
+        return tuple(sorted((str(k), v) for k, v in (self.analytic_distribution or {}).items()))
+
+    @api.model
+    def _stamp_analytic(self, line_commands, distribution):
+        """Put ``distribution`` on every ``(0, 0, vals)`` command in place.
+
+        Applied to **both** legs, and to every leg of a disposal or
+        revaluation, because the point of the field is that Accounting can read
+        the Operating Unit off the journal entry — a distribution on only the
+        P&L side leaves half the document unattributed. This mirrors what
+        ``levis.cogs.run`` does for periodic COGS.
+
+        ``setdefault`` rather than assignment: a caller that already worked out
+        a more specific distribution for one leg keeps it.
+        """
+        if not distribution:
+            return line_commands
+        for command in line_commands:
+            if command and command[0] == 0 and isinstance(command[2], dict):
+                command[2].setdefault("analytic_distribution", distribution)
+        return line_commands
+
     def _group_depreciation_moves(self):
         """Whether to book ONE journal entry per period instead of one per asset.
 
@@ -1086,6 +1120,10 @@ class CustomFixedAsset(models.Model):
                     asset.expense_account_id.id,
                     asset.depreciation_account_id.id,
                     line.date,
+                    # Two assets in different Operating Units must not be
+                    # rolled into one entry: the whole point of the analytic
+                    # distribution is that the entry says which store it is.
+                    asset._analytic_distribution_key(),
                     # Without grouping, the line's own id keeps every bucket
                     # singular and restores the one-move-per-line behaviour.
                     None if grouped else line.id,
@@ -1095,7 +1133,7 @@ class CustomFixedAsset(models.Model):
 
         posted_count = 0
         for key in sorted(buckets, key=lambda k: (k[4], k[0], k[1])):
-            company_id, journal_id, expense_id, accum_id, date, _singleton = key
+            company_id, journal_id, expense_id, accum_id, date, _analytic_key, _singleton = key
             lines = buckets[key]
             total = sum(lines.mapped("amount"))
             if not total:
@@ -1119,34 +1157,40 @@ class CustomFixedAsset(models.Model):
                 expense_label = _("Depreciation %(date)s", date=date)
                 accum_label = _("Accum. depreciation %(date)s", date=date)
 
+            # Every asset in this bucket shares an analytic key, so any of
+            # them answers for the distribution.
+            distribution = lines.asset_id[:1].analytic_distribution
             move = AccountMove.create(
                 {
                     "date": date,
                     "journal_id": journal_id,
                     "company_id": company_id,
                     "ref": ref,
-                    "line_ids": [
-                        (
-                            0,
-                            0,
-                            {
-                                "name": expense_label,
-                                "account_id": expense_id,
-                                "debit": total,
-                                "credit": 0.0,
-                            },
-                        ),
-                        (
-                            0,
-                            0,
-                            {
-                                "name": accum_label,
-                                "account_id": accum_id,
-                                "debit": 0.0,
-                                "credit": total,
-                            },
-                        ),
-                    ],
+                    "line_ids": self._stamp_analytic(
+                        [
+                            (
+                                0,
+                                0,
+                                {
+                                    "name": expense_label,
+                                    "account_id": expense_id,
+                                    "debit": total,
+                                    "credit": 0.0,
+                                },
+                            ),
+                            (
+                                0,
+                                0,
+                                {
+                                    "name": accum_label,
+                                    "account_id": accum_id,
+                                    "debit": 0.0,
+                                    "credit": total,
+                                },
+                            ),
+                        ],
+                        distribution,
+                    ),
                 }
             )
             move.action_post()

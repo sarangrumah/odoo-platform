@@ -56,6 +56,23 @@ ERAJAYA_ASSET_GROUP_SEED = [
     ("ROU-OFFC", "Right of Use Asset - Office and outlet equipment", "1206104000", "1206203000", "7205003000", 60),
     ("ROU-MACH", "Right of Use Asset - Machinery", "1206105000", "1206204000", "7205005000", 60),
     ("ROU-FURN", "Right of Use Asset - Furniture and fixtures", "1206106000", "1206205000", "7205004000", 60),
+    # Low Value Asset. Confirmed by Accounting on 16-Sep-2026 (sheet #52): an
+    # LVA is acquired straight to **1116100009 Prepaid - Office supplies** and
+    # then depreciated in full, in the month it was acquired, to whichever
+    # expense account suits the item. So cost and accumulated deliberately point
+    # at the same prepaid account, and ``useful_life`` is deliberately 1 -- this
+    # is the nature of the transaction, not a misconfiguration.
+    #
+    # The expense account is left EMPTY on purpose. #52 asks for it to be chosen
+    # per asset ("tergantung asset LVA ini lebih cocok dicatat ke COA Expense
+    # yang mana"), and the 88 live LVAs charging 7211002000 are that choice
+    # being exercised, not a defect.
+    #
+    # Seeded rather than left to the UI because the group was created by hand on
+    # the tenant and would not survive a rebuild: the upsert below is keyed on
+    # ``(code, company_id)`` and only fills fields that are still empty, so
+    # adding it here cannot disturb the group already live in production.
+    ("FA-LVA", "LVA (Low Value Asset)", "1116100009", "1116100009", None, 1),
 ]
 
 # Journal every depreciating group posts its depreciation to. A group created
@@ -85,9 +102,9 @@ class CustomFixedAssetGroup(models.Model):
           skipped automatically;
         * a category whose cost account is absent in a company is skipped for that
           company; an accum/expense account that does not resolve is left empty;
-        * a depreciating category (one with an expense account) is pointed at the
-          company's ``DEPRE`` journal, without which ``action_confirm()`` raises.
-          Land carries no expense account and so is left without a journal.
+        * a depreciating category (``useful_life`` > 0) is pointed at the company's
+          ``DEPRE`` journal, without which ``action_confirm()`` raises. Land, at
+          life 0, is the only kind left without one.
         """
         Account = self.env["account.account"]
         Journal = self.env["account.journal"]
@@ -120,7 +137,14 @@ class CustomFixedAssetGroup(models.Model):
                     "default_depreciation_account_id": _acc(accum_code),
                     "default_expense_account_id": expense_id,
                 }
-                if expense_id and journal_id:
+                # A group that depreciates needs the journal, or ``action_confirm()``
+                # raises on every asset created from it. The test is the useful
+                # life, NOT the expense account: FA-LVA depreciates in one month
+                # yet deliberately carries no group-level expense account, and
+                # keying on the account would leave it journal-less on a rebuild
+                # (the live group has DEPRE, set by hand). Land, at life 0, is
+                # the only kind that genuinely needs no journal.
+                if useful_life and journal_id:
                     account_vals["default_journal_id"] = journal_id
                 group = self.with_context(active_test=False).search(
                     [("code", "=", code), ("company_id", "=", company.id)], limit=1
