@@ -233,9 +233,23 @@ class CustomReportAgedReceivable(models.AbstractModel):
         Partial = self.env["account.partial.reconcile"]
         # A partial credits the debit leg and debits the credit leg, so it
         # always moves both balances towards zero.
-        for field, sign in (("debit_move_id", -1.0), ("credit_move_id", 1.0)):
+        #
+        # The *counterpart* must be posted for the match to count. A draft
+        # payment already carries partials, and honouring them would retire an
+        # invoice against money the ledger has not booked — the report would
+        # then sit below the trial balance by exactly those drafts. This is the
+        # same guard ``custom.report.gl.open.items._settled_by`` applies; it is
+        # written as a domain here so it stays inside the single read_group.
+        for field, counter, sign in (
+            ("debit_move_id", "credit_move_id", -1.0),
+            ("credit_move_id", "debit_move_id", 1.0),
+        ):
             groups = Partial._read_group(
-                [(field, "in", lines.ids), ("max_date", "<=", date_to)],
+                [
+                    (field, "in", lines.ids),
+                    ("max_date", "<=", date_to),
+                    ("%s.parent_state" % counter, "=", "posted"),
+                ],
                 groupby=[field],
                 aggregates=["amount:sum"],
             )

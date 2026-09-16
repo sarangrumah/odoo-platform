@@ -2,7 +2,7 @@
 #
 # Dijalankan lewat odoo shell (butuh ORM untuk .reconcile()):
 #   docker exec -i odoo19-platform-odoo odoo shell -d prd_levis_begbal --no-http \
-#       --shell-interface=python < scripts/tenants/levis/90_fix_aged_payable_recon.py
+#       --shell-interface=python < scripts/tenants/levis/109_fix_aged_payable_recon.py
 #
 # Env:  CONFIRM=1      -> benar-benar menulis + commit per kelompok.
 #                         Tanpa ini: DRY RUN, rollback tiap kelompok.
@@ -247,14 +247,8 @@ def tahap_c():
         sisa = sum(terbuka.mapped("amount_residual"))
         dipasangkan += 1
         nilai += abs(sum(l.amount_residual for l in bayar))
-        print(
-            "    %-22s <-> %-60s"
-            % (bayar_nama, ", ".join(bill_nama_list))
-        )
-        print(
-            "        %s  net sebelum %s  sisa sesudah %s"
-            % (partner.display_name[:40], rupiah(net), rupiah(sisa))
-        )
+        print("    %-22s <-> %-60s" % (bayar_nama, ", ".join(bill_nama_list)))
+        print("        %s  net sebelum %s  sisa sesudah %s" % (partner.display_name[:40], rupiah(net), rupiah(sisa)))
     return dipasangkan, nilai
 
 

@@ -3,7 +3,7 @@
 # SELECT-ONLY. Tidak ada satu pun UPDATE/INSERT ke Odoo; satu-satunya tulisan adalah
 # file Excel di /srv/sftp-share/files (bisa diunduh lewat File Browser /files).
 #
-#   python3 scripts/tenants/levis/91_report_aged_payable_recon.py
+#   python3 scripts/tenants/levis/110_report_aged_payable_recon.py
 #
 # Env:  DB       -> database (default prd_levis_begbal)
 #       DATE_TO  -> cut-off (default 2026-07-31)
@@ -44,9 +44,7 @@ from openpyxl.utils import get_column_letter
 PG = "odoo19-platform-postgres"
 DB = os.environ.get("DB", "prd_levis_begbal")
 DATE_TO = os.environ.get("DATE_TO", "2026-07-31")
-OUT = os.environ.get(
-    "OUT", "/srv/sftp-share/files/Rekonsiliasi_Aged_Payable_%s.xlsx" % DATE_TO
-)
+OUT = os.environ.get("OUT", "/srv/sftp-share/files/Rekonsiliasi_Aged_Payable_%s.xlsx" % DATE_TO)
 
 MONEY = "#,##0.00"
 HDR_FILL = PatternFill("solid", fgColor="1F4E78")
@@ -61,11 +59,15 @@ def q(sql):
     """Run a read-only query and return a list of dicts."""
     out = subprocess.run(
         [
-            "docker", "exec", PG, "sh", "-c",
-            'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" '
-            f"-d {DB} --csv -v ON_ERROR_STOP=1 -c \"{sql}\"",
+            "docker",
+            "exec",
+            PG,
+            "sh",
+            "-c",
+            f'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d {DB} --csv -v ON_ERROR_STOP=1 -c "{sql}"',
         ],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if out.returncode:
         sys.exit(f"query failed:\n{out.stderr}")
@@ -193,9 +195,16 @@ ws["A2"] = DB
 ws["A2"].font = NOTE_FONT
 
 head(
-    ws, 4,
-    ["Akun", "Nama Akun", "Trial Balance", "Aging (logika lama)",
-     "Aging (residual as-of)", "Selisih C1 (dibayar setelah cut-off)"],
+    ws,
+    4,
+    [
+        "Akun",
+        "Nama Akun",
+        "Trial Balance",
+        "Aging (logika lama)",
+        "Aging (residual as-of)",
+        "Selisih C1 (dibayar setelah cut-off)",
+    ],
     [14, 38, 20, 20, 20, 24],
 )
 r = 5
@@ -240,27 +249,35 @@ c.fill = OK_FILL if sisa == 0 else WARN_FILL
 r += 2
 
 note(
-    ws, r,
+    ws,
+    r,
     "C1 -- report lama memakai residual HIDUP dan membuang baris yang sudah reconciled, "
     "sehingga tagihan yang masih terbuka per cut-off tapi dibayar sesudahnya hilang dari "
     "aging. Itu sebabnya angka aging periode yang sama mengecil terus tiap kali dibuka. "
     "Kolom 'Aging (residual as-of)' adalah hasil logika baru, yang memakai posisi "
-    "rekonsiliasi per tanggal cut-off.", 6,
+    "rekonsiliasi per tanggal cut-off.",
+    6,
 )
 r += 2
 note(
-    ws, r,
+    ws,
+    r,
     "C2 -- jurnal yang belum posted tetapi masih memegang rekonsiliasi. Bill lawannya "
     "hilang dari aging (sudah dianggap lunas) padahal TB yang posted-only masih "
-    "mencatatnya. Rinciannya di sheet 'Draft Reconciled'.", 6,
+    "mencatatnya. Rinciannya di sheet 'Draft Reconciled'.",
+    6,
 )
 
 # ---- Sheet 2: draft reconciled
 ws2 = wb.create_sheet("Draft Reconciled")
 ws2["A1"] = "Jurnal belum posted yang masih memegang rekonsiliasi"
 ws2["A1"].font = Font(bold=True, size=12)
-head(ws2, 3, ["Jurnal", "State", "Tanggal", "Debit", "Ter-match ke", "State lawan",
-              "Nilai match"], [22, 10, 12, 18, 30, 12, 18])
+head(
+    ws2,
+    3,
+    ["Jurnal", "State", "Tanggal", "Debit", "Ter-match ke", "State lawan", "Nilai match"],
+    [22, 10, 12, 18, 30, 12, 18],
+)
 r = 4
 for x in draft:
     ws2.cell(row=r, column=1, value=x["mv"])
@@ -276,19 +293,22 @@ if not draft:
     r += 1
 r += 1
 note(
-    ws2, r,
+    ws2,
+    r,
     "Butuh keputusan Finance: posting jurnalnya (TB naik, aging tetap), atau batalkan "
     "rekonsiliasinya (TB tetap, bill kembali muncul di aging). Skrip perbaikan "
-    "(90_fix_aged_payable_recon.py) sengaja tidak menyentuhnya karena kedua pilihan "
-    "mengubah angka yang sudah dilaporkan.", 7,
+    "(109_fix_aged_payable_recon.py) sengaja tidak menyentuhnya karena kedua pilihan "
+    "mengubah angka yang sudah dilaporkan.",
+    7,
 )
 
 # ---- Sheet 3: payment menggantung
 ws3 = wb.create_sheet("Payment Menggantung")
 ws3["A1"] = "Pembayaran yang men-debit akun hutang tapi tidak ter-match ke bill mana pun"
 ws3["A1"].font = Font(bold=True, size=12)
-head(ws3, 3, ["Jurnal", "Tanggal", "Partner", "Keterangan", "Debit", "Residual", "Status"],
-     [22, 12, 36, 46, 18, 18, 34])
+head(
+    ws3, 3, ["Jurnal", "Tanggal", "Partner", "Keterangan", "Debit", "Residual", "Status"], [22, 12, 36, 46, 18, 18, 34]
+)
 r = 4
 STATUS = {
     "8282/2026/07/009": "diperbaiki skrip 90 -> match ke bill 00086/00087/00088",
@@ -308,20 +328,26 @@ for x in gantung:
     r += 1
 r += 1
 note(
-    ws3, r,
+    ws3,
+    r,
     "Ketiganya adalah jurnal manual (move_type = 'entry'), bukan vendor payment. Di "
     "account_partial_reconcile tidak ada satu pun baris untuknya -- jadi memang belum "
     "pernah dipasangkan ke tagihan. Aged Payable menampilkan setiap baris hutang yang "
     "masih terbuka, sehingga bill dan pembayarannya berdiri sebagai dua open item yang "
-    "saling plus-minus, bukan saling meniadakan.", 7,
+    "saling plus-minus, bukan saling meniadakan.",
+    7,
 )
 
 # ---- Sheet 4: 016 vs 045
 ws4 = wb.create_sheet("016 vs 045")
 ws4["A1"] = "Dua jurnal bernominal sama untuk PT Metropolitan Land Tbk."
 ws4["A1"].font = Font(bold=True, size=12)
-head(ws4, 3, ["Jurnal", "Tanggal", "Keterangan", "Partner", "Debit", "Residual",
-              "Reconciled"], [22, 12, 46, 36, 18, 18, 12])
+head(
+    ws4,
+    3,
+    ["Jurnal", "Tanggal", "Keterangan", "Partner", "Debit", "Residual", "Reconciled"],
+    [22, 12, 46, 36, 18, 18, 12],
+)
 r = 4
 for x in kembar:
     ws4.cell(row=r, column=1, value=x["mv"])
@@ -336,19 +362,20 @@ for x in kembar:
     r += 1
 r += 1
 note(
-    ws4, r,
+    ws4,
+    r,
     "Nominal, tanggal dan partner keduanya sama persis; 045 sudah ter-match ke tagihannya "
     "sedangkan 016 menggantung penuh. Kemungkinan dobel-catat, atau 016 memang deposit "
     "yang belum ada tagihannya. Mohon dikonfirmasi ke Finance sebelum dijurnal balik atau "
-    "dipasangkan.", 7,
+    "dipasangkan.",
+    7,
 )
 
 # ---- Sheet 5: EBR-GL
 ws5 = wb.create_sheet("EBR-GL")
 ws5["A1"] = "Baris beginning balance (Bill Reference berawalan EBR-GL) di akun hutang"
 ws5["A1"].font = Font(bold=True, size=12)
-head(ws5, 3, ["Partner", "Jurnal", "Reference", "Tanggal", "Debit", "Credit", "Residual"],
-     [36, 22, 24, 12, 18, 18, 18])
+head(ws5, 3, ["Partner", "Jurnal", "Reference", "Tanggal", "Debit", "Credit", "Residual"], [36, 22, 24, 12, 18, 18, 18])
 r = 4
 per_partner = {}
 t_res = Decimal(0)
@@ -370,7 +397,8 @@ c.fill = OK_FILL if t_res == 0 else WARN_FILL
 r += 2
 tidak_nol = {k: v for k, v in per_partner.items() if v != 0}
 note(
-    ws5, r,
+    ws5,
+    r,
     "Net seluruh baris = %s. Sisi tagihan (BILL/2026/06/xxxx) dan sisi bank "
     "(BNK1/2026/xxxxx) dari upload beginning balance dua-duanya masuk ke akun hutang "
     "tanpa pernah saling direkonsiliasi, jadi keduanya tampil sebagai open item. "
