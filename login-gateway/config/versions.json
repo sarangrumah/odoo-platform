@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-16T00:31:17+00:00",
+  "generated_at": "2026-09-16T00:36:19+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "e711c780",
-    "branch": "t00-208"
+    "commit": "266c3825",
+    "branch": "t00-193"
   },
   "buckets": [
     {
@@ -374,10 +374,10 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.41.0",
+      "version": "19.0.1.51.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
-      "depends": 9,
+      "depends": 10,
       "public": false,
       "last_change": "2026-09-04",
       "change_count": 53,
@@ -2136,9 +2136,14 @@
       "category": "Accounting/Bank",
       "depends": 4,
       "public": true,
-      "last_change": "2026-07-29",
-      "change_count": 9,
+      "last_change": "2026-09-16",
+      "change_count": 10,
       "changes": [
+        {
+          "sha": "266c3825",
+          "date": "2026-09-16",
+          "subject": "feat(bank_import): recognise BRI's second export, and stop overlapping files from re-posting (#208)"
+        },
         {
           "sha": "4704e07d",
           "date": "2026-07-29",
@@ -2173,11 +2178,6 @@
           "sha": "0432fb48",
           "date": "2026-05-22",
           "subject": "modules: add manifest-declared data files that were never committed"
-        },
-        {
-          "sha": "358f7db1",
-          "date": "2026-05-21",
-          "subject": "Deploy baseline: Odoo 19 port + multi-tenant + EE-gap module set"
         }
       ]
     },

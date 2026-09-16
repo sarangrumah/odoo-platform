@@ -90,6 +90,7 @@
                             <field name="sample_narrative" readonly="1"/>
                             <field name="warehouse_id"/>
                             <field name="analytic_account_id"/>
+                            <field name="evidence_note" readonly="1"/>
                             <field name="skip"/>
                             <field name="statement_line_ids" column_invisible="1"/>
                             <field name="currency_id" column_invisible="1"/>

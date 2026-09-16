@@ -8,6 +8,7 @@
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="purchase_type"/>
                 <field name="payable_account_id"/>
+                <field name="related_payable_account_id"/>
                 <field name="grir_account_id"/>
                 <field name="expense_account_id"/>
             </list>
@@ -24,6 +25,7 @@
                         <field name="company_id" groups="base.group_multi_company"/>
                         <field name="purchase_type"/>
                         <field name="payable_account_id"/>
+                        <field name="related_payable_account_id"/>
                         <field name="grir_account_id"/>
                         <field name="expense_account_id"/>
                     </group>

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.41.0",
+    "version": "19.0.1.51.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -154,6 +154,18 @@ Bundles four tenant-specific requirements for the Levi's databases
     and posted receivables lacking an Operating Unit are all surfaced as
     diagnostics with click-through, and block generation until acknowledged.
 
+22. **Duplicate-SKU gate on purchase orders.** Every garment size is its own
+    variant with its own PROD SKU, so a PO sheet whose product column was copied
+    down orders one size several times -- and receiving books exactly that, because
+    the receipt inherits its products from the order (feature #6). Confirming an
+    order that repeats a SKU therefore opens a confirmation listing the repeats,
+    their size/inseam values and **the sizes of the same template that are NOT on
+    the order**; a reason must be typed, and it is stamped on the order
+    (``l10n_dup_sku_ack`` / ``l10n_dup_sku_reason``) and posted to the chatter. Not
+    a hard block -- the same SKU on two delivery dates is legitimate -- and the
+    acknowledgement is cleared again as soon as the order returns to draft or a line
+    changes product or quantity.
+
 16. **COGS catch-up on goods receipt.** The companion to #12, for the cost that
     arrives late. When a vendor receipt establishes a cost for a product, the
     units of *that* product already sold and not yet charged are recognised
@@ -178,18 +190,6 @@ Bundles four tenant-specific requirements for the Levi's databases
     next receipt or by the monthly run. Visible at Accounting > Accounting >
     COGS Catch-up.
 
-17. **Duplicate-SKU gate on purchase orders.** Every garment size is its own
-    variant with its own PROD SKU, so a PO sheet whose product column was copied
-    down orders one size several times -- and receiving books exactly that, because
-    the receipt inherits its products from the order (feature #6). Confirming an
-    order that repeats a SKU therefore opens a confirmation listing the repeats,
-    their size/inseam values and **the sizes of the same template that are NOT on
-    the order**; a reason must be typed, and it is stamped on the order
-    (``l10n_dup_sku_ack`` / ``l10n_dup_sku_reason``) and posted to the chatter. Not
-    a hard block -- the same SKU on two delivery dates is legitimate -- and the
-    acknowledgement is cleared again as soon as the order returns to draft or a line
-    changes product or quantity.
-
 TENANT-SCOPED: install only on the Levi's tenant databases.
 """,
     "author": "Custom Platform",
@@ -204,6 +204,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "purchase",
         "purchase_stock",
         "account",
+        "mail",
         "point_of_sale",
         "custom_retail_import_pos",
     ],
@@ -211,6 +212,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "security/ir.model.access.csv",
         "data/res.bank.csv",
         "data/config_parameters.xml",
+        "data/cash_deposit_sequence.xml",
         "data/po_sequences.xml",
         "data/bill_sequences.xml",
         "data/payment_methods.xml",
@@ -228,9 +230,15 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "views/cogs_catchup_views.xml",
         "views/categ_reclass_views.xml",
         "views/levis_clearing_config_views.xml",
+        "views/stock_warehouse_views.xml",
+        "views/levis_store_cash_deposit_views.xml",
+        "views/levis_store_daily_closing_views.xml",
+        "wizard/levis_clearing_writeoff_wizard_views.xml",
         "wizard/levis_bank_mid_map_wizard_views.xml",
         "wizard/levis_po_dup_sku_wizard_views.xml",
         "views/levis_pos_clearing_views.xml",
+        "views/levis_pos_clearing_day_views.xml",
+        "views/levis_pos_clearing_store_day_views.xml",
         "views/account_bank_statement_line_views.xml",
         "views/scrap_batch_views.xml",
         "views/levis_mdr_bin_views.xml",
@@ -241,6 +249,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "views/stock_report_action.xml",
         "views/purchase_order_views.xml",
         "views/levis_purchase_account_map_views.xml",
+        "views/res_partner_views.xml",
         "reports/paperformat.xml",
         "reports/payment_report_actions.xml",
         "reports/payment_voucher_templates.xml",

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_levis_clearing_writeoff_wizard_form" model="ir.ui.view">
+        <field name="name">levis.clearing.writeoff.wizard.form</field>
+        <field name="model">levis.clearing.writeoff.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Write Off Residual">
+                <div class="alert alert-info" role="alert">
+                    Leaving a residual on suspense is the default and is what the
+                    clearing does on its own. Choose an account only for a difference
+                    someone has actually identified — a write-off is a decision about
+                    money, and it is recorded with your name against it.
+                </div>
+                <div class="alert alert-warning" role="alert" invisible="posted_count == 0">
+                    <field name="posted_count" class="oe_inline"/> of these settlements
+                    are already posted. For those, this replaces the suspense item on the
+                    bank entry itself — the only thing that can close it, since the
+                    suspense account is not reconcilable.
+                </div>
+                <group>
+                    <group>
+                        <field name="line_count" string="Settlements"/>
+                        <field name="residual_total"/>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="company_id" invisible="1"/>
+                        <field name="forbidden_account_ids" invisible="1"
+                               widget="many2many_tags"/>
+                    </group>
+                    <group>
+                        <field name="mode" widget="radio"/>
+                        <field name="account_id"
+                               invisible="mode != 'absorb'"
+                               required="mode == 'absorb'"
+                               options="{'no_create': True}"/>
+                        <field name="reason"
+                               invisible="mode != 'absorb'"
+                               required="mode == 'absorb'"/>
+                        <field name="label" invisible="mode != 'absorb'"/>
+                    </group>
+                </group>
+                <field name="line_ids" readonly="1">
+                    <list>
+                        <field name="payment_ref"/>
+                        <field name="settlement_date"/>
+                        <field name="analytic_account_id"/>
+                        <field name="statement_amount"/>
+                        <field name="allocated"/>
+                        <field name="short_amount" sum="Residual"/>
+                        <field name="state"/>
+                        <field name="currency_id" column_invisible="1"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_apply" type="object" string="Apply"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

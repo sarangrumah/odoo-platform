@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_levis_pos_clearing_day_kanban" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.day.kanban</field>
+        <field name="model">levis.pos.clearing.day</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="settlement_date" create="false"
+                    class="o_kanban_dashboard" group_expand="True">
+                <field name="kanban_color"/>
+                <field name="state"/>
+                <field name="currency_id"/>
+                <templates>
+                    <t t-name="card">
+                        <div t-attf-class="oe_kanban_color_#{record.kanban_color.raw_value}">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong class="fs-5">
+                                    <field name="settlement_date"/>
+                                </strong>
+                                <field name="state" widget="label_selection"
+                                       options="{'classes': {'ok': 'success', 'posted': 'success', 'partial': 'warning', 'todo': 'default'}}"/>
+                            </div>
+                            <div class="text-muted small mb-2">
+                                <field name="bank_journal_id"/> ·
+                                <field name="line_count"/> lines ·
+                                <field name="store_ok_count"/> of
+                                <field name="store_count"/> stores settled
+                            </div>
+                            <table class="table table-sm mb-0">
+                                <tr>
+                                    <td class="text-muted">Gross</td>
+                                    <td class="text-end">
+                                        <field name="gross_total" widget="monetary"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Sales H-1</td>
+                                    <td class="text-end">
+                                        <field name="sales_h1_total" widget="monetary"/>
+                                    </td>
+                                </tr>
+                                <tr t-if="record.tally_variance.raw_value">
+                                    <td class="text-muted">Gross vs Sales</td>
+                                    <td class="text-end text-warning">
+                                        <field name="tally_variance" widget="monetary"/>
+                                    </td>
+                                </tr>
+                                <tr t-if="record.unexplained_total.raw_value">
+                                    <td class="text-muted fw-bold">Unexplained</td>
+                                    <td class="text-end fw-bold text-danger">
+                                        <field name="unexplained_total" widget="monetary"/>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_day_list" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.day.list</field>
+        <field name="model">levis.pos.clearing.day</field>
+        <field name="arch" type="xml">
+            <list string="POS Clearing Daily" create="false"
+                  decoration-success="is_balanced"
+                  decoration-warning="state == 'partial'"
+                  decoration-danger="unmapped_count &gt; 0 or unparsed_count &gt; 0">
+                <field name="settlement_date"/>
+                <field name="trading_date" optional="show"/>
+                <field name="bank_journal_id"/>
+                <field name="store_count" optional="hide"/>
+                <field name="store_ok_count" string="Stores OK"/>
+                <field name="bank_in_total" sum="Bank In"/>
+                <field name="mdr_total" sum="MDR" optional="show"/>
+                <field name="gross_total" sum="Gross"/>
+                <field name="sales_h1_total" sum="Sales H-1"/>
+                <field name="tally_variance" sum="Gross vs Sales"/>
+                <field name="writeoff_total" sum="Written Off" optional="hide"/>
+                <field name="unexplained_total" sum="Unexplained"/>
+                <field name="unmapped_count" optional="hide"/>
+                <field name="unparsed_count" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state in ('ok', 'posted')"
+                       decoration-warning="state == 'partial'"/>
+                <field name="is_balanced" column_invisible="1"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_day_calendar" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.day.calendar</field>
+        <field name="model">levis.pos.clearing.day</field>
+        <field name="arch" type="xml">
+            <calendar string="POS Clearing Daily" date_start="settlement_date"
+                      color="kanban_color" mode="month" create="false" quick_create="false">
+                <field name="bank_journal_id"/>
+                <field name="unexplained_total"/>
+            </calendar>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_day_form" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.day.form</field>
+        <field name="model">levis.pos.clearing.day</field>
+        <field name="arch" type="xml">
+            <form string="POS Clearing Day" create="false">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh"/>
+                    <button name="action_write_off" type="object" string="Write Off Residual"
+                            invisible="unexplained_total == 0"
+                            groups="account.group_account_manager"/>
+                    <button name="action_open_lines" type="object" string="Settlements"/>
+                    <button name="action_open_unexplained" type="object" string="Unexplained"
+                            invisible="unexplained_total == 0"/>
+                    <button name="action_open_run" type="object" string="Open Run"/>
+                    <field name="state" widget="statusbar" statusbar_visible="todo,partial,ok,posted"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="settlement_date"/></h1>
+                        <h3 class="text-muted">
+                            sales of <field name="trading_date" class="oe_inline"/>
+                            · <field name="bank_journal_id" class="oe_inline"/>
+                        </h3>
+                    </div>
+                    <div class="alert alert-success" role="alert" invisible="not is_balanced">
+                        Every bank line on this day is accounted for.
+                    </div>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="unmapped_count == 0 and unparsed_count == 0">
+                        <field name="unmapped_count" class="oe_inline"/> line(s) name no store and
+                        <field name="unparsed_count" class="oe_inline"/> could not be read. Until
+                        those are mapped the day cannot be finished — the clearing will not guess
+                        whose money it is.
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="tally_variance == 0">
+                        Gross received differs from the trading day's sales by
+                        <field name="tally_variance" class="oe_inline" widget="monetary"/>.
+                        This is a supervisory check, not a blocker: a settlement may
+                        legitimately draw on more than one trading day.
+                    </div>
+                    <group>
+                        <group string="Money In">
+                            <field name="bank_in_total"/>
+                            <field name="mdr_total"/>
+                            <field name="gross_total"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="is_balanced" invisible="1"/>
+                        </group>
+                        <group string="Against Sales">
+                            <field name="sales_h1_total"/>
+                            <field name="tally_variance"/>
+                            <field name="store_ok_count"/>
+                            <field name="store_count"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Settled">
+                            <field name="allocated_total"/>
+                            <field name="writeoff_total"/>
+                        </group>
+                        <group string="Outstanding">
+                            <field name="short_total"/>
+                            <field name="unexplained_total"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Settlements" name="lines">
+                            <field name="line_ids" readonly="1">
+                                <list create="false" delete="false"
+                                      decoration-success="state == 'ok'"
+                                      decoration-warning="state == 'short'"
+                                      decoration-danger="state in ('unmapped', 'unparsed')">
+                                    <field name="analytic_account_id"/>
+                                    <field name="payment_ref" optional="hide"/>
+                                    <field name="channel"/>
+                                    <field name="statement_amount" sum="Bank"/>
+                                    <field name="mdr" sum="MDR"/>
+                                    <field name="gross" sum="Gross"/>
+                                    <field name="allocated" sum="Allocated"/>
+                                    <field name="short_amount" sum="Short"/>
+                                    <field name="writeoff_account_id" optional="show"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Review" name="review">
+                            <group>
+                                <field name="reviewer_id"/>
+                            </group>
+                            <field name="review_note" placeholder="What was decided, and why."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_levis_pos_clearing_day_search" model="ir.ui.view">
+        <field name="name">levis.pos.clearing.day.search</field>
+        <field name="model">levis.pos.clearing.day</field>
+        <field name="arch" type="xml">
+            <search string="POS Clearing Daily">
+                <field name="settlement_date"/>
+                <field name="bank_journal_id"/>
+                <field name="run_id"/>
+                <filter name="not_settled" string="Not Settled"
+                        domain="[('is_balanced', '=', False)]"/>
+                <filter name="needs_mapping" string="Store Unknown"
+                        domain="['|', ('unmapped_count', '&gt;', 0), ('unparsed_count', '&gt;', 0)]"/>
+                <filter name="has_unexplained" string="Has Unexplained"
+                        domain="[('unexplained_total', '!=', 0)]"/>
+                <filter name="tally_off" string="Gross Disagrees With Sales"
+                        domain="[('tally_variance', '!=', 0)]"/>
+                <separator/>
+                <filter name="settled" string="Settled" domain="[('is_balanced', '=', True)]"/>
+                <separator/>
+                <filter name="group_date" string="Settlement Date"
+                        context="{'group_by': 'settlement_date'}"/>
+                <filter name="group_bank" string="Bank"
+                        context="{'group_by': 'bank_journal_id'}"/>
+                <filter name="group_state" string="Status"
+                        context="{'group_by': 'state'}"/>
+                <filter name="group_run" string="Run" context="{'group_by': 'run_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_pos_clearing_day" model="ir.actions.act_window">
+        <field name="name">POS Clearing Daily</field>
+        <field name="res_model">levis.pos.clearing.day</field>
+        <field name="view_mode">kanban,list,calendar,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No settlement days yet</p>
+            <p>Days appear when a POS clearing run computes its summary. A day turns
+               green once every bank line on it is accounted for — allocated, or written
+               off on purpose.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_levis_pos_clearing_day"
+              name="POS Clearing Daily"
+              parent="account.menu_finance_entries"
+              action="action_levis_pos_clearing_day"
+              sequence="91"/>
+</odoo>
