@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- ============ PIVOT / GRAPH (dashboard analytics) ============ -->
+        <record id="view_petty_cash_request_pivot" model="ir.ui.view">
+            <field name="name">petty.cash.request.pivot</field>
+            <field name="model">petty.cash.request</field>
+            <field name="arch" type="xml">
+                <pivot string="Cash Advance Analysis" sample="1">
+                    <field name="l10n_ou_analytic_id" type="row"/>
+                    <field name="state" type="col"/>
+                    <field name="amount_requested" type="measure"/>
+                    <field name="amount_realized" type="measure"/>
+                    <field name="amount_float_consumed" type="measure"/>
+                    <field name="amount_outstanding_company" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_petty_cash_request_graph" model="ir.ui.view">
+            <field name="name">petty.cash.request.graph</field>
+            <field name="model">petty.cash.request</field>
+            <field name="arch" type="xml">
+                <graph string="Cash Advance Analysis" type="bar" sample="1">
+                    <field name="l10n_ou_analytic_id"/>
+                    <field name="amount_outstanding_company" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <!-- ============ FINANCE REVIEW QUEUE ============ -->
+        <record id="view_petty_cash_review_list" model="ir.ui.view">
+            <field name="name">petty.cash.request.review.list</field>
+            <field name="model">petty.cash.request</field>
+            <field name="arch" type="xml">
+                <list decoration-danger="is_overdue" create="0" multi_edit="0">
+                    <field name="name"/>
+                    <field name="request_date"/>
+                    <field name="employee_id"/>
+                    <field name="l10n_ou_analytic_id"/>
+                    <field name="advance_type_id"/>
+                    <field name="advance_type_kind" optional="hide"/>
+                    <field name="purpose" optional="show"/>
+                    <field name="amount_requested" sum="Requested"/>
+                    <field name="amount_float_consumed" sum="Reserved" optional="show"/>
+                    <field name="float_id" optional="hide"/>
+                    <field name="currency_id" column_invisible="1"/>
+                    <field name="company_currency_id" column_invisible="1"/>
+                    <field name="is_overdue" column_invisible="1"/>
+                    <field name="state" widget="badge"/>
+                    <button name="action_approve" type="object" string="Approve"
+                            icon="fa-check" class="text-success"
+                            invisible="state != 'to_approve'"/>
+                    <button name="action_reject" type="object" string="Send Back"
+                            icon="fa-undo" class="text-warning"
+                            invisible="state != 'to_approve'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_petty_cash_review" model="ir.actions.act_window">
+            <field name="name">Review Queue</field>
+            <field name="res_model">petty.cash.request</field>
+            <field name="view_mode">list,form,pivot,graph</field>
+            <field name="search_view_id" ref="view_petty_cash_request_search"/>
+            <field name="domain">[('state', '=', 'to_approve')]</field>
+            <field name="context">{'search_default_group_ou': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">Nothing waiting for review</p>
+                <p>Requests submitted by employees land here for Finance to approve,
+                   send back for correction, or refuse.</p>
+            </field>
+        </record>
+
+        <record id="action_petty_cash_review_list_view" model="ir.actions.act_window.view">
+            <field name="sequence" eval="1"/>
+            <field name="view_mode">list</field>
+            <field name="view_id" ref="view_petty_cash_review_list"/>
+            <field name="act_window_id" ref="action_petty_cash_review"/>
+        </record>
+
+        <!-- ============ OUTSTANDING PER OPERATING UNIT ============ -->
+        <record id="action_petty_cash_outstanding_ou" model="ir.actions.act_window">
+            <field name="name">Outstanding per Operating Unit</field>
+            <field name="res_model">petty.cash.request</field>
+            <field name="view_mode">pivot,graph,list,form</field>
+            <field name="search_view_id" ref="view_petty_cash_request_search"/>
+            <field name="domain">[('state', 'in', ('draft', 'to_approve', 'approved', 'disbursed', 'in_realization'))]</field>
+            <field name="context">{'search_default_group_ou': 1, 'search_default_group_state': 1}</field>
+        </record>
+
+        <!-- ============ DASHBOARD ============ -->
+        <record id="action_petty_cash_dashboard" model="ir.actions.act_window">
+            <field name="name">Cash Advance Dashboard</field>
+            <field name="res_model">petty.cash.request</field>
+            <field name="view_mode">list,kanban,pivot,graph,form</field>
+            <field name="search_view_id" ref="view_petty_cash_request_search"/>
+            <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">No request matches this filter</p>
+                <p>Slice every cash advance by store, employee, type or status.
+                   Use the list view's <b>Export</b> action for XLSX/CSV.</p>
+            </field>
+        </record>
+
+        <!-- ============ REVIEW WIZARD ============ -->
+        <record id="view_petty_cash_review_wizard_form" model="ir.ui.view">
+            <field name="name">petty.cash.review.wizard.form</field>
+            <field name="model">petty.cash.review.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Finance Review">
+                    <group>
+                        <field name="summary" readonly="1" nolabel="1" colspan="2"/>
+                        <field name="decision" widget="radio"/>
+                        <field name="reason" placeholder="Why? The employee reads this in the chatter."
+                               required="decision in ('send_back', 'refuse')"/>
+                        <field name="request_ids" invisible="1"/>
+                    </group>
+                    <footer>
+                        <button name="action_apply" type="object" string="Apply" class="btn-primary"/>
+                        <button special="cancel" string="Cancel" class="btn-secondary"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_petty_cash_review_wizard" model="ir.actions.act_window">
+            <field name="name">Finance Review</field>
+            <field name="res_model">petty.cash.review.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="binding_model_id" ref="model_petty_cash_request"/>
+            <field name="binding_view_types">list,form</field>
+            <field name="group_ids" eval="[(4, ref('custom_petty_cash.group_petty_cash_finance'))]"/>
+        </record>
+    </data>
+</odoo>

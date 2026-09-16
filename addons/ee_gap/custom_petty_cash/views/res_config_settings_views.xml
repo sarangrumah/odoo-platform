@@ -20,6 +20,10 @@
                         <setting string="Expense Journal" help="Miscellaneous journal for non-third-party expense entries.">
                             <field name="petty_cash_expense_journal_id"/>
                         </setting>
+                        <setting string="Initial Petty Cash per Store"
+                                 help="Plafon of every store's 'Petty Cash Awal' request. Seeds each new store float; adjustable per store afterwards.">
+                            <field name="petty_cash_initial_amount"/>
+                        </setting>
                         <setting string="Realization Deadline (days)">
                             <field name="petty_cash_realization_days"/>
                         </setting>

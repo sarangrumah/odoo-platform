@@ -19,6 +19,15 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
+# The 0.6.0 store-float families. Everything outside this tuple keeps the
+# pre-0.6.0 behaviour, so the six tenants already running CA/PC types are
+# untouched by the float control.
+KIND_INITIAL = "pc_initial"
+KIND_REALIZATION = "pc_realization"
+KIND_CLAIM = "pc_claim"
+FLOAT_KINDS = (KIND_INITIAL, KIND_REALIZATION, KIND_CLAIM)
+
+
 class PettyCashType(models.Model):
     _name = "petty.cash.type"
     _description = "Cash Advance / Petty Cash Type"
@@ -32,6 +41,9 @@ class PettyCashType(models.Model):
     )
     kind = fields.Selection(
         selection=[
+            ("pc_initial", "Petty Cash Awal"),
+            ("pc_realization", "Realisasi"),
+            ("pc_claim", "Claim"),
             ("cash_advance", "Cash Advance"),
             ("petty_cash", "Petty Cash"),
             ("other", "Other"),
@@ -39,8 +51,15 @@ class PettyCashType(models.Model):
         string="Kind",
         required=True,
         default="cash_advance",
-        help="Behavioural family. Drives default labelling and voucher titles "
-        "only — the accounting comes from the fields below.",
+        help="Behavioural family.\n"
+        "• Petty Cash Awal — grants the store's revolving float, capped by the "
+        "float's plafon; disbursed from the bank.\n"
+        "• Realisasi — a spend against that float. Reserved from draft onwards "
+        "and refused once the store's available balance runs out.\n"
+        "• Claim — a spend the float cannot cover; bypasses the float check and "
+        "is paid directly by Finance.\n"
+        "• Cash Advance / Petty Cash / Other — the pre-0.6.0 families, "
+        "unaffected by the float control.",
     )
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)

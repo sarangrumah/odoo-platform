@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-15T23:53:03+00:00",
+  "generated_at": "2026-09-16T00:26:55+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "efcf2c75",
-    "branch": "t00-177"
+    "commit": "f4853a77",
+    "branch": "t00-194"
   },
   "buckets": [
     {
@@ -1756,8 +1756,13 @@
       "depends": 5,
       "public": true,
       "last_change": "2026-09-16",
-      "change_count": 56,
+      "change_count": 57,
       "changes": [
+        {
+          "sha": "f4853a77",
+          "date": "2026-09-16",
+          "subject": "feat(reports): record the VAT ledger and the GL Open Items netting that production already runs (#177)"
+        },
         {
           "sha": "efcf2c75",
           "date": "2026-09-16",
@@ -1792,11 +1797,6 @@
           "sha": "c854c713",
           "date": "2026-08-11",
           "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
-        },
-        {
-          "sha": "53afaa51",
-          "date": "2026-08-05",
-          "subject": "fix(reports): pin the XStore menu so an upgrade cannot un-archive it"
         }
       ]
     },
@@ -3910,7 +3910,7 @@
       "module": "custom_petty_cash",
       "bucket": "ee_gap",
       "name": "Custom Cash Advance & Petty Cash",
-      "version": "19.0.0.5.0",
+      "version": "19.0.0.6.2",
       "summary": "Employee cash advances / petty cash: typed request, Finance approval, Bank-Out disbursement, realization (third-party vendor bill or plain expense), return/top-up settlement, advance ceilings, and Kartu Uang Muka / outstanding / aging monitoring — multi-currency throughout.",
       "category": "Accounting/Accounting",
       "depends": 9,

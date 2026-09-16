@@ -11,10 +11,12 @@ Odoo 19 Community.
 
 ## Flow
 
-0. **Type** (`petty.cash.type`) — Cash Advance, Petty Cash, Travel… Each type
-   carries its own advance account, journals, sequence and ceilings, per company.
+0. **Type** (`petty.cash.type`) — Petty Cash Awal, Realisasi, Claim, Cash
+   Advance, Petty Cash, Travel… Each type carries its own advance account,
+   journals, sequence and ceilings, per company. The first three drive the
+   store float described below.
 1. **Request** (`petty.cash.request`) — an employee asks for cash for an
-   Operating Unit, optionally with an estimate breakdown.
+   Operating Unit, optionally itemised into detail lines.
 2. **Approval** — routed through `custom_approval_engine`'s matrix; when no
    matrix matches, a Finance user approves directly.
 3. **Disbursement (Bank Out)** — Finance disburses the approved amount:
@@ -35,6 +37,47 @@ Odoo 19 Community.
    ledger and an **Aging** report.
 7. **Vouchers** — printable Bukti Pencairan, Bukti Pertanggungjawaban and
    Bukti Penyelesaian with signature blocks.
+
+## Store petty cash float
+
+Retail tenants run the module the other way round: instead of one advance per
+employee, each **store (Operating Unit)** holds a revolving float.
+
+| Type kind | Role | Bank-Out | Gated on |
+|---|---|---|---|
+| **Petty Cash Awal** (`pc_initial`) | grants the store's float | yes | the store's plafon (1.000.000 by default, set by Finance) |
+| **Realisasi** (`pc_realization`) | one spend out of the float | no — the cash is already in the drawer | the store's available balance |
+| **Claim** (`pc_claim`) | a spend the float cannot cover | yes | nothing — this is the escape hatch |
+
+A Realisasi reserves its full amount **from draft**, so a store cannot queue
+several drafts that each look affordable on their own. Once Finance approves it,
+the employee records the realization against that same request; every rupiah
+realized frees a rupiah of the reservation ("saldo pulih sesuai nilai yang
+direalisasikan"). Whatever was never realized is handed back by **Close &
+Release**, which books nothing — that cash never left the store.
+
+`Invoicing → Cash Advance → Finance Review → Store Floats` shows plafon, granted, reserved
+and available per store, next to the advance-account GL balance. The two differ
+between a realization and its replenishment, by design.
+
+The plafon lives in `Accounting → Settings → Petty Cash → Initial Petty Cash per
+Store` and can be overridden store by store on the float itself.
+
+## Finance review & dashboard
+
+`Invoicing → Cash Advance → Finance Review`
+
+* **Review Queue** — everything awaiting approval, with inline Approve / Send
+  Back, and a batch wizard (Approve / Send back / Refuse) whose reason is posted
+  to each request's chatter.
+* **Store Floats** — outstanding per Operating Unit; exhausted stores in red.
+* **Outstanding per Operating Unit** — pivot of requested / realized / reserved /
+  outstanding, pre-grouped by store and status.
+
+`Invoicing → Cash Advance → Dashboard` is the same data over **list, kanban, pivot and
+graph**, with filters per type kind, overdue, reserving-float and this month,
+and group-by store / employee / type / status / month. Export uses Odoo's
+native list export (XLSX / CSV).
 
 ## Multi-currency
 
