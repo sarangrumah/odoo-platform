@@ -7,7 +7,9 @@
             <form string="Asset Register">
                 <group>
                     <group>
-                        <field name="year"/>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="basis"/>
                         <field name="asset_states"/>
                     </group>
                     <group>

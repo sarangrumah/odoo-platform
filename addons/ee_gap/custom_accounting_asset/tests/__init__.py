@@ -3,3 +3,4 @@ from . import test_asset
 from . import test_quantity_asset
 from . import test_group_defaults
 from . import test_asset_analytic
+from . import test_asset_register

@@ -30,10 +30,12 @@
                                     <th>No</th>
                                     <th>Code</th>
                                     <th>Asset Name</th>
+                                    <th>Location</th>
+                                    <th>Operating Unit</th>
                                     <th>Acq. Date</th>
                                     <th class="num">Acquisition Value</th>
                                     <th class="num">Accum. Opening</th>
-                                    <th class="num">YTD</th>
+                                    <th class="num">Period</th>
                                     <th class="num">Accum. End</th>
                                     <th class="num">Book Value</th>
                                 </tr>
@@ -44,6 +46,8 @@
                                     <td t-esc="line.get('no')"/>
                                     <td t-esc="line.get('code')"/>
                                     <td t-esc="line.get('name')"/>
+                                    <td t-esc="line.get('location')"/>
+                                    <td t-esc="line.get('analytic')"/>
                                     <td t-esc="line.get('acq_date')"/>
                                     <td class="num">
                                         <span t-esc="line.get('acq_value')"
