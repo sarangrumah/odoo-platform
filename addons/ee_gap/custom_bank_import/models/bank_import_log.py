@@ -20,6 +20,13 @@ class BankImportLog(models.Model):
     file_hash = fields.Char(index=True, help="sha256 of raw bytes, for dedup.")
     line_count = fields.Integer(default=0)
     error_count = fields.Integer(default=0)
+    duplicate_count = fields.Integer(
+        default=0,
+        string="Already Present",
+        help="Transactions in the file that this journal already held, and were "
+        "therefore not created again. A non-zero count here is normal when bank "
+        "exports overlap; it is only a problem if it is unexpectedly large.",
+    )
     imported_at = fields.Datetime(default=fields.Datetime.now)
     imported_by_id = fields.Many2one("res.users", default=lambda s: s.env.user, readonly=True)
     state = fields.Selection(

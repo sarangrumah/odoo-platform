@@ -63,19 +63,50 @@ Both pipelines write to `account.bank.statement` / `account.bank.statement.line`
 - **Cross-vertical:** generic — every Indonesian tenant needs bank import.
 - **Downstream:** `custom_accounting_full.custom.reconcile.rule._cron_auto_reconcile` consumes the produced `account.bank.statement.line` rows.
 
+## Per-transaction duplicate guard (19.0.0.5.0)
+
+The file hash catches a byte-identical re-upload and **nothing else**, which is not
+the shape this goes wrong in. Four IBCA exports of August 2026 each started at the
+1st and ran to a later day: every one was a different file re-carrying every earlier
+transaction, every hash passed, and 1.943 duplicate statement lines were posted —
+3.145 rows where 1.202 were real, bank GL out by 940.983.
+
+`custom.bank.import.dedup` (AbstractModel) holds the real guard and **both** intake
+paths inherit it — the CSV wizard and `custom.bank.h2h.connection`. The H2H path is
+the one that repeats unattended: `_sync_one` asks for a window that deliberately
+overlaps the last, so without the guard a cron reproduces the CSV disaster nightly.
+
+- `_dedup_key(date, payment_ref, amount)` — matches
+  `levis.pos.clearing._duplicate_groups` on purpose, so the importer and the
+  clearing's readiness gate cannot disagree about what a duplicate is. **The date is
+  normalised through `fields.Date.to_date`**: H2H sends `"2026-05-01"`, a parsed CSV
+  row sends a `date`, and comparing them raw makes every key unique and the guard
+  silently useless — which is exactly how it first failed in testing.
+- `_split_already_imported(keyed_rows)` — a **count difference**, not "key exists →
+  skip": two genuine sales can be identical (same store, price, day, memo), and
+  dropping the second loses real money as surely as importing it twice invents it.
+  `create = max(0, times in feed − times in database)`.
+- `custom.bank.import.log.duplicate_count` records what was left out. A wholly
+  repeated feed creates **no statement at all** — an empty statement reads as a
+  delivery that happened.
+
+Scope limit worth knowing: the search is bounded to the journal and the feed's own
+date span. A file says nothing about days it does not cover.
+
 ## Gotchas
 - **Mandiri/BNI/BRI/CIMB/Permata/Danamon adapters are placeholders** — they're aliases of `GenericBankH2HAdapter` with distinct `adapter_type` names (so breakers track separately) but use the same canonical-form signing path. Per-bank production wiring is deferred.
 - **BCA adapter notes `_sign_request` is an inherit point** — production code must override for the strict `METHOD:Path:AccessToken:LowerCase(SHA256(Body)):Timestamp` canonical form; the framework's HMAC signer covers only the simpler `ts || body` shape.
 - **File-hash dedup blocks re-import even for legitimately edited files** — the only way to re-import is to archive the prior log first.
 - **Zero-amount lines silently dropped** — `if amount == Decimal("0"): continue` — fee-only or memo entries are lost.
 - **CSV parser does NOT support XLSX despite manifest claim** — only `csv.reader`. XLSX paths would need `openpyxl` integration.
-- **H2H `_persist_lines` creates a NEW `account.bank.statement` PER SYNC** (`name = "H2H <bank> <date>"`) — multiple syncs same day produce multiple statements; consolidation is the operator's problem.
+- **H2H `_persist_lines` creates a NEW `account.bank.statement` per sync that brings something new** (`name = "H2H <bank> <date>"`) — multiple syncs the same day produce multiple statements and consolidation is the operator's problem. A sync whose window was entirely seen before creates none at all, only a log row carrying `duplicate_count`.
 - **`_h2h_pseudo_template` creates a per-bank shadow template** to satisfy the log's required `template_id` — these show up in the template list as "H2H Pseudo — BCA" etc.
 - **`status='error'` is sticky** — `_do_sync` only flips back to `active` on successful sync; a paused/error connection requires manual `action_sync_now` or UI reset to retry (the cron skips non-active connections via `[("status", "=", "active")]`).
 - **`adapter.inquiry_statement` date range** uses `last_sync_at.date()` or last 24h — if cron stops for a week, only the last 24h are pulled on resume; older days are lost unless the operator manually back-fills.
 - **`_parse_date` returns False on parse failure**; the row is then added to `errors` and skipped — no partial parsing of malformed dates.
 - **File container is sniffed by magic bytes, not extension** — `_read_rows` routes OLE2 (`D0 CF 11 E0…`) to xlrd, zip (`PK`) to openpyxl (first sheet, `data_only`), anything else to the CSV reader. `.xls`/`.xlsx` uploads therefore work through the same wizard; `_parse_date` accepts native `datetime`/`date` cells.
 - **Three more bank layouts are auto-detected** (like BCA-corp, independent of template config): BRI "BRISIM" XLSX (`Tanggal|Uraian|Teller|Debet|Kredit|Saldo` header — the export is column-shifted: only Tanggal+Uraian are trustworthy, the debet/kredit/saldo triple is regex-extracted from inside the Uraian text, and a single Uraian can embed a second timestamped transaction e.g. "DEBET BY CEK"; NB the export itself omits rows — its running-saldo chain has gaps — so totals may not tie to the real mutasi), BNI "TRANSACTION INQUIRY" XLS (header row located by labels `Post Date`/`Db/Cr`/`Amount`; native datetime cells; sign from Db/Cr C/D), and Mandiri "Acc_Statement" XLS (labels `Posting Date`/`Remark`/`Debit`/`Credit`; all string cells, `dd/mm/YYYY HH:MM:SS` dates, US-separator amounts; `No of Debit` summary block terminates parsing).
+- **BRI ships two different exports, and only one of them is BRISIM** (19.0.0.6.0). The second, "MUTASI BRI", is an honest grid: `Tanggal` is a real date cell, `Debet`/`Kredit`/`Saldo` are numbers in their own columns, and only the AMT/MDR pair stays inside the Uraian text. Its header spells the labels out (`Tanggal|Uraian Transaksi|Teller ID|Debet|Kredit|Saldo`), so the BRISIM exact-match detector never fired: the file fell through to the generic column model, where the BRISIM template carries no column indexes, every row computed to a zero amount and was silently skipped. The user saw `No transaction lines parsed. 0 parse errors.` — a dead end with nothing to read. `_is_bri_mutasi` prefix-matches that header and must stay **after** `_is_brisim` in `parse_csv`, because the BRISIM header is a prefix of this one. Amount cells are read US-separator-style whether they arrive as numbers or as padded text (`" 2,383,786 "`), since a file re-saved through a spreadsheet flips between the two.
 - **Accounting date = bank transaction date, even in soft-locked periods** — core `_post()` silently shifts a statement-line move dated on/before `fiscalyear_lock_date` to today; the wizard writes the parsed transaction date back afterwards with `bypass_lock_check=BYPASS_LOCK_CHECK` (grouped per date). Dates on/before `hard_lock_date` refuse the whole import up front with a UserError.
 - **BCA corporate ("KlikBCA Bisnis" / CorpAcctTrxn) CSV is auto-detected** — `parse_csv` sniffs the signature (`Informasi Rekening` preamble or the `Tanggal Transaksi,Keterangan,Cabang,Jumlah,Saldo` header) and routes to `_parse_bca_corp`, ignoring the template's column-index/date-format config. That layout can't use the generic model: dates are `DD/MM` with the year only in the `Periode :` preamble, and amount+sign are fused in one `Jumlah` cell (`30,000.00 DB` / `10,930,941.82 CR`; CR→+ inflow, DB→− outflow). `Saldo Awal/Mutasi/Saldo Akhir` footer rows terminate parsing. So a mis-mapped "BCA CSV" template (e.g. `%d/%m/%Y` on yearless dates, no amount column) still parses correctly.
 - **`(amount)` parentheses-style negatives** are recognised; trailing `-` (e.g. `1234.56-`) is NOT.
