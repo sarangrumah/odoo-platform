@@ -152,11 +152,13 @@ class CustomReportArAgingExport(models.AbstractModel):
             so_no = move.invoice_origin or ""
         return po_no, so_no, do_no, receive_date
 
-    def _payment_date(self, line):
-        """Latest date on which something was matched against this line."""
+    def _payment_date(self, line, as_of=None):
+        """Latest date on which something was matched against this line, on or
+        before ``as_of`` — a match made after the cut-off did not exist yet in
+        the period being reported."""
         dates = []
         for partial in line.matched_credit_ids | line.matched_debit_ids:
-            if partial.max_date:
+            if partial.max_date and (not as_of or partial.max_date <= as_of):
                 dates.append(partial.max_date)
         return max(dates) if dates else False
 
@@ -180,8 +182,10 @@ class CustomReportArAgingExport(models.AbstractModel):
     def _build_lines(self, filters):
         as_of = filters["date_to"]
         rows = []
-        for line in self._open_lines(filters):
-            residual = line.amount_residual
+        lines = self._open_lines(filters)
+        matched = self._matched_as_of(lines, as_of)
+        for line in lines:
+            residual = self._residual_as_of(line, matched)
             if not residual:
                 continue
             move = line.move_id
@@ -189,7 +193,7 @@ class CustomReportArAgingExport(models.AbstractModel):
             doc_date = move.invoice_date or line.date
             po_no, so_no, do_no, receive_date = self._commercial_refs(move)
             dpp, ppn, full = self._tax_split(move, line.balance)
-            payment_date = self._payment_date(line)
+            payment_date = self._payment_date(line, as_of)
             row = {
                 "partner_name": line.partner_id.display_name or "No Partner",
                 "doc_no": move.name or "",

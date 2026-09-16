@@ -60,6 +60,12 @@
               action="action_aged_payable_wizard"
               sequence="70"/>
 
+    <menuitem id="menu_custom_reports_ap_aging_export"
+              name="AP Aging Export"
+              parent="menu_custom_reports_root"
+              action="action_ap_aging_export_wizard"
+              sequence="75"/>
+
     <menuitem id="menu_custom_reports_partner_ledger"
               name="Partner Ledger"
               parent="menu_custom_reports_root"

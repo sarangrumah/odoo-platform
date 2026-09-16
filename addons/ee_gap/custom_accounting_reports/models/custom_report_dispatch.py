@@ -30,6 +30,7 @@ REPORT_MODEL_MAP = {
     "aged_receivable": "custom.report.aged.receivable",
     "aged_payable": "custom.report.aged.payable",
     "ar_aging_export": "custom.report.ar.aging.export",
+    "ap_aging_export": "custom.report.ap.aging.export",
     "partner_ledger": "custom.report.partner.ledger",
     "payable_card": "custom.report.payable.card",
     "receivable_card": "custom.report.receivable.card",

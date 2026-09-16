@@ -12,16 +12,28 @@
                     <group>
                         <field name="company_ids" widget="many2many_tags"/>
                         <field name="partner_ids" widget="many2many_tags"/>
-                        <field name="detail_mode"/>
+                        <field name="detail_mode" invisible="context.get('ap_aging_export')"/>
                     </group>
                 </group>
                 <footer>
                     <button string="View" name="action_view"
-                            type="object" class="btn-primary"/>
+                            type="object" class="btn-primary"
+                            invisible="context.get('ap_aging_export')"/>
                     <button string="Print PDF" name="action_print"
-                            type="object" class="btn-secondary"/>
+                            type="object" class="btn-secondary"
+                            invisible="context.get('ap_aging_export')"/>
                     <button string="Export Excel" name="action_export_xlsx"
-                            type="object" class="btn-secondary"/>
+                            type="object" class="btn-secondary"
+                            invisible="context.get('ap_aging_export')"/>
+                    <button string="View" name="action_view_ap_aging"
+                            type="object" class="btn-primary"
+                            invisible="not context.get('ap_aging_export')"/>
+                    <button string="Print PDF" name="action_print_ap_aging"
+                            type="object" class="btn-secondary"
+                            invisible="not context.get('ap_aging_export')"/>
+                    <button string="Export Excel" name="action_export_ap_aging_xlsx"
+                            type="object" class="btn-secondary"
+                            invisible="not context.get('ap_aging_export')"/>
                     <button string="Cancel" class="btn-secondary"
                             special="cancel"/>
                 </footer>
@@ -34,5 +46,12 @@
         <field name="res_model">custom.report.aged.payable.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
+    </record>
+    <record id="action_ap_aging_export_wizard" model="ir.actions.act_window">
+        <field name="name">AP Aging Export</field>
+        <field name="res_model">custom.report.aged.payable.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'ap_aging_export': 1}</field>
     </record>
 </odoo>

@@ -2175,3 +2175,180 @@ class TestCustomReports(TransactionCase):
         rows = [ln for ln in focused if not ln.get("type")]
         self.assertEqual([r["reference"] for r in rows], ["BILL-A2"])
         self.assertAlmostEqual(focused[-1]["outstanding"], 100.0, places=2)
+
+    def test_aged_payable_residual_is_as_of_the_cut_off(self):
+        """A bill open on the cut-off must stay in that period's aging even
+        after it is paid — otherwise the same report shrinks every time it is
+        re-run and never ties back to the trial balance.
+
+        Regression for ``prd_levis_begbal``: the report filtered on the live
+        ``reconciled`` flag and read the live ``amount_residual``, so July's
+        aging silently lost every bill settled in August (Rp 2,41 M).
+        """
+        bill_date = date(2026, 6, 15)
+        pay_date = date(2026, 7, 10)
+        june_end = date(2026, 6, 30)
+
+        bill = self._post_move(
+            [(self.acc_expense, 1000.0, 0.0), (self.acc_pay, 0.0, 1000.0)],
+            dt=bill_date,
+            partner=self.partner_b,
+            ref="BILL-JUNE",
+        )
+        payment = self._post_move(
+            [(self.acc_pay, 1000.0, 0.0), (self.acc_cash, 0.0, 1000.0)],
+            dt=pay_date,
+            partner=self.partner_b,
+            ref="PAY-JULY",
+        )
+        pay_lines = (bill.line_ids | payment.line_ids).filtered(lambda l: l.account_id == self.acc_pay)
+        pay_lines.reconcile()
+        self.assertTrue(all(pay_lines.mapped("reconciled")), "fixture must be fully matched")
+
+        report = self.env["custom.report.aged.payable"]
+
+        as_of_june = report._build_summary_lines(self._filters(date_to=june_end))
+        self.assertAlmostEqual(
+            as_of_june["grand_total"]["total"],
+            -1000.0,
+            places=2,
+            msg="bill was still open on 30 June — paying it in July must not erase it",
+        )
+
+        as_of_july = report._build_summary_lines(self._filters(date_to=date(2026, 7, 31)))
+        self.assertAlmostEqual(
+            as_of_july["grand_total"]["total"],
+            0.0,
+            places=2,
+            msg="by 31 July both legs are matched, so nothing is left open",
+        )
+
+    def test_ap_aging_export(self):
+        """The payable twin of the AR worklist: same fifteen buckets, read off
+        the payable account, with vendor wording on the columns."""
+        today = date.today()
+        vendor = self.Partner.create({"name": "ApAgingVendor"})
+        for label, due, amount in (
+            ("od5", today - timedelta(days=5), 500.0),
+            ("notdue", today + timedelta(days=10), 300.0),
+        ):
+            self.Move.create(
+                {
+                    "journal_id": self.j_misc.id,
+                    "date": today - timedelta(days=5),
+                    "company_id": self.company.id,
+                    "partner_id": vendor.id,
+                    "line_ids": [
+                        Command.create(
+                            {
+                                "account_id": self.acc_pay.id,
+                                "name": label,
+                                "debit": 0.0,
+                                "credit": amount,
+                                "partner_id": vendor.id,
+                                "date_maturity": due,
+                            }
+                        ),
+                        Command.create(
+                            {
+                                "account_id": self.acc_expense.id,
+                                "name": label,
+                                "debit": amount,
+                                "credit": 0.0,
+                                "partner_id": vendor.id,
+                            }
+                        ),
+                    ],
+                }
+            ).action_post()
+
+        report = self.env["custom.report.ap.aging.export"]
+        rows = [r for r in report._build_lines(self._filters()) if r.get("partner_name") == "ApAgingVendor"]
+        self.assertEqual(len(rows), 2, "One row per open payable line.")
+
+        by_bucket = {}
+        for row in rows:
+            bucket = next(code for code in ("od_5", "od_le_0") if row[code])
+            by_bucket[bucket] = row
+        self.assertEqual(set(by_bucket), {"od_5", "od_le_0"})
+        # A credit balance is negative, and the worklist reports what is owed.
+        self.assertAlmostEqual(abs(by_bucket["od_5"]["od_5"]), 500.0, places=2)
+
+        headers = [c["header"] for c in report._xlsx_columns()]
+        for wanted in ("Vendor Name", "No Bill", "No. PO", "Vendor Ref", "No. GR"):
+            self.assertIn(wanted, headers, "AP wording must replace the AR wording")
+        self.assertNotIn("Customer Name", headers)
+
+    def test_ap_aging_export_is_dispatchable(self):
+        """The report must be reachable by code, or the menu prints whatever
+        the dispatch map falls back to."""
+        from odoo.addons.custom_accounting_reports.models.custom_report_dispatch import (
+            REPORT_MODEL_MAP,
+        )
+
+        self.assertEqual(REPORT_MODEL_MAP.get("ap_aging_export"), "custom.report.ap.aging.export")
+        self.assertEqual(self.env["custom.report.ap.aging.export"]._report_code, "ap_aging_export")
+
+    def test_aged_as_of_ignores_a_draft_counterpart(self):
+        """A match against a payment that is no longer posted must not retire
+        the bill.
+
+        Odoo 19 keeps the reconciliation when a move is reset to draft, so the
+        partial outlives the posting. Honouring it would net the bill against
+        money the ledger no longer carries, and the aging would sit below the
+        trial balance by exactly those drafts.
+        """
+        bill = self._post_move(
+            [(self.acc_expense, 700.0, 0.0), (self.acc_pay, 0.0, 700.0)],
+            dt=date(2026, 6, 15),
+            partner=self.partner_b,
+            ref="BILL-DRAFTCP",
+        )
+        payment = self._post_move(
+            [(self.acc_pay, 700.0, 0.0), (self.acc_cash, 0.0, 700.0)],
+            dt=date(2026, 6, 20),
+            partner=self.partner_b,
+            ref="PAY-DRAFTCP",
+        )
+        legs = (bill.line_ids | payment.line_ids).filtered(lambda l: l.account_id == self.acc_pay)
+        legs.reconcile()
+
+        report = self.env["custom.report.aged.payable"]
+        filters = self._filters(date_to=date(2026, 6, 30))
+        settled = report._build_summary_lines(filters)["grand_total"]["total"]
+
+        payment.button_draft()
+        self.assertEqual(payment.state, "draft")
+        reopened = report._build_summary_lines(filters)["grand_total"]["total"]
+
+        self.assertAlmostEqual(settled, 0.0, places=2, msg="both legs posted and matched")
+        self.assertAlmostEqual(
+            reopened,
+            -700.0,
+            places=2,
+            msg="the payment is draft again, so the bill is open again",
+        )
+
+    def test_aged_payable_unmatched_payment_stays_open(self):
+        """An unreconciled payment on the payable account is a real open item
+        and must keep showing — it is what makes bill and payment appear as two
+        rows that never net to zero. The fix for that is reconciling the data,
+        not hiding the row."""
+        bill = self._post_move(
+            [(self.acc_expense, 500.0, 0.0), (self.acc_pay, 0.0, 500.0)],
+            dt=date(2026, 6, 15),
+            partner=self.partner_a,
+            ref="BILL-OPEN",
+        )
+        self._post_move(
+            [(self.acc_pay, 500.0, 0.0), (self.acc_cash, 0.0, 500.0)],
+            dt=date(2026, 6, 20),
+            partner=self.partner_a,
+            ref="PAY-UNMATCHED",
+        )
+        lines = self.env["custom.report.aged.payable"]._build_detail_lines(self._filters(date_to=date(2026, 6, 30)))
+        group = next(g for g in lines["partners"] if g["partner_name"] == self.partner_a.name)
+        refs = {r["reference"] for r in group["rows"]}
+        self.assertEqual(refs, {"BILL-OPEN", "PAY-UNMATCHED"})
+        self.assertAlmostEqual(group["subtotal"]["total"], 0.0, places=2)
+        self.assertTrue(bill.line_ids)

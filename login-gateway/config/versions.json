@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-16T00:36:19+00:00",
+  "generated_at": "2026-09-16T00:48:58+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "266c3825",
-    "branch": "t00-193"
+    "commit": "d58d9f4e",
+    "branch": "feat/aged-as-of-and-ap-aging-export"
   },
   "buckets": [
     {
@@ -379,9 +379,14 @@
       "category": "Tenants/Levis",
       "depends": 10,
       "public": false,
-      "last_change": "2026-09-04",
-      "change_count": 53,
+      "last_change": "2026-09-16",
+      "change_count": 54,
       "changes": [
+        {
+          "sha": "58ac20f9",
+          "date": "2026-09-16",
+          "subject": "feat(levis): record ten releases of localization that production already runs (#193)"
+        },
         {
           "sha": "17200d43",
           "date": "2026-09-04",
@@ -416,11 +421,6 @@
           "sha": "5021153b",
           "date": "2026-08-13",
           "subject": "feat(levis): read NFC settlements off the BCA narrative (#168)"
-        },
-        {
-          "sha": "d45b75b6",
-          "date": "2026-08-12",
-          "subject": "feat(levis): clear the POS receivable on the statement line, not beside it (#167)"
         }
       ]
     },
@@ -1750,14 +1750,24 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.27.0",
+      "version": "19.0.0.28.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
       "last_change": "2026-09-16",
-      "change_count": 57,
+      "change_count": 59,
       "changes": [
+        {
+          "sha": "d58d9f4e",
+          "date": "2026-09-16",
+          "subject": "feat(reports): AP Aging Export, and only count a match whose counterpart is posted"
+        },
+        {
+          "sha": "0aeb569d",
+          "date": "2026-08-07",
+          "subject": "fix(reports): age payable/receivable at the cut-off date, not today"
+        },
         {
           "sha": "f4853a77",
           "date": "2026-09-16",
@@ -1787,16 +1797,6 @@
           "sha": "3e7fdd6f",
           "date": "2026-08-20",
           "subject": "feat(reports): rekap PPN Keluaran Digunggung untuk PKP Pedagang Eceran (#190)"
-        },
-        {
-          "sha": "49c8f74f",
-          "date": "2026-08-19",
-          "subject": "feat(reports): split the Purchase Register into Trade and Non-Trade (#183)"
-        },
-        {
-          "sha": "c854c713",
-          "date": "2026-08-11",
-          "subject": "feat(security): roles, Operating Units, and the data isolation built on them (#157)"
         }
       ]
     },

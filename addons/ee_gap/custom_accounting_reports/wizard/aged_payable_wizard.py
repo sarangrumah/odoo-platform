@@ -71,3 +71,50 @@ class AgedPayableWizard(models.TransientModel):
             aging_detail=self.detail_mode == "detail",
         )
         return report._xlsx_action(options, filename)
+
+    # ------------------------------------------------------------------
+    # AP Aging Export
+    # ------------------------------------------------------------------
+    # The payable twin of ``action_*_ar_aging`` on the receivable wizard, and
+    # reusing this wizard for the same reason: a new TransientModel would force
+    # a schema change on all thirteen databases that carry this addon. The menu
+    # points here with ``ap_aging_export`` in the context, which swaps the
+    # footer buttons and hides ``detail_mode`` (the export is always per
+    # document).
+    _AP_AGING_CODE = "ap_aging_export"
+
+    def _ap_aging_options(self):
+        return {
+            **self._build_filters(),
+            "date_from": date(1970, 1, 1).isoformat(),
+            "date_to": self.date_to.isoformat(),
+        }
+
+    def action_view_ap_aging(self):
+        self.ensure_one()
+        title = self.env["custom.report.ap.aging.export"]._report_title
+        return {
+            "type": "ir.actions.client",
+            "tag": "custom_report_table",
+            "name": title,
+            "params": {
+                "report_code": self._AP_AGING_CODE,
+                "options": self._ap_aging_options(),
+                "context_extra": {},
+                "title": title,
+            },
+        }
+
+    def action_print_ap_aging(self):
+        self.ensure_one()
+        data = {
+            "report_code": self._AP_AGING_CODE,
+            "doc_model": self._name,
+            "options": self._ap_aging_options(),
+        }
+        return self.env.ref("custom_accounting_reports.action_report_custom_financial").report_action(self, data=data)
+
+    def action_export_ap_aging_xlsx(self):
+        self.ensure_one()
+        filename = "AP_Aging_Export_%s.xlsx" % self.date_to
+        return self.env["custom.report.ap.aging.export"]._xlsx_action(self._ap_aging_options(), filename)

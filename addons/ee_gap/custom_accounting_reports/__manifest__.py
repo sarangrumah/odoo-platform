@@ -26,7 +26,7 @@ render to QWeb PDF or HTML. PSAK-aligned default tree shipped under
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Accounting",
-    "version": "19.0.0.27.0",
+    "version": "19.0.0.28.0",
     "license": "LGPL-3",
     "depends": [
         "custom_core",
@@ -79,6 +79,7 @@ render to QWeb PDF or HTML. PSAK-aligned default tree shipped under
         "reports/aged_receivable_template.xml",
         "reports/aged_payable_template.xml",
         "reports/ar_aging_export_template.xml",
+        "reports/ap_aging_export_template.xml",
         "reports/partner_ledger_template.xml",
         "reports/partner_card_template.xml",
         "reports/advance_template.xml",
