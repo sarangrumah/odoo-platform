@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-16T01:36:12+00:00",
+  "generated_at": "2026-09-16T04:29:53+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "1b4f3498",
-    "branch": "feat/asset-operating-unit-analytic"
+    "commit": "18e48a40",
+    "branch": "feat/asset-register-columns-daterange"
   },
   "buckets": [
     {
@@ -296,9 +296,9 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "1b4f3498",
+          "sha": "18e48a40",
           "date": "2026-09-16",
-          "subject": "feat(assets): carry the Operating Unit from the asset onto every entry it writes"
+          "subject": "feat(assets): carry the Operating Unit from the asset onto every entry it writes (#244)"
         },
         {
           "sha": "62b4b5db",
@@ -1593,7 +1593,7 @@
       "module": "custom_accounting_asset",
       "bucket": "ee_gap",
       "name": "Custom Accounting - Fixed Assets",
-      "version": "19.0.0.9.0",
+      "version": "19.0.0.10.0",
       "summary": "Fixed asset register with depreciation schedule, monthly posting cron, and disposal workflow",
       "category": "Accounting/Accounting",
       "depends": 5,
@@ -1602,9 +1602,9 @@
       "change_count": 27,
       "changes": [
         {
-          "sha": "1b4f3498",
+          "sha": "18e48a40",
           "date": "2026-09-16",
-          "subject": "feat(assets): carry the Operating Unit from the asset onto every entry it writes"
+          "subject": "feat(assets): carry the Operating Unit from the asset onto every entry it writes (#244)"
         },
         {
           "sha": "1f5ed466",

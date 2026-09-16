@@ -229,6 +229,11 @@ class TestCustomFixedAsset(TransactionCase):
     def test_06_asset_register_report(self):
         # 12000 over 12 months from 2025-01-01 -> 1000/month, first line
         # 2025-02-01. So 11 monthly lines (Feb..Dec) fall in 2025.
+        #
+        # Nothing here is posted, so this exercises the ``schedule`` basis. The
+        # register's DEFAULT is ``posted`` -- see the assertion at the end, and
+        # ``test_asset_register.py`` for why: an opname is reconciled against
+        # the ledger, not against a plan.
         asset = self._make_asset()
         asset.action_confirm()
 
@@ -238,6 +243,7 @@ class TestCustomFixedAsset(TransactionCase):
             "date_to": date(2025, 12, 31),
             "company_ids": [self.company.id],
             "year": 2025,
+            "basis": "schedule",
         }
         lines = rep._build_lines(filters)
         row = next(l for l in lines if l.get("code") == asset.code)
@@ -252,6 +258,13 @@ class TestCustomFixedAsset(TransactionCase):
 
         grand = next(l for l in lines if l.get("type") == "grand_total")
         self.assertAlmostEqual(grand["ytd"], 11000.0, places=2)
+
+        # Same asset, default basis: the ledger carries nothing yet, so the
+        # register says nothing has depreciated and the book value is intact.
+        posted_rows = rep._build_lines({k: v for k, v in filters.items() if k != "basis"})
+        posted_row = next(l for l in posted_rows if l.get("code") == asset.code)
+        self.assertAlmostEqual(posted_row["ytd"], 0.0, places=2)
+        self.assertAlmostEqual(posted_row["book"], 12000.0, places=2)
 
     def test_07_posting_date_modes(self):
         # posting_date defaults to acquisition_date; next_month keeps behavior.
