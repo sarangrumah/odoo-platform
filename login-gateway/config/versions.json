@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-17T02:05:09+00:00",
+  "generated_at": "2026-09-17T08:35:28+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "a9875fef",
-    "branch": "feat/fk-keluaran-coretax-and-retur-pajakku"
+    "commit": "f030ccb0",
+    "branch": "feat/pph-journal-column-and-equalisasi-source"
   },
   "buckets": [
     {
@@ -1755,14 +1755,19 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.28.0",
+      "version": "19.0.0.29.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
-      "last_change": "2026-09-16",
-      "change_count": 58,
+      "last_change": "2026-09-17",
+      "change_count": 59,
       "changes": [
+        {
+          "sha": "f030ccb0",
+          "date": "2026-09-17",
+          "subject": "fix(reports): say when there is no separate PPh entry, and let one domain decide what is an objek PPh"
+        },
         {
           "sha": "6d3f17c6",
           "date": "2026-09-16",
@@ -1797,11 +1802,6 @@
           "sha": "3e7fdd6f",
           "date": "2026-08-20",
           "subject": "feat(reports): rekap PPN Keluaran Digunggung untuk PKP Pedagang Eceran (#190)"
-        },
-        {
-          "sha": "49c8f74f",
-          "date": "2026-08-19",
-          "subject": "feat(reports): split the Purchase Register into Trade and Non-Trade (#183)"
         }
       ]
     },
@@ -2249,9 +2249,14 @@
       "category": "Accounting/Localizations",
       "depends": 3,
       "public": true,
-      "last_change": "2026-09-08",
-      "change_count": 11,
+      "last_change": "2026-09-17",
+      "change_count": 12,
       "changes": [
+        {
+          "sha": "4dfa0c75",
+          "date": "2026-09-17",
+          "subject": "feat(coretax): both export formats, and digunggung as a source for Faktur Keluaran (#249)"
+        },
         {
           "sha": "32873ec7",
           "date": "2026-09-08",
@@ -2286,11 +2291,6 @@
           "sha": "43281e24",
           "date": "2026-08-05",
           "subject": "feat(coretax): export e-Faktur Keluaran (FK/OF) per invoice and per selection (#95)"
-        },
-        {
-          "sha": "f5d8d58b",
-          "date": "2026-08-04",
-          "subject": "style: satisfy pre-commit across the branch"
         }
       ]
     },
