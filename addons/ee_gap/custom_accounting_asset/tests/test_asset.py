@@ -117,6 +117,58 @@ class TestCustomFixedAsset(TransactionCase):
         vals.update(overrides)
         return self.env["custom.fixed.asset"].create(vals)
 
+    def test_00_bulk_confirm_reports_instead_of_aborting(self):
+        """Sheet #78: one unconfirmable asset must not sink the batch."""
+        good_a = self._make_asset(name="Bulk confirm A")
+        good_b = self._make_asset(name="Bulk confirm B")
+        # No journal -> action_confirm raises for this one only.
+        broken = self._make_asset(name="Bulk confirm broken")
+        broken.journal_id = False
+        already = self._make_asset(name="Bulk confirm running")
+        already.action_confirm()
+
+        batch = good_a | good_b | broken | already
+        action = batch.action_confirm_selected()
+
+        self.assertEqual(good_a.state, "running")
+        self.assertEqual(good_b.state, "running")
+        self.assertEqual(broken.state, "draft")
+        message = action["params"]["message"]
+        self.assertIn("2 asset(s) confirmed.", message)
+        self.assertIn("1 skipped (not draft).", message)
+        self.assertIn(broken.code, message)
+
+    def test_00_disposal_journal_falls_back_to_depreciation(self):
+        """Sheet #66: disposals can carry their own journal, and usually do not."""
+        asset = self._make_asset()
+        self.assertFalse(asset.disposal_journal_id)
+        self.assertEqual(asset._disposal_journal(), asset.journal_id)
+
+        disposal_journal = self.env["account.journal"].create(
+            {
+                "name": "Fixed Asset Disposal",
+                "code": "DSPFA",
+                "type": "general",
+                "company_id": self.company.id,
+            }
+        )
+        asset.disposal_journal_id = disposal_journal
+        self.assertEqual(asset._disposal_journal(), disposal_journal)
+
+    def test_00_group_default_disposal_journal_follows_the_group(self):
+        disposal_journal = self.env["account.journal"].create(
+            {
+                "name": "Fixed Asset Disposal",
+                "code": "DSPF2",
+                "type": "general",
+                "company_id": self.company.id,
+            }
+        )
+        self.group.default_disposal_journal_id = disposal_journal
+        asset = self.env["custom.fixed.asset"].new({"group_id": self.group.id})
+        asset._onchange_group_id()
+        self.assertEqual(asset.disposal_journal_id, disposal_journal)
+
     def test_01_create_and_build_schedule(self):
         asset = self._make_asset()
         self.assertEqual(asset.state, "draft")
@@ -256,8 +308,15 @@ class TestCustomFixedAsset(TransactionCase):
         self.assertAlmostEqual(row["m0"], 0.0, places=2)
         self.assertAlmostEqual(row["m1"], 1000.0, places=2)
 
+        # The grand total sums every asset the company owns, so asserting a
+        # bare 11,000 only ever held on an empty database — on a tenant clone
+        # carrying a real register it reports billions and the test fails for
+        # reasons that have nothing to do with the code. Assert what a grand
+        # total actually promises: the sum of the rows above it.
         grand = next(l for l in lines if l.get("type") == "grand_total")
-        self.assertAlmostEqual(grand["ytd"], 11000.0, places=2)
+        data_rows = [l for l in lines if not l.get("type")]
+        self.assertAlmostEqual(grand["ytd"], sum(r["ytd"] for r in data_rows), places=2)
+        self.assertGreaterEqual(grand["ytd"], 11000.0)
 
         # Same asset, default basis: the ledger carries nothing yet, so the
         # register says nothing has depreciated and the book value is intact.

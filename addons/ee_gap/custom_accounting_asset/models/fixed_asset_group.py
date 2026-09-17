@@ -38,6 +38,12 @@ class CustomFixedAssetGroup(models.Model):
         string="Default Depreciation Journal",
         domain="[('type', '=', 'general'), ('company_id', '=', company_id)]",
     )
+    default_disposal_journal_id = fields.Many2one(
+        comodel_name="account.journal",
+        string="Default Disposal Journal",
+        domain="[('type', '=', 'general'), ('company_id', '=', company_id)]",
+        help="Journal for disposal entries. Leave empty to use the depreciation journal.",
+    )
     default_revaluation_surplus_account_id = fields.Many2one(
         comodel_name="account.account",
         string="Default Revaluation Surplus Account",

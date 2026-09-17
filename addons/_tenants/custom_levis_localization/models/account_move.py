@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 from odoo import api, fields, models
+from odoo.exceptions import RedirectWarning, UserError, ValidationError
 
 from .terbilang import terbilang_id
 
@@ -182,6 +183,56 @@ class AccountMove(models.Model):
             if not group.filtered(lambda line: line.debit) or not group.filtered(lambda line: line.credit):
                 continue
             group.reconcile()
+
+    # ------------------------------------------------------------------
+    # Bulk reset to draft (sheet #76)
+    # ------------------------------------------------------------------
+    def action_levis_reset_to_draft_selected(self):
+        """Reset every selected entry to draft, one savepoint each.
+
+        Two things make a bulk reset different from clicking the button 292
+        times, and both are why this is scoped to the Levi's tenant module
+        rather than offered platform-wide:
+
+        * Odoo 19 **keeps the reconciliation** when a move goes back to draft,
+          so a reset entry is still matched against whatever it was matched to.
+        * Re-posting recomputes the tax lines, which overwrites the hand-keyed
+          PPN/PPh amounts this tenant relies on.
+
+        Neither is changed here — the point is only that one entry the period
+        lock refuses must not throw away the reset of the ones before it. Each
+        move gets its own savepoint and the refusals are reported together.
+        """
+        posted = self.filtered(lambda move: move.state == "posted")
+        skipped = len(self) - len(posted)
+        done = 0
+        failures = []
+        for move in posted:
+            try:
+                with self.env.cr.savepoint():
+                    move.button_draft()
+            except (UserError, ValidationError, RedirectWarning) as exc:
+                failures.append("%s: %s" % (move.name, exc.args[0] if exc.args else exc))
+            else:
+                done += 1
+        message = self.env._("%(count)s entr(y/ies) reset to draft.", count=done)
+        if skipped:
+            message += "\n" + self.env._("%(count)s skipped (not posted).", count=skipped)
+        if failures:
+            message += "\n" + self.env._("%(count)s refused:", count=len(failures))
+            message += "\n" + "\n".join(failures[:10])
+            if len(failures) > 10:
+                message += "\n" + self.env._("... and %(count)s more.", count=len(failures) - 10)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "type": "success" if done and not failures else "warning",
+                "title": self.env._("Reset to Draft"),
+                "message": message,
+                "sticky": bool(failures),
+            },
+        }
 
     def _post(self, soft=True):
         posted = super()._post(soft=soft)

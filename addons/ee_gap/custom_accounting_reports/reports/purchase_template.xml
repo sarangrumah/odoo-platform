@@ -9,6 +9,9 @@
             <p t-if="show_gr" class="fw-bold">
                 Periode Berdasarkan: <span t-esc="date_basis_label"/>
             </p>
+            <p t-if="include_unbilled" class="fst-italic">
+                Termasuk barang yang sudah diterima tetapi belum di-bill, dinilai dari harga PO.
+            </p>
             <table class="table table-sm table-bordered">
                 <thead class="table-light">
                     <tr>
@@ -17,8 +20,12 @@
                         <th t-if="show_gr">Tgl Bill</th>
                         <th t-if="not show_gr">Date</th>
                         <th>Bill No</th>
+                        <th t-if="show_bill_status">Status Bill</th>
+                        <th>No. PO</th>
                         <th t-if="show_ptype">Type</th>
                         <th>Vendor</th>
+                        <th>Vendor Ref</th>
+                        <th>Warehouse</th>
                         <th>Item Code</th>
                         <th>Item Name</th>
                         <th class="text-end">Qty</th>
@@ -35,8 +42,12 @@
                         <td t-if="show_gr" t-esc="line.get('bill_date')"/>
                         <td t-if="not show_gr" t-esc="line.get('date')"/>
                         <td t-esc="line.get('invoice_no')"/>
+                        <td t-if="show_bill_status" t-esc="line.get('bill_status')"/>
+                        <td t-esc="line.get('po_no')"/>
                         <td t-if="show_ptype" t-esc="line.get('ptype')"/>
                         <td t-esc="line.get('vendor')"/>
+                        <td t-esc="line.get('vendor_ref')"/>
+                        <td t-esc="line.get('warehouse')"/>
                         <td t-esc="line.get('item_code')"/>
                         <td t-esc="line.get('product')"/>
                         <td class="text-end" t-esc="line.get('quantity')"/>

@@ -126,6 +126,7 @@
                         <group>
                             <field name="expense_account_id"/>
                             <field name="journal_id"/>
+                            <field name="disposal_journal_id"/>
                             <field name="analytic_precision" invisible="1"/>
                             <field name="analytic_distribution" widget="analytic_distribution"
                                    options="{'account_field': 'expense_account_id'}"/>

@@ -35,6 +35,7 @@
                             <field name="default_depreciation_account_id"/>
                             <field name="default_expense_account_id"/>
                             <field name="default_journal_id"/>
+                            <field name="default_disposal_journal_id"/>
                         </group>
                     </group>
                     <group string="Revaluation Defaults (IAS 16)">
