@@ -62,7 +62,42 @@ same facts, same sources, one line at a time.
   The only change made there is that `writeoff_vals` now honours
   `analytic_distribution`.
 
+## Mapping a MID from the reconciliation screen
+
+Sheet row #41. A settlement whose MID the parser read but whose store it could not resolve is
+one mapping away from being solved -- and solving it fixes **every** line carrying that MID,
+past and future. So the work is per-MID, not per-line, and the screen is arranged that way:
+
+- `levis_mid` shows by default in the Bank Reconciliation list (it used to be
+  `optional="hide"`, which is what #41 was reporting).
+- Filter **"MID Known, Store Unmapped"** (`levis_mid_unmapped`) is deliberately *not* the same
+  as the older **"Store Not Identified"** (`levis_unmapped`): this one is the subset whose MID
+  *was* read, so one mapping clears it. A line with no MID at all needs its narrative read by
+  hand -- different work, different queue.
+- Group-by **Bank MID** shows how many lines and how much money one unmapped MID is holding.
+- Button **"Petakan MID ke toko"** on the reconciliation form opens `levis.bank.mid.map`
+  pre-filled with the MID, its match type, the journal and the narrative as a label. The
+  **store is left empty on purpose**: picking it is the judgement being asked for, and
+  pre-selecting a guess is how a wrong mapping gets saved without anyone reading it. The
+  button only appears where it can help -- MID present, store absent.
+- `scripts/tenants/levis/113_report_unmapped_mid.py` produces the same list as a workbook for
+  Finance AR, one row per MID with a sample narrative so the store can be recognised without
+  opening Odoo.
+
+**The backlog this was built for is nearly gone.** When the task was written there were 73
+lines with a MID but no store, worth Rp 368 jt. On 17-Sep-2026 there are **2**, worth
+Rp 5.050.800 -- two credit-card MIDs ("LEVIS BLP SUPER", "LEVIS TRANS STU") that simply are
+not in the mapping table yet. The tooling still earns its place because statements keep
+arriving, but nobody should expect it to surface a pile.
+
 ## Gotchas
+- **The reconciliation form is a wizard over the line, not the line.** `levis_mid` there is a
+  `related` on `custom.bank.reconcile.wizard`, so a button in that view calls the **wizard**;
+  `action_levis_map_mid` therefore exists twice -- the real one on
+  `account.bank.statement.line`, and a one-line delegate on the wizard.
+- **`account.bank.statement.line` has no `date` column.** Odoo 19 delegates it to
+  `account.move`, so SQL must join `account_move` (the scripts do). `journal.name` is
+  `jsonb` too -- `->>'en_US'` it before aggregating.
 - **Another store's receivable is never offered** on a mapped line. An empty
   candidate list means the store has no open tender receivable in the window —
   a finding, not a reason to widen. *Search More* is the explicit override.

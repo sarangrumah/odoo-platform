@@ -24,7 +24,8 @@ scorer. A guess is never manufactured out of a narrative that was not understood
 
 from datetime import timedelta
 
-from odoo import models
+from odoo import _, models
+from odoo.exceptions import UserError
 
 # How far either side of the assumed trading day the receivable may sit. A
 # settlement early in the month pays for sales made in the previous one, and the
@@ -41,6 +42,49 @@ class AccountBankStatementLine(models.Model):
     # ------------------------------------------------------------------
     # Levi's view of the line
     # ------------------------------------------------------------------
+    def action_levis_map_mid(self):
+        """Open a Bank MID Mapping form pre-filled from this statement line.
+
+        Sheet row #41. A settlement whose MID the parser read but whose store it
+        could not resolve is one mapping away from being solved -- and solving
+        it fixes **every** line carrying that MID, past and future, not just
+        this one. Without this the operator has to copy the number out of the
+        narrative by hand, which is exactly where a transposed digit creeps in.
+
+        Only the key and its type are defaulted. The store is deliberately left
+        empty: picking it is the judgement being asked for, and pre-selecting a
+        guess is how a wrong mapping gets saved without anyone reading it.
+        """
+        self.ensure_one()
+        if not self.levis_mid:
+            raise UserError(
+                _(
+                    "Baris ini tidak membawa MID, jadi tidak ada kunci untuk dipetakan. "
+                    "Tokonya harus ditetapkan dari narasinya."
+                )
+            )
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Petakan MID %s", self.levis_mid),
+            "res_model": "levis.bank.mid.map",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_key": self.levis_mid,
+                "default_match_type": "mid",
+                "default_company_id": self.company_id.id,
+                "default_journal_id": self.journal_id.id,
+                # A label the operator can recognise later; the narrative is the
+                # only human-readable clue the bank gives about which store it is.
+                "default_name": (self.payment_ref or "")[:64],
+                "default_note": _(
+                    "Dibuat dari baris mutasi %(ref)s tanggal %(date)s.",
+                    ref=self.payment_ref or self.display_name,
+                    date=self.date,
+                ),
+            },
+        }
+
     def _levis_clearing_config(self):
         """The tenant's clearing accounts, or empty when not configured."""
         self.ensure_one()

@@ -11,7 +11,7 @@
                 <field name="levis_ou_analytic_id" optional="show"/>
                 <field name="levis_narrative_kind" optional="show"/>
                 <field name="levis_channel" optional="hide"/>
-                <field name="levis_mid" optional="hide"/>
+                <field name="levis_mid" optional="show"/>
             </field>
             <field name="amount" position="after">
                 <field name="levis_gross" optional="show" sum="Gross"/>
@@ -39,6 +39,14 @@
                 <filter name="levis_unmapped" string="Store Not Identified"
                         domain="[('levis_ou_analytic_id', '=', False),
                                  ('levis_narrative_kind', 'in', ('settlement', 'cash_deposit'))]"/>
+                <!-- Berbeda dari "Store Not Identified" di atas: yang ini justru
+                     baris yang MID-nya SUDAH terbaca, jadi tokonya bisa
+                     ditetapkan sekali lewat Bank MID Mapping dan seluruh baris
+                     ber-MID sama ikut terselesaikan. Baris tanpa MID sama sekali
+                     perlu dibaca narasinya satu per satu — pekerjaan yang lain. -->
+                <filter name="levis_mid_unmapped" string="MID Known, Store Unmapped"
+                        domain="[('levis_mid', '!=', False),
+                                 ('levis_ou_analytic_id', '=', False)]"/>
                 <filter name="levis_mismatch" string="Amount Disagrees With Narrative"
                         domain="[('levis_amount_matches_narrative', '=', False)]"/>
             </filter>
@@ -47,6 +55,8 @@
                         context="{'group_by': 'levis_ou_analytic_id'}"/>
                 <filter name="levis_group_kind" string="Narrative Type"
                         context="{'group_by': 'levis_narrative_kind'}"/>
+                <filter name="levis_group_mid" string="Bank MID"
+                        context="{'group_by': 'levis_mid'}"/>
             </filter>
         </field>
     </record>
@@ -104,6 +114,12 @@
                             <field name="levis_narrative_kind" readonly="1" invisible="not levis_is_tender"/>
                             <field name="levis_channel" readonly="1" invisible="not levis_is_tender"/>
                             <field name="levis_mid" readonly="1" invisible="not levis_is_tender"/>
+                            <!-- Only offered where it can actually help: the MID
+                                 was read but the store was not resolved. -->
+                            <button name="action_levis_map_mid" type="object"
+                                    string="Petakan MID ke toko" class="btn-link"
+                                    icon="fa-map-marker"
+                                    invisible="not levis_mid or levis_ou_analytic_id"/>
                         </group>
                         <group string="Amounts">
                             <field name="amount" readonly="1"/>

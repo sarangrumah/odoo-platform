@@ -53,6 +53,12 @@ class BankReconcileWizard(models.TransientModel):
     )
 
     @api.depends("st_line_id")
+    def action_levis_map_mid(self):
+        """Delegate to the statement line — the reconciliation screen is a
+        wizard over it, and the mapping belongs to the line's MID."""
+        self.ensure_one()
+        return self.st_line_id.action_levis_map_mid()
+
     def _compute_levis_is_tender(self):
         for wiz in self:
             st_line = wiz.st_line_id
