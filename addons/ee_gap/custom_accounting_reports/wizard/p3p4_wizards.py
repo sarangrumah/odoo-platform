@@ -173,8 +173,11 @@ class PphEqualisasiWizard(models.TransientModel):
         ]
         if self.posted_only:
             domain.append(("parent_state", "=", "posted"))
-        if "x_custom_withholding_category_id" in self.env["product.template"]._fields:
-            domain.append(("product_id.product_tmpl_id.x_custom_withholding_category_id", "!=", False))
+        # Pending Tax #3: this used to test only the product mapping while the
+        # report itself ORs three routes, so "View source" showed a different
+        # — and on this tenant nearly empty — set of rows. One definition now,
+        # owned by the report.
+        domain += self.env[self._report_model]._objek_pph_routes()
         return domain
 
 

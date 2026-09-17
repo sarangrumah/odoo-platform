@@ -27,6 +27,9 @@ _PPH_LABEL = {
     "pph_26": "PPh 26",
 }
 
+# Tidak ada entri pemotongan terpisah -- lihat _pph_journal_label().
+_NO_PPH_JOURNAL = "—"
+
 
 class CustomReportPphWithholding(models.AbstractModel):
     _name = "custom.report.pph.withholding"
@@ -40,7 +43,12 @@ class CustomReportPphWithholding(models.AbstractModel):
         return [
             {"header": "Tanggal", "field": "date", "kind": "date", "width": 12},
             {"header": "No. Dokumen", "field": "doc_no", "kind": "text", "width": 18},
-            {"header": "No. Dokumen Jurnal", "field": "journal_no", "kind": "text", "width": 18},
+            # "Jurnal PPh", not "No. Dokumen Jurnal": this column carries the
+            # SEPARATE withholding entry the engine books, which is a different
+            # document from the bill in column 2. It used to repeat the bill
+            # number verbatim on every row (311 of 311 across Jun-Sep 2026),
+            # which told the reader nothing and cost a column.
+            {"header": "Jurnal PPh", "field": "journal_no", "kind": "text", "width": 20},
             {"header": "No. Invoice", "field": "invoice_no", "kind": "text", "width": 18},
             {"header": "Tgl Invoice", "field": "invoice_date", "kind": "date", "width": 12},
             {"header": "NPWP/NIK", "field": "npwp", "kind": "text", "width": 20},
@@ -250,7 +258,12 @@ class CustomReportPphWithholding(models.AbstractModel):
                     {
                         "date": move.date or move.invoice_date,
                         "doc_no": move.name or "",
-                        "journal_no": move.name or "",
+                        # Native-tax route: the PPh rides on the bill itself, so
+                        # there is no separate withholding entry. Say so with an
+                        # em dash rather than echoing the bill number — an empty
+                        # PPh journal is exactly why the bupot pipeline has
+                        # nothing to pick up, and Tax needs to see it.
+                        "journal_no": self._pph_journal_label(move),
                         "invoice_no": move.ref or "",
                         "invoice_date": move.invoice_date,
                         "npwp": self._opt(partner, "x_custom_npwp") or self._opt(partner, "vat"),
@@ -266,6 +279,18 @@ class CustomReportPphWithholding(models.AbstractModel):
                     }
                 )
         return buckets
+
+    def _pph_journal_label(self, move):
+        """Name of the separate "Pemotongan PPh" entry, or an em dash.
+
+        Two callers, one answer. ``custom_tax_id`` can book the withholding as
+        its own journal entry (``x_custom_withholding_move_id``); where it does
+        not — which on this tenant is every bill — the PPh rides on the bill and
+        there is no second document. Echoing the bill number here, as this
+        column used to, made it look like there was one.
+        """
+        wmove = self._opt(move, "x_custom_withholding_move_id")
+        return (wmove.name or _NO_PPH_JOURNAL) if wmove else _NO_PPH_JOURNAL
 
     def _build_lines(self, filters):
         pph_kind = filters.get("pph_kind") or "all"
@@ -307,8 +332,7 @@ class CustomReportPphWithholding(models.AbstractModel):
             partner = move.commercial_partner_id or move.partner_id
             # Separate PPh journal entry ("Pemotongan PPh …"), when custom_tax_id
             # books it as its own move; blank if the field/module is absent.
-            wmove = self._opt(move, "x_custom_withholding_move_id")
-            journal_no = wmove.name if wmove else ""
+            journal_no = self._pph_journal_label(move)
             # Expense account of the withheld source line.
             exp_acc = wl.move_line_id.account_id if wl.move_line_id else False
             coa_expense = ""
