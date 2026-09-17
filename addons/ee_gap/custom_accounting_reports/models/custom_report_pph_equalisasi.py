@@ -82,6 +82,32 @@ class CustomReportPphEqualisasi(models.AbstractModel):
         """
         return abs(self._line_tax_amount(ml, ml.tax_ids.filtered(self._is_pph_tax)))
 
+    def _objek_pph_routes(self):
+        """OR-domain for "this expense line is an objek PPh", as one definition.
+
+        Extracted because the **"View source" button used a different one** and
+        therefore showed a different set of rows than the report above it — the
+        symptom Tax reported as Pending Tax #3. The button tested the product
+        mapping alone, which on this tenant matches nothing at all: measured on
+        ``prd_levis_begbal`` for 1 Jun – 9 Sep 2026 the button returned **0
+        rows while the report showed 338**, because 1 of 31,996 product
+        templates is mapped and all 338 lines that do carry a PPh tax are
+        free-text expense lines with ``product_id`` NULL.
+
+        Three routes, because a line can be an objek PPh in three ways:
+
+        * the product template is mapped to a withholding category;
+        * the Kode Objek PPh is picked on the line itself (``custom_tax_id``);
+        * the line carries a native PPh tax — the groups are named "PPh …",
+          which also keeps a 0 %-rated VAT out of the test.
+        """
+        AML = self.env["account.move.line"]
+        routes = [("product_id.product_tmpl_id.x_custom_withholding_category_id", "!=", False)]
+        if "x_custom_withholding_category_id" in AML._fields:
+            routes.append(("x_custom_withholding_category_id", "!=", False))
+        routes.append(("tax_ids.tax_group_id.name", "=ilike", "pph%"))
+        return ["|"] * (len(routes) - 1) + routes
+
     def _build_lines(self, filters):
         Template = self.env["product.template"]
         if "x_custom_withholding_category_id" not in Template._fields:
@@ -103,20 +129,7 @@ class CustomReportPphEqualisasi(models.AbstractModel):
         else:
             domain.append(("parent_state", "in", ("draft", "posted")))
 
-        # An expense line counts as "objek PPh" through any of three routes.
-        # Keying on the product mapping alone used to miss almost everything:
-        # bills are commonly keyed as free-text expense lines with no product at
-        # all (on prd_levis_begbal all 247 bill lines have product_id NULL, and
-        # 1 of 31,978 templates is mapped), so the 113 lines actually carrying a
-        # PPh tax were invisible to this report.
-        routes = [("product_id.product_tmpl_id.x_custom_withholding_category_id", "!=", False)]
-        if "x_custom_withholding_category_id" in AML._fields:
-            # Kode Objek PPh picked directly on the line (custom_tax_id).
-            routes.append(("x_custom_withholding_category_id", "!=", False))
-        # A native PPh tax on the line — the PPh groups are named "PPh ...",
-        # which also keeps a 0%-rated VAT out of this test.
-        routes.append(("tax_ids.tax_group_id.name", "=ilike", "pph%"))
-        domain += ["|"] * (len(routes) - 1) + routes
+        domain += self._objek_pph_routes()
 
         lines = AML.search(domain)
 
