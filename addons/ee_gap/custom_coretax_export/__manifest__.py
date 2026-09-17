@@ -23,10 +23,36 @@ subclassing the report engine.
 
 Templates covered
 -----------------
-- **e-Faktur Keluaran** (``Import FK`` sheet) — two-record layout: one ``FK``
-  row per invoice followed by its ``OF`` item rows, 35 + 16 columns.
-- **Retur Masukan** — three sections: NPWP Pembeli banner, ``Retur`` table
-  terminated by an ``END`` sentinel, then ``DetailRetur``.
+- **e-Faktur Keluaran — Mitra Pajakku** (``Import FK`` sheet) — two-record
+  layout: one ``FK`` row followed by its ``OF`` item rows, 35 + 16 columns.
+- **e-Faktur Keluaran — Coretax** — two sheets, ``Faktur`` (18 columns) beside
+  ``DetailFaktur`` (14).
+- **Retur Masukan — Coretax** — two sheets, ``Retur`` (12) beside
+  ``DetailRetur`` (15).
+- **Retur Masukan — Mitra Pajakku** (``Import RM``) — one ``RM`` row per credit
+  note followed by its ``OF`` rows, 24 + 23 columns.
+
+Every column tuple is transcribed verbatim from the client's own templates in
+``docs/projects/levis/tax-templates/``. These are import files read **by
+position**, so a column added, dropped or reordered makes the upload fail in a
+way correct arithmetic does not rescue; ``tests/test_template_shapes.py`` pins
+the shapes.
+
+Faktur Keluaran has two possible sources, chosen on the wizard:
+
+- **Faktur penjualan** — one FK per ``out_invoice``, buyer identified. This is
+  what a B2B seller exports.
+- **Rekap digunggung** — one FK per trading day per store, for a PKP Pedagang
+  Eceran whose sales never become invoices at all. Figures come from
+  ``custom.report.ppn.digunggung`` rather than being re-derived, so the export
+  and the number Finance carries into the SPT cannot drift apart. The buyer
+  fields follow DJP's own instruction for a non-TIN buyer: NPWP
+  ``0000000000000000``, ID TKU ``000000``, kode transaksi ``04`` (DPP Nilai
+  Lain, which is what the PMK 131 restatement produces).
+
+The two sources never overlap — the digunggung report covers exactly the moves
+that are *not* invoices — so "Keduanya" double-counts nothing and is the
+complete picture for a retailer.
 - **Bupot Unifikasi** (PPh 23 / 4(2) / 22 / 15) — 23 columns.
 - **Bupot PPh 21** — 27 columns, carries Gross Up and PTKP.
 - **Bupot Non-Resident** (PPh 26 / 4(2)) — 32 columns, carries TIN, kode
@@ -128,7 +154,7 @@ e-Faktur Keluaran and Retur Masukan are not blocked on it.
     "author": "Custom Platform",
     "website": "https://example.com/custom-platform",
     "category": "Accounting/Localizations",
-    "version": "19.0.1.8.0",
+    "version": "19.0.1.9.0",
     "license": "LGPL-3",
     "depends": [
         "custom_tax_id",

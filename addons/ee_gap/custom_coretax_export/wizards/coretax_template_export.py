@@ -160,6 +160,122 @@ RETUR_DETAIL_COLUMNS = (
 # reference dump of the company's configured taxes grouped by tax group ("tax
 # categories"), with the Coretax-relevant DPP nilai-lain settings alongside the
 # rate so the client can reconcile Odoo's tax master against Coretax.
+# --- DJP Coretax: Faktur Pajak Keluaran (sheet "Faktur" + "DetailFaktur") ---
+# Verbatim from the client's own template, docs/projects/levis/tax-templates/
+# "Sample Template Faktur Pajak Keluaran CORETAX.xlsx". Do not reorder: the
+# importer reads by position, and the sheet's own "Keterangan" tab is the
+# authority on which of these are mandatory.
+FAKTUR_CORETAX_COLUMNS = (
+    "Baris",
+    "Tanggal Faktur",
+    "Jenis Faktur",
+    "Kode Transaksi",
+    "Keterangan Tambahan",
+    "Dokumen Pendukung",
+    "Period Dok Pendukung",
+    "Referensi",
+    "Cap Fasilitas",
+    "ID TKU Penjual",
+    "NPWP/NIK Pembeli",
+    "Jenis ID Pembeli",
+    "Negara Pembeli",
+    "Nomor Dokumen Pembeli",
+    "Nama Pembeli",
+    "Alamat Pembeli",
+    "Email Pembeli",
+    "ID TKU Pembeli",
+)
+
+DETAIL_FAKTUR_CORETAX_COLUMNS = (
+    "Baris",
+    "Barang/Jasa",
+    "Kode Barang Jasa",
+    "Nama Barang/Jasa",
+    "Nama Satuan Ukur",
+    "Harga Satuan",
+    "Jumlah Barang Jasa",
+    "Total Diskon",
+    "DPP",
+    "DPP Nilai Lain",
+    "Tarif PPN",
+    "PPN",
+    "Tarif PPnBM",
+    "PPnBM",
+)
+
+# --- Mitra Pajakku: Retur Pajak Masukan (one sheet, RM rows + OF rows) ---
+# The OF header repeats four names (RETUR_DISKON, RETUR_DPP, RETUR_DPP_LAIN,
+# RETUR_PPN): columns 9-16 carry the *faktur* figures and 17-23 the *retur*
+# ones. Kept verbatim, duplicates and all, because the importer reads by
+# position and "tidying" the names would break it.
+RM_COLUMNS = (
+    "RM",
+    "NPWP_WP",
+    "ID_TKU_WP",
+    "NPWP",
+    "NAMA",
+    "KD_JENIS_TRANSAKSI",
+    "FG_PENGGANTI",
+    "NOMOR_FAKTUR",
+    "TANGGAL_FAKTUR",
+    "IS_CREDITABLE",
+    "NOMOR_DOKUMEN_RETUR",
+    "TANGGAL_RETUR",
+    "MASA_PAJAK_RETUR",
+    "TAHUN_PAJAK_RETUR",
+    "NILAI_RETUR_DPP",
+    "NILAI_RETUR_DPP_LAIN",
+    "NILAI_RETUR_PPN",
+    "NILAI_RETUR_PPNBM",
+    "KETERANGAN",
+    "BRANCH/FIELD_TAMBAHAN_1",
+    "FIELD_TAMBAHAN_2",
+    "FIELD_TAMBAHAN_3",
+    "FIELD_TAMBAHAN_4",
+    "FIELD_TAMBAHAN_5",
+)
+
+RM_OF_COLUMNS = (
+    "OF",
+    "BARANG_JASA",
+    "KODE_OBJEK",
+    "NAMA",
+    "SATUAN",
+    "HARGA_SATUAN",
+    "JUMLAH_BARANG",
+    "HARGA_TOTAL",
+    "RETUR_DISKON",
+    "CHECK_DPP_LAIN",
+    "RETUR_DPP",
+    "RETUR_DPP_LAIN",
+    "TARIF_PPN",
+    "RETUR_PPN",
+    "TARIF_PPNBM_FAKTUR",
+    "PPNBM_FAKTUR",
+    "RETUR_BARANG_JASA",
+    "RETUR_DISKON",
+    "RETUR_DPP",
+    "RETUR_DPP_LAIN",
+    "RETUR_PPN",
+    "TARIF_PPNBM",
+    "RETUR_PPNBM",
+)
+
+# --- Digunggung (PKP Pedagang Eceran) --------------------------------------
+# A retail seller issues a struk, not a faktur per buyer, so there is no buyer
+# identity to export. DJP's own template says what to write instead:
+# "NPWP/NIK Pembeli ... isikan dengan 0000000000000000 jika Jenis ID Pembeli
+# selain TIN" and "ID TKU Pembeli ... jika selain TIN isikan dengan 000000".
+DIGUNGGUNG_KODE_TRANSAKSI = "04"  # DPP Nilai Lain — matches the PMK 131 presentation
+DIGUNGGUNG_NPWP_PEMBELI = "0000000000000000"
+DIGUNGGUNG_JENIS_ID = "Other ID"
+DIGUNGGUNG_NEGARA = "IDN"
+DIGUNGGUNG_NO_DOKUMEN = "-"
+DIGUNGGUNG_NAMA_PEMBELI = "Pembeli Eceran"
+DIGUNGGUNG_ID_TKU_PEMBELI = "000000"
+DIGUNGGUNG_SATUAN = "UM.0018"  # Unit
+DIGUNGGUNG_BARANG = "A"  # Barang
+
 TAXLIST_COLUMNS = (
     "Grup Pajak",
     "Nama Pajak",
@@ -224,8 +340,10 @@ class CoretaxTemplateExportWizard(models.TransientModel):
             ("bppu", "Bupot Unifikasi (PPh 23 / 4(2) / 22 / 15)"),
             ("bp21", "Bupot PPh 21"),
             ("bpnr", "Bupot Non-Resident (PPh 26)"),
-            ("fk", "e-Faktur Keluaran (Import FK)"),
-            ("retur", "Retur Masukan"),
+            ("fk", "e-Faktur Keluaran — Mitra Pajakku (Import FK)"),
+            ("fk_coretax", "e-Faktur Keluaran — Coretax (Faktur + DetailFaktur)"),
+            ("retur", "Retur Masukan — Coretax (Retur + DetailRetur)"),
+            ("retur_pajakku", "Retur Masukan — Mitra Pajakku (RM + OF)"),
             ("taxlist", "Tax List (Daftar Pajak)"),
         ],
         required=True,
@@ -256,6 +374,22 @@ class CoretaxTemplateExportWizard(models.TransientModel):
     )
 
     file_data = fields.Binary(string="File", readonly=True, attachment=False)
+    fk_source = fields.Selection(
+        [
+            ("invoice", "Faktur penjualan (out_invoice)"),
+            ("digunggung", "Rekap digunggung (PKP Pedagang Eceran)"),
+            ("both", "Keduanya"),
+        ],
+        string="Sumber Faktur Keluaran",
+        default="invoice",
+        required=True,
+        help="Faktur penjualan: satu FK per out_invoice, pembeli teridentifikasi. "
+        "Rekap digunggung: satu FK per hari per toko dari penyerahan eceran, "
+        "yang tidak pernah menjadi out_invoice. Keduanya tidak tumpang tindih — "
+        "setiap rupiah PPN Keluaran masuk tepat satu di antaranya — jadi "
+        "'Keduanya' aman dan itulah yang lengkap untuk peritel.",
+    )
+
     file_name = fields.Char(readonly=True)
     line_count = fields.Integer(readonly=True, string="Baris Terekspor")
 
@@ -451,6 +585,42 @@ class CoretaxTemplateExportWizard(models.TransientModel):
 
     # ``_line_vat`` and ``_item_jenis`` come from ``custom.coretax.fk.builder``.
 
+    # ------------------------------------------------------------------
+    # Digunggung — the retail seller's side of PPN Keluaran
+    # ------------------------------------------------------------------
+    def _digunggung_details(self):
+        """One row per (trading day, store) from ``custom.report.ppn.digunggung``.
+
+        Reused rather than re-derived: that report already resolves which taxes
+        count as PPN Keluaran, restates them PMK 131-style (12 % statutory on a
+        DPP Nilai Lain of 11/12) and excludes anything that is an invoice. Two
+        implementations of "what is a digunggung supply" would drift, and the
+        report is the one Finance already reconciles against the SPT.
+        """
+        start, end = self._period_bounds()
+        report = self.env["custom.report.ppn.digunggung"]
+        filters = {
+            "date_from": start,
+            "date_to": end,
+            "company_ids": self.company_id.ids,
+            "partner_ids": [],
+            "posted_only": True,
+        }
+        # Only the per-day/per-store detail rows: headers, subtotals and the
+        # grand total would double-count.
+        return [row for row in report._build_lines(filters) if not row.get("type")]
+
+    def _digunggung_seller_tku(self):
+        """22-digit NITKU: the 16-digit NPWP plus a 6-digit branch, HO = 000000."""
+        npwp = (self.company_id._check_coretax_pemotong(require_signer=False) or "").strip()
+        return "%s%s" % (npwp, "000000")
+
+    def _digunggung_label(self, row):
+        return "Penyerahan eceran %s - %s" % (
+            row.get("ou_name") or "(tanpa Operating Unit)",
+            row["date"].strftime("%d/%m/%Y"),
+        )
+
     def _rows_fk(self):
         """One FK row per invoice, each followed by its OF item rows.
 
@@ -459,7 +629,208 @@ class CoretaxTemplateExportWizard(models.TransientModel):
         builder derives from ``invoice_date`` are provably the wizard's own
         values — this path keeps emitting exactly what it did before.
         """
-        return self._coretax_fk_rows(self._vat_moves(("out_invoice",)), company=self.company_id)
+        headers, rows = self._coretax_fk_rows(
+            self._vat_moves(("out_invoice",))
+            if self.fk_source in ("invoice", "both")
+            else self.env["account.move"].browse(),
+            company=self.company_id,
+        )
+        if self.fk_source in ("digunggung", "both"):
+            rows = rows + self._digunggung_fk_pajakku_rows()
+        return headers, rows
+
+    def _digunggung_fk_pajakku_rows(self):
+        """Digunggung supplies as Mitra Pajakku FK/OF pairs.
+
+        One FK per (day, store): that is the grain a PKP Pedagang Eceran
+        actually reports, and the grain the digunggung report already ties to
+        the SPT. The OF line underneath it is the day's takings as a single
+        unit — there is no per-item detail to export, because a struk is not an
+        invoice line in this ledger.
+        """
+        npwp = (self.company_id._check_coretax_pemotong(require_signer=False) or "").strip()
+        rows = []
+        for row in self._digunggung_details():
+            tanggal = row["date"]
+            label = self._digunggung_label(row)
+            dpp = round(row["dpp_penuh"], 2)
+            dpp_lain = round(row["dpp_lain"], 2)
+            ppn = round(row["ppn"], 2)
+            tarif = row.get("tarif") or 0.0
+            rows.append(
+                [
+                    "FK",
+                    npwp,
+                    "000000",
+                    DIGUNGGUNG_KODE_TRANSAKSI,
+                    "0",
+                    "",
+                    tanggal.strftime("%m"),
+                    str(tanggal.year),
+                    tanggal.strftime("%Y-%m-%d"),
+                    DIGUNGGUNG_NPWP_PEMBELI,
+                    DIGUNGGUNG_JENIS_ID,
+                    "",
+                    DIGUNGGUNG_NEGARA,
+                    DIGUNGGUNG_NAMA_PEMBELI,
+                    "",
+                    row.get("ou_name") or "",
+                    DIGUNGGUNG_ID_TKU_PEMBELI,
+                    dpp,
+                    dpp_lain,
+                    ppn,
+                    0,
+                    "",
+                    "0",
+                    "",
+                    0,
+                    0,
+                    0,
+                    0,
+                    label,
+                    "",
+                    row.get("ou_code") or "",
+                    "",
+                    "",
+                    "",
+                    "",
+                ]
+            )
+            rows.append(
+                [
+                    "OF",
+                    "Barang",
+                    "000000",
+                    label,
+                    DIGUNGGUNG_SATUAN,
+                    dpp,
+                    1,
+                    dpp,
+                    0,
+                    "Y",
+                    dpp,
+                    dpp_lain,
+                    tarif,
+                    ppn,
+                    0,
+                    0,
+                ]
+            )
+        return rows
+
+    def _rows_fk_coretax(self):
+        """DJP Coretax layout: sheet ``Faktur`` beside sheet ``DetailFaktur``.
+
+        Same figures as the Mitra Pajakku export, different shape — and a
+        genuinely different workbook, two sheets rather than one, which is why
+        this returns sheet tuples instead of a single header/row pair.
+        """
+        faktur, detail = [], []
+        tku_penjual = self._digunggung_seller_tku()
+        baris = 0
+
+        if self.fk_source in ("invoice", "both"):
+            for move in self._vat_moves(("out_invoice",)):
+                baris += 1
+                partner = move.partner_id
+                faktur.append(
+                    [
+                        baris,
+                        move.invoice_date.strftime("%d/%m/%Y") if move.invoice_date else "",
+                        "Normal",
+                        move.l10n_id_kode_transaksi or "01",
+                        "",
+                        "",
+                        "",
+                        move.name or "",
+                        "",
+                        tku_penjual,
+                        (partner.vat or DIGUNGGUNG_NPWP_PEMBELI).replace(".", "").replace("-", ""),
+                        "TIN" if partner.vat else DIGUNGGUNG_JENIS_ID,
+                        DIGUNGGUNG_NEGARA,
+                        "-" if partner.vat else DIGUNGGUNG_NO_DOKUMEN,
+                        partner.name or "",
+                        self._partner_address(partner),
+                        partner.email or "",
+                        "000000",
+                    ]
+                )
+                for line in move.invoice_line_ids.filtered(lambda l: l.display_type == "product"):
+                    dpp, dpp_lain, ppn, tarif, _uses = self._line_vat(line)
+                    detail.append(
+                        [
+                            baris,
+                            DIGUNGGUNG_BARANG,
+                            "",
+                            line.product_id.name or line.name or "",
+                            line.product_uom_id.x_custom_coretax_code or CORETAX_UOM_FALLBACK,
+                            line.price_unit,
+                            line.quantity,
+                            0,
+                            round(dpp, 2),
+                            round(dpp_lain, 2),
+                            tarif,
+                            round(ppn, 2),
+                            0,
+                            0,
+                        ]
+                    )
+
+        if self.fk_source in ("digunggung", "both"):
+            for row in self._digunggung_details():
+                baris += 1
+                tanggal = row["date"]
+                label = self._digunggung_label(row)
+                dpp = round(row["dpp_penuh"], 2)
+                dpp_lain = round(row["dpp_lain"], 2)
+                ppn = round(row["ppn"], 2)
+                faktur.append(
+                    [
+                        baris,
+                        tanggal.strftime("%d/%m/%Y"),
+                        "Normal",
+                        DIGUNGGUNG_KODE_TRANSAKSI,
+                        "",
+                        "",
+                        "",
+                        label,
+                        "",
+                        tku_penjual,
+                        DIGUNGGUNG_NPWP_PEMBELI,
+                        DIGUNGGUNG_JENIS_ID,
+                        DIGUNGGUNG_NEGARA,
+                        DIGUNGGUNG_NO_DOKUMEN,
+                        DIGUNGGUNG_NAMA_PEMBELI,
+                        row.get("ou_name") or "",
+                        "",
+                        DIGUNGGUNG_ID_TKU_PEMBELI,
+                    ]
+                )
+                detail.append(
+                    [
+                        baris,
+                        DIGUNGGUNG_BARANG,
+                        "",
+                        label,
+                        DIGUNGGUNG_SATUAN,
+                        dpp,
+                        1,
+                        0,
+                        dpp,
+                        dpp_lain,
+                        row.get("tarif") or 0.0,
+                        ppn,
+                        0,
+                        0,
+                    ]
+                )
+
+        if not faktur:
+            return [], []
+        return [
+            ("Faktur", [list(FAKTUR_CORETAX_COLUMNS)], faktur),
+            ("DetailFaktur", [list(DETAIL_FAKTUR_CORETAX_COLUMNS)], detail),
+        ], faktur
 
     def _rows_retur(self):
         """Retur Masukan: banner, Retur table, END sentinel, DetailRetur table.
@@ -524,9 +895,108 @@ class CoretaxTemplateExportWizard(models.TransientModel):
                     0,
                 ]
             )
-        if baris:
-            block.append(["END"])
-        return [], block + details if baris else []
+        if not baris:
+            return [], []
+        # The client's own template is two SHEETS -- ``Retur`` beside
+        # ``DetailRetur`` -- not one sheet with an END sentinel between the two
+        # tables. Corrected 17-Sep-2026 against
+        # "Sample Template Retur Pajak Masukan CORETAX.xlsx"; the previous
+        # layout had been written from an assumption and never had data to
+        # expose it.
+        retur_sheet = [["Retur"], ["NPWP Pembeli", "", npwp_pembeli], [], list(RETUR_COLUMNS)]
+        return [
+            ("Retur", retur_sheet, block[4:]),
+            ("DetailRetur", [list(RETUR_DETAIL_COLUMNS)], details[3:]),
+        ], block[4:]
+
+    # ------------------------------------------- Retur Masukan — Mitra Pajakku
+
+    def _rows_retur_pajakku(self):
+        """Retur Masukan in the Mitra Pajakku shape: one ``RM`` row per credit
+        note, each followed by its ``OF`` item rows.
+
+        Same source and the same guard as the Coretax variant: a retur that
+        cannot name the faktur it reverses is unimportable, so it is skipped
+        with a log line rather than emitted as junk.
+        """
+        npwp_wp = self.company_id._check_coretax_pemotong(require_signer=False)
+        rows = []
+        for move in self._vat_moves(("in_refund",)):
+            origin = move.reversed_entry_id
+            faktur = origin.x_custom_nsfp if origin else ""
+            if not faktur:
+                _logger.info("Retur Masukan (Pajakku): skipping %s, no NSFP on origin", move.name)
+                continue
+            items = move.invoice_line_ids.filtered(lambda l: l.display_type == "product")
+            t_dpp = t_lain = t_ppn = 0.0
+            of_rows = []
+            for line in items:
+                dpp, dpp_lain, ppn, tarif, uses = self._line_vat(line)
+                t_dpp += dpp
+                t_lain += dpp_lain
+                t_ppn += ppn
+                satuan = line.product_uom_id.x_custom_coretax_code or CORETAX_UOM_FALLBACK
+                harga_total = (line.price_unit or 0.0) * (line.quantity or 0.0)
+                of_rows.append(
+                    [
+                        "OF",
+                        "Barang",
+                        "000000",
+                        line.product_id.name or line.name or "",
+                        satuan,
+                        line.price_unit,
+                        line.quantity,
+                        harga_total,
+                        0,
+                        "Y" if uses else "N",
+                        round(dpp, 2),
+                        round(dpp_lain, 2),
+                        tarif,
+                        round(ppn, 2),
+                        0,
+                        0,
+                        line.quantity,
+                        0,
+                        round(dpp, 2),
+                        round(dpp_lain, 2),
+                        round(ppn, 2),
+                        0,
+                        0,
+                    ]
+                )
+            retur_date = move.invoice_date or move.date
+            rows.append(
+                [
+                    "RM",
+                    npwp_wp,
+                    "000000",
+                    move.partner_id.commercial_partner_id._custom_coretax_npwp(),
+                    move.partner_id.commercial_partner_id.name or "",
+                    origin.l10n_id_kode_transaksi or "01",
+                    "0",
+                    faktur,
+                    self._fmt_date(origin.invoice_date),
+                    "1",
+                    move.name or "",
+                    self._fmt_date(retur_date),
+                    retur_date.strftime("%m") if retur_date else "",
+                    str(retur_date.year) if retur_date else "",
+                    round(t_dpp, 2),
+                    round(t_lain, 2),
+                    round(t_ppn, 2),
+                    0,
+                    "",
+                    "HO",
+                    "",
+                    "",
+                    "",
+                    "",
+                ]
+            )
+            rows.extend(of_rows)
+        if not rows:
+            return [], []
+        return [list(RM_COLUMNS), list(RM_OF_COLUMNS)], rows
 
     # -------------------------------------------------------------- Tax List
 
@@ -575,8 +1045,10 @@ class CoretaxTemplateExportWizard(models.TransientModel):
         "bppu": ("_rows_bppu", "Template", "sample_pph_uni_bppu"),
         "bp21": ("_rows_bp21", "Template", "sample_pph_21_bp_21"),
         "bpnr": ("_rows_bpnr", "Template", "sample_pph_uni_bp_nr"),
-        "fk": ("_rows_fk", "Import FK", "faktur_keluaran"),
-        "retur": ("_rows_retur", "Retur", "retur_masukan"),
+        "fk": ("_rows_fk", "Import FK", "faktur_keluaran_pajakku"),
+        "fk_coretax": ("_rows_fk_coretax", None, "faktur_keluaran_coretax"),
+        "retur": ("_rows_retur", None, "retur_masukan_coretax"),
+        "retur_pajakku": ("_rows_retur_pajakku", "Import RM", "retur_masukan_pajakku"),
         "taxlist": ("_rows_taxlist", "Tax List", "tax_list"),
     }
 
@@ -593,9 +1065,21 @@ class CoretaxTemplateExportWizard(models.TransientModel):
             # explanation — reuse the date-range wizard's probes instead of the
             # generic "periksa bukti potong" line, which sends the user looking
             # in the wrong place entirely.
-            if self.template == "fk":
-                detail = "\n\n".join(self._coretax_fk_empty_hints(start, end, self.company_id))
-            elif self.template == "retur":
+            if self.template in ("fk", "fk_coretax"):
+                if self.fk_source == "digunggung":
+                    detail = _(
+                        "Sumber dipilih 'Rekap digunggung', tetapi tidak ada penyerahan "
+                        "eceran ber-PPN Keluaran di periode ini. Periksa Rekap PPN "
+                        "Digunggung untuk masa yang sama."
+                    )
+                else:
+                    detail = "\n\n".join(self._coretax_fk_empty_hints(start, end, self.company_id))
+                    if self.fk_source == "invoice":
+                        detail += _(
+                            "\n\nPeritel tidak menerbitkan faktur per pembeli: setel "
+                            "'Sumber Faktur Keluaran' ke Rekap digunggung."
+                        )
+            elif self.template in ("retur", "retur_pajakku"):
                 detail = _(
                     "Retur Masukan diambil dari nota kredit pemasok (vendor credit note) "
                     "ter-posting di periode ini — bukan dari retur penjualan."
@@ -617,7 +1101,13 @@ class CoretaxTemplateExportWizard(models.TransientModel):
                     detail=detail,
                 )
             )
-        content = self._render(header_rows, data_rows, sheet_name)
+        # ``sheet_name is None`` marks a multi-sheet template: the builder then
+        # returns sheet tuples in place of header rows, because the Coretax
+        # layouts are two sheets and no single-sheet file will import.
+        if sheet_name is None:
+            content = self._render_sheets(header_rows)
+        else:
+            content = self._render(header_rows, data_rows, sheet_name)
         self.write(
             {
                 "file_data": base64.b64encode(content),

@@ -718,6 +718,33 @@ class CoretaxFkBuilder(models.AbstractModel):
 
     # ------------------------------------------------------------------ render
 
+    def _render_sheets(self, sheets):
+        """Write several sheets in one workbook.
+
+        ``sheets`` is ``[(name, header_rows, data_rows), ...]``. The Coretax
+        templates are genuinely multi-sheet — ``Faktur`` beside
+        ``DetailFaktur``, ``Retur`` beside ``DetailRetur`` — so a single-sheet
+        renderer cannot produce a file their importer accepts.
+        """
+        import xlsxwriter
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {"in_memory": True})
+        bold = workbook.add_format({"bold": True})
+        for name, header_rows, data_rows in sheets:
+            sheet = workbook.add_worksheet(name[:31])
+            row = 0
+            for header in header_rows:
+                for col, value in enumerate(header):
+                    sheet.write(row, col, value, bold)
+                row += 1
+            for data in data_rows:
+                for col, value in enumerate(data):
+                    sheet.write(row, col, value)
+                row += 1
+        workbook.close()
+        return output.getvalue()
+
     def _render(self, header_rows, data_rows, sheet_name):
         """Header rows first (row 1..n), then data. No banner, no formatting.
 

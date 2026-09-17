@@ -41,8 +41,9 @@ which dispatches through `_BUILDERS` to the matching `_rows_*` builder.
   `self` where the other `_rows_*` builders expect them; `account.move` reaches it through
   `self.env[...]`. No table, so it needs no `ir.model.access` row.
 - `custom.coretax.template.export.wizard` — **TransientModel.** The original masa-pajak
-  wizard; owns `_rows_bppu` / `_rows_bp21` / `_rows_bpnr` / `_rows_retur` / `_rows_taxlist`
-  and the `_pemotong()` signer logic. Its `_rows_fk` now just delegates to the builder.
+  wizard; owns `_rows_bppu` / `_rows_bp21` / `_rows_bpnr` / `_rows_retur` /
+  `_rows_retur_pajakku` / `_rows_fk_coretax` / `_rows_taxlist` and the `_pemotong()` signer
+  logic. Its `_rows_fk` delegates to the builder, then appends digunggung rows when asked.
 - `custom.coretax.fk.export.wizard` — **TransientModel.** Date-range FK/OF export with
   optional partner/journal filters and a computed `preview_count`.
 - `account.move` — extended with `action_coretax_fk_export()`, written multi-record so the
@@ -50,7 +51,10 @@ which dispatches through `_BUILDERS` to the matching `_rows_*` builder.
 
 ## Important Fields
 - **custom.coretax.template.export.wizard**
-  - `template`: `Selection` — bppu / bp21 / bpnr / fk / retur / taxlist.
+  - `template`: `Selection` — bppu / bp21 / bpnr / fk / **fk_coretax** / retur /
+    **retur_pajakku** / taxlist.
+  - `fk_source`: `Selection` — invoice / digunggung / both. Only meaningful for the two FK
+    templates; default `invoice`, so no tenant's existing export changes.
   - `masa_pajak`, `tahun_pajak`: the tax period; `_period_bounds()` turns them into dates.
   - `company_id`: the pemotong.
   - `file_data` / `file_name` / `line_count`: the rendered result, shown for download.
@@ -70,7 +74,53 @@ On `custom.coretax.fk.builder`:
 - `_coretax_fk_filename(moves, stem=...)` — one naming rule for every entry point.
 - `_round_and_plug(raw_values, rounding)` → `(written_values, total)`.
 
+## The four import layouts
+
+Every column tuple is transcribed verbatim from the client's own templates in
+`docs/projects/levis/tax-templates/`, and `tests/test_template_shapes.py` pins the shapes.
+
+| Template | Selection | Sheets | Columns |
+|---|---|---|---|
+| Faktur Keluaran — Mitra Pajakku | `fk` | `Import FK` | `FK` 35 + `OF` 16 |
+| Faktur Keluaran — Coretax | `fk_coretax` | `Faktur`, `DetailFaktur` | 18 + 14 |
+| Retur Masukan — Coretax | `retur` | `Retur`, `DetailRetur` | 12 + 15 |
+| Retur Masukan — Mitra Pajakku | `retur_pajakku` | `Import RM` | `RM` 24 + `OF` 23 |
+
+## Faktur Keluaran has two sources
+
+`fk_source` picks where the figures come from, and the two never overlap:
+
+- **`invoice`** — one FK per `out_invoice`, buyer identified. What a B2B seller exports.
+- **`digunggung`** — one FK per trading day per store, taken from
+  `custom.report.ppn.digunggung`. A PKP Pedagang Eceran issues a struk, not a faktur per
+  buyer, so `out_invoice` is empty for such a tenant: `prd_levis_begbal` carries 0 sales
+  invoices against 2,096 output-VAT lines, every one of them without a partner.
+
+The figures are read from the report rather than re-derived, so the export and the number
+Finance carries into the SPT cannot drift apart. Measured on masa 08/2026: 679 faktur,
+DPP Rp 13.782.351.923,00 and PPN Rp 1.516.072.957,00 in both formats, identical to the recap.
+
+Buyer fields follow DJP's own instruction for a non-TIN buyer, quoted from the template's
+`Keterangan` sheet: NPWP `0000000000000000`, ID TKU `000000`, kode transaksi `04`
+(DPP Nilai Lain, which is what the PMK 131 restatement already produces), satuan `UM.0018`,
+Jenis ID `Other ID`.
+
 ## Gotchas
+- **These files are read BY POSITION.** A column added, dropped or reordered breaks the
+  upload while leaving every figure correct. The Mitra Pajakku retur `OF` header repeats
+  four names on purpose — columns 9-16 carry the *faktur* figures and 17-23 the *retur*
+  ones — so deduplicating them would look tidier and break every upload.
+- **`sheet_name is None` in `_BUILDERS` marks a multi-sheet template.** The builder then
+  returns `[(name, header_rows, data_rows), ...]` for `_render_sheets` instead of a single
+  header/row pair for `_render`.
+- **The Coretax Retur used to write one sheet; the real template is two.** The old layout
+  put `Retur`, an `END` sentinel and `DetailRetur` in a single sheet. It had been written
+  from an assumption and never had data to expose it; corrected 17-Sep-2026 against the
+  client's file.
+- **The `DetailRetur` sample header is one column short.** It stops at `Tarif PPnBM` (14),
+  while the exporter writes 15 with `PPNBM Retur` last. The exporter is right: the
+  `Keterangan` sheet in the same workbook lists `PPNBM Retur` as mandatory. Do not "fix"
+  the code to match the sample.
 - **The money grid is whole rupiah, fixed by the DJP format — not `currency.rounding`.**
   Odoo ships IDR with a rounding of `0.01` and both production tenants keep it that way, so
   deriving the grid from the ledger would emit decimal cells Coretax does not accept. The
