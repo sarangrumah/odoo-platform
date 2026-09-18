@@ -18,6 +18,11 @@ This writes that workbook. Two things are deliberate:
   key, so the manual half of the month has somewhere to happen and somewhere to
   come back to (see ``levis.clearing.recon.upload``).
 
+``COMPILE SALES`` is the slow half and the only slow half: the X70D feed is read
+through a SQL view over staged JSON, which costs about a minute on a real month
+where every other sheet is done in two seconds. It is a switch on the wizard for
+that reason, not because the sheet is optional to the reconciliation.
+
 The ``_META`` sheet is what makes the round trip safe: it names the run and
 carries a token over ``(statement line, date, amount)``, so a file filled in
 against figures that have since moved is recognised rather than applied.
@@ -679,39 +684,56 @@ class LevisClearingEbr(models.AbstractModel):
             "date",
         ]
         by_ref = self._receipts_by_ref(run)
-        txns = self.env["levis.pos.x70d.txn"].search(
+        # ``search_read`` rather than a recordset: ``levis.pos.x70d.txn`` is a SQL
+        # view over the staged JSON, so every prefetch batch re-runs the whole
+        # scan. Measured on prd_levis_begbal September 2026 — 3.491 rows — that
+        # was 74 of the export's 89 seconds. One query instead.
+        txns = self.env["levis.pos.x70d.txn"].search_read(
             [
                 ("company_id", "=", run.company_id.id),
                 ("trans_date", ">=", run.date_from),
                 ("trans_date", "<=", run.date_to),
             ],
+            [
+                "ref",
+                "store_code",
+                "sap_store_code",
+                "store_name",
+                "trans_date",
+                "register",
+                "transnum",
+                "tender",
+                "auth",
+                "voucher",
+                "amount",
+            ],
             order="trans_date, store_code, transnum",
         )
         total = 0.0
         for number, txn in enumerate(txns, start=1):
-            line = by_ref.get(txn.ref)
+            line = by_ref.get(txn["ref"])
             _code, _name, label = stores.get(line.analytic_account_id.id, ("", "", "")) if line else ("", "", "")
             bank = self._bank_label(line.bank_journal_id) if line else ""
-            total += txn.amount or 0.0
+            total += txn["amount"] or 0.0
             row = self._write_row(
                 sheet,
                 fmts,
                 row,
                 [
                     number,
-                    txn.store_code or "",
-                    txn.sap_store_code or "",
-                    txn.store_name or "",
-                    txn.trans_date,
-                    txn.register or "",
-                    txn.transnum or "",
+                    txn["store_code"] or "",
+                    txn["sap_store_code"] or "",
+                    txn["store_name"] or "",
+                    txn["trans_date"],
+                    txn["register"] or "",
+                    txn["transnum"] or "",
                     None,
                     None,
-                    txn.tender or "",
-                    txn.amount,
+                    txn["tender"] or "",
+                    txn["amount"],
                     None,
-                    txn.auth or "",
-                    txn.voucher or "",
+                    txn["auth"] or "",
+                    txn["voucher"] or "",
                     bank,
                     ("%s CEK (%s)" % (label, bank)) if label and bank else "",
                     line.settlement_date if line else None,

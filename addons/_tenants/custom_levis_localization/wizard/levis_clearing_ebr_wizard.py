@@ -24,7 +24,11 @@ class LevisClearingEbrWizard(models.TransientModel):
     compile_sales = fields.Boolean(
         string="Include COMPILE SALES",
         default=True,
-        help="Every X70D tender transaction of the period — around 9.000 rows for a Levi's month.",
+        help="Every X70D tender transaction of the period — around 9.000 rows for a "
+        "Levi's month. It is the slow half of the export: the staged feed is read "
+        "through a SQL view over JSON, about a minute on prd_levis_begbal against "
+        "two seconds for everything else. Untick it if you only need the "
+        "reconciliation; SUMMARY already carries the sales side per store-day.",
     )
     receipt_gaps = fields.Boolean(
         string="Also list lines with unnamed receipts",

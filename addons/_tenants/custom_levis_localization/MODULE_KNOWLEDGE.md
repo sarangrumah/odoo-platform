@@ -1679,6 +1679,19 @@ itself without taking the rest of the upload down.
 The export changes nothing at all — no Compute, no projection rebuild, no receipt
 touched — and `test_export_carries_the_sheets_and_writes_nothing` is its test.
 
+### What it costs, and where
+
+Measured on the live `prd_levis_begbal`, September run, 567 lines: `_META` 0,1 s,
+`SUMMARY` 0,1 s, `MUTASI IBCA` 0,2 s, `UNMAPPED` 0,0 s, `AR` 1,4 s, `REF` 0,0 s —
+and **`COMPILE SALES` 62 s**. The whole cost is one scan of `levis.pos.x70d.txn`,
+a SQL view over staged JSON that no index reaches; reading it with `search_read`
+instead of a recordset removed 12 s of repeated prefetch scans, and the remaining
+60 s is the scan itself. It is a wizard switch for that reason.
+
+No timeout is at risk: `limit_time_real` is 1200 s and Caddy's read/write timeout
+is 720 s. Worth knowing before somebody "fixes" a 90-second export that is not
+broken.
+
 ### Measured against the client's own workbook (August 2026)
 
 Built from `POSCLR/2026/0001` on a clone of `prd_levis_begbal`: 2.348 statement
