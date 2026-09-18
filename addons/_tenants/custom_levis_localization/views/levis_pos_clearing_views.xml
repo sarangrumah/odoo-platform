@@ -67,6 +67,9 @@
                                    readonly="state != 'draft'"/>
                             <field name="ar_fallback" readonly="state not in ('draft', 'computed')"/>
                             <field name="auto_only" readonly="state not in ('draft', 'computed')"/>
+                            <field name="scope_analytic_ids" widget="many2many_tags"
+                                   readonly="state not in ('draft', 'computed')"
+                                   options="{'no_create': True}"/>
                             <field name="currency_id" invisible="1"/>
                             <field name="move_count" invisible="1"/>
                             <field name="leg_count" invisible="1"/>

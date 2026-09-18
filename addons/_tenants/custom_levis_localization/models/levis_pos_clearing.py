@@ -221,6 +221,16 @@ class LevisPosClearing(models.Model):
         "else is still listed, with the reason, and left for a person.",
     )
 
+    scope_analytic_ids = fields.Many2many(
+        "account.analytic.account",
+        string="Only These Stores",
+        copy=False,
+        help="Book only the settlements belonging to these Operating Units. Every "
+        "other line is still listed with its reason and left untouched, so a later "
+        "run over the same period finds it exactly as it was. Empty means the whole "
+        "period, which is the ordinary run.",
+    )
+
     line_ids = fields.One2many("levis.pos.clearing.line", "run_id", copy=False)
     leg_ids = fields.One2many("levis.pos.clearing.leg", "run_id", copy=False)
     receipt_ids = fields.One2many("levis.pos.clearing.receipt", "run_id", copy=False)
@@ -1915,6 +1925,18 @@ class LevisPosClearing(models.Model):
             return vals
 
         if parsed["kind"] in _BANK_KINDS:
+            if self.scope_analytic_ids:
+                # A run narrowed to a few stores must not book the bank's own
+                # sweeps and charges: those belong to the company, not to a
+                # store, and the wide run that follows is meant to find them.
+                vals.update(
+                    {
+                        "state": "skipped",
+                        "block": False,
+                        "note": _("Out of this run's store scope."),
+                    }
+                )
+                return vals
             vals.update({"state": "ok", "block": "c"})
             return vals
 
@@ -1952,6 +1974,19 @@ class LevisPosClearing(models.Model):
                     "res_model": "account.bank.statement.line",
                     "res_id": statement_line.id,
                     "message": parsed["mid"] or parsed["tid"] or (parsed["keyword"] or "")[:120],
+                }
+            )
+            return vals
+
+        if self.scope_analytic_ids and target_analytic not in self.scope_analytic_ids:
+            # Listed, explained, and left exactly as it was found.
+            vals.update(
+                {
+                    "analytic_account_id": target_analytic.id,
+                    "trans_date": primary,
+                    "state": "skipped",
+                    "block": False,
+                    "note": _("Out of this run's store scope."),
                 }
             )
             return vals

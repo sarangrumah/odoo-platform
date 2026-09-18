@@ -1737,3 +1737,51 @@ so where the two disagree, it is the workbook that is adding something up twice.
 + 10 tender disagreements. That is the month's real manual work, against the 920
 rows the first cut of this sheet produced before the receipt gaps were moved
 behind a switch.
+
+## Feature 30 — Clearing one store-day, and pairing its two lists by hand
+
+Feature 27 answers "which store-days tie?" and books them in one narrowed run.
+What it could not do is the other half of month-end: take the store-day that
+does *not* tie, work out by hand which receipts that particular credit paid, and
+clear that store alone.
+
+### The run can be narrowed to a set of stores
+
+`scope_analytic_ids` on `levis.pos.clearing`. A line whose store is outside the
+scope is `skipped` with `block = False` and a reason — the same shape `auto_only`
+uses, and for the same purpose: a later wide run must find it exactly as it was.
+Block C is skipped too when a scope is set, because the bank's own sweeps belong
+to the company and not to the store being cleared.
+
+`action_clear` on `levis.pos.clearing.store.day` (one record or a selection from
+the list) creates that narrowed run over the picked dates and stores, computes
+it, and opens it. It stops there. Prepare Entries and Post & Reconcile are
+unchanged, so partial clearing behaves as it always has: what the allocation
+explains is booked, and an unexplained remainder stays on suspense with the bank
+line still open.
+
+The guarantee that makes this safe is one #258 already had to establish:
+`_mark_statement_lines` claims only lines that produced legs, so a narrowed run
+never locks a line it did not book out of the run that will.
+
+### `levis.clearing.match` — the bank on the left, the till on the right
+
+Opened from a store-day. Left column: that day's bank credits with gross, what
+is already matched and what is not. Right column: the store's X70D transactions
+for the trading day. Tick one credit and the transactions it paid, press
+*Pasangkan*, and both totals are shown with their difference as you go.
+
+Three rules, each one the engine's own:
+
+* **Pairing names one credit.** Ticking two would leave the assignment
+  ambiguous, so `action_match` refuses it by name.
+* **A transaction is paid once.** Every claimed transaction — including one held
+  by another credit on the *same* store-day — is shown with the entry holding it
+  and cannot be ticked. An earlier cut locked only the ones held elsewhere, which
+  let a tick look available and then fail at the partial unique index on the way
+  out; measured on a real store-day (Plaza Senayan, 7 September) that was 5
+  visible locks where there are in fact 11.
+* **The answer outlives the run.** It is written to `levis.clearing.manual.map`
+  as well as to the receipts, because `action_compute` rebuilds receipts.
+
+The screen books nothing. It records what pays what.

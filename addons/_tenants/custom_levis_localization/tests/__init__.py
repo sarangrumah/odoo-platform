@@ -20,3 +20,4 @@ from . import test_journal_code_allocation
 from . import test_ou_required
 from . import test_session_cogs
 from . import test_clearing_recon_roundtrip
+from . import test_clearing_store_day_match
