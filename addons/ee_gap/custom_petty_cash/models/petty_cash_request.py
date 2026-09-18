@@ -25,12 +25,15 @@ through the company's exchange-difference journal.
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 from .petty_cash_type import FLOAT_KINDS, KIND_CLAIM, KIND_INITIAL, KIND_REALIZATION
+
+_logger = logging.getLogger(__name__)
 
 DEFAULT_OU_PLAN = "Operating Unit"
 
@@ -134,7 +137,7 @@ class PettyCashRequest(models.Model):
     advance_account_id = fields.Many2one(
         "account.account",
         string="Advance Account",
-        domain="[('reconcile', '=', True)]",
+        domain="['|', ('reconcile', '=', True), ('account_type', '=', 'asset_cash')]",
     )
 
     disburse_move_id = fields.Many2one("account.move", string="Disbursement Entry", copy=False, readonly=True)
@@ -1132,8 +1135,17 @@ class PettyCashRequest(models.Model):
                 )
             )
         # Reconcile the advance-account lines so the ledger closes for this request.
+        #
+        # A cash advance account is allowed (sheet #44 asks for 1102000001 Cash
+        # on hand), and a cash account is not reconcilable — Odoo would refuse
+        # the reconcile and, worse, ``mapped("account_id").reconcile`` raises a
+        # singleton error the moment the lines span two accounts. So the test is
+        # ``all(...)`` over the mapped booleans, and a non-reconcilable advance
+        # account simply settles without auto-matching, which is the correct
+        # behaviour for a float account.
         adv_lines = self._advance_move_lines(posted_only=True).filtered(lambda l: not l.reconciled)
-        if adv_lines and adv_lines.mapped("account_id").reconcile:
+        adv_accounts = adv_lines.mapped("account_id")
+        if adv_lines and adv_accounts and all(adv_accounts.mapped("reconcile")):
             try:
                 result = adv_lines.reconcile()
             except UserError:
@@ -1141,6 +1153,12 @@ class PettyCashRequest(models.Model):
                 pass
             else:
                 self._pc_tag_exchange_moves(result)
+        elif adv_lines:
+            _logger.info(
+                "petty cash %s: advance account %s is not reconcilable, settling without auto-reconcile.",
+                self.name,
+                ", ".join(adv_accounts.mapped("display_name")),
+            )
         self.state = "settled"
         self.message_post(body=_("Settled — advance cleared."), subtype_xmlid="mail.mt_note")
         return True

@@ -107,6 +107,10 @@ This is the canonical Indonesian withholding + DPP module. Any BRD with "potong 
 - **`x_custom_pkp` is a flag without behavior in-tree** — fiscal-position automation is left for Coretax / verticals.
 - **Bupot creation failure does NOT block withholding line creation** — error posted to chatter, line stays.
 
+- **The Kode Objek's COA is checked at posting, never rewritten.** `tax.withholding.rule.account_id` is the mapping Tim Tax maintains per Kode Objek, but the GL is written by Odoo's native tax engine, which takes its account from the tax's repartition line and has never heard of the Kode Objek — two sources of truth that can drift in silence. Re-pointing the tax line before `super()._post()` does **not** work: posting re-syncs the dynamic lines and recomputes the account from the repartition line, which is the same reason the labels and amounts in `account_move_inherit.py` are stashed and restored around super. So `_custom_check_withholding_accounts` is a gate: read-only, rebuild-proof, and it names both accounts. Fixing a divergence means pointing the tax's repartition line at the account the rule names — **not** enabling the withholding engine, which would book the same money twice.
+- **It currently never fires, and that is the point.** On `prd_levis_begbal` every Kode Objek in use already agrees with its rule (Z1-1F → 2104100001, the seven Z5-* → 2104100005, Z3-3I → 2104100003), so the guard costs nothing today and catches the first divergence on the day Tax introduces one. `custom_tax_id.withholding_account_guard` turns it off; `scripts/tenants/levis/118_audit_pph_coa_mapping.py` reports both sides.
+- **Two Kode Objek behind one tax line is a mapping the native engine cannot express.** The guard logs a warning and declines to pick a winner, rather than silently routing half the money.
+
 ## Out of Scope
 - **PPh 21 personal payroll withholding** — see payroll modules (separate from this AP-focused engine).
 - **e-Bupot XML serialisation** — `custom_coretax` / `custom_coretax_bupot` own the actual XML build + DJP submission.

@@ -1236,3 +1236,23 @@ the "bug" in the admin-fee module is a dead end.
   `payment_term` — the last is the receivable/payable leg, which the Operating Unit has
   no business on. Restricting the cascade to product lines is what made the header field
   look like it had not worked on exactly the entries #36 is about.
+
+## Feature 26 — Inventory adjustments get a document number (sheet #70)
+
+Odoo 19 books an inventory adjustment as bare `stock.move` records with
+`is_inventory = True` and **no picking**, so there is no document to point at and two
+unrelated counts on the same day are indistinguishable in the Reference column.
+
+The hook already exists in core: `stock.move.inventory_name` feeds `_compute_reference`,
+and `stock.quant._get_inventory_move_values` picks it up from the context. So
+`stock_quant.py` draws **one** number per `_apply_inventory` — one count is one document,
+however many lines it touches — from the `levis.stock.adjustment` sequence
+(`STADJ/YYYY/MM/NNNNN`, `noupdate="1"` so an upgrade never resets a drawn number) and lets
+core carry it. Do not reach for a new model; there is nothing to model.
+
+The sibling numbering — `GR/<wh>/YYYY/MM/NNNNN` and `INTF/<wh>/YYYY/MM/NNNNN` per picking
+type, `STSCP/YYYY/MM/NNNNN` for scrap — is configuration, not code:
+`scripts/tenants/levis/120_set_document_numbering.py`. **The warehouse code is not
+optional in INTF**, even though the client's example omits it: each of the 34 internal
+picking types owns its own sequence, so a shared prefix would run 34 counters in parallel
+and mint duplicate document numbers.

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+          Sheet row #70: inventory adjustments need a document number of their
+          own. One sequence for the company, drawn once per apply — the
+          warehouse is already on every line, and a per-warehouse counter would
+          make one physical count look like 34 documents.
+
+          noupdate="1" so a number already drawn is never reset by an upgrade.
+        -->
+        <record id="seq_levis_stock_adjustment" model="ir.sequence">
+            <field name="name">Levi's Inventory Adjustment</field>
+            <field name="code">levis.stock.adjustment</field>
+            <field name="prefix">STADJ/%(range_year)s/%(range_month)s/</field>
+            <field name="padding">5</field>
+            <field name="use_date_range" eval="True"/>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

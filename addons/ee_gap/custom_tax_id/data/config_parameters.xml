@@ -18,5 +18,18 @@
             <field name="key">custom_tax_id.withholding_gl_posting</field>
             <field name="value">1</field>
         </record>
-    </data>
+
+        <!--
+          T17: refuse to post a PPh line whose account ignores the Kode Objek
+          mapping on tax.withholding.rule. Default ON because it currently
+          never fires — every code in use on prd_levis_begbal already agrees
+          with its rule — so it costs nothing today and catches the first
+          divergence on the day Tax introduces it.
+        -->
+        <record id="param_withholding_account_guard" model="ir.config_parameter">
+            <field name="key">custom_tax_id.withholding_account_guard</field>
+            <field name="value">1</field>
+        </record>
+
+</data>
 </odoo>

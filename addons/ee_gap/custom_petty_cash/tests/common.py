@@ -36,11 +36,22 @@ class PettyCashCommon(TransactionCase):
         )
         cls.gen_journal = Journal.create({"name": "CA Misc", "type": "general", "code": "CAMS"})
 
+        # Test-only codes ("T-" prefix). ``petty_cash_type`` carries a
+        # unique(code, company) constraint, and a tenant database that already
+        # runs Petty Cash owns the obvious codes — "CA" and "PC" both exist on
+        # prd_levis_begbal. Hard-coding them made setUpClass raise on every
+        # configured database, which took five test classes down with it.
         Type = cls.env["petty.cash.type"]
+        # ``is_default`` is unique per (kind, company) and a tenant database
+        # already has one. Stand the incumbent down inside the test transaction
+        # — it rolls back with everything else.
+        Type.with_context(active_test=False).search(
+            [("company_id", "=", cls.company.id), ("is_default", "=", True)]
+        ).is_default = False
         cls.type_ca = Type.create(
             {
                 "name": "Cash Advance",
-                "code": "CA",
+                "code": "T-CA",
                 "kind": "cash_advance",
                 "is_default": True,
                 "company_id": cls.company.id,
@@ -53,7 +64,7 @@ class PettyCashCommon(TransactionCase):
         cls.type_pc = Type.create(
             {
                 "name": "Petty Cash",
-                "code": "PC",
+                "code": "T-PC",
                 "kind": "petty_cash",
                 "company_id": cls.company.id,
                 "advance_account_id": cls.advance_pc.id,

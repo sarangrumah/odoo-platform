@@ -34,3 +34,4 @@ from . import levis_pos_clearing
 from . import levis_pos_clearing_day
 from . import levis_pos_clearing_x70d
 from . import levis_pos_clearing_store_day
+from . import stock_quant

@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 
 from odoo import Command, _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -73,7 +74,98 @@ class AccountMove(models.Model):
 
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # The Kode Objek's COA must be the COA the PPh actually credits (T17)
+    # ------------------------------------------------------------------
+    # ``tax.withholding.rule.account_id`` is the mapping Tim Tax maintains per
+    # Kode Objek. The GL, however, is written by Odoo's native tax engine, which
+    # takes its account from the tax's repartition line and has never heard of
+    # the Kode Objek. Today the two agree for every code in use on
+    # prd_levis_begbal — Z1-1F -> 2104100001, the seven Z5-* -> 2104100005,
+    # Z3-3I -> 2104100003 — but nothing *enforces* that. The day Tax points a
+    # code at a different account, the bill would post to the old one and
+    # nobody would find out until the SPT did not tie.
+    #
+    # Re-pointing the tax line's ``account_id`` before ``super()._post()`` does
+    # not work: posting re-syncs the dynamic lines and recomputes the account
+    # from the repartition line, which is also why the labels and amounts in
+    # this file are stashed and restored around super. So the enforcement is a
+    # gate, not a rewrite — it is read-only, and it cannot be undone by the
+    # rebuild. Fixing a divergence means pointing the tax's repartition line at
+    # the account the rule names (script 118 reports both sides).
+    def _custom_withholding_account_mismatches(self):
+        """[(tax line, account it uses, account its Kode Objek prescribes)]."""
+        self.ensure_one()
+        if self.move_type not in ("in_invoice", "in_refund"):
+            return []
+        Rule = self.env["tax.withholding.rule"]
+        company = self.company_id
+        mismatches = []
+        for tax_line in self.line_ids:
+            tax = tax_line.tax_line_id
+            if not tax or tax.amount >= 0:
+                continue
+            bases = self.line_ids.filtered(lambda line, t=tax: line.display_type == "product" and t in line.tax_ids)
+            targets = set()
+            for category in bases.mapped("x_custom_withholding_category_id"):
+                rule = Rule._rule_for_category(category, company)
+                if rule and rule.account_id:
+                    targets.add(rule.account_id)
+            # No Kode Objek on any base line -> nothing prescribed, nothing to
+            # check. Two different accounts behind ONE tax line is a mapping the
+            # native engine cannot express at all; say so rather than pick one.
+            if not targets:
+                continue
+            if len(targets) > 1:
+                _logger.warning(
+                    "%s: tax %s covers Kode Objek mapped to %s different accounts; "
+                    "the native tax engine can only use one.",
+                    self.name or "/",
+                    tax.name,
+                    len(targets),
+                )
+                continue
+            target = targets.pop()
+            if tax_line.account_id != target:
+                mismatches.append((tax_line, tax_line.account_id, target))
+        return mismatches
+
+    def _custom_check_withholding_accounts(self):
+        """Refuse to post a PPh line that ignores its Kode Objek's COA."""
+        param = self.env["ir.config_parameter"].sudo()
+        if str(param.get_param("custom_tax_id.withholding_account_guard", "1")).strip().lower() not in (
+            "1",
+            "true",
+            "yes",
+        ):
+            return
+        problems = []
+        for move in self:
+            company = move.company_id
+            for tax_line, used, target in move._custom_withholding_account_mismatches():
+                problems.append(
+                    "%s | %s | posts to %s | Kode Objek maps to %s"
+                    % (
+                        move.name or "/",
+                        tax_line.tax_line_id.name,
+                        used.with_company(company).code or used.display_name,
+                        target.with_company(company).code or target.display_name,
+                    )
+                )
+        if not problems:
+            return
+        raise UserError(
+            self.env._(
+                "The PPh account does not match the Kode Objek mapping.\n\n%(lines)s\n\n"
+                "Point the tax's repartition line at the mapped account, or change the "
+                "mapping on the withholding rule. "
+                "scripts/tenants/levis/118_audit_pph_coa_mapping.py reports both sides.",
+                lines="\n".join(problems[:20]),
+            )
+        )
+
     def _post(self, soft=True):
+        self._custom_check_withholding_accounts()
         # Materialise withholding lines + bupot drafts BEFORE super so they are
         # available on the freshly-posted move.
         for move in self:
