@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-17T09:06:16+00:00",
+  "generated_at": "2026-09-18T00:14:10+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "c3b1c7dd",
-    "branch": "t18-rebase"
+    "commit": "0cd2f3d1",
+    "branch": "feat/levis-golive-wave1"
   },
   "buckets": [
     {
@@ -287,14 +287,19 @@
       "module": "custom_levis_asset_accounts",
       "bucket": "_tenants",
       "name": "Levi's Fixed Asset Revaluation Accounts",
-      "version": "19.0.2.2.0",
+      "version": "19.0.2.3.0",
       "summary": "Seed the 6 EBR fixed-asset categories and wire IAS 16 revaluation account defaults onto fixed-asset groups by resolving Erajaya chart codes per company.",
       "category": "Tenants/Levis",
       "depends": 1,
       "public": false,
-      "last_change": "2026-09-16",
-      "change_count": 5,
+      "last_change": "2026-09-18",
+      "change_count": 6,
       "changes": [
+        {
+          "sha": "25ba40af",
+          "date": "2026-09-18",
+          "subject": "feat(levis): the receipts a bill has not reached, and five more sheet rows"
+        },
         {
           "sha": "18e48a40",
           "date": "2026-09-16",
@@ -335,9 +340,9 @@
       "change_count": 4,
       "changes": [
         {
-          "sha": "c3b1c7dd",
+          "sha": "81d69375",
           "date": "2026-09-17",
-          "subject": "feat(levis): show the bank MID, and make one unmapped MID one click from fixed"
+          "subject": "feat(levis): show the bank MID, and make one unmapped MID one click from fixed (#250)"
         },
         {
           "sha": "889ce243",
@@ -384,14 +389,24 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.52.0",
+      "version": "19.0.1.53.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
       "public": false,
-      "last_change": "2026-09-17",
-      "change_count": 55,
+      "last_change": "2026-09-18",
+      "change_count": 57,
       "changes": [
+        {
+          "sha": "0cd2f3d1",
+          "date": "2026-09-18",
+          "subject": "fix(levis): ir.actions.server takes group_ids in Odoo 19, not groups_id"
+        },
+        {
+          "sha": "25ba40af",
+          "date": "2026-09-18",
+          "subject": "feat(levis): the receipts a bill has not reached, and five more sheet rows"
+        },
         {
           "sha": "a9875fef",
           "date": "2026-09-17",
@@ -421,16 +436,6 @@
           "sha": "e0f5965d",
           "date": "2026-08-19",
           "subject": "feat(levis): the payment voucher names every bill it settles, with the amount applied to each (#184)"
-        },
-        {
-          "sha": "2653a4b8",
-          "date": "2026-08-18",
-          "subject": "feat(levis): batch menengah sheet after-go-live — filter status bill, kolom store, daftar bill di payment, jurnal sales return (#176)"
-        },
-        {
-          "sha": "62b4b5db",
-          "date": "2026-08-18",
-          "subject": "fix(levis): batch cepat dari sheet after-go-live — Tax Number \"04\", pencarian Kode Objek PPh, kategori aset ROU, flag payment destination (#172)"
         }
       ]
     },
@@ -1598,14 +1603,19 @@
       "module": "custom_accounting_asset",
       "bucket": "ee_gap",
       "name": "Custom Accounting - Fixed Assets",
-      "version": "19.0.0.10.0",
+      "version": "19.0.0.11.0",
       "summary": "Fixed asset register with depreciation schedule, monthly posting cron, and disposal workflow",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
-      "last_change": "2026-09-17",
-      "change_count": 28,
+      "last_change": "2026-09-18",
+      "change_count": 29,
       "changes": [
+        {
+          "sha": "25ba40af",
+          "date": "2026-09-18",
+          "subject": "feat(levis): the receipts a bill has not reached, and five more sheet rows"
+        },
         {
           "sha": "a3b291a8",
           "date": "2026-09-17",
@@ -1640,11 +1650,6 @@
           "sha": "d1c89520",
           "date": "2026-07-30",
           "subject": "feat(assets): book one monthly depreciation entry instead of one per asset"
-        },
-        {
-          "sha": "4704e07d",
-          "date": "2026-07-29",
-          "subject": "fix: convert every _sql_constraints to models.Constraint"
         }
       ]
     },
@@ -1760,14 +1765,19 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.29.0",
+      "version": "19.0.0.30.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
-      "last_change": "2026-09-17",
-      "change_count": 59,
+      "last_change": "2026-09-18",
+      "change_count": 60,
       "changes": [
+        {
+          "sha": "25ba40af",
+          "date": "2026-09-18",
+          "subject": "feat(levis): the receipts a bill has not reached, and five more sheet rows"
+        },
         {
           "sha": "a23047cc",
           "date": "2026-09-17",
@@ -1802,11 +1812,6 @@
           "sha": "bde8a4e8",
           "date": "2026-08-26",
           "subject": "feat(reports): rincian PPN Keluaran Digunggung sampai nomor transaksi (#195)"
-        },
-        {
-          "sha": "3e7fdd6f",
-          "date": "2026-08-20",
-          "subject": "feat(reports): rekap PPN Keluaran Digunggung untuk PKP Pedagang Eceran (#190)"
         }
       ]
     },
