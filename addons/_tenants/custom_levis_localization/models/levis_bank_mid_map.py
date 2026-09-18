@@ -48,6 +48,7 @@ class LevisBankMidMap(models.Model):
         [
             ("mid", "Bank MID"),
             ("tid", "Terminal / TID"),
+            ("terminal", "E-Banking / CDM Terminal"),
             ("keyword", "Narrative Keyword"),
         ],
         required=True,
@@ -162,7 +163,11 @@ class LevisBankMidMap(models.Model):
         if not self._journals_overlap(other) or not self._dates_overlap(other):
             return False
         if self.match_type == "keyword":
-            return (self.key or "").strip().lower() == (other.key or "").strip().lower()
+            # Compared compacted, because that is how they are matched now: two
+            # rules spelling one shorthand differently are one rule twice.
+            return self._compact(self.key) == self._compact(other.key)
+        if self.match_type == "terminal":
+            return self._normalise_terminal(self.key) == self._normalise_terminal(other.key)
         return self._keys_match(self._normalise_key(other.key), self._normalise_key(self.key))
 
     def _journals_overlap(self, other):
@@ -182,6 +187,8 @@ class LevisBankMidMap(models.Model):
         self.ensure_one()
         if self.match_type == "keyword":
             return _("the same keyword")
+        if self.match_type == "terminal":
+            return _("the same terminal code")
         mine, theirs = self._normalise_key(self.key), self._normalise_key(other.key)
         if mine == theirs:
             if (self.key or "") == (other.key or ""):
@@ -224,6 +231,30 @@ class LevisBankMidMap(models.Model):
     # ------------------------------------------------------------------
     # Matching
     # ------------------------------------------------------------------
+    @api.model
+    @api.model
+    def _normalise_terminal(self, raw):
+        """An e-banking terminal, compared whole.
+
+        Deliberately not ``_normalise_key``: that keeps digits only, which turns
+        ``Z6FK1`` into ``61`` and would then suffix-match it against merchant ids
+        all over the table. A terminal code is short and alphanumeric, so it is
+        compared exactly, upper-cased.
+        """
+        return "".join(ch for ch in (raw or "") if ch.isalnum()).upper()
+
+    @api.model
+    def _compact(self, raw):
+        """Text with every separator removed, for matching a store shorthand.
+
+        Cashiers type the shorthand with spaces wherever it suits them: the same
+        outlet arrives as ``k gm``, ``kgm`` and ``KG M``, and Kelapa Gading's
+        deposits were being matched by three separate rules for three spellings.
+        Comparing without separators makes one rule cover every spelling, and the
+        ones nobody has thought of yet.
+        """
+        return "".join(ch for ch in (raw or "") if ch.isalnum()).lower()
+
     @api.model
     def _normalise_key(self, raw):
         """Digits only, without the leading zeros the bank pads with."""
@@ -283,10 +314,39 @@ class LevisBankMidMap(models.Model):
         # fuzzy-matching that is exactly what this model exists to avoid.
         if parsed.get("mid") or parsed.get("tid"):
             return self.browse()
+
+        # A cash deposit's terminal, on the other hand, is a hint and not an
+        # identity: the same machine serves whoever walks up to it. So an
+        # unmapped terminal falls through to the keyword rules rather than
+        # blocking them the way an unmapped MID does.
+        terminal = self._normalise_terminal(parsed.get("terminal"))
+        if terminal:
+            hit = rules.filtered(
+                lambda r, t=terminal: r.match_type == "terminal" and self._normalise_terminal(r.key) == t
+            )
+            if hit:
+                return hit[0]
+
         haystack = (parsed.get("keyword") or parsed.get("raw") or "").lower()
         if not haystack:
             return self.browse()
-        hits = rules.filtered(lambda r: r.match_type == "keyword" and r.key and r.key.lower() in haystack)
+        # Matched twice: as written, and with every separator removed. The second
+        # pass is what catches the shorthand a cashier broke up with spaces
+        # ("k gm", "bi p", "T smc"); the first keeps the multi-word rules that
+        # already exist working as they read. Anything under three characters is
+        # only matched as written -- compacted, a two-letter key lands inside
+        # people's names.
+        compact_hay = self._compact(haystack)
+        hits = rules.filtered(
+            lambda r: (
+                r.match_type == "keyword"
+                and r.key
+                and (
+                    r.key.lower() in haystack
+                    or (len(self._compact(r.key)) >= 3 and self._compact(r.key) in compact_hay)
+                )
+            )
+        )
         if not hits:
             return self.browse()
         # The most specific keyword wins, not the first row off the recordset.

@@ -1,0 +1,44 @@
+match_type,key,operating_unit,bukti_baris,catatan
+terminal,Z1651,OLS SES - SENAYAN CITY,7,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z1661,OLS SES - SENAYAN CITY,6,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z1671,OLS SES - SENAYAN CITY,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z1681,OLS SES - SENAYAN CITY,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z3KZ1,OLS SES - MALL OF INDONESIA,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z3WH1,OLS SES - TRANS STUDIO MALL BANDUNG,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FF1,OLS SES - KELAPA GADING MALL,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FH1,OLS SES - KELAPA GADING MALL,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FJ1,OLS SES - KELAPA GADING MALL,2,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FK1,OLS SES - KELAPA GADING MALL,5,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FL1,OLS SES - KELAPA GADING MALL,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FM1,OLS SES - KELAPA GADING MALL,3,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FN1,OLS SES - MALL OF INDONESIA,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FP1,OLS SES - MALL OF INDONESIA,3,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FQ1,OLS SES - MALL OF INDONESIA,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FR1,OLS SES - MALL OF INDONESIA,7,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z6FU1,OLS SES - MALL OF INDONESIA,6,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z8D91,OLS SES - PARIS VAN JAVA,2,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z8E01,OLS SES - PARIS VAN JAVA,3,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z8VP1,OLS SES - SENAYAN CITY,1,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,Z8VR1,OLS SES - PONDOK INDAH MALL 1,4,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZA321,OLS SES - TRANS STUDIO CIBUBUR,2,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZC311,OLS SES - TRANS STUDIO CIBUBUR,5,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZKA11,OLS SES - PLAZA SENAYAN,3,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZKB11,OLS SES - PLAZA SENAYAN,12,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZL6C1,OLS SES - GRAND INDONESIA,5,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZL6D1,OLS SES - GRAND INDONESIA,5,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZL6E1,OLS SES - GRAND INDONESIA,3,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZL6F1,OLS SES - GRAND INDONESIA,7,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZL6H1,OLS SES - GRAND INDONESIA,4,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+terminal,ZLE51,OLS SES - PLAZA SENAYAN,4,kode terminal BCA e-banking/CDM; satu toko bisa punya beberapa
+singkatan,AEONBSD,OLS SES - AEON BSD CITY,14,
+singkatan,BIP,OLS SES - BANDUNG INDAH PLAZA,29,
+singkatan,GALAXY,OLS SES - GALAXY MALL 3,12,
+singkatan,GALAXYMAL,OLS SES - GALAXY MALL 3,9,
+singkatan,KGM,OLS SES - KELAPA GADING MALL,5,
+singkatan,LOTTE,OLS SES - LOTTE SHOPPING AVENUE,10,
+singkatan,MMB,OLS SES - METROPOLITAN MALL BEKASI,24,
+singkatan,PAKUWON,OLS SES - PAKUWON MALL SURABAYA,22,
+singkatan,PAKUWONMAL,OLS SES - PAKUWON MALL SURABAYA,8,
+singkatan,PVJ,OLS SES - PARIS VAN JAVA,48,
+singkatan,PASKAL,OLS SES - PASKAL BANDUNG,13,
+singkatan,TSC,OLS SES - TRANS STUDIO CIBUBUR,2,"HATI-HATI: bukti hanya 2 baris, dan 'TSC' ada di dalam kode bank FTSCY — hanya aman bila boilerplate dibuang lebih dulu"

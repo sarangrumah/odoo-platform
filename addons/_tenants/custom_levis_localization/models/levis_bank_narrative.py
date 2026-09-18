@@ -68,6 +68,17 @@ _BRI_SETTLE = re.compile(
     re.IGNORECASE,
 )
 
+# The terminal a cash deposit was paid in at. Two spellings in the real feed:
+# "SETORAN VIA CDM 05/07 WSID:ZT481 ..." and the bare code an e-banking transfer
+# carries ("TRSF E-BANKING CR 07/03 Z8VR1 RISA INDRIYANI"). The bare form is
+# anchored to the date that always precedes it, so it cannot swallow a word from
+# the free text that follows.
+_BCA_TERMINAL = re.compile(
+    r"WSID[:\s]*(?P<terminal>[A-Z0-9]{4,8})\b"
+    r"|\b\d{1,2}/\d{1,2}\s+(?P<terminal2>Z[A-Z0-9]{3,7})\b",
+    re.IGNORECASE,
+)
+
 # Noise stripped before a free-text cash deposit is offered as a keyword rule.
 _NOISE = (
     re.compile(r"\b\d{1,4}/[A-Z]+/[A-Z0-9]+\b"),  # 0107/FTSCY/WS95031
@@ -129,6 +140,11 @@ class LevisBankNarrative(models.AbstractModel):
             "kind": "unknown",
             "mid": None,
             "tid": None,
+            # The e-banking / CDM terminal a cash deposit was paid in at. Kept
+            # apart from ``tid``: that one is a card terminal and is compared on
+            # digits alone, which would reduce "Z6FK1" to "61" and collide it
+            # with half the merchant ids in the table.
+            "terminal": None,
             "keyword": None,
             "gross": 0.0,
             "mdr": 0.0,
@@ -230,9 +246,18 @@ class LevisBankNarrative(models.AbstractModel):
             return self._blank(payment_ref, kind="interest", gross=abs(amount or 0.0))
 
         if re.search(r"^(TRSF E-BANKING CR|SETORAN TUNAI|SETORAN VIA CDM|BI-FAST CR)", upper):
+            # Read the terminal BEFORE _strip_noise, which deliberately deletes
+            # these codes: left in the keyword they would make every deposit its
+            # own group. As a field of its own the same code is the best evidence
+            # a cash deposit carries — a store's staff use the machines nearest
+            # the shop, so one terminal means one store (31 of 33 observed codes
+            # resolve to exactly one, several stores having more than one).
+            hit = _BCA_TERMINAL.search(upper)
+            terminal = (hit.group("terminal") or hit.group("terminal2")) if hit else None
             return self._blank(
                 payment_ref,
                 kind="cash_deposit",
+                terminal=terminal.upper() if terminal else None,
                 keyword=self._strip_noise(text),
                 gross=abs(amount or 0.0),
                 channel="cash",
