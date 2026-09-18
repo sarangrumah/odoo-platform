@@ -1352,9 +1352,18 @@ sanctioned route for cash remains `levis.store.cash.deposit` with a validated
 *berita acara*, whose `_find_for_statement_line` returns a record only when
 exactly one candidate fits.
 
-`deposit_match_window_days` (default 3) is still **not read by anything**. When
-the cash path is taken up, note that three days does not survive a long weekend —
-which is scenario 2 above.
+`deposit_match_window_days` (default 3) is still **not read by anything**, and
+it cannot usefully be switched on yet: `levis.store.cash.deposit._find_for_statement_line`,
+the only thing the window would parameterise, has no production caller either —
+its `window_days=3` default is reached only from its own tests. So the field is
+inert twice over, and wiring it before the cash path exists would be wiring a
+knob into nothing.
+
+When that path is built, two things are already known about it. Three days does
+not survive a long weekend, which is scenario 2 above and the reason the default
+is wrong rather than merely conservative. And the search direction is right as
+it stands: it looks only backwards from the bank date, because money is paid in
+on or before the day it lands.
 
 ### An unreadable line poisons its whole bank day
 
