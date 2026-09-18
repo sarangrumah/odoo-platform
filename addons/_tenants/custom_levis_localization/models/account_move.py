@@ -30,6 +30,13 @@ _logger = logging.getLogger(__name__)
 # ``0`` stops it instantly without a redeploy, which is the rollback.
 GRIR_AUTO_PARAM = "custom_levis_localization.grir_auto_reconcile"
 
+# Sheet #36: a P&L line with no Operating Unit is invisible in per-store
+# reporting, and 79 of 2026's posted lines are exactly that. Default OFF —
+# Finance backfills the existing ones first, then the switch goes on.
+OU_REQUIRED_PARAM = "custom_levis_localization.ou_required_pl"
+OU_SKIP_CONTEXT = "levis_skip_ou_required"
+OU_PLAN_NAME = "Operating Unit"
+
 BILL_TRADE_SEQ = "account.move.levis.bill.trade"
 BILL_NONTRADE_SEQ = "account.move.levis.bill.nontrade"
 
@@ -64,11 +71,22 @@ class AccountMove(models.Model):
 
     @api.onchange("l10n_ou_analytic_id")
     def _onchange_l10n_ou_analytic_id(self):
-        """Cascade the header OU onto product lines that have none yet."""
+        """Cascade the header OU onto every line that has none yet.
+
+        Product lines are the common case, but sheet #36 is about the ones that
+        are not: a bank charge or a rounding line keyed straight onto the entry
+        is still a P&L line, and leaving it out of the cascade is what made the
+        header field feel like it had not worked. An OU already filled by hand
+        is never overwritten.
+        """
         if not self.l10n_ou_analytic_id:
             return
-        for line in self.invoice_line_ids:
-            if line.display_type == "product" and not line.l10n_ou_analytic_id:
+        for line in self.invoice_line_ids | self.line_ids:
+            # payment_term is the receivable/payable leg — a balance-sheet line
+            # that the Operating Unit has no business on.
+            if line.display_type in ("line_section", "line_note", "payment_term"):
+                continue
+            if not line.l10n_ou_analytic_id:
                 line.l10n_ou_analytic_id = self.l10n_ou_analytic_id
 
     # ------------------------------------------------------------------
@@ -234,7 +252,112 @@ class AccountMove(models.Model):
             },
         }
 
+    # ------------------------------------------------------------------
+    # Operating Unit is mandatory on P&L lines (sheet row #36)
+    # ------------------------------------------------------------------
+    # The client re-opened this on 16-Sep: "masih ada transaksi ke COA P&L yang
+    # tidak mengisi operating unit tapi tetap bisa diposting (Hasil cek: bank
+    # admin)". The bank-admin case is not a broken code path — the admin-fee
+    # write-off already carries the OU when the payment wizard has one; it is
+    # that nothing makes anyone fill it in. So the answer is a gate on posting,
+    # not another stamping hook.
+    #
+    # Measured on prd_levis_begbal for 2026: 21,988 posted P&L lines, of which
+    # **79** carry no Operating Unit — GLJV 50, OBCA 12, EBRTB 6, IBRI/IMand/
+    # IBNI/BILL 9, DEPRE 2. Turning the switch on before those are backfilled
+    # would block nothing that matters and annoy everyone, which is why it
+    # defaults to 0 and is flipped as a separate, reversible step.
+    def _levis_ou_required_enabled(self):
+        param = self.env["ir.config_parameter"].sudo().get_param(OU_REQUIRED_PARAM, "0")
+        return str(param).strip().lower() in ("1", "true", "yes")
+
+    def _levis_pl_account_ids(self, company):
+        """Ids of this company's P&L accounts, by code head 5-9.
+
+        One query per company per post, not a ``.code`` read per line: ``code``
+        is company-dependent in Odoo 19 (``code_store`` is a jsonb keyed by
+        company id), so reading it line by line would be a Python round-trip on
+        the hottest path in accounting.
+        """
+        self.env.cr.execute(
+            "SELECT id FROM account_account WHERE left(code_store->>%s, 1) BETWEEN '5' AND '9'",
+            (str(company.id),),
+        )
+        return {row[0] for row in self.env.cr.fetchall()}
+
+    def _levis_ou_analytic_ids(self):
+        """Ids of every analytic account in the Operating Unit plan."""
+        return set(self.env["account.analytic.account"].sudo().search([("plan_id.name", "=", OU_PLAN_NAME)]).ids)
+
+    @staticmethod
+    def _levis_distribution_has_ou(distribution, ou_ids):
+        """Whether ``distribution`` names any Operating Unit account.
+
+        Keys are comma-joined analytic account ids, one per plan, so the OU can
+        sit anywhere in the key — a membership test on the split, never on the
+        whole string.
+        """
+        if not distribution:
+            return False
+        for key in distribution:
+            for part in str(key).split(","):
+                if part.isdigit() and int(part) in ou_ids:
+                    return True
+        return False
+
+    def _levis_check_ou_required(self):
+        """Refuse to post a P&L line with no Operating Unit."""
+        if not self._levis_ou_required_enabled():
+            return
+        if self.env.context.get(OU_SKIP_CONTEXT):
+            _logger.warning(
+                "levis: OU-required check skipped by context for %s",
+                # An unposted move's name is False, not "/", so mapped() yields
+                # a truthy list of False and `or ["/"]` never fires.
+                ", ".join(move.name or "/" for move in self),
+            )
+            return
+        ou_ids = self._levis_ou_analytic_ids()
+        pl_by_company = {}
+        offenders = []
+        for move in self:
+            company = move.company_id
+            if company.id not in pl_by_company:
+                pl_by_company[company.id] = self._levis_pl_account_ids(company)
+            pl_ids = pl_by_company[company.id]
+            for line in move.line_ids:
+                if line.display_type in ("line_section", "line_note"):
+                    continue
+                if line.account_id.id not in pl_ids:
+                    continue
+                if line.l10n_ou_analytic_id:
+                    continue
+                if self._levis_distribution_has_ou(line.analytic_distribution, ou_ids):
+                    continue
+                offenders.append(
+                    "%s | %s | %s | %s"
+                    % (
+                        move.name or "/",
+                        line.account_id.with_company(company).code,
+                        (line.name or "")[:40],
+                        line.balance,
+                    )
+                )
+        if not offenders:
+            return
+        raise UserError(
+            self.env._(
+                "Operating Unit is required on profit-and-loss lines.\n\n"
+                "%(lines)s\n\n"
+                "Fill the Operating Unit on the header or on each line, or ask "
+                "Accounting to post it with the override.",
+                lines="\n".join(offenders[:20])
+                + ("\n... and %s more." % (len(offenders) - 20) if len(offenders) > 20 else ""),
+            )
+        )
+
     def _post(self, soft=True):
+        self._levis_check_ou_required()
         posted = super()._post(soft=soft)
         posted._levis_reconcile_grir()
         return posted

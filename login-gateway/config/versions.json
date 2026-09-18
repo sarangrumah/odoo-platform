@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-18T00:14:10+00:00",
+  "generated_at": "2026-09-18T00:24:31+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "0cd2f3d1",
-    "branch": "feat/levis-golive-wave1"
+    "commit": "ac2b249e",
+    "branch": "wave2-rebuilt"
   },
   "buckets": [
     {
@@ -296,9 +296,9 @@
       "change_count": 6,
       "changes": [
         {
-          "sha": "25ba40af",
+          "sha": "975f80bb",
           "date": "2026-09-18",
-          "subject": "feat(levis): the receipts a bill has not reached, and five more sheet rows"
+          "subject": "feat(levis): the receipts a bill has not reached, and five more After Go-Live rows (#255)"
         },
         {
           "sha": "18e48a40",
@@ -389,7 +389,7 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.53.0",
+      "version": "19.0.1.54.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
@@ -398,14 +398,14 @@
       "change_count": 57,
       "changes": [
         {
-          "sha": "0cd2f3d1",
+          "sha": "ac2b249e",
           "date": "2026-09-18",
-          "subject": "fix(levis): ir.actions.server takes group_ids in Odoo 19, not groups_id"
+          "subject": "feat(levis): refuse to post a P&L line with no Operating Unit"
         },
         {
-          "sha": "25ba40af",
+          "sha": "975f80bb",
           "date": "2026-09-18",
-          "subject": "feat(levis): the receipts a bill has not reached, and five more sheet rows"
+          "subject": "feat(levis): the receipts a bill has not reached, and five more After Go-Live rows (#255)"
         },
         {
           "sha": "a9875fef",
@@ -1612,9 +1612,9 @@
       "change_count": 29,
       "changes": [
         {
-          "sha": "25ba40af",
+          "sha": "975f80bb",
           "date": "2026-09-18",
-          "subject": "feat(levis): the receipts a bill has not reached, and five more sheet rows"
+          "subject": "feat(levis): the receipts a bill has not reached, and five more After Go-Live rows (#255)"
         },
         {
           "sha": "a3b291a8",
@@ -1774,9 +1774,9 @@
       "change_count": 60,
       "changes": [
         {
-          "sha": "25ba40af",
+          "sha": "975f80bb",
           "date": "2026-09-18",
-          "subject": "feat(levis): the receipts a bill has not reached, and five more sheet rows"
+          "subject": "feat(levis): the receipts a bill has not reached, and five more After Go-Live rows (#255)"
         },
         {
           "sha": "a23047cc",

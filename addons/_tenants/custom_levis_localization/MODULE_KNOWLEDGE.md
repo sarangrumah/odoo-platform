@@ -1206,3 +1206,33 @@ still keeps the reconciliation, and re-posting still recomputes the hand-keyed P
 — it only stops one entry refused by a period lock from discarding the resets before it.
 Each move gets its own savepoint and the refusals are reported together. Tenant-scoped
 deliberately: the two hazards above make this a poor platform-wide default.
+
+## Feature 25 — Operating Unit is mandatory on P&L lines (sheet #36)
+
+The client re-opened #36 on 16-Sep with a specific case: *"masih ada transaksi ke COA
+P&L yang tidak mengisi operating unit tapi tetap bisa diposting (Hasil cek: bank admin)"*.
+
+The bank-admin case is **not** a broken code path. `account.payment.register.
+_prepare_admin_fee_write_off_vals` already merges the wizard's OU into the fee line;
+what is missing is anything that makes an operator fill the wizard's OU in. So the
+answer is a gate on posting, not another stamping hook — which is also why looking for
+the "bug" in the admin-fee module is a dead end.
+
+- `_levis_check_ou_required()` runs from `_post`, **not** `@api.constrains`: a constraint
+  is validated at flush and an elevated env can walk straight past it.
+- `_levis_pl_account_ids(company)` is one SQL per company per post, reading
+  `code_store->>'<cid>'`. Never read `.code` per line — it is company-dependent in
+  Odoo 19, so a per-line read is a Python round-trip on the hottest path in accounting.
+- An OU counts whether it sits in `l10n_ou_analytic_id` or anywhere inside
+  `analytic_distribution` — keys are comma-joined analytic ids, one per plan, so the test
+  is membership on the split, never a substring on the key.
+- `custom_levis_localization.ou_required_pl` defaults to **0**, and
+  `levis_skip_ou_required` in the context is the emergency door (it logs a warning).
+  Measured on `prd_levis_begbal` for 2026: 21,988 posted P&L lines, **79** with no OU —
+  GLJV 50, OBCA 12, EBRTB 6, IBRI/IMand/IBNI/BILL 9, DEPRE 2. Finance backfills those
+  from `scripts/tenants/levis/116_report_pl_lines_without_ou.py` first; flipping the
+  switch is a separate, reversible step.
+- The header onchange now cascades to every line except `line_section`, `line_note` and
+  `payment_term` — the last is the receivable/payable leg, which the Operating Unit has
+  no business on. Restricting the cascade to product lines is what made the header field
+  look like it had not worked on exactly the entries #36 is about.

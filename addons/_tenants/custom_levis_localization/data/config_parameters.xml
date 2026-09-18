@@ -50,6 +50,18 @@
                              month of the sale while that month is still open,
                              or on today's date once it is closed.
         -->
+        <!--
+          Sheet #36: block posting a P&L line with no Operating Unit.
+          Default OFF. prd_levis_begbal carries 79 posted 2026 lines that would
+          fail it, so Finance backfills first and the switch is flipped as a
+          separate, reversible step. Context key ``levis_skip_ou_required``
+          is the emergency door and logs a warning when used.
+        -->
+        <record id="param_ou_required_pl" model="ir.config_parameter">
+            <field name="key">custom_levis_localization.ou_required_pl</field>
+            <field name="value">0</field>
+        </record>
+
         <record id="param_cogs_catchup_enabled" model="ir.config_parameter">
             <field name="key">custom_levis_localization.cogs_catchup_enabled</field>
             <field name="value">0</field>
