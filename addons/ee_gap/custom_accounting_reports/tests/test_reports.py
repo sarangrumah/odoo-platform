@@ -1814,6 +1814,64 @@ class TestCustomReports(TransactionCase):
         expected = "gr" if wizard.show_gr else "bill"
         self.assertEqual(wizard._build_filters()["date_basis"], expected)
 
+    def test_purchase_register_carries_po_vendor_ref_and_warehouse(self):
+        """Sheet #25 / gate K-1: No. PO, Vendor Ref and Warehouse on every row."""
+        report = self.env["custom.report.purchase"]
+        self._mk_bill(1000.0, "trade")
+        headers = [c["header"] for c in report._xlsx_columns()]
+        for header in ("No. PO", "Vendor Ref", "Warehouse"):
+            self.assertIn(header, headers)
+        # Status Bill only makes sense where receipts exist to be missing.
+        self.assertEqual("Status Bill" in headers, report._gr_available())
+
+        rows = [line for line in report._build_lines(self._purchase_options()) if not line.get("type")]
+        self.assertTrue(rows)
+        for row in rows:
+            for key in ("po_no", "vendor_ref", "warehouse", "bill_status"):
+                self.assertIn(key, row)
+            self.assertEqual(row["bill_status"], "Billed")
+
+    def test_purchase_register_groups_by_warehouse(self):
+        report = self.env["custom.report.purchase"]
+        self._mk_bill(1000.0, "trade")
+        lines = report._build_lines(self._purchase_options(group_by="warehouse"))
+        subtotals = [line for line in lines if line.get("type") == "subtotal"]
+        self.assertTrue(subtotals)
+        # The label lands in the warehouse column, not in Bill No.
+        self.assertTrue(all(str(line["warehouse"]).startswith("Subtotal:") for line in subtotals))
+        self.assertAlmostEqual(lines[-1]["untaxed"], 1000.0, places=2)
+
+    def test_purchase_register_unbilled_receipts(self):
+        """Sheet #67: goods received but not billed still reach the register."""
+        report = self.env["custom.report.purchase"]
+        self._mk_bill(1000.0, "trade")
+        options = self._purchase_options(date_basis="gr")
+
+        with_unbilled = report._build_lines({**options, "include_unbilled": True})
+        without = report._build_lines({**options, "include_unbilled": False})
+        # Whatever this database holds, switching the population off can only
+        # ever remove rows, never add them, and the billed rows are identical.
+        self.assertGreaterEqual(len(with_unbilled), len(without))
+        billed_only = [r for r in with_unbilled if not r.get("type") and r["bill_status"] == "Billed"]
+        self.assertEqual(len(billed_only), len([r for r in without if not r.get("type")]))
+        for row in with_unbilled:
+            if row.get("type") or row["bill_status"] != "Belum di-bill":
+                continue
+            # An unbilled row is a receipt: it has a PO and no bill number.
+            self.assertTrue(row["po_no"])
+            self.assertFalse(row["invoice_no"])
+
+        # On the bill basis the extra population is never pulled in.
+        bill_basis = report._build_lines(self._purchase_options(date_basis="bill", include_unbilled=True))
+        self.assertFalse([r for r in bill_basis if not r.get("type") and r["bill_status"] != "Billed"])
+
+    def test_purchase_wizard_carries_include_unbilled(self):
+        wizard = self.env["custom.report.purchase.wizard"].create({})
+        self.assertTrue(wizard.include_unbilled)
+        self.assertTrue(wizard._build_filters()["include_unbilled"])
+        wizard.include_unbilled = False
+        self.assertFalse(wizard._build_filters()["include_unbilled"])
+
     def test_ppn_masukan_import_carries_the_faktur_pajak(self):
         """Sheet #33: nomor + tanggal faktur pajak next to the invoice pair."""
         report = self.env["custom.report.ppn.masukan.import"]

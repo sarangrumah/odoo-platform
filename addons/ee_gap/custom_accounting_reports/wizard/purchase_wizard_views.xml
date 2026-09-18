@@ -9,6 +9,8 @@
                     <group>
                         <field name="show_gr" invisible="1"/>
                         <field name="date_basis" invisible="not show_gr"/>
+                        <field name="include_unbilled"
+                               invisible="not show_gr or date_basis != 'gr'"/>
                         <field name="date_from"/>
                         <field name="date_to"/>
                         <field name="group_by"/>

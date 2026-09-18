@@ -30,6 +30,8 @@ class PurchaseWizard(models.TransientModel):
             ("product", "By Product"),
             ("month", "By Month"),
             ("purchase_type", "By Trade / Non-Trade"),
+            ("gr_date", "By GR Date"),
+            ("warehouse", "By Warehouse"),
         ],
         string="Group By",
         default="none",
@@ -50,6 +52,17 @@ class PurchaseWizard(models.TransientModel):
         required=True,
         help="Tanggal GR: baris ditarik menurut penerimaan barang pertama dari "
         "baris PO-nya. Baris tanpa PO (jasa, non-trade) tetap memakai tanggal bill.",
+    )
+    # Levi's sheet #67: a register built from bill lines cannot show a receipt
+    # that has not been billed, and in September 2026 that hid 3,430 of 3,433
+    # purchase order lines. Those receipts are valued off their purchase order
+    # and carried here as "Belum di-bill" rows, which is also the GR/IR
+    # position Accounting reconciles against.
+    include_unbilled = fields.Boolean(
+        string="Termasuk GR belum di-bill",
+        default=True,
+        help="Tampilkan barang yang sudah diterima tetapi belum ada vendor "
+        "bill-nya, dinilai dari harga PO. Hanya berlaku pada basis Tanggal GR.",
     )
     show_gr = fields.Boolean(compute="_compute_show_gr")
 
@@ -96,6 +109,7 @@ class PurchaseWizard(models.TransientModel):
             "posted_only": self.posted_only,
             "purchase_type": self.purchase_type,
             "date_basis": self.date_basis if self.show_gr else "bill",
+            "include_unbilled": self.include_unbilled,
         }
 
     def action_print(self):

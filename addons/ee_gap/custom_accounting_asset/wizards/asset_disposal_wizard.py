@@ -269,7 +269,7 @@ class CustomFixedAssetDisposalWizard(models.TransientModel):
         move = self.env["account.move"].create(
             {
                 "date": self.disposal_date,
-                "journal_id": asset.journal_id.id,
+                "journal_id": asset._disposal_journal().id,
                 "company_id": asset.company_id.id,
                 "ref": _("Disposal %(code)s", code=asset.code),
                 "line_ids": asset._stamp_analytic(lines, asset.analytic_distribution),

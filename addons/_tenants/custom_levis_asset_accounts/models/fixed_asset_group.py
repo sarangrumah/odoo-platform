@@ -80,6 +80,13 @@ ERAJAYA_ASSET_GROUP_SEED = [
 # owned categories down before it was wired by hand.
 ERAJAYA_DEPRECIATION_JOURNAL_CODE = "DEPRE"
 
+# Sheet #66: a disposal booked into DEPRE is numbered DEPRE/2026/09/0123 and is
+# indistinguishable from the monthly depreciation run in a journal listing. In
+# Odoo 19 an entry's number follows its journal, so giving disposals their own
+# journal IS the requested "DSPFA/YY/MM/XXXX" prefix.
+ERAJAYA_DISPOSAL_JOURNAL_CODE = "DSPFA"
+ERAJAYA_DISPOSAL_JOURNAL_NAME = "Fixed Asset Disposal"
+
 
 class CustomFixedAssetGroup(models.Model):
     _inherit = "custom.fixed.asset.group"
@@ -125,6 +132,28 @@ class CustomFixedAssetGroup(models.Model):
                 ],
                 limit=1,
             ).id
+            # Scoped to companies that already carry DEPRE: that is the test for
+            # "runs the Erajaya chart", and it keeps the journal out of every
+            # other tenant on the same container.
+            disposal_journal_id = False
+            if journal_id:
+                disposal = Journal.search(
+                    [
+                        ("code", "=", ERAJAYA_DISPOSAL_JOURNAL_CODE),
+                        ("company_id", "=", company.id),
+                    ],
+                    limit=1,
+                )
+                if not disposal:
+                    disposal = Journal.create(
+                        {
+                            "name": ERAJAYA_DISPOSAL_JOURNAL_NAME,
+                            "code": ERAJAYA_DISPOSAL_JOURNAL_CODE,
+                            "type": "general",
+                            "company_id": company.id,
+                        }
+                    )
+                disposal_journal_id = disposal.id
 
             for code, name, cost_code, accum_code, expense_code, useful_life in ERAJAYA_ASSET_GROUP_SEED:
                 cost_id = _acc(cost_code)
@@ -146,6 +175,10 @@ class CustomFixedAssetGroup(models.Model):
                 # the only kind that genuinely needs no journal.
                 if useful_life and journal_id:
                     account_vals["default_journal_id"] = journal_id
+                # Land depreciates not at all but can still be disposed of, so
+                # the disposal journal is not gated on the useful life.
+                if disposal_journal_id:
+                    account_vals["default_disposal_journal_id"] = disposal_journal_id
                 group = self.with_context(active_test=False).search(
                     [("code", "=", code), ("company_id", "=", company.id)], limit=1
                 )
@@ -167,9 +200,29 @@ class CustomFixedAssetGroup(models.Model):
                     )
                     seeded += 1
 
+        # Group defaults only reach an asset at create/onchange time, so assets
+        # that already exist keep booking disposals into DEPRE until they are
+        # told otherwise. Non-destructive: only assets with an empty field.
+        Asset = self.env["custom.fixed.asset"]
+        stamped = 0
+        for journal in self.env["account.journal"].search(
+            [("code", "=", ERAJAYA_DISPOSAL_JOURNAL_CODE), ("type", "=", "general")]
+        ):
+            # By company, not by group: an asset created without a group — or in
+            # a group somebody added by hand — would otherwise keep booking its
+            # disposal into DEPRE, and nothing on screen would say so.
+            assets = Asset.with_context(active_test=False).search(
+                [("company_id", "=", journal.company_id.id), ("disposal_journal_id", "=", False)]
+            )
+            if assets:
+                assets.write({"disposal_journal_id": journal.id})
+                stamped += len(assets)
+
         _logger.info(
-            "custom_levis_asset_accounts: seeded/updated %s Erajaya asset group(s).",
+            "custom_levis_asset_accounts: seeded/updated %s Erajaya asset group(s), "
+            "stamped the disposal journal onto %s asset(s).",
             seeded,
+            stamped,
         )
         return seeded
 

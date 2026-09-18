@@ -35,6 +35,7 @@ class CustomFixedAsset(models.Model):
         ("depreciation_account_id", "default_depreciation_account_id"),
         ("expense_account_id", "default_expense_account_id"),
         ("journal_id", "default_journal_id"),
+        ("disposal_journal_id", "default_disposal_journal_id"),
     )
 
     name = fields.Char(required=True, tracking=True)
@@ -269,6 +270,19 @@ class CustomFixedAsset(models.Model):
         comodel_name="account.journal",
         string="Depreciation Journal",
         domain="[('type', '=', 'general'), ('company_id', '=', company_id)]",
+    )
+    # Levi's sheet #66: a disposal booked into the depreciation journal is
+    # numbered DEPRE/YYYY/MM/NNNN, which makes it indistinguishable from the
+    # monthly depreciation run in a journal listing. Accounting asked for its
+    # own prefix, and in Odoo 19 an entry's number follows its journal — so a
+    # separate journal IS the prefix. Empty falls back to the depreciation
+    # journal, which is the behaviour every other tenant already has.
+    disposal_journal_id = fields.Many2one(
+        comodel_name="account.journal",
+        string="Disposal Journal",
+        domain="[('type', '=', 'general'), ('company_id', '=', company_id)]",
+        help="Journal used for disposal and partial-disposal entries. "
+        "Leave empty to book them in the depreciation journal.",
     )
 
     # ------------------------------------------------------------------
@@ -1054,6 +1068,11 @@ class CustomFixedAsset(models.Model):
         return tuple(sorted((str(k), v) for k, v in (self.analytic_distribution or {}).items()))
 
     @api.model
+    def _disposal_journal(self):
+        """Journal a disposal entry belongs in — its own, or depreciation's."""
+        self.ensure_one()
+        return self.disposal_journal_id or self.journal_id
+
     def _stamp_analytic(self, line_commands, distribution):
         """Put ``distribution`` on every ``(0, 0, vals)`` command in place.
 
@@ -1223,6 +1242,48 @@ class CustomFixedAsset(models.Model):
                 "title": _("Depreciation Posting"),
                 "message": _("%(count)s depreciation entr(y/ies) posted.", count=count),
                 "sticky": False,
+            },
+        }
+
+    def action_confirm_selected(self):
+        """Confirm every draft asset in ``self``, one savepoint each.
+
+        Wired to a list multi-select server action for Levi's sheet #78: an
+        import lands 144 assets in draft, and confirming them one form at a
+        time is the whole of the complaint. ``action_confirm`` raises on the
+        first asset that is missing an account or a journal, which on a bulk
+        run would throw away the work done on the ones before it — so each
+        asset gets its own savepoint and the failures are reported together
+        instead of stopping the batch.
+        """
+        draft = self.filtered(lambda asset: asset.state == "draft")
+        skipped = len(self) - len(draft)
+        confirmed = 0
+        failures = []
+        for asset in draft:
+            try:
+                with self.env.cr.savepoint():
+                    asset.action_confirm()
+            except UserError as exc:
+                failures.append("%s: %s" % (asset.code or asset.name, exc.args[0] if exc.args else exc))
+            else:
+                confirmed += 1
+        message = _("%(count)s asset(s) confirmed.", count=confirmed)
+        if skipped:
+            message += "\n" + _("%(count)s skipped (not draft).", count=skipped)
+        if failures:
+            message += "\n" + _("%(count)s failed:", count=len(failures))
+            message += "\n" + "\n".join(failures[:10])
+            if len(failures) > 10:
+                message += "\n" + _("... and %(count)s more.", count=len(failures) - 10)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "type": "success" if confirmed and not failures else "warning",
+                "title": _("Confirm Assets"),
+                "message": message,
+                "sticky": bool(failures),
             },
         }
 

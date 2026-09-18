@@ -68,6 +68,8 @@ next upgrade.
 - The note claiming `1205202000` "Accum depre - Vehicles" is missing from the
   chart is **stale** — the account exists and `FA-VEH` resolves it.
 
+- **The seed creates the `DSPFA` disposal journal, and back-stamps it onto assets that already exist.** Sheet #66 asked for disposals to carry their own prefix; in Odoo 19 that means their own journal. `_seed_erajaya_asset_groups` creates it only for a company that already carries `DEPRE` — that is the test for "runs the Erajaya chart", and it keeps the journal off every other tenant on the same container. Group defaults only reach an asset at create/onchange time, so the same pass writes `disposal_journal_id` onto existing assets whose field is still empty; it never overwrites one that is set.
+
 ## Out of Scope
 - Depreciation posting, revaluation and disposal — all in
   `custom_accounting_asset`.

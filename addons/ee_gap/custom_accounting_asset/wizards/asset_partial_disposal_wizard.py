@@ -332,7 +332,7 @@ class CustomFixedAssetPartialDisposalWizard(models.TransientModel):
         move = self.env["account.move"].create(
             {
                 "date": self.disposal_date,
-                "journal_id": asset.journal_id.id,
+                "journal_id": asset._disposal_journal().id,
                 "company_id": asset.company_id.id,
                 "ref": _(
                     "Partial retirement %(code)s (%(qty)s unit)",

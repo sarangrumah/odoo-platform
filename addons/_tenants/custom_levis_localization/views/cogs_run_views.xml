@@ -15,6 +15,10 @@
                     <button name="action_view_move" type="object"
                             string="View Journal Entry"
                             invisible="not move_id"/>
+                    <button name="action_backfill_charges" type="object"
+                            string="Backfill Charge Ledger"
+                            confirm="Reconstruct the charge ledger for this run? Only do this for a run generated before the ledger existed."
+                            invisible="state != 'generated' or charge_count &gt; 0"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,computed,generated"/>
                 </header>
@@ -31,6 +35,7 @@
                         <group>
                             <field name="journal_id"/>
                             <field name="move_id" readonly="1"/>
+                            <field name="charge_count" readonly="1"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
                     </group>

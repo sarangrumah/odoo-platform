@@ -18,6 +18,8 @@ from odoo import fields, models
 
 PTYPE_LABELS = {"trade": "Trade", "non_trade": "Non-Trade"}
 UNCLASSIFIED = "Unclassified"
+BILLED = "Billed"
+UNBILLED = "Belum di-bill"
 
 
 class CustomReportPurchase(models.AbstractModel):
@@ -91,6 +93,103 @@ class CustomReportPurchase(models.AbstractModel):
         return {pol: ", ".join(sorted(vals)) for pol, vals in names.items()}
 
     # ------------------------------------------------------------------
+    # Receipts that no bill covers yet (Levi's sheet #67)
+    # ------------------------------------------------------------------
+    # A register built from bill lines can only ever show what has been
+    # billed. In September 2026 that hid almost everything: 3,433 receipt
+    # lines landed, and 3,430 of their purchase order lines still had no
+    # posted bill. Accounting pulls this register per receiving period, so
+    # those receipts belong in it — valued off the purchase order, which is
+    # the only price they have until the invoice arrives.
+    def _received_in_window(self, filters):
+        """{purchase.order.line id: {"qty", "date"}} received inside the window.
+
+        Quantity is net of returns to the vendor: a return keeps the
+        ``purchase_line_id`` of the receipt it reverses, so counting every done
+        move would report goods that went straight back out.
+        """
+        if not self._gr_available():
+            return {}
+        date_from = fields.Date.to_date(filters["date_from"])
+        date_to = fields.Date.to_date(filters["date_to"])
+        base = [
+            ("state", "=", "done"),
+            ("purchase_line_id", "!=", False),
+            ("company_id", "in", list(filters["company_ids"])),
+            ("date", ">=", datetime.combine(date_from, time.min)),
+            ("date", "<=", datetime.combine(date_to, time.max)),
+        ]
+        Move = self.env["stock.move"].sudo()
+        result = {}
+        for usage, sign in (("internal", 1.0), ("supplier", -1.0)):
+            groups = Move._read_group(
+                domain=base + [("location_dest_id.usage", "=", usage)],
+                groupby=["purchase_line_id"],
+                aggregates=["quantity:sum", "date:min"],
+            )
+            for pol, qty, dt in groups:
+                bucket = result.setdefault(pol.id, {"qty": 0.0, "date": None})
+                bucket["qty"] += (qty or 0.0) * sign
+                if sign > 0 and dt and (bucket["date"] is None or dt.date() < bucket["date"]):
+                    bucket["date"] = dt.date()
+        return result
+
+    def _billed_quantities(self, po_line_ids, filters):
+        """{purchase.order.line id: quantity already carried by bills}.
+
+        Refund lines net the figure down, so a receipt billed and then credited
+        counts as unbilled again. Draft bills are included only when the report
+        itself is pulled with ``posted_only`` off, so the two populations always
+        answer to the same state filter.
+        """
+        if not po_line_ids:
+            return {}
+        states = ("posted",) if filters.get("posted_only", True) else ("draft", "posted")
+        AML = self.env["account.move.line"]
+        result = {}
+        for move_type, sign in (("in_invoice", 1.0), ("in_refund", -1.0)):
+            groups = AML._read_group(
+                domain=[
+                    ("purchase_line_id", "in", list(po_line_ids)),
+                    ("move_id.move_type", "=", move_type),
+                    ("parent_state", "in", states),
+                    ("display_type", "=", "product"),
+                ],
+                groupby=["purchase_line_id"],
+                aggregates=["quantity:sum"],
+            )
+            for pol, qty in groups:
+                result[pol.id] = result.get(pol.id, 0.0) + (qty or 0.0) * sign
+        return result
+
+    # ------------------------------------------------------------------
+    # PO number, vendor reference, warehouse (Levi's sheet #25, gate K-1)
+    # ------------------------------------------------------------------
+    # The client fills Vendor Reference with the SES sales-order number; it is
+    # the key they reconcile SES goods issues against EBR goods receipts, so it
+    # travels with the PO number and the receiving warehouse.
+    def _warehouse_label(self, pol):
+        """Receiving warehouse of a purchase order line, or ''."""
+        if not pol:
+            return ""
+        picking_type = pol.order_id.picking_type_id
+        warehouse = picking_type.warehouse_id if picking_type else False
+        return warehouse.display_name if warehouse else ""
+
+    def _ou_label(self, ml):
+        """Operating Unit of a bill line, used where there is no PO to read.
+
+        Services and manual non-trade bills never touch a warehouse. Their
+        Operating Unit is the nearest thing to one, and leaving the column
+        blank for ~850 lines would read as missing data rather than as "this
+        cost belongs to no warehouse".
+        """
+        if "l10n_ou_analytic_id" not in ml._fields:
+            return ""
+        ou = ml.l10n_ou_analytic_id
+        return ou.display_name if ou else ""
+
+    # ------------------------------------------------------------------
     # Trade / Non-Trade split (Levi's feature #9)
     # ------------------------------------------------------------------
     # ``account.move.l10n_purchase_type`` is added by the tenant module
@@ -127,10 +226,15 @@ class CustomReportPurchase(models.AbstractModel):
         else:
             cols.append({"header": "Date", "field": "date", "kind": "date", "width": 12})
         cols.append({"header": "Bill No", "field": "invoice_no", "kind": "text", "width": 18})
+        if show_gr:
+            cols.append({"header": "Status Bill", "field": "bill_status", "kind": "text", "width": 14})
+        cols.append({"header": "No. PO", "field": "po_no", "kind": "text", "width": 22})
         if self._purchase_type_available():
             cols.append({"header": "Type", "field": "ptype", "kind": "text", "width": 12})
         cols += [
             {"header": "Vendor", "field": "vendor", "kind": "text", "width": 28},
+            {"header": "Vendor Ref", "field": "vendor_ref", "kind": "text", "width": 18},
+            {"header": "Warehouse", "field": "warehouse", "kind": "text", "width": 22},
             {"header": "Item Code", "field": "item_code", "kind": "text", "width": 16},
             {"header": "Item Name", "field": "product", "kind": "text", "width": 30},
             {"header": "Description", "field": "label", "kind": "text", "width": 30},
@@ -160,6 +264,8 @@ class CustomReportPurchase(models.AbstractModel):
         ctx["show_gr"] = show_gr
         basis = (ctx["filters"].get("date_basis") or "gr") if show_gr else "bill"
         ctx["date_basis_label"] = "Tanggal GR" if basis == "gr" else "Tanggal Bill"
+        ctx["show_bill_status"] = show_gr
+        ctx["include_unbilled"] = bool(basis == "gr" and ctx["filters"].get("include_unbilled", True))
         return ctx
 
     def _group_key(self, row, group_by):
@@ -171,7 +277,84 @@ class CustomReportPurchase(models.AbstractModel):
             return row["date"].strftime("%Y-%m") if row["date"] else "—"
         if group_by == "purchase_type":
             return row.get("ptype") or UNCLASSIFIED
+        if group_by == "gr_date":
+            # The receipt date, not the basis date: on a bill-basis pull these
+            # differ, and "By GR Date" has to mean the receipt either way.
+            gr = row.get("gr_date")
+            return gr.strftime("%Y-%m-%d") if gr else "—"
+        if group_by == "warehouse":
+            return row.get("warehouse") or "—"
         return None
+
+    def _unbilled_rows(self, filters, has_ptype, want_ptype):
+        """Register rows for goods received in the window that no bill covers.
+
+        Valued off the purchase order line — ``price_subtotal / product_qty``
+        rather than ``price_unit``, so the discount and the unit of measure are
+        already in the figure — pro-rated to the quantity actually received.
+        That is the accrual the receipt itself booked into GR/IR, which is why
+        these rows tie to the GR/IR balance rather than to accounts payable.
+        """
+        received = self._received_in_window(filters)
+        if not received:
+            return []
+        billed = self._billed_quantities(list(received), filters)
+        pending = {}
+        for pol_id, bucket in received.items():
+            remainder = bucket["qty"] - billed.get(pol_id, 0.0)
+            # Float noise on a netted quantity would otherwise emit rows worth
+            # a fraction of a piece.
+            if remainder <= 0.000001:
+                continue
+            pending[pol_id] = (remainder, bucket["date"])
+        if not pending:
+            return []
+
+        gr_numbers = self._gr_numbers(list(pending), filters)
+        partner_ids = set(filters.get("partner_ids") or ())
+        po_type_available = has_ptype and "l10n_purchase_type" in self.env["purchase.order"]._fields
+        rows = []
+        for pol in self.env["purchase.order.line"].browse(list(pending)).exists():
+            remainder, gr_date = pending[pol.id]
+            order = pol.order_id
+            if partner_ids and order.partner_id.id not in partner_ids:
+                continue
+            ptype = order.l10n_purchase_type if po_type_available else False
+            if want_ptype == "unclassified":
+                if ptype:
+                    continue
+            elif want_ptype != "all" and ptype != want_ptype:
+                continue
+            qty_ordered = pol.product_qty or 0.0
+            unit_net = (pol.price_subtotal / qty_ordered) if qty_ordered else (pol.price_unit or 0.0)
+            unit_gross = (pol.price_total / qty_ordered) if qty_ordered else unit_net
+            untaxed = unit_net * remainder
+            total = unit_gross * remainder
+            rows.append(
+                {
+                    "date": gr_date,
+                    "bill_date": None,
+                    "gr_date": gr_date,
+                    "gr_no": gr_numbers.get(pol.id, ""),
+                    "invoice_no": "",
+                    "bill_status": UNBILLED,
+                    "po_no": order.name or "",
+                    "vendor_ref": order.partner_ref or "",
+                    "warehouse": self._warehouse_label(pol),
+                    "ptype": PTYPE_LABELS.get(ptype, UNCLASSIFIED if has_ptype else ""),
+                    "vendor": order.partner_id.display_name or "",
+                    "item_code": pol.product_id.default_code or "",
+                    "product": pol.product_id.name or "",
+                    "label": pol.name or "",
+                    "quantity": remainder,
+                    "price_unit": pol.price_unit or 0.0,
+                    "discount": pol.discount or 0.0,
+                    "untaxed": untaxed,
+                    "tax": total - untaxed,
+                    "total": total,
+                }
+            )
+        return rows
 
     def _build_lines(self, filters):
         group_by = filters.get("group_by") or "none"
@@ -238,7 +421,8 @@ class CustomReportPurchase(models.AbstractModel):
             sign = -1.0 if ml.move_id.move_type == "in_refund" else 1.0
             untaxed = ml.price_subtotal * sign
             total = ml.price_total * sign
-            pol_id = ml.purchase_line_id.id if show_gr else False
+            pol = ml.purchase_line_id if show_gr else self.env["purchase.order.line"]
+            pol_id = pol.id if pol else False
             gr_date = first_gr.get(pol_id) if pol_id else None
             rows.append(
                 {
@@ -247,6 +431,10 @@ class CustomReportPurchase(models.AbstractModel):
                     "gr_date": gr_date,
                     "gr_no": gr_numbers.get(pol_id, "") if pol_id else "",
                     "invoice_no": ml.move_id.name or "",
+                    "bill_status": BILLED,
+                    "po_no": pol.order_id.name if pol else "",
+                    "vendor_ref": (pol.order_id.partner_ref or "") if pol else "",
+                    "warehouse": self._warehouse_label(pol) or self._ou_label(ml),
                     "ptype": PTYPE_LABELS.get(ptype, UNCLASSIFIED if has_ptype else ""),
                     "vendor": ml.move_id.partner_id.display_name or "",
                     "item_code": ml.product_id.default_code or "",
@@ -260,6 +448,9 @@ class CustomReportPurchase(models.AbstractModel):
                     "total": total,
                 }
             )
+
+        if basis == "gr" and filters.get("include_unbilled", True):
+            rows += self._unbilled_rows(filters, has_ptype, want_ptype)
 
         lines = []
         g_qty = g_un = g_tx = g_tot = 0.0
@@ -276,9 +467,15 @@ class CustomReportPurchase(models.AbstractModel):
                 lines.append(r)
                 _accumulate(r)
         else:
-            label_field = {"vendor": "vendor", "product": "product", "purchase_type": "ptype"}.get(
-                group_by, "invoice_no"
-            )
+            # "gr_date" deliberately labels into invoice_no: its own column is
+            # rendered as a date, and a "Subtotal: 2026-09-01" string in a date
+            # cell loses its formatting in the xlsx.
+            label_field = {
+                "vendor": "vendor",
+                "product": "product",
+                "purchase_type": "ptype",
+                "warehouse": "warehouse",
+            }.get(group_by, "invoice_no")
             rows.sort(key=lambda r: (self._group_key(r, group_by), r["date"] or date_cls.min, r["invoice_no"]))
             for key, grp in groupby(rows, key=lambda r: self._group_key(r, group_by)):
                 grp = list(grp)
