@@ -281,6 +281,52 @@ class TestClearingReconRoundTrip(AccountTestInvoicingCommon):
         self.assertEqual(data[header["METHOD"]], "DEBIT")
         self.assertEqual(data[header["REMARKS"]], "S-ONE CEK (BCA)")
 
+    def test_compile_sales_covers_the_trading_days_not_the_bank_days(self):
+        """Money in on 1 September pays the day the store traded: 31 August.
+
+        Filtering the sales side on the run's own dates reports the wrong days at
+        both ends — it drops the takings the period actually settles and adds a
+        day that will not be paid until the next period.
+        """
+        self._posrec(self.tender_visa, self.store_one, date(2026, 7, 8), 1_000_000.0)
+        self._statement(date(2026, 7, 9), 990_000.0, self._settlement_ref(MID_ONE, 1_000_000.0, 10_000.0))
+        run = self._run()
+        run.action_compute()
+
+        sales_from, sales_to = self.env["levis.clearing.ebr"]._trading_window(run)
+        lag = run.config_id.settlement_lag_days
+        self.assertEqual(lag, 1)
+        self.assertEqual(sales_from, date(2026, 6, 30), "a July run settles trading days from 30 June")
+        self.assertEqual(sales_to, date(2026, 7, 30))
+
+        book = openpyxl.load_workbook(io.BytesIO(self._export(run)))
+        banner = book["COMPILE SALES"].cell(row=1, column=1).value
+        book.close()
+        self.assertIn("2026-06-30", banner, "the sheet says which trading days it covers")
+        self.assertIn("2026-07-30", banner)
+
+    def test_a_tender_is_offered_by_name_and_read_back_either_way(self):
+        """A bare code names nothing: ten receivables differ in their last digits."""
+        Ebr = self.env["levis.clearing.ebr"]
+        label = Ebr._tender_label(self.tender_visa, self.company)
+        self.assertEqual(label, "1106000102 — POS Receivable - OFFLINE_VISA")
+
+        day = date(2026, 7, 8)
+        self._posrec(self.tender_visa, self.store_one, day, 300_000.0)
+        self._posrec(self.tender_cash, self.store_one, day, 900_000.0)
+        statement = self._statement(date(2026, 7, 9), 297_000.0, self._settlement_ref(MID_ONE, 300_000.0, 3_000.0))
+        run = self._run()
+        run.action_compute()
+
+        # The label the sheet offers, and the bare code somebody typed instead:
+        # both have to resolve to the same account.
+        for written in (label, "1106000102"):
+            self.env["levis.clearing.manual.map"].search([("statement_line_id", "=", statement.id)]).unlink()
+            filled = self._fill(self._export(run, receipt_gaps=True), {statement.id: {"TENDER": written}})
+            self._upload(run, filled, create_rules=False, force=True).action_apply()
+            mapping = self.env["levis.clearing.manual.map"].search([("statement_line_id", "=", statement.id)])
+            self.assertEqual(mapping.tender_account_id, self.tender_visa, "written as %r" % written)
+
     # ------------------------------------------------------------------
     # The round trip
     # ------------------------------------------------------------------

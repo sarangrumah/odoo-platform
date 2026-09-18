@@ -1679,6 +1679,26 @@ itself without taking the rest of the upload down.
 The export changes nothing at all — no Compute, no projection rebuild, no receipt
 touched — and `test_export_carries_the_sheets_and_writes_nothing` is its test.
 
+### Three things the first users asked for
+
+* **The sales side is the trading days, not the bank days.** Money in on 1
+  September pays the day the store traded — 31 August. `_trading_window` shifts
+  `COMPILE SALES` back by `settlement_lag_days`, the same anchor
+  `_resolve_target` uses, so the two sides cannot drift apart; the sheet prints
+  the window it covers. Filtering on the run's own dates was wrong at both ends:
+  it dropped the takings the period settles and added a day the next period pays.
+* **A tender is offered by name.** The ten receivables differ only in their last
+  digits, so the dropdown and the `REF` sheet now read
+  `1106000102 — POS Receivable - OFFLINE_VISA`. The upload accepts the label, the
+  label with a plain hyphen, or the bare code — `_resolve_tender` takes the code
+  off the front of whatever was written.
+* **The AR sheet names the transactions.** An open POS receivable is one X70D
+  transfer line per store, per day, per tender, so it carries no receipt number
+  at all; `_ar_receipts` reads them from the staged X70D rows and keeps only the
+  ones matching that row's own tender. A collected row shows the receipts its
+  settling bank line names. Measured on the live September run: 5.072 of 5.083 AR
+  rows carry transaction numbers, capped at ten per cell with the rest counted.
+
 ### What it costs, and where
 
 Measured on the live `prd_levis_begbal`, September run, 567 lines: `_META` 0,1 s,

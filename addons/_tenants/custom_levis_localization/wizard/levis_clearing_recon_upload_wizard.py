@@ -227,9 +227,18 @@ class LevisClearingReconUpload(models.TransientModel):
         company = run.company_id
         config = run.config_id or self.env["levis.clearing.config"]._get(company)
         cash_account = config._cash_receivable_account()
-        tender_by_code = {
-            (account.with_company(company).code or ""): account for account in config.pos_receivable_account_ids
-        }
+        # The sheet offers "1106000102 — POS Receivable - OFFLINE_VISA", because a
+        # bare code names nothing to the person reading it. Both forms are keys
+        # here, so a cell typed by hand as just the code still resolves.
+        tender_by_key = {}
+        for account in config.pos_receivable_account_ids:
+            code = (account.with_company(company).code or "").strip()
+            if code:
+                tender_by_key[code] = account
+            label = self.env["levis.clearing.ebr"]._tender_label(account, company)
+            if label:
+                tender_by_key[label] = account
+                tender_by_key[label.replace("—", "-")] = account
         lines_by_statement = {line.statement_line_id.id: line for line in run.line_ids}
         existing = self.env["levis.clearing.manual.map"]._for_lines(company, lines_by_statement.keys())
         Warehouse = self.env["stock.warehouse"]
@@ -276,7 +285,7 @@ class LevisClearingReconUpload(models.TransientModel):
                     continue
                 result["analytic"] = analytic
             if row["tender"]:
-                account = tender_by_code.get(row["tender"].strip())
+                account = self._resolve_tender(row["tender"], tender_by_key)
                 if not account:
                     result.update(
                         status="reject",
@@ -310,6 +319,17 @@ class LevisClearingReconUpload(models.TransientModel):
                 result["reason"] = _("Applied — note the run was recomputed after this file was exported.")
             results.append(result)
         return results
+
+    def _resolve_tender(self, cell, tender_by_key):
+        """The account a TENDER cell names, whichever form it was written in."""
+        wanted = (cell or "").strip()
+        account = tender_by_key.get(wanted)
+        if account:
+            return account
+        # A label the operator edited, or a code with the name typed after it in
+        # some other punctuation: the leading code is the part that identifies it.
+        head = wanted.replace("—", "-").split("-")[0].strip()
+        return tender_by_key.get(head)
 
     def _as_int(self, value):
         try:

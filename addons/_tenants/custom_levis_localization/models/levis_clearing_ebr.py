@@ -178,6 +178,18 @@ class LevisClearingEbr(models.AbstractModel):
             )
         return index
 
+    def _tender_label(self, account, company):
+        """``1106000102 — POS Receivable - OFFLINE_VISA``.
+
+        A bare code names nothing to the person filling the sheet in: the ten
+        receivables differ only in their last digits. The label carries both, and
+        the upload reads the code off the front of it, so either form is accepted
+        back.
+        """
+        code = account.with_company(company).code or ""
+        name = account.name or ""
+        return ("%s — %s" % (code, name)).strip(" —")
+
     def _bank_label(self, journal):
         """``BCA`` / ``BRI`` / … from the journal, for the sheet name and REMARKS."""
         haystack = " ".join(filter(None, [journal.name or "", journal.code or "", journal.bank_id.name or ""])).upper()
@@ -597,9 +609,11 @@ class LevisClearingEbr(models.AbstractModel):
                     self._reason(line),
                     stores.get(line.analytic_account_id.id, ("", "", ""))[0],
                     None,
-                    None,
-                    None,
-                    None,
+                    self._tender_label(line.manual_map_id.tender_account_id, run.company_id)
+                    if line.manual_map_id.tender_account_id
+                    else None,
+                    line.manual_map_id.receipt_refs or None,
+                    line.manual_map_id.note or None,
                 ],
                 styles,
             )
@@ -637,6 +651,20 @@ class LevisClearingEbr(models.AbstractModel):
     # ------------------------------------------------------------------
     # COMPILE SALES — the tender side
     # ------------------------------------------------------------------
+    def _trading_window(self, run):
+        """The trading days this period's money belongs to — ``(from, to)``.
+
+        Money that lands on 1 September pays the day the store traded, which is
+        one settlement lag earlier: 31 August. Filtering the sales side on the
+        run's own dates therefore reports the wrong days at both ends — it drops
+        the 31 August takings the period actually settles and adds the last day's
+        takings, which will not be paid until the next period. The lag is the
+        same ``settlement_lag_days`` the allocation anchors on
+        (``_resolve_target``), so the two sides cannot drift apart.
+        """
+        lag = timedelta(days=(run.config_id.settlement_lag_days or 0))
+        return run.date_from - lag, run.date_to - lag
+
     def _sheet_compile_sales(self, book, fmts, run, stores):
         sheet = book.add_worksheet("COMPILE SALES")
         columns = [
@@ -658,12 +686,23 @@ class LevisClearingEbr(models.AbstractModel):
             ("STATUS", 22),
             ("CASH RECEIVED DATE", 16),
         ]
+        sales_from, sales_to = self._trading_window(run)
         sheet.write(
             0,
             0,
+            _(
+                "Trading days %s .. %s — the days this period's settlements pay, one "
+                "settlement lag before the bank dates.",
+                sales_from,
+                sales_to,
+            ),
+        )
+        sheet.write(
+            1,
+            0,
             _("CASHIER and METODE PEMBAYARAN are not in the X70D feed — they stay blank here on purpose."),
         )
-        row = self._write_header(sheet, fmts, columns, row=2)
+        row = self._write_header(sheet, fmts, columns, row=3)
         styles = [
             "int",
             "text",
@@ -691,8 +730,8 @@ class LevisClearingEbr(models.AbstractModel):
         txns = self.env["levis.pos.x70d.txn"].search_read(
             [
                 ("company_id", "=", run.company_id.id),
-                ("trans_date", ">=", run.date_from),
-                ("trans_date", "<=", run.date_to),
+                ("trans_date", ">=", sales_from),
+                ("trans_date", "<=", sales_to),
             ],
             [
                 "ref",
@@ -756,6 +795,7 @@ class LevisClearingEbr(models.AbstractModel):
             ("STORE NAME", 30),
             ("TRANS DATE", 12),
             ("TENDER ACCOUNT", 34),
+            ("NO TRANSAKSI", 40),
             ("ENTRY", 20),
             ("AMOUNT", 16),
             ("MID", 16),
@@ -773,6 +813,7 @@ class LevisClearingEbr(models.AbstractModel):
             "date",
             "text",
             "text",
+            "text",
             "num",
             "text",
             "num",
@@ -783,6 +824,8 @@ class LevisClearingEbr(models.AbstractModel):
         ]
         number = 0
         collected_amls = set()
+        open_amls = self._open_prior_receivables(run)
+        receipts_for = self._ar_receipts(run, open_amls)
         # What this run collected out of a receivable older than the period.
         allocs = run.line_ids.mapped("alloc_ids").filtered(
             lambda alloc: alloc.source_date and run.date_from and alloc.source_date < run.date_from
@@ -802,6 +845,11 @@ class LevisClearingEbr(models.AbstractModel):
                     name,
                     alloc.source_date,
                     alloc.account_id.display_name,
+                    # The receipts the settling bank line names. They belong to
+                    # the whole line rather than to this one leg, which is why
+                    # the column is headed by the transaction numbers and not by
+                    # a claim that these are the ones this leg paid.
+                    line.x24_trans_refs or "",
                     line.move_name or "",
                     alloc.amount,
                     line.mid_key or line.tid_key or "",
@@ -814,7 +862,7 @@ class LevisClearingEbr(models.AbstractModel):
                 styles,
             )
         # And what is still sitting there, uncollected, at the end of the period.
-        for aml in self._open_prior_receivables(run):
+        for aml in open_amls:
             if aml.id in collected_amls:
                 continue
             analytic = self._aml_analytic(aml)
@@ -830,6 +878,7 @@ class LevisClearingEbr(models.AbstractModel):
                     name,
                     aml.date,
                     aml.account_id.display_name,
+                    receipts_for(analytic, aml.date, aml.account_id),
                     aml.move_id.name or "",
                     aml.amount_residual,
                     None,
@@ -842,6 +891,41 @@ class LevisClearingEbr(models.AbstractModel):
                 styles,
             )
         return sheet
+
+    def _ar_receipts(self, run, amls):
+        """``f(store, day, account) -> "80435-1-1868, 80435-1-1869 (+31)"``.
+
+        An open POS receivable is one X70D transfer line per store, per trading
+        day, per tender, so it carries no transaction number at all — the numbers
+        live in the staged X70D rows. This reads them once for every day the
+        sheet will show and hands back the ones that match a row's own tender,
+        which is the only thing that makes an AR line chaseable back to a till.
+
+        A day can hold hundreds of transactions, so the cell lists the first ten
+        and counts the rest rather than becoming unreadable.
+        """
+        if not amls:
+            return lambda analytic, day, account: ""
+        analytic_ids = {self._aml_analytic(aml) for aml in amls}
+        analytic_ids.discard(False)
+        dates = amls.mapped("date")
+        if not analytic_ids or not dates:
+            return lambda analytic, day, account: ""
+        rows = self.env["levis.pos.clearing.alloc"]._x24_rows(analytic_ids, min(dates), max(dates), run.company_id)
+        Alloc = self.env["levis.pos.clearing.alloc"]
+
+        def lookup(analytic, day, account):
+            if not analytic or not day:
+                return ""
+            wanted = Alloc._x24_tender_of_account(account)
+            refs = [ref for tender, ref, _amount in rows.get((analytic, day), ()) if not wanted or tender == wanted]
+            if not refs:
+                return ""
+            if len(refs) <= 10:
+                return ", ".join(refs)
+            return "%s (+%d)" % (", ".join(refs[:10]), len(refs) - 10)
+
+        return lookup
 
     def _open_prior_receivables(self, run):
         config = run.config_id or self.env["levis.clearing.config"].search(
@@ -892,13 +976,16 @@ class LevisClearingEbr(models.AbstractModel):
         )
         accounts = config._pos_accounts_sorted() if config else self.env["account.account"]
         start = row + 2
-        sheet.write(start - 1, 5, "TENDER ACCOUNT", fmts["header"])
-        sheet.write(start - 1, 6, "NAME", fmts["header"])
-        sheet.set_column(5, 5, 16)
-        sheet.set_column(6, 6, 34)
+        sheet.write(start - 1, 5, "TENDER (pilihan)", fmts["header"])
+        sheet.write(start - 1, 6, "CODE", fmts["header"])
+        sheet.write(start - 1, 7, "NAME", fmts["header"])
+        sheet.set_column(5, 5, 46)
+        sheet.set_column(6, 6, 16)
+        sheet.set_column(7, 7, 34)
         for index, account in enumerate(accounts):
-            sheet.write(start + index, 5, account.with_company(run.company_id).code or "", fmts["text"])
-            sheet.write(start + index, 6, account.name or "", fmts["text"])
+            sheet.write(start + index, 5, self._tender_label(account, run.company_id), fmts["text"])
+            sheet.write(start + index, 6, account.with_company(run.company_id).code or "", fmts["text"])
+            sheet.write(start + index, 7, account.name or "", fmts["text"])
         if accounts:
             book.define_name("REF_TENDERS", "=REF!$F$%s:$F$%s" % (start + 1, start + len(accounts)))
 
