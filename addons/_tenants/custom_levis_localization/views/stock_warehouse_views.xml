@@ -11,6 +11,11 @@
                        help="The code this store is known by outside Odoo — on the
                              retail feed, on a cash-deposit transfer memo, and on the
                              bank statement. Leave empty rather than inventing one."/>
+                <field name="levis_ebr_label"
+                       placeholder="e.g. SENCY"
+                       help="How the bank reconciliation workbook names this store in its
+                             REMARKS column. Only fill it where Finance uses a different
+                             short name than the warehouse code."/>
             </field>
         </field>
     </record>
@@ -23,6 +28,7 @@
             <!-- The core list carries no ``code`` field, so anchor on ``name``. -->
             <field name="name" position="after">
                 <field name="l10n_store_code" optional="show"/>
+                <field name="levis_ebr_label" optional="hide"/>
             </field>
         </field>
     </record>

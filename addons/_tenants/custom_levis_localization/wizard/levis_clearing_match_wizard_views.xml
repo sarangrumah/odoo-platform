@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_levis_clearing_match_form" model="ir.ui.view">
+        <field name="name">levis.clearing.match.form</field>
+        <field name="model">levis.clearing.match</field>
+        <field name="arch" type="xml">
+            <form string="Match Bank to Transactions">
+                <header>
+                    <button name="action_match" type="object" string="Pasangkan"
+                            class="btn-primary"
+                            help="Record that the ticked transactions are what the ticked bank credit paid."/>
+                    <button name="action_unmatch_all" type="object" string="Lepas Semua"
+                            help="Release every transaction currently matched to the ticked bank credit."/>
+                </header>
+                <sheet>
+                    <field name="store_day_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="ties" invisible="1"/>
+                    <div class="oe_title">
+                        <h1><field name="analytic_account_id" readonly="1"/></h1>
+                        <h3 class="text-muted">
+                            money in <field name="settlement_date" class="oe_inline" readonly="1"/>
+                            · sales of <field name="trading_date" class="oe_inline" readonly="1"/>
+                        </h3>
+                    </div>
+
+                    <div class="alert alert-success" role="alert" invisible="not ties">
+                        The ticked credit and the ticked transactions are the same figure.
+                        Press <b>Pasangkan</b> to record it.
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="ties or bank_selected == 0">
+                        Selected bank <field name="bank_selected" class="oe_inline" widget="monetary" readonly="1"/>
+                        against transactions <field name="txn_selected" class="oe_inline" widget="monetary" readonly="1"/>
+                        — difference <field name="gap" class="oe_inline" widget="monetary" readonly="1"/>.
+                        A credit may legitimately pay part of a day; matching what you are sure of is
+                        still worth recording.
+                    </div>
+                    <div class="alert alert-secondary" role="alert" invisible="bank_selected != 0">
+                        Tick <b>one</b> bank settlement on the left, then the transactions on the right
+                        that it paid. A transaction another credit already names is shown with that
+                        entry and cannot be ticked here.
+                    </div>
+
+                    <group>
+                        <group string="Bank (H)">
+                            <field name="bank_selected" readonly="1"/>
+                        </group>
+                        <group string="Store Transactions (H-1)">
+                            <field name="txn_selected" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <separator string="Bank Settlements"/>
+                            <field name="bank_ids" nolabel="1">
+                                <list editable="bottom" create="false" delete="false"
+                                      decoration-success="state == 'ok'"
+                                      decoration-warning="state == 'short'"
+                                      decoration-danger="state in ('unmapped', 'unparsed')">
+                                    <field name="selected" widget="boolean_toggle"/>
+                                    <field name="move_name" readonly="1"/>
+                                    <field name="channel" readonly="1" optional="show"/>
+                                    <field name="target" readonly="1" sum="Gross"/>
+                                    <field name="statement_amount" readonly="1" optional="hide"/>
+                                    <field name="mdr" readonly="1" optional="hide"/>
+                                    <field name="matched_total" readonly="1" string="Matched" optional="show"/>
+                                    <field name="match_gap" readonly="1" string="Unmatched" optional="show"/>
+                                    <field name="state" readonly="1" widget="badge" optional="hide"/>
+                                    <field name="payment_ref" readonly="1" optional="hide"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </div>
+                        <div class="col-lg-6">
+                            <separator string="X70D Transactions"/>
+                            <field name="txn_ids" nolabel="1">
+                                <list editable="bottom" create="false" delete="false"
+                                      decoration-muted="claimed_by != False">
+                                    <field name="selected" widget="boolean_toggle"
+                                           readonly="claimed_by != False"/>
+                                    <field name="ref" readonly="1"/>
+                                    <field name="tender" readonly="1"/>
+                                    <field name="amount" readonly="1" sum="Total"/>
+                                    <field name="claimed_by" readonly="1" optional="show"/>
+                                    <field name="trans_date" readonly="1" optional="hide"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </div>
+                    </div>
+
+                    <group>
+                        <field name="note" placeholder="e.g. sisa dibayar bersama settlement 3 Sept"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

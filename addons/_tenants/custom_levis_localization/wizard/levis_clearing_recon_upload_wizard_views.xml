@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_levis_clearing_recon_upload_form" model="ir.ui.view">
+        <field name="name">levis.clearing.recon.upload.form</field>
+        <field name="model">levis.clearing.recon.upload</field>
+        <field name="arch" type="xml">
+            <form string="Upload Finished Recon">
+                <field name="run_id" invisible="1"/>
+                <field name="previewed" invisible="1"/>
+                <group>
+                    <field name="file" filename="file_name" required="1"/>
+                    <field name="file_name" invisible="1"/>
+                    <field name="create_rules"/>
+                    <field name="recompute"/>
+                    <field name="force"/>
+                </group>
+                <div class="text-muted" invisible="previewed">
+                    <p>Upload the workbook exported from this run with its <b>UNMAPPED</b>
+                       sheet filled in. <b>Check File</b> reads and validates it without
+                       writing anything.</p>
+                </div>
+                <field name="preview_html" widget="html" readonly="1" invisible="not previewed"/>
+                <footer>
+                    <button name="action_preview" type="object" string="Check File" class="btn-primary"/>
+                    <button name="action_apply" type="object" string="Apply &amp; Recompute"
+                            class="btn-primary" invisible="not previewed"
+                            confirm="This records the manual mappings and recomputes the run. It generates no entries and posts nothing. Continue?"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

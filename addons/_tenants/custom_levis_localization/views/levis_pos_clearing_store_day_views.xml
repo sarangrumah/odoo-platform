@@ -57,6 +57,10 @@
                   decoration-success="is_balanced"
                   decoration-warning="not is_balanced and x70d_count &gt; 0"
                   decoration-danger="x70d_count == 0">
+                <header>
+                    <button name="action_clear" type="object" string="Clear Selected Store Days"
+                            help="Prepare a clearing narrowed to the stores and dates you picked. It computes and stops."/>
+                </header>
                 <field name="analytic_account_id" optional="show"/>
                 <field name="settlement_date"/>
                 <field name="trading_date" optional="show"/>
@@ -90,6 +94,11 @@
         <field name="arch" type="xml">
             <form string="Store Settlement Day" create="false" edit="false">
                 <header>
+                    <button name="action_open_matcher" type="object" string="Match Bank ↔ X70D"
+                            class="btn-primary"
+                            help="Both lists on one screen: tick the bank credit and the transactions it paid."/>
+                    <button name="action_clear" type="object" string="Clear This Store Day"
+                            help="Prepare a clearing narrowed to this store and date. It computes and stops — Prepare Entries and Post stay on the run."/>
                     <button name="action_refresh" type="object" string="Refresh"/>
                     <button name="action_open_lines" type="object" string="Statement Lines"/>
                     <button name="action_open_x70d" type="object" string="X70D Transactions"/>

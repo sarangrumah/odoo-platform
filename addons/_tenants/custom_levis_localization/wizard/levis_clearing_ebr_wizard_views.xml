@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_levis_clearing_ebr_wizard_form" model="ir.ui.view">
+        <field name="name">levis.clearing.ebr.wizard.form</field>
+        <field name="model">levis.clearing.ebr.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Export Recon Workbook">
+                <field name="run_id" invisible="1"/>
+                <group>
+                    <field name="compile_sales"/>
+                    <field name="ar_sheet"/>
+                    <field name="receipt_gaps"/>
+                </group>
+                <div class="text-muted">
+                    <p>The workbook carries one <b>MUTASI</b> sheet per bank with the store,
+                       MID, MDR and gross Odoo resolved, a <b>SUMMARY</b> of every store-day
+                       against its X70D sales, and an <b>UNMAPPED</b> sheet holding exactly
+                       what Odoo could not place.</p>
+                    <p>Fill the five yellow columns of <b>UNMAPPED</b> and upload the same
+                       file back through <b>Upload Recon</b>. Nothing is booked by either step.</p>
+                </div>
+                <footer>
+                    <button name="action_export" type="object" string="Export" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>
