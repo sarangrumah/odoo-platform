@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The rate card the client supplied (LIST_MDR.xlsx, 17 banks x 18 product columns),
+     reduced to the 39 PAYMENT labels the stores' X70D export actually writes.
+
+     Two things about this data are easy to "correct" and must not be:
+
+     * QRIS at BCA, BNI and BRI is 0,00%, while MANDIRI and CIMB charge 0,70%. The
+       zeros are real numbers in the source and were confirmed by the client on
+       2026-09-18. QRIS is also the busiest tender there is (47% of transactions at
+       Kelapa Gading), so assuming the regulated 0,70% instead would overstate the
+       fee by about Rp 1,19 million per store per month.
+     * BNI charges the same 1,10% on us and off us. Unusual, and what the card says.
+
+     No date_from: the rate card carries no effective date. Empty means "as far back
+     as there is data", which is right until Finance says from when these were
+     agreed. Set date_from then, and add the older rates as separate rows rather than
+     editing these: a rate is effective-dated so that reconciliations already done
+     are not silently restated.
+
+     Only the four acquirers that appear in the feed are seeded. The other thirteen
+     banks on the card are card *issuers* on installment plans, and the PAYMENT label
+     names only the acquirer ("BCA - 0% 3 Bln"), so an issuer-funded installment
+     cannot be told apart from the acquirer's own rate. No installment transaction
+     has been seen yet; confirm with Finance before the first one is.
+
+     noupdate="1": rates are operational data. Once loaded they belong to Finance,
+     and a module upgrade must not undo a renegotiation. -->
+<odoo noupdate="1">
+
+    <record id="rate_cash" model="levis.mdr.rate">
+        <field name="payment">CASH</field>
+        <field name="acquirer"></field>
+        <field name="percent">0.0</field>
+        <field name="note">Not a card tender: no acquirer, no fee.</field>
+    </record>
+
+    <record id="rate_transfer" model="levis.mdr.rate">
+        <field name="payment">TRANSFER</field>
+        <field name="acquirer"></field>
+        <field name="percent">0.0</field>
+        <field name="note">Not a card tender: no acquirer, no fee.</field>
+    </record>
+
+    <record id="rate_bca__debit_bca__bca_gpn" model="levis.mdr.rate">
+        <field name="payment">BCA - DEBIT BCA / BCA GPN</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">0.15</field>
+    </record>
+
+    <record id="rate_bca__debit_other" model="levis.mdr.rate">
+        <field name="payment">BCA - DEBIT OTHER</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">1.0</field>
+    </record>
+
+    <record id="rate_bca__bca_card" model="levis.mdr.rate">
+        <field name="payment">BCA - BCA Card</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">0.9</field>
+    </record>
+
+    <record id="rate_bca__regular_off_us" model="levis.mdr.rate">
+        <field name="payment">BCA - REGULAR OFF US</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">1.2</field>
+    </record>
+
+    <record id="rate_bca__regular_on_us" model="levis.mdr.rate">
+        <field name="payment">BCA - REGULAR ON US</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">1.0</field>
+    </record>
+
+    <record id="rate_bca__0_3_bln" model="levis.mdr.rate">
+        <field name="payment">BCA - 0% 3 Bln</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">3.0</field>
+    </record>
+
+    <record id="rate_bca__0_6_bln" model="levis.mdr.rate">
+        <field name="payment">BCA - 0% 6 Bln</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">4.0</field>
+    </record>
+
+    <record id="rate_bca__0_12_bln" model="levis.mdr.rate">
+        <field name="payment">BCA - 0% 12 Bln</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">5.0</field>
+    </record>
+
+    <record id="rate_bca__qris" model="levis.mdr.rate">
+        <field name="payment">BCA - QRIS</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">0.0</field>
+    </record>
+
+    <record id="rate_bca__jcb_on_us" model="levis.mdr.rate">
+        <field name="payment">BCA - JCB On Us</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">1.2</field>
+    </record>
+
+    <record id="rate_bca__jcb_off_us" model="levis.mdr.rate">
+        <field name="payment">BCA - JCB Off Us</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">1.4</field>
+    </record>
+
+    <record id="rate_bca__amex_on_us" model="levis.mdr.rate">
+        <field name="payment">BCA - AMEX On Us</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">1.2</field>
+    </record>
+
+    <record id="rate_bca__amex_off_us" model="levis.mdr.rate">
+        <field name="payment">BCA - AMEX Off Us</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">1.4</field>
+    </record>
+
+    <record id="rate_bca__union_pay_on_us" model="levis.mdr.rate">
+        <field name="payment">BCA - UNION PAY On Us</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">1.2</field>
+    </record>
+
+    <record id="rate_bca__union_pay_off_us" model="levis.mdr.rate">
+        <field name="payment">BCA - UNION PAY Off Us</field>
+        <field name="acquirer">BCA</field>
+        <field name="percent">1.4</field>
+    </record>
+
+    <record id="rate_bni__debit_bni__bni_gpn" model="levis.mdr.rate">
+        <field name="payment">BNI - DEBIT BNI / BNI GPN</field>
+        <field name="acquirer">BNI</field>
+        <field name="percent">0.15</field>
+    </record>
+
+    <record id="rate_bni__debit_other" model="levis.mdr.rate">
+        <field name="payment">BNI - DEBIT OTHER</field>
+        <field name="acquirer">BNI</field>
+        <field name="percent">0.8</field>
+    </record>
+
+    <record id="rate_bni__regular_on_us" model="levis.mdr.rate">
+        <field name="payment">BNI - REGULAR ON US</field>
+        <field name="acquirer">BNI</field>
+        <field name="percent">1.1</field>
+    </record>
+
+    <record id="rate_bni__regular_off_us" model="levis.mdr.rate">
+        <field name="payment">BNI - REGULAR OFF US</field>
+        <field name="acquirer">BNI</field>
+        <field name="percent">1.1</field>
+    </record>
+
+    <record id="rate_bni__0_3_bln" model="levis.mdr.rate">
+        <field name="payment">BNI - 0% 3 Bln</field>
+        <field name="acquirer">BNI</field>
+        <field name="percent">3.0</field>
+    </record>
+
+    <record id="rate_bni__0_6_bln" model="levis.mdr.rate">
+        <field name="payment">BNI - 0% 6 Bln</field>
+        <field name="acquirer">BNI</field>
+        <field name="percent">4.0</field>
+    </record>
+
+    <record id="rate_bni__0_12_bln" model="levis.mdr.rate">
+        <field name="payment">BNI - 0% 12 Bln</field>
+        <field name="acquirer">BNI</field>
+        <field name="percent">5.0</field>
+    </record>
+
+    <record id="rate_bni__qris" model="levis.mdr.rate">
+        <field name="payment">BNI - QRIS</field>
+        <field name="acquirer">BNI</field>
+        <field name="percent">0.0</field>
+    </record>
+
+    <record id="rate_mandiri__debit_mandiri_mandiri_gpn" model="levis.mdr.rate">
+        <field name="payment">MANDIRI - DEBIT MANDIRI/MANDIRI GPN</field>
+        <field name="acquirer">MANDIRI</field>
+        <field name="percent">0.15</field>
+    </record>
+
+    <record id="rate_mandiri__debit_other" model="levis.mdr.rate">
+        <field name="payment">MANDIRI - DEBIT OTHER</field>
+        <field name="acquirer">MANDIRI</field>
+        <field name="percent">1.0</field>
+    </record>
+
+    <record id="rate_mandiri__regular_off_us" model="levis.mdr.rate">
+        <field name="payment">MANDIRI - REGULAR OFF US</field>
+        <field name="acquirer">MANDIRI</field>
+        <field name="percent">1.4</field>
+    </record>
+
+    <record id="rate_mandiri__regular_on_us" model="levis.mdr.rate">
+        <field name="payment">MANDIRI - REGULAR ON US</field>
+        <field name="acquirer">MANDIRI</field>
+        <field name="percent">1.35</field>
+    </record>
+
+    <record id="rate_mandiri__0_3_bln" model="levis.mdr.rate">
+        <field name="payment">MANDIRI - 0% 3 BLN</field>
+        <field name="acquirer">MANDIRI</field>
+        <field name="percent">3.0</field>
+    </record>
+
+    <record id="rate_mandiri__0_6_bln" model="levis.mdr.rate">
+        <field name="payment">MANDIRI - 0% 6 Bln</field>
+        <field name="acquirer">MANDIRI</field>
+        <field name="percent">4.0</field>
+    </record>
+
+    <record id="rate_mandiri__0_12_bln" model="levis.mdr.rate">
+        <field name="payment">MANDIRI - 0% 12 Bln</field>
+        <field name="acquirer">MANDIRI</field>
+        <field name="percent">5.0</field>
+    </record>
+
+    <record id="rate_mandiri__qris" model="levis.mdr.rate">
+        <field name="payment">MANDIRI - QRIS</field>
+        <field name="acquirer">MANDIRI</field>
+        <field name="percent">0.7</field>
+    </record>
+
+    <record id="rate_bri__debit_bri__bri_gpn" model="levis.mdr.rate">
+        <field name="payment">BRI - DEBIT BRI / BRI GPN</field>
+        <field name="acquirer">BRI</field>
+        <field name="percent">0.15</field>
+    </record>
+
+    <record id="rate_bri__debit_other" model="levis.mdr.rate">
+        <field name="payment">BRI - DEBIT OTHER</field>
+        <field name="acquirer">BRI</field>
+        <field name="percent">0.75</field>
+    </record>
+
+    <record id="rate_bri__regular_on_us" model="levis.mdr.rate">
+        <field name="payment">BRI - REGULAR ON US</field>
+        <field name="acquirer">BRI</field>
+        <field name="percent">1.0</field>
+    </record>
+
+    <record id="rate_bri__regular_off_us" model="levis.mdr.rate">
+        <field name="payment">BRI - REGULAR OFF US</field>
+        <field name="acquirer">BRI</field>
+        <field name="percent">1.1</field>
+    </record>
+
+    <record id="rate_bri__qris" model="levis.mdr.rate">
+        <field name="payment">BRI - QRIS</field>
+        <field name="acquirer">BRI</field>
+        <field name="percent">0.0</field>
+    </record>
+
+    <record id="rate_cancel" model="levis.mdr.rate">
+        <field name="payment">CANCEL</field>
+        <field name="acquirer"></field>
+        <field name="percent">0.0</field>
+        <field name="note">Not a card tender: no acquirer, no fee.</field>
+    </record>
+
+</odoo>

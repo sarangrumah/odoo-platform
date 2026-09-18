@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_levis_mdr_rate_list" model="ir.ui.view">
+        <field name="name">levis.mdr.rate.list</field>
+        <field name="model">levis.mdr.rate</field>
+        <field name="arch" type="xml">
+            <list string="Card MDR Rates" editable="bottom" default_order="acquirer, payment">
+                <field name="acquirer"/>
+                <field name="payment"/>
+                <field name="percent" string="MDR %" digits="[16,4]"/>
+                <field name="fixed_fee" optional="hide"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="note" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_mdr_rate_search" model="ir.ui.view">
+        <field name="name">levis.mdr.rate.search</field>
+        <field name="model">levis.mdr.rate</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="payment"/>
+                <field name="acquirer"/>
+                <filter name="current" string="Currently effective"
+                        domain="['|', ('date_to', '=', False), ('date_to', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="zero" string="Zero rate" domain="[('percent', '=', 0)]"/>
+                <separator/>
+                <filter name="by_acquirer" string="Acquirer" context="{'group_by': 'acquirer'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_mdr_rate" model="ir.actions.act_window">
+        <field name="name">Card MDR Rates</field>
+        <field name="res_model">levis.mdr.rate</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Set the merchant discount rate per tender type</p>
+            <p>
+                The rate is keyed on the PAYMENT label exactly as a store's X70D export
+                writes it, for example <b>BCA - QRIS</b>. Rates are effective-dated: to
+                apply a renegotiated rate, add a row with a new start date rather than
+                editing the old one, so reconciliations already done keep the rate they
+                were done at.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_levis_mdr_txn_list" model="ir.ui.view">
+        <field name="name">levis.mdr.txn.list</field>
+        <field name="model">levis.mdr.txn</field>
+        <field name="arch" type="xml">
+            <list string="Card Transaction MDR" create="false" edit="false">
+                <field name="trans_date"/>
+                <field name="store_code"/>
+                <field name="analytic_account_id" optional="show"/>
+                <field name="transnum"/>
+                <field name="payment"/>
+                <field name="appr_code" optional="hide"/>
+                <field name="tender_type" optional="hide"/>
+                <field name="mdr_percent" string="MDR %" digits="[16,4]" optional="show"/>
+                <field name="amount" sum="Gross"/>
+                <field name="mdr_amount" sum="MDR"/>
+                <field name="net_settlement" sum="Expected Settlement"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_mdr_txn_search" model="ir.ui.view">
+        <field name="name">levis.mdr.txn.search</field>
+        <field name="model">levis.mdr.txn</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="store_code"/>
+                <field name="payment"/>
+                <field name="transnum"/>
+                <field name="appr_code"/>
+                <filter name="unlabelled" string="No acquirer yet" domain="[('payment', '=', False)]"
+                        help="The store has not sent the weekly export covering this day."/>
+                <filter name="unpriced" string="No rate on file" domain="[('payment', '!=', False), ('rate_id', '=', False)]"
+                        help="A label the rate card does not cover. These need a rate before the day can be reconciled."/>
+                <separator/>
+                <filter name="this_month" string="This month" date="trans_date"/>
+                <separator/>
+                <filter name="by_day" string="Trading Day" context="{'group_by': 'trans_date'}"/>
+                <filter name="by_store" string="Store" context="{'group_by': 'analytic_account_id'}"/>
+                <filter name="by_payment" string="Tender Type" context="{'group_by': 'payment'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_mdr_txn" model="ir.actions.act_window">
+        <field name="name">Card Transaction MDR</field>
+        <field name="res_model">levis.mdr.txn</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_by_payment': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No card transactions yet</p>
+            <p>
+                Every transaction the nightly X70D reported, priced with the rate of its
+                acquirer. A blank tender type means that store has not sent the weekly
+                export covering the day — its MDR is shown as empty rather than zero,
+                because the fee is unknown, not waived.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_levis_mdr_txn"
+              name="Card Transaction MDR"
+              parent="account.menu_finance_entries"
+              action="action_levis_mdr_txn"
+              sequence="95"/>
+
+    <menuitem id="menu_levis_mdr_rate"
+              name="Card MDR Rates"
+              parent="account.account_account_menu"
+              action="action_levis_mdr_rate"
+              sequence="95"/>
+
+</odoo>
