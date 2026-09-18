@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-18T01:03:19+00:00",
+  "generated_at": "2026-09-18T01:29:13+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "0c4ef59b",
-    "branch": "feat/levis-golive-wave3"
+    "commit": "1e6edc4a",
+    "branch": "HEAD"
   },
   "buckets": [
     {
@@ -389,14 +389,29 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.55.0",
+      "version": "19.0.1.56.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
       "public": false,
       "last_change": "2026-09-18",
-      "change_count": 57,
+      "change_count": 60,
       "changes": [
+        {
+          "sha": "1e6edc4a",
+          "date": "2026-09-18",
+          "subject": "feat(levis): prove a store's trading day, and book only what ties"
+        },
+        {
+          "sha": "b3e4cac9",
+          "date": "2026-09-18",
+          "subject": "fix(levis): a clearing run claims only the statement lines it books"
+        },
+        {
+          "sha": "bc3ec2dd",
+          "date": "2026-09-18",
+          "subject": "feat(levis): document numbering, the PPh COA gate, and four things Accounting decided (#257)"
+        },
         {
           "sha": "0c4ef59b",
           "date": "2026-09-18",
@@ -421,21 +436,6 @@
           "sha": "17200d43",
           "date": "2026-09-04",
           "subject": "feat(levis): make a repeated SKU on a purchase order say so out loud (#211)"
-        },
-        {
-          "sha": "9742a004",
-          "date": "2026-09-04",
-          "subject": "feat(levis): recognise COGS when a goods receipt reveals the cost (#210)"
-        },
-        {
-          "sha": "889ce243",
-          "date": "2026-08-28",
-          "subject": "feat(levis): prove a settlement against the receipts it paid (#198)"
-        },
-        {
-          "sha": "e0f5965d",
-          "date": "2026-08-19",
-          "subject": "feat(levis): the payment voucher names every bill it settles, with the amount applied to each (#184)"
         }
       ]
     },
@@ -3930,9 +3930,14 @@
       "category": "Accounting/Accounting",
       "depends": 9,
       "public": true,
-      "last_change": "2026-09-16",
-      "change_count": 8,
+      "last_change": "2026-09-18",
+      "change_count": 9,
       "changes": [
+        {
+          "sha": "bc3ec2dd",
+          "date": "2026-09-18",
+          "subject": "feat(levis): document numbering, the PPh COA gate, and four things Accounting decided (#257)"
+        },
         {
           "sha": "e711c780",
           "date": "2026-09-16",
@@ -3967,11 +3972,6 @@
           "sha": "708b338b",
           "date": "2026-07-21",
           "subject": "feat(petty_cash): identify employee via a dedicated 'Employee' analytic plan"
-        },
-        {
-          "sha": "dba97acd",
-          "date": "2026-07-21",
-          "subject": "feat(petty_cash): add custom_petty_cash advance→realization→settlement module"
         }
       ]
     },
@@ -5167,9 +5167,14 @@
       "category": "Accounting/Localizations",
       "depends": 9,
       "public": true,
-      "last_change": "2026-08-19",
-      "change_count": 22,
+      "last_change": "2026-09-18",
+      "change_count": 23,
       "changes": [
+        {
+          "sha": "bc3ec2dd",
+          "date": "2026-09-18",
+          "subject": "feat(levis): document numbering, the PPh COA gate, and four things Accounting decided (#257)"
+        },
         {
           "sha": "c8248721",
           "date": "2026-08-19",
@@ -5204,11 +5209,6 @@
           "sha": "81daf3c7",
           "date": "2026-07-24",
           "subject": "fix(custom_tax_id): skip PPh withholding on lines with native negative PPh tax"
-        },
-        {
-          "sha": "1fd93a41",
-          "date": "2026-07-22",
-          "subject": "style: clear the branch's repo-wide ruff debt; refresh two WMS knowledge files"
         }
       ]
     },

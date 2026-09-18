@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+      The driver ships switched off twice over: this record is inactive, and
+      even active it does nothing until `levis.clearing.config.auto_clear_enabled`
+      is set on a company. Turn it on one database at a time, read the
+      before/after numbers, and leave `auto_clear_dry_run` on until they have
+      been read.
+    -->
+    <record id="cron_levis_pos_clearing_auto" model="ir.cron">
+        <field name="name">Levi's: Prepare Proven POS Clearing</field>
+        <field name="model_id" ref="model_levis_pos_clearing"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_auto_clear()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="False"/>
+    </record>
+</odoo>

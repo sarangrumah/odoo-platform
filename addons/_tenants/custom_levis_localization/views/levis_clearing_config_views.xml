@@ -61,6 +61,26 @@
                             <field name="currency_id" invisible="1"/>
                         </group>
                     </group>
+                    <group string="Automatic Clearing">
+                        <p colspan="2" class="text-muted">
+                            The driver only ever prepares. It picks up a settlement date
+                            once the feeds have settled, weighs each store's trading day
+                            against that day's own open receivable, and books nothing
+                            unless the two tie to the rupiah — everything else is listed
+                            with its reason and left for a person. Posting stays a click.
+                        </p>
+                        <group>
+                            <field name="auto_clear_enabled"/>
+                            <field name="auto_clear_dry_run"
+                                   invisible="not auto_clear_enabled"/>
+                        </group>
+                        <group>
+                            <field name="auto_clear_delay_days"
+                                   invisible="not auto_clear_enabled"/>
+                            <field name="auto_clear_max_dates"
+                                   invisible="not auto_clear_enabled"/>
+                        </group>
+                    </group>
                 </sheet>
             </form>
         </field>

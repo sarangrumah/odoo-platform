@@ -14,6 +14,7 @@ from . import test_store_cash_deposit
 from . import test_clearing_writeoff
 from . import test_clearing_day
 from . import test_clearing_store_day
+from . import test_auto_clearing
 from . import test_po_dup_sku_guard
 from . import test_journal_code_allocation
 from . import test_ou_required
