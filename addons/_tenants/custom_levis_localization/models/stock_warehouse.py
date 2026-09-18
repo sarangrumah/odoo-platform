@@ -52,6 +52,14 @@ class StockWarehouse(models.Model):
         "and what lets a bank credit name its own store.",
     )
 
+    levis_ebr_label = fields.Char(
+        string="Recon Label",
+        copy=False,
+        help='How this store is named in the bank reconciliation workbook — "PVJ", '
+        '"SENCY", "PIM 2". Finance keys the REMARKS column on it, so the export '
+        "carries it verbatim; empty falls back to the warehouse short name.",
+    )
+
     _store_code_uniq = models.Constraint(
         "unique(company_id, l10n_store_code)",
         "Two stores of the same company cannot share a store code.",

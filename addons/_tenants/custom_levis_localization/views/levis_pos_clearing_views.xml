@@ -37,6 +37,12 @@
                     <button name="action_view_store_days" type="object"
                             string="Store Reconcile" invisible="state == 'draft'"
                             help="One row per store per settlement date: money in on the day against the tenders that store rang up the day before."/>
+                    <button name="action_export_ebr" type="object"
+                            string="Export Recon (EBR)" invisible="state == 'draft'"
+                            help="The month in the workbook Finance reads: one MUTASI sheet per bank with the mapping filled in, the sales side, and an UNMAPPED sheet for what is left to do by hand."/>
+                    <button name="action_open_recon_upload" type="object"
+                            string="Upload Recon" invisible="state not in ('draft', 'computed')"
+                            help="Read back the UNMAPPED sheet of that workbook. Applies the mapping and recomputes; it never generates or posts."/>
                     <button name="action_view_moves" type="object"
                             string="Journal Entries" invisible="move_count == 0"/>
                     <field name="state" widget="statusbar"
@@ -352,6 +358,7 @@
                             <field name="run_state" invisible="1"/>
                             <field name="analytic_account_id" readonly="1"/>
                             <field name="map_id" readonly="1"/>
+                            <field name="manual_map_id" readonly="1"/>
                             <field name="bank_journal_id" readonly="1"/>
                             <field name="move_name" readonly="1"/>
                             <field name="x24_match" readonly="1"/>

@@ -862,15 +862,9 @@ class LevisPosClearing(models.Model):
         means upgrading every database that shares this addon.
         """
         self.ensure_one()
-        code = (
-            self.env["ir.config_parameter"]
-            .sudo()
-            .get_param("custom_levis_localization.pos_cash_receivable_code", "1106000101")
-        )
-        company = self.company_id
-        return self.config_id.pos_receivable_account_ids.filtered(
-            lambda a: (a.with_company(company).code or "") == code
-        )[:1]
+        # The rule itself lives on the config, because a manual mapping has to ask
+        # the same question without a run to ask it from.
+        return self.config_id._cash_receivable_account()
 
     def _pool_accounts_for_channel(self, parsed, cash_account):
         """Which tender receivables this settlement is allowed to consume.
@@ -1107,7 +1101,9 @@ class LevisPosClearing(models.Model):
         diag_vals = []
         prepared = []
         duplicates = self._duplicate_line_ids()
-        for statement_line in self._statement_lines():
+        statement_lines = self._statement_lines()
+        manual_maps = self.env["levis.clearing.manual.map"]._for_lines(self.company_id, statement_lines.ids)
+        for statement_line in statement_lines:
             journal = statement_line.journal_id
             if journal.id not in rules_cache:
                 rules_cache[journal.id] = MidMap._candidates(self.company_id, journal)
@@ -1119,6 +1115,10 @@ class LevisPosClearing(models.Model):
                     "rules": rules_cache[journal.id],
                     "evidence": None,
                     "duplicate_of": duplicates.get(statement_line.id),
+                    # A person's answer about this bank line, if one was ever
+                    # given. Read on every Compute because the run is rebuilt on
+                    # every Compute and the answer is not.
+                    "manual": manual_maps.get(statement_line.id),
                 }
             )
         self._attach_evidence(prepared, pos_accounts)
@@ -1196,7 +1196,9 @@ class LevisPosClearing(models.Model):
             self.company_id,
         )
         if not rows:
-            return True
+            # No staged X70D for these days. The arithmetic has nothing to offer,
+            # but a person's answer stands on its own and still has to be put back.
+            return self._apply_manual_receipts(lines, {})
         claimed = set(Receipt.search([("company_id", "=", self.company_id.id), ("matched", "=", True)]).mapped("ref"))
         to_create = []
         for line in lines:
@@ -1250,6 +1252,75 @@ class LevisPosClearing(models.Model):
             # afterwards sweeps the candidates a tick has just invalidated.
             Receipt.with_context(levis_skip_receipt_release=True).create(to_create)
             Receipt._sweep_claimed(self.company_id)
+        self._apply_manual_receipts(lines, rows)
+        return True
+
+    def _apply_manual_receipts(self, lines, rows):
+        """Put back the ticks a person made, which this rebuild has just removed.
+
+        Compute deletes the candidate rows and builds them again from the
+        arithmetic, so a tick that only the arithmetic supports comes back by
+        itself and a tick that a person made does not. That asymmetry is what
+        cost 44 hand-made ticks in September 2026. The answers now live on
+        ``levis.clearing.manual.map``, keyed on the statement line rather than on
+        the clearing line, precisely because the clearing line is rebuilt.
+
+        A receipt the *arithmetic* has meanwhile claimed for another line is taken
+        off that line: the person looked at the money, the arithmetic only looked
+        at an equal number. A receipt another *person* ticked elsewhere is left
+        exactly where it is — that is a disagreement between two people, and a
+        recompute is not the place to settle one.
+        """
+        self.ensure_one()
+        if not lines:
+            return True
+        Receipt = self.env["levis.pos.clearing.receipt"]
+        manual_maps = self.env["levis.clearing.manual.map"]._for_lines(
+            self.company_id, lines.mapped("statement_line_id").ids
+        )
+        if not manual_maps:
+            return True
+        for line in lines:
+            manual = manual_maps.get(line.statement_line_id.id)
+            refs = manual._refs() if manual else []
+            if not refs:
+                continue
+            claimed = Receipt.search(
+                [("company_id", "=", self.company_id.id), ("ref", "in", refs), ("matched", "=", True)]
+            )
+            elsewhere = claimed.filtered(lambda receipt: receipt.line_id != line)
+            # Only a tick the arithmetic made is taken away. A tick another person
+            # made on another bank line is a disagreement between two people, and
+            # a recompute is not the place to settle one — the upload refuses that
+            # row up front instead, by name.
+            by_hand = elsewhere.filtered(lambda receipt: not receipt.suggested)
+            if by_hand:
+                refs = [ref for ref in refs if ref not in set(by_hand.mapped("ref"))]
+                if not refs:
+                    continue
+            (elsewhere - by_hand).unlink()
+            mine = Receipt.search([("line_id", "=", line.id), ("ref", "in", refs)])
+            mine.filtered(lambda receipt: not receipt.matched).write({"matched": True})
+            missing = set(refs) - set(mine.mapped("ref"))
+            if not missing:
+                continue
+            known = {}
+            for tender, ref, amount in rows.get((line.analytic_account_id.id, line.trans_date), ()):
+                known[ref] = (tender, amount)
+            Receipt.with_context(levis_skip_receipt_release=True).create(
+                [
+                    {
+                        "line_id": line.id,
+                        "ref": ref,
+                        "tender": known.get(ref, (False, 0.0))[0],
+                        "trans_date": line.trans_date,
+                        "amount": known.get(ref, (False, 0.0))[1],
+                        "suggested": False,
+                        "matched": True,
+                    }
+                    for ref in sorted(missing)
+                ]
+            )
         return True
 
     def action_match_proven(self):
@@ -1320,6 +1391,19 @@ class LevisPosClearing(models.Model):
         stated = parsed["trans_date"] if parsed["confidence"] == "exact" else None
         return rule, primary, stated != primary
 
+    def _target_analytic(self, prep):
+        """The store this settlement belongs to — a person's answer, then the rule.
+
+        A mapping typed by hand outranks a mapping rule on purpose: the rule is a
+        generalisation over a merchant id, the manual answer is about this one
+        bank line, and whoever wrote it was looking at the narrative.
+        """
+        manual = (prep or {}).get("manual")
+        if manual and manual.analytic_account_id:
+            return manual.analytic_account_id
+        rule = (prep or {}).get("rule")
+        return rule.analytic_account_id if rule else self.env["account.analytic.account"]
+
     def _tender_accounts(self, accounts):
         """``{tender name: account}`` for the tenders an account name spells out."""
         Alloc = self.env["levis.pos.clearing.alloc"]
@@ -1358,14 +1442,29 @@ class LevisPosClearing(models.Model):
                 continue
             rule, primary, derived = self._resolve_target(prep["statement_line"], parsed, prep["rules"])
             prep.update({"rule": rule, "trans_date": primary, "trans_date_is_derived": derived})
-            if rule and parsed.get("gross"):
+            if self._target_analytic(prep) and parsed.get("gross"):
                 settling.append(prep)
+        # A tender chosen by hand is evidence of the same kind the receipts give,
+        # and it is applied before the receipt search so the search does not
+        # overwrite it. It is still only a *priority*: ``_allocate_with_evidence``
+        # falls back to the channel's pool for whatever that account cannot cover,
+        # and ``_pool_accounts_for_channel`` still binds over both.
+        for prep in settling:
+            manual = prep.get("manual")
+            if manual and manual.tender_account_id:
+                prep["evidence"] = {
+                    "state": "manual",
+                    "tender": self.env["levis.pos.clearing.alloc"]._x24_tender_of_account(manual.tender_account_id),
+                    "refs": tuple(manual._refs()),
+                    "day": prep["trans_date"],
+                    "account": manual.tender_account_id,
+                }
         if not settling:
             return prepared
         dates = [prep["trans_date"] for prep in settling]
         lookback = timedelta(days=(self.config_id.lookback_days or 0) + 1)
         rows = Alloc._x24_rows(
-            set(prep["rule"].analytic_account_id.id for prep in settling),
+            set(self._target_analytic(prep).id for prep in settling),
             min(dates) - lookback,
             max(dates) + lookback,
             self.company_id,
@@ -1378,7 +1477,10 @@ class LevisPosClearing(models.Model):
         # the one expensive step in the run. Asked once, answered for all of them.
         cache = {}
         for prep in settling:
-            analytic_id = prep["rule"].analytic_account_id.id
+            if prep.get("evidence"):
+                # Already answered by hand.
+                continue
+            analytic_id = self._target_analytic(prep).id
             gross = round(prep["parsed"]["gross"], 2)
             for day in self._candidate_dates(prep["trans_date"]):
                 key = (analytic_id, day, gross)
@@ -1516,7 +1618,7 @@ class LevisPosClearing(models.Model):
                 continue
             parsed = prep["parsed"]
             unreadable = parsed["kind"] == "unknown"
-            unmapped = parsed["kind"] == "settlement" and not prep.get("rule")
+            unmapped = parsed["kind"] == "settlement" and not self._target_analytic(prep)
             if unreadable or unmapped:
                 blocked_bank_days.add((statement_line.journal_id.id, statement_line.date))
 
@@ -1525,10 +1627,10 @@ class LevisPosClearing(models.Model):
             parsed = prep["parsed"]
             if parsed["kind"] != "settlement":
                 continue
-            rule = prep.get("rule")
-            if not rule or not prep.get("trans_date"):
+            analytic = self._target_analytic(prep)
+            if not analytic or not prep.get("trans_date"):
                 continue
-            key = (rule.analytic_account_id.id, prep["trans_date"])
+            key = (analytic.id, prep["trans_date"])
             group = groups.setdefault(key, {"gross": 0.0, "preps": [], "blocked": False})
             statement_line = prep["statement_line"]
             if parsed.get("channel") not in _CARD_CHANNELS or not parsed.get("gross"):
@@ -1822,7 +1924,16 @@ class LevisPosClearing(models.Model):
             rule, primary, derived = prep["rule"], prep["trans_date"], prep["trans_date_is_derived"]
         else:
             rule, primary, derived = self._resolve_target(statement_line, parsed, rules)
-        if not rule:
+        # A store chosen by hand answers the same question the rule answers, and
+        # it answers it for this bank line specifically — so it wins. It is kept
+        # on ``levis.clearing.manual.map`` rather than on the line, because this
+        # method runs again from scratch on every Compute and the line does not
+        # survive one.
+        manual = prep.get("manual")
+        # ``prep`` carries the rule only when ``_attach_evidence`` ran; the direct
+        # call path resolves it here, and the target has to see it either way.
+        target_analytic = self._target_analytic({**prep, "rule": rule})
+        if not target_analytic:
             vals.update(
                 {
                     "state": "unmapped",
@@ -1845,8 +1956,9 @@ class LevisPosClearing(models.Model):
             )
             return vals
 
-        vals["map_id"] = rule.id
-        vals["analytic_account_id"] = rule.analytic_account_id.id
+        vals["map_id"] = rule.id if rule else False
+        vals["analytic_account_id"] = target_analytic.id
+        vals["manual_map_id"] = manual.id if manual else False
         vals["trans_date"] = primary
         vals["trans_date_is_derived"] = derived
 
@@ -1888,7 +2000,7 @@ class LevisPosClearing(models.Model):
         taken, left = self._allocate_with_evidence(
             pool,
             residual,
-            rule.analytic_account_id.id,
+            target_analytic.id,
             dates,
             parsed["gross"],
             only,
@@ -1908,7 +2020,7 @@ class LevisPosClearing(models.Model):
                     "%(store)s on %(day)s was proven to the rupiah, yet %(left)s of "
                     "%(gross)s could not be allocated. The proof and the allocation "
                     "disagree; nothing has been booked.",
-                    store=rule.analytic_account_id.display_name,
+                    store=target_analytic.display_name,
                     day=primary,
                     left=left,
                     gross=parsed["gross"],
@@ -1916,7 +2028,7 @@ class LevisPosClearing(models.Model):
             )
         block = "a"
         if not enforced and left > _EPS and ar_pool:
-            ar_taken, left = self._allocate_flat(ar_pool, ar_residual, rule.analytic_account_id.id, left)
+            ar_taken, left = self._allocate_flat(ar_pool, ar_residual, target_analytic.id, left)
             if ar_taken and not taken:
                 # Nothing of this store's POS receivable was open: the settlement is
                 # collecting an older trade receivable, not this month's sales.
@@ -1945,14 +2057,14 @@ class LevisPosClearing(models.Model):
                     "severity": "warning",
                     "date": statement_line.date,
                     "bank_journal_id": statement_line.journal_id.id,
-                    "analytic_account_id": rule.analytic_account_id.id,
+                    "analytic_account_id": target_analytic.id,
                     "amount": left,
                     "count": 1,
                     "res_model": "account.bank.statement.line",
                     "res_id": statement_line.id,
                     "message": _(
                         "No open receivable left for %(store)s around %(date)s.",
-                        store=rule.analytic_account_id.display_name,
+                        store=target_analytic.display_name,
                         date=primary,
                     ),
                 }
@@ -2759,6 +2871,30 @@ class LevisPosClearing(models.Model):
             "context": {"search_default_group_store": 1},
         }
 
+    def action_export_ebr(self):
+        """The month, in the workbook Finance already reconciles in."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Export Recon Workbook"),
+            "res_model": "levis.clearing.ebr.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_run_id": self.id},
+        }
+
+    def action_open_recon_upload(self):
+        """Read the finished workbook back in. Applies and recomputes; never books."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Upload Finished Recon"),
+            "res_model": "levis.clearing.recon.upload",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_run_id": self.id},
+        }
+
     def action_open_mapping_wizard(self):
         self.ensure_one()
         return {
@@ -2826,6 +2962,13 @@ class LevisPosClearingLine(models.Model):
     mid_key = fields.Char(string="MID")
     tid_key = fields.Char(string="Terminal")
     map_id = fields.Many2one("levis.bank.mid.map", string="Mapping")
+    manual_map_id = fields.Many2one(
+        "levis.clearing.manual.map",
+        string="Manual Mapping",
+        ondelete="set null",
+        help="The hand-made decision this line was resolved by — the store, the "
+        "tender, or the receipts. Kept off the line itself so it survives a recompute.",
+    )
     analytic_account_id = fields.Many2one("account.analytic.account", string="Operating Unit")
     statement_amount = fields.Monetary(currency_field="currency_id", string="Bank Amount")
     gross = fields.Monetary(currency_field="currency_id")

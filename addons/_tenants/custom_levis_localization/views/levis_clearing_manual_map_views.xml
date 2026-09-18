@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_levis_clearing_manual_map_list" model="ir.ui.view">
+        <field name="name">levis.clearing.manual.map.list</field>
+        <field name="model">levis.clearing.manual.map</field>
+        <field name="arch" type="xml">
+            <list string="Manual Clearing Mappings">
+                <field name="statement_date"/>
+                <field name="journal_id"/>
+                <field name="move_name"/>
+                <field name="payment_ref" optional="show"/>
+                <field name="statement_amount" sum="Amount"/>
+                <field name="analytic_account_id"/>
+                <field name="tender_account_id" optional="show"/>
+                <field name="receipt_refs" optional="hide"/>
+                <field name="note" optional="hide"/>
+                <field name="source"/>
+                <field name="user_id" optional="hide"/>
+                <field name="upload_log_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_clearing_manual_map_form" model="ir.ui.view">
+        <field name="name">levis.clearing.manual.map.form</field>
+        <field name="model">levis.clearing.manual.map</field>
+        <field name="arch" type="xml">
+            <form string="Manual Clearing Mapping">
+                <header>
+                    <button name="action_open_statement_line" type="object" string="Bank Line"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="display_name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="The bank line">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="statement_line_id" required="1"/>
+                            <field name="journal_id" readonly="1"/>
+                            <field name="statement_date" readonly="1"/>
+                            <field name="statement_amount" readonly="1"/>
+                            <field name="payment_ref" readonly="1"/>
+                        </group>
+                        <group string="The decision">
+                            <field name="analytic_account_id"/>
+                            <field name="tender_account_id"/>
+                            <field name="receipt_refs"/>
+                            <field name="note"/>
+                            <field name="source"/>
+                            <field name="user_id" readonly="1"/>
+                            <field name="upload_log_id" readonly="1"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <div class="text-muted">
+                        <p>Read on every Compute. A decision here outranks the MID rules,
+                           because it was made about this bank line and not about a merchant id —
+                           except the channel restriction, which still binds: a cash deposit
+                           settles the cash receivable and nothing else.</p>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_levis_clearing_manual_map_search" model="ir.ui.view">
+        <field name="name">levis.clearing.manual.map.search</field>
+        <field name="model">levis.clearing.manual.map</field>
+        <field name="arch" type="xml">
+            <search string="Manual Clearing Mappings">
+                <field name="move_name"/>
+                <field name="payment_ref"/>
+                <field name="analytic_account_id"/>
+                <field name="receipt_refs"/>
+                <filter name="from_upload" string="From an upload" domain="[('source', '=', 'upload')]"/>
+                <filter name="has_tender" string="Tender locked" domain="[('tender_account_id', '!=', False)]"/>
+                <filter name="has_refs" string="Names receipts" domain="[('receipt_refs', '!=', False)]"/>
+                <separator/>
+                <filter name="group_store" string="Store" context="{'group_by': 'analytic_account_id'}"/>
+                <filter name="group_bank" string="Bank" context="{'group_by': 'journal_id'}"/>
+                <filter name="group_upload" string="Upload" context="{'group_by': 'upload_log_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_clearing_manual_map" model="ir.actions.act_window">
+        <field name="name">Manual Clearing Mappings</field>
+        <field name="res_model">levis.clearing.manual.map</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nothing has been mapped by hand yet.</p>
+            <p>Rows land here when a finished recon workbook is uploaded, or when
+               someone answers a bank line Odoo could not place. They outlive the
+               clearing run, so recomputing never loses them.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_levis_clearing_manual_map"
+              name="Manual Clearing Mappings"
+              parent="account.menu_finance_entries"
+              action="action_levis_clearing_manual_map"
+              sequence="94"/>
+
+</odoo>

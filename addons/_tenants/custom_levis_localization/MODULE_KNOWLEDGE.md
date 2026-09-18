@@ -1554,3 +1554,153 @@ Units whose `standard_price` is still zero are skipped **in silence** and left t
 receipt catch-up. Booking zero would put a meaningless line on the entry and, worse,
 write a charge row claiming the unit had been costed. Lines are grouped per product
 category so one session cannot grow hundreds of journal lines.
+## Feature 29 — The recon workbook, out and back again
+
+Odoo maps what it can, a person maps the rest in the workbook Finance already
+reconciles in, and the finished workbook comes back. Three pieces:
+`levis.clearing.ebr` (the export), `levis.clearing.recon.upload` (the import)
+and `levis.clearing.manual.map` (the part that has to outlive a recompute).
+
+### The workbook is the client's, not ours
+
+The export mirrors the EBR workbook Finance has always filled in by hand —
+`MUTASI <BANK>` per bank, `COMPILE SALES`, `AR <previous month>`, `SUMMARY` —
+with every column Odoo can answer already answered. The columns and their
+sources:
+
+| EBR column | Source |
+|---|---|
+| CASH IN/ATS | `line.kind` — settlement/cash deposit → `CASH IN`, sweep → `ATS`, charge → `BIAYA ADMIN`, interest → `BUNGA` |
+| METHOD | `line.channel` → `DEBIT` / `KREDIT` / `QRIS` / `CASH` |
+| MID NO, MDR, AMOUNT PAYMENT | `line.mid_key`/`tid_key`, `line.mdr`, `line.gross` — all read off the narrative |
+| REMARKS | `stock.warehouse.levis_ebr_label` + the bank, e.g. `SENCY CEK (BCA)` |
+| Cabang | never filled — the branch code is not on the imported line, but the column stays so the geometry matches the sheet Finance pastes into |
+| Store code / Store Name | the warehouse's `l10n_store_code` behind `line.analytic_account_id` |
+| STATUS | `ok` → `REKON DONE`, `short` → `SELISIH`, `skipped` → `SKIP`, unmapped → blank |
+
+Two sheets deviate from the client's on purpose. `SUMMARY` is the store-day
+reconciliation (`levis.pos.clearing.store.day`) rather than a sales pivot,
+because the question month-end actually asks is the variance. And `COMPILE SALES`
+leaves `CASHIER LOGIN ID`, `CASHIER NAME` and `METODE PEMBAYARAN` blank and says
+so on the sheet: the first two are in the X24 item feed rather than X70D, and the
+third is the client's own acquirer label, not feed data. Filling them with
+something plausible would be worse than leaving them empty.
+
+A settlement that is mapped, allocated and merely has receipts nobody has ticked
+yet is deliberately **not** there: on August 2026 that is 831 rows against the 89
+that need a decision, and burying the 89 is how a worksheet stops being used.
+*Also list lines with unnamed receipts* on the export wizard adds them for
+whoever wants them; the in-app Receipt Matching worksheet is where ticking them
+one at a time belongs.
+
+`AMOUNT PAYMENT` is blank on a sweep or a charge for the same kind of reason.
+Those are not takings, and filling the cell with the bank amount had the column
+footing to Rp 27,89 miliar against a Rp 15,42 miliar month — the ATS sweeps alone
+are Rp 12,47 miliar of August. The client's own sheet zeroes them.
+
+`levis_ebr_label` is the one thing the export cannot derive: the warehouse code
+is a number (34885) and the store name is the full mall name, while Finance
+writes `BIP`. `scripts/tenants/levis/125_seed_ebr_store_labels.py` seeds it from
+the client's own workbook — their store code and their remark sit on the same
+statement row, so the pairing is theirs — and never overwrites a label a person
+set. Without it REMARKS falls back to the store code.
+
+`levis.pos.x70d.txn` gained `sap_store_code`, `store_name`, `auth` and `voucher`
+for this. They were always in `raw_data_json`; the view simply did not expose
+them.
+
+### `UNMAPPED` is the sheet that comes back
+
+It carries every line `_compute_one` could not place — `unmapped`, `unparsed`,
+`short`, `mismatch`, `skipped` — plus anything whose receipts name a tender the
+allocation did not credit (`x24_tender_mismatch`), and five input columns: **STORE CODE**, **SIMPAN RULE
+(Y/N)**, **TENDER**, **NO TRANSAKSI X24DN**, **CATATAN**. The first and third are
+dropdowns over the hidden `REF` sheet (which is also the generated version of the
+client's `Sheet2`), because a store code typed from memory is the most common way
+a round trip comes back unusable.
+
+The `_META` sheet names the run and carries a **token** — a digest over every
+`(statement line, date, amount)` in the run. It is not a checksum of the file,
+which is meant to be edited; it is a checksum of what the file claims about the
+ledger, so an upload can tell "someone filled in the blanks" from "the run has
+been recomputed since". A token mismatch is a warning, not a refusal: every row
+is validated against the ledger as it stands anyway.
+
+### Why the answers cannot live on the run
+
+`action_compute` unlinks `line_ids` and `_generate_receipts` drops every
+candidate receipt that is not ticked. A decision written onto a clearing line
+therefore does not survive the next Compute — which is exactly how 44 hand-made
+ticks were lost on 9 September 2026 and had to be recovered from a dump and
+re-keyed on `statement_line_id`.
+
+So the decisions live on **`levis.clearing.manual.map`**, one row per
+`account.bank.statement.line`, unique per company, outliving the run entirely.
+Compute reads them back through four small hooks and nothing else changes:
+
+* `_compute_one` loads them once (`_for_lines`) and hangs them on each `prep`;
+* `_target_analytic(prep)` is the store — the manual answer first, then the rule.
+  A manual mapping outranks a MID rule because the rule generalises over a
+  merchant id while the manual answer is about this one bank line;
+* `_attach_evidence` turns a chosen tender into evidence of the same shape the
+  receipts produce, so `_allocate_with_evidence` drains it first with no new
+  allocation code at all — and `_pool_accounts_for_channel` still binds over it;
+* `_apply_manual_receipts` re-ticks the named receipts after every rebuild,
+  releasing an *automatic* claim elsewhere but never a human one.
+
+`levis.pos.clearing.line.manual_map_id` is the only new column on the line, and
+it is a back-reference for the operator, not an input.
+
+### A refusal is a sentence
+
+`_pool_accounts_for_channel` would silently ignore a cash deposit pointed at a
+card receivable, and the person who typed it would never learn their answer did
+nothing. So the same rule is checked at upload time and refused by name, and
+again as a `@api.constrains` on the model so the UI path cannot bypass it. The
+other refusals: a bank line not in this run, a row whose amount or date has moved
+since the export, an unknown store code, a warehouse with no Operating Unit, a
+tender outside `pos_receivable_account_ids`, a receipt that is not among that
+store's transactions, a receipt a person has already ticked elsewhere, and a
+receipt claimed twice inside the same file. Whole-file refusals: another run,
+another company, or a run already `generated`/`posted`.
+
+Every upload writes a `levis.clearing.upload.log` — the file itself, its SHA-256,
+the counts and the rejections with their reasons — even when nothing is applied,
+because a failed import that rolls back leaves nothing to look at otherwise. A
+byte-identical re-upload is refused unless *Upload again anyway* is ticked.
+
+### What it deliberately does not do
+
+Apply ends at `action_compute`. It never generates and never posts: the three
+hard-separated stages are the feature, not an obstacle. `SIMPAN RULE = Y` creates
+a `levis.bank.mid.map` inside its own savepoint, so a colliding rule refuses
+itself without taking the rest of the upload down.
+
+The export changes nothing at all — no Compute, no projection rebuild, no receipt
+touched — and `test_export_carries_the_sheets_and_writes_nothing` is its test.
+
+### Measured against the client's own workbook (August 2026)
+
+Built from `POSCLR/2026/0001` on a clone of `prd_levis_begbal`: 2.348 statement
+lines, **17 s**, 1,0 MB, sheets `SUMMARY` (678 store-days), `MUTASI BCA` (2.035
+rows), `MUTASI BRI` (306), `MUTASI BNI` (5), `MUTASI MANDIRI` (2), `UNMAPPED`
+(99), `COMPILE SALES` (9.197), `AR JULY 2026` (2.648).
+
+The `AMOUNT PAYMENT` column against the figure Finance typed into their own
+`SALES PER BANK` cell for the same month:
+
+| | Odoo | Client's workbook | Difference |
+|---|---|---|---|
+| BCA | 13.969.794.486 | 13.969.830.691,67 | 36.205,67 |
+| BRI | 1.446.723.819 | 1.446.724.196 | 377 |
+
+The BCA difference is one row: `TRSF E-BANKING DB 0508/SWBCA/WS954` of 36.205,
+an ATS sweep the workbook counted inside settlement takings. BRI's 377 is the
+`ADJUSTMENT BANK 288` the sheet carries plus narrative rounding. Both columns sum
+to `run.total_gross` exactly (15.416.518.305), which the workbook's does not —
+so where the two disagree, it is the workbook that is adding something up twice.
+
+`UNMAPPED`'s 99 rows are 68 `unmapped` + 8 `unparsed` + 10 `short` + 3 `skipped`
++ 10 tender disagreements. That is the month's real manual work, against the 920
+rows the first cut of this sheet produced before the receipt gaps were moved
+behind a switch.

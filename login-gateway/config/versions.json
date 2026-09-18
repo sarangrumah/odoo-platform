@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-18T04:02:56+00:00",
+  "generated_at": "2026-09-18T14:33:34+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "d0dcf858",
+    "commit": "843dc6d9",
     "branch": "HEAD"
   },
   "buckets": [
@@ -389,7 +389,7 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.57.0",
+      "version": "19.0.1.58.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
@@ -398,9 +398,9 @@
       "change_count": 60,
       "changes": [
         {
-          "sha": "d0dcf858",
+          "sha": "843dc6d9",
           "date": "2026-09-18",
-          "subject": "feat(levis): mass clearing, COGS on the sales journal, and the journal number"
+          "subject": "feat(levis): the rest of the open After Go-Live rows — stock registers, mass clearing, COGS on the sales journal (#259)"
         },
         {
           "sha": "e0b2e284",
@@ -1478,9 +1478,14 @@
       "category": "Custom Platform/Technical/UX",
       "depends": 3,
       "public": true,
-      "last_change": "2026-09-16",
-      "change_count": 1,
+      "last_change": "2026-09-18",
+      "change_count": 2,
       "changes": [
+        {
+          "sha": "843dc6d9",
+          "date": "2026-09-18",
+          "subject": "feat(levis): the rest of the open After Go-Live rows — stock registers, mass clearing, COGS on the sales journal (#259)"
+        },
         {
           "sha": "97ade13b",
           "date": "2026-09-16",
@@ -1578,9 +1583,9 @@
       "change_count": 5,
       "changes": [
         {
-          "sha": "d0dcf858",
+          "sha": "843dc6d9",
           "date": "2026-09-18",
-          "subject": "feat(levis): mass clearing, COGS on the sales journal, and the journal number"
+          "subject": "feat(levis): the rest of the open After Go-Live rows — stock registers, mass clearing, COGS on the sales journal (#259)"
         },
         {
           "sha": "5ebc32fe",
@@ -1776,17 +1781,12 @@
       "depends": 5,
       "public": true,
       "last_change": "2026-09-18",
-      "change_count": 62,
+      "change_count": 61,
       "changes": [
         {
-          "sha": "d0dcf858",
+          "sha": "843dc6d9",
           "date": "2026-09-18",
-          "subject": "feat(levis): mass clearing, COGS on the sales journal, and the journal number"
-        },
-        {
-          "sha": "b5dcb0c5",
-          "date": "2026-09-18",
-          "subject": "feat(levis): six stock registers in Invoicing ▸ Reporting, and they are fast"
+          "subject": "feat(levis): the rest of the open After Go-Live rows — stock registers, mass clearing, COGS on the sales journal (#259)"
         },
         {
           "sha": "975f80bb",
@@ -1817,6 +1817,11 @@
           "sha": "3b5671fa",
           "date": "2026-09-16",
           "subject": "feat(reports): remember column widths on the on-screen report tables too (#240)"
+        },
+        {
+          "sha": "e808bf53",
+          "date": "2026-09-16",
+          "subject": "fix(reports): read Kode Objek PPh from the expense line, not the tax line (#238)"
         }
       ]
     },
