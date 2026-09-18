@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-18T01:29:13+00:00",
+  "generated_at": "2026-09-18T04:01:30+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "1e6edc4a",
+    "commit": "e0b2e284",
     "branch": "HEAD"
   },
   "buckets": [
@@ -395,17 +395,12 @@
       "depends": 10,
       "public": false,
       "last_change": "2026-09-18",
-      "change_count": 60,
+      "change_count": 59,
       "changes": [
         {
-          "sha": "1e6edc4a",
+          "sha": "e0b2e284",
           "date": "2026-09-18",
-          "subject": "feat(levis): prove a store's trading day, and book only what ties"
-        },
-        {
-          "sha": "b3e4cac9",
-          "date": "2026-09-18",
-          "subject": "fix(levis): a clearing run claims only the statement lines it books"
+          "subject": "feat(levis): prove a store's trading day, and clear only what ties (#258)"
         },
         {
           "sha": "bc3ec2dd",
@@ -436,6 +431,11 @@
           "sha": "17200d43",
           "date": "2026-09-04",
           "subject": "feat(levis): make a repeated SKU on a purchase order say so out loud (#211)"
+        },
+        {
+          "sha": "9742a004",
+          "date": "2026-09-04",
+          "subject": "feat(levis): recognise COGS when a goods receipt reveals the cost (#210)"
         }
       ]
     },
@@ -1765,7 +1765,7 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.30.0",
+      "version": "19.0.0.31.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 5,

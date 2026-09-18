@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_stock_movement_wizard" model="ir.ui.view">
+            <field name="name">custom.report.stock.movement.wizard.form</field>
+            <field name="model">custom.report.stock.movement.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Movement Inventory Detail">
+                    <field name="show_stock" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="company_ids" widget="many2many_tags"
+                                   groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="warehouse_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"
+                                   placeholder="Kosongkan untuk SEMUA warehouse"/>
+                            <field name="categ_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                            <field name="product_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-warning" role="alert" invisible="show_stock">
+                        Modul Inventory tidak terpasang di database ini — laporan akan kosong.
+                    </div>
+                    <footer>
+                        <button name="action_view" type="object" string="Tampilkan" class="btn-primary"/>
+                        <button name="action_export_xlsx" type="object" string="Export XLSX" class="btn-secondary"/>
+                        <button name="action_print" type="object" string="Cetak PDF" class="btn-secondary"/>
+                        <button string="Batal" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+        <record id="action_stock_movement_wizard" model="ir.actions.act_window">
+            <field name="name">Movement Inventory Detail</field>
+            <field name="res_model">custom.report.stock.movement.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <record id="view_inventory_summary_wizard" model="ir.ui.view">
+            <field name="name">custom.report.inventory.summary.wizard.form</field>
+            <field name="model">custom.report.inventory.summary.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Summary Inventory">
+                    <field name="show_stock" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="company_ids" widget="many2many_tags"
+                                   groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="warehouse_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"
+                                   placeholder="Kosongkan untuk SEMUA warehouse"/>
+                            <field name="categ_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                            <field name="product_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-warning" role="alert" invisible="show_stock">
+                        Modul Inventory tidak terpasang di database ini — laporan akan kosong.
+                    </div>
+                    <group>
+                        <field name="group_by"/>
+                    </group>
+                    <footer>
+                        <button name="action_view" type="object" string="Tampilkan" class="btn-primary"/>
+                        <button name="action_export_xlsx" type="object" string="Export XLSX" class="btn-secondary"/>
+                        <button name="action_print" type="object" string="Cetak PDF" class="btn-secondary"/>
+                        <button string="Batal" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+        <record id="action_inventory_summary_wizard" model="ir.actions.act_window">
+            <field name="name">Summary Inventory</field>
+            <field name="res_model">custom.report.inventory.summary.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <record id="view_inventory_warehouse_wizard" model="ir.ui.view">
+            <field name="name">custom.report.inventory.warehouse.wizard.form</field>
+            <field name="model">custom.report.inventory.warehouse.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Inventory per Warehouse">
+                    <field name="show_stock" invisible="1"/>
+                    <field name="date_from" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="date_to"/>
+                            <field name="group_by"/>
+                            <field name="company_ids" widget="many2many_tags"
+                                   groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="warehouse_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"
+                                   placeholder="Kosongkan untuk SEMUA warehouse"/>
+                            <field name="categ_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Kosongkan Warehouse untuk menarik seluruh warehouse sekaligus.
+                    </div>
+                    <footer>
+                        <button name="action_view" type="object" string="Tampilkan" class="btn-primary"/>
+                        <button name="action_export_xlsx" type="object" string="Export XLSX" class="btn-secondary"/>
+                        <button name="action_print" type="object" string="Cetak PDF" class="btn-secondary"/>
+                        <button string="Batal" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+        <record id="action_inventory_warehouse_wizard" model="ir.actions.act_window">
+            <field name="name">Inventory per Warehouse</field>
+            <field name="res_model">custom.report.inventory.warehouse.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <record id="view_purchase_return_wizard" model="ir.ui.view">
+            <field name="name">custom.report.purchase.return.wizard.form</field>
+            <field name="model">custom.report.purchase.return.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Purchase Return Report">
+                    <field name="show_stock" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="company_ids" widget="many2many_tags"
+                                   groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="warehouse_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"
+                                   placeholder="Kosongkan untuk SEMUA warehouse"/>
+                            <field name="categ_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                            <field name="product_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-warning" role="alert" invisible="show_stock">
+                        Modul Inventory tidak terpasang di database ini — laporan akan kosong.
+                    </div>
+                    <group>
+                        <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                        <field name="group_by"/>
+                    </group>
+                    <footer>
+                        <button name="action_view" type="object" string="Tampilkan" class="btn-primary"/>
+                        <button name="action_export_xlsx" type="object" string="Export XLSX" class="btn-secondary"/>
+                        <button name="action_print" type="object" string="Cetak PDF" class="btn-secondary"/>
+                        <button string="Batal" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+        <record id="action_purchase_return_wizard" model="ir.actions.act_window">
+            <field name="name">Purchase Return Report</field>
+            <field name="res_model">custom.report.purchase.return.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <record id="view_stock_transfer_wizard" model="ir.ui.view">
+            <field name="name">custom.report.stock.transfer.wizard.form</field>
+            <field name="model">custom.report.stock.transfer.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Internal Transfer Stock Detail">
+                    <field name="show_stock" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="company_ids" widget="many2many_tags"
+                                   groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="warehouse_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"
+                                   placeholder="Kosongkan untuk SEMUA warehouse"/>
+                            <field name="categ_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                            <field name="product_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-warning" role="alert" invisible="show_stock">
+                        Modul Inventory tidak terpasang di database ini — laporan akan kosong.
+                    </div>
+                    <group>
+                        <field name="group_by"/>
+                    </group>
+                    <footer>
+                        <button name="action_view" type="object" string="Tampilkan" class="btn-primary"/>
+                        <button name="action_export_xlsx" type="object" string="Export XLSX" class="btn-secondary"/>
+                        <button name="action_print" type="object" string="Cetak PDF" class="btn-secondary"/>
+                        <button string="Batal" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+        <record id="action_stock_transfer_wizard" model="ir.actions.act_window">
+            <field name="name">Internal Transfer Stock Detail</field>
+            <field name="res_model">custom.report.stock.transfer.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <record id="view_stock_adjustment_wizard" model="ir.ui.view">
+            <field name="name">custom.report.stock.adjustment.wizard.form</field>
+            <field name="model">custom.report.stock.adjustment.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Adjustment &amp; Scrap Stock Report">
+                    <field name="show_stock" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="company_ids" widget="many2many_tags"
+                                   groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="warehouse_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"
+                                   placeholder="Kosongkan untuk SEMUA warehouse"/>
+                            <field name="categ_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                            <field name="product_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-warning" role="alert" invisible="show_stock">
+                        Modul Inventory tidak terpasang di database ini — laporan akan kosong.
+                    </div>
+                    <group>
+                        <field name="adjustment_kind"/>
+                        <field name="group_by"/>
+                    </group>
+                    <footer>
+                        <button name="action_view" type="object" string="Tampilkan" class="btn-primary"/>
+                        <button name="action_export_xlsx" type="object" string="Export XLSX" class="btn-secondary"/>
+                        <button name="action_print" type="object" string="Cetak PDF" class="btn-secondary"/>
+                        <button string="Batal" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+        <record id="action_stock_adjustment_wizard" model="ir.actions.act_window">
+            <field name="name">Adjustment &amp; Scrap Stock Report</field>
+            <field name="res_model">custom.report.stock.adjustment.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+    </data>
+</odoo>

@@ -264,6 +264,42 @@
               action="action_purchase_wizard"
               sequence="87"/>
 
+    <!-- Sheet #26, #27, #28, #59, #64, #69, #70: Accounting asked for the
+         stock registers next to the Purchase Report, in Invoicing, not in
+         Inventory. Sequences sit after Purchase (87) and before the tax root
+         (89) — 87 was already taken three times over, so these use 87.1-87.6
+         rather than adding a fourth tie. -->
+    <menuitem id="menu_custom_reports_purchase_return"
+              name="Purchase Return Report"
+              parent="menu_custom_reports_root"
+              action="action_purchase_return_wizard"
+              sequence="871"/>
+    <menuitem id="menu_custom_reports_stock_movement"
+              name="Movement Inventory Detail"
+              parent="menu_custom_reports_root"
+              action="action_stock_movement_wizard"
+              sequence="872"/>
+    <menuitem id="menu_custom_reports_inventory_summary"
+              name="Summary Inventory"
+              parent="menu_custom_reports_root"
+              action="action_inventory_summary_wizard"
+              sequence="873"/>
+    <menuitem id="menu_custom_reports_inventory_warehouse"
+              name="Inventory per Warehouse"
+              parent="menu_custom_reports_root"
+              action="action_inventory_warehouse_wizard"
+              sequence="874"/>
+    <menuitem id="menu_custom_reports_stock_transfer"
+              name="Internal Transfer Stock Detail"
+              parent="menu_custom_reports_root"
+              action="action_stock_transfer_wizard"
+              sequence="875"/>
+    <menuitem id="menu_custom_reports_stock_adjustment"
+              name="Adjustment &amp; Scrap Stock Report"
+              parent="menu_custom_reports_root"
+              action="action_stock_adjustment_wizard"
+              sequence="876"/>
+
     <menuitem id="menu_custom_reports_gl_open_items"
               name="GL Open Items / Outstanding"
               parent="menu_custom_reports_root"
