@@ -52,4 +52,54 @@
         <field name="dry_run" eval="True"/>
     </record>
 
+    <!-- Second mailbox on the SAME INBOX, for the X70D that stores export themselves.
+
+         Why a second record rather than widening the first: the two sources need
+         opposite handling. The nightly file is the system of record and is posted;
+         the store file is a lookup and must never be posted. They also need different
+         drop directories — the store file is named "X70D_Tender_Detail_Report -OLS
+         MKG SEPTEMBER 2026.xlsx", which matches feed_levis_x70d's own X70D*.xlsx
+         glob. Dropped beside the nightly file it would be imported as a second
+         nightly file and would duplicate a store's sales.
+
+         The two records never fight over a message because their sender filters are
+         disjoint: the nightly reports come from XcenterAdmin@levi.com, the store
+         reports from a person at @erajaya.com. IMAP SEARCH cannot express "not from
+         X", so the separation has to come from the addresses themselves — do not
+         blank this filter.
+
+         Purge stays OFF here whatever the other mailbox does. Store mail is sent
+         weekly and cumulative, so an old message is still the only copy of the weeks
+         it covers, and retention measured from the send date would delete it while
+         it is current. -->
+    <record id="mailbox_levis_store_tender" model="retail.import.mailbox">
+        <field name="name">Levi's stores — weekly X70D export</field>
+        <field name="host">mail.erajaya.com</field>
+        <field name="port">993</field>
+        <field name="use_ssl" eval="True"/>
+        <field name="username">levis.data@erajaya.com</field>
+        <field name="password_env">LEVIS_MAIL_PASSWORD</field>
+        <field name="folder">INBOX</field>
+        <field name="sender_filter">erajaya.com</field>
+
+        <!-- Back up every attachment: the stores also send "LAPORAN HARIAN", a manual
+             retype of the same data whose only original column is a free-text remark
+             (split payment, short swipe). It is kept because that remark explains
+             differences, and deliberately not ingested: its retyped figures disagree
+             with the export they were copied from. -->
+        <field name="attachment_glob">*.xlsx</field>
+        <field name="ingest_glob">X70D*.xlsx</field>
+
+        <field name="drop_dir">/mnt/data_levis/data_store</field>
+        <field name="backup_dir">/mnt/data_levis/mailbox_store</field>
+
+        <field name="retention_days">0</field>
+        <field name="max_messages">0</field>
+        <field name="max_bytes_mb">0</field>
+
+        <field name="active" eval="False"/>
+        <field name="purge_enabled" eval="False"/>
+        <field name="dry_run" eval="True"/>
+    </record>
+
 </odoo>

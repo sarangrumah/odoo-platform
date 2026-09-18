@@ -83,6 +83,36 @@
         <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "tender_type": 9, "tender_amount": 10, "auth": 11, "voucher": 12}</field>
     </record>
 
+    <!-- X70D as a STORE exports it. Same 12 columns in the same order as the nightly
+         file, but columns 11/12 carry different data: the nightly report heads them
+         AUTH NUMBER / VOUCHER NUMBER and ships them empty in every row (verified over
+         79 files and 25.414 rows), while the store export heads them PAYMENT / APPR
+         CODE and fills them in. PAYMENT names the acquirer and the product — "BCA -
+         QRIS", "BRI - DEBIT OTHER" — which is what an MDR rate is keyed on and what
+         TENDER TYPE cannot tell you: one TENDER TYPE mixes QRIS, debit and credit at
+         different rates.
+
+         Mapping those two columns onto the nightly profile's logical names would be
+         quietly wrong — "BCA - QRIS" would land in a field labelled Approval Code —
+         so this profile names them for what they hold.
+
+         all_sheets: the store export puts one trading day per worksheet, each with its
+         own header row. require_fields: every sheet ends with a TOTAL row that carries
+         an amount and no store code. -->
+    <record id="profile_levis_x70d_store" model="retail.import.profile">
+        <field name="name">Levi's — X70D Tender Detail (store export)</field>
+        <field name="code">levis_x70d_store</field>
+        <field name="file_type">x70d_store</field>
+        <field name="namespace">levis</field>
+        <field name="file_format">xlsx</field>
+        <field name="all_sheets" eval="True"/>
+        <field name="data_start_row">2</field>
+        <field name="date_format">%Y-%m-%d</field>
+        <field name="require_fields">store_code,trans_date,transnum</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="column_map_json">{"store_code": 1, "sap_store_code": 2, "store_name": 3, "trans_date": 4, "register": 5, "transnum": 6, "cashier_id": 7, "cashier_name": 8, "tender_type": 9, "tender_amount": 10, "payment": 11, "appr_code": 12}</field>
+    </record>
+
     <!-- X31 — Discount Journal. 7 metadata rows, header row 8, data row 9. -->
     <record id="profile_levis_x31" model="retail.import.profile">
         <field name="name">Levi's — X31 Discount Journal</field>

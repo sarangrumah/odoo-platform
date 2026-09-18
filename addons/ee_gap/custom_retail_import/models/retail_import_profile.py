@@ -105,6 +105,14 @@ TEXT_FIELDS = frozenset(
         "tender_type",
         "auth",
         "voucher",
+        # store-exported X70D: the acquirer label and the approval code. APPR CODE is
+        # an identifier that merely looks numeric -- the real files carry "007403"
+        # (leading zeros Excel drops) beside "Tgccbw" and "R68223" -- so it has to be
+        # read as text or it stops matching the acquirer's own settlement reference.
+        "payment",
+        "appr_code",
+        "cashier_id",
+        "cashier_name",
         "discount_code",
         # CoA and the company key/value sheet
         "code",
@@ -154,6 +162,7 @@ FILE_TYPES = [
     ("x20", "X20 — Current On-hand Inventory"),
     ("x24", "X24DN — Retail Sales Detail (POS)"),
     ("x70d", "X70D — Tender Detail (payments)"),
+    ("x70d_store", "X70D (store export) — Tender Detail with PAYMENT/APPR CODE"),
     ("x70t", "X70T — Tender Settlement"),
     ("x31", "X31 — Discount Journal (promotions)"),
     ("x32p", "X32P — Stock Movement with Price (reference)"),
@@ -191,6 +200,19 @@ class RetailImportProfile(models.Model):
     # --- source format ---
     file_format = fields.Selection([("xlsx", "Excel (.xlsx)"), ("csv", "CSV")], default="xlsx", required=True)
     sheet_name = fields.Char(help="For xlsx: sheet to read. Empty = active/first sheet.")
+    all_sheets = fields.Boolean(
+        help="For xlsx: read EVERY worksheet, not just one, concatenating their rows. "
+        "``data_start_row`` is applied per sheet, so a workbook that repeats its header "
+        "on each tab parses correctly. Set for sources that split one logical table "
+        "across tabs -- the store-exported X70D puts one trading day per tab. "
+        "Ignored when ``sheet_name`` is set.",
+    )
+    require_fields = fields.Char(
+        help="Comma-separated logical field names that must be non-blank for a row to be "
+        "kept. A row missing any of them is dropped as structural noise rather than "
+        "reaching the executor. This is what removes the per-sheet TOTAL row of the "
+        "store-exported X70D, which carries an amount but no store code.",
+    )
     data_start_row = fields.Integer(
         default=2,
         required=True,
@@ -330,10 +352,16 @@ class RetailImportProfile(models.Model):
             ) from e
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
         try:
-            ws = wb[self.sheet_name] if self.sheet_name else wb.active
+            if self.sheet_name:
+                sheets = [wb[self.sheet_name]]
+            elif self.all_sheets:
+                sheets = list(wb.worksheets)
+            else:
+                sheets = [wb.active]
             start = max(self.data_start_row, 1)
-            for row in ws.iter_rows(min_row=start, values_only=True):
-                yield row
+            for ws in sheets:
+                for row in ws.iter_rows(min_row=start, values_only=True):
+                    yield ws.title, row
         finally:
             wb.close()
 
@@ -344,7 +372,7 @@ class RetailImportProfile(models.Model):
         for n, row in enumerate(reader, start=1):
             if n < start:
                 continue
-            yield row
+            yield "", row
 
     def _iter_raw_rows(self, file_bytes: bytes):
         if self.file_format == "csv":
@@ -364,11 +392,12 @@ class RetailImportProfile(models.Model):
         """
         self.ensure_one()
         col_map = self._column_map()
+        required = [f.strip() for f in (self.require_fields or "").split(",") if f.strip()]
         file_bytes = base64.b64decode(file_b64)
         records: list[dict] = []
         total = 0
         blank = 0
-        for raw in self._iter_raw_rows(file_bytes):
+        for sheet, raw in self._iter_raw_rows(file_bytes):
             total += 1
             row = list(raw)
             if not row or all((c is None or str(c).strip() == "") for c in row):
@@ -384,7 +413,15 @@ class RetailImportProfile(models.Model):
                     rec[field_name] = self._clean_cell(cell)
                 else:
                     rec[field_name] = self._clean_str(cell) if isinstance(cell, str) else cell
+            # A row that cannot identify itself is structure, not data -- a TOTAL
+            # line, a spacer, a stray note. Counted as blank so the log's arithmetic
+            # (total = kept + blank) still holds and nothing looks silently lost.
+            if required and any(str(rec.get(f) or "").strip() == "" for f in required):
+                blank += 1
+                continue
             rec["_row"] = total + self.data_start_row - 1
+            if sheet:
+                rec["_sheet"] = sheet
             records.append(rec)
             if limit and len(records) >= limit:
                 break

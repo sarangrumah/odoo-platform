@@ -2942,11 +2942,36 @@ class RetailImportExecutor(models.AbstractModel):
             line_ids = [ln.id for ln in row_to_line.values()]
             if line_ids:
                 self.env["retail.import.line"].browse(line_ids).write({"state": "skipped"})
-            self.env.cr.commit()
+            # _ri_commit, not cr.commit: a raw commit escapes a TransactionCase
+            # rollback and makes every stage-only loader untestable.
+            self._ri_commit()
         _logger.info("%s: staged %s rows (no model writes)", profile.file_type, len(records))
 
     def _load_x70t(self, profile, file_b64, log):
         self._stage_only(profile, file_b64, log, "X70T settlement: staged for reconciliation (Phase 5 decision).")
+
+    def _load_x70d_store(self, profile, file_b64, log):
+        """The store's own X70D export: staged, never posted.
+
+        The nightly corporate X70D is the system of record for what was tendered --
+        it covers every store and already creates the POS orders. This file covers
+        one store and would duplicate them. What it uniquely carries is the acquirer
+        label (``PAYMENT``, e.g. "BCA - QRIS") and the approval code, which the
+        nightly file ships as ``AUTH NUMBER``/``VOUCHER NUMBER`` and leaves empty in
+        every row. So this loader only stages: the reconciliation reads the staged
+        rows as a lookup and attaches the label to the nightly transaction.
+
+        Stores send the file weekly, cumulative from the 1st, so the same trading day
+        arrives several times. Nothing is de-duplicated here on purpose -- staging
+        stays an append-only record of what was received, and the reader resolves
+        each transaction to its most recently imported row.
+        """
+        self._stage_only(
+            profile,
+            file_b64,
+            log,
+            "X70D store export: staged as the acquirer/MDR lookup for the nightly X70D (never posted).",
+        )
 
     def _x31_post_enabled(self):
         return self.env["ir.config_parameter"].sudo().get_param("retail_import.x31_post_enabled", "0") in (

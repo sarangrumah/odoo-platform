@@ -48,6 +48,26 @@
         <field name="active" eval="True"/>
     </record>
 
+    <!-- The store export gets its own directory, not the shared drop dir: its filename
+         matches feed_levis_x70d's X70D*.xlsx glob, so side by side the nightly feed
+         would import it as a nightly file and duplicate that store's sales.
+
+         Inactive on purpose — turn it on only once the stores actually send. Stores
+         send weekly and cumulative from the 1st, so the same day arrives several
+         times; staging is append-only and the reconciliation resolves each
+         transaction to its most recent row, which is also what lets a store correct
+         a week by resending it. -->
+    <record id="feed_levis_x70d_store" model="retail.import.feed">
+        <field name="sequence">25</field>
+        <field name="name">Levi's X70D — store export (weekly, acquirer labels)</field>
+        <field name="profile_id" ref="profile_levis_x70d_store"/>
+        <field name="source_type">local</field>
+        <field name="local_dir">/mnt/data_levis/data_store</field>
+        <field name="archive_dir">/mnt/data_levis/archive_store</field>
+        <field name="file_glob">X70D*.xlsx</field>
+        <field name="active" eval="False"/>
+    </record>
+
     <!-- ===== Master data + staged types (inactive: review before enabling) ===== -->
 
     <!-- X20 is inactive on purpose. _load_x20 seeds opening on-hand once (it is guarded),
