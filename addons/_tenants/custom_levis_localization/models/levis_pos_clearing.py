@@ -1878,9 +1878,19 @@ class LevisPosClearing(models.Model):
         return True
 
     def _mark_statement_lines(self):
+        """Claim the statement lines this run actually books — and only those.
+
+        The claim exists to stop two runs spending one statement line, so it
+        belongs to the lines that produced legs. A line that produced none —
+        skipped as a duplicate re-import, as bank interest, as already consumed,
+        or as unproven — was never this run's to hold, and claiming it anyway
+        locks it out of the next run: ``_assert_generatable`` reads a foreign
+        claim as a refusal and a ``consumed`` diagnostic as a blocker, so one
+        narrow run would stop every later one over the same period.
+        """
         self.ensure_one()
         for line in self.line_ids:
-            if line.statement_line_id:
+            if line.statement_line_id and line.leg_ids:
                 line.statement_line_id.levis_clearing_line_id = line.id
         return True
 
