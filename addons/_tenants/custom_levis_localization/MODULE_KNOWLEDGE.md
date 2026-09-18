@@ -1785,3 +1785,78 @@ Three rules, each one the engine's own:
   as well as to the receipts, because `action_compute` rebuilds receipts.
 
 The screen books nothing. It records what pays what.
+## Feature 31 — A deposit slip is what names a cash deposit's store
+
+`levis.store.cash.deposit` and its matcher `_find_for_statement_line` shipped in
+Feature 17 with **no production caller** — the method was reachable only from its
+own tests, and `deposit_match_window_days` was a config field nothing read. This
+connects them, and it is the only thing that can close the cash hole.
+
+### Why a keyword rule cannot do this job
+
+Measured on `prd_levis_begbal`, September 2026: **70 cash deposits worth
+Rp 106.059.800** resolved to no store. Classified by what the narrative actually
+says:
+
+| What the narrative names | Lines | Value |
+|---|---|---|
+| **No store at all** — a depositor's name, a date, or just `SETORAN TUNAI` | **44** | Rp 48,3 jt |
+| A store, but one of the nine whose sales never reached X24/X70D | 25 | Rp 55,0 jt |
+| A store that does have a feed (Kelapa Gading) | 1 | Rp 2,75 jt |
+
+So 44 of 70 can never be placed by any rule, because the text names nobody. And
+of the 25 that do name a store, **every one is a feed-gap store with no open CASH
+receivable** — mapping them moves the line from `unmapped` to `short` and clears
+nothing. Writing keyword rules for this list would have produced one clearable
+line worth Rp 2,75 juta.
+
+There is a second trap worth recording. Keyword matching is a plain substring
+(`r.key.lower() in haystack`, `levis_bank_mid_map.py:289`), while BCA wraps the
+free text every ~30 characters **mid-word**: the same shop appears as
+`Cash ols mantos`, `Storan cash ols ma ntos`, `setoran cash OLS S ES QM`,
+`Setoran OLS The Pa rk Ke`, `SETORAN OLS SES PA NAKKU`. A rule keyed `mantos`
+misses `ma ntos`, and the split point moves with the length of whatever preceded
+it. Do not try to solve cash attribution with keywords.
+
+### What a slip is allowed to decide, and what it is not
+
+A till is counted, signed for and attached before it is banked, so the berita
+acara is evidence in a way a transfer memo never is. `_line_from_parsed` now
+consults it for a `cash_deposit` **only after** `_resolve_target` has found no
+rule — a mapped terminal still outranks a slip, because the slip is about who
+banked the money and the rule is about which terminal took it.
+
+* **Tolerance is nailed to zero**, exactly as in `_prove_store_days`. This
+  decides *whose money this is*; a band would make that a guess.
+  `_find_for_statement_line` already returns nothing when two slips fit, so the
+  only answer taken is unambiguous — two shops, one bank and one flat float is a
+  real situation and is evidence for neither.
+* **The window comes from `deposit_match_window_days`**, which finally has a
+  reader. It searches backwards only: money is paid in on or before the day it
+  lands. Three days does not survive a long weekend, so expect to raise it.
+* **A slip states the trading day**, so `trans_date_is_derived` is False on a
+  line it placed — unlike the lag-derived guess a narrative leaves behind.
+* **A slip does not prove a store-day.** Cash stays out of both sides of
+  `_prove_store_days`, slip or no slip, for the reasons in Feature 27: a sale
+  banked before it reaches XStore, and a till banked days late, both move cash
+  with no receivable on the day. The slip places the store; the card proof is
+  still decided without cash.
+
+### The slip is spent when the money is
+
+`_claim_cash_deposits` runs in `action_post`, never at compute. A computed run is
+a proposal that may be recomputed or cancelled any number of times, and a slip
+claimed by a proposal would be invisible to the next one — the same trap
+`_mark_statement_lines` fell into with statement lines, fixed in the commit
+before Feature 27. The link is recorded on `levis.pos.clearing.line.cash_deposit_id`
+from compute onward so the operator can see *why* a store was named, but the
+`state = matched` write happens only when the money actually moves.
+
+### What this does not fix
+
+Nothing here creates deposit slips. With `levis_store_cash_deposit` empty — and
+it is empty in production — this feature changes nothing at all. It is the
+mechanism waiting for the input, and the input is a shop-floor process: count
+the till, attach the slip, submit, validate. Until that happens the 70 unplaced
+deposits stay unplaced, and the honest thing to say is that the gap is
+operational rather than technical.
