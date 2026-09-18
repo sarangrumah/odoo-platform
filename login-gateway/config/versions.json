@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-18T04:01:30+00:00",
+  "generated_at": "2026-09-18T04:02:21+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "e0b2e284",
+    "commit": "b5dcb0c5",
     "branch": "HEAD"
   },
   "buckets": [
@@ -1569,7 +1569,7 @@
       "module": "custom_account_reconcile",
       "bucket": "ee_gap",
       "name": "Custom Account Reconciliation",
-      "version": "19.0.3.0.0",
+      "version": "19.0.3.1.0",
       "summary": "Enterprise-style manual reconciliation menu and wizard for Odoo CE (EE-gap closure).",
       "category": "Accounting/Accounting",
       "depends": 1,
@@ -1765,14 +1765,19 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.31.0",
+      "version": "19.0.0.32.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
       "last_change": "2026-09-18",
-      "change_count": 60,
+      "change_count": 61,
       "changes": [
+        {
+          "sha": "b5dcb0c5",
+          "date": "2026-09-18",
+          "subject": "feat(levis): six stock registers in Invoicing ▸ Reporting, and they are fast"
+        },
         {
           "sha": "975f80bb",
           "date": "2026-09-18",
@@ -1807,11 +1812,6 @@
           "sha": "e808bf53",
           "date": "2026-09-16",
           "subject": "fix(reports): read Kode Objek PPh from the expense line, not the tax line (#238)"
-        },
-        {
-          "sha": "bde8a4e8",
-          "date": "2026-08-26",
-          "subject": "feat(reports): rincian PPN Keluaran Digunggung sampai nomor transaksi (#195)"
         }
       ]
     },

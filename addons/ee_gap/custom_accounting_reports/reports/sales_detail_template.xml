@@ -11,6 +11,7 @@
                         <th>Reg</th>
                         <th>Trans</th>
                         <th>Tanggal</th>
+                        <th>Nomor Jurnal</th>
                         <th>Item Code</th>
                         <th>Item Name</th>
                         <th>Kategori</th>
@@ -48,6 +49,7 @@
                             <td t-esc="line.get('register')"/>
                             <td t-esc="line.get('txn_no')"/>
                             <td t-esc="line.get('txn_date')" t-options="{'widget':'date'}"/>
+                            <td t-esc="line.get('journal_no')"/>
                             <td t-esc="line.get('item_code')"/>
                             <td t-esc="line.get('item_name')"/>
                             <td t-esc="line.get('categ')"/>
