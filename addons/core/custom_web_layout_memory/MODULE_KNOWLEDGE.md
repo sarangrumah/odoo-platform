@@ -149,3 +149,7 @@ Neither behaviour is configurable in Odoo 19 core:
   patches core web/mail components. Follow the platform rule for shared addons:
   bump the manifest version and run `-u custom_web_layout_memory` on every
   database that has it, or the assets bundle and the Python side drift apart.
+
+- **🔴 The column-width key must NOT include the field set.** `ListRenderer.createViewKey()` mixes the sorted field names into its hash, which is correct for optional-column memory — a column that no longer exists has no state worth keeping — and wrong for widths. Every module that adds a single field to `account.move`'s list view rotates that hash and orphans every width the user ever set, which is why sheet #11 kept coming back after each `-u`. Widths are stored **per column name** (`saveColumnWidths` writes `{name: px}`, `processAllColumn` reads `saved[column.name]`), so a changed field set is already handled correctly: a column that disappeared is ignored, a new one takes the default. The key is now `resModel|viewId|nestedModel.field`; the nested part stays because an x2many list inside a form is a different table from the top-level one.
+- **The change orphans the widths stored under the old key, once.** Old keys carry the hash, the new one does not, so the first load after the upgrade shows defaults. After that they survive every future `-u` — which is the whole point.
+- `shortHash` still lives in `resizable_table_hook.js`, which has its own copy and its own reason to key on the column list. Removing it from `list_column_width.js` does not touch that.
