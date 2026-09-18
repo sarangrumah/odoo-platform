@@ -38,7 +38,7 @@
                             string="Store Reconcile" invisible="state == 'draft'"
                             help="One row per store per settlement date: money in on the day against the tenders that store rang up the day before."/>
                     <button name="action_export_ebr" type="object"
-                            string="Export Recon (EBR)" invisible="state == 'draft'"
+                            string="Export Recon (EBR)"
                             help="The month in the workbook Finance reads: one MUTASI sheet per bank with the mapping filled in, the sales side, and an UNMAPPED sheet for what is left to do by hand."/>
                     <button name="action_open_recon_upload" type="object"
                             string="Upload Recon" invisible="state not in ('draft', 'computed')"

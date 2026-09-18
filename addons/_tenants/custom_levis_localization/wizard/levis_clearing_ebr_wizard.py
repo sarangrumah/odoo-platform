@@ -46,7 +46,14 @@ class LevisClearingEbrWizard(models.TransientModel):
     def action_export(self):
         self.ensure_one()
         if self.run_id.state == "draft":
-            raise UserError(_("Compute %s first — there is nothing to report yet.", self.run_id.name))
+            raise UserError(
+                _(
+                    "%s has not been computed yet, so there is nothing to report. Press "
+                    "Compute Summary on the run first — it reads the statements and "
+                    "builds the lines, and books nothing.",
+                    self.run_id.name,
+                )
+            )
         return self.env["levis.clearing.ebr"]._action(
             self.run_id,
             options={
