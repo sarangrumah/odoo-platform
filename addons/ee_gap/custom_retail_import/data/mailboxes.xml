@@ -88,7 +88,9 @@
              differences, and deliberately not ingested: its retyped figures disagree
              with the export they were copied from. -->
         <field name="attachment_glob">*.xlsx</field>
-        <field name="ingest_glob">X70D*.xlsx</field>
+        <field name="ingest_glob">*.xlsx</field>
+        <field name="ingest_signature">TRANSNUM,TENDER AMOUNT</field>
+        <field name="ingest_store_check" eval="True"/>
 
         <field name="drop_dir">/mnt/data_levis/data_store</field>
         <field name="backup_dir">/mnt/data_levis/mailbox_store</field>

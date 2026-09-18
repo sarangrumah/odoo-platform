@@ -207,6 +207,14 @@ class RetailImportProfile(models.Model):
         "across tabs -- the store-exported X70D puts one trading day per tab. "
         "Ignored when ``sheet_name`` is set.",
     )
+    header_signature = fields.Char(
+        help="Comma-separated column captions that must ALL appear in a sheet's header "
+        "row for that sheet to be parsed. Captions are compared trimmed and "
+        "case-insensitively. This is how a workbook is recognised by what it contains "
+        "rather than by what someone named it -- the stores send their X70D export under "
+        "a dozen different filenames, and some workbooks mix X70D tabs with tabs that are "
+        "something else entirely. A sheet that does not match is skipped, not parsed.",
+    )
     require_fields = fields.Char(
         help="Comma-separated logical field names that must be non-blank for a row to be "
         "kept. A row missing any of them is dropped as structural noise rather than "
@@ -359,11 +367,40 @@ class RetailImportProfile(models.Model):
             else:
                 sheets = [wb.active]
             start = max(self.data_start_row, 1)
+            wanted = self._signature_captions()
             for ws in sheets:
-                for row in ws.iter_rows(min_row=start, values_only=True):
+                # With a signature the header row is read first and the sheet is
+                # skipped unless it matches. Read from one row earlier so the
+                # header is the first row yielded by the iterator -- reopening a
+                # read-only sheet to peek at row 1 would read the file twice.
+                first = max(start - 1, 1) if wanted else start
+                rows = ws.iter_rows(min_row=first, values_only=True)
+                if wanted:
+                    try:
+                        header = next(rows)
+                    except StopIteration:
+                        continue
+                    if not self._header_matches(header, wanted):
+                        continue
+                for row in rows:
                     yield ws.title, row
         finally:
             wb.close()
+
+    def _signature_captions(self) -> list[str]:
+        self.ensure_one()
+        return [c.strip().upper() for c in (self.header_signature or "").split(",") if c.strip()]
+
+    @staticmethod
+    def _header_matches(header, wanted: list[str]) -> bool:
+        """True when every wanted caption appears in this header row.
+
+        Compared on the caption text alone, never on position: the very same
+        workbook heads column 11 ``Payment Method`` on one tab and ``PAYMENT`` on
+        another, so only the presence of the anchor columns is reliable.
+        """
+        present = {str(c).strip().upper() for c in (header or ()) if c is not None}
+        return all(w in present for w in wanted)
 
     def _read_rows_csv(self, file_bytes: bytes):
         text = file_bytes.decode(self.encoding or "utf-8", errors="replace")
