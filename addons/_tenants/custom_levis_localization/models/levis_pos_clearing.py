@@ -1412,7 +1412,33 @@ class LevisPosClearing(models.Model):
         if manual and manual.analytic_account_id:
             return manual.analytic_account_id
         rule = (prep or {}).get("rule")
-        return rule.analytic_account_id if rule else self.env["account.analytic.account"]
+        if rule:
+            return rule.analytic_account_id
+        # Last, the berita acara. A till is counted, signed for and attached
+        # before it is banked, so the slip is evidence in a way a cash narrative
+        # never is — on the 70 deposits no rule could place in September 2026,
+        # 44 named no store at all, only the depositor or the date. It comes
+        # after the rule because a rule is about which terminal took the money
+        # and a slip is about who banked it.
+        deposit = (prep or {}).get("deposit")
+        return deposit.analytic_account_id if deposit else self.env["account.analytic.account"]
+
+    def _deposit_for(self, prep):
+        """The validated deposit slip this cash credit pays in, or empty.
+
+        Tolerance is nailed to zero, as in ``_prove_store_days``: this decides
+        whose money the deposit is, and a band would make that a guess.
+        ``_find_for_statement_line`` already returns nothing when two slips fit —
+        two shops, one bank and one flat float is a real situation and evidence
+        for neither.
+        """
+        self.ensure_one()
+        Deposit = self.env["levis.store.cash.deposit"]
+        if (prep or {}).get("parsed", {}).get("kind") != "cash_deposit":
+            return Deposit
+        return Deposit._find_for_statement_line(
+            prep["statement_line"], tolerance=0.0, window_days=self.config_id.deposit_match_window_days or 3
+        )
 
     def _tender_accounts(self, accounts):
         """``{tender name: account}`` for the tenders an account name spells out."""
@@ -1452,6 +1478,11 @@ class LevisPosClearing(models.Model):
                 continue
             rule, primary, derived = self._resolve_target(prep["statement_line"], parsed, prep["rules"])
             prep.update({"rule": rule, "trans_date": primary, "trans_date_is_derived": derived})
+            prep["deposit"] = self._deposit_for(prep)
+            if prep["deposit"] and not rule and not prep.get("manual"):
+                # The slip states the day the till was banked. That is a fact,
+                # where the narrative would have left a lag-derived guess.
+                prep.update({"trans_date": prep["deposit"].deposit_date or primary, "trans_date_is_derived": False})
             if self._target_analytic(prep) and parsed.get("gross"):
                 settling.append(prep)
         # A tender chosen by hand is evidence of the same kind the receipts give,
@@ -1946,6 +1977,10 @@ class LevisPosClearing(models.Model):
             rule, primary, derived = prep["rule"], prep["trans_date"], prep["trans_date_is_derived"]
         else:
             rule, primary, derived = self._resolve_target(statement_line, parsed, rules)
+            prep = {**prep, "rule": rule, "statement_line": statement_line, "parsed": parsed}
+            prep["deposit"] = self._deposit_for(prep)
+            if prep["deposit"] and not rule and not prep.get("manual"):
+                primary, derived = prep["deposit"].deposit_date or primary, False
         # A store chosen by hand answers the same question the rule answers, and
         # it answers it for this bank line specifically — so it wins. It is kept
         # on ``levis.clearing.manual.map`` rather than on the line, because this
@@ -1994,6 +2029,7 @@ class LevisPosClearing(models.Model):
         vals["map_id"] = rule.id if rule else False
         vals["analytic_account_id"] = target_analytic.id
         vals["manual_map_id"] = manual.id if manual else False
+        vals["cash_deposit_id"] = prep.get("deposit").id if prep.get("deposit") else False
         vals["trans_date"] = primary
         vals["trans_date_is_derived"] = derived
 
@@ -2670,11 +2706,26 @@ class LevisPosClearing(models.Model):
             )
         return True
 
+    def _claim_cash_deposits(self):
+        """Bind each berita acara to the credit that paid it in.
+
+        At posting and never at compute: a computed run is a proposal that may
+        be recomputed or cancelled any number of times, and a slip claimed by a
+        proposal would be invisible to the next one — the trap
+        ``_mark_statement_lines`` fell into with statement lines.
+        """
+        self.ensure_one()
+        for line in self.line_ids:
+            if line.cash_deposit_id and line.statement_line_id and not line.cash_deposit_id.statement_line_id:
+                line.cash_deposit_id._claim(line.statement_line_id)
+        return True
+
     def action_post(self):
         self.ensure_one()
         self._preflight()
         self._apply_to_statement_lines()
         self._reconcile_allocations()
+        self._claim_cash_deposits()
         self._snapshot_after()
         self.state = "posted"
         return True
@@ -3098,6 +3149,16 @@ class LevisPosClearingLine(models.Model):
         help="What that store's non-cash POS receivable still held open on that "
         "trading day when the proof was taken. The same figure on every line of "
         "the group, because the group is what was weighed.",
+    )
+    cash_deposit_id = fields.Many2one(
+        "levis.store.cash.deposit",
+        string="Deposit Slip",
+        index="btree_not_null",
+        ondelete="set null",
+        copy=False,
+        help="The validated berita acara that named this deposit's store. Set "
+        "only where exactly one slip fit the amount and the window — an "
+        "ambiguous pair names neither.",
     )
     note = fields.Text()
     alloc_ids = fields.One2many("levis.pos.clearing.alloc", "line_id", copy=False)

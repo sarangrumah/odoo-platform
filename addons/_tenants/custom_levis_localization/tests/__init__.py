@@ -11,6 +11,7 @@ from . import test_journal_billing_tax_number
 from . import test_clearing_matcher
 from . import test_store_code
 from . import test_store_cash_deposit
+from . import test_cash_deposit_matching
 from . import test_clearing_writeoff
 from . import test_clearing_day
 from . import test_clearing_store_day

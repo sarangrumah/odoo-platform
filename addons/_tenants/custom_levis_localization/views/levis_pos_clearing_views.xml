@@ -512,6 +512,7 @@
                 <field name="x24_tender_mismatch" optional="hide" string="Tender Disagrees"/>
                 <field name="proof_state" optional="show" string="Store Day"
                        decoration-success="proof_state in ['exact', 'subset']"/>
+                <field name="cash_deposit_id" optional="show" string="Deposit Slip"/>
                 <field name="proof_ledger_total" optional="hide" string="Store Day Receivable"/>
                 <field name="statement_amount" sum="Bank" optional="hide"/>
                 <field name="gross" sum="Gross"/>
