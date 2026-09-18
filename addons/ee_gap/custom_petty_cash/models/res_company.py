@@ -17,7 +17,7 @@ class ResCompany(models.Model):
     petty_cash_advance_account_id = fields.Many2one(
         "account.account",
         string="Default Advance Account",
-        domain="[('reconcile', '=', True)]",
+        domain="['|', ('reconcile', '=', True), ('account_type', '=', 'asset_cash')]",
         help="Company-wide fallback. Reconcilable asset account 'Uang Muka'. Debited on "
         "disbursement (per employee), credited as the employee realizes or "
         "returns the money; clears to zero when a request is settled.",

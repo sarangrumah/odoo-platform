@@ -78,7 +78,7 @@ class PettyCashType(models.Model):
         "account.account",
         string="Advance Account",
         check_company=True,
-        domain="[('reconcile', '=', True)]",
+        domain="['|', ('reconcile', '=', True), ('account_type', '=', 'asset_cash')]",
         help="Reconcilable asset account debited on disbursement and credited "
         "as the employee realizes or returns the money.",
     )

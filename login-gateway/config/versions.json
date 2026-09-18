@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-18T00:24:31+00:00",
+  "generated_at": "2026-09-18T01:03:19+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "ac2b249e",
-    "branch": "wave2-rebuilt"
+    "commit": "0c4ef59b",
+    "branch": "feat/levis-golive-wave3"
   },
   "buckets": [
     {
@@ -389,7 +389,7 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.54.0",
+      "version": "19.0.1.55.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
@@ -398,9 +398,9 @@
       "change_count": 57,
       "changes": [
         {
-          "sha": "ac2b249e",
+          "sha": "0c4ef59b",
           "date": "2026-09-18",
-          "subject": "feat(levis): refuse to post a P&L line with no Operating Unit"
+          "subject": "feat(levis): refuse to post a P&L line with no Operating Unit, and send the six missing report templates (#256)"
         },
         {
           "sha": "975f80bb",
@@ -3925,7 +3925,7 @@
       "module": "custom_petty_cash",
       "bucket": "ee_gap",
       "name": "Custom Cash Advance & Petty Cash",
-      "version": "19.0.0.6.2",
+      "version": "19.0.0.6.3",
       "summary": "Employee cash advances / petty cash: typed request, Finance approval, Bank-Out disbursement, realization (third-party vendor bill or plain expense), return/top-up settlement, advance ceilings, and Kartu Uang Muka / outstanding / aging monitoring — multi-currency throughout.",
       "category": "Accounting/Accounting",
       "depends": 9,
@@ -5162,7 +5162,7 @@
       "module": "custom_tax_id",
       "bucket": "ee_gap",
       "name": "Custom Tax Indonesia (PPh + DPP Nilai Lain)",
-      "version": "19.0.0.8.0",
+      "version": "19.0.0.9.0",
       "summary": "PPh 23 / 4(2) / 26 withholding engine, PPN DPP Nilai Lain (PMK 131/2024), Faktur Pengganti workflow",
       "category": "Accounting/Localizations",
       "depends": 9,

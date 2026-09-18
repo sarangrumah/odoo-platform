@@ -31,6 +31,16 @@ class TestPettyCashFlow(TransactionCase):
         )
         cls.gen_journal = Journal.create({"name": "PC Misc", "type": "general", "code": "PCMS"})
 
+        # This class configures the COMPANY defaults and deliberately creates no
+        # petty.cash.type, because the fallback chain it exercises is
+        # request -> type -> company. On a tenant database a default type
+        # already exists and wins, so the advance lands on the tenant's own
+        # account and every assertion here reads the wrong line. Stand the
+        # incumbent down inside the test transaction.
+        cls.env["petty.cash.type"].with_context(active_test=False).search(
+            [("company_id", "=", cls.company.id), ("is_default", "=", True)]
+        ).is_default = False
+
         cls.company.write(
             {
                 "petty_cash_advance_account_id": cls.advance.id,
