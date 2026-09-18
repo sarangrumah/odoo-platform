@@ -1,7 +1,7 @@
 """Normalise the Levi's Operating-Unit dimension on an existing DB.
 
-After this runs the "Operating Unit" analytic plan holds exactly 24 ACTIVE
-accounts: ``EBR - HEAD OFFICE`` plus the 23 live stores. Everything else in the
+After this runs the "Operating Unit" analytic plan holds exactly 33 ACTIVE
+accounts: ``EBR - HEAD OFFICE`` plus the 32 live stores. Everything else in the
 plan is archived, never deleted.
 
     RUN_DRY=0 docker exec -i odoo19-platform-odoo-mgmt odoo shell \
@@ -73,6 +73,18 @@ STORES = {
     # Absent from the official store list but trades daily in the X24DN files,
     # so it must stay postable (_ri_assert_stores_postable).
     "14703": "OLS SES - GRAND INDONESIA",
+    # Sulawesi/Kalimantan batch, added 2026-09-16 (108_add_stores.py). These have
+    # no legacy XStore number, so their warehouse code IS the current X24 STORE
+    # CODE — the 5 digits after the "00200" of the ship-to the client supplied.
+    "80680": "OLS SES - DR RATULANGI MAKASSAR",
+    "80741": "OLS SES - BALIKPAPAN SUPERBLOCK",
+    "80742": "OLS SES - BIG MALL SAMARINDA",
+    "80743": "OLS SES - DUTA MALL BANJARMASIN",
+    "80744": "OLS SES - MANADO TOWN SQUARE",
+    "80745": "OLS SES - Q MALL BANJARBARU",
+    "80746": "OLS SES - TRANS STUDIO MAKASSAR",
+    "80747": "OLS SES - THE PARK KENDARI",
+    "80748": "OLS SES - MALL PANAKKUKANG",
 }
 
 # Stores absent from the official list AND absent from the sales files.
