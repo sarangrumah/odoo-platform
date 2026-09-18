@@ -1256,3 +1256,259 @@ type, `STSCP/YYYY/MM/NNNNN` for scrap — is configuration, not code:
 optional in INTF**, even though the client's example omits it: each of the 34 internal
 picking types owns its own sequence, so a shared prefix would run 34 counters in parallel
 and mint duplicate document numbers.
+## Feature 27 — The store-day proof, and the run that books only what it proves
+
+Month-end at Levi's was days of wizard work because the clearing had no way to
+say "this part is not in doubt". It now has one, and it is the only thing in
+this feature that is new arithmetic: everything else is the existing engine,
+narrowed.
+
+### The unit is a store's trading day, never a settlement line
+
+A settlement cannot be checked against a receivable one at a time. The bank's
+channels (debit, credit, QRIS) and X70D's tenders (ten accounts) are two
+different partitions of the same money. The case that settles it, measured on
+`prd_levis_begbal`, PIM 2 on 3 September 2026:
+
+| Bank paid | X70D booked |
+|---|---|
+| debit 17.605.500 | DOMESTIC_CARD 69.099.900 |
+| QRIS 65.499.000 | OTHER_CREDITCARD 14.004.600 |
+| **83.104.500** | **83.104.500** |
+
+The totals are one figure to the rupiah and no member of either side is a subset
+of the other. One MID covers Visa, Mastercard, JCB and Amex alike and
+`levis.mdr.bin` is empty, so nothing states which of the ten accounts a
+settlement pays. Below the day, the two sides are not comparable at all.
+
+### Why the line-grain routes were rejected, with the numbers
+
+Measured over the 1.125 open September settlement lines:
+
+* `_get_auto_match_candidate`'s existing rule — one candidate whose residual
+  equals the gross — reaches **27 %** (246 of 916 at the time of measuring).
+* Feeding `levis.clearing.matcher._subset_match` the same question per line,
+  composing **whole** receivable rows, also reaches **27 %** (312 of 1.125,
+  Rp 1,08 miliar). It is not a tuning problem: the split genuinely does not
+  line up, so most lines have no whole-row subset at all.
+* Weighing the **store-day** instead: **289 of 457 store-days** tie to the
+  rupiah in the ledger — Rp 5,12 miliar of Rp 7,27 miliar. That is the
+  arithmetic ceiling. What the engine actually proves is lower, because the
+  blocking rule below takes some of those days away; the measured figure is in
+  "What a September clone produces".
+
+The reason the third works where the first two cannot is `_allocate`, which
+takes `min(left, remaining)` and so may spend part of a receivable.
+`_reconcile_with_amls` in `custom_account_reconcile` cannot: it creates one
+counterpart per AML at the **full** residual. That single difference is why this
+lives in `levis.pos.clearing` and not in the bank-reconcile wizard.
+
+### `_prove_store_days` — the gate
+
+Runs in `_compute_one` immediately after `_attach_evidence`, **before** the
+allocation loop, because allocation spends the very residual the proof reads.
+Groups card and QRIS settlements by `(analytic_account_id, trans_date)`, sums
+`parsed["gross"]`, and weighs it against that key's open residual on
+`pos_receivable_account_ids` **less the CASH account**. Six verdicts, stamped on
+every line of the group as `proof_state` with `proof_ledger_total` beside it:
+
+* `exact` — ties to the rupiah. Evidence.
+* `subset` — the day holds more, and exactly one combination of its open items
+  makes the gross. Evidence, and only when `advanced_matching` is set. One
+  nuance of `_subset_match`'s contract is easy to misread: a lone item equal to
+  the gross short-circuits the composition search, so a day holding a single
+  500.000 alongside a 300.000 + 200.000 pair takes the single one rather than
+  reporting ambiguity. Uniqueness is required of the *compositions*; a single
+  item matching to the rupiah is the standard `_get_auto_match_candidate` has
+  always applied.
+* `over` — the bank paid more than the day sold. A backlog, or a day imported
+  twice. Books nothing.
+* `under` — part of the day has not been settled yet. Books nothing.
+* `no_sales` — the day has no receivable at all. Books nothing.
+* `blocked` — see below. Books nothing.
+
+**Zero tolerance, and `config._match_tolerance()` is never called here.** Its own
+docstring forbids it: a tolerance widens what is *offered to a person* and must
+never size, absorb or book anything. A tolerance inside a booking predicate
+launders a shortfall into a fee. `_EPS` stays what it has always been, float
+noise.
+
+### Cash is on neither side, and that is the defence
+
+Two things happen in the shops that would otherwise poison this arithmetic, both
+raised by the client:
+
+1. **A sale rung up manually and banked before it ever reaches XStore.** Money
+   in, no receivable behind it.
+2. **A till deposited days late** because the bank was shut or the field had a
+   problem. The H-1 assumption collapses entirely.
+
+Neither can reach the proof: `levis_channel = "cash"` never joins the bank side
+and the CASH receivable never joins the ledger side — the same asymmetry
+`_pool_accounts_for_channel` already keeps for allocation, for the same measured
+reason. What they do instead is show on the store-day screen as a variance
+exactly the size of the cash, which is what that screen was built to say. The
+sanctioned route for cash remains `levis.store.cash.deposit` with a validated
+*berita acara*, whose `_find_for_statement_line` returns a record only when
+exactly one candidate fits.
+
+`deposit_match_window_days` (default 3) is still **not read by anything**. When
+the cash path is taken up, note that three days does not survive a long weekend —
+which is scenario 2 above.
+
+### An unreadable line poisons its whole bank day
+
+A money-in line that is `unparsed`, or a settlement whose MID is unmapped, could
+be any store's takings on that date. It therefore blocks **every** group sharing
+its `(journal, bank date)`, not only itself. A settlement whose channel could not
+be read blocks its own group for the same reason: it is money the day holds and
+the proof cannot weigh, and leaving it out of the sum while calling the remainder
+exact would be arithmetic over a set already known to be wrong. A narrative that
+disagrees with the money it moved (`levis_amount_matches_narrative`) blocks its
+group too.
+
+A **negative** line blocks nothing — a sweep out or a bank charge cannot be a
+shop's takings.
+
+**This rule is expensive, and here is what it costs.** Measured on the
+September clone: **6** `(journal, bank date)` pairs carried an unreadable or
+unmapped money-in line, and those six days blocked **89 store-days — 234
+settlement lines, Rp 1,55 miliar** that would otherwise have been weighed. Two
+unmapped MIDs and a handful of unparsed narratives are the whole cause.
+
+That is the rule working, not failing: those days genuinely hold money nobody
+can attribute, and clearing the rest of the day would be arithmetic over a set
+known to be incomplete. But it does put the incentive somewhere specific —
+keeping `levis.bank.mid.map` complete and the narrative grammars current is now
+what makes the automation earn its keep, and the mapping wizard is one screen
+away. Re-measure this figure each period; a rising one means the feeds have
+drifted, not that the rule needs relaxing.
+
+### The load-bearing change: a proven day is spent on itself
+
+`_line_from_parsed` used to pass `_candidate_dates(primary)` — a ±`lookback_days`
+ladder — into `_allocate_with_evidence` for every settlement. A proven group
+`(store, D)` allowed to reach `(store, D-1)` breaks the neighbour's tie *after*
+that tie was measured, which makes proving anything pointless. So a proven line **on a narrowed
+run** gets `dates = [primary]` and `pin=True`, and `pin` also stops the
+receipts' evidence day from lengthening the ladder again.
+
+**The pin binds a narrowed run only, and so does the allocation order.** A wide
+run records the verdict and otherwise allocates exactly what it always did —
+pinning it would leave a neighbour's receivable open where it used to clear,
+which is a behaviour change dressed as a safety measure. That is the inertness
+contract, and `test_a_wide_run_still_reaches_the_neighbour_it_always_reached`
+is the mirror of the pin's own regression test. The evidence account keeps its
+priority: draining the named tender first **inside** the proven day changes
+nothing about the day's total. `tests/test_auto_clearing.py` guards this with a
+neighbouring receivable of exactly the settlement's gross — the most tempting
+thing a greedy largest-first search could find.
+
+A proven line that still comes up short raises rather than booking: the group's
+two sides were equal when weighed, so a shortfall means the code disagrees with
+itself. Compute creates nothing, so it is the cheapest place to say so.
+
+### MDR is the printed fee, and QRIS's zero is a real zero
+
+Inside a proven group `ratio == 1`, so `mdr_booked == parsed["mdr"]` exactly.
+`_counterpart_plan` emits the MDR leg only when the fee is non-zero, so a QRIS
+settlement with `DDR: 0.00` produces a two-leg entry and needs no special case.
+**Do not "fix" that by looking up a rate.** September: 1.973 of 1.980 debit and
+1.243 of 1.243 credit settlements carried an MDR; QRIS genuinely does not.
+
+### `auto_only` — the narrowed run
+
+A run with `auto_only` set books the store-days it proved plus block C (the
+bank's own sweeps and charges), and marks every other settlement `skipped` with
+`block = False`, so `action_generate_moves` produces no legs for them with **no
+change to stage 2 or stage 3**. Narrowing the run's *scope* is what made the
+deferred `_generate_moves(lines=None)` refactor — "the riskiest change in the
+whole plan" — unnecessary.
+
+Two consequences worth knowing:
+
+* **`_mark_statement_lines` was fixed first, in its own commit.** It claimed
+  every line carrying a `statement_line_id`, skipped ones included. A narrowed
+  run would then lock the lines it had *not* booked out of the wide run that was
+  meant to finish them, because `_assert_generatable` reads a foreign claim as a
+  refusal. It now claims only lines that produced legs.
+* **A narrowed run is exempt from the unparsed / unmapped / mismatch warning.**
+  Not as a convenience: it books none of those lines, and an unreadable money-in
+  line already blocks every store-day sharing its bank day, which is a stronger
+  guarantee than the tick the warning asks for. Asking for the tick as well
+  would only teach an operator to set `ignore_warnings` by reflex. The
+  `sweep_double` blocker is **not** waived — block C is booked by every run.
+
+### The driver prepares and never posts
+
+`_cron_auto_clear` → `_auto_clear_company` → `_auto_clear_dates` →
+`_auto_clear_one`. It walks as far as a prepared plan and stops; posting is
+still a person who has read the summary. A date is eligible when it is
+`auto_clear_delay_days` old, sits after the lock date, has unclaimed unreconciled
+lines, is not covered by any non-cancelled run, and its newest statement line is
+older than `_DUP_BATCH_GAP_SECONDS` — the same constant that defines "the import
+has settled" for `_duplicate_groups`, borrowed so the two definitions cannot
+drift apart.
+
+* **A cron, not a queue job.** The queue runner keys pending jobs by UUID across
+  every tenant database and a duplicated database has been enough to crash-loop
+  it for all of them. A job touching receivables is the last place to accept a
+  failure mode shared with every other tenant.
+* **Not hooked to the import.** Statements arrive cumulatively (1-7, then 1-14,
+  then 1-31), so an import is not the event "a new day exists"; clearing on that
+  hook would race the dedup that reads it.
+* `pg_try_advisory_xact_lock` per company, so two passes — or a pass and a
+  person — cannot spend the same open items. Each date gets its own savepoint
+  and a `UserError` is logged with the date rather than abandoning the rest: a
+  cron that raises retries forever.
+
+### Switches, and what each one now means
+
+* **`auto_clear_enabled`** (new, default off) with `auto_clear_dry_run` (default
+  **on**, stop after Compute), `auto_clear_delay_days` (2) and
+  `auto_clear_max_dates` (5). The cron record also ships `active="False"`, so
+  the feature is off twice over.
+* **`advanced_matching`** finally has a reader, and it is the meaning the field
+  was declared with: it gates the `subset` tier, and only there are
+  `subset_max_items` and `subset_node_budget` read. It was deliberately **not**
+  reused as this feature's on/off switch — repurposing a switch for a different
+  meaning is how a Finance user turns on something they never read about.
+* `_subset_match` now has a production caller. The note that it and `_x24_subset`
+  are two implementations of one search still stands as separate work; do not
+  carry subset search back into `_x24_identify`.
+
+### What a September clone produces
+
+Measured, not estimated: a narrowed run over 2026-09-01..30 on a clone of
+`prd_levis_begbal`, 1.363 open statement lines, `advanced_matching` off.
+
+| Store-day verdict | Days | Settlement lines |
+|---|---|---|
+| `exact` | **226** | **570** |
+| `blocked` | 89 | 234 |
+| `no_sales` | 124 | 278 |
+| `over` | 10 | 32 |
+| `under` | 8 | 11 |
+| no card settlement at all | 5 | — |
+
+**Rp 3.887.852.400 proven, carrying Rp 17.108.954 of MDR, and `short_total` on
+the proven lines is exactly zero** — every proven line allocated in full, so the
+"proven yet short" guard never fired on real data. 570 lines land in block A, 18
+in block C (the bank's own sweeps and charges), and 692 are skipped with a
+reason. `no_sales` is feed gaps rather than accounting differences: nine
+Sulawesi/Kalimantan stores whose sales never reached X24/X70D (PR #243 puts them
+in the canonical store map) and 13 + 15 September missing for every store.
+
+The gap between 226 proven days and the 289 the ledger arithmetic allows is the
+blocking rule, and it is accounted for above to the day. A materially different
+set of numbers, once that is subtracted, means the key, the anchor or the pool
+restriction is wrong — not that a tolerance needs loosening.
+
+**Inertness, measured the same way.** A *wide* run over the same period on the
+same clone, before and after this feature, produces the same 1.363 lines, the
+same Rp 7.721.009.359 gross, the same Rp 6.318.390.681 allocated, the same
+block A/B/C totals, the same 1.657 allocation rows, and the same hash over every
+`(statement line, source item, amount)` triple: `12b59f19f96ea4f7`. The verdict
+is recorded on a wide run and binds nothing. That is the inertness contract the
+config file already states, and `test_a_wide_run_is_unchanged_by_all_of_this`
+is its test.

@@ -76,6 +76,8 @@ _logger = logging.getLogger(__name__)
 # Half a cent: below this, a difference is float noise, not money.
 # Channels whose money demonstrably did not arrive as cash.
 _CARD_CHANNELS = ("debit", "credit", "qris")
+# Store-day verdicts that are evidence. Everything else is a finding to read.
+_PROVEN_STATES = ("exact", "subset")
 
 _EPS = 0.005
 
@@ -134,6 +136,13 @@ _DIAG_KINDS = [
     ("dup_statement", "Bank statement imported more than once"),
     ("import_incomplete", "Bank statement stops before the period ends"),
     ("coverage", "Settlements exceed the open receivable pool"),
+    # The store-day proof's four ways of saying "not proven", plus the one
+    # finding that can only appear after a day was cleared.
+    ("store_day_over", "Store day: settlements exceed the day's receivable"),
+    ("store_day_under", "Store day: settlements fall short of the day's receivable"),
+    ("store_day_no_sales", "Store day: the day's sales never arrived"),
+    ("store_day_blocked", "Store day: an unreadable line on the same bank day"),
+    ("late_sales", "Receivable booked after the trading day was cleared"),
 ]
 
 # Diagnostics answering "is the data fit to clear at all", as opposed to those
@@ -198,6 +207,15 @@ class LevisPosClearing(models.Model):
         copy=False,
         help="Generate the entries even though unparsed lines, unmapped MIDs or "
         "amount mismatches remain. Recorded so the decision stays auditable.",
+    )
+
+    auto_only = fields.Boolean(
+        string="Proven Store Days Only",
+        default=False,
+        copy=False,
+        help="Book only the store-days whose settlements tie to their own open "
+        "receivable to the rupiah, plus the bank's own movements. Everything "
+        "else is still listed, with the reason, and left for a person.",
     )
 
     line_ids = fields.One2many("levis.pos.clearing.line", "run_id", copy=False)
@@ -792,7 +810,7 @@ class LevisPosClearing(models.Model):
                     dates.append(candidate)
         return dates
 
-    def _allocate(self, pool, residual, analytic_id, dates, amount, only_accounts=None):
+    def _allocate(self, pool, residual, analytic_id, dates, amount, only_accounts=None, only_amls=None):
         """Spend ``amount`` on open debits, largest residual first.
 
         Returns ``([(account_id, aml_id, date, amount)], shortfall)``. The greedy
@@ -803,6 +821,11 @@ class LevisPosClearing(models.Model):
         is passed **only where the tender is certain** — see
         ``_allowed_accounts_for``. Left empty, every configured tender account is
         eligible, which is what a card settlement needs.
+
+        ``only_amls`` restricts to named open items rather than to accounts. It
+        is passed only where a subset search proved that *those* items and no
+        other combination make the settlement's gross, so the greedy order has
+        nothing left to decide.
         """
         taken = []
         left = round(amount, 2)
@@ -814,6 +837,8 @@ class LevisPosClearing(models.Model):
                 if left <= _EPS:
                     break
                 if allowed is not None and aml.account_id.id not in allowed:
+                    continue
+                if only_amls is not None and aml.id not in only_amls:
                     continue
                 remaining = residual.get(aml.id, 0.0)
                 if remaining <= _EPS:
@@ -966,6 +991,10 @@ class LevisPosClearing(models.Model):
                 }
             )
         self._attach_evidence(prepared, pos_accounts)
+        # Weighed before allocation, because allocation is what spends the very
+        # residual the proof reads. The store-day projection at the end only
+        # copies the verdict up; a projection must never gate what it describes.
+        self._prove_store_days(prepared, pool, residual, cash_account, diag_vals)
 
         line_vals = [None] * len(prepared)
         for index in self._allocation_order(prepared):
@@ -1242,7 +1271,260 @@ class LevisPosClearing(models.Model):
                 break
         return prepared
 
-    def _allocate_with_evidence(self, pool, residual, analytic_id, dates, gross, only, evidence, vals):
+    def _prove_by_subset(self, items, gross, state):
+        """The day holds more than the bank paid — did it pay a nameable part?
+
+        Off unless ``advanced_matching`` is set, which is the meaning that field
+        was declared with and has never had a reader until now.
+
+        The search itself is ``levis.clearing.matcher._subset_match``, and the
+        reason it may be trusted here is written in its own docstring: it refuses
+        to name a subset of *receipt numbers*, which would be an unverifiable
+        claim about which customers an acquirer paid, but this is ledger
+        allocation, where a subset is already chosen greedily today and every
+        item taken is recorded on ``levis.pos.clearing.alloc`` and reconciled as
+        an exact pair. It is also honest in the two ways an unattended matcher
+        needs: items are totally ordered before anything is searched, so a
+        shuffled pool yields the identical answer, and the search stops at the
+        **second** solution rather than the first — a settlement that can be
+        composed two ways is not evidence for either.
+
+        One nuance of that contract, because it is easy to misread: a lone open
+        item equal to the gross short-circuits the composition search, so a day
+        holding both a single 500.000 and a 300.000 + 200.000 pair takes the
+        single one rather than reporting ambiguity. Uniqueness is required of
+        the *compositions*; a single item matching to the rupiah is the same
+        standard ``_get_auto_match_candidate`` has always applied.
+
+        The tolerance is nailed to zero. Everything in the docstring above is
+        about *which* items; none of it licenses a different *amount*.
+        """
+        self.ensure_one()
+        config = self.config_id
+        if not config.advanced_matching or not items:
+            return None, state
+        verdict, chosen = self.env["levis.clearing.matcher"]._subset_match(
+            items,
+            gross,
+            tolerance=0.0,
+            max_items=config.subset_max_items or 24,
+            node_budget=config.subset_node_budget or 20000,
+        )
+        if verdict != "unique":
+            return None, state
+        return set(chosen), "subset"
+
+    def _prove_store_days(self, prepared, pool, residual, cash_account, diag_vals):
+        """Weigh each store's trading day against that day's own open receivable.
+
+        **Why the group and not the line.** The bank's channels and the POS
+        tenders are two different partitions of the same money. Measured on
+        3 September 2026, PIM 2: the bank paid a debit settlement of 17.605.500
+        and a QRIS settlement of 65.499.000, while X70D had booked
+        DOMESTIC_CARD 69.099.900 and OTHER_CREDITCARD 14.004.600. The totals are
+        the same figure, 83.104.500; no subset of one side makes a member of the
+        other. One MID covers Visa, Mastercard, JCB and Amex alike and
+        ``levis.mdr.bin`` is empty, so nothing states which of the ten accounts a
+        settlement pays. Below the day, the two sides are not comparable at all.
+
+        Measured over open September lines: 289 of 457 store-days tie to the
+        rupiah — 747 of 1.125 settlement lines, Rp 5,12 miliar of Rp 7,27
+        miliar. Of the 168 that do not, almost all are feed gaps rather than
+        accounting differences: nine stores whose sales never reached X24/X70D at
+        all, and two days missing for every store.
+
+        **Cash is excluded from both sides, and that is the defence, not a
+        simplification.** Two things happen in the shops that would otherwise
+        poison this arithmetic: a sale rung up on paper and banked before it ever
+        reaches XStore, and a till deposited days late because the bank was shut.
+        Both move cash without a matching receivable on the day the money lands.
+        Neither can reach this proof, because ``levis_channel = "cash"`` never
+        joins the bank side and the CASH receivable never joins the ledger side —
+        the same asymmetry ``_pool_accounts_for_channel`` already keeps for
+        allocation, for the same measured reason. What they do instead is show up
+        on the store-day screen as a variance exactly the size of the cash, which
+        is what that screen was built to say.
+
+        **Zero tolerance, to the rupiah.** ``config._match_tolerance`` is never
+        consulted here: it widens what is *offered to a person* and its own
+        docstring says it must never size, absorb or book anything. A tolerance
+        inside a booking predicate launders a shortfall into a fee. ``_EPS``
+        stays what it is, float noise.
+
+        Stamps ``prep["proof"]`` on every settlement prep and appends its
+        findings to ``diag_vals``. Reads ``residual`` but never spends it —
+        allocation has not run yet.
+        """
+        self.ensure_one()
+        if not cash_account:
+            # Without a CASH receivable to exclude, the ledger side would count
+            # the till — and the two shop-floor cases above are exactly what
+            # would then walk into the arithmetic. Nothing is proven until the
+            # account is configured; the `no_cash_account` diagnostic already
+            # says so on the run.
+            return prepared
+        currency = self.company_id.currency_id
+        non_cash = self.config_id.pos_receivable_account_ids - cash_account
+
+        # A money-in line nobody could read might be any store's card takings
+        # that day, so it blocks every group sharing its bank day rather than
+        # only itself. Two lines deliberately do NOT block:
+        #
+        # * a negative one — a sweep out or a charge cannot be a shop's takings;
+        # * an unattributed **cash deposit** — and this one is the whole point.
+        #   A till banked late, or banked for a sale that never reached XStore,
+        #   routinely arrives with no merchant id to map. It is cash, so it is
+        #   already outside both sides of this arithmetic and cannot consume a
+        #   non-cash receivable either. Letting it block would hand the shop
+        #   floor a way to stop the card clearing by being slow to the bank,
+        #   which is the opposite of what excluding cash is for.
+        blocked_bank_days = set()
+        for prep in prepared:
+            statement_line = prep["statement_line"]
+            if statement_line.amount <= 0:
+                continue
+            parsed = prep["parsed"]
+            unreadable = parsed["kind"] == "unknown"
+            unmapped = parsed["kind"] == "settlement" and not prep.get("rule")
+            if unreadable or unmapped:
+                blocked_bank_days.add((statement_line.journal_id.id, statement_line.date))
+
+        groups = {}
+        for prep in prepared:
+            parsed = prep["parsed"]
+            if parsed["kind"] != "settlement":
+                continue
+            rule = prep.get("rule")
+            if not rule or not prep.get("trans_date"):
+                continue
+            key = (rule.analytic_account_id.id, prep["trans_date"])
+            group = groups.setdefault(key, {"gross": 0.0, "preps": [], "blocked": False})
+            statement_line = prep["statement_line"]
+            if parsed.get("channel") not in _CARD_CHANNELS or not parsed.get("gross"):
+                # A settlement whose channel could not be read is money this day
+                # holds and this method cannot weigh. Refusing to prove the day
+                # is the honest answer; leaving it out of the sum and calling the
+                # remainder exact would not be.
+                group["blocked"] = True
+                continue
+            group["gross"] = round(group["gross"] + parsed["gross"], 2)
+            group["preps"].append(prep)
+            if abs(round(statement_line.amount - (parsed["gross"] - parsed["mdr"]), 2)) > _EPS:
+                # A narrative that disagrees with the money it moved is a
+                # known-wrong member of the set.
+                group["blocked"] = True
+            if (statement_line.journal_id.id, statement_line.date) in blocked_bank_days:
+                group["blocked"] = True
+
+        no_sales = defaultdict(lambda: {"days": 0, "gross": 0.0, "line": None})
+        for key in sorted(groups):
+            analytic_id, day = key
+            group = groups[key]
+            if not group["preps"]:
+                continue
+            ledger = 0.0
+            items = []
+            for aml in pool.get((analytic_id, day), ()):
+                if aml.account_id in non_cash:
+                    remaining = residual.get(aml.id, 0.0)
+                    ledger = round(ledger + remaining, 2)
+                    items.append((aml.id, remaining, aml.date))
+            amls = None
+            if group["blocked"]:
+                state = "blocked"
+            elif currency.is_zero(ledger):
+                state = "no_sales"
+            elif not currency.compare_amounts(group["gross"], ledger):
+                state = "exact"
+            elif group["gross"] > ledger:
+                state = "over"
+            else:
+                state = "under"
+                amls, state = self._prove_by_subset(items, group["gross"], state)
+            for prep in group["preps"]:
+                prep["proof"] = {"state": state, "ledger": ledger, "day": day, "amls": amls}
+            if state in _PROVEN_STATES:
+                # Proven is proven, whether the whole day made the number or one
+                # combination of it did. Only the refusals below have anything
+                # left to say.
+                continue
+            statement_line = group["preps"][0]["statement_line"]
+            store = self.env["account.analytic.account"].browse(analytic_id)
+            if state == "no_sales":
+                # One row per store, not per day: nine stores missing thirteen
+                # days each is one import to fix, not 117 findings to read.
+                bucket = no_sales[analytic_id]
+                bucket["days"] += 1
+                bucket["gross"] = round(bucket["gross"] + group["gross"], 2)
+                bucket["line"] = bucket["line"] or statement_line
+                continue
+            messages = {
+                "over": _(
+                    "%(store)s, %(day)s: the bank paid %(gross)s against %(ledger)s still "
+                    "open. More money than sales — a backlog, or a day imported twice.",
+                    store=store.display_name,
+                    day=day,
+                    gross=group["gross"],
+                    ledger=ledger,
+                ),
+                "under": _(
+                    "%(store)s, %(day)s: the bank paid %(gross)s against %(ledger)s still "
+                    "open. Part of the day has not been settled yet.",
+                    store=store.display_name,
+                    day=day,
+                    gross=group["gross"],
+                    ledger=ledger,
+                ),
+                "blocked": _(
+                    "%(store)s, %(day)s: a line on the same bank day could not be read or "
+                    "mapped, so this day cannot be proven at all.",
+                    store=store.display_name,
+                    day=day,
+                ),
+            }
+            diag_vals.append(
+                {
+                    "kind": "store_day_%s" % ("no_sales" if state == "no_sales" else state),
+                    "severity": "warning",
+                    "date": day,
+                    "bank_journal_id": statement_line.journal_id.id,
+                    "analytic_account_id": analytic_id,
+                    "amount": round(group["gross"] - ledger, 2),
+                    "count": len(group["preps"]),
+                    "res_model": "account.bank.statement.line",
+                    "res_id": statement_line.id,
+                    "message": messages[state],
+                }
+            )
+        for analytic_id, bucket in sorted(no_sales.items()):
+            store = self.env["account.analytic.account"].browse(analytic_id)
+            diag_vals.append(
+                {
+                    "kind": "store_day_no_sales",
+                    "severity": "warning",
+                    "date": self.date_from,
+                    "bank_journal_id": bucket["line"].journal_id.id,
+                    "analytic_account_id": analytic_id,
+                    "amount": bucket["gross"],
+                    "count": bucket["days"],
+                    "res_model": "account.bank.statement.line",
+                    "res_id": bucket["line"].id,
+                    "message": _(
+                        "%(store)s: %(days)s trading day(s) worth %(gross)s were settled by "
+                        "the bank but never sold in Odoo — X24DN/X70D did not deliver them. "
+                        "There is no receivable to credit; this is an import to chase, not a "
+                        "difference to clear.",
+                        store=store.display_name,
+                        days=bucket["days"],
+                        gross=bucket["gross"],
+                    ),
+                }
+            )
+        return prepared
+
+    def _allocate_with_evidence(
+        self, pool, residual, analytic_id, dates, gross, only, evidence, vals, pin=False, only_amls=None
+    ):
         """Spend the settlement on the tender the receipts name, then on the rest.
 
         The evidence account is not a restriction, it is a *priority*. Restricting
@@ -1256,41 +1538,72 @@ class LevisPosClearing(models.Model):
         ``only_accounts`` still binds: a cash deposit may not consume a card
         receivable however its receipts read, because the channel restriction
         answers a question the receipts do not.
+
+        ``pin`` binds harder still. On a proven store-day the ladder is one day
+        long by construction, and the receipts' own day must not lengthen it
+        again: a proven group that is allowed to spend outside itself breaks the
+        neighbour whose tie was measured a moment earlier. The evidence account
+        keeps its priority — draining the named tender first inside the proven
+        day changes nothing about the day's total.
         """
         self.ensure_one()
         account = (evidence or {}).get("account")
         allowed = set(only.ids) if only else None
         if not account or (allowed is not None and account.id not in allowed):
-            return self._allocate(pool, residual, analytic_id, dates, gross, only_accounts=only)
+            return self._allocate(pool, residual, analytic_id, dates, gross, only_accounts=only, only_amls=only_amls)
         day = evidence.get("day")
+        if pin or not day:
+            ladder = dates
+        else:
+            # The proven day first — the receipts belong to it — but the rest of
+            # the ladder stays open, because a trading day can be booked a day
+            # late without making the tender wrong.
+            ladder = [day] + [other for other in dates if other != day]
         taken, left = self._allocate(
             pool,
             residual,
             analytic_id,
-            # The proven day first — the receipts belong to it — but the rest of
-            # the ladder stays open, because a trading day can be booked a day
-            # late without making the tender wrong.
-            [day] + [other for other in dates if other != day] if day else dates,
+            ladder,
             gross,
             only_accounts=account,
+            only_amls=only_amls,
         )
         vals["tender_locked"] = bool(taken)
         if left > _EPS:
-            rest, left = self._allocate(pool, residual, analytic_id, dates, left, only_accounts=only)
+            rest, left = self._allocate(
+                pool, residual, analytic_id, dates, left, only_accounts=only, only_amls=only_amls
+            )
             taken += rest
         return taken, left
 
     def _allocation_order(self, prepared):
-        """Indices to allocate in: what the receipts prove, before what they don't.
+        """Indices to allocate in: what is proven, before what is merely likely.
 
         Order decides who gets the money when the pool is thin, and a proven
         settlement has a better claim on a receivable than a settlement that
-        merely wants one. Statement order is kept inside each group so a rerun
-        allocates identically.
+        merely wants one. A store-day that ties to the rupiah outranks a tender
+        the receipts merely named, because the first is arithmetic over the whole
+        day and the second is an ordering hint. Statement order is kept inside
+        each tier so a rerun allocates identically.
+
+        The store-day tier is read only on a narrowed run. On a wide one the
+        order is what it always was, because that run promises to allocate what
+        it always did.
         """
-        proven = [index for index, prep in enumerate(prepared) if (prep.get("evidence") or {}).get("account")]
-        rest = [index for index, prep in enumerate(prepared) if not (prep.get("evidence") or {}).get("account")]
-        return proven + rest
+
+        proof_binds = self.auto_only
+
+        def tier(prep):
+            if proof_binds and (prep.get("proof") or {}).get("state") in _PROVEN_STATES:
+                return 0
+            if (prep.get("evidence") or {}).get("account"):
+                return 1
+            return 2
+
+        tiers = [[], [], []]
+        for index, prep in enumerate(prepared):
+            tiers[tier(prep)].append(index)
+        return tiers[0] + tiers[1] + tiers[2]
 
     def _line_from_parsed(
         self,
@@ -1405,14 +1718,73 @@ class LevisPosClearing(models.Model):
         vals["analytic_account_id"] = rule.analytic_account_id.id
         vals["trans_date"] = primary
         vals["trans_date_is_derived"] = derived
-        dates = self._candidate_dates(primary)
+
+        proof = prep.get("proof") or {}
+        proven = proof.get("state") in _PROVEN_STATES
+        # The verdict is recorded on every run, because it is worth reading. It
+        # only *binds* a narrowed one. A wide run is the run that promises to
+        # behave exactly as it did before this feature existed, and pinning its
+        # day ladder or reordering its allocation would quietly break that
+        # promise: a proven day that used to reach a neighbour would stop, and
+        # the neighbour's receivable would be left open where it used to clear.
+        enforced = proven and self.auto_only
+        if proof:
+            vals["proof_state"] = proof["state"]
+            vals["proof_ledger_total"] = proof["ledger"]
+        if self.auto_only and not proven:
+            # A narrowed run books what it can prove and leaves the rest exactly
+            # as it found it — unallocated, unclaimed, still listed with the
+            # reason. The wide run that follows is meant to find it untouched.
+            vals.update(
+                {
+                    "state": "skipped",
+                    "block": False,
+                    "note": _("Left for review: this store's trading day does not tie to its own receivable."),
+                }
+            )
+            return vals
+
+        if enforced:
+            # Spent on itself only. The ladder exists for a settlement whose day
+            # is a guess; a day that ties to the rupiah is not a guess, and
+            # letting it reach a neighbour would break the neighbour's tie after
+            # it was measured. See ``_prove_store_days``.
+            dates = [primary]
+        else:
+            dates = self._candidate_dates(primary)
 
         only = self._pool_accounts_for_channel(parsed, cash_account)
         taken, left = self._allocate_with_evidence(
-            pool, residual, rule.analytic_account_id.id, dates, parsed["gross"], only, prep.get("evidence"), vals
+            pool,
+            residual,
+            rule.analytic_account_id.id,
+            dates,
+            parsed["gross"],
+            only,
+            prep.get("evidence"),
+            vals,
+            pin=enforced,
+            only_amls=proof.get("amls") if enforced else None,
         )
+        if enforced and left > _EPS:
+            # The group's settlements and the day's receivable were equal when
+            # they were weighed, so a proven line cannot come up short unless
+            # something spent the pool in between. That is a defect in this
+            # code, not a finding about the data, and Compute — which books
+            # nothing — is the cheapest place to say so.
+            raise UserError(
+                _(
+                    "%(store)s on %(day)s was proven to the rupiah, yet %(left)s of "
+                    "%(gross)s could not be allocated. The proof and the allocation "
+                    "disagree; nothing has been booked.",
+                    store=rule.analytic_account_id.display_name,
+                    day=primary,
+                    left=left,
+                    gross=parsed["gross"],
+                )
+            )
         block = "a"
-        if left > _EPS and ar_pool:
+        if not enforced and left > _EPS and ar_pool:
             ar_taken, left = self._allocate_flat(ar_pool, ar_residual, rule.analytic_account_id.id, left)
             if ar_taken and not taken:
                 # Nothing of this store's POS receivable was open: the settlement is
@@ -1801,12 +2173,25 @@ class LevisPosClearing(models.Model):
             # longer has to: the copies are left out at compute time, so there is
             # nothing here for "Ignore warnings" to let through. They stay on the
             # Diagnostics tab, because the import is still worth fixing upstream.
-            if self.unparsed_count:
-                problems.append(_("%s unparsed narrative(s)", self.unparsed_count))
-            if self.unmapped_count:
-                problems.append(_("%s unmapped MID/terminal(s)", self.unmapped_count))
-            if self.mismatch_count:
-                problems.append(_("%s amount mismatch(es)", self.mismatch_count))
+            #
+            # A narrowed run is exempt from the next three, and not as a
+            # convenience. The warning exists because booking the rest would
+            # leave those lines' money on suspense with nothing said about why.
+            # A narrowed run books none of them — and more than that, an
+            # unreadable or unmapped money-in line blocks every store-day that
+            # shares its bank day (see ``_prove_store_days``), so a day touched
+            # by one is never proven in the first place. That is a stronger
+            # guarantee than the tick this warning asks for, so asking for the
+            # tick as well would only teach an operator to set it by reflex.
+            if not self.auto_only:
+                if self.unparsed_count:
+                    problems.append(_("%s unparsed narrative(s)", self.unparsed_count))
+                if self.unmapped_count:
+                    problems.append(_("%s unmapped MID/terminal(s)", self.unmapped_count))
+                if self.mismatch_count:
+                    problems.append(_("%s amount mismatch(es)", self.mismatch_count))
+            # The sweep hazard is not about suspense and is not narrowed away:
+            # block C is booked by every run, narrow or wide.
             if self.diag_ids.filtered(lambda d: d.kind == "sweep_double"):
                 problems.append(_("the sweep destination is also a statement source"))
             if problems:
@@ -1868,6 +2253,12 @@ class LevisPosClearing(models.Model):
         if not legs:
             raise UserError(
                 _(
+                    "Nothing to book. No store's trading day ties to its own open "
+                    "receivable, so this narrowed run has nothing it can prove — the "
+                    "Store Reconcile screen says why, store by store."
+                )
+                if self.auto_only
+                else _(
                     "Nothing to book. Either no settlement could be matched to an open "
                     "receivable, or every statement line is unparsed or unmapped — the "
                     "diagnostics list says which."
@@ -2374,6 +2765,30 @@ class LevisPosClearingLine(models.Model):
             ("skipped", "Out of Scope"),
         ],
         default="ok",
+    )
+    proof_state = fields.Selection(
+        [
+            ("exact", "Store day ties"),
+            ("subset", "Store day ties on one combination"),
+            ("over", "More money than receivable"),
+            ("under", "Less money than receivable"),
+            ("no_sales", "No sales for that day"),
+            ("blocked", "Unreadable line on the same bank day"),
+        ],
+        string="Store Day Proof",
+        copy=False,
+        help="The verdict on the whole store-and-trading-day this settlement "
+        "belongs to, not on this line alone. Only a tie is evidence: the bank's "
+        "channels and the POS tenders are different partitions of the same "
+        "money, so no single line can be checked against a single receivable.",
+    )
+    proof_ledger_total = fields.Monetary(
+        currency_field="currency_id",
+        string="Store Day Receivable",
+        copy=False,
+        help="What that store's non-cash POS receivable still held open on that "
+        "trading day when the proof was taken. The same figure on every line of "
+        "the group, because the group is what was weighed.",
     )
     note = fields.Text()
     alloc_ids = fields.One2many("levis.pos.clearing.alloc", "line_id", copy=False)

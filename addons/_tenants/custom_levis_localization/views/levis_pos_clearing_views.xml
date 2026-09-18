@@ -60,6 +60,7 @@
                             <field name="bank_journal_ids" widget="many2many_tags"
                                    readonly="state != 'draft'"/>
                             <field name="ar_fallback" readonly="state not in ('draft', 'computed')"/>
+                            <field name="auto_only" readonly="state not in ('draft', 'computed')"/>
                             <field name="currency_id" invisible="1"/>
                             <field name="move_count" invisible="1"/>
                             <field name="leg_count" invisible="1"/>
@@ -108,6 +109,13 @@
                         Their money stays on suspense. Map or fix them and press Compute
                         again, or tick <em>Ignore warnings</em> to book the rest deliberately.
                         <field name="ignore_warnings"/>
+                    </div>
+
+                    <div class="alert alert-info" role="alert" invisible="not auto_only">
+                        This run books only the store-days that tie to their own open
+                        receivable to the rupiah, plus the bank's own movements. Every
+                        other line is listed with its reason and left untouched, for the
+                        wide run — or the person — that comes next.
                     </div>
 
                     <div class="alert alert-warning" role="alert"
@@ -172,6 +180,8 @@
                                            decoration-muted="x24_match == 'none'"/>
                                     <field name="x24_tender" optional="hide"/>
                                     <field name="tender_locked" optional="show" string="Tender Proven"/>
+                                    <field name="proof_state" optional="show" string="Store Day"
+                                           decoration-success="proof_state in ['exact', 'subset']"/>
                                     <field name="x24_tender_mismatch" optional="show"
                                            string="Tender Disagrees"/>
                                     <field name="x24_trans_count" optional="hide"/>
@@ -490,6 +500,9 @@
                 <field name="x24_tender" optional="hide"/>
                 <field name="tender_locked" optional="show" string="Tender Proven"/>
                 <field name="x24_tender_mismatch" optional="hide" string="Tender Disagrees"/>
+                <field name="proof_state" optional="show" string="Store Day"
+                       decoration-success="proof_state in ['exact', 'subset']"/>
+                <field name="proof_ledger_total" optional="hide" string="Store Day Receivable"/>
                 <field name="statement_amount" sum="Bank" optional="hide"/>
                 <field name="gross" sum="Gross"/>
                 <field name="mdr" sum="MDR"/>
@@ -539,6 +552,8 @@
                         domain="[('x24_tender_mismatch', '=', True)]"/>
                 <filter name="tender_locked" string="Tender Proven"
                         domain="[('tender_locked', '=', True)]"/>
+                <filter name="store_day_proven" string="Store Day Proven"
+                        domain="[('proof_state', 'in', ['exact', 'subset'])]"/>
                 <filter name="derived_date" string="Trading Day Inferred"
                         domain="[('trans_date_is_derived', '=', True)]"/>
                 <separator/>

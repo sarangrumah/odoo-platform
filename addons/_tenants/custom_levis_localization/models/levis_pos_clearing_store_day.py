@@ -28,6 +28,17 @@ an undeposited till for a missing settlement. A store whose card money is
 perfect and whose cash is still in the safe shows a variance exactly equal to
 the cash — which is the point, not a defect.
 
+**Two differences, and they are not merged.** ``variance`` weighs the bank
+against the *staged X70D file*, and stays supervisory exactly as this docstring
+has always said. ``proof_variance`` weighs it against the *open receivable in
+the ledger*, and that one is a gate: ``proof_state`` is what decides whether a
+store-day may be booked without a person reading it. (``short_total``, a third
+figure nearby, is neither — it reports what the allocation managed to take.)
+Merging them would be a mistake with a measured cost: X70D is missing for nine
+stores and for two September days, so a gate built on ``variance`` would refuse
+days that are perfectly clearable, for a reason that has nothing to do with the
+money.
+
 **H-1 is an assumption, not a fact.** The trading day is the settlement date
 less the configured lag, the same assumption ``_candidate_dates`` walks a ladder
 around. A settlement may legitimately draw on two days, so a variance here is
@@ -126,6 +137,35 @@ class LevisPosClearingStoreDay(models.Model):
     )
     is_balanced = fields.Boolean(string="Tallies")
     kanban_color = fields.Integer(string="Colour")
+
+    # --- the ledger side, which is the one that gates --------------------
+    ledger_open_total = fields.Monetary(
+        string="Receivable Open",
+        currency_field="currency_id",
+        help="What this store's non-cash POS receivable still held open on the "
+        "trading day when the run was computed. Not the same population as "
+        "X70D: the file is missing for some stores and days, while the "
+        "receivable is what the POS actually booked.",
+    )
+    proof_state = fields.Selection(
+        [
+            ("exact", "Ties"),
+            ("subset", "Ties on one combination"),
+            ("over", "More money than receivable"),
+            ("under", "Less money than receivable"),
+            ("no_sales", "No sales for that day"),
+            ("blocked", "Unreadable line on the same bank day"),
+        ],
+        string="Proof",
+        help="Whether this store-day may be booked without anyone reading it. Only a tie to the rupiah counts.",
+    )
+    proof_variance = fields.Monetary(
+        string="Difference (ledger)",
+        currency_field="currency_id",
+        help="Gross received less the receivable still open on the trading day. "
+        "This is the figure the proof weighs — Difference compares against X70D "
+        "instead, and the two have different populations.",
+    )
 
     x70d_txn_ids = fields.Many2many(
         "levis.pos.x70d.txn",
@@ -271,6 +311,13 @@ class LevisPosClearingStoreDay(models.Model):
             values["variance_bank"] = round(values["statement_total"] - values["x70d_total"], 2)
             values["is_balanced"] = abs(values["variance"]) <= max(tolerance, _EPS)
             values["kanban_color"] = 10 if values["is_balanced"] else (3 if values["x70d_count"] else 1)
+            # The proof is not recomputed here — it was taken before allocation
+            # spent the residual it reads, and every settlement of the group
+            # carries the same verdict. Copying it up is all a projection may do.
+            proofs = set(settling.mapped("proof_state")) - {False}
+            values["proof_state"] = proofs.pop() if len(proofs) == 1 else False
+            values["ledger_open_total"] = max(settling.mapped("proof_ledger_total") or [0.0])
+            values["proof_variance"] = round(values["gross_total"] - values["ledger_open_total"], 2)
             row.write(values)
 
             for tender in sorted(set(by_tender) | set(booked)):

@@ -71,6 +71,10 @@
                 <field name="variance" sum="Difference"
                        decoration-danger="variance != 0"/>
                 <field name="variance_bank" sum="Difference (bank)" optional="hide"/>
+                <field name="proof_state" string="Proof" optional="show"
+                       decoration-success="proof_state in ['exact', 'subset']"/>
+                <field name="ledger_open_total" sum="Receivable Open" optional="hide"/>
+                <field name="proof_variance" sum="Difference (ledger)" optional="hide"/>
                 <field name="short_total" sum="Short" optional="hide"/>
                 <field name="other_total" sum="Other" optional="hide"/>
                 <field name="run_id" optional="hide"/>
@@ -211,6 +215,14 @@
                 <filter name="has_short" string="Has Shortfall" domain="[('short_total', '!=', 0)]"/>
                 <separator/>
                 <filter name="tallies" string="Tallies" domain="[('is_balanced', '=', True)]"/>
+                <separator/>
+                <filter name="proven" string="Proven" domain="[('proof_state', 'in', ['exact', 'subset'])]"/>
+                <filter name="not_proven" string="Not Proven"
+                        domain="[('proof_state', 'not in', ['exact', 'subset'])]"/>
+                <filter name="feed_gap" string="Sales Never Arrived"
+                        domain="[('proof_state', '=', 'no_sales')]"/>
+                <separator/>
+                <filter name="group_proof" string="Proof" context="{'group_by': 'proof_state'}"/>
                 <separator/>
                 <filter name="period" string="Settlement Date" date="settlement_date"/>
                 <separator/>
