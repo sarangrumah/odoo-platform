@@ -1521,3 +1521,36 @@ block A/B/C totals, the same 1.657 allocation rows, and the same hash over every
 is recorded on a wide run and binds nothing. That is the inertness contract the
 config file already states, and `test_a_wide_run_is_unchanged_by_all_of_this`
 is its test.
+
+
+## Feature 28 — COGS inside the POS session's own closing entry (sheet #16)
+
+The client reopened #16 twice. The second time they were explicit: *"COGS yang
+di-compute oleh Odoo in total sesuai dengan Report Sales Detail Juni-Agustus, namun
+line GL COGS belum melekat ke masing-masing jurnal Sales"*. The totals were never the
+problem — the attachment was.
+
+A session is one store on one day, so its closing entry is exactly the document the
+COGS belongs on. `custom_retail_import_pos` already proves the insertion point:
+`_create_account_move` runs while `move_id` is still draft and under
+`check_move_validity=False`, so a balanced pair can be appended and `_check_balanced`
+still passes. Do not invent a new hook.
+
+Three things make this safe rather than clever:
+
+- **🔴 The cutover date is mandatory and empty by default.**
+  `custom_levis_localization.cogs_session_start` starts blank, so the hook does nothing
+  until somebody names a date. June–August 2026 are already booked by
+  `COGS/2026/0001..0003`; a date earlier than the cutover charges them a second time, and
+  that is the one mistake here that cannot be undone.
+- **Every charged unit is written to `levis.cogs.charge` with `source = "session"`.**
+  That ledger, not the journal, is what stops the monthly run and the receipt catch-up
+  from charging the same unit again (Feature 23). A new Selection value needs no `-u`.
+- **Failure never blocks the close.** The retail import closes sessions in bulk; a COGS
+  problem must not hold up the day's sales. The block logs and gets out of the way, the
+  same contract `stock_move.py` keeps for receipts.
+
+Units whose `standard_price` is still zero are skipped **in silence** and left to the
+receipt catch-up. Booking zero would put a meaningless line on the entry and, worse,
+write a charge row claiming the unit had been costed. Lines are grouped per product
+category so one session cannot grow hundreds of journal lines.

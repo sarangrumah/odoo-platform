@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!--
+          ONE template for all six stock registers.
+
+          Every other report here writes its <th> literally, which is why adding
+          a column to them forces a -u across thirteen databases. This one reads
+          the same ``_xlsx_columns()`` spec the XLSX writer uses, so the two can
+          never disagree and a new column is a Python change only.
+        -->
+        <template id="report_stock_generic">
+            <t t-call="custom_accounting_reports.report_header"/>
+            <p t-if="not stock_available" class="fw-bold text-danger">
+                Modul Inventory tidak terpasang di database ini, jadi laporan ini kosong.
+            </p>
+            <p t-if="report_note" class="fst-italic">
+                <span t-esc="report_note"/>
+            </p>
+            <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th t-foreach="columns" t-as="col"
+                            t-att-class="'text-end' if col.get('kind') == 'number' else ''"
+                            t-esc="col['header']"/>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="lines" t-as="line"
+                        t-att-class="'fw-bold table-secondary' if line.get('type') in ('subtotal', 'grand_total') else ''">
+                        <t t-foreach="columns" t-as="col">
+                            <td t-if="col.get('kind') == 'number'" class="text-end">
+                                <span t-esc="line.get(col['field'])"/>
+                            </td>
+                            <td t-else="" t-esc="line.get(col['field'])"/>
+                        </t>
+                    </tr>
+                </tbody>
+            </table>
+            <t t-call="custom_accounting_reports.report_footer_signature"/>
+        </template>
+    </data>
+</odoo>

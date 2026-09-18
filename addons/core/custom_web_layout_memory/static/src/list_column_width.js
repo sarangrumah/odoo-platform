@@ -38,15 +38,6 @@ const WIDTH_CONSUMING_WIDGETS = new Set([
     "pdf_viewer",
 ]);
 
-/** djb2, base36. The full view key is long and we store hundreds of them. */
-function shortHash(str) {
-    let hash = 5381;
-    for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
-    }
-    return (hash >>> 0).toString(36);
-}
-
 /** Sum of a cell's left and right padding, which sits outside the stored width. */
 function horizontalPadding(el) {
     const { paddingLeft, paddingRight } = getComputedStyle(el);
@@ -57,13 +48,30 @@ patch(ListRenderer.prototype, {
     setup() {
         super.setup();
         this.layoutPrefs = useService(LAYOUT_PREFS_SERVICE);
-        // `createViewKey` already distinguishes a nested x2many list from the
-        // top-level one, and changes when the arch's field set changes -- the
-        // same identity Odoo uses to remember optional columns.
-        const viewKey = this.createViewKey();
-        this.layoutMemoryKey = `${this.props.list.resModel}|${
-            this.env.config?.viewId || 0
-        }|${shortHash(viewKey)}`;
+        // The key deliberately leaves the FIELD SET out.
+        //
+        // `createViewKey` mixes the sorted field names into its hash, which is
+        // right for optional-column memory (a column that no longer exists has
+        // no state worth keeping) and wrong for widths: every module that adds
+        // one field to account.move's list rotates the hash and orphans every
+        // width the user ever set. That is sheet #11 -- "di tampilan list
+        // transaksi (vendor bill, journal entries) belum tersetting seperti
+        // request user" -- and it reappeared after each -u.
+        //
+        // Widths are stored per COLUMN NAME (see saveColumnWidths) and read back
+        // by name in processAllColumn, so a changed field set is already handled
+        // correctly: a column that disappeared is ignored, a new one takes the
+        // default. Keeping the field hash in the key threw that away for nothing.
+        //
+        // The nested-list identity still matters -- an x2many list inside a form
+        // is a different table from the top-level one -- so those parts of
+        // Odoo's own key are kept.
+        const nested = this.props.nestedKeyOptionalFieldsData;
+        this.layoutMemoryKey = [
+            this.props.list.resModel,
+            this.env.config?.viewId || 0,
+            nested ? `${nested.model}.${nested.field}` : "",
+        ].join("|");
         onWillStart(() => this.layoutPrefs.ready());
 
         if (!this.constructor.useMagicColumnWidths || !this.columnWidths) {

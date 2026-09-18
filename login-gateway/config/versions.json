@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-18T01:29:13+00:00",
+  "generated_at": "2026-09-18T04:02:56+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "1e6edc4a",
+    "commit": "d0dcf858",
     "branch": "HEAD"
   },
   "buckets": [
@@ -389,7 +389,7 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.56.0",
+      "version": "19.0.1.57.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
@@ -398,14 +398,14 @@
       "change_count": 60,
       "changes": [
         {
-          "sha": "1e6edc4a",
+          "sha": "d0dcf858",
           "date": "2026-09-18",
-          "subject": "feat(levis): prove a store's trading day, and book only what ties"
+          "subject": "feat(levis): mass clearing, COGS on the sales journal, and the journal number"
         },
         {
-          "sha": "b3e4cac9",
+          "sha": "e0b2e284",
           "date": "2026-09-18",
-          "subject": "fix(levis): a clearing run claims only the statement lines it books"
+          "subject": "feat(levis): prove a store's trading day, and clear only what ties (#258)"
         },
         {
           "sha": "bc3ec2dd",
@@ -1473,7 +1473,7 @@
       "module": "custom_web_layout_memory",
       "bucket": "core",
       "name": "Backend Layout Memory",
-      "version": "19.0.1.3.0",
+      "version": "19.0.1.4.0",
       "summary": "Remember list column widths per user and let the chatter be folded away",
       "category": "Custom Platform/Technical/UX",
       "depends": 3,
@@ -1569,14 +1569,19 @@
       "module": "custom_account_reconcile",
       "bucket": "ee_gap",
       "name": "Custom Account Reconciliation",
-      "version": "19.0.3.0.0",
+      "version": "19.0.3.1.0",
       "summary": "Enterprise-style manual reconciliation menu and wizard for Odoo CE (EE-gap closure).",
       "category": "Accounting/Accounting",
       "depends": 1,
       "public": true,
-      "last_change": "2026-08-11",
-      "change_count": 4,
+      "last_change": "2026-09-18",
+      "change_count": 5,
       "changes": [
+        {
+          "sha": "d0dcf858",
+          "date": "2026-09-18",
+          "subject": "feat(levis): mass clearing, COGS on the sales journal, and the journal number"
+        },
         {
           "sha": "5ebc32fe",
           "date": "2026-08-11",
@@ -1765,14 +1770,24 @@
       "module": "custom_accounting_reports",
       "bucket": "ee_gap",
       "name": "Custom Accounting Reports",
-      "version": "19.0.0.30.0",
+      "version": "19.0.0.32.0",
       "summary": "Production-grade financial reports engine (P&L, BS, GL, TB, Cash Flow, Aging, Partner Ledger, Tax, Day/Cash/Bank Book, Journal Audit) for the Custom Platform.",
       "category": "Accounting/Accounting",
       "depends": 5,
       "public": true,
       "last_change": "2026-09-18",
-      "change_count": 60,
+      "change_count": 62,
       "changes": [
+        {
+          "sha": "d0dcf858",
+          "date": "2026-09-18",
+          "subject": "feat(levis): mass clearing, COGS on the sales journal, and the journal number"
+        },
+        {
+          "sha": "b5dcb0c5",
+          "date": "2026-09-18",
+          "subject": "feat(levis): six stock registers in Invoicing ▸ Reporting, and they are fast"
+        },
         {
           "sha": "975f80bb",
           "date": "2026-09-18",
@@ -1802,16 +1817,6 @@
           "sha": "3b5671fa",
           "date": "2026-09-16",
           "subject": "feat(reports): remember column widths on the on-screen report tables too (#240)"
-        },
-        {
-          "sha": "e808bf53",
-          "date": "2026-09-16",
-          "subject": "fix(reports): read Kode Objek PPh from the expense line, not the tax line (#238)"
-        },
-        {
-          "sha": "bde8a4e8",
-          "date": "2026-08-26",
-          "subject": "feat(reports): rincian PPN Keluaran Digunggung sampai nomor transaksi (#195)"
         }
       ]
     },

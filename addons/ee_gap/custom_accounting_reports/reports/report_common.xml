@@ -66,6 +66,9 @@
                         <t t-elif="report_code == 'purchase'">
                             <t t-call="custom_accounting_reports.report_purchase"/>
                         </t>
+                        <t t-elif="report_code in ('purchase_return', 'stock_movement', 'stock_transfer', 'stock_adjustment', 'inventory_summary', 'inventory_warehouse')">
+                            <t t-call="custom_accounting_reports.report_stock_generic"/>
+                        </t>
                         <t t-elif="report_code == 'credit_limit'">
                             <t t-call="custom_accounting_reports.report_credit_limit"/>
                         </t>
