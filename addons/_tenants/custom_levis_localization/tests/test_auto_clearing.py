@@ -400,6 +400,73 @@ class TestAutoClearing(TestPosClearing):
         self.assertEqual(self._proof_states(run), {"subset"})
         self.assertEqual(set(run.line_ids.alloc_ids.mapped("source_aml_id").ids), {exact.id})
 
+    # ------------------------------------------------------------------
+    # The driver
+    # ------------------------------------------------------------------
+    def _settle_the_import(self):
+        """Age the statement lines past the quiet period the driver waits for."""
+        self.env.cr.execute(
+            "UPDATE account_bank_statement_line SET create_date = create_date - interval '2 hours' "
+            "WHERE company_id = %s",
+            (self.company.id,),
+        )
+        self.env.invalidate_all()
+
+    def test_the_driver_prepares_a_proven_day_and_does_not_post_it(self):
+        self._pim2()
+        self._settle_the_import()
+        self.config.write({"auto_clear_enabled": True, "auto_clear_dry_run": False, "auto_clear_delay_days": 0})
+
+        runs = self.env["levis.pos.clearing"]._auto_clear_company(self.config)
+
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs.state, "generated", "the driver prepares; posting stays a person's click")
+        self.assertTrue(runs.auto_only)
+        self.assertEqual(runs.date_from, SETTLED_ON)
+        self.assertEqual(runs.date_to, SETTLED_ON)
+        self.assertFalse(runs.move_ids, "nothing may be posted by a cron")
+
+    def test_a_dry_run_stops_at_the_summary(self):
+        self._pim2()
+        self._settle_the_import()
+        self.config.write({"auto_clear_enabled": True, "auto_clear_dry_run": True, "auto_clear_delay_days": 0})
+
+        runs = self.env["levis.pos.clearing"]._auto_clear_company(self.config)
+
+        self.assertEqual(runs.state, "computed")
+        self.assertFalse(runs.leg_ids)
+
+    def test_the_driver_stays_out_of_a_period_someone_owns(self):
+        self._pim2()
+        self._settle_the_import()
+        self.config.write({"auto_clear_enabled": True, "auto_clear_dry_run": True, "auto_clear_delay_days": 0})
+        mine = self._run()
+
+        runs = self.env["levis.pos.clearing"]._auto_clear_company(self.config)
+
+        self.assertFalse(runs, "a run already covering the date means a person owns it")
+        self.assertTrue(mine.exists())
+
+    def test_the_driver_waits_for_the_import_to_settle(self):
+        self._pim2()
+        self.config.write({"auto_clear_enabled": True, "auto_clear_dry_run": True, "auto_clear_delay_days": 0})
+
+        runs = self.env["levis.pos.clearing"]._auto_clear_company(self.config)
+
+        self.assertFalse(runs, "a statement written minutes ago may still be a cumulative re-import")
+
+    def test_a_second_pass_finds_nothing_left_to_do(self):
+        self._pim2()
+        self._settle_the_import()
+        self.config.write({"auto_clear_enabled": True, "auto_clear_dry_run": False, "auto_clear_delay_days": 0})
+        Clearing = self.env["levis.pos.clearing"]
+
+        first = Clearing._auto_clear_company(self.config)
+        second = Clearing._auto_clear_company(self.config)
+
+        self.assertTrue(first)
+        self.assertFalse(second, "the date is claimed and covered; a second pass must do nothing")
+
     def test_nothing_is_proven_until_the_cash_receivable_is_known(self):
         """Excluding cash is the defence; without it there is no proof to give."""
         self.env["ir.config_parameter"].sudo().set_param(

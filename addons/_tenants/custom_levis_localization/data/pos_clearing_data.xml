@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!--
-      No cron ships with this feature, deliberately and unlike
-      levis.inventory.reconciliation: a clearing moves money between control
-      accounts and reconciles receivables, so it is always started by a person
-      who has read the summary first.
+      A clearing moves money between control accounts and reconciles
+      receivables, so posting is always a person who has read the summary
+      first. That has not changed.
+
+      What did change: a cron now ships in pos_clearing_auto_data.xml, and it
+      stops short of posting. It prepares a narrowed run for a settlement date
+      once the feeds have settled, and that run books only the store-days whose
+      settlements tie to their own open receivable to the rupiah. Everything
+      else is listed with its reason and left untouched. The cron ships
+      inactive, behind a per-company switch that also ships off.
     -->
     <record id="seq_levis_pos_clearing" model="ir.sequence">
         <field name="name">Monthly POS Clearing</field>

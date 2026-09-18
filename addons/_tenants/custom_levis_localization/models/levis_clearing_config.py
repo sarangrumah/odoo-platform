@@ -142,6 +142,36 @@ class LevisClearingConfig(models.Model):
         help="Largest residual a single line may absorb into a chosen account. Zero means no limit.",
     )
 
+    # --- automatic clearing -------------------------------------------
+    # Four switches, all inert on arrival, in the same spirit as the block
+    # above. They gate the *driver*, not the arithmetic: a proven store-day is
+    # proven whether a cron or a person asked the question.
+    auto_clear_enabled = fields.Boolean(
+        string="Automatic Clearing",
+        default=False,
+        help="Let the scheduled driver prepare clearing runs on its own. It only "
+        "ever prepares: a proven store-day still waits for someone to post it.",
+    )
+    auto_clear_dry_run = fields.Boolean(
+        string="Automatic Clearing — Prepare Only",
+        default=True,
+        help="Stop after Compute, which creates nothing. Leave this on until the "
+        "before/after numbers have been read on a real period.",
+    )
+    auto_clear_delay_days = fields.Integer(
+        string="Automatic Clearing — Settle For (days)",
+        default=2,
+        help="How long a settlement date is left alone before the driver looks at "
+        "it, so the acquirer's feed and the day's sales have both landed.",
+    )
+    auto_clear_max_dates = fields.Integer(
+        string="Automatic Clearing — Dates Per Pass",
+        default=5,
+        help="Upper bound on how many settlement dates one pass may prepare. A "
+        "backlog is worked off over several passes rather than in one long "
+        "transaction.",
+    )
+
     _company_uniq = models.Constraint(
         "unique(company_id)",
         "POS clearing accounts are already configured for this company.",

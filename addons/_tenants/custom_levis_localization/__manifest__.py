@@ -222,6 +222,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "data/cogs_catchup_data.xml",
         "data/categ_reclass_sequence.xml",
         "data/pos_clearing_data.xml",
+        "data/pos_clearing_auto_data.xml",
         "data/account_move_actions.xml",
         "data/stock_numbering.xml",
         "views/res_bank_views.xml",

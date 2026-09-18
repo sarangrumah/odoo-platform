@@ -109,6 +109,9 @@ _SUBSET_MAX_SOLUTIONS = 2
 # when they arrived in DIFFERENT imports — rows created this far apart cannot
 # have come from one file.
 _DUP_BATCH_GAP_SECONDS = 3600
+# Advisory-lock namespace for the automatic driver, one holder per company.
+# Arbitrary, but it must never collide with another feature's key.
+_AUTO_CLEAR_LOCK = 0x4C56_4331 & 0x7FFFFFFF
 # Settlements exceeding the open receivable pool by more than this are reported:
 # the money cannot have come from sales that were never booked.
 _COVERAGE_TOLERANCE = 1.2
@@ -913,6 +916,134 @@ class LevisPosClearing(models.Model):
         if parsed.get("kind") == "settlement" and parsed.get("channel") in _CARD_CHANNELS:
             return self.config_id.pos_receivable_account_ids - cash_account
         return self.env["account.account"]
+
+    # ------------------------------------------------------------------
+    # The driver — prepares, and never posts
+    # ------------------------------------------------------------------
+    @api.model
+    def _cron_auto_clear(self):
+        """Prepare a clearing for each settlement date that has settled down.
+
+        The module's rule that nothing here is automatic is about **money
+        moving**, and that rule is untouched: this walks as far as a prepared
+        plan and stops. Posting is still a person reading a summary and pressing
+        a button — the only thing that changes is that they are handed the
+        month already weighed instead of weighing it themselves.
+
+        It is a cron rather than a queue job on purpose. The queue runner keys
+        pending jobs by UUID across every tenant database, and a duplicated
+        database has been enough to crash-loop it for all of them; a job that
+        touches receivables is the last place to accept a failure mode shared
+        with every other tenant. It is not hooked to the import either: the
+        client's statements arrive cumulatively — 1-7, then 1-14, then 1-31 —
+        so an import is not the event "a new day exists", and clearing on that
+        hook would race the very dedup that reads it.
+        """
+        for config in self.env["levis.clearing.config"].search([("auto_clear_enabled", "=", True)]):
+            self._auto_clear_company(config)
+        return True
+
+    @api.model
+    def _auto_clear_company(self, config):
+        """One company's pass. Never raises: a cron that raises retries forever."""
+        company = config.company_id
+        # One writer per company. Transaction-scoped, so it survives the
+        # per-date savepoints below and is released by the commit either way.
+        self.env.cr.execute("SELECT pg_try_advisory_xact_lock(%s, %s)", (_AUTO_CLEAR_LOCK, company.id))
+        if not self.env.cr.fetchone()[0]:
+            _logger.info("Automatic clearing for %s: another writer holds it, nothing done.", company.display_name)
+            return self.browse()
+        runs = self.browse()
+        for settlement_date in self._auto_clear_dates(config):
+            try:
+                with self.env.cr.savepoint():
+                    runs |= self._auto_clear_one(config, settlement_date)
+            except UserError as error:
+                # A locked period, a date another run claimed, a readiness
+                # refusal: all findings about one day, none a reason to abandon
+                # the rest. Logged with the date so the reason is recoverable.
+                _logger.info("Automatic clearing skipped %s for %s: %s", settlement_date, company.display_name, error)
+        return runs
+
+    @api.model
+    def _auto_clear_dates(self, config):
+        """The settlement dates this pass may look at, oldest first."""
+        company = config.company_id
+        journals = config.bank_journal_ids
+        if not journals:
+            return []
+        newest = fields.Date.context_today(self) - timedelta(days=max(config.auto_clear_delay_days or 0, 0))
+        locks = [d for d in (company.fiscalyear_lock_date, company.hard_lock_date) if d]
+        domain = [
+            ("journal_id", "in", journals.ids),
+            ("company_id", "=", company.id),
+            ("move_id.state", "=", "posted"),
+            ("is_reconciled", "=", False),
+            ("levis_clearing_line_id", "=", False),
+            ("date", "<=", newest),
+        ]
+        if locks:
+            domain.append(("date", ">", max(locks)))
+        lines = self.env["account.bank.statement.line"].search(domain)
+        if not lines:
+            return []
+
+        # The import has to have settled. A cumulative re-import writes copies,
+        # and `_duplicate_groups` cannot tell a copy from a genuine identical
+        # twin until the rows are further apart than this; borrowing the same
+        # constant is what keeps the two definitions of "settled" one.
+        quiet_before = fields.Datetime.now() - timedelta(seconds=_DUP_BATCH_GAP_SECONDS)
+        freshest = {}
+        for line in lines:
+            current = freshest.get(line.date)
+            if current is None or line.create_date > current:
+                freshest[line.date] = line.create_date
+        dates = [day for day in sorted(freshest) if freshest[day] <= quiet_before]
+        if not dates:
+            return []
+
+        # A period a person owns is a period the driver stays out of. This is
+        # `_diag_overlap`'s question, asked as a refusal rather than a warning:
+        # a warning is for someone reading the screen, and nobody is.
+        busy = self.search(
+            [
+                ("company_id", "=", company.id),
+                ("state", "!=", "cancel"),
+                ("date_from", "<=", dates[-1]),
+                ("date_to", ">=", dates[0]),
+            ]
+        )
+        free = [day for day in dates if not any(run.date_from <= day <= run.date_to for run in busy)]
+        return free[: max(config.auto_clear_max_dates or 0, 1)]
+
+    @api.model
+    def _auto_clear_one(self, config, settlement_date):
+        """One settlement date: a narrowed run, computed, and prepared if asked."""
+        run = self.create(
+            {
+                "company_id": config.company_id.id,
+                "date_from": settlement_date,
+                "date_to": settlement_date,
+                "journal_id": config.journal_id.id,
+                "bank_journal_ids": [(6, 0, config.bank_journal_ids.ids)],
+                "auto_only": True,
+            }
+        )
+        run.action_compute()
+        if config.auto_clear_dry_run:
+            return run
+        if not run.line_ids.filtered(lambda line: line.block in ("a", "b", "c")):
+            # Nothing was proven and the bank moved nothing of its own. The
+            # computed run is still the report of why, so it is kept.
+            return run
+        try:
+            # Its own savepoint: a refusal to prepare must not discard the
+            # summary that explains the refusal.
+            with self.env.cr.savepoint():
+                run.action_generate_moves()
+        except UserError as error:
+            _logger.info("Automatic clearing prepared nothing for %s: %s", settlement_date, error)
+        return run
 
     # ------------------------------------------------------------------
     # Stage 1 — summary. Creates nothing.

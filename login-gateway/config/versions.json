@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-18T01:28:41+00:00",
+  "generated_at": "2026-09-18T01:29:13+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,7 +9,7 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "b3e4cac9",
+    "commit": "1e6edc4a",
     "branch": "HEAD"
   },
   "buckets": [
@@ -395,8 +395,13 @@
       "depends": 10,
       "public": false,
       "last_change": "2026-09-18",
-      "change_count": 59,
+      "change_count": 60,
       "changes": [
+        {
+          "sha": "1e6edc4a",
+          "date": "2026-09-18",
+          "subject": "feat(levis): prove a store's trading day, and book only what ties"
+        },
         {
           "sha": "b3e4cac9",
           "date": "2026-09-18",
@@ -431,11 +436,6 @@
           "sha": "17200d43",
           "date": "2026-09-04",
           "subject": "feat(levis): make a repeated SKU on a purchase order say so out loud (#211)"
-        },
-        {
-          "sha": "9742a004",
-          "date": "2026-09-04",
-          "subject": "feat(levis): recognise COGS when a goods receipt reveals the cost (#210)"
         }
       ]
     },
