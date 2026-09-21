@@ -22,3 +22,4 @@ from . import test_ou_required
 from . import test_session_cogs
 from . import test_clearing_recon_roundtrip
 from . import test_clearing_store_day_match
+from . import test_clearing_cash_match

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Localization",
-    "version": "19.0.1.60.0",
+    "version": "19.0.1.61.0",
     "summary": "Levi's tenant customisations: HS Code, receipt qty cap, "
     "no inventory GL at goods receipt, payment voucher/receipt, journal billing, "
     "multi-COA admin fees on payment.",
@@ -241,6 +241,7 @@ TENANT-SCOPED: install only on the Levi's tenant databases.
         "wizard/levis_clearing_ebr_wizard_views.xml",
         "wizard/levis_clearing_recon_upload_wizard_views.xml",
         "wizard/levis_clearing_match_wizard_views.xml",
+        "wizard/levis_clearing_cash_match_wizard_views.xml",
         "wizard/levis_po_dup_sku_wizard_views.xml",
         "views/levis_pos_clearing_views.xml",
         "views/levis_pos_clearing_day_views.xml",

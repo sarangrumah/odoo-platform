@@ -91,6 +91,10 @@ _DIAG_DETAIL_CAP = 200
 # from the staged rows, which is the one place the per-transaction detail survives:
 # the receivable the settlement consumes is a per-store/day/tender total.
 _X24_TENDER_FOLD = {"OFFLINE_OTHER_CARD": "OFFLINE_OTHER_CREDITCARD"}
+# X70D tender names that mean notes and coins rather than a card the bank settles.
+# Defined here because both the store-day projection and the cash matcher read it,
+# and two spellings of "which tender is cash" is exactly the drift to avoid.
+_CASH_TENDERS = frozenset({"CASH", "TUNAI"})
 _POS_RECV_PREFIX = "POS Receivable - "
 # How many receipt numbers a cell spells out before it states the count instead.
 _TRANS_REF_CAP_ALLOC = 20
@@ -146,6 +150,9 @@ _DIAG_KINDS = [
     ("store_day_no_sales", "Store day: the day's sales never arrived"),
     ("store_day_blocked", "Store day: an unreadable line on the same bank day"),
     ("late_sales", "Receivable booked after the trading day was cleared"),
+    # What the cash matcher did, and what it refused to do.
+    ("cash_matched", "Cash deposit matched to a store by amount"),
+    ("cash_ambiguous", "Cash deposit fits more than one store-day"),
 ]
 
 # Diagnostics answering "is the data fit to clear at all", as opposed to those
@@ -1132,6 +1139,11 @@ class LevisPosClearing(models.Model):
                 }
             )
         self._attach_evidence(prepared, pos_accounts)
+        # After the evidence pass, because that is where a rule and a deposit slip
+        # are resolved, and this only looks at the deposits neither answered;
+        # before the proof, which is indifferent to it — cash joins neither side
+        # of that arithmetic.
+        self._attribute_cash_deposits(prepared, cash_account, diag_vals)
         # Weighed before allocation, because allocation is what spends the very
         # residual the proof reads. The store-day projection at the end only
         # copies the verdict up; a projection must never gate what it describes.
@@ -1421,7 +1433,16 @@ class LevisPosClearing(models.Model):
         # after the rule because a rule is about which terminal took the money
         # and a slip is about who banked it.
         deposit = (prep or {}).get("deposit")
-        return deposit.analytic_account_id if deposit else self.env["account.analytic.account"]
+        if deposit:
+            return deposit.analytic_account_id
+        # Last of all, and only for a cash deposit nothing above could place: an
+        # amount that fits one store's till on one day. Weaker than a merchant
+        # id, weaker than a signed slip, far weaker than a person — so it never
+        # gets to overrule any of them. See ``_attribute_cash_deposits``.
+        cash_match = (prep or {}).get("cash_match")
+        if cash_match:
+            return cash_match["analytic"]
+        return self.env["account.analytic.account"]
 
     def _deposit_for(self, prep):
         """The validated deposit slip this cash credit pays in, or empty.
@@ -1449,6 +1470,195 @@ class LevisPosClearing(models.Model):
             if tender and tender not in out:
                 out[tender] = account
         return out
+
+    def _cash_candidate_stores(self):
+        """Every operating unit a store could be, for the cash matcher to weigh.
+
+        The MID map cannot answer this one: a cash deposit carries no merchant id
+        — that is precisely why it is unattributed — so the population has to be
+        the shops themselves. Warehouses carrying an operating unit is the same
+        chain ``_x24_rows`` joins through, which keeps the two from disagreeing
+        about which stores exist.
+        """
+        self.ensure_one()
+        if self.scope_analytic_ids:
+            return self.scope_analytic_ids
+        warehouses = self.env["stock.warehouse"].search(
+            [("company_id", "=", self.company_id.id), ("l10n_ou_analytic_id", "!=", False)]
+        )
+        return warehouses.mapped("l10n_ou_analytic_id")
+
+    def _attribute_cash_deposits(self, prepared, cash_account, diag_vals):
+        """Give an unattributed cash deposit the store whose till it pays in.
+
+        **What is left after the slip.** A card settlement names its shop through
+        its merchant id; a cash deposit names nothing, and the deposit slip
+        (``levis.store.cash.deposit``) is what closes that for the tills Finance
+        keys a document for. Of the 70 deposits worth Rp 106.059.800 that
+        September 2026 left unplaced in prd_levis_begbal, **44 name no store at
+        all** — a depositor, a date, or a bare "SETORAN TUNAI" — and those are
+        only reachable through a slip that exists or through the one thing the
+        credit does carry: its amount. This pass is that second route, for the
+        days nobody keyed a slip for.
+
+        **The only evidence a deposit carries is its amount**, so that is what is
+        weighed, against exactly the figure the store-day screen shows: the X70D
+        cash tenders of one trading day. Two rules keep an amount from becoming a
+        guess:
+
+        * **the day must be the single answer** — one store, one trading day in
+          the lookback window whose cash adds up to this credit to the rupiah;
+        * **and the deposit must be the single claimant** — if two credits of the
+          same amount both fit that store-day, neither takes it. Two shops
+          banking the same round float on the same morning is a real situation
+          (5 of September's 70), and it is not evidence for either of them.
+
+        Both refusals are reported rather than swallowed: ``cash_ambiguous``
+        names the candidates so a person can pick one on the store-day screen.
+
+        This outranks nothing. ``_target_analytic`` consults it last of all, so a
+        manual mapping, a MID rule and a signed deposit slip each still win, and
+        the pass only ever looks at the deposits none of them answered.
+
+        Nothing is booked here. The match sets the store and the trading day; the
+        ordinary allocation then spends it on the CASH receivable and nothing
+        else, because ``_pool_accounts_for_channel`` already binds a deposit to
+        that one account.
+        """
+        self.ensure_one()
+        config = self.config_id
+        if not config.cash_auto_match or not cash_account:
+            return prepared
+        pending = [
+            prep
+            for prep in prepared
+            if prep["parsed"]["kind"] == "cash_deposit"
+            and prep["statement_line"].amount > 0
+            # A later import of a line this run already holds is not a second
+            # deposit, and letting one into the search would be worse than
+            # useless: it clears nothing itself, and as a second claimant on the
+            # store-day it would stop the real credit from being matched. The
+            # client imports cumulatively, so this is the common case, not an
+            # edge one.
+            and not prep.get("duplicate_of")
+            and not self._target_analytic(prep)
+        ]
+        if not pending:
+            return prepared
+        stores = self._cash_candidate_stores()
+        if not stores:
+            return prepared
+        lookback = max(config.cash_match_lookback_days or 0, 0)
+        dates = [prep["statement_line"].date for prep in pending]
+        rows = self.env["levis.pos.clearing.alloc"]._x24_rows(
+            set(stores.ids),
+            min(dates) - timedelta(days=lookback + (config.settlement_lag_days or 0)),
+            max(dates),
+            self.company_id,
+        )
+        if not rows:
+            return prepared
+        # The till of one store on one trading day, which is the same number the
+        # store-day screen calls "X70D Cash". A day holding no cash at all is not
+        # a candidate for anything.
+        cash_by_day = {}
+        for (analytic_id, day), day_rows in rows.items():
+            total = round(sum(amount for tender, _ref, amount in day_rows if tender in _CASH_TENDERS), 2)
+            if total > _EPS:
+                cash_by_day[(analytic_id, day)] = total
+        if not cash_by_day:
+            return prepared
+        # A store-day whose till a *mapped* deposit already pays is spoken for.
+        # Without this the same takings could be claimed twice — once by the
+        # narrative and once by the arithmetic — and both would look settled.
+        claimed = set()
+        for prep in prepared:
+            if prep["parsed"]["kind"] != "cash_deposit":
+                continue
+            analytic = self._target_analytic(prep)
+            if analytic and prep.get("trans_date"):
+                claimed.add((analytic.id, prep["trans_date"]))
+
+        # Candidates first, decisions second: a store-day may only be taken when
+        # exactly one deposit wants it, and that cannot be known one deposit at a
+        # time.
+        fits = {}
+        for prep in pending:
+            statement_line = prep["statement_line"]
+            amount = round(statement_line.amount, 2)
+            window = [
+                statement_line.date - timedelta(days=offset)
+                for offset in range((config.settlement_lag_days or 0), (config.settlement_lag_days or 0) + lookback + 1)
+            ]
+            fits[id(prep)] = [
+                (analytic_id, day)
+                for day in window
+                for analytic_id in stores.ids
+                if (analytic_id, day) not in claimed and abs(cash_by_day.get((analytic_id, day), 0.0) - amount) <= _EPS
+            ]
+        wanted_by = defaultdict(list)
+        for prep in pending:
+            for key in fits[id(prep)]:
+                wanted_by[key].append(prep)
+
+        for prep in pending:
+            statement_line = prep["statement_line"]
+            candidates = fits[id(prep)]
+            if not candidates:
+                continue
+            unique = [key for key in candidates if len(wanted_by[key]) == 1]
+            if len(candidates) > 1 or not unique:
+                diag_vals.append(
+                    {
+                        "kind": "cash_ambiguous",
+                        "severity": "warning",
+                        "date": statement_line.date,
+                        "bank_journal_id": statement_line.journal_id.id,
+                        "amount": statement_line.amount,
+                        "count": len(candidates),
+                        "res_model": "account.bank.statement.line",
+                        "res_id": statement_line.id,
+                        "message": _(
+                            "%(amount)s fits the till of %(candidates)s. Nothing was matched — "
+                            "pick the right one on the store settlement screen.",
+                            amount=statement_line.amount,
+                            candidates=", ".join(
+                                "%s %s"
+                                % (
+                                    self.env["account.analytic.account"].browse(analytic_id).display_name,
+                                    day,
+                                )
+                                for analytic_id, day in candidates[:_TRANS_REF_CAP_ALLOC]
+                            ),
+                        ),
+                    }
+                )
+                continue
+            analytic_id, day = unique[0]
+            store = self.env["account.analytic.account"].browse(analytic_id)
+            prep["cash_match"] = {"analytic": store, "day": day, "amount": cash_by_day[(analytic_id, day)]}
+            claimed.add((analytic_id, day))
+            diag_vals.append(
+                {
+                    "kind": "cash_matched",
+                    "severity": "info",
+                    "date": statement_line.date,
+                    "bank_journal_id": statement_line.journal_id.id,
+                    "analytic_account_id": analytic_id,
+                    "amount": statement_line.amount,
+                    "count": 1,
+                    "res_model": "account.bank.statement.line",
+                    "res_id": statement_line.id,
+                    "message": _(
+                        "%(store)s rang up exactly %(amount)s in cash on %(day)s, and no other "
+                        "store-day or deposit fits. Matched by amount, not by narrative.",
+                        store=store.display_name,
+                        amount=statement_line.amount,
+                        day=day,
+                    ),
+                }
+            )
+        return prepared
 
     def _attach_evidence(self, prepared, pos_accounts):
         """Ask the receipts, per settlement, which tender it paid.
@@ -1937,7 +2147,7 @@ class LevisPosClearing(models.Model):
             # copy that consumed a receivable here would make the original read
             # as short, and the run would then be wrong about the real line too.
             kept = self.env["account.bank.statement.line"].browse(duplicate_of)
-            vals.update({"state": "skipped", "block": False})
+            vals.update({"state": "skipped", "block": False, "duplicate_of_id": duplicate_of})
             vals["note"] = _(
                 "A later import of %(entry)s. The bank moved this money once, so this copy clears nothing.",
                 entry=kept.move_id.name or kept.payment_ref or duplicate_of,
@@ -1990,6 +2200,27 @@ class LevisPosClearing(models.Model):
         # ``prep`` carries the rule only when ``_attach_evidence`` ran; the direct
         # call path resolves it here, and the target has to see it either way.
         target_analytic = self._target_analytic({**prep, "rule": rule})
+        cash_match = prep.get("cash_match")
+        if cash_match and target_analytic == cash_match["analytic"]:
+            # The match is only credible as a pair — this amount is that store's
+            # till *on that day*. Taking the store and leaving the day to the lag
+            # would point the allocation at a day nothing was matched against.
+            primary, derived = cash_match["day"], True
+            vals["cash_auto_matched"] = True
+            vals["note"] = _(
+                "No store in the narrative and no deposit slip. Matched by amount to "
+                "%(store)s: its X70D cash tenders on %(day)s add up to exactly this credit, "
+                "and no other store-day or deposit fits.",
+                store=target_analytic.display_name,
+                day=primary,
+            )
+        if manual and manual.trading_date and parsed["kind"] == "cash_deposit":
+            # A person naming the till this deposit pays outranks the lag, the
+            # slip and the arithmetic alike, for the same reason a person naming
+            # the store does: they were looking at the evidence. Cash only — a
+            # card settlement's day comes from the bank, not from an opinion.
+            primary, derived = manual.trading_date, True
+            vals["cash_auto_matched"] = False
         if not target_analytic:
             vals.update(
                 {
@@ -3056,6 +3287,21 @@ class LevisPosClearingLine(models.Model):
         "tender, or the receipts. Kept off the line itself so it survives a recompute.",
     )
     analytic_account_id = fields.Many2one("account.analytic.account", string="Operating Unit")
+    duplicate_of_id = fields.Many2one(
+        "account.bank.statement.line",
+        string="Duplicate Of",
+        ondelete="set null",
+        help="A later import of a bank line this run already holds. The bank moved "
+        "the money once, so this copy clears nothing — and nothing downstream may "
+        "count its amount a second time either.",
+    )
+    cash_auto_matched = fields.Boolean(
+        string="Store Found by Amount",
+        help="This cash deposit names no store, and none was mapped, slipped or keyed: "
+        "the store and the trading day were taken from the one till whose X70D cash "
+        "adds up to exactly this credit. Weaker evidence than a merchant id — "
+        "switched on per company, and every match is listed in the findings.",
+    )
     statement_amount = fields.Monetary(currency_field="currency_id", string="Bank Amount")
     gross = fields.Monetary(currency_field="currency_id")
     mdr = fields.Monetary(currency_field="currency_id", string="MDR (narrative)")

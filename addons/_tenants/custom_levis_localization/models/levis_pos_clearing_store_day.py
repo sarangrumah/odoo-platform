@@ -18,15 +18,24 @@ acquirer fee, the store rang up gross, so a single "statement vs sales" number
 would report the MDR as a shortfall every single day. The row therefore carries
 all three: what hit the bank (``statement_total``), what that was worth before
 the fee (``gross_total``), and what the store actually sold (``x70d_total``).
-``variance`` compares the two comparable ones — gross against X70D — and
-``variance_bank`` is kept beside it for whoever is reading the bank book rather
-than the ledger.
+``variance`` compares the two comparable ones — gross against X70D.
 
-**Cash is included.** By instruction: the row shows every tender the store rang
-up, cash among them, with cash split out into its own column so nobody mistakes
-an undeposited till for a missing settlement. A store whose card money is
-perfect and whose cash is still in the safe shows a variance exactly equal to
-the cash — which is the point, not a defect.
+**Cash is included, and it is counted on its own side.** The row shows every
+tender the store rang up, cash among them, split into its own column so nobody
+mistakes an undeposited till for a missing settlement. But the two populations
+are settled by different events: an acquirer pays a card on H, net of its fee,
+while a till reaches the bank as a deposit on whatever day the shop got to the
+counter. So each side gets its own difference and they are never crossed —
+``variance_bank`` weighs card money against card tenders (on a day that ties it
+is exactly the fee), and ``cash_variance`` weighs the till against what has
+actually been banked against it. ``variance`` remains the one number over both,
+for whoever wants the day in a single figure.
+
+That split is not cosmetic. Weighing the whole statement against the whole X70D
+— which is what ``variance_bank`` used to do — produced a figure like
+Rp -1.161.572 on a store-day whose card side was perfect to the rupiah: the
+acquirer fee of 161.672 and an unbanked till of 999.900, added together, in a
+column labelled as a bank difference. Neither number could be read out of it.
 
 **Two differences, and they are not merged.** ``variance`` weighs the bank
 against the *staged X70D file*, and stays supervisory exactly as this docstring
@@ -46,16 +55,18 @@ supervisory information — it never gates the clearing, and nothing here blocks
 posting.
 """
 
+from collections import defaultdict
 from datetime import timedelta
 
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import UserError
 
-from .levis_pos_clearing import _SETTLING_KINDS
+from .levis_pos_clearing import _CASH_TENDERS, _SETTLING_KINDS
 
 _EPS = 0.005
-# Tender names that mean notes and coins rather than a card the bank settles.
-_CASH_TENDERS = {"CASH", "TUNAI"}
+# States in which a line belongs to nobody: no store was found, or the narrative
+# could not be read at all. Everything else names a store and a trading day.
+_UNPLACED_STATES = ("unmapped", "unparsed")
 
 
 class LevisPosClearingStoreDay(models.Model):
@@ -93,6 +104,13 @@ class LevisPosClearingStoreDay(models.Model):
         currency_field="currency_id",
         help="What actually reached the bank account on the settlement date, for this store.",
     )
+    statement_card_total = fields.Monetary(
+        string="Statement Amount (card)",
+        currency_field="currency_id",
+        help="The part of the money in that is card and QRIS settlements — what the "
+        "acquirers paid for the trading day's cards. A cash deposit is money in too, "
+        "but it pays a till, not a card, so the two are never weighed together.",
+    )
     mdr_total = fields.Monetary(string="MDR", currency_field="currency_id")
     gross_total = fields.Monetary(
         string="Gross",
@@ -123,6 +141,15 @@ class LevisPosClearingStoreDay(models.Model):
         "usually on another date — so a variance of exactly this figure is a till, not a loss.",
     )
     x70d_count = fields.Integer(string="X70D Transactions")
+    cash_deposit_total = fields.Monetary(
+        string="Cash Deposited",
+        currency_field="currency_id",
+        help="Deposits in this run that pay THIS trading day's till, wherever the credit "
+        "itself landed — a till banked on Monday for Saturday's takings belongs to "
+        "Saturday. Counted once the deposit names a store, whether or not this run "
+        "cleared it: the question is whether the cash reached the bank. A duplicate "
+        "import and a deposit belonging to nobody are both left out.",
+    )
 
     # --- the comparison -----------------------------------------------------
     variance = fields.Monetary(
@@ -134,7 +161,18 @@ class LevisPosClearingStoreDay(models.Model):
     variance_bank = fields.Monetary(
         string="Difference (bank)",
         currency_field="currency_id",
-        help="Statement amount less X70D tender. Differs from Difference by the acquirer fee.",
+        help="The card side only, measured in the money that actually landed: card and "
+        "QRIS settlements less the card tenders the store rang up. On a day that ties, "
+        "this is exactly the acquirer fee — the bank pays net, the shop rang up gross. "
+        "Cash is deliberately not in it: the bank never settles a till, so subtracting "
+        "an undeposited one here would report the fee and the safe as a single number.",
+    )
+    cash_variance = fields.Monetary(
+        string="Difference (cash)",
+        currency_field="currency_id",
+        help="The till this store rang up on the trading day, less what has actually "
+        "been banked against it. Positive: cash is still out — in the safe, or paid in "
+        "under a narrative nobody could read.",
     )
     is_balanced = fields.Boolean(string="Tallies")
     kanban_color = fields.Integer(string="Colour")
@@ -264,10 +302,50 @@ class LevisPosClearingStoreDay(models.Model):
             rows_wanted.company_id[:1] or self.env.company,
         )
 
+    def _deposits_by_trading_day(self):
+        """``{(run, store, trading day): amount}`` — tills that reached the bank.
+
+        Read across the whole run rather than off ``line_ids``, because a deposit
+        belongs to two different days at once: it is money in on the day the bank
+        credited it, and it pays the till of the day the shop rang up. The first
+        is what buckets it into a store-day row; this is the second, and joining
+        them would mean a Saturday till banked on Monday never meeting Saturday.
+
+        **Placed, not booked.** The question this column answers is about the
+        money — *did the shop's cash reach the bank?* — and a deposit that named
+        its store answers it whether or not this particular run chose to clear
+        it. An ``auto_only`` run skips every cash deposit by construction (cash
+        carries no store-day proof, so nothing about it is ever *proven*), and
+        counting only what such a run booked would report every till in it as
+        still in the safe. Whether the clearing took it is a different question,
+        answered by ``allocated_total`` and the line's own state.
+
+        Two exclusions, both of them about the money rather than the workflow: a
+        line that belongs to nobody, and a duplicate import — the bank moved that
+        cash once, and the second copy must not bank the till twice.
+        """
+        runs = self.mapped("run_id")
+        out = defaultdict(float)
+        for line in runs.mapped("line_ids"):
+            if line.kind != "cash_deposit" or line.state in _UNPLACED_STATES:
+                continue
+            if line.duplicate_of_id or not (line.analytic_account_id and line.trans_date):
+                continue
+            key = (line.run_id.id, line.analytic_account_id.id, line.trans_date)
+            out[key] = round(out[key] + line.statement_amount, 2)
+        return out
+
     def _recompute_figures(self):
-        """Roll the bank lines up, read the trading day, and compare the two."""
+        """Roll the bank lines up, read the trading day, and compare the two.
+
+        Card against card and cash against cash, never crossed: the acquirer
+        settles a card net of its fee on H, while a till reaches the bank as a
+        deposit on whatever day the shop got to the counter. One difference over
+        both populations answers neither question — see ``variance_bank``.
+        """
         Tender = self.env["levis.pos.clearing.store.day.tender"]
         rows_by_key = self._x70d_rows()
+        deposits = self._deposits_by_trading_day()
         Tender.search([("store_day_id", "in", self.ids)]).unlink()
         tender_vals = []
         for row in self:
@@ -307,9 +385,15 @@ class LevisPosClearingStoreDay(models.Model):
                     sum(bucket["amount"] for tender, bucket in by_tender.items() if tender in _CASH_TENDERS), 2
                 ),
                 "x70d_count": len(day_rows),
+                "statement_card_total": sum(line.statement_amount for line in settling if line.kind != "cash_deposit"),
+                "cash_deposit_total": deposits.get((row.run_id.id, row.analytic_account_id.id, row.trading_date), 0.0),
             }
             values["variance"] = round(values["gross_total"] - values["x70d_total"], 2)
-            values["variance_bank"] = round(values["statement_total"] - values["x70d_total"], 2)
+            # The card side, in the money that landed. On a day that ties this is
+            # exactly the acquirer fee, which is the whole reason it is stated
+            # separately from ``variance``.
+            values["variance_bank"] = round(values["statement_card_total"] - values["x70d_card_total"], 2)
+            values["cash_variance"] = round(values["x70d_cash_total"] - values["cash_deposit_total"], 2)
             values["is_balanced"] = abs(values["variance"]) <= max(tolerance, _EPS)
             values["kanban_color"] = 10 if values["is_balanced"] else (3 if values["x70d_count"] else 1)
             # The proof is not recomputed here — it was taken before allocation
@@ -402,6 +486,32 @@ class LevisPosClearingStoreDay(models.Model):
             "view_mode": "form",
             # A full page, not a dialog: two lists of a day's transactions do not
             # fit in a modal, and this is read as much as it is clicked.
+            "target": "current",
+        }
+
+    def action_match_cash(self):
+        """The unattributed cash deposits that could be this trading day's till."""
+        self.ensure_one()
+        if not self.trading_date:
+            raise UserError(_("This store day has no trading day, so there is no till to pay."))
+        wizard = self.env["levis.clearing.cash.match"]._build_for(self)
+        if not wizard.line_ids:
+            raise UserError(
+                _(
+                    "No bank credit in this run reads as a cash deposit without a store, "
+                    "within %(days)s day(s) of %(day)s. Either every deposit is already "
+                    "placed, or the credit that pays this till is outside the run's dates.",
+                    days=(self.run_id.config_id.cash_match_lookback_days or 0)
+                    + (self.run_id.config_id.settlement_lag_days or 0),
+                    day=self.trading_date,
+                )
+            )
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Cash deposits — %s", self.display_name),
+            "res_model": "levis.clearing.cash.match",
+            "res_id": wizard.id,
+            "view_mode": "form",
             "target": "current",
         }
 

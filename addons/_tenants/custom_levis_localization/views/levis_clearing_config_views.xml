@@ -51,6 +51,9 @@
                             <field name="suggest_tolerance_amount"/>
                             <field name="suggest_tolerance_ratio"/>
                             <field name="deposit_match_window_days"/>
+                            <field name="cash_auto_match"/>
+                            <field name="cash_match_lookback_days"
+                                   invisible="not cash_auto_match"/>
                         </group>
                         <group>
                             <field name="subset_max_items"

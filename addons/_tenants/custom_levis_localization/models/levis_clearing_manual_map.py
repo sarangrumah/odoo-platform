@@ -70,6 +70,13 @@ class LevisClearingManualMap(models.Model):
         "exactly like a tender the receipts prove; whatever it cannot cover falls "
         "back to the ordinary search over the channel's pool.",
     )
+    trading_date = fields.Date(
+        string="Trading Day",
+        help="The day whose takings this bank line pays in, where a person knows it "
+        "and the lag does not. Read for cash deposits, which routinely pay a till "
+        "rung up several days before the shop reached the counter; a card "
+        "settlement stays anchored on the bank mutation, where the evidence is.",
+    )
     receipt_refs = fields.Char(
         string="X24DN Transactions",
         help="``store-register-transaction`` references, comma separated. Ticked "

@@ -794,8 +794,46 @@ The bank pays net of the acquirer fee and the store rang up gross, so a single
 "statement vs sales" number would report the MDR as a shortfall every day. The
 row therefore carries `statement_total` (what hit the bank), `gross_total` (what
 that was worth before the fee) and `x70d_total` (what the store sold).
-`variance` compares the two comparable ones; `variance_bank` is kept beside it
-for whoever reads the bank book rather than the ledger.
+`variance` compares the two comparable ones.
+
+### Card against card, cash against cash (Sep-2026)
+
+`variance_bank` used to be `statement_total - x70d_total` — the whole money in
+against the whole X70D, cash included. On store-day 3059 (OLS SES — AEON BSD
+CITY, money in 13 Sep) that read **Rp -1.161.572** while every card tender of
+the day matched to the rupiah: the acquirer fee of 161.672 and an unbanked till
+of 999.900, added together, in a column labelled as a bank difference. Neither
+number could be read back out of it, and the screen offered nothing that could.
+
+The two populations are settled by different events — an acquirer pays a card on
+H net of its fee, a till reaches the bank as a deposit whenever the shop got to
+the counter — so each side now has its own difference and they are never
+crossed:
+
+| field | what it weighs |
+|---|---|
+| `statement_card_total` | the money in that is card/QRIS settlement |
+| `variance_bank` | `statement_card_total - x70d_card_total` — on a day that ties, exactly the fee |
+| `cash_deposit_total` | deposits that pay **this trading day's** till, wherever the credit landed |
+| `cash_variance` | `x70d_cash_total - cash_deposit_total` — the till still out |
+| `variance` | unchanged: `gross_total - x70d_total`, the one number over both |
+
+`cash_deposit_total` is read across the whole run, not off `line_ids`, because a
+deposit belongs to two days at once: it is money in on the day the bank credited
+it (which buckets it into a store-day row) and it pays the till of the day the
+shop rang up. Joining the two would mean a Saturday till banked on Monday never
+meeting Saturday.
+
+It counts a deposit that is **placed**, not one that was booked. The question is
+whether the shop's cash reached the bank, and a deposit that named its store
+answers it whether or not this run chose to clear it — an `auto_only` run skips
+*every* cash deposit by construction (cash carries no store-day proof, so it is
+never *proven*: 137 of run POSCLR/2026/0007's 207 deposits, Rp 340.419.900, read
+`skipped` with "left for review"). Counting only what such a run booked would
+report every till in it as still in the safe. Two exclusions, both about the
+money rather than the workflow: a line belonging to nobody, and a duplicate
+import — `duplicate_of_id`, a new stored column, because cumulative statement
+re-imports are deliberate here and the bank moved that cash once.
 
 **Money in is takings only** — `kind in _SETTLING_KINDS`. A sweep to the pooling
 account is the same money leaving again and its `gross` is a sign artefact of the
@@ -804,8 +842,9 @@ sweep also carries no merchant id, so it names no store at all.
 
 **Cash is included, and split out.** By instruction the comparison covers every
 tender, cash among them, with `x70d_cash_total` in its own column: a store whose
-card money is perfect and whose till is still in the safe shows a variance
-exactly equal to the cash, which is information rather than a defect.
+card money is perfect and whose till is still in the safe shows a `variance`
+exactly equal to the cash, which is information rather than a defect — and now a
+`cash_variance` that says the same thing without the fee mixed in.
 
 ### The sales side is the feed, not the ledger
 
@@ -1860,3 +1899,76 @@ mechanism waiting for the input, and the input is a shop-floor process: count
 the till, attach the slip, submit, validate. Until that happens the 70 unplaced
 deposits stay unplaced, and the honest thing to say is that the gap is
 operational rather than technical.
+
+## Feature 32 — The deposits no slip was ever keyed for
+
+Feature 31 closes the cash hole for every till Finance keys a slip for. This is
+the rest of it: of those same 70 unplaced deposits, **44 name no store at all**,
+and a slip only exists once somebody has sat down and typed one. For those days
+the credit carries exactly one piece of evidence — its amount — and this section
+is what may, and may not, be concluded from it.
+
+Store-day 3059 is the whole pattern in one row, reported by the client on 21 Sep
+2026: OLS SES — AEON BSD CITY rang up 999.900 in cash on the 12th, a bare
+`SETORAN TUNAI` of exactly 999.900 was credited on the 13th, and nothing joined
+them — so the screen reported the same money twice, once as an unattributed
+credit and once as a till that never arrived.
+
+### `_attribute_cash_deposits` — what arithmetic may decide
+
+Runs after `_attach_evidence` (so it sees the store a rule resolved and only
+looks at what no rule answered) and before `_prove_store_days` (which is
+indifferent to it: cash joins neither side of that arithmetic). The only
+evidence a deposit carries is its amount, so that is what is weighed — against
+exactly the figure the store-day screen shows, the X70D **cash** tenders of one
+trading day. Two rules keep an amount from becoming a guess:
+
+* **the day must be the single answer** — one store, one trading day inside
+  `cash_match_lookback_days`, summing to the credit to the rupiah (`_EPS`, never
+  `_match_tolerance`: a tolerance inside a booking predicate launders a
+  shortfall);
+* **the deposit must be the single claimant** — two credits of the same amount
+  both fitting one store-day take neither. Two shops banking the same round
+  float on the same morning is real (5 of September's 70).
+
+A store-day whose till a *mapped* deposit already pays is excluded outright, so
+the same takings cannot be sold twice. Both refusals are reported as
+`cash_ambiguous` findings naming the candidates; every match is reported as
+`cash_matched`, and the line carries `cash_auto_matched` plus a note saying so.
+
+`_target_analytic` consults the match **last of all** — after a manual mapping,
+after a MID rule and after a signed deposit slip — because an amount is weaker evidence than a merchant id and
+far weaker than a person. The match also pins the trading day: it is only
+credible as a pair (*this* amount is that store's till *on that day*), and
+carrying the store while letting the lag name the day would point the allocation
+at a day nothing was matched against. Booking itself is unchanged —
+`_pool_accounts_for_channel` already binds a deposit to the CASH receivable and
+nothing else.
+
+**Ships inert.** `cash_auto_match` defaults `False`, like every switch in the
+Advanced Matching block: turning it off has to restore the old numbers exactly,
+and the old numbers are "the deposit stays unattributed".
+
+### `levis.clearing.cash.match` — what a person decides
+
+The other half, reached from **Cocokkan Setoran Tunai** on the store-day form
+(shown only while `cash_variance` is non-zero). It lists the run's cash deposits
+that belong to nobody within the same window, closest to the outstanding till
+first, beside the figure they have to add up to. Confirming writes the answer to
+`levis.clearing.manual.map` — store **and** `trading_date`, a new column read
+only for cash deposits — and then recomputes the run, because a clearing line is
+a derivation (allocation, store-day, proof, diagnostics) and patching one field
+of it would leave a row claiming a store and settling nothing.
+
+No tie is demanded: a shop that banks half its till on Monday and the rest on
+Wednesday is ordinary. What is refused is a ticked total **larger** than the
+till it claims to pay — that is not a partial answer, it is a wrong one — and a
+run that has already generated its entries, where the answer is still recorded
+for the next run to read.
+
+Measured feasibility on September 2026, exact match against one store-day's
+whole till within four days: **20 of the 70 (Rp 31.164.400) resolve to exactly
+one store**, 5 are ambiguous, and 45 match no single full day — multi-day or
+part deposits, or stores whose X70D never arrived. The screen is for those 50.
+
+Tests: `tests/test_clearing_cash_match.py`, 19 cases.
