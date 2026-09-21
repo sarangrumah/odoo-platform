@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-18T14:40:47+00:00",
+  "generated_at": "2026-09-21T02:23:35+00:00",
   "platform": {
     "odoo": {
       "edition": "Community",
@@ -9,8 +9,8 @@
     },
     "postgres": "16",
     "python": "3.12",
-    "commit": "bc233449",
-    "branch": "cash2"
+    "commit": "cc921485",
+    "branch": "feat/levis-store-day-cash-matching"
   },
   "buckets": [
     {
@@ -389,14 +389,24 @@
       "module": "custom_levis_localization",
       "bucket": "_tenants",
       "name": "Levi's Localization",
-      "version": "19.0.1.60.0",
+      "version": "19.0.1.61.0",
       "summary": "Levi's tenant customisations: HS Code, receipt qty cap, no inventory GL at goods receipt, payment voucher/receipt, journal billing, multi-COA admin fees on payment.",
       "category": "Tenants/Levis",
       "depends": 10,
       "public": false,
-      "last_change": "2026-09-18",
-      "change_count": 61,
+      "last_change": "2026-09-21",
+      "change_count": 63,
       "changes": [
+        {
+          "sha": "cc921485",
+          "date": "2026-09-21",
+          "subject": "feat(levis): weigh a store-day's card money and its till apart, and place the cash deposits nobody named"
+        },
+        {
+          "sha": "2f123ba9",
+          "date": "2026-09-18",
+          "subject": "feat(levis): let a deposit slip name the store a cash deposit belongs to (#261)"
+        },
         {
           "sha": "bc233449",
           "date": "2026-09-18",
@@ -426,16 +436,6 @@
           "sha": "975f80bb",
           "date": "2026-09-18",
           "subject": "feat(levis): the receipts a bill has not reached, and five more After Go-Live rows (#255)"
-        },
-        {
-          "sha": "a9875fef",
-          "date": "2026-09-17",
-          "subject": "feat(levis): net the GR/IR accrual when the vendor bill is posted (#247)"
-        },
-        {
-          "sha": "58ac20f9",
-          "date": "2026-09-16",
-          "subject": "feat(levis): record ten releases of localization that production already runs (#193)"
         }
       ]
     },
