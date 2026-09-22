@@ -74,3 +74,7 @@ access_levis_clearing_match_bank,levis.clearing.match.bank manager,model_levis_c
 access_levis_clearing_match_bank_inv,levis.clearing.match.bank invoicing,model_levis_clearing_match_bank,account.group_account_invoice,1,1,1,1
 access_levis_clearing_match_txn,levis.clearing.match.txn manager,model_levis_clearing_match_txn,account.group_account_manager,1,1,1,1
 access_levis_clearing_match_txn_inv,levis.clearing.match.txn invoicing,model_levis_clearing_match_txn,account.group_account_invoice,1,1,1,1
+access_levis_clearing_cash_match,levis.clearing.cash.match manager,model_levis_clearing_cash_match,account.group_account_manager,1,1,1,1
+access_levis_clearing_cash_match_inv,levis.clearing.cash.match invoicing,model_levis_clearing_cash_match,account.group_account_invoice,1,1,1,1
+access_levis_clearing_cash_match_line,levis.clearing.cash.match.line manager,model_levis_clearing_cash_match_line,account.group_account_manager,1,1,1,1
+access_levis_clearing_cash_match_line_inv,levis.clearing.cash.match.line invoicing,model_levis_clearing_cash_match_line,account.group_account_invoice,1,1,1,1

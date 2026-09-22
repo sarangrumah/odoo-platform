@@ -136,6 +136,21 @@ class LevisClearingConfig(models.Model):
         default=3,
         help="How far a validated cash deposit may sit from the bank credit that pays it in.",
     )
+    cash_auto_match = fields.Boolean(
+        string="Match Cash Deposits by Amount",
+        default=False,
+        help="Let a bank credit that names no store take the store whose till it "
+        "matches: one trading day whose X70D cash tenders add up to exactly this "
+        "credit, and only where that store-and-day is the single answer. Off means "
+        "an unattributed deposit stays unattributed, exactly as before.",
+    )
+    cash_match_lookback_days = fields.Integer(
+        string="Cash Deposit Lookback (days)",
+        default=3,
+        help="How many trading days back from the credit the till it pays in may "
+        "have been rung up. A shop banks yesterday's takings, but a weekend or a "
+        "public holiday pushes that out.",
+    )
     writeoff_limit_amount = fields.Monetary(
         string="Write-off Limit",
         default=0.0,

@@ -75,6 +75,9 @@
                 <field name="variance" sum="Difference"
                        decoration-danger="variance != 0"/>
                 <field name="variance_bank" sum="Difference (bank)" optional="hide"/>
+                <field name="cash_deposit_total" sum="Cash Deposited" optional="hide"/>
+                <field name="cash_variance" sum="Difference (cash)" optional="hide"/>
+                <field name="statement_card_total" sum="Statement (card)" optional="hide"/>
                 <field name="proof_state" string="Proof" optional="show"
                        decoration-success="proof_state in ['exact', 'subset']"/>
                 <field name="ledger_open_total" sum="Receivable Open" optional="hide"/>
@@ -97,6 +100,9 @@
                     <button name="action_open_matcher" type="object" string="Match Bank ↔ X70D"
                             class="btn-primary"
                             help="Both lists on one screen: tick the bank credit and the transactions it paid."/>
+                    <button name="action_match_cash" type="object" string="Cocokkan Setoran Tunai"
+                            invisible="cash_variance == 0"
+                            help="Bank credits that read as a cash deposit and name no store, beside the till this day is still out."/>
                     <button name="action_clear" type="object" string="Clear This Store Day"
                             help="Prepare a clearing narrowed to this store and date. It computes and stops — Prepare Entries and Post stay on the run."/>
                     <button name="action_refresh" type="object" string="Refresh"/>
@@ -118,10 +124,14 @@
                     <div class="alert alert-warning" role="alert"
                          invisible="is_balanced or x70d_count == 0">
                         Gross received differs from the trading day's tenders by
-                        <field name="variance" class="oe_inline" widget="monetary"/>.
-                        A settlement may legitimately draw on more than one trading day, and cash
-                        stays in the till until it is deposited — so read this against the tender
-                        breakdown below before calling it a loss.
+                        <field name="variance" class="oe_inline" widget="monetary"/>
+                        — card <field name="variance_bank" class="oe_inline" widget="monetary"/>,
+                        cash <field name="cash_variance" class="oe_inline" widget="monetary"/>.
+                        The two are settled by different events: the acquirer pays a card on H net
+                        of its fee, while a till reaches the bank as a deposit whenever the shop
+                        got to the counter. A settlement may also draw on more than one trading
+                        day — so read this against the tender breakdown below before calling it a
+                        loss.
                     </div>
                     <div class="alert alert-danger" role="alert" invisible="x70d_count != 0">
                         No X70D transaction was staged for this store on
@@ -132,6 +142,8 @@
                     <group>
                         <group string="Money In (H)">
                             <field name="statement_total"/>
+                            <field name="statement_card_total"
+                                   invisible="statement_card_total == statement_total"/>
                             <field name="mdr_total"/>
                             <field name="gross_total"/>
                             <field name="other_total" invisible="other_total == 0"/>
@@ -143,6 +155,7 @@
                             <field name="x70d_total"/>
                             <field name="x70d_card_total"/>
                             <field name="x70d_cash_total"/>
+                            <field name="cash_deposit_total" invisible="x70d_cash_total == 0"/>
                             <field name="x70d_count"/>
                         </group>
                     </group>
@@ -150,6 +163,8 @@
                         <group string="Difference">
                             <field name="variance"/>
                             <field name="variance_bank"/>
+                            <field name="cash_variance"
+                                   invisible="x70d_cash_total == 0 and cash_deposit_total == 0"/>
                         </group>
                         <group string="Cleared">
                             <field name="allocated_total"/>
@@ -185,7 +200,9 @@
                                     <field name="gross" sum="Gross"/>
                                     <field name="x24_match" string="Receipt Match" optional="show"/>
                                     <field name="x24_trans_refs" string="Transactions" optional="show"/>
+                                    <field name="match_gap" sum="Still Unmatched" optional="show"/>
                                     <field name="short_amount" sum="Short" optional="show"/>
+                                    <field name="cash_auto_matched" optional="hide"/>
                                     <field name="state" widget="badge"/>
                                     <field name="currency_id" column_invisible="1"/>
                                 </list>

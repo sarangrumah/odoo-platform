@@ -12,6 +12,7 @@
                 <field name="payment_ref" optional="show"/>
                 <field name="statement_amount" sum="Amount"/>
                 <field name="analytic_account_id"/>
+                <field name="trading_date" optional="hide"/>
                 <field name="tender_account_id" optional="show"/>
                 <field name="receipt_refs" optional="hide"/>
                 <field name="note" optional="hide"/>
@@ -45,6 +46,7 @@
                         </group>
                         <group string="The decision">
                             <field name="analytic_account_id"/>
+                            <field name="trading_date"/>
                             <field name="tender_account_id"/>
                             <field name="receipt_refs"/>
                             <field name="note"/>
