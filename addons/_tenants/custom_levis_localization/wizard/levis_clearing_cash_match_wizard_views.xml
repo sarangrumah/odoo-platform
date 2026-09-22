@@ -9,12 +9,19 @@
                 <header>
                     <button name="action_apply" type="object" string="Pasangkan Setoran"
                             class="btn-primary"
+                            invisible="applied"
+                            confirm="Jawaban ini akan disimpan, lalu seluruh run dihitung ulang supaya uangnya teralokasi. Untuk run satu bulan prosesnya bisa memakan beberapa menit — tunggu sampai layar berpindah sendiri, jangan menutup tab atau menekan tombol ini dua kali. Lanjutkan?"
                             help="Record that the ticked credits pay this trading day's till, then recompute the run so they are allocated."/>
+                    <button name="action_apply" type="object" string="Lihat Hasilnya"
+                            class="btn-primary"
+                            invisible="not applied"
+                            help="This answer is already recorded and the run already recomputed. Opens the store-day it produced."/>
                 </header>
                 <sheet>
                     <field name="store_day_id" invisible="1"/>
                     <field name="currency_id" invisible="1"/>
                     <field name="ties" invisible="1"/>
+                    <field name="applied" invisible="1"/>
                     <div class="oe_title">
                         <h1><field name="analytic_account_id" readonly="1"/></h1>
                         <h3 class="text-muted">
@@ -22,23 +29,27 @@
                         </h3>
                     </div>
 
-                    <div class="alert alert-success" role="alert" invisible="not ties">
+                    <div class="alert alert-success" role="alert" invisible="not applied">
+                        Jawaban ini sudah tersimpan dan run sudah dihitung ulang. Tekan
+                        <b>Lihat Hasilnya</b> untuk membuka store-day-nya — tidak perlu diulang.
+                    </div>
+                    <div class="alert alert-success" role="alert" invisible="not ties or applied">
                         The ticked credits are exactly the till still out.
                         Press <b>Pasangkan Setoran</b> to record it and recompute.
                     </div>
-                    <div class="alert alert-info" role="alert" invisible="ties or selected_total == 0">
+                    <div class="alert alert-info" role="alert" invisible="ties or selected_total == 0 or applied">
                         Ticked <field name="selected_total" class="oe_inline" widget="monetary" readonly="1"/>
                         against <field name="outstanding" class="oe_inline" widget="monetary" readonly="1"/>
                         still out — difference <field name="gap" class="oe_inline" widget="monetary" readonly="1"/>.
                         A shop may bank one till in two goes, so a part answer is still worth recording.
                     </div>
-                    <div class="alert alert-secondary" role="alert" invisible="selected_total != 0">
+                    <div class="alert alert-secondary" role="alert" invisible="selected_total != 0 or applied">
                         These are the bank credits of this run that read as a cash deposit and name
                         no store at all. Tick the one that pays this shop's till of
                         <field name="trading_date" class="oe_inline" readonly="1"/>. Recording it
                         recomputes the run, which is what actually allocates the money.
                     </div>
-                    <div class="alert alert-warning" role="alert" invisible="outstanding != 0">
+                    <div class="alert alert-warning" role="alert" invisible="outstanding != 0 or applied">
                         Nothing of this trading day's till is still out. Anything ticked here would
                         be paying a till that is already banked.
                     </div>

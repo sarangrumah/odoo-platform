@@ -350,6 +350,65 @@ class TestClearingCashMatch(TestClearingStoreDay):
         self.assertAlmostEqual(row.cash_deposit_total, 999_900.0, places=2, msg="the till is banked once")
         self.assertAlmostEqual(row.cash_variance, 0.0, places=2)
 
+    # ------------------------------------------------------------------
+    # Surviving its own recompute
+    # ------------------------------------------------------------------
+    def test_the_screen_survives_the_recompute_it_asks_for(self):
+        """Reported from prd_levis_begbal, 22 Sep 2026.
+
+        Applying recomputes the run, and a recompute deletes every store-day and
+        every clearing line it holds. While this wizard hung off those records
+        with ``ondelete="cascade"``, the answer succeeded and then deleted the
+        screen that gave it: the operator was left on a dead form, and pressing
+        again reported "record deleted" for work that had already been done.
+        """
+        self._switched_on()
+        run = self._unmatched_day()
+        row = run.store_day_ids.filtered(
+            lambda day: day.analytic_account_id == self.store_one and day.trading_date == date(2026, 7, 8)
+        )
+        wizard = self.env["levis.clearing.cash.match"]._build_for(row)
+        wizard.line_ids.selected = True
+        wizard.action_apply()
+        self.assertTrue(wizard.exists(), "the screen must outlive the recompute it triggers")
+        self.assertTrue(wizard.line_ids.exists(), "its candidate rows too")
+        self.assertTrue(wizard.applied)
+        self.assertEqual(wizard.analytic_account_id, self.store_one, "identity is snapshotted, not borrowed")
+
+    def test_pressing_apply_again_shows_the_result_rather_than_redoing_it(self):
+        """The second press is a person who was given no sign the first worked."""
+        self._switched_on()
+        run = self._unmatched_day()
+        row = run.store_day_ids.filtered(
+            lambda day: day.analytic_account_id == self.store_one and day.trading_date == date(2026, 7, 8)
+        )
+        wizard = self.env["levis.clearing.cash.match"]._build_for(row)
+        wizard.line_ids.selected = True
+        first = wizard.action_apply()
+        self.assertEqual(first["res_model"], "levis.pos.clearing.store.day")
+        again = wizard.action_apply()
+        self.assertEqual(
+            again["res_id"],
+            first["res_id"],
+            "a second press must not rebuild the projection — same row, not a new one",
+        )
+
+    def test_the_action_it_returns_points_at_the_rebuilt_row(self):
+        self._switched_on()
+        run = self._unmatched_day()
+        row = run.store_day_ids.filtered(
+            lambda day: day.analytic_account_id == self.store_one and day.trading_date == date(2026, 7, 8)
+        )
+        wizard = self.env["levis.clearing.cash.match"]._build_for(row)
+        wizard.line_ids.selected = True
+        action = wizard.action_apply()
+        self.assertFalse(row.exists(), "the row it was opened from is gone — rebuilt, not patched")
+        rebuilt = self.env["levis.pos.clearing.store.day"].browse(action["res_id"])
+        self.assertTrue(rebuilt.exists())
+        self.assertEqual(rebuilt.analytic_account_id, self.store_one)
+        self.assertEqual(rebuilt.settlement_date, date(2026, 7, 9))
+        self.assertTrue(action.get("views"), "an act_window without resolved views lands on a blank screen")
+
     def test_the_screen_refuses_a_deposit_bigger_than_the_till_it_claims(self):
         self._switched_on()
         self._card_day_with_cash(cash=100_000.0)

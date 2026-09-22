@@ -1971,4 +1971,37 @@ whole till within four days: **20 of the 70 (Rp 31.164.400) resolve to exactly
 one store**, 5 are ambiguous, and 45 match no single full day — multi-day or
 part deposits, or stores whose X70D never arrived. The screen is for those 50.
 
-Tests: `tests/test_clearing_cash_match.py`, 19 cases.
+### The screen must outlive the recompute it asks for (22 Sep 2026)
+
+Reported from production the day after release: pressing **Pasangkan Setoran**
+spun for minutes, came back to the same screen, and a second press said
+*record deleted*. The database said otherwise — the manual map was written, the
+run was recomputed, and the till was matched. **The work had succeeded and the
+operator was told nothing.**
+
+One cause for both halves. The wizard hung off the store-day with
+`ondelete="cascade"`, and its candidate rows off the clearing lines the same
+way. `action_compute` deletes every store-day and every line of the run before
+rebuilding them, so the FK cascade deleted the wizard *and its rows* mid-method:
+the form the person was looking at no longer existed, so the client had nothing
+to return to, and the second press hit a record that was gone.
+
+The fix is that this screen now **snapshots its identity instead of borrowing
+it** — run, store, settlement date, trading date and both till figures are plain
+columns filled by `_build_for`, and `store_day_id` survives as `set null` for
+navigation only. Three more guards around it:
+
+* `applied` is set **before** the recompute (a failure rolls both back). A second
+  press then navigates to the result instead of spending another recompute;
+* the returned action spells out its `views`, because an act_window without them
+  is the one that lands on a blank screen, and falls back to the run's list when
+  the store-day legitimately does not come back;
+* the button carries a `confirm` that says the recompute takes minutes and asks
+  the operator not to press twice — the honest fix for a multi-minute click.
+
+Measured: the request was never near a limit (`limit_time_real` 1200 s, Caddy
+read/write 720 s, the recompute ~100 s for 1 354 lines). Nothing timed out; the
+screen destroyed itself.
+
+Tests: `tests/test_clearing_cash_match.py`, 22 cases — three of them for this,
+verified red against the `cascade` version before the fix.

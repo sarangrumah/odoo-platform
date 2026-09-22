@@ -43,23 +43,35 @@ class LevisClearingCashMatch(models.TransientModel):
     _name = "levis.clearing.cash.match"
     _description = "Match Cash Deposits to a Store's Till"
 
-    store_day_id = fields.Many2one("levis.pos.clearing.store.day", required=True, ondelete="cascade")
-    run_id = fields.Many2one(related="store_day_id.run_id")
-    company_id = fields.Many2one(related="store_day_id.company_id")
-    currency_id = fields.Many2one(related="store_day_id.currency_id")
-    analytic_account_id = fields.Many2one(related="store_day_id.analytic_account_id", string="Store")
-    trading_date = fields.Date(related="store_day_id.trading_date", string="Trading Day")
+    # **Everything here is a snapshot, and that is the point.** Applying an answer
+    # recomputes the run, and a recompute deletes and rebuilds every store-day and
+    # every clearing line it holds. While these fields were `related` through a
+    # store-day with `ondelete="cascade"`, that rebuild deleted this wizard and its
+    # rows out from under the person still looking at them: the screen had nothing
+    # left to return to, and pressing the button a second time reported
+    # "record deleted" for work that had in fact already succeeded. Observed in
+    # prd_levis_begbal on 22 September 2026 — the answer was saved, the run was
+    # recomputed, the till was matched, and the operator was told none of it.
+    store_day_id = fields.Many2one(
+        "levis.pos.clearing.store.day",
+        ondelete="set null",
+        help="The row this screen was opened from. Emptied by the recompute that "
+        "rebuilds it — the way back is the key below, never this id.",
+    )
+    run_id = fields.Many2one("levis.pos.clearing", required=True, ondelete="cascade")
+    company_id = fields.Many2one("res.company", required=True, ondelete="cascade")
+    currency_id = fields.Many2one("res.currency", required=True, ondelete="cascade")
+    analytic_account_id = fields.Many2one("account.analytic.account", string="Store", required=True, ondelete="cascade")
+    settlement_date = fields.Date(string="Money In")
+    trading_date = fields.Date(string="Trading Day")
+    applied = fields.Boolean(
+        string="Already Recorded",
+        help="This screen has already written its answer and recomputed the run. "
+        "Pressing again navigates to the result instead of doing the work twice.",
+    )
 
-    x70d_cash_total = fields.Monetary(
-        related="store_day_id.x70d_cash_total",
-        currency_field="currency_id",
-        string="Till Rang Up",
-    )
-    cash_deposit_total = fields.Monetary(
-        related="store_day_id.cash_deposit_total",
-        currency_field="currency_id",
-        string="Already Banked",
-    )
+    x70d_cash_total = fields.Monetary(currency_field="currency_id", string="Till Rang Up")
+    cash_deposit_total = fields.Monetary(currency_field="currency_id", string="Already Banked")
     outstanding = fields.Monetary(
         compute="_compute_totals",
         currency_field="currency_id",
@@ -107,6 +119,14 @@ class LevisClearingCashMatch(models.TransientModel):
         return self.create(
             {
                 "store_day_id": store_day.id,
+                "run_id": store_day.run_id.id,
+                "company_id": store_day.company_id.id,
+                "currency_id": store_day.currency_id.id,
+                "analytic_account_id": store_day.analytic_account_id.id,
+                "settlement_date": store_day.settlement_date,
+                "trading_date": store_day.trading_date,
+                "x70d_cash_total": store_day.x70d_cash_total,
+                "cash_deposit_total": store_day.cash_deposit_total,
                 "line_ids": [
                     (
                         0,
@@ -130,12 +150,7 @@ class LevisClearingCashMatch(models.TransientModel):
             }
         )
 
-    @api.depends(
-        "line_ids.selected",
-        "line_ids.amount",
-        "store_day_id.x70d_cash_total",
-        "store_day_id.cash_deposit_total",
-    )
+    @api.depends("line_ids.selected", "line_ids.amount", "x70d_cash_total", "cash_deposit_total")
     def _compute_totals(self):
         for wizard in self:
             outstanding = round(wizard.x70d_cash_total - wizard.cash_deposit_total, 2)
@@ -158,6 +173,12 @@ class LevisClearingCashMatch(models.TransientModel):
         claims to pay: that is not a partial answer, it is a wrong one.
         """
         self.ensure_one()
+        if self.applied:
+            # The work is already done and committed. A second press is almost
+            # always a person who was given no sign that the first one worked —
+            # so show them the result rather than spending another recompute on
+            # an answer the run already holds.
+            return self._open_result()
         picked = self.line_ids.filtered("selected")
         if not picked:
             raise UserError(_("Tick the deposit that pays this store's till first."))
@@ -214,26 +235,61 @@ class LevisClearingCashMatch(models.TransientModel):
                         source="ui",
                     )
                 )
-        # The answer is written; this is what turns it into an allocation. Note
-        # the recompute *destroys* this store-day row — the projection is rebuilt
-        # wholesale — so the way back is its key, never its id.
-        key = (run.id, self.store_day_id.settlement_date, self.analytic_account_id.id)
+        # Marked before the recompute, not after: if anything below raises, the
+        # whole transaction rolls back and the flag goes with it. Marked at all
+        # because the recompute is minutes long, and a person watching a spinner
+        # with no result will press again.
+        self.applied = True
+        # The answer is written; this is what turns it into an allocation. The
+        # recompute rebuilds every store-day of the run, so the row this screen
+        # was opened from is destroyed and recreated under a new id — the way
+        # back is its key.
         run.action_compute()
-        rebuilt = self.env["levis.pos.clearing.store.day"].search(
+        return self._open_result()
+
+    def _open_result(self):
+        """The store-day this answer was about, as the recompute left it.
+
+        Looked up by key rather than by id for the reason above. Falling back to
+        the whole list is deliberate: a store-day can legitimately fail to come
+        back — every one of its lines may have moved to another date — and
+        landing on the list is better than a form pointed at nothing.
+        """
+        self.ensure_one()
+        StoreDay = self.env["levis.pos.clearing.store.day"]
+        rebuilt = StoreDay.search(
             [
-                ("run_id", "=", key[0]),
-                ("settlement_date", "=", key[1]),
-                ("analytic_account_id", "=", key[2]),
+                ("run_id", "=", self.run_id.id),
+                ("settlement_date", "=", self.settlement_date),
+                ("analytic_account_id", "=", self.analytic_account_id.id),
             ],
             limit=1,
         )
-        return {
+        if rebuilt:
+            self.store_day_id = rebuilt.id
+        action = {
             "type": "ir.actions.act_window",
+            "name": _("Store settlement — %s", self.analytic_account_id.display_name),
             "res_model": "levis.pos.clearing.store.day",
-            "res_id": rebuilt.id,
+            # Spelled out rather than left to `view_mode`: an act_window without
+            # its views resolved is the one that lands on a blank screen.
+            "views": [(False, "form")],
             "view_mode": "form",
             "target": "current",
+            "context": {"create": False},
         }
+        if rebuilt:
+            action["res_id"] = rebuilt.id
+        else:
+            action.update(
+                {
+                    "name": _("Store settlement days"),
+                    "views": [(False, "list"), (False, "form")],
+                    "view_mode": "list,form",
+                    "domain": [("run_id", "=", self.run_id.id)],
+                }
+            )
+        return action
 
 
 class LevisClearingCashMatchLine(models.TransientModel):
@@ -243,7 +299,9 @@ class LevisClearingCashMatchLine(models.TransientModel):
 
     wizard_id = fields.Many2one("levis.clearing.cash.match", required=True, ondelete="cascade")
     currency_id = fields.Many2one(related="wizard_id.currency_id")
-    line_id = fields.Many2one("levis.pos.clearing.line", string="Clearing Line", ondelete="cascade")
+    # Not cascade: a recompute unlinks every clearing line of the run, which
+    # would take these candidate rows with it while the screen is still open.
+    line_id = fields.Many2one("levis.pos.clearing.line", string="Clearing Line", ondelete="set null")
     statement_line_id = fields.Many2one("account.bank.statement.line", required=True, ondelete="cascade")
     move_name = fields.Char(related="statement_line_id.move_id.name", string="Bank Entry")
     date = fields.Date(related="statement_line_id.date", string="Money In")
