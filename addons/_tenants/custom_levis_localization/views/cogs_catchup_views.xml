@@ -6,9 +6,13 @@
         <field name="arch" type="xml">
             <form string="COGS Catch-up" create="false" edit="false">
                 <header>
+                    <button name="action_post" type="object"
+                            string="Post Entry" class="btn-primary"
+                            invisible="move_state != 'draft'"/>
                     <button name="action_view_move" type="object"
-                            string="View Journal Entry" class="btn-primary"
+                            string="View Journal Entry"
                             invisible="not move_id"/>
+                    <field name="move_state" widget="statusbar" statusbar_visible="draft,posted"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -23,6 +27,11 @@
                             <field name="move_id"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
+                    </group>
+                    <group>
+                        <field name="post_error" invisible="not post_error"
+                               readonly="1" nolabel="1" colspan="2"
+                               class="text-danger"/>
                     </group>
                     <notebook>
                         <page string="Booked" name="lines">
@@ -70,8 +79,34 @@
                 <field name="book_date"/>
                 <field name="total_cogs" sum="COGS"/>
                 <field name="move_id"/>
+                <field name="move_state" widget="badge"
+                       decoration-warning="move_state == 'draft'"
+                       decoration-success="move_state == 'posted'"/>
+                <field name="post_error" optional="hide"/>
                 <field name="currency_id" column_invisible="1"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_levis_cogs_catchup_search" model="ir.ui.view">
+        <field name="name">levis.cogs.catchup.search</field>
+        <field name="model">levis.cogs.catchup</field>
+        <field name="arch" type="xml">
+            <search string="COGS Catch-up">
+                <field name="name"/>
+                <field name="book_date"/>
+                <!-- The question Finance actually asks of this screen: what has
+                     been recognised but not yet posted? -->
+                <filter name="not_posted" string="Entry Not Posted"
+                        domain="[('move_id.state', '=', 'draft')]"/>
+                <filter name="posted" string="Posted"
+                        domain="[('move_id.state', '=', 'posted')]"/>
+                <filter name="failed" string="Posting Failed"
+                        domain="[('post_error', '!=', False)]"/>
+                <separator/>
+                <filter name="group_book_date" string="Booking Date"
+                        context="{'group_by': 'book_date'}"/>
+            </search>
         </field>
     </record>
 
