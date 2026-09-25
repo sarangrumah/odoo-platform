@@ -103,10 +103,9 @@
                         domain="[('move_id.state', '=', 'posted')]"/>
                 <filter name="failed" string="Posting Failed"
                         domain="[('post_error', '!=', False)]"/>
-                <group expand="0" string="Group By">
-                    <filter name="group_book_date" string="Booking Date"
-                            context="{'group_by': 'book_date'}"/>
-                </group>
+                <separator/>
+                <filter name="group_book_date" string="Booking Date"
+                        context="{'group_by': 'book_date'}"/>
             </search>
         </field>
     </record>

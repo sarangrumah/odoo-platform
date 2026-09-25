@@ -139,7 +139,9 @@ for spec in [s for s in MANUAL.split(",") if s.strip()]:
         per_ou.setdefault(ou.id, [0.0, 0.0])[1] += charge.amount
     for ou_id, (manual_amount, catchup_amount) in sorted(per_ou.items(), key=lambda item: -item[1][0]):
         ou = env["account.analytic.account"].browse(ou_id)
-        flag = "" if abs(manual_amount - catchup_amount) < 1.0 else "   <-- beda"
+        gap = abs(manual_amount - catchup_amount)
+        # Puluhan rupiah = pembulatan ratusan baris, bukan populasi yang beda.
+        flag = "" if gap < 1.0 else ("   (pembulatan)" if gap < 1000.0 else "   <-- BEDA, periksa")
         print("    %-38s %s %s%s" % (ou.name or ou_id, rp(manual_amount), rp(catchup_amount), flag))
 
     label = "COGS catch-up %s" % period.strftime("%m/%Y")
