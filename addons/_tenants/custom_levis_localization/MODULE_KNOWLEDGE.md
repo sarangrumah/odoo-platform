@@ -1860,3 +1860,73 @@ mechanism waiting for the input, and the input is a shop-floor process: count
 the till, attach the slip, submit, validate. Until that happens the 70 unplaced
 deposits stay unplaced, and the honest thing to say is that the gap is
 operational rather than technical.
+
+## Feature 32 — COGS catch-up carried through to a posted entry, with no user in it
+
+The receipt hook already ran without anybody opening a menu, but it stopped at a
+draft entry and nothing said so afterwards. On `prd_levis_begbal`, 25-Sep-2026,
+that was **eight draft entries, Rp 3.007.522.761, untouched for eleven days**.
+Two switches finish the job, both shipped off:
+
+- `custom_levis_localization.cogs_catchup_autopost` posts the entry the hook just
+  wrote, inside the receipt's own transaction. Immediate — and it costs one entry
+  per receipt, because `_get_or_create` only ever joins a *draft* entry. There
+  were 45 incoming pickings on 21-Sep-2026; with autopost that is 45 entries
+  instead of one. `test_03` asserts exactly that, so the trade-off is on the
+  record rather than discovered in production.
+- `cron_levis_cogs_catchup` (inactive in data) runs `_cron_catch_up()` nightly:
+  `_sweep()` first, then `_post_due()`, then `_warn_stale()`. **Today's entry is
+  deliberately not posted** — receipts still land on it, and leaving it draft is
+  what holds the day to a single journal entry.
+
+Running both is the recommended shape: the hook recognises cost as it happens,
+the cron is the net underneath it.
+
+### The sweep exists because a cost can appear with no receipt behind it
+
+`_levis_cogs_catchup` only ever looks at the products on the receipt in front of
+it. A corrected product master, a price the client finally answered, a hook that
+raised — none of those are a receipt, and nothing noticed them. `_sweep()` asks
+the ledger what is still outstanding in the window and charges whatever now
+carries a `standard_price`. That is the only basis available here (no receipt, so
+no PO line to read); for anything that ever arrived, the receipt already
+refreshed `standard_price` to the purchase price net of tax, so the two agree.
+
+What it cannot fix, it says: products sold with **no** cost at all are logged as
+a warning, because no receipt can ever reveal their cost — they need a price from
+the client. On 25-Sep-2026 that was 3 SKUs of one style at Grand Indonesia
+(`005DS0005026/27/28`, sizes 26/27/28, 14 units), whose size-25 sibling carries a
+PO at Rp 413.011 tax-included = Rp 372.082 net.
+
+### 🔴 A manual journal leaves no ledger row — seed it before automating
+
+This is the one thing that must be done before either switch is turned on.
+`levis.cogs.charge` is the only guard against charging twice, and an entry an
+accountant writes by hand does not write to it. In production the consequence was
+already sitting there, harmlessly, as long as the entries stayed draft:
+
+| | |
+|---|---|
+| FA by hand, 31-Aug, `GLJV/2026/08/0021` | Rp 531.048.759 |
+| Catch-up for sale month August (4 draft entries) | Rp 528.443.941 |
+| Difference | Rp 2.604.639 = the 7 no-PO units above |
+
+The per-store amounts agree to the rupiah for 13 of 14 stores, so the population
+is the same one twice. Auto-posting would have made it permanent, in a period
+that is now locked. `scripts/tenants/levis/126_seed_cogs_charge_manual.py` closes
+the gap: it moves those charge rows onto the manual journal
+(`source = "manual"`, a new Selection value, no `-u` needed), trims the August
+portion out of the draft entries, and seeds the no-PO units. It refuses to run
+when the manual journal is not posted, when the catch-up portion is already
+posted, or when the two totals diverge by more than 2 % — a divergence means the
+populations are *not* the same and a script must not decide that.
+
+### Where a failure ends up
+
+`_try_post()` posts one savepoint per record, so a lock date on one day never
+takes the others down and never poisons the goods receipt's own transaction. The
+reason is kept on `post_error` and surfaced on the form and the *Posting Failed*
+filter, because the container log is not where Finance looks. `_warn_stale()`
+logs the drafts still unposted after `cogs_catchup_alert_days` (default 2) — that
+line is the alarm a monitor can read; the *Entry Not Posted* filter is the same
+answer in the UI.

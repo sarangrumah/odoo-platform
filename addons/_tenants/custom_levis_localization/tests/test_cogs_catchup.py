@@ -14,8 +14,9 @@ from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 from odoo.tests import tagged
 
 
-@tagged("post_install", "-at_install")
-class TestCogsCatchup(AccountTestInvoicingCommon):
+class CogsCatchupCommon(AccountTestInvoicingCommon):
+    """Fixtures shared with ``test_cogs_catchup_automation``."""
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -168,8 +169,9 @@ class TestCogsCatchup(AccountTestInvoicingCommon):
     def _catchups(self):
         return self.env["levis.cogs.catchup"].search([("company_id", "=", self.company.id)])
 
-    # ------------------------------------------------------------------
 
+@tagged("post_install", "-at_install")
+class TestCogsCatchup(CogsCatchupCommon):
     def test_01_receipt_charges_what_was_already_sold(self):
         self._sell(self.jeans, 3)
         self._receive(self.jeans, 10)

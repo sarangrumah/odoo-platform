@@ -56,6 +56,10 @@ _SOLD_STATES = ("paid", "done", "invoiced")
 PARAM_START = "custom_levis_localization.cogs_catchup_start"
 # Code of the journal the catch-up entries go to. Empty -> the stock journal.
 PARAM_JOURNAL = "custom_levis_localization.cogs_catchup_journal_code"
+# Post the entry the receipt hook has just written, instead of leaving it draft.
+PARAM_AUTOPOST = "custom_levis_localization.cogs_catchup_autopost"
+# Age, in days, at which a still-draft entry is logged as a warning.
+PARAM_ALERT_DAYS = "custom_levis_localization.cogs_catchup_alert_days"
 
 # Arbitrary but FIXED first key of the per-company advisory lock taken while the
 # ledger is read and written.
@@ -94,6 +98,11 @@ class LevisCogsCharge(models.Model):
             # ledger has to be able to say so — otherwise the monthly run would
             # charge the same units again. A new Selection value needs no -u.
             ("session", "POS Session"),
+            # An entry an accountant wrote by hand leaves no row here by
+            # itself, and the catch-up would then charge the same units again
+            # (August 2026: Rp 528 m). scripts/tenants/levis/126_seed_cogs_
+            # charge_manual.py writes those rows after the fact.
+            ("manual", "Manual Journal"),
         ],
         required=True,
     )
@@ -237,6 +246,13 @@ class LevisCogsCatchup(models.Model):
     charge_ids = fields.One2many("levis.cogs.charge", "catchup_id", readonly=True)
     currency_id = fields.Many2one(related="company_id.currency_id")
     total_cogs = fields.Monetary(compute="_compute_total", currency_field="currency_id", store=True)
+    move_state = fields.Selection(related="move_id.state", string="Entry Status")
+    post_error = fields.Text(
+        readonly=True,
+        copy=False,
+        string="Last Posting Error",
+        help="Why the last attempt to post this entry failed. Cleared once it posts.",
+    )
 
     @api.depends("line_ids.amount")
     def _compute_total(self):
@@ -332,6 +348,8 @@ class LevisCogsCatchup(models.Model):
                 charge["catchup_id"] = catchup.id
                 charge["move_id"] = catchup.move_id.id
         Charge.create(charges)
+        if self._autopost_enabled():
+            touched._try_post()
         return touched
 
     @api.model
@@ -469,6 +487,198 @@ class LevisCogsCatchup(models.Model):
                 }
             )
         self.charge_ids.filtered(lambda c: not c.move_id).move_id = self.move_id
+
+    # ------------------------------------------------------------------
+    # Posting without a user in the loop
+    # ------------------------------------------------------------------
+    # The receipt hook already runs without anybody opening a menu, but it stops
+    # at a draft entry — and in September 2026 eight of them sat unposted for
+    # eleven days, Rp 3,01 bn, with nothing anywhere saying so. Two switches
+    # close that gap, both off by default:
+    #
+    # * ``cogs_catchup_autopost`` posts the entry the hook has just written,
+    #   inside the receipt's own transaction. Immediate, at the price of one
+    #   entry per receipt: :meth:`_get_or_create` only ever joins a *draft*
+    #   entry, so posting at once means the next receipt of the day starts its
+    #   own (45 pickings on 21-Sep-2026 would have been 45 entries).
+    # * the nightly cron sweeps first and posts afterwards, which keeps one
+    #   entry per booking date. Running both is fine, and is the shape to
+    #   recommend: the hook recognises the cost as it happens, the cron is the
+    #   net underneath it.
+    #
+    # 🔴 Neither may be switched on before the charge ledger covers every period
+    # that was booked by hand. A manual journal leaves no ``levis.cogs.charge``
+    # row, so the catch-up cannot see it and charges the same units again — in
+    # August 2026 that was Rp 528 m, and an automatic post would have made it
+    # permanent instead of leaving a draft to delete. Seed the ledger first:
+    # ``scripts/tenants/levis/126_seed_cogs_charge_manual.py``.
+    @api.model
+    def _autopost_enabled(self):
+        param = self.env["ir.config_parameter"].sudo().get_param(PARAM_AUTOPOST, "0")
+        return str(param).strip().lower() not in ("0", "false", "", "none")
+
+    @api.model
+    def _alert_days(self):
+        raw = (self.env["ir.config_parameter"].sudo().get_param(PARAM_ALERT_DAYS) or "").strip()
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return 2
+
+    def _try_post(self):
+        """Post the entries behind these catch-ups, one savepoint each.
+
+        A lock date, a missing account or an entry somebody has meanwhile
+        touched must not take the other days down with it — and must never
+        poison the transaction of the goods receipt that triggered this. What
+        went wrong is kept on the record, so it is answerable from the UI and
+        not only from the container log.
+        """
+        posted = self.browse()
+        for record in self:
+            move = record.move_id
+            if not move or move.state != "draft":
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    move._post(soft=False)
+            except Exception as error:  # noqa: BLE001 - reported, never re-raised
+                record.post_error = str(error)
+                _logger.warning("COGS catch-up %s stays draft: %s", record.name, error)
+            else:
+                record.post_error = False
+                posted |= record
+        return posted
+
+    def action_post(self):
+        """Post from the UI, and say out loud why an entry could not be."""
+        failed = self - self._try_post()
+        if not failed:
+            return True
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "type": "danger",
+                "sticky": True,
+                "title": _("Not posted"),
+                "message": "\n".join(
+                    "%s: %s" % (record.name, record.post_error or _("nothing left to post")) for record in failed
+                ),
+            },
+        }
+
+    # ------------------------------------------------------------------
+    # Nightly cron
+    # ------------------------------------------------------------------
+    @api.model
+    def _cron_catch_up(self):
+        """Charge what the receipts could not see, then post what is due.
+
+        Three steps, each guarded on its own: a company whose sweep fails still
+        gets its due entries posted, and a single unpostable entry never stops
+        the warning about the others.
+        """
+        if not self.env["stock.move"]._levis_cogs_catchup_enabled():
+            return
+        for company in self.env["res.company"].search([]):
+            if not self.env["stock.warehouse"].search_count([("company_id", "=", company.id)]):
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    self._sweep(company)
+            except Exception:  # pragma: no cover - the cron must reach the posting step
+                _logger.exception("COGS catch-up sweep failed in %s", company.display_name)
+            self._post_due(company)
+            self._warn_stale(company)
+
+    @api.model
+    def _sweep(self, company):
+        """Charge every sold-but-uncosted unit whose cost is known by now.
+
+        The receipt hook only ever looks at the products on the receipt in front
+        of it. A cost can appear with no receipt behind it — a corrected product
+        master, a price the client finally answered, a hook that failed — and
+        nothing would notice. This is that net.
+
+        ``standard_price`` is the only basis available here: there is no receipt
+        to read a PO line from. For anything that ever arrived the receipt has
+        already refreshed it to the purchase price net of tax, so the two agree;
+        where they cannot, the hook got there first anyway.
+        """
+        Charge = self.env["levis.cogs.charge"]
+        today = fields.Date.context_today(self)
+        start = self._window_start(today)
+        warehouses = self.env["stock.warehouse"].search([("company_id", "=", company.id)])
+        costs = {}
+        uncosted = {}
+        for period_date in Charge._months_between(start, today):
+            for warehouse in warehouses:
+                outstanding = Charge._outstanding(company, warehouse, period_date, date_to=today)
+                for product, qty in outstanding.items():
+                    if product in costs:
+                        continue
+                    cost = product.with_company(company).standard_price
+                    if cost:
+                        costs[product] = cost
+                    else:
+                        uncosted[product] = uncosted.get(product, 0.0) + qty
+        if uncosted:
+            # Nothing automatic will ever fix these: no PO carried them, so no
+            # receipt can reveal a cost. They need a price from the client, and
+            # until then the monthly run keeps counting them as Quantity
+            # Without Cost.
+            _logger.warning(
+                "COGS catch-up: %s unit(s) of %s product(s) sold with no cost at all in %s (%s)",
+                sum(uncosted.values()),
+                len(uncosted),
+                company.display_name,
+                ", ".join(sorted(p.default_code or p.display_name for p in uncosted)[:10]),
+            )
+        if not costs:
+            return self.browse()
+        return self._catch_up(company, costs, origin=_("nightly sweep"))
+
+    @api.model
+    def _post_due(self, company=None, book_before=None):
+        """Post the draft entries whose booking date has passed.
+
+        Today's entry is deliberately left alone: more receipts may still land
+        on it, and ``_get_or_create`` keeps adding to a draft — which is what
+        holds this to one journal entry per booking date.
+        """
+        book_before = book_before or fields.Date.context_today(self)
+        domain = [("move_id.state", "=", "draft"), ("book_date", "<", book_before)]
+        if company:
+            domain.append(("company_id", "=", company.id))
+        return self.search(domain)._try_post()
+
+    @api.model
+    def _warn_stale(self, company, days=None):
+        """Log the entries still draft ``days`` after their booking date.
+
+        The log line is the alarm a monitor can read; the *Not posted* filter on
+        the list is where Finance sees the same thing.
+        """
+        days = self._alert_days() if days is None else days
+        cutoff = fields.Date.context_today(self) - relativedelta(days=days)
+        stale = self.search(
+            [
+                ("company_id", "=", company.id),
+                ("move_id.state", "=", "draft"),
+                ("book_date", "<=", cutoff),
+            ]
+        )
+        if stale:
+            _logger.warning(
+                "COGS catch-up: %s draft entr(ies) older than %s day(s) unposted in %s, %s in total: %s",
+                len(stale),
+                days,
+                company.display_name,
+                sum(stale.mapped("total_cogs")),
+                ", ".join(stale.mapped("name")),
+            )
+        return stale
 
 
 class LevisCogsCatchupLine(models.Model):

@@ -98,5 +98,33 @@
             <field name="key">custom_levis_localization.cogs_catchup_journal_code</field>
             <field name="value"></field>
         </record>
+        <!--
+          Post the catch-up entry as soon as the receipt writes it, instead of
+          leaving it draft for the accountant.
+
+            "0" (default) -> draft; somebody posts it (or the nightly cron does)
+            "1"           -> posted inside the receipt's own transaction
+
+          Immediate, but it costs one journal entry per receipt: an entry is
+          only ever added to while it is still draft, so posting at once makes
+          the next receipt of the day start a new one. Leave it off and let the
+          cron post if one entry per day matters more than the few hours.
+
+          🔴 Neither this nor the cron may be turned on while a period booked by
+          hand is still missing from levis.cogs.charge: the catch-up cannot see
+          a manual journal and would charge those units again.
+        -->
+        <record id="param_cogs_catchup_autopost" model="ir.config_parameter">
+            <field name="key">custom_levis_localization.cogs_catchup_autopost</field>
+            <field name="value">0</field>
+        </record>
+        <!--
+          Age in days at which an entry that is still draft is logged as a
+          warning by the nightly cron. Default 2.
+        -->
+        <record id="param_cogs_catchup_alert_days" model="ir.config_parameter">
+            <field name="key">custom_levis_localization.cogs_catchup_alert_days</field>
+            <field name="value">2</field>
+        </record>
     </data>
 </odoo>
