@@ -150,6 +150,32 @@
         <field name="column_map_json">{"store_code": 1, "sap_store_code": 3, "store_name": 4, "trans_date": 5, "total_amount": 6, "tender_amount": 7}</field>
     </record>
 
+    <!-- X70T — Tender Settlement. 9 metadata rows, header row 10, data row 11.
+
+         A cross-tab: the left block identifies the store-day-terminal and EVERY column
+         after it is one tender, named in the header (CASH, BCA_QRIS, OFFLINE_VISA...).
+         The set of columns changes nightly — only tenders actually taken get one — so
+         the column map stops at the fixed block and the executor reads the rest by
+         caption through ``read_wide_records``. ``NON CASH(Total)`` is a subtotal and is
+         dropped there, not here.
+
+         require_fields: a row that names no store and no date is structure, not a
+         store-day. header_signature: the same nightly mailbox also carries X70D and
+         X24DN, whose header has STORE CODE but no TERMINAL column. -->
+    <record id="profile_levis_x70t" model="retail.import.profile">
+        <field name="name">Levi's — X70T Tender Settlement</field>
+        <field name="code">levis_x70t</field>
+        <field name="file_type">x70t</field>
+        <field name="namespace">levis</field>
+        <field name="file_format">xlsx</field>
+        <field name="data_start_row">11</field>
+        <field name="date_format">%Y-%m-%d</field>
+        <field name="require_fields">store_code,trans_date</field>
+        <field name="header_signature">STORE CODE,TRANS DATE,TERMINAL</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="column_map_json">{"store_code": 1, "sap_store_code": 3, "store_name": 4, "trans_date": 5, "register": 6}</field>
+    </record>
+
     <!-- X26 — Shipping Report. 8 metadata rows, header row 9, data row 10. Cols 2-3 blank (merged). -->
     <record id="profile_levis_x26" model="retail.import.profile">
         <field name="name">Levi's — X26 Shipping Report</field>

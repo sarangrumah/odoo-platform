@@ -2677,6 +2677,181 @@ class RetailImportExecutor(models.AbstractModel):
         return orders
 
     # ==================================================================
+    # Tender settlement — shared by X70D (per transaction) and X70T (per day)
+    # ==================================================================
+    #: Prefix of the per-tender receivable accounts ``_x24_recv_account_for`` creates.
+    _RI_RECV_PREFIX = "POS Receivable - "
+
+    #: X70T column captions that are subtotals, not tenders. Staging them would double
+    #: the day: ``NON CASH(Total)`` is the sum of every card column beside it.
+    _X70T_TOTAL_CAPTIONS = ("NON CASH(TOTAL)", "NON CASH (TOTAL)", "TOTAL", "GRAND TOTAL")
+
+    def _ri_rirec_journal(self, company):
+        """The RIREC journal every tender transfer is posted to (created on first use)."""
+        Journal = self.env["account.journal"].sudo()
+        journal = Journal.search([("code", "=", "RIREC"), ("company_id", "=", company.id)], limit=1)
+        if not journal:
+            journal = Journal.create(
+                {
+                    "name": "Retail Import Reconciliation",
+                    "code": "RIREC",
+                    "type": "general",
+                    "company_id": company.id,
+                }
+            )
+        return journal
+
+    def _ri_line_ou_id(self, line):
+        """The Operating-Unit analytic a posted line carries, or ``False``."""
+        if "l10n_ou_analytic_id" in line._fields and line.l10n_ou_analytic_id:
+            return line.l10n_ou_analytic_id.id
+        for key in line.analytic_distribution or {}:
+            head = str(key).split(",")[0]
+            if head.isdigit():
+                return int(head)
+        return False
+
+    def _ri_settled_by_tender(self, company, day):
+        """What a trading day has **already** transferred out of suspense.
+
+        Returns ``{(tender, operating-unit id): amount}`` read back from the posted
+        RIREC debits of that date. Both settlement loaders net their own figures
+        against this before posting, which is what lets them run in any order and more
+        than once: X70D covers a day, X70T later covers the same day plus the tenders
+        X70D never reports, and only the difference is posted. Two sources agreeing on
+        a tender therefore book it once, not twice.
+
+        A manual RIREC entry a human posted for the same day and tender counts as
+        settled too, and will suppress the automatic transfer — which is the intent:
+        the money was already moved by hand.
+        """
+        AML = self.env["account.move.line"].sudo()
+        lines = AML.search(
+            [
+                ("company_id", "=", company.id),
+                ("journal_id", "=", self._ri_rirec_journal(company).id),
+                ("date", "=", day),
+                ("parent_state", "=", "posted"),
+                ("debit", ">", 0),
+            ]
+        )
+        settled = defaultdict(float)
+        for ln in lines:
+            name = ln.account_id.with_company(company).name or ""
+            if not name.startswith(self._RI_RECV_PREFIX):
+                continue  # not a tender receivable: a correction, a fee, something else
+            tender = name[len(self._RI_RECV_PREFIX) :].strip()
+            settled[(tender, self._ri_line_ou_id(ln))] += ln.debit
+        return settled
+
+    def _ri_post_tender_transfer(self, company, susp, gl_date, by_tender, source, ns, log):
+        """Post one Dr per-tender receivable / Cr Suspense entry for ``gl_date``.
+
+        ``by_tender`` is ``{(tender, operating-unit id): amount}``, already netted of
+        whatever that day settled before. Returns the posted move.
+        """
+        AnalyticAccount = self.env["account.analytic.account"]
+        line_ids = []
+        # Credit the suspense per OU as well, so the entry balances *within* each
+        # Operating Unit instead of leaving one store debited and another credited.
+        susp_by_ou = defaultdict(float)
+        for (tender, ou_id), amt in sorted(by_tender.items()):
+            ou = AnalyticAccount.browse(ou_id) if ou_id else AnalyticAccount
+            recv = self._x24_recv_account_for(company, tender)
+            line_ids.append(
+                (
+                    0,
+                    0,
+                    dict(
+                        self._ri_ou_line_vals(ou),
+                        account_id=recv.id,
+                        debit=amt,
+                        credit=0.0,
+                        partner_id=False,
+                        name=f"{source} settlement {tender}",
+                    ),
+                )
+            )
+            susp_by_ou[ou_id] += amt
+        for ou_id, amt in sorted(susp_by_ou.items(), key=lambda kv: kv[0] or 0):
+            ou = AnalyticAccount.browse(ou_id) if ou_id else AnalyticAccount
+            line_ids.append(
+                (
+                    0,
+                    0,
+                    dict(
+                        self._ri_ou_line_vals(ou),
+                        account_id=susp.id,
+                        debit=0.0,
+                        credit=round(amt, 2),
+                        partner_id=False,
+                        name=f"{source} settlement (Suspense clearing)",
+                    ),
+                )
+            )
+        move = (
+            self.env["account.move"]
+            .sudo()
+            .create(
+                {
+                    "move_type": "entry",
+                    "journal_id": self._ri_rirec_journal(company).id,
+                    "date": gl_date,
+                    "company_id": company.id,
+                    "ref": f"{source} settlement transfer {gl_date} (log {log.id})",
+                    "line_ids": line_ids,
+                }
+            )
+        )
+        move.action_post()
+        # Odoo bumps a past-dated entry to today on post; re-stamp within the same FY.
+        self._ri_backdate_move(move, gl_date, source.lower())
+        self._xid_set(ns, self._safe_xid(f"{source.lower()}reconcile_", f"{log.id}_{gl_date}"), "account.move", move.id)
+        return move
+
+    def _ri_reconcile_suspense(self, company, susp):
+        """Reconcile the open suspense lines; returns how many partner groups matched.
+
+        Group by partner because reconcile requires a single partner per receivable
+        batch; POS close lines are normally partner-less, matching our partner-less
+        settlement credit.
+        """
+        AML = self.env["account.move.line"].sudo()
+        open_lines = AML.search(
+            [
+                ("account_id", "=", susp.id),
+                ("company_id", "=", company.id),
+                ("parent_state", "=", "posted"),
+                ("reconciled", "=", False),
+            ]
+        )
+        by_partner = defaultdict(lambda: AML.browse())
+        for ln in open_lines:
+            by_partner[ln.partner_id.id] += ln
+        reconciled_groups = 0
+        for grp in by_partner.values():
+            if len(grp) > 1:
+                try:
+                    grp.reconcile()
+                    reconciled_groups += 1
+                except Exception as re:
+                    _logger.warning("tender settlement: group reconcile skipped: %s", re)
+        return reconciled_groups
+
+    def _ri_suspense_residual(self, company, susp):
+        """Net open balance left on the suspense account, post-reconcile."""
+        AML = self.env["account.move.line"].sudo()
+        still_open = AML.search(
+            [
+                ("account_id", "=", susp.id),
+                ("company_id", "=", company.id),
+                ("parent_state", "=", "posted"),
+                ("reconciled", "=", False),
+            ]
+        )
+        return round(sum(still_open.mapped("amount_residual")), 2)
+
+    # ==================================================================
     # X70D — Tender detail (Phase 5, staged until X24 is enabled)
     # ==================================================================
     def _load_x70d(self, profile, file_b64, log):
@@ -2704,7 +2879,6 @@ class RetailImportExecutor(models.AbstractModel):
         (surfaced in the log note)."""
         ns = profile.namespace
         company = profile.company_id
-        AML = self.env["account.move.line"].sudo()
 
         # Whole-file idempotency guard (mirror _post_x24 / _post_x31): refuse to re-run a
         # second X70D transfer over the same suspense balance — archive the prior first.
@@ -2779,107 +2953,28 @@ class RetailImportExecutor(models.AbstractModel):
             return
 
         # One transfer entry per day: Dr each per-tender receivable / Cr Suspense. RIREC.
-        Journal = self.env["account.journal"].sudo()
-        journal = Journal.search([("code", "=", "RIREC"), ("company_id", "=", company.id)], limit=1)
-        if not journal:
-            journal = Journal.create(
-                {
-                    "name": "Retail Import Reconciliation",
-                    "code": "RIREC",
-                    "type": "general",
-                    "company_id": company.id,
-                }
-            )
-        AnalyticAccount = self.env["account.analytic.account"]
         fallback = datetime.now().date()
         for day in sorted(by_day, key=lambda d: d or fallback):
             gl_date = day or fallback
-            by_tender = {k: round(a, 2) for k, a in by_day[day].items() if round(a, 2)}
+            # Net off what this trading day already settled, so re-dropping an old file
+            # -- or an X70T that covered the day first -- tops the day up instead of
+            # crediting the suspense a second time.
+            settled = self._ri_settled_by_tender(company, gl_date)
+            by_tender = {
+                k: round(a - settled.get(k, 0.0), 2)
+                for k, a in by_day[day].items()
+                if round(a - settled.get(k, 0.0), 2) > 0
+            }
             if not by_tender:
                 continue
-            line_ids = []
-            # Credit the suspense per OU as well, so the entry balances *within* each
-            # Operating Unit instead of leaving one store debited and another credited.
-            susp_by_ou = defaultdict(float)
-            for (tender, ou_id), amt in sorted(by_tender.items()):
-                ou = AnalyticAccount.browse(ou_id) if ou_id else AnalyticAccount
-                recv = self._x24_recv_account_for(company, tender)
-                line_ids.append(
-                    (
-                        0,
-                        0,
-                        dict(
-                            self._ri_ou_line_vals(ou),
-                            account_id=recv.id,
-                            debit=amt,
-                            credit=0.0,
-                            partner_id=False,
-                            name=f"X70D settlement {tender}",
-                        ),
-                    )
-                )
-                susp_by_ou[ou_id] += amt
-            for ou_id, amt in sorted(susp_by_ou.items(), key=lambda kv: kv[0] or 0):
-                ou = AnalyticAccount.browse(ou_id) if ou_id else AnalyticAccount
-                line_ids.append(
-                    (
-                        0,
-                        0,
-                        dict(
-                            self._ri_ou_line_vals(ou),
-                            account_id=susp.id,
-                            debit=0.0,
-                            credit=round(amt, 2),
-                            partner_id=False,
-                            name="X70D settlement (Suspense clearing)",
-                        ),
-                    )
-                )
-            move = (
-                self.env["account.move"]
-                .sudo()
-                .create(
-                    {
-                        "move_type": "entry",
-                        "journal_id": journal.id,
-                        "date": gl_date,
-                        "company_id": company.id,
-                        "ref": f"X70D settlement transfer {gl_date} (log {log.id})",
-                        "line_ids": line_ids,
-                    }
-                )
-            )
-            move.action_post()
-            # Odoo bumps a past-dated entry to today on post; re-stamp within the same FY.
-            self._ri_backdate_move(move, gl_date, "x70d")
-            self._xid_set(ns, self._safe_xid("x70dreconcile_", f"{log.id}_{gl_date}"), "account.move", move.id)
+            move = self._ri_post_tender_transfer(company, susp, gl_date, by_tender, "X70D", ns, log)
             posted += 1
             total += sum(by_tender.values())
             _logger.info("x70d reconcile: move %s dated %s (%s tender lines)", move.name, gl_date, len(by_tender))
         total = round(total, 2)
 
-        # Reconcile all open suspense lines (session-close debits + this credit). Group by
-        # partner because reconcile requires a single partner per receivable batch; POS
-        # close lines are normally partner-less, matching our partner_id=False credit.
-        open_lines = AML.search(
-            [
-                ("account_id", "=", susp.id),
-                ("company_id", "=", company.id),
-                ("parent_state", "=", "posted"),
-                ("reconciled", "=", False),
-            ]
-        )
-        by_partner = defaultdict(lambda: AML.browse())
-        for ln in open_lines:
-            by_partner[ln.partner_id.id] += ln
-        reconciled_groups = 0
-        for grp in by_partner.values():
-            if len(grp) > 1:
-                try:
-                    grp.reconcile()
-                    reconciled_groups += 1
-                except Exception as re:
-                    _logger.warning("x70d reconcile: group reconcile skipped: %s", re)
+        # Reconcile all open suspense lines (session-close debits + this credit).
+        reconciled_groups = self._ri_reconcile_suspense(company, susp)
 
         # Per-transaction "sales without payment" report: posted X24 orders whose txn key
         # has no matching X70D tender (both sides run through the same _safe_xid transform).
@@ -2898,15 +2993,7 @@ class RetailImportExecutor(models.AbstractModel):
         unpaid = posted_xids - x70d_keys
         # Re-read post-reconcile: fully-matched lines drop out; the sum of remaining
         # residuals is the true net open balance on the suspense account.
-        still_open = AML.search(
-            [
-                ("account_id", "=", susp.id),
-                ("company_id", "=", company.id),
-                ("parent_state", "=", "posted"),
-                ("reconciled", "=", False),
-            ]
-        )
-        residual = round(sum(still_open.mapped("amount_residual")), 2)
+        residual = self._ri_suspense_residual(company, susp)
 
         log.records_created = posted
         log.records_skipped = len(records)
@@ -2948,7 +3035,142 @@ class RetailImportExecutor(models.AbstractModel):
         _logger.info("%s: staged %s rows (no model writes)", profile.file_type, len(records))
 
     def _load_x70t(self, profile, file_b64, log):
-        self._stage_only(profile, file_b64, log, "X70T settlement: staged for reconciliation (Phase 5 decision).")
+        """X70T is the only nightly file that names the acquirer behind a card sale.
+
+        Levi's POS started issuing acquirer-level tenders on 16-Sep-2026 (BCA_QRIS,
+        BCA_DEBIT_GPN, BRI_REGULAR_OFF_US, …). **X70D drops those rows entirely** —
+        verified over 87 nightly pairs: the two files agree to the rupiah on every day
+        that used only the OFFLINE_*/CASH vocabulary, and X70D is short by exactly the
+        acquirer-coded tenders on every day that did not (Rp 389.478.201 over 16-24 Sep
+        2026). X24DN still bills the full sale, so that money stays on POS Suspense
+        Clearing with nothing to clear it.
+
+        X70T carries it: per store, trading day and terminal, one column per tender,
+        and its per-store totals equal X24DN's sales to the rupiah. It is a day-grain
+        file, so it settles the GL; the transaction-grain X70D stays the source for
+        anything that needs a receipt (matching, store-day proof, MDR per transaction).
+        """
+        if self._x24_decouple_enabled() and self._x70t_post_enabled():
+            self._post_x70t_settlement(profile, file_b64, log)
+        else:
+            self._stage_only(
+                profile,
+                file_b64,
+                log,
+                "X70T settlement: staged (set retail_import.x70t_post_enabled=1 to settle the tenders X70D omits).",
+            )
+
+    def _x70t_post_enabled(self):
+        """Whether X70T tops up the day's settlement. Gated, default OFF."""
+        return self.env["ir.config_parameter"].sudo().get_param("retail_import.x70t_post_enabled", "0") in (
+            "1",
+            "true",
+            "True",
+        )
+
+    def _post_x70t_settlement(self, profile, file_b64, log):
+        """Settle the part of a trading day X70D never reported.
+
+        Same entry as the X70D transfer — Dr per-tender receivable / Cr POS Suspense
+        Clearing, per day, per Operating Unit — but posted for the **difference**
+        between what X70T says the day tendered and what that day has already settled
+        (:meth:`_ri_settled_by_tender`). Consequences worth keeping:
+
+        * order does not matter. X70D first, X70T first, both, or the same file twice:
+          each tender is booked once. Re-running this loader posts nothing.
+        * a day X70D never delivered at all (13-Sep-2026, Rp 707.801.650) settles in
+          full from X70T alone.
+        * a tender X70T reports *less* of than the day already settled is never
+          reversed here — that is a correction someone has to make deliberately, so it
+          is reported in the log note instead.
+        """
+        ns = profile.namespace
+        company = profile.company_id
+
+        data = profile.read_wide_records(
+            file_b64,
+            label_field="tender_type",
+            value_field="tender_amount",
+            ignore_captions=self._X70T_TOTAL_CAPTIONS,
+        )
+        records = data["records"]
+        log.line_count = len(records)
+        row_to_line = self._persist_lines(log, records) if records else {}
+        if row_to_line:
+            self.env["retail.import.line"].browse([ln.id for ln in row_to_line.values()]).write({"state": "skipped"})
+        self._ri_commit()
+
+        susp = self._x24_suspense_account(company)
+        by_day = defaultdict(lambda: defaultdict(float))
+        cfg_cache, ou_cache = {}, {}
+
+        def resolve_config(store):
+            if store not in cfg_cache:
+                cid = self._xid_get(ns, self._safe_xid("posconfig_", store), "pos.config")
+                cfg_cache[store] = self.env["pos.config"].with_context(active_test=False).browse(cid) if cid else False
+            return cfg_cache[store]
+
+        unmapped = set()
+        for r in records:
+            tender = str(r.get("tender_type") or "").strip()
+            if not tender:
+                continue
+            tender = self._X24_TENDER_FOLD.get(tender, tender)
+            amt = float(profile._parse_amount(r.get("tender_amount")) or 0)
+            store = str(r.get("store_code") or "").strip()
+            if store not in ou_cache:
+                cfg = resolve_config(store)
+                if not cfg:
+                    unmapped.add(store)
+                ou_cache[store] = self._ri_config_ou(cfg)
+            ou = ou_cache[store]
+            by_day[profile._parse_date(r.get("trans_date"))][(tender, ou.id if ou else False)] += amt
+
+        posted, total = 0, 0.0
+        ahead = []
+        fallback = datetime.now().date()
+        for day in sorted(by_day, key=lambda d: d or fallback):
+            gl_date = day or fallback
+            settled = self._ri_settled_by_tender(company, gl_date)
+            by_tender = {}
+            for key, amount in by_day[day].items():
+                delta = round(amount - settled.get(key, 0.0), 2)
+                if delta > 0:
+                    by_tender[key] = delta
+                elif delta < 0:
+                    ahead.append((gl_date, key[0], -delta))
+            if not by_tender:
+                continue
+            move = self._ri_post_tender_transfer(company, susp, gl_date, by_tender, "X70T", ns, log)
+            posted += 1
+            total += sum(by_tender.values())
+            _logger.info("x70t settlement: move %s dated %s (%s tender lines)", move.name, gl_date, len(by_tender))
+        total = round(total, 2)
+
+        reconciled_groups = self._ri_reconcile_suspense(company, susp)
+        residual = self._ri_suspense_residual(company, susp)
+
+        log.records_created = posted
+        log.records_skipped = len(records)
+        note = (
+            f"X70T settlement: {posted} daily top-up move(s) posted "
+            f"(Dr tender receivables {total:.2f} / Cr Suspense); "
+            f"reconciled {reconciled_groups} suspense group(s); "
+            f"suspense residual {residual:.2f}."
+        )
+        if unmapped:
+            note += f" WARNING: {len(unmapped)} store(s) have no pos.config ({', '.join(sorted(unmapped)[:5])}) — posted without an Operating Unit."
+        if ahead:
+            note += f" WARNING: {len(ahead)} day/tender pair(s) already settled for MORE than X70T reports; left untouched for review."
+        log.error_message = note
+        self._ri_commit()
+        _logger.info(
+            "x70t settlement: %s move(s), total %.2f, residual %.2f, %s unmapped store(s)",
+            posted,
+            total,
+            residual,
+            len(unmapped),
+        )
 
     def _load_x70d_store(self, profile, file_b64, log):
         """The store's own X70D export: staged, never posted.

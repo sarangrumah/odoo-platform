@@ -9,3 +9,4 @@ from . import test_x101_seam
 from . import test_store_mail_routing
 from . import test_x70d_store_export
 from . import test_x24_pending_replay
+from . import test_x70t_settlement

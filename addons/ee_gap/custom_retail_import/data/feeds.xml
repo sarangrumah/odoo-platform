@@ -129,10 +129,28 @@
         <field name="active" eval="False"/>
     </record>
 
+    <!-- Superseded by feed_levis_x70t below: this one reads X70T through the X70 profile,
+         whose column map stops at the first two tender columns. Kept inactive rather than
+         deleted because a live database may still point at it (noupdate="1"). -->
     <record id="feed_levis_x70" model="retail.import.feed">
         <field name="sequence">90</field>
-        <field name="name">Levi's X70T — Tender Settlement (FTPS drop)</field>
+        <field name="name">Levi's X70 — Tender Breakdown (legacy, superseded)</field>
         <field name="profile_id" ref="profile_levis_x70"/>
+        <field name="source_type">local</field>
+        <field name="local_dir">/mnt/data_levis/data</field>
+        <field name="archive_dir">/mnt/data_levis/archive</field>
+        <field name="file_glob">X70_*.xlsx</field>
+        <field name="active" eval="False"/>
+    </record>
+
+    <!-- X70T settles what X70D omits, so it must run AFTER X70D (sequence 20) has had
+         its go at the same trading day: the top-up is computed against what the day has
+         already settled. Sequence 60 keeps it ahead of the reference-only feeds without
+         disturbing the master-data block at 90. -->
+    <record id="feed_levis_x70t" model="retail.import.feed">
+        <field name="sequence">60</field>
+        <field name="name">Levi's X70T — Tender Settlement (FTPS drop)</field>
+        <field name="profile_id" ref="profile_levis_x70t"/>
         <field name="source_type">local</field>
         <field name="local_dir">/mnt/data_levis/data</field>
         <field name="archive_dir">/mnt/data_levis/archive</field>

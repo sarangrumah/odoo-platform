@@ -463,3 +463,102 @@ class RetailImportProfile(models.Model):
             if limit and len(records) >= limit:
                 break
         return {"records": records, "total_rows": total, "blank_rows": blank}
+
+    def read_wide_records(self, file_b64: str, label_field: str, value_field: str, ignore_captions=()):
+        """Parse a cross-tab sheet — one column per label — into one record per cell.
+
+        X70T heads one column per tender (``CASH``, ``BCA_QRIS``, ``OFFLINE_VISA``, …)
+        and the set changes from night to night: only the tenders a store actually took
+        that day get a column, so 24-Sep-2026 ships 20 of them and 21-Sep ships 13. An
+        index-based ``column_map`` cannot follow that. The fixed left-hand block (store,
+        date, terminal) is still read from the map; every other captioned column is
+        unpivoted into its own record carrying ``label_field`` (the caption) and
+        ``value_field`` (the cell).
+
+        Captions listed in ``ignore_captions`` are dropped — the report's own
+        ``NON CASH(Total)`` column is a subtotal, and staging it would double the day.
+        So are empty and zero cells: in a cross-tab an empty cell means "no such tender
+        that day", and counting it as a zero tender would invent settlement rows for
+        every store × every tender.
+
+        Returns the same shape as :meth:`read_records`, where ``total_rows`` counts
+        source rows (not the records they expanded into).
+        """
+        self.ensure_one()
+        col_map = self._column_map()
+        required = [f.strip() for f in (self.require_fields or "").split(",") if f.strip()]
+        skip = {c.strip().upper() for c in ignore_captions}
+        file_bytes = base64.b64decode(file_b64)
+
+        header = self._read_header_row(file_bytes)
+        # 1-based column index -> caption, for every column the map does not claim.
+        value_cols = {
+            idx: caption
+            for idx, caption in enumerate(header, start=1)
+            if caption and idx not in set(col_map.values()) and caption.upper() not in skip
+        }
+
+        records: list[dict] = []
+        total = 0
+        blank = 0
+        for sheet, raw in self._iter_raw_rows(file_bytes):
+            total += 1
+            row = list(raw)
+            if not row or all((c is None or str(c).strip() == "") for c in row):
+                blank += 1
+                continue
+            base = {}
+            for field_name, idx in col_map.items():
+                cell = self._safe_cell(row, idx)
+                if _is_text_field(field_name):
+                    base[field_name] = self._clean_cell(cell)
+                else:
+                    base[field_name] = self._clean_str(cell) if isinstance(cell, str) else cell
+            if required and any(str(base.get(f) or "").strip() == "" for f in required):
+                blank += 1
+                continue
+            base["_row"] = total + self.data_start_row - 1
+            if sheet:
+                base["_sheet"] = sheet
+            kept = 0
+            for idx, caption in value_cols.items():
+                cell = self._safe_cell(row, idx)
+                if cell is None or str(cell).strip() == "":
+                    continue
+                amount = self._parse_amount(cell)
+                if not amount:
+                    continue
+                records.append(dict(base, **{label_field: caption, value_field: str(amount)}))
+                kept += 1
+            if not kept:
+                # A store that took nothing that day still ships a row. It is not an
+                # error and not data either; counted as blank keeps the log arithmetic
+                # (total = kept + blank) honest.
+                blank += 1
+        return {"records": records, "total_rows": total, "blank_rows": blank}
+
+    def _read_header_row(self, file_bytes: bytes) -> list[str]:
+        """The caption row immediately above ``data_start_row``, as clean strings."""
+        self.ensure_one()
+        row_no = max(self.data_start_row - 1, 1)
+        if self.file_format == "csv":
+            text = file_bytes.decode(self.encoding or "utf-8", errors="replace")
+            reader = csv.reader(io.StringIO(text), delimiter=self.delimiter or ",")
+            for n, row in enumerate(reader, start=1):
+                if n == row_no:
+                    return [str(c or "").strip() for c in row]
+            return []
+        try:
+            import openpyxl  # noqa: PLC0415 - optional, image-provided
+        except ImportError as e:  # pragma: no cover - depends on image
+            raise UserError(
+                _("openpyxl is not installed in this Odoo image. Add it to odoo/requirements.txt and rebuild.")
+            ) from e
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+        try:
+            ws = wb[self.sheet_name] if self.sheet_name else wb.active
+            for row in ws.iter_rows(min_row=row_no, max_row=row_no, values_only=True):
+                return [str(c).strip() if c is not None else "" for c in row]
+            return []
+        finally:
+            wb.close()

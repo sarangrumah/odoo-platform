@@ -35,10 +35,15 @@
 
         <!-- Back up all six nightly reports... -->
         <field name="attachment_glob">*.xlsx</field>
-        <!-- ...but only hand X24 / X70D / X31 to the import feeds. X20 is a one-shot
-             opening-balance loader whose profile expects a different CSV layout, and
-             X32P / X70T are staged-only today. -->
-        <field name="ingest_glob">X24*.xlsx,X70D*.xlsx,X31*.xlsx</field>
+        <!-- ...but only hand X24 / X70D / X31 / X70T to the import feeds. X20 is a
+             one-shot opening-balance loader whose profile expects a different CSV
+             layout, and X32P is staged-only today.
+
+             X70T joined the list on 26-Sep-2026: it is the only nightly file that
+             reports the acquirer-level tenders (BCA_QRIS, BRI_REGULAR_OFF_US, …) the
+             POS has issued since 16-Sep, and X70D drops those rows. Note the glob is
+             matched per file name, so X70D*.xlsx does NOT catch X70T. -->
+        <field name="ingest_glob">X24*.xlsx,X70D*.xlsx,X31*.xlsx,X70T*.xlsx</field>
 
         <field name="drop_dir">/mnt/data_levis/data</field>
         <field name="backup_dir">/mnt/data_levis/mailbox</field>
