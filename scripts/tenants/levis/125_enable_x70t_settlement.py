@@ -19,6 +19,15 @@ dua kali tidak menggandakan apa pun.
 Env:
   CONFIRM=1   -> menulis + commit. Tanpa itu: DRY RUN (rollback di akhir).
   SINCE=YYYYMMDD -> susulkan file X70T dari tanggal itu (default: tidak menyusul).
+                    HANYA jalan bila CONFIRM=1.
+
+PERINGATAN yang mahal kalau tidak tahu: bagian susulan TIDAK BISA di-dry-run.
+``_post_x70t_settlement`` memanggil ``_ri_commit`` setelah tiap file (supaya file
+berikutnya melihat apa yang sudah diselesaikan), jadi ``env.cr.rollback()`` di akhir
+skrip ini tidak bisa menariknya kembali -- jurnalnya sudah ter-commit. Karena itu
+susulan dikunci di belakang CONFIRM. Yang memang ikut rollback saat dry run hanya
+perubahan konfigurasi (feed, mailbox, parameter). Tidak berbahaya kalau terlanjur:
+posting X70T idempoten -- menjalankannya lagi menghasilkan 0 move.
 
 --------------------------------------------------------------------------
 Yang diubah
@@ -86,7 +95,10 @@ Param.set_param("retail_import.x70t_post_enabled", "1")
 print("param    : retail_import.x70t_post_enabled = 1")
 
 # --- catch-up --------------------------------------------------------------
-if SINCE:
+if SINCE and not CONFIRM:
+    print(f"\nsusulan  : DILEWATI -- {SINCE} diminta, tapi posting X70T tidak bisa di-rollback.")
+    print("           Jalankan ulang dengan CONFIRM=1 bila memang mau menyusul.")
+elif SINCE:
     files = sorted(glob.glob(f"{MAILBOX_DIR}/*/*/X70T_*.xlsx"))
     files = [f for f in files if (re.search(r"__(\d{8})T", os.path.basename(f)) or [None, ""])[1] >= SINCE]
     print(f"\nsusulan  : {len(files)} file X70T sejak {SINCE}")
@@ -95,6 +107,15 @@ if SINCE:
             b64 = base64.b64encode(fh.read()).decode()
         log = env["retail.import.log"].create({"profile_id": profile.id, "filename": os.path.basename(path)})
         env["retail.import.executor"]._load_x70t(profile, b64, log)
+        # Calling the loader directly skips ``executor.run``, which is what normally
+        # closes the log; left on ``queued`` the row reads as "never ran" and
+        # ``find_duplicate`` still counts it, so say plainly that it finished.
+        log.write(
+            {
+                "state": "partial" if log.error_count else "imported",
+                "finished_at": log.finished_at or odoo.fields.Datetime.now(),
+            }
+        )
         print(f"  {os.path.basename(path)[:50]:<50} {log.records_created} move | {(log.error_message or '')[:100]}")
 
 env.cr.execute(
