@@ -179,6 +179,27 @@ class TestX70tSettlement(TransactionCase):
         # The untouched day is unaffected: netting is per day and tender, not per file.
         self.assertEqual(qris["2026-09-23"], 1000000)
 
+    def test_08_the_x70d_guard_refuses_a_file_not_a_night(self):
+        """The old guard blocked every night after the first clean import."""
+        Log = self.env["retail.import.log"]
+        x70d = self.env.ref("custom_retail_import.profile_levis_x70d")
+        executor = self.executor
+
+        same = Log.create({"profile_id": x70d.id, "filename": "a.xlsx", "file_hash": "h1", "state": "imported"})
+        with self.assertRaises(Exception):
+            executor._x70d_assert_file_not_reconciled(
+                x70d, Log.create({"profile_id": x70d.id, "filename": "a.xlsx", "file_hash": "h1"})
+            )
+        # A different file is a different night and must go through, no matter what
+        # state the previous night's log ended in.
+        executor._x70d_assert_file_not_reconciled(
+            x70d, Log.create({"profile_id": x70d.id, "filename": "b.xlsx", "file_hash": "h2"})
+        )
+        same.state = "cancelled"
+        executor._x70d_assert_file_not_reconciled(
+            x70d, Log.create({"profile_id": x70d.id, "filename": "a.xlsx", "file_hash": "h1"})
+        )
+
     def test_07_staged_and_silent_while_the_switch_is_off(self):
         self.env["ir.config_parameter"].sudo().set_param("retail_import.x70t_post_enabled", "0")
         log = self._log()

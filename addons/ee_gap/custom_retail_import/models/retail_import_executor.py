@@ -2838,6 +2838,38 @@ class RetailImportExecutor(models.AbstractModel):
                     _logger.warning("tender settlement: group reconcile skipped: %s", re)
         return reconciled_groups
 
+    def _x70d_assert_file_not_reconciled(self, profile, log):
+        """Refuse to settle the SAME FILE twice. Nothing wider than that.
+
+        This used to be the house whole-file guard (mirror ``_post_x24`` / ``_post_x31``):
+        refuse while **any** other log of the profile sat on ``imported``. It could only
+        ever fire on the wrong thing. A nightly X70D normally lands on ``partial``, so the
+        guard is invisible until one file imports with ``error_count == 0`` — after which
+        every later night raises *"X70D already reconciled"*, and catching up four nights
+        in Sep-2026 meant flipping each finished log back to ``partial`` by hand.
+
+        What it was protecting against cannot happen any more: the transfer nets against
+        what the trading day already settled (:meth:`_ri_settled_by_tender`), so a second
+        run over the same day books nothing. What is still worth refusing is the same file
+        arriving under two log rows — a duplicate the feed's SHA256 dedup would normally
+        have caught before a log ever existed.
+        """
+        if not log.file_hash:
+            return
+        prior = self.env["retail.import.log"].search(
+            [
+                ("profile_id", "=", profile.id),
+                ("file_hash", "=", log.file_hash),
+                ("state", "in", ("imported", "partial")),
+                ("id", "!=", log.id),
+            ],
+            limit=1,
+        )
+        if prior:
+            raise UserError(
+                _("X70D file already reconciled (log #%s). Cancel that log first to re-run this file.") % prior.id
+            )
+
     def _ri_suspense_residual(self, company, susp):
         """Net open balance left on the suspense account, post-reconcile."""
         AML = self.env["account.move.line"].sudo()
@@ -2880,19 +2912,7 @@ class RetailImportExecutor(models.AbstractModel):
         ns = profile.namespace
         company = profile.company_id
 
-        # Whole-file idempotency guard (mirror _post_x24 / _post_x31): refuse to re-run a
-        # second X70D transfer over the same suspense balance — archive the prior first.
-        prior = self.env["retail.import.log"].search(
-            [("profile_id", "=", profile.id), ("state", "=", "imported"), ("id", "!=", log.id)], limit=1
-        )
-        if prior:
-            raise UserError(
-                _(
-                    "X70D already reconciled (log #%s). Archive it before re-posting to "
-                    "avoid double-crediting the suspense account."
-                )
-                % prior.id
-            )
+        self._x70d_assert_file_not_reconciled(profile, log)
 
         # Stage the rows (audit trail) exactly like _stage_only, without the early return.
         data = profile.read_records(file_b64)
