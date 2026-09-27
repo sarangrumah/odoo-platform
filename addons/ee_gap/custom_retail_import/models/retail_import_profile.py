@@ -105,6 +105,14 @@ TEXT_FIELDS = frozenset(
         "tender_type",
         "auth",
         "voucher",
+        # store-exported X70D: the acquirer label and the approval code. APPR CODE is
+        # an identifier that merely looks numeric -- the real files carry "007403"
+        # (leading zeros Excel drops) beside "Tgccbw" and "R68223" -- so it has to be
+        # read as text or it stops matching the acquirer's own settlement reference.
+        "payment",
+        "appr_code",
+        "cashier_id",
+        "cashier_name",
         "discount_code",
         # CoA and the company key/value sheet
         "code",
@@ -154,6 +162,7 @@ FILE_TYPES = [
     ("x20", "X20 — Current On-hand Inventory"),
     ("x24", "X24DN — Retail Sales Detail (POS)"),
     ("x70d", "X70D — Tender Detail (payments)"),
+    ("x70d_store", "X70D (store export) — Tender Detail with PAYMENT/APPR CODE"),
     ("x70t", "X70T — Tender Settlement"),
     ("x31", "X31 — Discount Journal (promotions)"),
     ("x32p", "X32P — Stock Movement with Price (reference)"),
@@ -191,6 +200,27 @@ class RetailImportProfile(models.Model):
     # --- source format ---
     file_format = fields.Selection([("xlsx", "Excel (.xlsx)"), ("csv", "CSV")], default="xlsx", required=True)
     sheet_name = fields.Char(help="For xlsx: sheet to read. Empty = active/first sheet.")
+    all_sheets = fields.Boolean(
+        help="For xlsx: read EVERY worksheet, not just one, concatenating their rows. "
+        "``data_start_row`` is applied per sheet, so a workbook that repeats its header "
+        "on each tab parses correctly. Set for sources that split one logical table "
+        "across tabs -- the store-exported X70D puts one trading day per tab. "
+        "Ignored when ``sheet_name`` is set.",
+    )
+    header_signature = fields.Char(
+        help="Comma-separated column captions that must ALL appear in a sheet's header "
+        "row for that sheet to be parsed. Captions are compared trimmed and "
+        "case-insensitively. This is how a workbook is recognised by what it contains "
+        "rather than by what someone named it -- the stores send their X70D export under "
+        "a dozen different filenames, and some workbooks mix X70D tabs with tabs that are "
+        "something else entirely. A sheet that does not match is skipped, not parsed.",
+    )
+    require_fields = fields.Char(
+        help="Comma-separated logical field names that must be non-blank for a row to be "
+        "kept. A row missing any of them is dropped as structural noise rather than "
+        "reaching the executor. This is what removes the per-sheet TOTAL row of the "
+        "store-exported X70D, which carries an amount but no store code.",
+    )
     data_start_row = fields.Integer(
         default=2,
         required=True,
@@ -330,12 +360,47 @@ class RetailImportProfile(models.Model):
             ) from e
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
         try:
-            ws = wb[self.sheet_name] if self.sheet_name else wb.active
+            if self.sheet_name:
+                sheets = [wb[self.sheet_name]]
+            elif self.all_sheets:
+                sheets = list(wb.worksheets)
+            else:
+                sheets = [wb.active]
             start = max(self.data_start_row, 1)
-            for row in ws.iter_rows(min_row=start, values_only=True):
-                yield row
+            wanted = self._signature_captions()
+            for ws in sheets:
+                # With a signature the header row is read first and the sheet is
+                # skipped unless it matches. Read from one row earlier so the
+                # header is the first row yielded by the iterator -- reopening a
+                # read-only sheet to peek at row 1 would read the file twice.
+                first = max(start - 1, 1) if wanted else start
+                rows = ws.iter_rows(min_row=first, values_only=True)
+                if wanted:
+                    try:
+                        header = next(rows)
+                    except StopIteration:
+                        continue
+                    if not self._header_matches(header, wanted):
+                        continue
+                for row in rows:
+                    yield ws.title, row
         finally:
             wb.close()
+
+    def _signature_captions(self) -> list[str]:
+        self.ensure_one()
+        return [c.strip().upper() for c in (self.header_signature or "").split(",") if c.strip()]
+
+    @staticmethod
+    def _header_matches(header, wanted: list[str]) -> bool:
+        """True when every wanted caption appears in this header row.
+
+        Compared on the caption text alone, never on position: the very same
+        workbook heads column 11 ``Payment Method`` on one tab and ``PAYMENT`` on
+        another, so only the presence of the anchor columns is reliable.
+        """
+        present = {str(c).strip().upper() for c in (header or ()) if c is not None}
+        return all(w in present for w in wanted)
 
     def _read_rows_csv(self, file_bytes: bytes):
         text = file_bytes.decode(self.encoding or "utf-8", errors="replace")
@@ -344,7 +409,7 @@ class RetailImportProfile(models.Model):
         for n, row in enumerate(reader, start=1):
             if n < start:
                 continue
-            yield row
+            yield "", row
 
     def _iter_raw_rows(self, file_bytes: bytes):
         if self.file_format == "csv":
@@ -364,11 +429,12 @@ class RetailImportProfile(models.Model):
         """
         self.ensure_one()
         col_map = self._column_map()
+        required = [f.strip() for f in (self.require_fields or "").split(",") if f.strip()]
         file_bytes = base64.b64decode(file_b64)
         records: list[dict] = []
         total = 0
         blank = 0
-        for raw in self._iter_raw_rows(file_bytes):
+        for sheet, raw in self._iter_raw_rows(file_bytes):
             total += 1
             row = list(raw)
             if not row or all((c is None or str(c).strip() == "") for c in row):
@@ -384,8 +450,115 @@ class RetailImportProfile(models.Model):
                     rec[field_name] = self._clean_cell(cell)
                 else:
                     rec[field_name] = self._clean_str(cell) if isinstance(cell, str) else cell
+            # A row that cannot identify itself is structure, not data -- a TOTAL
+            # line, a spacer, a stray note. Counted as blank so the log's arithmetic
+            # (total = kept + blank) still holds and nothing looks silently lost.
+            if required and any(str(rec.get(f) or "").strip() == "" for f in required):
+                blank += 1
+                continue
             rec["_row"] = total + self.data_start_row - 1
+            if sheet:
+                rec["_sheet"] = sheet
             records.append(rec)
             if limit and len(records) >= limit:
                 break
         return {"records": records, "total_rows": total, "blank_rows": blank}
+
+    def read_wide_records(self, file_b64: str, label_field: str, value_field: str, ignore_captions=()):
+        """Parse a cross-tab sheet — one column per label — into one record per cell.
+
+        X70T heads one column per tender (``CASH``, ``BCA_QRIS``, ``OFFLINE_VISA``, …)
+        and the set changes from night to night: only the tenders a store actually took
+        that day get a column, so 24-Sep-2026 ships 20 of them and 21-Sep ships 13. An
+        index-based ``column_map`` cannot follow that. The fixed left-hand block (store,
+        date, terminal) is still read from the map; every other captioned column is
+        unpivoted into its own record carrying ``label_field`` (the caption) and
+        ``value_field`` (the cell).
+
+        Captions listed in ``ignore_captions`` are dropped — the report's own
+        ``NON CASH(Total)`` column is a subtotal, and staging it would double the day.
+        So are empty and zero cells: in a cross-tab an empty cell means "no such tender
+        that day", and counting it as a zero tender would invent settlement rows for
+        every store × every tender.
+
+        Returns the same shape as :meth:`read_records`, where ``total_rows`` counts
+        source rows (not the records they expanded into).
+        """
+        self.ensure_one()
+        col_map = self._column_map()
+        required = [f.strip() for f in (self.require_fields or "").split(",") if f.strip()]
+        skip = {c.strip().upper() for c in ignore_captions}
+        file_bytes = base64.b64decode(file_b64)
+
+        header = self._read_header_row(file_bytes)
+        # 1-based column index -> caption, for every column the map does not claim.
+        value_cols = {
+            idx: caption
+            for idx, caption in enumerate(header, start=1)
+            if caption and idx not in set(col_map.values()) and caption.upper() not in skip
+        }
+
+        records: list[dict] = []
+        total = 0
+        blank = 0
+        for sheet, raw in self._iter_raw_rows(file_bytes):
+            total += 1
+            row = list(raw)
+            if not row or all((c is None or str(c).strip() == "") for c in row):
+                blank += 1
+                continue
+            base = {}
+            for field_name, idx in col_map.items():
+                cell = self._safe_cell(row, idx)
+                if _is_text_field(field_name):
+                    base[field_name] = self._clean_cell(cell)
+                else:
+                    base[field_name] = self._clean_str(cell) if isinstance(cell, str) else cell
+            if required and any(str(base.get(f) or "").strip() == "" for f in required):
+                blank += 1
+                continue
+            base["_row"] = total + self.data_start_row - 1
+            if sheet:
+                base["_sheet"] = sheet
+            kept = 0
+            for idx, caption in value_cols.items():
+                cell = self._safe_cell(row, idx)
+                if cell is None or str(cell).strip() == "":
+                    continue
+                amount = self._parse_amount(cell)
+                if not amount:
+                    continue
+                records.append(dict(base, **{label_field: caption, value_field: str(amount)}))
+                kept += 1
+            if not kept:
+                # A store that took nothing that day still ships a row. It is not an
+                # error and not data either; counted as blank keeps the log arithmetic
+                # (total = kept + blank) honest.
+                blank += 1
+        return {"records": records, "total_rows": total, "blank_rows": blank}
+
+    def _read_header_row(self, file_bytes: bytes) -> list[str]:
+        """The caption row immediately above ``data_start_row``, as clean strings."""
+        self.ensure_one()
+        row_no = max(self.data_start_row - 1, 1)
+        if self.file_format == "csv":
+            text = file_bytes.decode(self.encoding or "utf-8", errors="replace")
+            reader = csv.reader(io.StringIO(text), delimiter=self.delimiter or ",")
+            for n, row in enumerate(reader, start=1):
+                if n == row_no:
+                    return [str(c or "").strip() for c in row]
+            return []
+        try:
+            import openpyxl  # noqa: PLC0415 - optional, image-provided
+        except ImportError as e:  # pragma: no cover - depends on image
+            raise UserError(
+                _("openpyxl is not installed in this Odoo image. Add it to odoo/requirements.txt and rebuild.")
+            ) from e
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+        try:
+            ws = wb[self.sheet_name] if self.sheet_name else wb.active
+            for row in ws.iter_rows(min_row=row_no, max_row=row_no, values_only=True):
+                return [str(c).strip() if c is not None else "" for c in row]
+            return []
+        finally:
+            wb.close()

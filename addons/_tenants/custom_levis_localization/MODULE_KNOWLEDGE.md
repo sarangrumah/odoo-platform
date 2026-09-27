@@ -228,6 +228,58 @@ that it resolves to a *card* channel at all, since an unrecognised one keeps the
 unrestricted pool and may settle the CASH receivable. Both observed rows carry
 `DDR: 0.00`, so contactless is fee-free here or billed elsewhere.
 
+### Naming the store behind a cash deposit (19.0.1.57.0)
+
+A card settlement carries a MID, so its store is a lookup. A cash deposit carries
+only free text a cashier typed, and two signals in it were measured against the
+785 deposits Finance had already mapped by hand (holdout 70/30 x5: 88% resolved,
+0.8% wrong — **99.0% accurate whenever it answers**):
+
+| Signal | right | wrong | note |
+|---|---|---|---|
+| store shorthand in the text | 568 | 6 | |
+| sender name (existing `keyword` rules) | 319 | 0 | already in use: 59 rules |
+| terminal code `Z####` / `WSID:` | 150 | 4 | **new `terminal` match type** |
+| `WS#####` | — | — | **useless**: 4 values in the whole feed, none pure. It is a BCA *branch* code, not a store. Do not map it. |
+
+Two things this changed, and why:
+
+* **`terminal` is its own match type, never `tid`.** `_normalise_key` keeps digits
+  only, so routing `Z6FK1` through `tid` reduces it to `61` and suffix-matches it
+  against merchant ids across the table. `_normalise_terminal` compares the whole
+  alphanumeric code instead. A store may own several terminals (Grand Indonesia
+  has ZL6F1/ZL6D1/ZL6C1) — staff use the machines nearest the shop, which is also
+  why 31 of the 33 observed codes resolve to exactly one store.
+* **An unmapped terminal falls through to the keyword rules**, unlike an unmapped
+  MID which deliberately blocks them. A MID *is* the merchant; a cash machine is
+  just whoever walked up to it, so it is a hint and must not veto better evidence.
+
+**Keyword rules are now matched twice: as written, and with every separator
+removed.** Cashiers break the shorthand up with spaces at random — `k gm`,
+`bi p`, `T smc`, `TH E PARK` — and before this, each spelling needed its own rule:
+Central Park really did have three (`ols cp`, `levis c p`, `setor cp`). Keys
+shorter than three characters are matched only as written, because compacted a
+two-letter key lands inside people's names. The longest match still wins, and the
+collision guard now compares keyword rules compacted, so one shorthand spelled two
+ways is caught as one rule twice.
+
+GOTCHA: `_strip_noise` deletes the terminal code on purpose (left in the keyword,
+every deposit becomes its own group), so the parser reads it **before** stripping.
+It also already deletes `FTSCY` — which matters more than it looks, because that
+token contains `TSC`, the initials of Trans Studio Cibubur. Match against the raw
+narrative instead of the stripped keyword and every deposit in the feed resolves
+to that one store.
+
+Seed rules derived from the mapped history live in
+`scripts/tenants/levis/cash_deposit_ou_rules.csv` (31 terminals + 12 shorthands),
+loaded by `80_load_cash_deposit_rules.py` (dry-run unless `CASH_RULES_APPLY=1`; it
+skips any key Finance has already mapped elsewhere rather than rewriting it).
+
+**Scope, honestly:** these rules reproduce Finance's own past decisions at 99%
+accuracy, but they only answer 50 of the 193 still-unmapped deposits (26%) — the
+easy ones were mapped long ago and the residue is genuinely unidentifiable text.
+The value is in the daily inflow, not the backlog.
+
 **Why the tender split is discovered, not read.** One card MID covers Visa,
 Mastercard, JCB and Amex alike, and `levis.mdr.bin` is empty, so nothing states
 which of the ten receivable accounts a settlement pays. `_allocate` consumes that

@@ -46,6 +46,7 @@ import fnmatch
 import hashlib
 import imaplib
 import logging
+import io
 import os
 import re
 from datetime import timedelta, timezone
@@ -112,6 +113,20 @@ class RetailImportMailbox(models.Model):
         "copied into the drop directory for retail.import.feed. Empty = back up only.",
     )
 
+    ingest_signature = fields.Char(
+        help="Comma-separated column captions. When set, an .xlsx is staged only if one "
+        "of its sheets carries all of them -- the decision is made on what the workbook "
+        "contains, not on what it was named. The stores send the same export as "
+        "'X70D_Tender_Detail_Report', 'Report Sales OLS SES ...', 'LAPORAN X70D ...' and "
+        "'3. X70D_...'; a filename glob silently dropped half of them.",
+    )
+    ingest_store_check = fields.Boolean(
+        help="Compare the store code in the subject line against the STORE CODE column "
+        "inside the workbook, and refuse to stage a file where they disagree. The store "
+        "mails announce themselves ('LAPORAN SALES 80432 18092026'), so the two are "
+        "independent statements of the same fact -- a mismatch means a store attached "
+        "another outlet's export, which would otherwise be imported in silence.",
+    )
     drop_dir = fields.Char(
         default="/mnt/data_levis/data",
         help="Directory polled by the matching retail.import.feed records.",
@@ -440,13 +455,17 @@ class RetailImportMailbox(models.Model):
                 sent = sent.astimezone(timezone.utc).replace(tzinfo=None)
         except (TypeError, ValueError):
             sent = None
+        subject = self._decode_header(msg.get("Subject"))[:255]
+        from_addr = self._decode_header(msg.get("From"))[:255]
         base = {
             "mailbox_id": self.id,
             "uid": uid,
             "uidvalidity": uidvalidity,
             "message_id": self._decode_header(msg.get("Message-ID"))[:255],
-            "subject": self._decode_header(msg.get("Subject"))[:255],
-            "from_addr": self._decode_header(msg.get("From"))[:255],
+            "subject": subject,
+            "from_addr": from_addr,
+            "sender_kind": self._sender_kind(from_addr),
+            "store_code": self._subject_store_code(subject) or False,
             "email_date": sent or fields.Datetime.now(),
         }
         stored = 0
@@ -464,13 +483,21 @@ class RetailImportMailbox(models.Model):
                     raise UserError(_("Backup of %(f)s did not verify against its SHA256.") % {"f": filename})
                 vals.update(backup_path=backup_path, state="backed_up")
 
-                if self.drop_dir and self._matches_ingest(filename):
+                ingest, reason, file_codes = self._should_ingest(filename, raw, base.get("store_code"))
+                if file_codes:
+                    vals["store_code_file"] = ",".join(sorted(file_codes))[:255]
+                if self.drop_dir and ingest:
                     if Log.find_duplicate(sha256):
                         vals["state"] = "skipped"
                     else:
                         staged = os.path.join(self.drop_dir, self._suffixed_name(filename, sent))
                         self._atomic_write(staged, raw)
                         vals.update(staged_path=staged, state="staged")
+                elif reason:
+                    # Backed up but deliberately not staged. The reason is written
+                    # down because "it just never arrived" is the failure mode this
+                    # whole mailbox exists to prevent.
+                    vals["error"] = reason
                 stored += 1
             except Exception as e:  # noqa: BLE001 - one bad attachment must not stop the rest
                 _logger.exception("Mailbox %s: UID %s attachment %s failed", self.name, uid, filename)
@@ -481,6 +508,152 @@ class RetailImportMailbox(models.Model):
             # and so retention can eventually clear it.
             self._upsert_row(Message, dict(base, filename="", sha256="", size=0, state="skipped"))
         return stored
+
+    # ------------------------------------------------------------------
+    # Telling the senders apart
+    # ------------------------------------------------------------------
+    #: The X-Store application mails from its own domain; people and shops mail
+    #: from the company's. The two are never the same address, so the domain is
+    #: the whole test -- no keyword guessing.
+    _AUTO_DOMAINS = ("@levi.com",)
+    #: Every shop's mailbox is levis.<shop>@erajaya.com. A person's is not.
+    _STORE_LOCAL_PREFIX = "levis."
+
+    @api.model
+    def _sender_kind(self, from_addr):
+        """``auto`` (the X-Store app), ``store`` (a shop), or ``person``.
+
+        They carry different things and deserve different trust: ``auto`` is raw
+        machine output, ``store`` is a shop's own recap with columns the raw feed
+        does not have, and ``person`` is usually Finance forwarding one of the
+        other two.
+        """
+        addr = (from_addr or "").lower()
+        if any(d in addr for d in self._AUTO_DOMAINS):
+            return "auto"
+        local = addr.split("<")[-1].split("@")[0].strip()
+        return "store" if local.startswith(self._STORE_LOCAL_PREFIX) else "person"
+
+    #: Five-digit store code, not flanked by a digit or a slash. The shops write
+    #: it in every shape they fancy -- "LAPORAN SALES 80432 18092026",
+    #: "(0020080747)", "20080741" -- beside dates that look just like it.
+    _SUBJECT_NUM_RE = re.compile(r"(?<![\d/])(\d{5,10})(?![\d/])")
+
+    @api.model
+    def _subject_store_code(self, subject):
+        """The store code a shop announced in its subject line, or ``False``.
+
+        Only a date-free five-digit run counts: "18092026" is a date and must not
+        be read as a store. Ambiguity returns nothing rather than a guess.
+        """
+        text = subject or ""
+        found = set()
+        for m in self._SUBJECT_NUM_RE.finditer(text):
+            raw = m.group(1)
+            if len(raw) > 6 and not raw.startswith("00") and not raw.startswith("2008"):
+                continue  # 18092026 and friends: a date, not a store
+            code = raw.lstrip("0")[-5:]
+            if len(code) == 5:
+                found.add(code)
+        return found.pop() if len(found) == 1 else False
+
+    # ------------------------------------------------------------------
+    # Deciding by content
+    # ------------------------------------------------------------------
+    def _should_ingest(self, filename, raw, subject_code):
+        """``(stage_it, why_not, store_codes_in_file)``.
+
+        Filename first, because it costs nothing and the nightly feed is named by
+        a machine. Content second, and only where the mailbox asks for it: the
+        shops name the same export a dozen ways, so what the workbook *contains*
+        is the only stable test. Where the subject also names a store, the two are
+        checked against each other -- they are independent statements of the same
+        fact, and a disagreement means the shop attached somebody else's file.
+        """
+        self.ensure_one()
+        if not self.ingest_signature:
+            return bool(self._matches_ingest(filename)), "", set()
+        if not filename.lower().endswith((".xlsx", ".xlsm")):
+            return False, "", set()
+        sheets, codes = self._probe_xlsx(raw)
+        if not sheets:
+            return False, _("No sheet carries %s; not this report.") % self.ingest_signature, codes
+        if self.ingest_store_check and subject_code and codes and subject_code not in codes:
+            return (
+                False,
+                _(
+                    "Store %(subject)s in the subject, %(file)s inside the file. Not staged: "
+                    "one of them is another outlet's data.",
+                    subject=subject_code,
+                    file=", ".join(sorted(codes)),
+                ),
+                codes,
+            )
+        return True, "", codes
+
+    @staticmethod
+    def _store_code_text(cell):
+        """The five-digit store code of a STORE CODE cell, or ``""``.
+
+        Excel types the column numerically, so openpyxl hands back ``80744.0``;
+        taking the last five characters of that gives ``744.0`` and the code then
+        matches nothing. The fraction is dropped before the digits are read.
+        """
+        if cell in (None, ""):
+            return ""
+        if isinstance(cell, float) and cell.is_integer():
+            cell = int(cell)
+        digits = "".join(ch for ch in str(cell).strip() if ch.isdigit())
+        return digits.lstrip("0")[-5:] if len(digits.lstrip("0")) >= 5 else digits.lstrip("0")
+
+    def _probe_xlsx(self, raw: bytes):
+        """``(matching_sheets, store_codes)`` for a workbook, or ``(0, set())``.
+
+        Opens the file only when the mailbox asks for a content decision, and
+        reads one header row plus a handful of data rows per sheet -- enough to
+        recognise the shape and to learn which shop the rows belong to, without
+        loading a 7 MB workbook into memory.
+        """
+        self.ensure_one()
+        wanted = [c.strip().upper() for c in (self.ingest_signature or "").split(",") if c.strip()]
+        if not wanted:
+            return 0, set()
+        try:
+            import openpyxl  # noqa: PLC0415 - optional, image-provided
+        except ImportError:  # pragma: no cover - depends on image
+            _logger.warning("Mailbox %s: openpyxl missing; cannot probe by content.", self.name)
+            return 0, set()
+        sheets = 0
+        codes = set()
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        except Exception as e:  # noqa: BLE001 - a non-workbook attachment is not an error
+            _logger.info("Mailbox %s: attachment is not a readable workbook (%s).", self.name, e)
+            return 0, set()
+        try:
+            for ws in wb.worksheets:
+                rows = ws.iter_rows(values_only=True)
+                try:
+                    header = next(rows)
+                except StopIteration:
+                    continue
+                present = {str(c).strip().upper(): i for i, c in enumerate(header or ()) if c is not None}
+                if not all(w in present for w in wanted):
+                    continue
+                sheets += 1
+                idx = present.get("STORE CODE")
+                if idx is None:
+                    continue
+                for n, row in enumerate(rows):
+                    if n >= 20:
+                        break
+                    cell = row[idx] if len(row) > idx else None
+                    code = self._store_code_text(cell)
+                    if code:
+                        codes.add(code)
+        finally:
+            wb.close()
+        return sheets, codes
 
     def _upsert_row(self, Message, vals):
         """Write-or-create on the ledger's unique key.
@@ -684,6 +857,26 @@ class RetailImportMailMessage(models.Model):
     message_id = fields.Char(index=True)
     subject = fields.Char()
     from_addr = fields.Char(string="From")
+    sender_kind = fields.Selection(
+        [
+            ("auto", "X-Store (automated)"),
+            ("store", "Store (manual recap)"),
+            ("person", "Person"),
+        ],
+        index=True,
+        help="Who sent it, and therefore what it is. X-Store mails raw machine output from "
+        "the till system. A store mails its own recap, which carries columns the raw feed "
+        "does not have and is the supporting document for the X70D tender. A person is "
+        "usually Finance forwarding one of the other two.",
+    )
+    store_code = fields.Char(
+        index=True,
+        help="Store code the sender put in the subject line, where there was exactly one.",
+    )
+    store_code_file = fields.Char(
+        help="Store codes actually found inside the workbook. Compared against the subject "
+        "when the mailbox asks for it.",
+    )
     email_date = fields.Datetime(index=True)
 
     filename = fields.Char()
