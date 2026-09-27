@@ -66,6 +66,10 @@ class CustomReportSalesDetail(models.AbstractModel):
             {"header": "Register", "field": "register", "kind": "text", "width": 10},
             {"header": "Transaction No", "field": "txn_no", "kind": "text", "width": 15},
             {"header": "Transaction Date", "field": "txn_date", "kind": "date", "width": 14},
+            # Sheet #49: Finance AR reconciles a sales line back to the journal
+            # it landed in. 1,783 of 1,784 sessions on prd_levis_begbal carry a
+            # move_id, so this is filled ~100% of the time.
+            {"header": "Nomor Jurnal", "field": "journal_no", "kind": "text", "width": 20},
             {"header": "Item Code", "field": "item_code", "kind": "text", "width": 18},
             {"header": "Item Name", "field": "item_name", "kind": "text", "width": 34},
             {"header": "Product Category", "field": "categ", "kind": "text", "width": 26},
@@ -79,6 +83,20 @@ class CustomReportSalesDetail(models.AbstractModel):
             {"header": "Margin", "field": "margin", "kind": "number", "width": 16},
             {"header": "Catatan", "field": "note", "kind": "text", "width": 22},
         ]
+
+    def _sales_detail_journal_no(self, order):
+        """The journal entry this POS line's revenue reached the GL through.
+
+        1,783 of 1,784 sessions on prd_levis_begbal carry a ``move_id``, so the
+        session entry answers ~100% of the time; an invoiced order falls back to
+        its own invoice.
+        """
+        session_move = order.session_id.move_id
+        if session_move:
+            return session_move.name or ""
+        if "account_move" in order._fields and order.account_move:
+            return order.account_move.name or ""
+        return ""
 
     @staticmethod
     def _split_reference(reference):
@@ -167,6 +185,12 @@ class CustomReportSalesDetail(models.AbstractModel):
                     "register": register,
                     "txn_no": txn_no,
                     "txn_date": order.date_order.date() if order.date_order else None,
+                    # The session's own closing entry is where this line's
+                    # revenue reached the GL; an invoiced POS order carries its
+                    # invoice instead. ``account_move`` is checked through
+                    # ``_fields`` rather than attribute access, which would
+                    # raise before any guard could see it.
+                    "journal_no": self._sales_detail_journal_no(order),
                     "item_code": product.default_code or "",
                     "item_name": pl.full_product_name or product.display_name or "",
                     "categ": product.categ_id.display_name or "",

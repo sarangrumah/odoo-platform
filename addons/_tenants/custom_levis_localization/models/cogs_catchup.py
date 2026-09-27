@@ -86,7 +86,17 @@ class LevisCogsCharge(models.Model):
     quantity = fields.Float(digits="Product Unit of Measure")
     amount = fields.Monetary(currency_field="currency_id")
     currency_id = fields.Many2one(related="company_id.currency_id")
-    source = fields.Selection([("catchup", "Receipt Catch-up"), ("run", "Periodic Run")], required=True)
+    source = fields.Selection(
+        [
+            ("catchup", "Receipt Catch-up"),
+            ("run", "Periodic Run"),
+            # Sheet #16: the session's own closing entry charges it, so the
+            # ledger has to be able to say so — otherwise the monthly run would
+            # charge the same units again. A new Selection value needs no -u.
+            ("session", "POS Session"),
+        ],
+        required=True,
+    )
     catchup_id = fields.Many2one("levis.cogs.catchup", ondelete="set null", index=True)
     run_id = fields.Many2one("levis.cogs.run", ondelete="set null", index=True)
     move_id = fields.Many2one("account.move", ondelete="set null")

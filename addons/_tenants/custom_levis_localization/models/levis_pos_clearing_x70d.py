@@ -39,8 +39,12 @@ _SELECT = """
            s.trans_date,
            s.tender,
            s.store_code,
+           s.sap_store_code,
+           s.store_name,
            s.register,
            s.transnum,
+           s.auth,
+           s.voucher,
            concat_ws('-', s.store_code, s.register, s.transnum) AS ref,
            s.amount
       FROM (
@@ -56,8 +60,14 @@ _SELECT = """
                         THEN (r.j ->> 'trans_date')::date END AS trans_date,
                    %(fold)s                   AS tender,
                    r.j ->> 'store_code'       AS store_code,
+                   -- Carried for the reconciliation workbook, which is keyed on
+                   -- the client's own codes rather than on Odoo's records.
+                   r.j ->> 'sap_store_code'   AS sap_store_code,
+                   r.j ->> 'store_name'       AS store_name,
                    r.j ->> 'register'         AS register,
                    r.j ->> 'transnum'         AS transnum,
+                   r.j ->> 'auth'             AS auth,
+                   r.j ->> 'voucher'          AS voucher,
                    CASE WHEN r.j ->> 'tender_amount' ~ '^-?[0-9]+([.][0-9]+)?$'
                         THEN (r.j ->> 'tender_amount')::numeric END AS amount
               FROM (SELECT l.id, l.log_id, p.company_id, l.raw_data_json::json AS j
@@ -87,8 +97,12 @@ _SELECT_EMPTY = """
            NULL::date      AS trans_date,
            NULL::varchar   AS tender,
            NULL::varchar   AS store_code,
+           NULL::varchar   AS sap_store_code,
+           NULL::varchar   AS store_name,
            NULL::varchar   AS register,
            NULL::varchar   AS transnum,
+           NULL::varchar   AS auth,
+           NULL::varchar   AS voucher,
            NULL::varchar   AS ref,
            NULL::numeric   AS amount
      WHERE FALSE
@@ -115,8 +129,12 @@ class LevisPosX70dTxn(models.Model):
     trans_date = fields.Date(string="Trading Day", readonly=True)
     tender = fields.Char(readonly=True)
     store_code = fields.Char(readonly=True)
+    sap_store_code = fields.Char(string="SAP Store Code", readonly=True)
+    store_name = fields.Char(string="Store Name (feed)", readonly=True)
     register = fields.Char(readonly=True)
     transnum = fields.Char(string="Trans. No.", readonly=True)
+    auth = fields.Char(string="Approval Code", readonly=True)
+    voucher = fields.Char(string="Voucher No.", readonly=True)
     amount = fields.Monetary(currency_field="currency_id", readonly=True)
     currency_id = fields.Many2one(
         "res.currency",

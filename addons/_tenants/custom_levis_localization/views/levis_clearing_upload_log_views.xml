@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_levis_clearing_upload_log_list" model="ir.ui.view">
+        <field name="name">levis.clearing.upload.log.list</field>
+        <field name="model">levis.clearing.upload.log</field>
+        <field name="arch" type="xml">
+            <list string="Recon Uploads">
+                <field name="create_date" string="Uploaded"/>
+                <field name="file_name"/>
+                <field name="run_id"/>
+                <field name="row_count"/>
+                <field name="applied_count"/>
+                <field name="unchanged_count"/>
+                <field name="rejected_count"/>
+                <field name="rule_count" optional="show"/>
+                <field name="recomputed" optional="hide"/>
+                <field name="user_id"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'applied'"
+                       decoration-warning="state == 'partial'"
+                       decoration-danger="state == 'failed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_clearing_upload_log_form" model="ir.ui.view">
+        <field name="name">levis.clearing.upload.log.form</field>
+        <field name="model">levis.clearing.upload.log</field>
+        <field name="arch" type="xml">
+            <form string="Recon Upload">
+                <header>
+                    <button name="action_open_mappings" type="object" string="Mappings"/>
+                    <button name="action_open_attachments" type="object" string="Files"/>
+                    <field name="state" widget="statusbar" statusbar_visible="failed,partial,applied"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="file_name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="run_id" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                            <field name="file_hash" readonly="1"/>
+                            <field name="recomputed" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="row_count" readonly="1"/>
+                            <field name="applied_count" readonly="1"/>
+                            <field name="unchanged_count" readonly="1"/>
+                            <field name="rejected_count" readonly="1"/>
+                            <field name="rule_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Rejections" name="rejections">
+                            <field name="error_message" readonly="1" widget="text"/>
+                        </page>
+                        <page string="Mappings" name="mappings">
+                            <field name="manual_map_ids" readonly="1">
+                                <list>
+                                    <field name="move_name"/>
+                                    <field name="statement_date"/>
+                                    <field name="statement_amount"/>
+                                    <field name="analytic_account_id"/>
+                                    <field name="tender_account_id"/>
+                                    <field name="receipt_refs"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_levis_clearing_upload_log" model="ir.actions.act_window">
+        <field name="name">Recon Uploads</field>
+        <field name="res_model">levis.clearing.upload.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_levis_clearing_upload_log"
+              name="Recon Uploads"
+              parent="account.menu_finance_entries"
+              action="action_levis_clearing_upload_log"
+              sequence="95"/>
+
+</odoo>

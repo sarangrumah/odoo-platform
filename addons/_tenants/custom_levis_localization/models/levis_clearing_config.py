@@ -263,3 +263,25 @@ class LevisClearingConfig(models.Model):
     def _pos_accounts_sorted(self):
         self.ensure_one()
         return self.pos_receivable_account_ids.sorted(lambda a: a.code or "")
+
+    def _cash_receivable_account(self):
+        """The per-tender receivable a cash deposit settles, or empty.
+
+        Resolved by code from ``ir.config_parameter`` (default ``1106000101``) and
+        required to be one of the configured tender accounts, so a typo cannot
+        point the restriction at some unrelated account. Deliberately not a field
+        here: that would be a column, and a column means upgrading every database
+        that shares this addon.
+
+        Lives on the config rather than on the run because the question is about
+        a company, not about a run — a manual mapping has to be able to ask it
+        before any run exists.
+        """
+        self.ensure_one()
+        code = (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param("custom_levis_localization.pos_cash_receivable_code", "1106000101")
+        )
+        company = self.company_id
+        return self.pos_receivable_account_ids.filtered(lambda a: (a.with_company(company).code or "") == code)[:1]

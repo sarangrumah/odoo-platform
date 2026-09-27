@@ -74,6 +74,18 @@
           into those months would charge their cost a second time. Set a date
           only after checking that the months it opens up carry no COGS yet.
         -->
+        <!--
+          Sheet #16: COGS booked inside the POS session's own closing entry.
+          EMPTY = OFF, deliberately. This touches the journal the retail import
+          posts every day, and June-August 2026 are already charged by
+          COGS/2026/0001..0003 — naming a date earlier than the cutover would
+          charge them twice. Set it to the first day the new mechanism owns.
+        -->
+        <record id="param_cogs_session_start" model="ir.config_parameter">
+            <field name="key">custom_levis_localization.cogs_session_start</field>
+            <field name="value"></field>
+        </record>
+
         <record id="param_cogs_catchup_start" model="ir.config_parameter">
             <field name="key">custom_levis_localization.cogs_catchup_start</field>
             <field name="value"></field>

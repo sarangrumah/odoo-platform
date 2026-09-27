@@ -44,3 +44,4 @@ from . import custom_report_books
 from . import custom_report_analysis
 from . import custom_report_vat
 from . import custom_report_dispatch
+from . import custom_report_stock

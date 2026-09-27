@@ -12,6 +12,7 @@ from . import test_journal_billing_tax_number
 from . import test_clearing_matcher
 from . import test_store_code
 from . import test_store_cash_deposit
+from . import test_cash_deposit_matching
 from . import test_clearing_writeoff
 from . import test_clearing_day
 from . import test_clearing_store_day
@@ -19,3 +20,6 @@ from . import test_auto_clearing
 from . import test_po_dup_sku_guard
 from . import test_journal_code_allocation
 from . import test_ou_required
+from . import test_session_cogs
+from . import test_clearing_recon_roundtrip
+from . import test_clearing_store_day_match

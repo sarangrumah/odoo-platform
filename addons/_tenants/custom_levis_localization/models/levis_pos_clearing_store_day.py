@@ -48,7 +48,8 @@ posting.
 
 from datetime import timedelta
 
-from odoo import _, api, fields, models
+from odoo import Command, _, api, fields, models
+from odoo.exceptions import UserError
 
 from .levis_pos_clearing import _SETTLING_KINDS
 
@@ -387,6 +388,63 @@ class LevisPosClearingStoreDay(models.Model):
                 ("trans_date", "=", self.trading_date),
             ],
             "context": {"create": False, "search_default_group_tender": 1},
+        }
+
+    def action_open_matcher(self):
+        """Both lists on one screen: the bank's credits and the till's receipts."""
+        self.ensure_one()
+        wizard = self.env["levis.clearing.match"]._build_for(self)
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Match — %s", self.display_name),
+            "res_model": "levis.clearing.match",
+            "res_id": wizard.id,
+            "view_mode": "form",
+            # A full page, not a dialog: two lists of a day's transactions do not
+            # fit in a modal, and this is read as much as it is clicked.
+            "target": "current",
+        }
+
+    def action_clear(self):
+        """Prepare a clearing for these store-days, and stop at the summary.
+
+        A narrowed run rather than anything new: ``scope_analytic_ids`` keeps it
+        to these stores and the dates keep it to these days, so every line
+        outside is listed with its reason and left exactly as it was found. What
+        the allocation can explain is booked; a store-day that does not tie
+        settles what it can and leaves the remainder on suspense, which is what
+        the wide run has always done with a short line.
+
+        It computes and stops. Prepare Entries and Post & Reconcile stay where
+        they are — a person who has read the summary.
+        """
+        if not self:
+            raise UserError(_("Pick at least one store settlement day."))
+        companies = self.mapped("company_id")
+        if len(companies) > 1:
+            raise UserError(_("Those store days belong to different companies."))
+        dates = [row.settlement_date for row in self if row.settlement_date]
+        if not dates:
+            raise UserError(_("Those store days carry no settlement date."))
+        config = self.env["levis.clearing.config"]._get(companies)
+        run = self.env["levis.pos.clearing"].create(
+            {
+                "company_id": companies.id,
+                "date_from": min(dates),
+                "date_to": max(dates),
+                "journal_id": config.journal_id.id,
+                "bank_journal_ids": [Command.set(config.bank_journal_ids.ids)],
+                "scope_analytic_ids": [Command.set(self.mapped("analytic_account_id").ids)],
+            }
+        )
+        run.action_compute()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Clearing for %s store(s)", len(self.mapped("analytic_account_id"))),
+            "res_model": "levis.pos.clearing",
+            "res_id": run.id,
+            "view_mode": "form",
+            "target": "current",
         }
 
     def action_open_run(self):

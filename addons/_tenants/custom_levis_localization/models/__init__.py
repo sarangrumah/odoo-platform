@@ -29,9 +29,12 @@ from . import levis_clearing_matcher
 from . import levis_store_cash_deposit
 from . import levis_store_daily_closing
 from . import levis_bank_mid_map
+from . import levis_clearing_upload_log
+from . import levis_clearing_manual_map
 from . import levis_bank_narrative
 from . import levis_pos_clearing
 from . import levis_pos_clearing_day
 from . import levis_pos_clearing_x70d
 from . import levis_pos_clearing_store_day
+from . import levis_clearing_ebr
 from . import stock_quant

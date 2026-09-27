@@ -28,3 +28,4 @@ from . import gl_open_items_wizard
 from . import bill_payment_wizard
 from . import sales_detail_wizard
 from . import vat_wizard
+from . import stock_wizards

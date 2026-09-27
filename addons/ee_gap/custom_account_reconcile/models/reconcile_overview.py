@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models, tools
+from odoo import _, api, fields, models, tools
 
 
 class CustomReconcileAccount(models.Model):
@@ -66,13 +66,20 @@ class CustomReconcileAccount(models.Model):
         )
 
     def action_open_lines(self):
-        """Drill down to this account's open items, ready to reconcile."""
+        """Drill down to this account's open items, ready to reconcile.
+
+        ``limit`` is not decoration. Without it this action opened 63,240 lines
+        for a single GR/IR account on prd_levis_begbal, which is sheet #61's
+        "odoo stuck saat akan di proses". Thousands of lines are not reconciled
+        by hand anyway — that is what ``action_open_batch_wizard`` is for.
+        """
         self.ensure_one()
         return {
             "type": "ir.actions.act_window",
             "name": self.account_id.display_name,
             "res_model": "account.move.line",
             "view_mode": "list",
+            "limit": 500,
             "domain": [
                 ("account_id", "=", self.account_id.id),
                 ("reconciled", "=", False),
@@ -81,5 +88,20 @@ class CustomReconcileAccount(models.Model):
             "context": {
                 "search_default_group_by_partner": 1,
                 "create": 0,
+            },
+        }
+
+    def action_open_batch_wizard(self):
+        """Clearing massal for this account, without loading a single line."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Clearing Massal — %s", self.account_id.display_name),
+            "res_model": "custom.account.reconcile.batch.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_account_id": self.account_id.id,
+                "default_company_id": self.company_id.id if "company_id" in self._fields else self.env.company.id,
             },
         }

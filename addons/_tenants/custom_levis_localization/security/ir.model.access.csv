@@ -61,3 +61,16 @@ access_levis_cogs_charge_acct,levis.cogs.charge account,model_levis_cogs_charge,
 access_levis_cogs_catchup_stock,levis.cogs.catchup stock,model_levis_cogs_catchup,stock.group_stock_manager,1,0,0,0
 access_levis_cogs_catchup_line_stock,levis.cogs.catchup.line stock,model_levis_cogs_catchup_line,stock.group_stock_manager,1,0,0,0
 access_levis_cogs_charge_stock,levis.cogs.charge stock,model_levis_cogs_charge,stock.group_stock_manager,1,0,0,0
+access_levis_clearing_manual_map_mgr,levis.clearing.manual.map manager,model_levis_clearing_manual_map,account.group_account_manager,1,1,1,1
+access_levis_clearing_manual_map_user,levis.clearing.manual.map invoicing,model_levis_clearing_manual_map,account.group_account_invoice,1,1,1,0
+access_levis_clearing_upload_log_mgr,levis.clearing.upload.log manager,model_levis_clearing_upload_log,account.group_account_manager,1,1,1,1
+access_levis_clearing_upload_log_user,levis.clearing.upload.log invoicing,model_levis_clearing_upload_log,account.group_account_invoice,1,0,1,0
+access_levis_clearing_ebr_wizard,levis.clearing.ebr.wizard manager,model_levis_clearing_ebr_wizard,account.group_account_manager,1,1,1,1
+access_levis_clearing_ebr_wizard_user,levis.clearing.ebr.wizard invoicing,model_levis_clearing_ebr_wizard,account.group_account_invoice,1,1,1,1
+access_levis_clearing_recon_upload,levis.clearing.recon.upload manager,model_levis_clearing_recon_upload,account.group_account_manager,1,1,1,1
+access_levis_clearing_match,levis.clearing.match manager,model_levis_clearing_match,account.group_account_manager,1,1,1,1
+access_levis_clearing_match_inv,levis.clearing.match invoicing,model_levis_clearing_match,account.group_account_invoice,1,1,1,1
+access_levis_clearing_match_bank,levis.clearing.match.bank manager,model_levis_clearing_match_bank,account.group_account_manager,1,1,1,1
+access_levis_clearing_match_bank_inv,levis.clearing.match.bank invoicing,model_levis_clearing_match_bank,account.group_account_invoice,1,1,1,1
+access_levis_clearing_match_txn,levis.clearing.match.txn manager,model_levis_clearing_match_txn,account.group_account_manager,1,1,1,1
+access_levis_clearing_match_txn_inv,levis.clearing.match.txn invoicing,model_levis_clearing_match_txn,account.group_account_invoice,1,1,1,1
