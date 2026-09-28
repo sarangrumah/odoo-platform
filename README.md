@@ -42,6 +42,11 @@ make update MODULE=custom_core DB=erp_dev
 
 See [docs/architecture.md](docs/architecture.md).
 
+New to this codebase? Start with the engineer handover pack in
+[docs/handover/](docs/handover/) — `00-master.md` covers the environment, the
+non-negotiables and the consolidated do-not-do list; one document per vertical
+covers Levi's, ARKA-AIM, WMS, the integrations and the prospect pipeline.
+
 ## Adding a vertical
 
 See [docs/adding-vertical.md](docs/adding-vertical.md). Fork `addons/verticals/_template/`.
