@@ -213,6 +213,7 @@ Full mapping: `docs/pdp-compliance.md`.
 
 ## Reference
 
+- **Engineer handover pack: `docs/handover/` — read `00-master.md` first**
 - Adding a vertical: `docs/adding-vertical.md`
 - Per-module feature catalog: `docs/platform-feature-catalog/catalog.md`
 - Per-project docs: `docs/projects/`
