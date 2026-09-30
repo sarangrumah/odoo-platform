@@ -10,8 +10,11 @@
                             class="btn-primary"
                             invisible="state == 'generated'"/>
                     <button name="action_generate_move" type="object"
-                            string="Generate Journal Entry" class="btn-primary"
+                            string="Generate Journal Entry"
                             invisible="state == 'generated'"/>
+                    <button name="action_post_period" type="object"
+                            string="Post Period" class="btn-primary"
+                            confirm="Post every draft COGS entry of this period and book the units nothing has recognised yet?"/>
                     <button name="action_view_move" type="object"
                             string="View Journal Entry"
                             invisible="not move_id"/>
@@ -47,6 +50,15 @@
                         below is understated. Load the purchases for those
                         products and press Compute again.
                     </div>
+                    <div class="alert alert-info" role="alert"
+                         invisible="total_draft == 0">
+                        <field name="total_draft" readonly="1" nolabel="1"
+                               class="oe_inline"/>
+                        of this period's cost already has a journal entry that is
+                        still draft — a receipt catch-up, or one the accountant
+                        wrote. It is deliberately NOT booked again below. Post
+                        Period posts those entries and books only what is left.
+                    </div>
                     <field name="line_ids">
                         <list create="false" editable="bottom">
                             <field name="warehouse_id"/>
@@ -54,6 +66,12 @@
                             <field name="product_categ_id"/>
                             <field name="expense_account_id"/>
                             <field name="valuation_account_id"/>
+                            <field name="sold_qty" sum="Sold"/>
+                            <field name="posted_qty" sum="Qty in GL" optional="hide"/>
+                            <field name="posted_amount" sum="Already in the GL"/>
+                            <field name="draft_qty" sum="Qty in draft" optional="hide"/>
+                            <field name="draft_amount" sum="Waiting in a draft entry"/>
+                            <field name="void_qty" sum="Entry gone" optional="hide"/>
                             <field name="quantity" sum="Qty"/>
                             <field name="zero_cost_qty" sum="Qty w/o cost"/>
                             <field name="amount" sum="COGS"/>
@@ -61,7 +79,11 @@
                         </list>
                     </field>
                     <group class="oe_subtotal_footer oe_right">
+                        <field name="total_posted" widget="monetary"/>
+                        <field name="total_draft" widget="monetary"/>
                         <field name="total_cogs" widget="monetary"/>
+                        <field name="total_period" widget="monetary"
+                               class="oe_subtotal_footer_separator"/>
                     </group>
                 </sheet>
             </form>
@@ -76,7 +98,10 @@
                 <field name="name"/>
                 <field name="date_from"/>
                 <field name="date_to"/>
-                <field name="total_cogs" sum="COGS"/>
+                <field name="total_posted" sum="In the GL" optional="show"/>
+                <field name="total_draft" sum="In a draft entry" optional="show"/>
+                <field name="total_cogs" sum="To book"/>
+                <field name="total_period" sum="COGS of the period" optional="hide"/>
                 <field name="state"
                        decoration-success="state == 'generated'"
                        decoration-info="state == 'computed'"

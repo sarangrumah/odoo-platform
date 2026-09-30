@@ -362,6 +362,43 @@ class AccountMove(models.Model):
         posted._levis_reconcile_grir()
         return posted
 
+    # ------------------------------------------------------------------
+    # Deleting a COGS entry has to take its ledger with it
+    # ------------------------------------------------------------------
+    # ``levis.cogs.charge`` is the only thing that stops a unit being charged
+    # twice, and ``move_id`` on it is ``ondelete="set null"``. Deleting the
+    # entry therefore used to leave the row behind, still claiming the cost was
+    # recognised over a general ledger that had nothing — and every later run
+    # subtracted it and proposed nothing. 30-Sep-2026 in ``prd_levis_begbal``:
+    # a September run was generated at 06:25 and deleted minutes later, leaving
+    # 6,962 rows for 15,579 units and Rp 5.43 bn that no entry backed.
+    #
+    # A cancelled entry needs no hook — the charge domains read ``move_id.state``
+    # and treat ``cancel`` as void. Only deletion destroys the link itself.
+    def unlink(self):
+        charges = self.env["levis.cogs.charge"].sudo().search([("move_id", "in", self.ids)])
+        if charges:
+            _logger.info(
+                "levis: dropping %s COGS charge row(s) (%s unit(s)) with the entr(ies) %s being deleted",
+                len(charges),
+                sum(charges.mapped("quantity")),
+                ", ".join(sorted({move.name or str(move.id) for move in self})),
+            )
+            charges.unlink()
+        catchups = self.env["levis.cogs.catchup"].sudo().search([("move_id", "in", self.ids)])
+        if catchups:
+            # The catch-up record is a wrapper around that one entry; without it
+            # it only misreports a total nobody can reach.
+            catchups.unlink()
+        runs = self.env["levis.cogs.run"].sudo().search([("move_id", "in", self.ids)])
+        if runs:
+            # Not deleted — the accountant may want the computed lines back. But
+            # it is no longer "generated", or ``_check_charge_ledger`` would read
+            # it as a run that booked cost and left no ledger and refuse every
+            # later recompute of the period.
+            runs.write({"state": "computed"})
+        return super().unlink()
+
     def _levis_wants_bill_number(self):
         self.ensure_one()
         return self.move_type in ("in_invoice", "in_refund") and bool(self.l10n_purchase_type)

@@ -65,6 +65,10 @@ PARAM_ALERT_DAYS = "custom_levis_localization.cogs_catchup_alert_days"
 # ledger is read and written.
 _ADVISORY_LOCK_KEY = 1926051
 
+# Entry states in which a charge row still stands for cost that will reach the
+# general ledger. Anything else (deleted, cancelled) means it never did.
+_LIVE_MOVE_STATES = ("draft", "posted")
+
 
 class LevisCogsCharge(models.Model):
     """Cost already recognised for (product, store, sale month).
@@ -195,19 +199,80 @@ class LevisCogsCharge(models.Model):
         return {product: qty for product, qty in grouped if qty}
 
     @api.model
-    def _charged_quantities(self, company, warehouse, period_date, products=None):
-        """Quantity of ``period_date``'s sales already charged to COGS."""
+    def _charge_domain(self, company, warehouse, period_date, products=None, basis="live"):
+        """The ledger of one (warehouse, sale month), narrowed by ``basis``.
+
+        A charge row holds a unit back only while the entry behind it is real.
+        ``move_id`` is ``ondelete="set null"``, so deleting the entry leaves the
+        row still claiming the cost was recognised over a general ledger that
+        has nothing — 30-Sep-2026 in ``prd_levis_begbal``: a September run was
+        generated and then deleted, and its 6,962 rows (15,579 units,
+        Rp 5.43 bn) went on suppressing every later run, which proposed nothing
+        at all. A cancelled entry is the same thing with a tombstone.
+
+        * ``live`` — backed by an entry that exists and is not cancelled. The
+          only rows allowed to hold a unit back.
+        * ``posted`` — already in the general ledger.
+        * ``draft`` — has an entry, waiting to be posted. Held back, because
+          posting that entry is what recognises it; booking it again here would
+          double it.
+        * ``void`` — the entry is gone or cancelled, so nothing was recognised.
+        * ``all`` — every row, whatever became of it.
+        """
         domain = [
             ("company_id", "=", company.id),
             ("warehouse_id", "=", warehouse.id),
             ("period_date", "=", period_date),
         ]
         if products is not None:
-            if not products:
-                return {}
             domain.append(("product_id", "in", products.ids))
+        if basis == "live":
+            domain.append(("move_id.state", "in", _LIVE_MOVE_STATES))
+        elif basis in ("posted", "draft"):
+            domain.append(("move_id.state", "=", basis))
+        elif basis == "void":
+            # A NULL many2one matches no dotted leaf, so the two cases have to
+            # be spelled out side by side.
+            domain = ["|", ("move_id", "=", False), ("move_id.state", "=", "cancel")] + domain
+        elif basis != "all":
+            raise ValueError("unknown charge basis %r" % basis)
+        return domain
+
+    @api.model
+    def _charged_quantities(self, company, warehouse, period_date, products=None, basis="live"):
+        """Quantity of ``period_date``'s sales already charged to COGS.
+
+        Only rows whose entry is still alive count by default: a row whose entry
+        was deleted or cancelled has to let its units be charged again, or the
+        cost is lost for good.
+        """
+        if products is not None and not products:
+            return {}
+        domain = self._charge_domain(company, warehouse, period_date, products=products, basis=basis)
         grouped = self._read_group(domain, ["product_id"], ["quantity:sum"])
         return {product: qty for product, qty in grouped if qty}
+
+    @api.model
+    def _charged_breakdown(self, company, warehouse, period_date, products=None):
+        """Per product, what each basis already holds — quantity and amount.
+
+        ``{product: {"posted_qty", "posted_amount", "draft_qty", "draft_amount",
+        "void_qty", "void_amount"}}``. This is what lets the periodic run show a
+        month whole — sold, already in the GL, waiting in a draft entry, still
+        to book — instead of only the remainder, which is what sheet #79
+        reported as "the 897 units disappeared from the report".
+        """
+        result = {}
+        if products is not None and not products:
+            return result
+        keys = ("posted_qty", "posted_amount", "draft_qty", "draft_amount", "void_qty", "void_amount")
+        for basis in ("posted", "draft", "void"):
+            domain = self._charge_domain(company, warehouse, period_date, products=products, basis=basis)
+            for product, qty, amount in self._read_group(domain, ["product_id"], ["quantity:sum", "amount:sum"]):
+                bucket = result.setdefault(product, dict.fromkeys(keys, 0.0))
+                bucket["%s_qty" % basis] = qty
+                bucket["%s_amount" % basis] = amount
+        return result
 
     @api.model
     def _outstanding(self, company, warehouse, period_date, products=None, date_to=None):

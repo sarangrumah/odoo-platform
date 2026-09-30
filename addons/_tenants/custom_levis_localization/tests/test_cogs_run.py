@@ -273,3 +273,152 @@ class TestCogsRun(AccountTestInvoicingCommon):
         run = self._run()
         with self.assertRaises(UserError):
             run.action_generate_move()
+
+    # ------------------------------------------------------------------
+    # What already happened to the month (sheet #79) and the one-button close
+    # ------------------------------------------------------------------
+    def _entry(self, amount, post=False, date="2026-06-30"):
+        """A balanced Dr COGS / Cr Inventory entry standing in for a real one."""
+        move = self.env["account.move"].create(
+            {
+                "move_type": "entry",
+                "journal_id": self.journal.id,
+                "company_id": self.company.id,
+                "date": date,
+                "ref": "stand-in COGS entry",
+                "line_ids": [
+                    (0, 0, {"account_id": self.cogs_textile.id, "name": "COGS", "debit": amount, "credit": 0.0}),
+                    (0, 0, {"account_id": self.inv_textile.id, "name": "COGS", "debit": 0.0, "credit": amount}),
+                ],
+            }
+        )
+        if post:
+            move._post(soft=False)
+        return move
+
+    def _charge(self, product, warehouse, qty, amount, move, source="catchup", catchup=None, period="2026-06-01"):
+        return self.env["levis.cogs.charge"].create(
+            {
+                "company_id": self.company.id,
+                "product_id": product.id,
+                "warehouse_id": warehouse.id,
+                "period_date": period,
+                "quantity": qty,
+                "amount": amount,
+                "source": source,
+                "move_id": move.id,
+                "catchup_id": catchup.id if catchup else False,
+            }
+        )
+
+    def _catchup_entry(self, product, warehouse, qty, amount):
+        """A draft receipt catch-up over ``qty`` units, ledger row and all."""
+        move = self._entry(amount)
+        catchup = self.env["levis.cogs.catchup"].create({"company_id": self.company.id, "book_date": "2026-06-30"})
+        catchup.move_id = move.id
+        self._charge(product, warehouse, qty, amount, move, catchup=catchup)
+        return catchup
+
+    def test_09_cost_already_in_the_gl_is_shown_and_not_booked_again(self):
+        self._sell(self.config1, [(self.jeans, 5)])
+        self._charge(self.jeans, self.wh1, 2, 190.0, self._entry(190.0, post=True), source="run")
+        run = self._run()
+        run.action_compute()
+
+        line = self._line(run, self.wh1, self.categ_textile)
+        self.assertEqual(line.sold_qty, 5.0)
+        self.assertEqual(line.posted_qty, 2.0)
+        # At the cost the other mechanism actually booked, not at standard_price.
+        self.assertEqual(line.posted_amount, 190.0)
+        self.assertEqual(line.quantity, 3.0)
+        self.assertEqual(line.amount, 300.0)
+        self.assertEqual(run.total_posted, 190.0)
+        self.assertEqual(run.total_cogs, 300.0)
+        self.assertEqual(run.total_period, 490.0)
+
+    def test_10_cost_waiting_in_a_draft_entry_is_shown_and_not_booked_again(self):
+        self._sell(self.config1, [(self.jeans, 5)])
+        self._catchup_entry(self.jeans, self.wh1, 2, 190.0)
+        run = self._run()
+        run.action_compute()
+
+        line = self._line(run, self.wh1, self.categ_textile)
+        self.assertEqual(line.draft_qty, 2.0)
+        self.assertEqual(line.draft_amount, 190.0)
+        self.assertEqual(line.posted_amount, 0.0)
+        # Booking it again here is what would double August 2026.
+        self.assertEqual(line.quantity, 3.0)
+        self.assertEqual(run.total_draft, 190.0)
+
+    def test_11_deleting_the_entry_frees_its_units_again(self):
+        self._sell(self.config1, [(self.jeans, 5)])
+        catchup = self._catchup_entry(self.jeans, self.wh1, 2, 190.0)
+        move = catchup.move_id
+
+        run = self._run()
+        run.action_compute()
+        self.assertEqual(self._line(run, self.wh1, self.categ_textile).quantity, 3.0)
+
+        move.unlink()
+        # The ledger row went with it — otherwise it would go on claiming the
+        # cost was recognised over a GL that has nothing (30-Sep-2026).
+        self.assertFalse(self.env["levis.cogs.charge"].search_count([("product_id", "=", self.jeans.id)]))
+        self.assertFalse(catchup.exists())
+
+        run.action_compute()
+        line = self._line(run, self.wh1, self.categ_textile)
+        self.assertEqual(line.draft_qty, 0.0)
+        self.assertEqual(line.quantity, 5.0)
+        self.assertEqual(line.amount, 500.0)
+
+    def test_12_a_cancelled_entry_holds_nothing_back(self):
+        self._sell(self.config1, [(self.jeans, 5)])
+        move = self._entry(190.0, post=True)
+        self._charge(self.jeans, self.wh1, 2, 190.0, move, source="run")
+        move.button_draft()
+        move.button_cancel()
+
+        run = self._run()
+        run.action_compute()
+        line = self._line(run, self.wh1, self.categ_textile)
+        self.assertEqual(line.void_qty, 2.0)
+        self.assertEqual(line.posted_qty, 0.0)
+        self.assertEqual(line.quantity, 5.0)
+
+    def test_13_post_period_posts_the_drafts_and_books_only_the_rest(self):
+        self._sell(self.config1, [(self.jeans, 5)])
+        catchup = self._catchup_entry(self.jeans, self.wh1, 2, 190.0)
+        run = self._run()
+        run.action_post_period()
+
+        self.assertEqual(catchup.move_id.state, "posted")
+        self.assertEqual(run.state, "generated")
+        self.assertEqual(run.move_id.state, "posted")
+        # 5 sold, 2 already carried by the catch-up entry: only 3 are booked.
+        self.assertEqual(sum(run.move_id.line_ids.mapped("debit")), 300.0)
+        self.assertEqual(run.total_cogs, 300.0)
+
+    def test_14_an_entry_this_module_did_not_write_is_named_never_posted(self):
+        self._sell(self.config1, [(self.jeans, 5)])
+        foreign = self._entry(190.0)
+        self._charge(self.jeans, self.wh1, 2, 190.0, foreign, source="manual")
+
+        run = self._run()
+        result = run.action_post_period()
+
+        # The accountant's own draft is left exactly as it was...
+        self.assertEqual(foreign.state, "draft")
+        self.assertIn(foreign.name or "/", result["params"]["message"])
+        # ...and its units are still not booked a second time.
+        self.assertEqual(sum(run.move_id.line_ids.mapped("debit")), 300.0)
+
+    def test_15_a_fully_recognised_period_books_nothing_and_says_so(self):
+        self._sell(self.config1, [(self.jeans, 5)])
+        self._charge(self.jeans, self.wh1, 5, 480.0, self._entry(480.0, post=True), source="run")
+        run = self._run()
+        result = run.action_post_period()
+
+        self.assertFalse(run.move_id)
+        self.assertEqual(run.total_cogs, 0.0)
+        self.assertEqual(run.total_posted, 480.0)
+        self.assertIn("Nothing left to book", result["params"]["message"])

@@ -1930,3 +1930,83 @@ filter, because the container log is not where Finance looks. `_warn_stale()`
 logs the drafts still unposted after `cogs_catchup_alert_days` (default 2) — that
 line is the alarm a monitor can read; the *Entry Not Posted* filter is the same
 answer in the UI.
+
+## Feature 33 — The month whole, and one button that closes it
+
+Periodic COGS used to answer one question — *what is left to book?* — and the way
+it answered destroyed the other one. `_detail()` subtracted `levis.cogs.charge`
+and returned only the remainder, so a month whose cost had already been
+recognised showed nothing at all. Sheet #79 is exactly that complaint: 897 units
+were charged by the receipt catch-up and Finance could not find them anywhere on
+the report, which had to be answered with a spreadsheet
+(`Rekon_COGS_Agustus_897unit_Levis.xlsx`).
+
+The guard itself had a worse hole. `levis.cogs.charge.move_id` is
+`ondelete="set null"`, so **deleting the entry left the ledger row behind** —
+still saying "this unit is charged" over a general ledger that had nothing. On
+30-Sep-2026 in `prd_levis_begbal` a September run was generated at 06:25
+(6,962 rows, 15,579 units, Rp 5.432.744.040,88) and the run and its entry were
+deleted minutes later. Every recompute of September after that proposed **Rp 0**.
+That is sheet #74 through the looking glass: there it was an entry with no
+ledger, here a ledger with no entry, and both end with cost that no mechanism
+will ever recognise again.
+
+### A charge row is only worth what its entry is
+
+`_charge_domain(company, warehouse, period_date, basis=...)` reads
+`move_id.state` and sorts every row into one of four bases:
+
+| basis | meaning | holds units back? |
+|---|---|---|
+| `posted` | already in the general ledger | yes |
+| `draft` | has an entry, waiting to be posted | yes |
+| `void` | entry deleted (`move_id` NULL) or cancelled | **no** |
+| `live` | `posted` + `draft` — the guard | yes |
+
+`_charged_quantities()` defaults to `live`, so the receipt catch-up, the nightly
+sweep and the periodic run all stopped honouring rows whose entry is gone.
+`_charged_breakdown()` returns all three quantities *and* amounts per product,
+which is what lets a run line show `sold_qty`, `posted_amount`, `draft_amount`,
+`void_qty` and `amount` side by side — the month whole, from whichever mechanism
+recognised each part.
+
+The amounts are deliberately **not** normalised to one cost basis: the catch-up
+books the purchase price net of tax from the receipt's own PO line, the run books
+`standard_price`. A column showing what was really booked is worth more than a
+column that is internally consistent and wrong.
+
+### `account.move.unlink()` takes the ledger with it
+
+The row may not outlive the entry that justified it. Deleting a COGS entry now
+deletes its `levis.cogs.charge` rows, deletes the `levis.cogs.catchup` wrapper
+(it is nothing but that entry), and puts a `levis.cogs.run` back to `computed` —
+otherwise `_check_charge_ledger()` would read it as a run that booked cost and
+left no ledger, and refuse every later recompute of the period. A *cancelled*
+entry needs no hook: the domains read the state.
+
+### `action_post_period()` — post what exists, book only what does not
+
+One button, in this order:
+
+1. Post the draft entries of the period that this module wrote (catch-ups, an
+   earlier run), one savepoint each, reusing `_try_post()` and its `post_error`.
+2. **Name, never post, the ones it did not write.** `GLJV/2026/08/0021` — FA's
+   own August COGS journal, Rp 531.048.759, reset to draft on 28-Sep-2026 — is
+   not this button's to post. Its units are still held back, so nothing is
+   booked twice; the notification says which entries are waiting on a human.
+3. Recompute, then generate and post the remainder. **Always recompute**: a run
+   computed at 06:25 and generated at 06:40 books what was true at 06:25, and on
+   30-Sep-2026 that gap was Rp 277.894.842,45 between the figure on the screen
+   and the figure that reached the ledger.
+
+A period whose cost is fully recognised now books nothing and says so, instead of
+raising "nothing to book" as if something were wrong.
+
+### Cleaning up what the old behaviour left behind
+
+`scripts/tenants/levis/128_purge_orphan_cogs_charges.py` (DRY RUN unless
+`CONFIRM=1`) lists the ledger by the state of the entry behind each row, deletes
+the rows whose entry is gone or cancelled, resets orphaned runs to `computed`,
+and prints the draft entries that are merely *queued* — those it never touches.
+After this feature the script is history-cleaning only: `_detail()` already
+ignores void rows, and `unlink()` stops new ones being made.
