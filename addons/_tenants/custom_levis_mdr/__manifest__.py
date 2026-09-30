@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Levi's Card MDR (per tender type)",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "summary": "Merchant discount rate per X70D PAYMENT label, and the expected fee "
     "and net settlement for every card transaction.",
     "description": """
@@ -49,6 +49,7 @@ database's stores actually send their weekly export.
     "data": [
         "security/ir.model.access.csv",
         "data/mdr_rates.xml",
+        "data/mdr_aliases.xml",
         "views/levis_mdr_views.xml",
     ],
     "installable": True,

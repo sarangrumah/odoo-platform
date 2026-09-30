@@ -3,3 +3,5 @@ access_levis_mdr_rate_acct_mgr,levis.mdr.rate account manager,model_levis_mdr_ra
 access_levis_mdr_rate_acct_user,levis.mdr.rate account user,model_levis_mdr_rate,account.group_account_user,1,0,0,0
 access_levis_mdr_txn_acct_user,levis.mdr.txn account user,model_levis_mdr_txn,account.group_account_user,1,0,0,0
 access_levis_mdr_txn_acct_mgr,levis.mdr.txn account manager,model_levis_mdr_txn,account.group_account_manager,1,0,0,0
+access_levis_mdr_alias_acct_mgr,levis.mdr.alias account manager,model_levis_mdr_alias,account.group_account_manager,1,1,1,1
+access_levis_mdr_alias_acct_user,levis.mdr.alias account user,model_levis_mdr_alias,account.group_account_user,1,0,0,0
