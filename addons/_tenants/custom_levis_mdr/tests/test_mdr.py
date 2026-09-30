@@ -206,3 +206,86 @@ class TestLevisMdr(TransactionCase):
             self.Rate.create({"payment": "TEST - UNIT", "percent": 15.0 * 100})
         with self.assertRaises(ValidationError):
             self.Rate.create({"payment": "TEST - NEGATIVE", "percent": -1.0})
+
+    # -- the store vocabularies ----------------------------------------
+    def test_10_punctuation_and_case_need_no_alias(self):
+        """Four stores, one tender, four spellings -- and no rows to maintain."""
+        for i, written in enumerate(("BCA-QRIS", "bca qris", "BCA _ QRIS", "  BCA - QRIS  "), start=1):
+            transnum = 7100 + i
+            self._stage(self.nightly, [self._nightly_row(transnum, 1000000)])
+            self._stage(self.store, [self._store_row(transnum, 1000000, written)])
+            txn = self._txn(transnum)
+            self.assertEqual(txn.payment, "BCA - QRIS", f"{written!r} must resolve without an alias")
+            self.assertEqual(txn.mdr_percent, 0.0)
+            self.assertIsNotNone(self._raw_mdr(transnum), f"{written!r} priced as unknown")
+
+    def test_11_alias_maps_a_store_wording_to_the_rate_label(self):
+        """'QRIS BCA' is the single biggest gap in Sep-2026: 798 trx, Rp 1,27 M."""
+        self._stage(self.nightly, [self._nightly_row(7201, 2000000)])
+        self._stage(self.store, [self._store_row(7201, 2000000, "QRIS BCA")])
+        txn = self._txn(7201)
+        self.assertEqual(txn.payment, "BCA - QRIS", "the seeded alias must resolve the word order")
+        self.assertEqual(txn.mdr_percent, 0.0)
+        self.assertEqual(self._raw_mdr(7201), 0, "a QRIS fee is a real zero, not unknown")
+
+    def test_12_on_us_and_off_us_debit_are_not_the_same_rate(self):
+        """0,15% against 1,00%: reading these two the same way costs real money."""
+        self._stage(self.nightly, [self._nightly_row(7301, 1000000), self._nightly_row(7302, 1000000)])
+        self._stage(
+            self.store,
+            [
+                self._store_row(7301, 1000000, "DEBIT BCA ON US"),
+                self._store_row(7302, 1000000, "DEBIT BCA OFF US"),
+            ],
+        )
+        self.assertEqual(self._txn(7301).payment, "BCA - DEBIT BCA / BCA GPN")
+        self.assertEqual(self._txn(7301).mdr_percent, 0.15)
+        self.assertEqual(self._txn(7302).payment, "BCA - DEBIT OTHER")
+        self.assertEqual(self._txn(7302).mdr_percent, 1.0)
+
+    def test_13_swapped_columns_still_price(self):
+        """Four stores export PAYMENT and APPR CODE the other way round."""
+        self._stage(self.nightly, [self._nightly_row(7401, 3000000)])
+        self._stage(self.store, [self._store_row(7401, 3000000, "544088", appr="BCA - REGULAR ON US")])
+        txn = self._txn(7401)
+        self.assertEqual(txn.payment, "BCA - REGULAR ON US", "the label was in the approval-code column")
+        self.assertEqual(txn.appr_code, "544088", "and the approval code in the label column")
+        self.assertTrue(txn.label_swapped)
+        self.assertEqual(txn.mdr_percent, 1.0)
+
+    def test_14_an_unknown_wording_is_still_unknown(self):
+        """The alias table must not become a licence to guess.
+
+        A tender type typed into the acquirer column spans three rates; an approval
+        code names no acquirer at all. Both have to stay null, or a store-day total
+        would read as complete when it is not.
+        """
+        for transnum, payment, appr in (
+            (7501, "OFFLINE_OTHER_CREDITCARD", "113512"),
+            (7502, "DEBIT CARD OTHER", "463827"),
+            (7503, "-", ""),
+            (7504, "A78E9B", "OFFLINE_VISA"),
+        ):
+            self._stage(self.nightly, [self._nightly_row(transnum, 999900)])
+            self._stage(self.store, [self._store_row(transnum, 999900, payment, appr=appr)])
+            self.assertFalse(self._txn(transnum).rate_id, f"{payment!r} must not resolve to a rate")
+            self.assertIsNone(self._raw_mdr(transnum), f"{payment!r} must price as unknown, not zero")
+
+    def test_15_alias_target_must_be_a_real_rate_label(self):
+        Alias = self.env["levis.mdr.alias"]
+        with self.assertRaises(ValidationError):
+            Alias.create({"alias": "QRIS BCAA", "payment": "BCA - QRIZ"})
+        # And two aliases that differ only by punctuation are the same key.
+        Alias.create({"alias": "TEST QRIS ONE", "payment": "BCA - QRIS"})
+        with self.assertRaises(ValidationError):
+            Alias.create({"alias": "TEST-QRIS-ONE", "payment": "BCA - QRIS"})
+
+    def test_16_seeded_aliases_all_resolve(self):
+        """Every alias shipped must point at a label that exists, or it is dead weight."""
+        Alias = self.env["levis.mdr.alias"]
+        on_file = {
+            "".join(ch for ch in (p or "").upper() if ch.isalnum()) for p in self.Rate.search([]).mapped("payment")
+        }
+        for rec in Alias.search([]):
+            key = "".join(ch for ch in (rec.payment or "").upper() if ch.isalnum())
+            self.assertIn(key, on_file, f"alias {rec.alias!r} points at a label with no rate")

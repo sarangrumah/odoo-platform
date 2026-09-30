@@ -51,6 +51,52 @@
         </field>
     </record>
 
+    <record id="view_levis_mdr_alias_list" model="ir.ui.view">
+        <field name="name">levis.mdr.alias.list</field>
+        <field name="model">levis.mdr.alias</field>
+        <field name="arch" type="xml">
+            <list string="Tender Type Aliases" editable="bottom" default_order="payment, alias">
+                <field name="payment"/>
+                <field name="alias"/>
+                <field name="note" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levis_mdr_alias_search" model="ir.ui.view">
+        <field name="name">levis.mdr.alias.search</field>
+        <field name="model">levis.mdr.alias</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="alias"/>
+                <field name="payment"/>
+                <separator/>
+                <filter name="by_payment" string="Rate label" context="{'group_by': 'payment'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levis_mdr_alias" model="ir.actions.act_window">
+        <field name="name">Tender Type Aliases</field>
+        <field name="res_model">levis.mdr.alias</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_by_payment': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Map a store's wording to a rate label</p>
+            <p>
+                Each store types the acquirer into its own X70D export by hand, so the same
+                BCA QRIS transaction arrives as <b>QRIS BCA</b> from one store and
+                <b>BCA - QRIS</b> from another. A row here says the two mean the same rate.
+            </p>
+            <p>
+                Case, spacing and punctuation are already ignored, so
+                <b>BCA-QRIS</b> needs no row — only a different word order, a different
+                wording or a misspelling does.
+            </p>
+        </field>
+    </record>
+
     <record id="view_levis_mdr_txn_list" model="ir.ui.view">
         <field name="name">levis.mdr.txn.list</field>
         <field name="model">levis.mdr.txn</field>
@@ -62,6 +108,7 @@
                 <field name="transnum"/>
                 <field name="payment"/>
                 <field name="appr_code" optional="hide"/>
+                <field name="label_swapped" optional="hide"/>
                 <field name="tender_type" optional="hide"/>
                 <field name="mdr_percent" string="MDR %" digits="[16,4]" optional="show"/>
                 <field name="amount" sum="Gross"/>
@@ -84,7 +131,9 @@
                 <filter name="unlabelled" string="No acquirer yet" domain="[('payment', '=', False)]"
                         help="The store has not sent the weekly export covering this day."/>
                 <filter name="unpriced" string="No rate on file" domain="[('payment', '!=', False), ('rate_id', '=', False)]"
-                        help="A label the rate card does not cover. These need a rate before the day can be reconciled."/>
+                        help="A wording neither the rate card nor the alias table covers. Map it or add a rate."/>
+                <filter name="swapped" string="Columns swapped" domain="[('label_swapped', '=', True)]"
+                        help="The store exports PAYMENT and APPR CODE the other way round."/>
                 <separator/>
                 <filter name="this_month" string="This month" date="trans_date"/>
                 <separator/>
@@ -122,5 +171,11 @@
               parent="account.account_account_menu"
               action="action_levis_mdr_rate"
               sequence="95"/>
+
+    <menuitem id="menu_levis_mdr_alias"
+              name="Tender Type Aliases"
+              parent="account.account_account_menu"
+              action="action_levis_mdr_alias"
+              sequence="96"/>
 
 </odoo>

@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The store vocabularies seen in the X70D exports of 24 Levi's stores, September 2026.
+
+     Read off 67.601 staged rows in prd_levis_begbal on 2026-09-30, the first month the
+     store feed ran. Only wordings that cost money are here: 1.578 transactions worth
+     Rp 2,68 miliar carried a label the rate card did not recognise, so their MDR read
+     "unknown" and every store-day total containing one read "unknown" with it.
+
+     Not in this file, on purpose:
+
+     * punctuation and spacing variants. The view compares letters and digits only, so
+       "BCA QRIS", "BCA-QRIS", "BCA -QRIS" and "BCA_QRIS" already resolve to
+       "BCA - QRIS" with no row of their own. Adding them would be noise that hides the
+       rows that matter.
+     * the approval codes that turn up in the PAYMENT column (R49076, 04FMAA, 71518Z).
+       Those are four stores exporting PAYMENT and APPR CODE the other way round; the
+       view reads the acquirer from whichever column carries a label it knows, so an
+       alias would be the wrong tool and a misleading record of what the store sent.
+     * "-" and "OFFLINE_OTHER_CREDITCARD". The first is a store writing "none"; the
+       second is the nightly tender type typed into the acquirer column, and it spans
+       three rates — pricing it would be a guess. Both stay unknown, which is correct.
+
+     The mapping itself is the reading of the wording, and two readings are worth
+     stating because they are the ones that could be wrong:
+
+     * "DEBIT BCA ON US" is an on-us debit, so it is the 0,15% BCA - DEBIT BCA / BCA GPN
+       rate, while "DEBIT BCA OFF US" is a debit card of another issuer acquired by BCA,
+       which is BCA - DEBIT OTHER at 1,00%. On-us and off-us are a 0,85 point difference:
+       if Finance reads these labels the other way round, say so and these rows change.
+     * "CREDIT ..." means the acquirer's own regular credit rate (REGULAR ON/OFF US), not
+       an installment plan. No installment transaction has been seen yet.
+
+     noupdate="1": once loaded these belong to Finance, the same as the rates. A store
+     that changes how it types its export gets a new row, not an edit of this file. -->
+<odoo noupdate="1">
+
+    <!-- BCA QRIS. The busiest tender there is, and the one most often typed backwards. -->
+    <record id="alias_qris_bca" model="levis.mdr.alias">
+        <field name="alias">QRIS BCA</field>
+        <field name="payment">BCA - QRIS</field>
+        <field name="note">798 trx / 7 stores / Rp 1,27 M in Sep-2026 — the single biggest gap.</field>
+    </record>
+
+    <record id="alias_bca_qris_bca" model="levis.mdr.alias">
+        <field name="alias">BCA - QRIS BCA</field>
+        <field name="payment">BCA - QRIS</field>
+    </record>
+
+    <record id="alias_qris_bca_on_us" model="levis.mdr.alias">
+        <field name="alias">QRIS BCA ON US</field>
+        <field name="payment">BCA - QRIS</field>
+        <field name="note">QRIS has one rate at BCA; on-us/off-us does not change it.</field>
+    </record>
+
+    <record id="alias_qris_bca_of_us" model="levis.mdr.alias">
+        <field name="alias">QRIS BCA OF US</field>
+        <field name="payment">BCA - QRIS</field>
+    </record>
+
+    <record id="alias_qria_bca_of_us" model="levis.mdr.alias">
+        <field name="alias">QRIA BCA OF US</field>
+        <field name="payment">BCA - QRIS</field>
+        <field name="note">Typo for QRIS.</field>
+    </record>
+
+    <record id="alias_qri_bca" model="levis.mdr.alias">
+        <field name="alias">QRI BCA</field>
+        <field name="payment">BCA - QRIS</field>
+        <field name="note">Typo for QRIS.</field>
+    </record>
+
+    <!-- BRI QRIS -->
+    <record id="alias_qris_bri" model="levis.mdr.alias">
+        <field name="alias">QRIS BRI</field>
+        <field name="payment">BRI - QRIS</field>
+    </record>
+
+    <record id="alias_bri_qris_bri" model="levis.mdr.alias">
+        <field name="alias">BRI - QRIS BRI</field>
+        <field name="payment">BRI - QRIS</field>
+    </record>
+
+    <!-- BCA credit, off us -->
+    <record id="alias_credit_bca_off_us" model="levis.mdr.alias">
+        <field name="alias">CREDIT BCA OFF US</field>
+        <field name="payment">BCA - REGULAR OFF US</field>
+        <field name="note">163 trx / 5 stores / Rp 305 jt in Sep-2026.</field>
+    </record>
+
+    <record id="alias_credit_bca_of_us" model="levis.mdr.alias">
+        <field name="alias">CREDIT BCA OF US</field>
+        <field name="payment">BCA - REGULAR OFF US</field>
+    </record>
+
+    <record id="alias_crredit_bca_off_us" model="levis.mdr.alias">
+        <field name="alias">CRREDIT BCA OFF US</field>
+        <field name="payment">BCA - REGULAR OFF US</field>
+        <field name="note">Typo for CREDIT.</field>
+    </record>
+
+    <record id="alias_bca_off_us" model="levis.mdr.alias">
+        <field name="alias">BCA OFF US</field>
+        <field name="payment">BCA - REGULAR OFF US</field>
+    </record>
+
+    <record id="alias_bca_reguler_off_us" model="levis.mdr.alias">
+        <field name="alias">BCA-REGULER OFF US</field>
+        <field name="payment">BCA - REGULAR OFF US</field>
+        <field name="note">Indonesian spelling of "regular".</field>
+    </record>
+
+    <record id="alias_reguler_off_us" model="levis.mdr.alias">
+        <field name="alias">REGULER OFF US</field>
+        <field name="payment">BCA - REGULAR OFF US</field>
+        <field name="note">Store writes no acquirer; its EDC is BCA.</field>
+    </record>
+
+    <record id="alias_bca_reguler_of_us" model="levis.mdr.alias">
+        <field name="alias">BCA REGULER OF US</field>
+        <field name="payment">BCA - REGULAR OFF US</field>
+    </record>
+
+    <!-- BCA credit, on us -->
+    <record id="alias_credit_bca_on_us" model="levis.mdr.alias">
+        <field name="alias">CREDIT BCA ON US</field>
+        <field name="payment">BCA - REGULAR ON US</field>
+        <field name="note">70 trx / 6 stores / Rp 100 jt in Sep-2026.</field>
+    </record>
+
+    <record id="alias_bca_reguler_on_us" model="levis.mdr.alias">
+        <field name="alias">BCA-REGULER ON US</field>
+        <field name="payment">BCA - REGULAR ON US</field>
+    </record>
+
+    <!-- BCA debit, on us: the bank's own card, 0,15% -->
+    <record id="alias_debit_bca_on_us" model="levis.mdr.alias">
+        <field name="alias">DEBIT BCA ON US</field>
+        <field name="payment">BCA - DEBIT BCA / BCA GPN</field>
+        <field name="note">153 trx / 6 stores / Rp 302 jt in Sep-2026. On us = BCA's own card = 0,15%.</field>
+    </record>
+
+    <record id="alias_bca_debit_bca" model="levis.mdr.alias">
+        <field name="alias">BCA - DEBIT BCA</field>
+        <field name="payment">BCA - DEBIT BCA / BCA GPN</field>
+    </record>
+
+    <record id="alias_debit_bca" model="levis.mdr.alias">
+        <field name="alias">DEBIT BCA</field>
+        <field name="payment">BCA - DEBIT BCA / BCA GPN</field>
+    </record>
+
+    <record id="alias_bca_debit" model="levis.mdr.alias">
+        <field name="alias">BCA DEBIT</field>
+        <field name="payment">BCA - DEBIT BCA / BCA GPN</field>
+    </record>
+
+    <!-- BCA debit, off us: another issuer's card on a BCA EDC, 1,00% -->
+    <record id="alias_debit_bca_off_us" model="levis.mdr.alias">
+        <field name="alias">DEBIT BCA OFF US</field>
+        <field name="payment">BCA - DEBIT OTHER</field>
+        <field name="note">146 trx / 6 stores / Rp 283 jt in Sep-2026. Off us = another issuer = 1,00%.</field>
+    </record>
+
+    <record id="alias_debit_bca_of_us" model="levis.mdr.alias">
+        <field name="alias">DEBIT BCA OF US</field>
+        <field name="payment">BCA - DEBIT OTHER</field>
+    </record>
+
+    <record id="alias_bca_debt_other" model="levis.mdr.alias">
+        <field name="alias">BCA - DEBT OTHER</field>
+        <field name="payment">BCA - DEBIT OTHER</field>
+        <field name="note">Typo for DEBIT.</field>
+    </record>
+
+    <!-- BRI -->
+    <record id="alias_debit_bri_off_us" model="levis.mdr.alias">
+        <field name="alias">DEBIT BRI OFF US</field>
+        <field name="payment">BRI - DEBIT OTHER</field>
+    </record>
+
+    <record id="alias_debit_bri_on_us" model="levis.mdr.alias">
+        <field name="alias">DEBIT BRI ON US</field>
+        <field name="payment">BRI - DEBIT BRI / BRI GPN</field>
+    </record>
+
+    <record id="alias_credit_bri_off_us" model="levis.mdr.alias">
+        <field name="alias">CREDIT BRI OFF US</field>
+        <field name="payment">BRI - REGULAR OFF US</field>
+    </record>
+
+    <record id="alias_credit_bri_on_us" model="levis.mdr.alias">
+        <field name="alias">CREDIT BRI ON US</field>
+        <field name="payment">BRI - REGULAR ON US</field>
+        <field name="note">Not seen in Sep-2026; the other three BRI wordings all follow this pattern.</field>
+    </record>
+
+    <record id="alias_bri_debit_bri" model="levis.mdr.alias">
+        <field name="alias">BRI - DEBIT BRI</field>
+        <field name="payment">BRI - DEBIT BRI / BRI GPN</field>
+        <field name="note">The rate card names the GPN scheme too; the store names only the card.</field>
+    </record>
+
+    <record id="alias_bri_on_us" model="levis.mdr.alias">
+        <field name="alias">BRI ON US</field>
+        <field name="payment">BRI - REGULAR ON US</field>
+        <field name="note">Acquirer and side, no product: read as the regular credit rate, the same
+            way BCA OFF US is. One transaction in Sep-2026 — confirm with the store if it recurs.</field>
+    </record>
+
+    <!-- BNI: one store, one transaction so far, and the rate card covers it. -->
+    <record id="alias_qris_bni" model="levis.mdr.alias">
+        <field name="alias">QRIS BNI</field>
+        <field name="payment">BNI - QRIS</field>
+    </record>
+
+    <!-- One-off misspellings. Each is a single transaction, and each would otherwise
+         leave a whole store-day unknown: null propagates through the totals. -->
+    <record id="alias_bca_bca_qris" model="levis.mdr.alias">
+        <field name="alias">BCA - BCA QRIS</field>
+        <field name="payment">BCA - QRIS</field>
+    </record>
+
+    <record id="alias_ba_qris" model="levis.mdr.alias">
+        <field name="alias">BA QRIS</field>
+        <field name="payment">BCA - QRIS</field>
+        <field name="note">Typo for BCA.</field>
+    </record>
+
+    <record id="alias_credit_bca_onn_us" model="levis.mdr.alias">
+        <field name="alias">CREDIT BCA ONN US</field>
+        <field name="payment">BCA - REGULAR ON US</field>
+        <field name="note">Typo for ON.</field>
+    </record>
+
+    <record id="alias_crdit_bca_on_us" model="levis.mdr.alias">
+        <field name="alias">CRDIT BCA ON US</field>
+        <field name="payment">BCA - REGULAR ON US</field>
+        <field name="note">Typo for CREDIT.</field>
+    </record>
+
+</odoo>
