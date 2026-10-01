@@ -2445,7 +2445,7 @@ class RetailImportExecutor(models.AbstractModel):
                     self._xid_set(ns, xn, "pos.config", cfg.id)
                     written += 1
         if commit:
-            self.env.cr.commit()
+            self._ri_commit()
             _logger.info("x24 store->config: %s xids written", written)
         return report
 
@@ -2921,7 +2921,7 @@ class RetailImportExecutor(models.AbstractModel):
         row_to_line = self._persist_lines(log, records) if records else {}
         if row_to_line:
             self.env["retail.import.line"].browse([ln.id for ln in row_to_line.values()]).write({"state": "skipped"})
-        self.env.cr.commit()
+        self._ri_commit()
 
         self._x24_automap_missing(ns, records)
         susp = self._x24_suspense_account(company)
@@ -2969,22 +2969,35 @@ class RetailImportExecutor(models.AbstractModel):
         if not any(round(a, 2) for day in by_day.values() for a in day.values()):
             log.records_skipped = len(records)
             log.error_message = "X70D: no postable tenders (empty/zero amounts)."
-            self.env.cr.commit()
+            self._ri_commit()
             return
 
         # One transfer entry per day: Dr each per-tender receivable / Cr Suspense. RIREC.
         fallback = datetime.now().date()
+        ahead = []
         for day in sorted(by_day, key=lambda d: d or fallback):
             gl_date = day or fallback
             # Net off what this trading day already settled, so re-dropping an old file
             # -- or an X70T that covered the day first -- tops the day up instead of
             # crediting the suspense a second time.
             settled = self._ri_settled_by_tender(company, gl_date)
-            by_tender = {
-                k: round(a - settled.get(k, 0.0), 2)
-                for k, a in by_day[day].items()
-                if round(a - settled.get(k, 0.0), 2) > 0
-            }
+            by_tender = {}
+            for key, amount in by_day[day].items():
+                delta = round(amount - settled.get(key, 0.0), 2)
+                if delta > 0:
+                    by_tender[key] = delta
+                elif delta < 0:
+                    # Already settled for MORE than this file reports. Left untouched on
+                    # purpose, exactly as X70T does: the difference between "a refund
+                    # happened" and "this file is short of the day" is not visible from
+                    # here, and posting the credit would reverse a correct receivable
+                    # every time a nightly file arrives incomplete. But it must be SAID.
+                    # Dropping it in silence is how 29-Sep-2026 left store 80449's
+                    # receivable Rp 3.849.700 high for three days: X70D carried a sale
+                    # and its re-ring but not the void between them, and only X70T --
+                    # which reports the void under the acquirer-level tender code --
+                    # noticed. The X70D path tracked nothing and said nothing.
+                    ahead.append((gl_date, key[0], -delta))
             if not by_tender:
                 continue
             move = self._ri_post_tender_transfer(company, susp, gl_date, by_tender, "X70D", ns, log)
@@ -3025,14 +3038,21 @@ class RetailImportExecutor(models.AbstractModel):
         )
         if unpaid:
             note += f" WARNING: {len(unpaid)} posted X24 sale(s) have no matching X70D tender (unpaid/unreconciled)."
+        if ahead:
+            note += (
+                f" WARNING: {len(ahead)} day/tender pair(s) already settled for MORE than X70D reports "
+                f"(e.g. {ahead[0][0]} {ahead[0][1]} by {ahead[0][2]:.2f}); left untouched for review — "
+                f"a void this file omits, or a short file."
+            )
         log.error_message = note
-        self.env.cr.commit()
+        self._ri_commit()
         _logger.info(
-            "x70d reconcile: %s daily move(s), total %.2f, residual %.2f, %s unpaid",
+            "x70d reconcile: %s daily move(s), total %.2f, residual %.2f, %s unpaid, %s over-settled",
             posted,
             total,
             residual,
             len(unpaid),
+            len(ahead),
         )
 
     # ==================================================================

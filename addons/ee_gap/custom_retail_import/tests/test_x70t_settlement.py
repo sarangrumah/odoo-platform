@@ -74,6 +74,44 @@ def _workbook() -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 
+#: The nightly X70D: flat, header on row 1, twelve columns, one row per tender.
+#: Needed here because the over-settled warning is a property of the X70D path and
+#: the X70T cross-tab cannot express a per-transaction tender row.
+_X70D_HEADER = (
+    "STORE CODE",
+    "SAP STORE CODE",
+    "STORE NAME",
+    "TRANS DATE",
+    "REGISTER ",
+    "TRANSNUM",
+    "CASHIER LOGIN ID",
+    "CASHIER NAME",
+    "TENDER TYPE",
+    "TENDER AMOUNT",
+    "AUTH NUMBER",
+    "VOUCHER NUMBER",
+)
+
+_X70D_ROWS = (
+    ("80431", "0020080431", "OLS SES - AEON BSD", "2026-09-24", 1, 101, "", "", "CASH", 2250800, "", ""),
+    ("80129", "0020080129", "OLS SES - TUNJUNGAN", "2026-09-24", 1, 102, "", "", "CASH", 1901800, "", ""),
+)
+
+
+def _x70d_workbook() -> str:
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "X70D_Tender_Detail_Report"
+    ws.append(_X70D_HEADER)
+    for row in _X70D_ROWS:
+        ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
 @tagged("post_install", "-at_install", "levis", "retail_import")
 class TestX70tSettlement(TransactionCase):
     @classmethod
@@ -198,6 +236,53 @@ class TestX70tSettlement(TransactionCase):
         same.state = "cancelled"
         executor._x70d_assert_file_not_reconciled(
             x70d, Log.create({"profile_id": x70d.id, "filename": "a.xlsx", "file_hash": "h1"})
+        )
+
+    def test_09_x70d_says_so_when_a_day_is_settled_for_more_than_it_reports(self):
+        """The X70D path dropped an over-settled tender in silence; X70T never did.
+
+        29-Sep-2026, store 80449: X24 carried a sale, a void and the re-ring. X70D
+        carried both positives and not the void, so the day was settled Rp 3.849.700
+        high. X70T saw it -- the void arrives there under the acquirer-level tender
+        code -- and warned. X70D computed the same negative and threw it away without
+        a word, which is why nobody looked for three days. Neither path posts the
+        credit: from inside the loader a negative is equally consistent with a refund
+        and with a file that is simply short of the day, and posting it would reverse
+        a correct receivable every time a nightly file arrives incomplete. Saying it
+        out loud is the whole fix.
+        """
+        x70d = self.env.ref("custom_retail_import.profile_levis_x70d")
+        susp = self.executor._x24_suspense_account(self.company)
+        recv = self.executor._x24_recv_account_for(self.company, "CASH")
+        # Somebody already moved more CASH out of suspense than the file will report.
+        self.env["account.move"].create(
+            {
+                "move_type": "entry",
+                "journal_id": self.executor._ri_rirec_journal(self.company).id,
+                "date": "2026-09-24",
+                "company_id": self.company.id,
+                "ref": "settled ahead of the file",
+                "line_ids": [
+                    (0, 0, {"account_id": recv.id, "debit": 9000000, "credit": 0.0, "name": "X70D settlement CASH"}),
+                    (0, 0, {"account_id": susp.id, "debit": 0.0, "credit": 9000000, "name": "X70D settlement"}),
+                ],
+            }
+        ).action_post()
+        before = sum(self._rirec_lines().mapped("debit"))
+
+        log = self.env["retail.import.log"].create(
+            {"profile_id": x70d.id, "filename": "X70D_Tender_Detail_Report__20260924T193031Z.xlsx"}
+        )
+        self.executor._post_x70d_reconcile(x70d, _x70d_workbook(), log)
+
+        self.assertIn("already settled for MORE than X70D reports", log.error_message or "")
+        self.assertIn("2026-09-24", log.error_message)
+        self.assertIn("CASH", log.error_message)
+        # And it is a warning, not a correction: the over-settled tender is untouched.
+        self.assertEqual(
+            sum(self._rirec_lines().mapped("debit")),
+            before,
+            "the loader reversed a receivable instead of reporting it",
         )
 
     def test_07_staged_and_silent_while_the_switch_is_off(self):
