@@ -69,6 +69,50 @@ class AccountMove(models.Model):
         "on every product line for per-OU P&L reporting.",
     )
 
+    # What this entry recognised of the COGS ledger. Read straight off
+    # ``levis.cogs.charge`` rather than off the journal items, because the
+    # ledger is the grain that matters — units, per sale month, per mechanism —
+    # and because a manual journal carries no product lines at all
+    # (``GLJV/2026/08/0021``: 32 lines, 904 units, no product named anywhere).
+    # Not stored: only ever read for the handful of entries on a screen.
+    levis_cogs_amount = fields.Monetary(
+        compute="_compute_levis_cogs",
+        currency_field="company_currency_id",
+        string="COGS Recognised",
+    )
+    levis_cogs_qty = fields.Float(
+        compute="_compute_levis_cogs",
+        digits="Product Unit of Measure",
+        string="COGS Units",
+    )
+    levis_cogs_source = fields.Char(
+        compute="_compute_levis_cogs",
+        string="COGS Source",
+        help="Which mechanism recognised the cost on this entry: the receipt "
+        "catch-up, the periodic run, a POS session, or an accountant by hand.",
+    )
+
+    @api.depends_context("company")
+    def _compute_levis_cogs(self):
+        Charge = self.env["levis.cogs.charge"]
+        labels = dict(Charge._fields["source"].selection)
+        grouped = Charge._read_group(
+            [("move_id", "in", self.ids)],
+            ["move_id", "source"],
+            ["quantity:sum", "amount:sum"],
+        )
+        found = {}
+        for move, source, qty, amount in grouped:
+            bucket = found.setdefault(move.id, {"qty": 0.0, "amount": 0.0, "sources": set()})
+            bucket["qty"] += qty
+            bucket["amount"] += amount
+            bucket["sources"].add(labels.get(source, source))
+        for move in self:
+            bucket = found.get(move.id)
+            move.levis_cogs_qty = bucket["qty"] if bucket else 0.0
+            move.levis_cogs_amount = bucket["amount"] if bucket else 0.0
+            move.levis_cogs_source = ", ".join(sorted(bucket["sources"])) if bucket else ""
+
     @api.onchange("l10n_ou_analytic_id")
     def _onchange_l10n_ou_analytic_id(self):
         """Cascade the header OU onto every line that has none yet.

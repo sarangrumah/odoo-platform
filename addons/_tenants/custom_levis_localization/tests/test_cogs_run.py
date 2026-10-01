@@ -422,3 +422,32 @@ class TestCogsRun(AccountTestInvoicingCommon):
         self.assertEqual(run.total_cogs, 0.0)
         self.assertEqual(run.total_posted, 480.0)
         self.assertIn("Nothing left to book", result["params"]["message"])
+
+    def test_16_the_period_lists_every_entry_that_recognised_its_cost(self):
+        """Finance's real question: where did the month's COGS go?
+
+        Before this, the answer lived on three screens — Periodic COGS, COGS
+        Catch-up, and the journal items of whatever the accountant wrote.
+        """
+        self._sell(self.config1, [(self.jeans, 5)])
+        catchup = self._catchup_entry(self.jeans, self.wh1, 2, 190.0)
+        earlier = self._entry(95.0, post=True)
+        self._charge(self.jeans, self.wh1, 1, 95.0, earlier, source="manual")
+
+        run = self._run()
+        run.action_compute()
+
+        self.assertEqual(run.period_move_count, 2)
+        self.assertEqual(run.period_draft_move_count, 1)
+        self.assertEqual(run.period_move_ids, catchup.move_id | earlier)
+        # Each row says what it recognised and who recognised it.
+        self.assertEqual(catchup.move_id.levis_cogs_amount, 190.0)
+        self.assertEqual(catchup.move_id.levis_cogs_qty, 2.0)
+        self.assertEqual(catchup.move_id.levis_cogs_source, "Receipt Catch-up")
+        self.assertEqual(earlier.levis_cogs_source, "Manual Journal")
+
+        # Once generated, this run's own entry joins the same list.
+        run.action_generate_move()
+        self.assertEqual(run.period_move_count, 3)
+        self.assertIn(run.move_id, run.period_move_ids)
+        self.assertEqual(run.move_id.levis_cogs_amount, 200.0)

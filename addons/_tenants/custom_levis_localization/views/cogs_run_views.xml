@@ -54,11 +54,17 @@
                          invisible="total_draft == 0">
                         <field name="total_draft" readonly="1" nolabel="1"
                                class="oe_inline"/>
-                        of this period's cost already has a journal entry that is
-                        still draft — a receipt catch-up, or one the accountant
-                        wrote. It is deliberately NOT booked again below. Post
-                        Period posts those entries and books only what is left.
+                        of this period's cost sits in
+                        <field name="period_draft_move_count" readonly="1" nolabel="1"
+                               class="oe_inline"/>
+                        journal entr(ies) that are still draft — a receipt
+                        catch-up, or one the accountant wrote. They are listed
+                        under <b>Journal Entries of This Period</b> and are
+                        deliberately NOT booked again below. Post Period posts
+                        the ones this module wrote and books only what is left.
                     </div>
+                    <notebook>
+                      <page string="Per Store and Category" name="lines">
                     <field name="line_ids">
                         <list create="false" editable="bottom">
                             <field name="warehouse_id"/>
@@ -78,6 +84,34 @@
                             <field name="currency_id" column_invisible="1"/>
                         </list>
                     </field>
+                      </page>
+                      <page string="Journal Entries of This Period" name="period_moves">
+                        <div class="text-muted mb-2">
+                            Every entry that recognised cost for this period —
+                            this run's own, the receipt catch-ups, the POS
+                            sessions, and anything an accountant wrote by hand.
+                            A draft row is cost that is NOT in the general ledger
+                            yet; Post Period posts the ones this module wrote and
+                            names the rest.
+                        </div>
+                        <field name="period_move_ids" readonly="1">
+                            <list create="false" delete="false" open_form_view="1">
+                                <field name="date"/>
+                                <field name="name"/>
+                                <field name="journal_id" optional="hide"/>
+                                <field name="ref" optional="show"/>
+                                <field name="levis_cogs_source"/>
+                                <field name="levis_cogs_qty" sum="Units"/>
+                                <field name="levis_cogs_amount" sum="COGS Recognised"/>
+                                <field name="state" widget="badge"
+                                       decoration-success="state == 'posted'"
+                                       decoration-warning="state == 'draft'"
+                                       decoration-danger="state == 'cancel'"/>
+                                <field name="company_currency_id" column_invisible="1"/>
+                            </list>
+                        </field>
+                      </page>
+                    </notebook>
                     <group class="oe_subtotal_footer oe_right">
                         <field name="total_posted" widget="monetary"/>
                         <field name="total_draft" widget="monetary"/>

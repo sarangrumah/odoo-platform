@@ -2010,3 +2010,23 @@ the rows whose entry is gone or cancelled, resets orphaned runs to `computed`,
 and prints the draft entries that are merely *queued* — those it never touches.
 After this feature the script is history-cleaning only: `_detail()` already
 ignores void rows, and `unlink()` stops new ones being made.
+
+### Where the month's COGS actually went
+
+Columns answer *how much*; Finance asked *where*. Until `19.0.1.65.0` the answer
+lived on three screens: Periodic COGS for the run, COGS Catch-up for the receipt
+entries, and the journal items of whatever the accountant wrote by hand.
+
+`levis.cogs.run.period_move_ids` collects every `account.move` that recognised
+cost for the run's months — its own entry included, once generated — from the
+ledger rather than from the journals, and the *Journal Entries of This Period*
+tab lists them with `state` as a badge. `period_draft_move_count` drives the
+alert: "Rp X sits in N journal entries that are still draft".
+
+Three non-stored fields on `account.move` make each row self-explaining:
+`levis_cogs_amount`, `levis_cogs_qty` and `levis_cogs_source` (the Selection
+labels of `levis.cogs.charge.source`, comma-joined when an entry carries more
+than one). They are read off the charge ledger, not the journal items, because
+that is the grain that matters — units, per sale month, per mechanism — and
+because a manual journal has no product lines at all: `GLJV/2026/08/0021` is
+32 lines for 904 units with no product named anywhere.

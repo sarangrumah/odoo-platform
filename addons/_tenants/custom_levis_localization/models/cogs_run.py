@@ -128,10 +128,43 @@ class LevisCogsRun(models.Model):
         "these are worth. Load the purchases for those products and recompute.",
     )
 
+    # Every journal entry that recognised cost for this period, whoever wrote
+    # it. Finance's question is not "what is left" but "where did the month's
+    # COGS go, and which parts are in the GL already" — and until this field
+    # existed the answer lived on three different screens (Periodic COGS, COGS
+    # Catch-up, and the journal items of a manual entry).
+    period_move_ids = fields.Many2many(
+        "account.move",
+        compute="_compute_period_moves",
+        string="Entries of This Period",
+    )
+    period_move_count = fields.Integer(compute="_compute_period_moves")
+    period_draft_move_count = fields.Integer(compute="_compute_period_moves")
+
     @api.depends("charge_ids")
     def _compute_charge_count(self):
         for run in self:
             run.charge_count = len(run.charge_ids)
+
+    @api.depends("company_id", "date_from", "date_to", "move_id")
+    def _compute_period_moves(self):
+        Charge = self.env["levis.cogs.charge"]
+        for run in self:
+            moves = run.move_id
+            if run.date_from and run.date_to:
+                grouped = Charge._read_group(
+                    [
+                        ("company_id", "=", run.company_id.id),
+                        ("period_date", "in", Charge._months_between(run.date_from, run.date_to)),
+                        ("move_id", "!=", False),
+                    ],
+                    ["move_id"],
+                    ["quantity:sum"],
+                )
+                moves |= self.env["account.move"].browse([move.id for move, _qty in grouped])
+            run.period_move_ids = moves.sorted(lambda move: (move.date or run.date_to, move.id))
+            run.period_move_count = len(moves)
+            run.period_draft_move_count = len(moves.filtered(lambda move: move.state == "draft"))
 
     @api.depends(
         "line_ids.amount",
