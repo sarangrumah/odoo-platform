@@ -330,3 +330,24 @@ class TestCogsCatchup(CogsCatchupCommon):
             move.picked = True
         picking.button_validate()
         self.assertAlmostEqual(self._catchups().total_cogs, 140.0, places=2)
+
+    def test_13_deleting_the_entry_lets_the_next_receipt_charge_again(self):
+        """The ledger may not outlive the entry that justified it.
+
+        ``move_id`` is ``ondelete="set null"``, so a deleted entry used to leave
+        the row behind saying "already charged" over a general ledger with
+        nothing in it — and no later receipt, sweep or run would ever touch
+        those units again.
+        """
+        self._sell(self.jeans, 4)
+        self._receive(self.jeans, 4)
+        catchup = self._catchups()
+        self.assertTrue(self._charges(self.jeans))
+
+        catchup.move_id.unlink()
+        self.assertFalse(self._charges(self.jeans))
+        self.assertFalse(catchup.exists())
+
+        # A second receipt now recognises the cost that never reached the GL.
+        self._receive(self.jeans, 4)
+        self.assertEqual(sum(self._charges(self.jeans).mapped("quantity")), 4.0)

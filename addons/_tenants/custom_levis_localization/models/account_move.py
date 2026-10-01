@@ -69,6 +69,50 @@ class AccountMove(models.Model):
         "on every product line for per-OU P&L reporting.",
     )
 
+    # What this entry recognised of the COGS ledger. Read straight off
+    # ``levis.cogs.charge`` rather than off the journal items, because the
+    # ledger is the grain that matters — units, per sale month, per mechanism —
+    # and because a manual journal carries no product lines at all
+    # (``GLJV/2026/08/0021``: 32 lines, 904 units, no product named anywhere).
+    # Not stored: only ever read for the handful of entries on a screen.
+    levis_cogs_amount = fields.Monetary(
+        compute="_compute_levis_cogs",
+        currency_field="company_currency_id",
+        string="COGS Recognised",
+    )
+    levis_cogs_qty = fields.Float(
+        compute="_compute_levis_cogs",
+        digits="Product Unit of Measure",
+        string="COGS Units",
+    )
+    levis_cogs_source = fields.Char(
+        compute="_compute_levis_cogs",
+        string="COGS Source",
+        help="Which mechanism recognised the cost on this entry: the receipt "
+        "catch-up, the periodic run, a POS session, or an accountant by hand.",
+    )
+
+    @api.depends_context("company")
+    def _compute_levis_cogs(self):
+        Charge = self.env["levis.cogs.charge"]
+        labels = dict(Charge._fields["source"].selection)
+        grouped = Charge._read_group(
+            [("move_id", "in", self.ids)],
+            ["move_id", "source"],
+            ["quantity:sum", "amount:sum"],
+        )
+        found = {}
+        for move, source, qty, amount in grouped:
+            bucket = found.setdefault(move.id, {"qty": 0.0, "amount": 0.0, "sources": set()})
+            bucket["qty"] += qty
+            bucket["amount"] += amount
+            bucket["sources"].add(labels.get(source, source))
+        for move in self:
+            bucket = found.get(move.id)
+            move.levis_cogs_qty = bucket["qty"] if bucket else 0.0
+            move.levis_cogs_amount = bucket["amount"] if bucket else 0.0
+            move.levis_cogs_source = ", ".join(sorted(bucket["sources"])) if bucket else ""
+
     @api.onchange("l10n_ou_analytic_id")
     def _onchange_l10n_ou_analytic_id(self):
         """Cascade the header OU onto every line that has none yet.
@@ -361,6 +405,43 @@ class AccountMove(models.Model):
         posted = super()._post(soft=soft)
         posted._levis_reconcile_grir()
         return posted
+
+    # ------------------------------------------------------------------
+    # Deleting a COGS entry has to take its ledger with it
+    # ------------------------------------------------------------------
+    # ``levis.cogs.charge`` is the only thing that stops a unit being charged
+    # twice, and ``move_id`` on it is ``ondelete="set null"``. Deleting the
+    # entry therefore used to leave the row behind, still claiming the cost was
+    # recognised over a general ledger that had nothing — and every later run
+    # subtracted it and proposed nothing. 30-Sep-2026 in ``prd_levis_begbal``:
+    # a September run was generated at 06:25 and deleted minutes later, leaving
+    # 6,962 rows for 15,579 units and Rp 5.43 bn that no entry backed.
+    #
+    # A cancelled entry needs no hook — the charge domains read ``move_id.state``
+    # and treat ``cancel`` as void. Only deletion destroys the link itself.
+    def unlink(self):
+        charges = self.env["levis.cogs.charge"].sudo().search([("move_id", "in", self.ids)])
+        if charges:
+            _logger.info(
+                "levis: dropping %s COGS charge row(s) (%s unit(s)) with the entr(ies) %s being deleted",
+                len(charges),
+                sum(charges.mapped("quantity")),
+                ", ".join(sorted({move.name or str(move.id) for move in self})),
+            )
+            charges.unlink()
+        catchups = self.env["levis.cogs.catchup"].sudo().search([("move_id", "in", self.ids)])
+        if catchups:
+            # The catch-up record is a wrapper around that one entry; without it
+            # it only misreports a total nobody can reach.
+            catchups.unlink()
+        runs = self.env["levis.cogs.run"].sudo().search([("move_id", "in", self.ids)])
+        if runs:
+            # Not deleted — the accountant may want the computed lines back. But
+            # it is no longer "generated", or ``_check_charge_ledger`` would read
+            # it as a run that booked cost and left no ledger and refuse every
+            # later recompute of the period.
+            runs.write({"state": "computed"})
+        return super().unlink()
 
     def _levis_wants_bill_number(self):
         self.ensure_one()

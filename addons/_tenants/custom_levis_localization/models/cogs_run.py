@@ -49,6 +49,21 @@ _logger = logging.getLogger(__name__)
 # POS orders that represent a real, settled sale. Draft/cancelled carry no cost.
 _SOLD_STATES = ("paid", "done", "invoiced")
 
+# One aggregated (warehouse, category) cell of a run line. ``qty``/``amount``
+# are what the run will book; the rest is what already happened to the month,
+# which is the half Finance could never see before (sheet #79).
+_EMPTY_BUCKET = {
+    "sold_qty": 0.0,
+    "posted_qty": 0.0,
+    "posted_amount": 0.0,
+    "draft_qty": 0.0,
+    "draft_amount": 0.0,
+    "void_qty": 0.0,
+    "qty": 0.0,
+    "amount": 0.0,
+    "zero_cost_qty": 0.0,
+}
+
 
 class LevisCogsRun(models.Model):
     _name = "levis.cogs.run"
@@ -75,7 +90,36 @@ class LevisCogsRun(models.Model):
     )
     currency_id = fields.Many2one(related="company_id.currency_id")
     charge_count = fields.Integer(compute="_compute_charge_count", string="Charge Rows")
-    total_cogs = fields.Monetary(compute="_compute_totals", currency_field="currency_id")
+    total_cogs = fields.Monetary(
+        compute="_compute_totals",
+        currency_field="currency_id",
+        string="This Run's Entry",
+        help="The sum of the lines below: what this run will book once "
+        "generated, or what it did book if it already was.",
+    )
+    total_posted = fields.Monetary(
+        compute="_compute_period_totals",
+        currency_field="currency_id",
+        string="Already in the GL",
+        help="Cost of this period recognised by a POSTED entry, read off the "
+        "charge ledger right now — an earlier run, a receipt catch-up, a POS "
+        "session, or a journal the accountant wrote by hand.",
+    )
+    total_draft = fields.Monetary(
+        compute="_compute_period_totals",
+        currency_field="currency_id",
+        string="Waiting in a Draft Entry",
+        help="Cost of this period that has a journal entry which is still "
+        "draft, so it is NOT in the general ledger yet. Posting that entry "
+        "recognises it; a run never books it a second time.",
+    )
+    total_period = fields.Monetary(
+        compute="_compute_period_totals",
+        currency_field="currency_id",
+        string="COGS of the Period",
+        help="Already in the GL + waiting in a draft entry + what is still to "
+        "book. The whole month, whichever mechanism recognised each part.",
+    )
     zero_cost_qty = fields.Float(
         compute="_compute_totals",
         digits="Product Unit of Measure",
@@ -85,16 +129,78 @@ class LevisCogsRun(models.Model):
         "these are worth. Load the purchases for those products and recompute.",
     )
 
+    # Every journal entry that recognised cost for this period, whoever wrote
+    # it. Finance's question is not "what is left" but "where did the month's
+    # COGS go, and which parts are in the GL already" — and until this field
+    # existed the answer lived on three different screens (Periodic COGS, COGS
+    # Catch-up, and the journal items of a manual entry).
+    period_move_ids = fields.Many2many(
+        "account.move",
+        compute="_compute_period_moves",
+        string="Entries of This Period",
+    )
+    period_move_count = fields.Integer(compute="_compute_period_moves")
+    period_draft_move_count = fields.Integer(compute="_compute_period_moves")
+
     @api.depends("charge_ids")
     def _compute_charge_count(self):
         for run in self:
             run.charge_count = len(run.charge_ids)
+
+    @api.depends("company_id", "date_from", "date_to", "move_id")
+    def _compute_period_moves(self):
+        Charge = self.env["levis.cogs.charge"]
+        for run in self:
+            moves = run.move_id
+            if run.date_from and run.date_to:
+                grouped = Charge._read_group(
+                    [
+                        ("company_id", "=", run.company_id.id),
+                        ("period_date", "in", Charge._months_between(run.date_from, run.date_to)),
+                        ("move_id", "!=", False),
+                    ],
+                    ["move_id"],
+                    ["quantity:sum"],
+                )
+                moves |= self.env["account.move"].browse([move.id for move, _qty in grouped])
+            run.period_move_ids = moves.sorted(lambda move: (move.date or run.date_to, move.id))
+            run.period_move_count = len(moves)
+            run.period_draft_move_count = len(moves.filtered(lambda move: move.state == "draft"))
 
     @api.depends("line_ids.amount", "line_ids.zero_cost_qty")
     def _compute_totals(self):
         for run in self:
             run.total_cogs = sum(run.line_ids.mapped("amount"))
             run.zero_cost_qty = sum(run.line_ids.mapped("zero_cost_qty"))
+
+    @api.depends("company_id", "date_from", "date_to", "move_id", "line_ids.amount")
+    def _compute_period_totals(self):
+        """What the period already carries, read off the ledger, not the lines.
+
+        The line columns are a snapshot of the moment Compute ran, which is
+        exactly right while a run is being prepared and exactly wrong once it is
+        generated: `COGS/2026/0002` is posted, yet its lines still say
+        "Rp 12,03 bn to book" because that is what they said in July. Finance
+        reads the footer, so the footer asks the ledger every time.
+
+        A generated run's own cost is in the ledger by then, so it must not be
+        counted a second time in the period total.
+        """
+        Charge = self.env["levis.cogs.charge"]
+        for run in self:
+            totals = {"posted": 0.0, "draft": 0.0}
+            if run.date_from and run.date_to:
+                months = Charge._months_between(run.date_from, run.date_to)
+                for basis in totals:
+                    domain = [
+                        ("company_id", "=", run.company_id.id),
+                        ("period_date", "in", months),
+                    ] + Charge._charge_state_domain(basis)
+                    grouped = Charge._read_group(domain, [], ["amount:sum"])
+                    totals[basis] = (grouped[0][0] or 0.0) if grouped else 0.0
+            run.total_posted = totals["posted"]
+            run.total_draft = totals["draft"]
+            run.total_period = totals["posted"] + totals["draft"] + (0.0 if run.move_id else run.total_cogs)
 
     @api.constrains("date_from", "date_to")
     def _check_period(self):
@@ -122,18 +228,30 @@ class LevisCogsRun(models.Model):
         return self.env["levis.cogs.charge"]._sold_quantities(self.company_id, warehouse, self.date_from, self.date_to)
 
     def _detail(self):
-        """Units awaiting COGS, per (sale month, warehouse, product).
+        """Every unit sold in the period, and what became of its cost.
 
-        Sales already charged by a receipt catch-up (``levis.cogs.charge``) are
-        subtracted here — without that, a month in which a late goods receipt
-        revealed a cost would be charged twice, once by the catch-up and once
-        by this run. The ledger is kept per sale MONTH, so a run covering only
-        part of a month subtracts that whole month's catch-up: partial-month
-        runs are not how this is operated, and over-subtracting is the safe
-        direction (cost deferred, never doubled).
+        One row per (sale month, warehouse, product), carrying the whole story
+        rather than only the leftover:
 
-        Returns a list of dicts, the raw material for both the aggregated run
-        lines and the ledger rows written when the entry is generated.
+        * ``sold_qty`` — units sold.
+        * ``posted_*`` — cost already in the general ledger: an earlier run, a
+          receipt catch-up, a POS session, or a journal the accountant wrote by
+          hand and ``126_seed_cogs_charge_manual.py`` registered.
+        * ``draft_*`` — cost that already has an entry, waiting to be posted.
+          Not booked again here: posting that entry is what recognises it, and
+          a second entry for the same units is the one unrecoverable mistake.
+        * ``void_*`` — rows whose entry was deleted or cancelled. Nothing ever
+          reached the ledger, so those units are charged again.
+        * ``quantity``/``amount`` — what this run will book.
+
+        The ledger is kept per sale MONTH, so a run covering only part of a
+        month subtracts that whole month's charges: partial-month runs are not
+        how this is operated, and over-subtracting is the safe direction (cost
+        deferred, never doubled).
+
+        Returns a list of dicts, the raw material for the aggregated run lines,
+        the ledger rows written when the entry is generated, and the columns
+        that let Finance see a month whole (sheet #79).
         """
         self.ensure_one()
         Charge = self.env["levis.cogs.charge"]
@@ -147,22 +265,30 @@ class LevisCogsRun(models.Model):
                 sold = Charge._sold_quantities(company, warehouse, month_start, month_end)
                 if not sold:
                     continue
-                charged = Charge._charged_quantities(company, warehouse, period_date)
+                charged = Charge._charged_breakdown(company, warehouse, period_date)
                 for product, qty in sold.items():
                     # Services and the non-merchandise items the retail import
                     # passes through (paper bags and the like) never sat in
                     # inventory, so they have no cost to release.
                     if not product.is_storable:
                         continue
-                    remaining = qty - charged.get(product, 0.0)
-                    if company.currency_id.is_zero(remaining):
-                        continue
+                    bucket = charged.get(product) or {}
+                    posted_qty = bucket.get("posted_qty", 0.0)
+                    draft_qty = bucket.get("draft_qty", 0.0)
+                    remaining = qty - posted_qty - draft_qty
                     cost = product.with_company(company).standard_price
                     rows.append(
                         {
                             "period_date": period_date,
                             "warehouse": warehouse,
                             "product": product,
+                            "sold_qty": qty,
+                            "posted_qty": posted_qty,
+                            "posted_amount": bucket.get("posted_amount", 0.0),
+                            "draft_qty": draft_qty,
+                            "draft_amount": bucket.get("draft_amount", 0.0),
+                            "void_qty": bucket.get("void_qty", 0.0),
+                            "void_amount": bucket.get("void_amount", 0.0),
                             "quantity": remaining,
                             "cost": cost,
                             "amount": remaining * cost if cost else 0.0,
@@ -173,7 +299,8 @@ class LevisCogsRun(models.Model):
     def _cogs_by_warehouse_category(self, detail=None):
         """Aggregate the detail into ``{(warehouse, category): bucket}``.
 
-        A bucket is ``{"qty", "amount", "zero_cost_qty"}``. Products still
+        A bucket carries what each basis holds — see :data:`_EMPTY_BUCKET`.
+        Products still
         without a cost are counted in ``zero_cost_qty`` rather than silently
         contributing zero — an understated COGS that nobody notices is worse
         than a visible gap.
@@ -184,7 +311,13 @@ class LevisCogsRun(models.Model):
         for row in detail if detail is not None else self._detail():
             categ = row["product"].categ_id.with_company(company)
             key = (row["warehouse"], categ)
-            bucket = result.setdefault(key, {"qty": 0.0, "amount": 0.0, "zero_cost_qty": 0.0})
+            bucket = result.setdefault(key, dict(_EMPTY_BUCKET))
+            bucket["sold_qty"] += row["sold_qty"]
+            bucket["posted_qty"] += row["posted_qty"]
+            bucket["posted_amount"] += row["posted_amount"]
+            bucket["draft_qty"] += row["draft_qty"]
+            bucket["draft_amount"] += row["draft_amount"]
+            bucket["void_qty"] += row["void_qty"]
             bucket["qty"] += row["quantity"]
             if not row["cost"]:
                 bucket["zero_cost_qty"] += row["quantity"]
@@ -280,6 +413,12 @@ class LevisCogsRun(models.Model):
                             "product_categ_id": categ.id,
                             "expense_account_id": categ.property_account_expense_categ_id.id,
                             "valuation_account_id": categ.property_stock_valuation_account_id.id,
+                            "sold_qty": bucket["sold_qty"],
+                            "posted_qty": bucket["posted_qty"],
+                            "posted_amount": bucket["posted_amount"],
+                            "draft_qty": bucket["draft_qty"],
+                            "draft_amount": bucket["draft_amount"],
+                            "void_qty": bucket["void_qty"],
                             "quantity": bucket["qty"],
                             "zero_cost_qty": bucket["zero_cost_qty"],
                             "amount": bucket["amount"],
@@ -348,8 +487,10 @@ class LevisCogsRun(models.Model):
         if not move_lines:
             raise UserError(
                 _(
-                    "Nothing to book — no costed sales in this period. If sales exist, "
-                    "their products still carry no cost; load the purchases first."
+                    "Nothing left to book for this period. Either every costed unit "
+                    "is already recognised — look at the Already in the GL and "
+                    "Waiting in a Draft Entry columns — or the products still carry "
+                    "no cost, in which case load the purchases first."
                 )
             )
         move = self.env["account.move"].create(
@@ -404,6 +545,132 @@ class LevisCogsRun(models.Model):
                 self.total_cogs,
             )
 
+    # ------------------------------------------------------------------
+    # Closing the month in one button
+    # ------------------------------------------------------------------
+    def _period_draft_entries(self):
+        """Draft entries that already carry cost of this run's period.
+
+        Returns ``(catchups, own_moves, foreign_moves)``. Own entries are the
+        ones this module wrote — a receipt catch-up or an earlier run — and may
+        be posted from here. Foreign ones, typically a journal the accountant
+        wrote by hand (``GLJV/2026/08/0021``, Rp 531 m, reset to draft on
+        28-Sep-2026), are named and left alone: an entry somebody else is still
+        working on is not this button's business, and posting it silently would
+        be worse than saying so.
+        """
+        self.ensure_one()
+        Charge = self.env["levis.cogs.charge"]
+        months = Charge._months_between(self.date_from, self.date_to)
+        charges = Charge.search(
+            [
+                ("company_id", "=", self.company_id.id),
+                ("period_date", "in", months),
+                ("move_id.state", "=", "draft"),
+            ]
+        )
+        moves = charges.mapped("move_id")
+        if not moves:
+            empty = self.env["account.move"]
+            return self.env["levis.cogs.catchup"], empty, empty
+        catchups = self.env["levis.cogs.catchup"].search([("move_id", "in", moves.ids)])
+        runs = self.search([("move_id", "in", moves.ids)])
+        own = catchups.mapped("move_id") | runs.mapped("move_id")
+        return catchups, own - catchups.mapped("move_id"), moves - own
+
+    def _post_move(self, move):
+        """Post one entry on its own savepoint; return the error, or ``None``.
+
+        A lock date or a missing account on one entry must not take the rest of
+        the month down with it — the same contract as
+        ``levis.cogs.catchup._try_post``.
+        """
+        try:
+            with self.env.cr.savepoint():
+                move._post(soft=False)
+        except Exception as error:  # noqa: BLE001 - reported, never re-raised
+            _logger.warning("COGS run %s could not post %s: %s", self.name, move.name or move.id, error)
+            return str(error)
+        return None
+
+    def action_post_period(self):
+        """Close the period: post what already has an entry, book only the rest.
+
+        This is the one button Finance asked for. What it does NOT do is the
+        point: a unit whose cost already sits in a draft entry is never booked
+        again here — that entry is posted instead. Writing a second entry for it
+        is the one unrecoverable mistake in this model, and it nearly happened
+        to August 2026 twice (Rp 528 m from the catch-up, Rp 531 m by hand).
+
+        Always recomputes before generating. A run computed an hour ago and
+        generated now books what was true an hour ago: on 30-Sep-2026 that gap
+        was Rp 277.894.842,45 between the figure on the screen and the figure
+        that reached the ledger.
+        """
+        self.ensure_one()
+        currency = self.company_id.currency_id
+        notes = []
+        catchups, own_moves, foreign_moves = self._period_draft_entries()
+
+        posted = catchups._try_post()
+        if posted:
+            notes.append(_("%s catch-up entry/entries posted.", len(posted)))
+        for record in catchups - posted:
+            notes.append(_("%(name)s stays draft: %(error)s", name=record.name, error=record.post_error or "?"))
+        for move in own_moves.filtered(lambda m: m.state == "draft"):
+            error = self._post_move(move)
+            notes.append(
+                _("%(name)s stays draft: %(error)s", name=move.name or "/", error=error)
+                if error
+                else _("%s posted.", move.name or "/")
+            )
+        if foreign_moves:
+            notes.append(
+                _(
+                    "Left alone because this module did not write them: %(names)s. "
+                    "They already carry cost of this period, so nothing was booked "
+                    "for those units — post them yourself to complete the month.",
+                    names=", ".join(move.name or "/" for move in foreign_moves),
+                )
+            )
+
+        if self.move_id:
+            if self.move_id.state == "draft":
+                error = self._post_move(self.move_id)
+                notes.append(
+                    _("%(name)s stays draft: %(error)s", name=self.move_id.name or "/", error=error)
+                    if error
+                    else _("%s posted.", self.move_id.name or "/")
+                )
+        else:
+            self.action_compute()
+            if any(not float_is_zero(line.amount, precision_rounding=currency.rounding) for line in self.line_ids):
+                self.action_generate_move()
+                error = self._post_move(self.move_id)
+                notes.append(
+                    _(
+                        "%(name)s booked %(amount)s and stays draft: %(error)s",
+                        name=self.move_id.name or "/",
+                        amount=self.total_cogs,
+                        error=error,
+                    )
+                    if error
+                    else _("Booked %(amount)s for the units nothing had recognised yet.", amount=self.total_cogs)
+                )
+            else:
+                notes.append(_("Nothing left to book — every costed unit of this period is accounted for."))
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "type": "success",
+                "sticky": True,
+                "title": _("Period closed: %s", self.name),
+                "message": "\n".join(notes),
+            },
+        }
+
     def action_view_move(self):
         self.ensure_one()
         return {
@@ -427,6 +694,18 @@ class LevisCogsRunLine(models.Model):
     product_categ_id = fields.Many2one("product.category", required=True)
     expense_account_id = fields.Many2one("account.account", string="COGS Account")
     valuation_account_id = fields.Many2one("account.account", string="Inventory Account")
-    quantity = fields.Float(digits="Product Unit of Measure")
+    sold_qty = fields.Float(digits="Product Unit of Measure", string="Sold")
+    posted_qty = fields.Float(digits="Product Unit of Measure", string="Qty in the GL")
+    posted_amount = fields.Monetary(currency_field="currency_id", string="Already in the GL")
+    draft_qty = fields.Float(digits="Product Unit of Measure", string="Qty in a Draft Entry")
+    draft_amount = fields.Monetary(currency_field="currency_id", string="Waiting in a Draft Entry")
+    void_qty = fields.Float(
+        digits="Product Unit of Measure",
+        string="Qty Whose Entry Is Gone",
+        help="Units that carry a charge row whose journal entry was deleted or "
+        "cancelled. Nothing reached the general ledger, so they are counted in "
+        "the amount to book again.",
+    )
+    quantity = fields.Float(digits="Product Unit of Measure", string="To Book (Qty)")
     zero_cost_qty = fields.Float(digits="Product Unit of Measure", string="Qty Without Cost")
     amount = fields.Monetary(currency_field="currency_id", string="COGS")
