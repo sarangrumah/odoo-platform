@@ -226,17 +226,26 @@ class LevisCogsCharge(models.Model):
         ]
         if products is not None:
             domain.append(("product_id", "in", products.ids))
+        return self._charge_state_domain(basis) + domain
+
+    @api.model
+    def _charge_state_domain(self, basis):
+        """Just the ``basis`` half of :meth:`_charge_domain`.
+
+        Separate because the periodic run asks the same question of a whole
+        period rather than of one (warehouse, month) cell.
+        """
         if basis == "live":
-            domain.append(("move_id.state", "in", _LIVE_MOVE_STATES))
-        elif basis in ("posted", "draft"):
-            domain.append(("move_id.state", "=", basis))
-        elif basis == "void":
+            return [("move_id.state", "in", _LIVE_MOVE_STATES)]
+        if basis in ("posted", "draft"):
+            return [("move_id.state", "=", basis)]
+        if basis == "void":
             # A NULL many2one matches no dotted leaf, so the two cases have to
             # be spelled out side by side.
-            domain = ["|", ("move_id", "=", False), ("move_id.state", "=", "cancel")] + domain
-        elif basis != "all":
-            raise ValueError("unknown charge basis %r" % basis)
-        return domain
+            return ["|", ("move_id", "=", False), ("move_id.state", "=", "cancel")]
+        if basis == "all":
+            return []
+        raise ValueError("unknown charge basis %r" % basis)
 
     @api.model
     def _charged_quantities(self, company, warehouse, period_date, products=None, basis="live"):

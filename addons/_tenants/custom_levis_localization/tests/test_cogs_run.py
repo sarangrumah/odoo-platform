@@ -451,3 +451,27 @@ class TestCogsRun(AccountTestInvoicingCommon):
         self.assertEqual(run.period_move_count, 3)
         self.assertIn(run.move_id, run.period_move_ids)
         self.assertEqual(run.move_id.levis_cogs_amount, 200.0)
+
+    def test_17_a_generated_run_reads_the_ledger_not_its_own_old_lines(self):
+        """The footer must not say "to book" about cost it already booked.
+
+        `COGS/2026/0002` is posted, and its lines still hold the figures of the
+        July it was computed in. Reading the totals off those lines made the
+        screen claim Rp 12,03 bn was still waiting to be booked.
+        """
+        self._sell(self.config1, [(self.jeans, 5)])
+        run = self._run()
+        run.action_generate_move()
+        self.assertEqual(run.total_cogs, 500.0)  # what it booked, from its lines
+
+        # Still draft: recognised by nothing yet.
+        self.assertEqual(run.total_posted, 0.0)
+        self.assertEqual(run.total_draft, 500.0)
+        # Its own cost is in the ledger now, so the period is 500, not 1000.
+        self.assertEqual(run.total_period, 500.0)
+
+        run.move_id._post(soft=False)
+        run.invalidate_recordset()
+        self.assertEqual(run.total_posted, 500.0)
+        self.assertEqual(run.total_draft, 0.0)
+        self.assertEqual(run.total_period, 500.0)

@@ -93,31 +93,32 @@ class LevisCogsRun(models.Model):
     total_cogs = fields.Monetary(
         compute="_compute_totals",
         currency_field="currency_id",
-        string="To Book",
-        help="What this run will book: the units of the period whose cost has not been recognised anywhere yet.",
+        string="This Run's Entry",
+        help="The sum of the lines below: what this run will book once "
+        "generated, or what it did book if it already was.",
     )
     total_posted = fields.Monetary(
-        compute="_compute_totals",
+        compute="_compute_period_totals",
         currency_field="currency_id",
         string="Already in the GL",
-        help="Cost of this period already recognised by a posted entry — an "
-        "earlier run, a receipt catch-up, a POS session, or a journal the "
-        "accountant wrote by hand.",
+        help="Cost of this period recognised by a POSTED entry, read off the "
+        "charge ledger right now — an earlier run, a receipt catch-up, a POS "
+        "session, or a journal the accountant wrote by hand.",
     )
     total_draft = fields.Monetary(
-        compute="_compute_totals",
+        compute="_compute_period_totals",
         currency_field="currency_id",
         string="Waiting in a Draft Entry",
-        help="Cost of this period that already has a journal entry which is "
-        "still draft. Posting that entry recognises it; this run deliberately "
-        "does not book it a second time.",
+        help="Cost of this period that has a journal entry which is still "
+        "draft, so it is NOT in the general ledger yet. Posting that entry "
+        "recognises it; a run never books it a second time.",
     )
     total_period = fields.Monetary(
-        compute="_compute_totals",
+        compute="_compute_period_totals",
         currency_field="currency_id",
         string="COGS of the Period",
-        help="Already in the GL + waiting in a draft entry + to book. The whole "
-        "month, whichever mechanism recognised each part.",
+        help="Already in the GL + waiting in a draft entry + what is still to "
+        "book. The whole month, whichever mechanism recognised each part.",
     )
     zero_cost_qty = fields.Float(
         compute="_compute_totals",
@@ -166,19 +167,40 @@ class LevisCogsRun(models.Model):
             run.period_move_count = len(moves)
             run.period_draft_move_count = len(moves.filtered(lambda move: move.state == "draft"))
 
-    @api.depends(
-        "line_ids.amount",
-        "line_ids.zero_cost_qty",
-        "line_ids.posted_amount",
-        "line_ids.draft_amount",
-    )
+    @api.depends("line_ids.amount", "line_ids.zero_cost_qty")
     def _compute_totals(self):
         for run in self:
             run.total_cogs = sum(run.line_ids.mapped("amount"))
             run.zero_cost_qty = sum(run.line_ids.mapped("zero_cost_qty"))
-            run.total_posted = sum(run.line_ids.mapped("posted_amount"))
-            run.total_draft = sum(run.line_ids.mapped("draft_amount"))
-            run.total_period = run.total_posted + run.total_draft + run.total_cogs
+
+    @api.depends("company_id", "date_from", "date_to", "move_id", "line_ids.amount")
+    def _compute_period_totals(self):
+        """What the period already carries, read off the ledger, not the lines.
+
+        The line columns are a snapshot of the moment Compute ran, which is
+        exactly right while a run is being prepared and exactly wrong once it is
+        generated: `COGS/2026/0002` is posted, yet its lines still say
+        "Rp 12,03 bn to book" because that is what they said in July. Finance
+        reads the footer, so the footer asks the ledger every time.
+
+        A generated run's own cost is in the ledger by then, so it must not be
+        counted a second time in the period total.
+        """
+        Charge = self.env["levis.cogs.charge"]
+        for run in self:
+            totals = {"posted": 0.0, "draft": 0.0}
+            if run.date_from and run.date_to:
+                months = Charge._months_between(run.date_from, run.date_to)
+                for basis in totals:
+                    domain = [
+                        ("company_id", "=", run.company_id.id),
+                        ("period_date", "in", months),
+                    ] + Charge._charge_state_domain(basis)
+                    grouped = Charge._read_group(domain, [], ["amount:sum"])
+                    totals[basis] = (grouped[0][0] or 0.0) if grouped else 0.0
+            run.total_posted = totals["posted"]
+            run.total_draft = totals["draft"]
+            run.total_period = totals["posted"] + totals["draft"] + (0.0 if run.move_id else run.total_cogs)
 
     @api.constrains("date_from", "date_to")
     def _check_period(self):

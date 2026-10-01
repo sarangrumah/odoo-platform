@@ -2030,3 +2030,24 @@ than one). They are read off the charge ledger, not the journal items, because
 that is the grain that matters — units, per sale month, per mechanism — and
 because a manual journal has no product lines at all: `GLJV/2026/08/0021` is
 32 lines for 904 units with no product named anywhere.
+
+### The footer asks the ledger; the lines are a snapshot
+
+`19.0.1.66.0`, found by reading the real screen on `prd_levis_begbal` rather
+than a fixture. The line columns are a snapshot of the moment Compute ran —
+right while a run is being prepared, wrong the moment it is generated, because
+`action_compute()` refuses to touch a run that has an entry. `COGS/2026/0002`
+is posted and its lines still hold July's figures, so a footer built from them
+announced **"To Book Rp 12.033.584.690,77"** about cost that had been in the
+general ledger since July, next to "Waiting Rp 0" and "1 draft entry".
+
+So `total_posted` / `total_draft` / `total_period` moved to
+`_compute_period_totals`, which asks `levis.cogs.charge` through
+`_charge_state_domain()` every time the record is read. `total_period` adds
+`total_cogs` only while the run has no entry of its own — once generated, that
+cost is in the ledger and counting the lines again would double it.
+
+`total_cogs` keeps its name and changes its label with the state: *To Book*
+while it is a proposal, *Booked by This Run* once it is a fact. The per-line
+snapshot columns are hidden on a generated run (`column_invisible`) rather than
+explained, because they were never computed for the runs that predate them.

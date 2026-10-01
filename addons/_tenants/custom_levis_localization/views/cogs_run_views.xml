@@ -72,12 +72,18 @@
                             <field name="product_categ_id"/>
                             <field name="expense_account_id"/>
                             <field name="valuation_account_id"/>
-                            <field name="sold_qty" sum="Sold"/>
-                            <field name="posted_qty" sum="Qty in GL" optional="hide"/>
-                            <field name="posted_amount" sum="Already in the GL"/>
-                            <field name="draft_qty" sum="Qty in draft" optional="hide"/>
-                            <field name="draft_amount" sum="Waiting in a draft entry"/>
-                            <field name="void_qty" sum="Entry gone" optional="hide"/>
+                            <field name="sold_qty" sum="Sold"
+                                   column_invisible="parent.state == 'generated'"/>
+                            <field name="posted_qty" sum="Qty in GL" optional="hide"
+                                   column_invisible="parent.state == 'generated'"/>
+                            <field name="posted_amount" sum="Already in the GL"
+                                   column_invisible="parent.state == 'generated'"/>
+                            <field name="draft_qty" sum="Qty in draft" optional="hide"
+                                   column_invisible="parent.state == 'generated'"/>
+                            <field name="draft_amount" sum="Waiting in a draft entry"
+                                   column_invisible="parent.state == 'generated'"/>
+                            <field name="void_qty" sum="Entry gone" optional="hide"
+                                   column_invisible="parent.state == 'generated'"/>
                             <field name="quantity" sum="Qty"/>
                             <field name="zero_cost_qty" sum="Qty w/o cost"/>
                             <field name="amount" sum="COGS"/>
@@ -115,7 +121,12 @@
                     <group class="oe_subtotal_footer oe_right">
                         <field name="total_posted" widget="monetary"/>
                         <field name="total_draft" widget="monetary"/>
-                        <field name="total_cogs" widget="monetary"/>
+                        <field name="total_cogs" widget="monetary"
+                               string="To Book"
+                               invisible="state == 'generated'"/>
+                        <field name="total_cogs" widget="monetary"
+                               string="Booked by This Run"
+                               invisible="state != 'generated'"/>
                         <field name="total_period" widget="monetary"
                                class="oe_subtotal_footer_separator"/>
                     </group>
@@ -134,8 +145,8 @@
                 <field name="date_to"/>
                 <field name="total_posted" sum="In the GL" optional="show"/>
                 <field name="total_draft" sum="In a draft entry" optional="show"/>
-                <field name="total_cogs" sum="To book"/>
-                <field name="total_period" sum="COGS of the period" optional="hide"/>
+                <field name="total_cogs" sum="This run's entry"/>
+                <field name="total_period" sum="COGS of the period" optional="show"/>
                 <field name="state"
                        decoration-success="state == 'generated'"
                        decoration-info="state == 'computed'"
